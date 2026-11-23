@@ -584,9 +584,9 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 40 分鐘 · 最多 67 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
-  assert.ok(all.includes('只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。'));
-  assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
+  assert.ok(all.includes('3 張卡 · 約 40 分鐘 · 約 67 次 AI 呼叫'), all.join('|'));
+  assert.ok(all.includes('AI 會企劃、寫作、找圖、校對每一章；企劃好後停下來讓你看方向。'), 'one intro sentence holds the old promise lines');
+  assert.ok(!all.some(x => /只會停一次|重跑那一章|前言 \+|會先停下/.test(x)), 'no promise lines, no breakdown, no pause note');
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
   const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
   assert.equal(areas.length, 6);
@@ -598,12 +598,12 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   for (const select of selects) assert.ok(shown(select), 'the four dropdowns are always shown');
   assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-models-change')), undefined, 'no change link');
   assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
-  // DOM order: intro, estimate, models, stops, settings.
+  // DOM order: intro, estimate, models, settings.
   const order = dom.findAll(modal.modalEl, () => true);
   const at = pred => order.findIndex(pred);
   const iIntro = at(i => i.cls.includes('vam-modal-intro')), iEst = at(i => i.cls.includes('vam-book-start-estimate'));
-  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iStops = at(i => i.cls.includes('vam-book-start-stops')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
-  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iStops && iStops < iSettings, [iIntro, iEst, iModels, iStops, iSettings].join(','));
+  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iSettings, [iIntro, iEst, iModels, iSettings].join(','));
   void s;
   assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
   cardButton(modal, '取消').click();
@@ -619,12 +619,12 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', 'AI 校對（和作者不同）']);
   assert.deepEqual(selects[1].children.map(o => o.optionValue), ['claude:sonnet', 'claude:opus', 'claude:haiku']);
   assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
-  const before = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
+  const before = texts(modal.modalEl).find(x => x.startsWith('3 張卡 · '));
   selects[1].value = 'claude:sonnet'; selects[1].change();
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
-  const after = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
-  assert.match(before, /最多 67 次/); assert.match(after, /最多 67 次/);
+  const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡 · '));
+  assert.match(before, /約 67 次/); assert.match(after, /約 67 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
@@ -687,7 +687,7 @@ test('suggestions: one call on the picture model\'s entry with only the root tit
     assert.ok(area.hasClass('vam-book-start-suggested'));
     assert.ok(shown(area));
   }
-  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), 'the waiting line is gone');
+  assert.ok(!texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'), 'the waiting line is gone');
   // The grey italic look is real CSS on the placeholder (computed look: checked live).
   assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--text-muted\)/);
   modal.close();
@@ -698,10 +698,10 @@ test('suggestions: failure, a timeout (20 s) and a late answer leave the fields 
   let h = await harness({ book: false });
   const failing = pending(); h.ctl.impl = () => failing.promise;
   let modal = await openCard(h);
-  assert.ok(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  assert.ok(texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'));
   failing.reject(new Error('boom')); await dom.tick(); await dom.tick();
   assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定');
-  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  assert.ok(!texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'));
   cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
   assert.equal((await h.plugin.repo.readNote(rootPath(h))).bookSettings, undefined, 'nothing written');
@@ -772,7 +772,7 @@ test('suggestions: a root with all six fields filled opens the card with no call
   const modal = await openCard(h);
   await dom.tick(); await dom.tick();
   assert.equal(h.ctl.calls.length, 0);
-  assert.equal(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), false);
+  assert.equal(texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'), false);
 });
 
 test('suggestions: the patch helper keeps typed text over a suggestion and ignores suggestions for a cleared prefilled field', () => {
@@ -813,10 +813,34 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
   assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 55 分鐘 · 最多 307 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 55 分鐘 · 約 307 次 AI 呼叫');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 55 minutes · up to 307 AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at 300).");
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 55 minutes · about 307 AI calls");
   lang('zh-TW');
+});
+
+test('start card (2026-11-23 mockup 10, 11): an ⓘ beside each model label explains its step (focusable, aria-label, tooltip); while the suggestions load a spinner shows beside the line and the fields shimmer, both gone when they arrive', async () => {
+  const h = await harness({ book: false });
+  const answer = pending(); h.ctl.impl = () => answer.promise;
+  const modal = await openCard(h);
+  const infos = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-info'));
+  assert.equal(infos.length, 4);
+  assert.deepEqual(infos.map(i => i.attrs['aria-label']), ['ui.book_start_tip_plan', 'ui.book_start_tip_write', 'ui.book_start_tip_images', 'ui.book_start_tip_proof'].map(k => tr(k)));
+  assert.ok(infos[0].attrs['aria-label'].startsWith('讀整張心智圖'));
+  for (const info of infos) assert.equal(info.attrs.tabindex, '0', 'reachable by keyboard');
+  const settings = dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(settings.hasClass('is-loading'));
+  assert.ok(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-spinner')));
+  answer.resolve(SUGGEST); await dom.tick(); await dom.tick(); await dom.tick();
+  assert.ok(!settings.hasClass('is-loading'), 'the shimmer stops when the suggestions arrive');
+  assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-spinner')), undefined);
+  assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader);
+  // Motion is CSS, with Obsidian variables, and stops for reduced motion.
+  assert.match(css, /\.vam-book-start-spinner \{[^}]*border-top-color: var\(--interactive-accent\)[^}]*animation: vam-book-start-spin/);
+  assert.match(css, /\.is-loading \.vam-book-start-field-wrap:has\(\.vam-book-start-field:placeholder-shown\)::after \{[^}]*animation: vam-book-start-shimmer/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.vam-book-start-spinner, [^}]*animation: none; \}/);
+  assert.doesNotMatch(css, /\.vam-book-start-estimate \{[^}]*font-weight/, 'the cost line is not bold');
+  modal.close();
 });
 
 test('start card: Start without touching the fields writes nothing to the root topic and starts once, even when pressed twice; the map file is not touched', async () => {
@@ -1864,15 +1888,15 @@ test('P4 gate words: the plan review counts, buttons and progress use the new st
   assert.equal(drawStruct(gateData(), progress({ phase: 'gate1', active: false, total: 5 }), undefined).state.structure, undefined);
 });
 
-test('P4 words in en and zh-CN; the start dialog line names preface + chapters + sections and omits 0 sections; card menu line', () => {
-  const est = start => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4), start);
+test('P4 words in en and zh-CN; the start dialog line is the card count, time and calls only (no preface/chapter/section breakdown, 2026-11-23); card menu line', () => {
+  const est = () => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4));
   lang('zh-TW');
-  assert.match(est({ chapters: 3, sections: 6 }), /^前言 \+ 3 章 \+ 6 節（10 張卡）· 約 .+ · 最多 207 次 AI 呼叫（含 AI 校對、自動修正和封面圖/);
-  assert.match(est({ chapters: 3, sections: 0 }), /^前言 \+ 3 章（10 張卡）· 約 /);
-  assert.doesNotMatch(est({ chapters: 3, sections: 0 }), /0 節/);
-  assert.match(est(undefined), /^10 張卡 · 約/);
+  assert.match(est(), /^10 張卡 · 約 \d+ 分鐘 · 約 207 次 AI 呼叫$/);
   lang('en');
-  assert.match(est({ chapters: 3, sections: 6 }), /^Preface \+ 3 chapters \+ 6 sections \(10 cards\)/);
+  assert.match(est(), /^10 cards · about \d+ minutes · about 207 AI calls$/);
+  lang('zh-CN');
+  assert.match(est(), /^10 张卡 · 约 \d+ 分钟 · 约 207 次 AI 调用$/);
+  lang('en');
   assert.equal(tr('ui.book_bar_plan_ready_struct_0_1', 3, 6), 'The preface, 3 chapters and 6 sections are planned');
   assert.equal(tr('ui.book_bar_open_plan'), 'Open the whole-book summary');
   lang('zh-CN');

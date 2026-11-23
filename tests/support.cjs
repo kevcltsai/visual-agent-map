@@ -90,7 +90,7 @@ function cachedParseYaml(text) {
   yamlMemo.set(text, structuredClone(parsed));
   return parsed;
 }
-const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu: class { addItem(callback) { callback({ setTitle() { return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick() { return this; } }); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } },
+const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, setTooltip() {}, displayTooltip() {}, Menu: class { addItem(callback) { callback({ setTitle() { return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick() { return this; } }); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } },
   Scope: class { constructor(parent) { this.parent = parent; this.keys = []; } register(modifiers, key, func) { const handler = { modifiers, key, func }; this.keys.push(handler); return handler; } unregister(handler) { this.keys = this.keys.filter(item => item !== handler); } },
   TFile, TFolder, App: class {}, Plugin: class {}, ItemView: class { constructor(leaf) { this.app = leaf.app; } async setState() {} }, PluginSettingTab: class {}, Modal: class {}, FuzzySuggestModal: class {}, Notice: class {}, FileSystemAdapter: class { getBasePath() { return '/vault'; } },
   normalizePath: value => value.replace(/\/+/g, '/').replace(/^\//, ''),

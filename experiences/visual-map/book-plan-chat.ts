@@ -18,7 +18,7 @@ import {
   writePlanEdits,
   type PlanEditNote
 } from "../../core/book-pipeline/plan-edit";
-import { bodyStateRaw, isKeptRaw, pipelineWroteRaw } from "../../core/book-pipeline/body-integrity";
+import { readerSummaryRaw } from "../../core/book-pipeline/body-integrity";
 import { parseBookPlanBody, parseBookPlanDecisions, replaceBookPlanThread } from "../../core/book-pipeline/plan-text";
 import {
   chatStructureOps,
@@ -201,12 +201,7 @@ export async function applyBookPlanEdit(
     if (!plan.unlocked.includes(change.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change.id);
     // The reader's own Summary (a kept chapter, a card the pipeline never wrote that has text, or one changed since the proposal)
     // stays when the covers change.
-    if (
-      now.summary !== (proposed.summary ?? "") ||
-      (isKeptRaw(now.raw) && bodyStateRaw(now.raw) !== "clean") ||
-      (bodyStateRaw(now.raw) === "unknown" && !pipelineWroteRaw(now.raw))
-    )
-      ownSummary.add(change.id);
+    if (now.summary !== (proposed.summary ?? "") || readerSummaryRaw(now.raw)) ownSummary.add(change.id);
   }
   const done = await writePlanEdits(
     {

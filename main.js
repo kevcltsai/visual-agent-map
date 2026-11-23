@@ -29972,6 +29972,19 @@ var integrityFpRaw = (raw) => {
   var _a2;
   return integrityFp((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
 };
+function mayRewriteRaw(raw, allow = {}) {
+  const state = bodyStateRaw(raw);
+  if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || allow.rerun)) return true;
+  return !!allow.permit && allow.permit === integrityFpRaw(raw);
+}
+function readerSummaryRaw(raw) {
+  const state = bodyStateRaw(raw);
+  return isKeptRaw(raw) && state !== "clean" || state === "unknown" && !pipelineWroteRaw(raw);
+}
+var keepVoided = (detail) => {
+  var _a2;
+  return !!((_a2 = readBodyRecord(detail)) == null ? void 0 : _a2.kept) && !isKept(detail);
+};
 
 // experiences/visual-map/merge-topics.ts
 function readingOrder2(nodes) {
@@ -52076,9 +52089,7 @@ function neighbourPosition(structure2, ownId, otherId) {
 }
 var coversText = (summary) => isPlaceholder(summary.trim()) ? "" : summary;
 function planLockedRaw(raw, prompt) {
-  const state = bodyStateRaw(raw);
-  const open2 = (state === "clean" || state === "empty") && !isKeptRaw(raw);
-  return !open2 || !readBrief(prompt).covers;
+  return !mayRewriteRaw(raw) || !readBrief(prompt).covers;
 }
 function planEditCardOf(id, place, role, title, prompt, locked) {
   const brief = readBrief(prompt);
@@ -58261,11 +58272,10 @@ var BookPipelineRuns = class {
                 if (!(slot == null ? void 0 : slot.again) || slot.done || !live2()) break;
                 await this.aiChapter(drive, id, slot.step, true, true);
                 const written2 = chaptersKey !== void 0 ? await this.ports.readCard((_d = (_c = drive.cards.get(id)) == null ? void 0 : _c.path) != null ? _d : "").catch(() => void 0) : void 0;
-                const state = written2 ? bodyStateRaw(written2.raw) : void 0;
-                const mine = !!written2 && (state === "clean" || state === "empty") && !isKeptRaw(written2.raw);
+                const mine = !!written2 && mayRewriteRaw(written2.raw);
                 const after = mine ? await bookKey() : void 0;
                 if (chaptersKey !== void 0 && after !== void 0 && after !== chaptersKey) {
-                  const rekeyed = await drive.store.commit((state2) => rekeyBookProof(state2, chaptersKey, after)).catch(() => void 0);
+                  const rekeyed = await drive.store.commit((state) => rekeyBookProof(state, chaptersKey, after)).catch(() => void 0);
                   if (rekeyed == null ? void 0 : rekeyed.accepted) chaptersKey = after;
                 }
               }
@@ -59640,18 +59650,17 @@ var BookPipelineRuns = class {
           };
         });
         const done2 = await drive.store.commit(
-          (state2) => applyAiProof(state2, token, { checked: review.checks.length, pending: pending2, open: open2 })
+          (state) => applyAiProof(state, token, { checked: review.checks.length, pending: pending2, open: open2 })
         );
         if (!(done2 == null ? void 0 : done2.accepted)) {
-          await drive.store.commit((state2) => applyAiStopped(state2, token, false));
+          await drive.store.commit((state) => applyAiStopped(state, token, false));
           return report("dropped");
         }
         return report("ok", { checked: review.checks.length, pending: pending2.length, open: open2.length });
       }
       const targets = (_d = same2 == null ? void 0 : same2.pending) != null ? _d : [];
       const raw = card.raw;
-      const state = bodyStateRaw(raw);
-      if (state !== "clean" && state !== "empty" || isKeptRaw(raw)) {
+      if (!mayRewriteRaw(raw)) {
         const refused2 = Object.fromEntries(targets.map((target) => [target.id, "hand_edited"]));
         const done2 = await drive.store.commit(
           (current) => applyAiFix(current, token, { applied: 0, appliedIds: [], refused: refused2 })
@@ -59881,8 +59890,7 @@ var BookPipelineRuns = class {
         });
         if (!mine.length) continue;
         const chapter = chapters[at];
-        const state = bodyStateRaw(chapter.raw);
-        if (state !== "clean" && state !== "empty" || isKeptRaw(chapter.raw)) {
+        if (!mayRewriteRaw(chapter.raw)) {
           for (const target of mine) refused[target.id] = "hand_edited";
           continue;
         }
@@ -60544,10 +60552,11 @@ var BookPipelineRuns = class {
    */
   mayOverwriteCard(drive, nodeId, raw) {
     var _a2;
-    const state = bodyStateRaw(raw);
-    if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || ((_a2 = drive.rerun) == null ? void 0 : _a2.nodeId) === nodeId)) return true;
     const permit = drive.overwrite.get(nodeId);
-    return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+    return mayRewriteRaw(raw, {
+      rerun: ((_a2 = drive.rerun) == null ? void 0 : _a2.nodeId) === nodeId,
+      permit: (permit == null ? void 0 : permit.runId) === drive.store.state.runId ? permit.fingerprint : void 0
+    });
   }
   async execPlan(drive, token, nodeId) {
     var _a2, _b2, _c, _d, _e;
@@ -60556,8 +60565,7 @@ var BookPipelineRuns = class {
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
-    if (isKeptRaw(card.raw) && bodyStateRaw(card.raw) !== "clean" || bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
-      drive.ownSummary.add(nodeId);
+    if (readerSummaryRaw(card.raw)) drive.ownSummary.add(nodeId);
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
       drive.planSkipped.add(nodeId);
@@ -62991,8 +62999,7 @@ async function applyBookPlanEdit(deps, action, baseline) {
     const now = await deps.readCard(path);
     seen.set(change2.id, { prompt: proposed.prompt, kind: proposed.kind, title: now.title });
     if (!plan.unlocked.includes(change2.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change2.id);
-    if (now.summary !== ((_a2 = proposed.summary) != null ? _a2 : "") || isKeptRaw(now.raw) && bodyStateRaw(now.raw) !== "clean" || bodyStateRaw(now.raw) === "unknown" && !pipelineWroteRaw(now.raw))
-      ownSummary.add(change2.id);
+    if (now.summary !== ((_a2 = proposed.summary) != null ? _a2 : "") || readerSummaryRaw(now.raw)) ownSummary.add(change2.id);
   }
   const done = await writePlanEdits(
     {
@@ -63202,7 +63209,7 @@ function seamFromOf(seam, order, at, titleOf) {
 }
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
@@ -63212,17 +63219,17 @@ function gate2Cards(input2) {
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
     const kept = isKept((_b2 = note == null ? void 0 : note.detail) != null ? _b2 : "");
     const record = readBodyRecord((_c = note == null ? void 0 : note.detail) != null ? _c : "");
-    const keptVoided = !kept && !!(record == null ? void 0 : record.kept);
+    const keptVoided = keepVoided((_d = note == null ? void 0 : note.detail) != null ? _d : "");
     const handEdited = keptVoided || view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue2.trim());
-    const beforeBook = handEdited && !(record == null ? void 0 : record.fp) && !hasHiddenCallout((_d = note == null ? void 0 : note.detail) != null ? _d : "");
+    const beforeBook = handEdited && !(record == null ? void 0 : record.fp) && !hasHiddenCallout((_e = note == null ? void 0 : note.detail) != null ? _e : "");
     const stale = !kept && !!input2.proofContext && proofIsStale(
-      { prompt: (_e = note == null ? void 0 : note.prompt) != null ? _e : "", detail: (_f = note == null ? void 0 : note.detail) != null ? _f : "" },
+      { prompt: (_f = note == null ? void 0 : note.prompt) != null ? _f : "", detail: (_g = note == null ? void 0 : note.detail) != null ? _g : "" },
       view.stage,
       id,
       input2.proofContext.runId,
       input2.proofContext.revisionOf(id)
     );
-    const inconsistencies = (kept ? [] : (_h = (_g = input2.inconsistencies) == null ? void 0 : _g.call(input2, id)) != null ? _h : []).map((item) => ({
+    const inconsistencies = (kept ? [] : (_i = (_h = input2.inconsistencies) == null ? void 0 : _h.call(input2, id)) != null ? _i : []).map((item) => ({
       ...item,
       otherTitle: input2.titleOf(item.other)
     }));
@@ -63235,11 +63242,11 @@ function gate2Cards(input2) {
       ...role ? { role } : {},
       ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof), failureLines: reasonLinesOf(issue2, proof) } : {},
       structureUnmet: checked2 && structure2 && !kept ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
-      factsOpen: checked2 && !kept ? ((_i = proof == null ? void 0 : proof.items) != null ? _i : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      factsOpen: checked2 && !kept ? ((_j = proof == null ? void 0 : proof.items) != null ? _j : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam,
       ...view.seam ? seamFromOf(note == null ? void 0 : note.pipelineSeam, input2.order, at, input2.titleOf) : {},
-      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_j = note == null ? void 0 : note.detail) != null ? _j : "") } : {},
+      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_k = note == null ? void 0 : note.detail) != null ? _k : "") } : {},
       ...beforeBook ? { handBeforeBook: true } : {},
       ...stale ? { proofStale: true } : {},
       ...inconsistencies.length ? { inconsistencies } : {},
@@ -87172,8 +87179,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const file = this.app.vault.getAbstractFileByPath(node.path);
       const raw = file instanceof import_obsidian39.TFile ? await this.app.vault.read(file).catch(() => null) : null;
       if (raw !== null) {
-        const state = bodyStateRaw(raw);
-        if (state !== "clean" && state !== "empty" || isKeptRaw(raw)) {
+        if (!mayRewriteRaw(raw)) {
           this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
           this.bookBarFocus = "rerun-go";
           return;
@@ -100996,7 +101002,7 @@ var BookHandEdits = class {
   }
   /** A save of a chapter note: when its rewrite box is ticked, carry the rewrite out (or queue it). */
   async tick(mapPath, nodeId) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     if (this.disposed) return;
     try {
       const map = await this.ports.readMap(mapPath);
@@ -101004,7 +101010,7 @@ var BookHandEdits = class {
       const node = map.nodes.find((item) => item.id === nodeId);
       if (read.kind !== "usable" || !node || !effectiveOrder(read.data).includes(nodeId)) return;
       const card = await this.ports.readCard(node.path);
-      if (((_a2 = readBodyRecord(card.detail)) == null ? void 0 : _a2.kept) && !isKeptRaw(card.raw) && ((_b2 = card.fields) == null ? void 0 : _b2.pipelineStage) === "checked")
+      if (keepVoided(card.detail) && ((_a2 = card.fields) == null ? void 0 : _a2.pipelineStage) === "checked")
         await this.ports.writeFields(node.path, {
           pipelineStage: "needs-review",
           pipelineIssue: "write failed: hand_edited"
@@ -101028,7 +101034,7 @@ var BookHandEdits = class {
         await this.patch(node.path, { queued: true, status: t("ui.book_review_hand_queued") });
         return;
       }
-      await this.carryOut(mapPath, nodeId, node.path, op, (_c = state.ifp) != null ? _c : now);
+      await this.carryOut(mapPath, nodeId, node.path, op, (_b2 = state.ifp) != null ? _b2 : now);
     } catch (e) {
     }
   }

@@ -26,7 +26,7 @@ import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
-import { integrityFp, isKept, readBodyRecord } from "../../core/book-pipeline/body-integrity";
+import { integrityFp, isKept, keepVoided, readBodyRecord } from "../../core/book-pipeline/body-integrity";
 import { hasHiddenCallout } from "../../core/book-pipeline/note-sections";
 
 export { countNotes, projectProofBody, wrapNote } from "../../core/book-pipeline/book-notes";
@@ -273,7 +273,7 @@ export function gate2Cards(input: {
     const kept = isKept(note?.detail ?? "");
     const record = readBodyRecord(note?.detail ?? "");
     // A kept text edited since: the keep no longer holds, the chapter asks the hand-edit question again (whatever its stage says now).
-    const keptVoided = !kept && !!record?.kept;
+    const keptVoided = keepVoided(note?.detail ?? "");
     const handEdited =
       keptVoided || (view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue.trim()));
     // Only a `[!vam-book]` callout (or the program's fingerprint) shows the program wrote this text; anything else came before the book.

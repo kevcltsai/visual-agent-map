@@ -4023,6 +4023,7 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     const author = [];
     let imageCalls = 0;
     let coverAsked = 0;
+    let picked = 0;
     const holder = {};
     const r = await aiRig({
       card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: variant === 'cover-bare-root' && request.card.kind === 'preface' ? [] : slots, ...(variant === 'plain' ? {} : { cover: { explains: 'a cover', search: ['route map', 'port'] } }) }),
@@ -4042,7 +4043,18 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     }, {
       titles,
       // One search call finds nothing; each call stands for up to BOOK_IMAGE_CALLS_PER_SEARCH model calls (the caption-language retry sits inside the real step).
-      ports: { findImages: async (request, run) => { if (request.slots.some(slot => slot.index === 0)) coverAsked++; for (let i = 0; i < 2; i++) { imageCalls++; await run.admission.reserve(); } return { bySlot: new Map(), found: 0, offTopic: 0 }; } }
+      // The first search of a chapter offers 3 non-Commons pictures for position 1, which the AI looks at and finds not fitting (the whole look allowance is spent).
+      ports: {
+        findImages: async (request, run) => {
+          if (request.slots.some(slot => slot.index === 0)) coverAsked++;
+          for (let i = 0; i < 2; i++) { imageCalls++; await run.admission.reserve(); }
+          if (request.again || !request.slots.some(slot => slot.index === 1)) return { bySlot: new Map(), found: 0, offTopic: 0 };
+          const list = [1, 2, 3].map(n => { const id = ++picked; return { title: `Web ${id}`, caption: `c${id}`, url: `https://img${id}.example.org/p${id}.jpg`, source: `https://blog${id}.example.org/post` }; });
+          return { bySlot: new Map([[1, list]]), found: 3, offTopic: 0 };
+        },
+        fetchPicture: async url => `data:image/jpeg;base64,${Buffer.from(url).toString('base64')}`,
+        lookAtImage: async (request, run) => { imageCalls++; await run.admission.reserve(); return { fits: false, caption: '' }; }
+      }
     });
     holder.r = r;
     await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
@@ -4052,18 +4064,18 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 16 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 16 per card; the covers add nothing');
+    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 19 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 19 per card (3 of them picture looks); the covers add nothing');
     counted.set(`${variant}:${titles.length}`, calls);
     if (variant === 'cover-bare-root') {
       assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
       assert.ok(calls <= estimate, `${titles.length} cards, bare root: ${calls} calls within the estimate ${estimate}`);
-      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 + 2, 'the bare root swaps its own picture searches (none: no slots) for the one cover search with its language retry');
+      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 - 3 + 2, 'the bare root swaps its own picture searches and looks (none: no slots) for the one cover search with its language retry');
     } else {
       assert.equal(calls, estimate, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none: the real maximum is the estimate`);
       assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');
     }
     assert.ok(calls <= estimate && calls <= 300);
-    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 167);
+    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 197);
   }
   }
 });

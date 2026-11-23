@@ -60782,6 +60782,7 @@ ${oldDetail}`);
     let looksUnfit = 0;
     let looksDropped = 0;
     const looksUnchecked = /* @__PURE__ */ new Set();
+    const settledSlots = /* @__PURE__ */ new Set();
     const lookRound = async () => {
       var _a3;
       const ports = this.ports;
@@ -60790,7 +60791,7 @@ ${oldDetail}`);
         const list2 = perSlot.get(slot.index);
         if (!list2) continue;
         const kept = [];
-        let settled2 = false;
+        let settled2 = settledSlots.has(slot.index);
         for (const item of list2) {
           const { candidate, href } = item;
           if (settled2 || !href || !item.loaded || lookedAt.has(href) || taken(imageKey(href))) {
@@ -60799,6 +60800,7 @@ ${oldDetail}`);
           }
           if (isCommonsCandidate(candidate)) {
             settled2 = true;
+            settledSlots.add(slot.index);
             kept.push(item);
             continue;
           }
@@ -60844,6 +60846,7 @@ ${oldDetail}`);
             kept.push(item);
           } else if (fit.fits) {
             settled2 = true;
+            settledSlots.add(slot.index);
             lookedFit.add(`${slot.index}|${candidate.imageUrl}`);
             kept.push(fit.caption ? { ...item, candidate: { ...candidate, caption: fit.caption } } : item);
           } else {
@@ -75749,6 +75752,7 @@ function bookChapterCalls() {
     plan: 1,
     write: writes + BOOK_EXPAND_PASSES,
     images: BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
+    look: LOOKS_PER_CHAPTER,
     proof: writes,
     aiProof: 1 + 2 * MAX_AI_FIX_ROUNDS
   };
@@ -75770,13 +75774,13 @@ function bookStartEstimate(cards, trialCards, models) {
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
   const aiProof = time("proof") + MAX_AI_FIX_ROUNDS * (time("write") + time("proof"));
-  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + BOOK_EXPAND_PASSES * time("write") + aiProof;
+  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + LOOKS_PER_CHAPTER * time("images") + BOOK_EXPAND_PASSES * time("write") + aiProof;
   const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
-    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.look + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
@@ -101619,17 +101623,25 @@ async function runImageFitCheck(aiCalls, request, run) {
 }
 var PICTURE_MAX_BYTES = 8 * 1024 * 1024;
 var PICTURE_TIMEOUT_MS = 15e3;
+function isPublicPictureHost(hostname) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (!host || host.startsWith("[") || host.includes(":")) return false;
+  if (/^[0-9.]+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) return false;
+  if (!host.includes(".")) return false;
+  return !(host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"));
+}
 function sniffPictureMime(bytes) {
   const gif = bytes.length >= 6 && [71, 73, 70, 56].every((byte, i) => bytes[i] === byte);
   return gif ? "image/gif" : sniffImageMime(bytes);
 }
 async function downloadPicture(url, fetch, options = {}) {
-  var _a2, _b2, _c;
+  var _a2;
   const { signal } = options;
   const max = (_a2 = options.maxBytes) != null ? _a2 : PICTURE_MAX_BYTES;
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return { ok: false, reason: "url" };
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !isPublicPictureHost(parsed.hostname))
+      return { ok: false, reason: "url" };
   } catch (e) {
     return { ok: false, reason: "url" };
   }
@@ -101643,14 +101655,40 @@ async function downloadPicture(url, fetch, options = {}) {
     timer = window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), (_a3 = options.timeoutMs) != null ? _a3 : PICTURE_TIMEOUT_MS);
   });
   try {
-    const response = await Promise.race([fetch(url).catch(() => ({ ok: false, reason: "failed" })), stop]);
+    const lengthOf2 = (headers) => {
+      var _a3;
+      return Number((_a3 = Object.entries(headers != null ? headers : {}).find(([name2]) => name2.toLowerCase() === "content-length")) == null ? void 0 : _a3[1]);
+    };
+    const redirected = (finalUrl) => {
+      if (!finalUrl) return false;
+      try {
+        return !isPublicPictureHost(new URL(finalUrl).hostname);
+      } catch (e) {
+        return true;
+      }
+    };
+    const probe = await Promise.race([
+      fetch(url, "HEAD").catch(() => ({ ok: false, reason: "failed" })),
+      stop
+    ]);
+    if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
+    if ("ok" in probe) {
+      if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
+    } else {
+      if (redirected(probe.finalUrl)) return { ok: false, reason: "url" };
+      if (probe.status === 200 && lengthOf2(probe.headers) > max) return { ok: false, reason: "size" };
+    }
+    const response = await Promise.race([
+      fetch(url).catch(() => ({ ok: false, reason: "failed" })),
+      stop
+    ]);
     if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
     if ("ok" in response) return response;
+    if (redirected(response.finalUrl)) return { ok: false, reason: "url" };
     if (response.status !== 200) return { ok: false, reason: "status" };
-    const length = Number(
-      (_c = Object.entries((_b2 = response.headers) != null ? _b2 : {}).find(([name2]) => name2.toLowerCase() === "content-length")) == null ? void 0 : _c[1]
-    );
-    if (Number.isFinite(length) && length > max || response.bytes.byteLength > max) return { ok: false, reason: "size" };
+    const length = lengthOf2(response.headers);
+    if (Number.isFinite(length) && length > max || response.bytes.byteLength > max)
+      return { ok: false, reason: "size" };
     const bytes = new Uint8Array(response.bytes);
     const mime = sniffPictureMime(bytes);
     return mime ? { ok: true, bytes, mime } : { ok: false, reason: "type" };
@@ -107778,9 +107816,11 @@ function figuresOf(markdown) {
     const nextSource = next === void 0 ? null : SOURCE_LINE2.exec(next);
     if (nextSource) detail = nextSource[1];
     else if (next !== void 0 && next.trim() && !IMAGE_LINE.test(next) && next.length <= CAPTION_MAX4) {
-      to++;
-      const after = lines[to] === void 0 ? null : SOURCE_LINE2.exec(lines[to]);
-      if (after) detail = after[1];
+      const after = lines[to + 1] === void 0 ? null : SOURCE_LINE2.exec(lines[to + 1]);
+      if (after) {
+        detail = after[1];
+        to++;
+      } else if (lines[to + 1] === void 0 || !lines[to + 1].trim()) to++;
     }
     if (detail !== void 0) to++;
     const alt = altOf(image);
@@ -108562,6 +108602,8 @@ var ShareModal = class extends import_obsidian48.Modal {
     __publicField(this, "busy", false);
     __publicField(this, "saving", false);
     __publicField(this, "dropImages", false);
+    /** The drop box had keyboard focus when it was toggled: the rebuild empties the warnings, so the new box takes the focus back. */
+    __publicField(this, "restoreDropFocus", false);
     __publicField(this, "closed", false);
     __publicField(this, "failed", false);
     __publicField(this, "detailsEl");
@@ -109053,6 +109095,7 @@ var ShareModal = class extends import_obsidian48.Modal {
       this.detailsEl.createDiv({ text: t("share.preview_topics_0", topics) });
     }
     if (!this.busy && result) this.renderWarnings(result);
+    if (!this.busy) this.restoreDropFocus = false;
     const locked = this.saving || this.translating;
     this.lockToggle(this.fullSetting, this.fullToggle, locked);
     this.lockToggle(this.imagesSetting, this.imagesToggle, locked || !this.includeDetail);
@@ -109164,8 +109207,13 @@ var ShareModal = class extends import_obsidian48.Modal {
     const check = label.createEl("input", { type: "checkbox" });
     check.checked = this.dropImages;
     label.createSpan({ text: t("share.image_check_drop_0", problems.length) });
+    if (this.restoreDropFocus) {
+      this.restoreDropFocus = false;
+      check.focus();
+    }
     check.addEventListener("change", () => {
       this.dropImages = check.checked;
+      this.restoreDropFocus = typeof activeDocument !== "undefined" && activeDocument.activeElement === check;
       this.restart();
     });
   }
@@ -115083,8 +115131,8 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       fetchPicture: async (url, model, signal) => {
         const picture = await downloadPicture(
           url,
-          async (address) => {
-            const response = await (0, import_obsidian53.requestUrl)({ url: address, method: "GET", throw: false });
+          async (address, method) => {
+            const response = await (0, import_obsidian53.requestUrl)({ url: address, method: method != null ? method : "GET", throw: false });
             return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
           },
           { signal }

@@ -159,6 +159,8 @@ export class ShareModal extends Modal {
   private busy = false;
   private saving = false;
   private dropImages = false;
+  /** The drop box had keyboard focus when it was toggled: the rebuild empties the warnings, so the new box takes the focus back. */
+  private restoreDropFocus = false;
   private closed = false;
   private failed = false;
   private detailsEl!: HTMLElement;
@@ -712,6 +714,7 @@ export class ShareModal extends Modal {
       this.detailsEl.createDiv({ text: t("share.preview_topics_0", topics) });
     }
     if (!this.busy && result) this.renderWarnings(result);
+    if (!this.busy) this.restoreDropFocus = false;
     const locked = this.saving || this.translating;
     this.lockToggle(this.fullSetting, this.fullToggle, locked);
     this.lockToggle(this.imagesSetting, this.imagesToggle, locked || !this.includeDetail);
@@ -837,8 +840,13 @@ export class ShareModal extends Modal {
     const check = label.createEl("input", { type: "checkbox" });
     check.checked = this.dropImages;
     label.createSpan({ text: t("share.image_check_drop_0", problems.length) });
+    if (this.restoreDropFocus) {
+      this.restoreDropFocus = false;
+      check.focus();
+    }
     check.addEventListener("change", () => {
       this.dropImages = check.checked;
+      this.restoreDropFocus = typeof activeDocument !== "undefined" && activeDocument.activeElement === check;
       this.restart();
     });
   }

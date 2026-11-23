@@ -922,8 +922,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     fetchPicture: async (url, model, signal) => {
       const picture = await downloadPicture(
         url,
-        async address => {
-          const response = await requestUrl({ url: address, method: "GET", throw: false });
+        async (address, method) => {
+          const response = await requestUrl({ url: address, method: method ?? "GET", throw: false });
           return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
         },
         { signal }

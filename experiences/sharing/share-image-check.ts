@@ -79,9 +79,12 @@ export function figuresOf(markdown: string): ShareFigure[] {
     const nextSource = next === undefined ? null : SOURCE_LINE.exec(next);
     if (nextSource) detail = nextSource[1];
     else if (next !== undefined && next.trim() && !IMAGE_LINE.test(next) && next.length <= CAPTION_MAX) {
-      to++;
-      const after = lines[to] === undefined ? null : SOURCE_LINE.exec(lines[to]);
-      if (after) detail = after[1];
+      // A caption only counts when a source line, a blank line or the end of the file follows it; otherwise it is the user's own paragraph.
+      const after = lines[to + 1] === undefined ? null : SOURCE_LINE.exec(lines[to + 1]);
+      if (after) {
+        detail = after[1];
+        to++;
+      } else if (lines[to + 1] === undefined || !lines[to + 1].trim()) to++;
     }
     if (detail !== undefined) to++;
     const alt = altOf(image);

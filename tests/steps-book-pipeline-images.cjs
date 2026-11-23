@@ -1847,6 +1847,14 @@ test('look: at most 3 looks a chapter; the 4th non-Commons candidate is not fetc
   assert.match(r.stat.logs.join('\n'), /look=3(?= |$).*look_unchecked=1/m);
 });
 
+test('look: a slot settled in round 1 is not looked at again in round 2 (the later candidates of a settled slot spend no look)', async () => {
+  const { seen, ports } = lookPorts({ verdict: () => ({ fits: true, caption: '' }) });
+  const r = await picRig({ ports, slots: 2, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2), webCand(3)] }) : n === 2 ? found({ 2: [webCand(4)] }) : none() });
+  await run(r);
+  assert.deepEqual(seen.fetched.map(([url]) => /img(\d)/.exec(url)[1]), ['1', '4'], 'only the first fitting candidate of slot 1 and the one of slot 2');
+  assert.equal(seen.looks.length, 2);
+});
+
 test('look: a picture the plugin could not fetch is dropped without a call to the AI', async () => {
   const { seen, ports } = lookPorts({ refuse: ['https://img1.example.org/p1.jpg'] });
   const r = await picRig({ ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
@@ -1927,6 +1935,31 @@ test('picture fetch: only https, 8 MB, PNG/JPEG/GIF/WebP bytes, a time limit and
   controller.abort();
   late.resolve({ status: 200, headers: {}, bytes: png.buffer });
   assert.equal((await pending).reason, 'aborted');
+});
+
+test('picture fetch: IP literals, localhost, .local, .internal and single-label hosts are refused before any request; HEAD asks first; a redirect to such a host is refused', async () => {
+  const { downloadPicture } = S.load('core/steps/book-pipeline/image-fit-check.ts');
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+  const buf = png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength);
+  const sent = [];
+  const fetchOf = (over = {}) => async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: {}, bytes: buf, ...(method === 'HEAD' ? {} : over) }; };
+  for (const host of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', '2130706433', '0x7f000001', '[::1]', '[fd00::1]', '[::ffff:127.0.0.1]', 'localhost', 'a.localhost', 'printer.local', 'db.internal', 'intranet', 'example.org.local']) {
+    sent.length = 0;
+    assert.equal((await downloadPicture(`https://${host}/x.png`, fetchOf())).reason, 'url', host);
+    assert.equal(sent.length, 0, `${host}: no request at all`);
+  }
+  sent.length = 0;
+  const ok = await downloadPicture('https://a.example.org/x', fetchOf());
+  assert.ok(ok.ok);
+  assert.deepEqual(sent, ['HEAD', 'GET'], 'the headers are asked first');
+  sent.length = 0;
+  const big = async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: method === 'HEAD' ? { 'content-length': String(9 * 1024 * 1024) } : {}, bytes: buf }; };
+  assert.equal((await downloadPicture('https://a.example.org/x', big)).reason, 'size');
+  assert.deepEqual(sent, ['HEAD'], 'an oversize HEAD answer means no GET');
+  sent.length = 0;
+  const redirected = async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: {}, bytes: buf, finalUrl: 'https://192.168.0.1/p.png' }; };
+  assert.equal((await downloadPicture('https://a.example.org/x', redirected)).reason, 'url');
+  assert.ok(!sent.includes('GET'), 'a redirect to a private host seen on the HEAD stops before the GET');
 });
 
 test('look step: the verdict is parsed strictly, the caption is one capped plain line, and the picture never enters the prompt', () => {

@@ -5339,6 +5339,8 @@ export class BookPipelineRuns {
     let looksUnfit = 0;
     let looksDropped = 0;
     const looksUnchecked = new Set<string>();
+    // A slot that already has its pick (a Commons picture ahead, or a candidate the AI said fits) stays settled in later rounds: nothing after it is looked at.
+    const settledSlots = new Set<number>();
     const lookRound = async (): Promise<void> => {
       const ports = this.ports;
       if (!ports.lookAtImage || !ports.fetchPicture) return;
@@ -5346,7 +5348,7 @@ export class BookPipelineRuns {
         const list = perSlot.get(slot.index);
         if (!list) continue;
         const kept: ProbedCandidate[] = [];
-        let settled = false;
+        let settled = settledSlots.has(slot.index);
         for (const item of list) {
           const { candidate, href } = item;
           if (settled || !href || !item.loaded || lookedAt.has(href) || taken(imageKey(href))) {
@@ -5356,6 +5358,7 @@ export class BookPipelineRuns {
           if (isCommonsCandidate(candidate)) {
             // A Commons picture ahead of the others is the slot's pick: nothing after it is looked at.
             settled = true;
+            settledSlots.add(slot.index);
             kept.push(item);
             continue;
           }
@@ -5401,6 +5404,7 @@ export class BookPipelineRuns {
             kept.push(item);
           } else if (fit.fits) {
             settled = true;
+            settledSlots.add(slot.index);
             lookedFit.add(`${slot.index}|${candidate.imageUrl}`);
             kept.push(fit.caption ? { ...item, candidate: { ...candidate, caption: fit.caption } } : item);
           } else {

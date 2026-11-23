@@ -664,6 +664,30 @@ test('hypothesis-leaning: the share scrub drops the front-matter block, so hypot
   assert.ok(!JSON.stringify(plain(tags(root))).includes('hypothesis'));
 });
 
+// Book any-site images P3 (L5): the exporter leaves a dropped picture out of the file and never touches the note.
+test('share exporter dropFigures: a dropped picture has no trace in the built html and the note bytes are unchanged; cleared, it is back', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const check = load('experiences/sharing/share-image-check.ts');
+  const detail = '正文一。\n\n![羅盤圖](https://cdn.dropped-host.example/a.png)\n一句圖說\n來源：dropped-host.example · © x（[連結](https://dropped-host.example/p)）\n\n![開放圖](https://upload.wikimedia.org/a.png)\n另一句\n來源：commons.wikimedia.org · CC BY 4.0（[連結](https://commons.wikimedia.org/wiki/File:a.png)）\n\n正文二。\n';
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }] };
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  exporter.renderOne = async markdown => ({ html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], mermaidUndrawn: 0, mermaidBlocked: 0 });
+  const ticket = { generation: 0, signal: new AbortController().signal, isCurrent: () => true };
+  const build = async () => { await exporter.ensureRendered(ticket, () => {}); return exporter.assemble({ includeDetail: true, includeImages: false }); };
+  const dropIndex = check.figuresOf(detail).find(f => f.host === 'dropped-host.example').index;
+  exporter.dropFigures(new Map([['a', new Set([dropIndex])]]));
+  const dropped = await build();
+  assert.ok(!dropped.html.includes('dropped-host.example'), 'no trace of the dropped host anywhere in the file');
+  assert.ok(!dropped.html.includes('羅盤圖'));
+  assert.ok(dropped.html.includes('upload.wikimedia.org'), 'the other picture stays');
+  assert.equal(notes.get('a').detail, detail, 'the note bytes are unchanged');
+  exporter.dropFigures(new Map());
+  const back = await build();
+  assert.ok(back.html.includes('dropped-host.example'), 'cleared: the picture is back');
+});
+
 // Persona G22: a card's cover picture lives in the note's front matter, not in its detail; it must be counted and travel in the file.
 test('share exporter covers: a topic-cover picture is collected, counted and embedded in the shared html; a cover-only card and an already-embedded cover too', async () => {
   class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }

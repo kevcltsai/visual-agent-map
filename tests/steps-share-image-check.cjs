@@ -56,15 +56,27 @@ test('withoutFigures: the chosen pictures lose image, caption, source line and S
   assert.deepEqual(plain(check.figuresOf(out)).map(f => f.alt), ['研磨粗細與萃取率', '開放授權圖']);
 });
 
+test('withoutFigures: a user paragraph straight after a hand-inserted picture is not taken for its caption', () => {
+  const text = '![手動圖](https://a.example/x.png)\n這是我自己寫的一段話。\n接著還有第二行。\n\n<!-- book-slots:v1 {"slots":[],"bad":0} -->\n';
+  const [figure] = plain(check.figuresOf(text));
+  assert.deepEqual([figure.from, figure.to], [0, 1], 'only the image line belongs to the picture');
+  const out = check.withoutFigures(text, new Set([0]));
+  assert.ok(out.includes('這是我自己寫的一段話。') && out.includes('接著還有第二行。'));
+  assert.ok(!out.includes('a.example'));
+  const withCaption = '![圖](https://a.example/x.png)\n一句圖說\n\n後文\n<!-- book-slots:v1 {"slots":[],"bad":0} -->\n';
+  assert.ok(!check.withoutFigures(withCaption, new Set([0])).includes('一句圖說'), 'a caption followed by a blank line still goes');
+});
+
 // ---- the dialog ----
 
 function harness({ detail = NOTE } = {}) {
+  const doc = { activeElement: null };
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', type: options.type, checked: false, disabled: false, children: [], listeners: {},
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
     createEl(name, value = {}) { const c = element(name, typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
     createSpan(value = {}) { const c = element('span', value); this.children.push(c); return c; },
-    empty() { this.children = []; this.text = ''; }, setText(value) { this.text = value; }, setAttr() {}, addClass() {}, addEventListener(name, fn) { this.listeners[name] = fn; }
+    focus() { doc.activeElement = this; }, empty() { this.children = []; this.text = ''; }, setText(value) { this.text = value; }, setAttr() {}, addClass() {}, addEventListener(name, fn) { this.listeners[name] = fn; }
   });
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => all(c, predicate))];
   class Modal { constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); } open() { this.onOpen(); } close() { this.onClose(); } }
@@ -74,7 +86,7 @@ function harness({ detail = NOTE } = {}) {
     addToggle(cb) { const input = { disabled: false }; const toggle = { setValue() { return toggle; }, onChange(fn) { toggle.fn = fn; return toggle; }, setDisabled() { return toggle; }, toggleEl: { setAttribute() {}, querySelector: () => input } }; cb(toggle); this.toggle = toggle; return this; }
     addDropdown() { return this; } setHeading() { return this; }
   }
-  const mod = load('experiences/sharing/share-modal.ts', { obsidian: { ...obsidian, Modal, Setting, Notice: class {} } });
+  const mod = load('experiences/sharing/share-modal.ts', { obsidian: { ...obsidian, Modal, Setting, Notice: class {} } }, { activeDocument: doc });
   const calls = { drop: [], assemble: 0 };
   const exporter = {
     async ensureRendered() {}, async ensureImages() {},
@@ -85,7 +97,7 @@ function harness({ detail = NOTE } = {}) {
   const source = { map: { id: 'm', title: 'Book', nodes: [{ id: 'a', title: '研磨度' }] }, notes, mapPath: 'Map.md' };
   const modal = new mod.ShareModal({}, { source, vamVersion: '1', language: 'zh-TW', createExporter: () => exporter });
   const text = () => all(modal.contentEl, i => i.text).map(i => i.text).join(' | ');
-  return { modal, calls, text, all, notes, imagesToggle: () => modal.imagesToggle };
+  return { modal, calls, text, all, notes, doc, imagesToggle: () => modal.imagesToggle };
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 8));
 
@@ -112,6 +124,18 @@ test('dialog: ticking the box leaves exactly those pictures out of the build and
   assert.equal(h.notes.get('a').detail, NOTE, 'the note text is the same bytes');
   const [again] = h.all(h.modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox');
   assert.equal(again.checked, true, 'the choice stays after the rebuild');
+});
+
+test('dialog: toggling the box by keyboard keeps the focus on the (rebuilt) box and its checked state', async () => {
+  {
+    const h = harness();
+    h.modal.open(); await tick(); await tick();
+    const [box] = h.all(h.modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox');
+    box.focus(); box.checked = true; box.listeners.change(); await tick(); await tick();
+    const [again] = h.all(h.modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox');
+    assert.equal(h.doc.activeElement, again, 'the focus is on the box that is in the dialog now');
+    assert.equal(again.checked, true);
+  }
 });
 
 test('dialog: all-open pictures show no reminder', async () => {

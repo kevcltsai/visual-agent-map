@@ -126,12 +126,12 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
   assert.equal(result.rejected.length, 5);
   assert.ok(result.rejected.every(entry => entry.code === 'too_many'));
 });
-test('schema lists exactly the kinds and run actions, and every property is required', () => {
+test('schema lists exactly the kinds and run actions, and every property but "rewrite" is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
   assert.equal(MAP_CHAT_ACTION_KINDS.length, 28);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
-  assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
+  assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).filter(key => key !== 'rewrite').sort());
   // Codex strict output: every object in the schema Codex gets, top level included, lists all its properties as required (a missing one is a 400).
   const strict = (node, where) => {
     if (!node || typeof node !== 'object') return;
@@ -395,6 +395,32 @@ test('service droppedOnRetry: the reply taken has fewer actions than a Structure
     ['a retry that adds', on => { on(''); on(body(2)); on(null); on(''); on(body(3)); }, 3],
     ['no stream at all', () => {}, 2]
   ]) assert.equal((await run(feed, final).chat(request(), new AbortController().signal)).droppedOnRetry, undefined, name);
+  // ai-exchanges 986: a full reply rejected (missing "rewrite"), a retry that did not parse, then an empty reply taken.
+  const lost = await run(on => { on(''); on(body(57)); on(null); on(''); on(body(40).slice(0, 200)); on(null); on(''); on(body(0)); }, 0).chat(request(), new AbortController().signal);
+  assert.equal(lost.droppedOnRetry, true);
+  // A call cut off before an empty answer is not a drop: a pure answer after a retried stream keeps its own words.
+  assert.equal((await run(on => { on(''); on(body(5).slice(0, 40)); on(null); on(''); on(body(0)); }, 0).chat(request(), new AbortController().signal)).droppedOnRetry, undefined);
+});
+test('prompt: a reply that sends no actions for a requested change may not blame the system or a classifier', () => {
+  const en = mapChatStep.render(request()), zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  assert.match(en, /When you send no actions for something the user asked to change, say only that this round did not get it done; never claim the system, a safety classifier or a filter blocked or intercepted you\./);
+  assert.match(zh, /使用者要求修改、你卻沒有送出動作時，只能說這一輪沒有完成；不可說被系統、安全分類器或過濾機制擋下或攔截。/);
+});
+test('schema: "rewrite" is not required for Claude (a missing one reads as false); strict output keeps it required and nullable', () => {
+  const { claudeOutputSchema } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn() {} } });
+  const { outputSchemaFor } = load('ai/runtime/output-schema.ts');
+  const itemOf = schema => schema.properties.actions.items;
+  assert.equal(MAP_CHAT_SCHEMA.properties.actions.items.properties.rewrite.type, 'boolean');
+  assert.equal(itemOf(claudeOutputSchema(MAP_CHAT_SCHEMA)).required.includes('rewrite'), false);
+  const strict = itemOf(outputSchemaFor(MAP_CHAT_SCHEMA, false));
+  assert.equal(strict.required.includes('rewrite'), true);
+  assert.deepEqual(plain(strict.properties.rewrite.type), ['boolean', 'null']);
+  const ctx = context({ selected: [topic('a')] });
+  const without = item('run_map_action', { nodeIds: ['a'], action: 'research_standard' });
+  delete without.rewrite;
+  const parsed = parseMapChat(JSON.stringify({ reply: 'r', actions: [without], remaining: '' }), ctx);
+  assert.equal(parsed.actions.length, 1);
+  assert.equal(parsed.actions[0].rewrite, undefined);
 });
 test('service stop: an aborted signal throws MapChatError stopped before and after the run', async () => {
   const controller = new AbortController();
@@ -794,7 +820,8 @@ test('B2 schema: mode (quick|standard|"") and images (boolean) are in the strict
   assert.ok(entry.required.includes('mode') && entry.required.includes('images'));
   assert.equal('depth' in entry.properties, false); assert.equal(entry.required.includes('depth'), false);
   assert.equal(entry.additionalProperties, false);
-  for (const key of Object.keys(entry.properties)) assert.ok(entry.required.includes(key), `${key} is required (strict schema)`);
+  // "rewrite" alone is optional (a missing one is false); strict output makes it required and nullable (see the rewrite test).
+  for (const key of Object.keys(entry.properties).filter(key => key !== 'rewrite')) assert.ok(entry.required.includes(key), `${key} is required (strict schema)`);
 });
 test('B2 parser: a research keeps mode, images and the extra requirement (direction); Quick never keeps images', () => {
   const [kept] = parse(reply(researchItem({ mode: 'standard', images: true, direction: ' only after 2020 ' }))).actions;
@@ -863,9 +890,9 @@ test('P1 prompt (zh and en): complete is defined, later steps are not promised, 
   for (const pattern of [/「完整」要完整/, /來源列出的每一項都要有議題/, /不可承諾其他之後的步驟/, /接續："remaining"/, /"remaining":""\}/, /只建根議題，並把 research_standard 放在最後一個動作/, /needsWeb（只用於 research_standard/, /"images":false,"needsWeb":false/]) assert.match(zh, pattern, String(pattern));
   for (const text of [en, zh]) assert.doesNotMatch(text, /單純建樹或擴充樹不需要|building or extending a tree on its own never needs it/);
 });
-test('rewrite: strict schema field; only a boolean true counts; missing or wrong type is false; other actions ignore it; the request carries it only when true', () => {
+test('rewrite: optional schema field (one action without it does not send the reply back); only a boolean true counts; missing or wrong type is false; other actions ignore it; the request carries it only when true', () => {
   const entry = MAP_CHAT_SCHEMA.properties.actions.items;
-  assert.deepEqual(plain(entry.properties.rewrite), { type: 'boolean' }); assert.ok(entry.required.includes('rewrite'));
+  assert.deepEqual(plain(entry.properties.rewrite), { type: 'boolean' }); assert.equal(entry.required.includes('rewrite'), false);
   assert.equal(parse(reply(researchItem({ rewrite: true }))).actions[0].rewrite, true);
   for (const value of ['true', 1, 'yes', null, false, undefined]) assert.equal(parse(reply(researchItem({ rewrite: value }))).actions[0].rewrite, undefined, String(value));
   assert.equal(parse(reply(researchItem())).actions[0].rewrite, undefined, 'an older reply has no rewrite: parses, false');

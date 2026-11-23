@@ -1328,6 +1328,7 @@ export const en = {
   "ui.map_chat_chain_reason_0": "Reason: {0}.",
   "ui.map_chat_chain_end_done_0": "Done after {0} rounds.",
   "ui.map_chat_chain_end_no_progress": "This round made no new progress, so it stops here.",
+  "ui.map_chat_reply_format_rejected": "The actions the AI sent this round did not match the required format and were sent back, so the map was not changed. This round did not get it done; send the request again, or ask for a smaller part at a time.",
   "ui.map_chat_chain_end_max_rounds_0": "It ran all {0} rounds, so it stops here.",
   "ui.map_chat_chain_end_max_rounds_more": "To go on, say “continue”.",
   "ui.map_chat_chain_end_research_failed": "The research did not work, so the subtopics were not filled in.",

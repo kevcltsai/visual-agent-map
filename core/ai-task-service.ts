@@ -31,6 +31,7 @@ import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondense
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
+import { keepOpenedVideoEmbeds } from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -244,7 +245,8 @@ export class AiTaskService {
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {
           if (event.method === "item/completed") retrievals++;
-          if (keepsEvents) webEvents.push(event);
+          // Kept for the argument proof and for the video check below (only the pages this call opened may be embedded).
+          if (keepsEvents || countsWeb) webEvents.push(event);
           onWebSearchEvent?.(event);
         }
       : onWebSearchEvent;
@@ -344,6 +346,9 @@ export class AiTaskService {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
         };
+      // A YouTube embed stays only when this call opened that video's page; a run that opens no pages (Quick) keeps none.
+      if ((context.mode ?? "task") === "task" && role === undefined && !input.countRepair)
+        result.detail = keepOpenedVideoEmbeds(result.detail, countsWeb ? openedUrlsFromEvents(webEvents) : []);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);

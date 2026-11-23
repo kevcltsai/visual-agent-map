@@ -344,8 +344,10 @@ import {
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
+  bookCardLock,
   effectiveOrder,
   type BookRole,
+  type PipelinePhase,
   type BookSettings,
   readBookPipeline,
   readPipelineStage,
@@ -2390,7 +2392,7 @@ export class VisualAgentMapView extends ItemView {
       (sibling: boolean) =>
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
-        if (this.presentation || this.notesLoading()) return false;
+        if (this.presentation || this.notesLoading() || this.bookLock().structure) return false;
         if (this.selection.state.multiSelectMode) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
@@ -5307,7 +5309,7 @@ export class VisualAgentMapView extends ItemView {
    * it; Enter takes the first row, "Topic". Esc closes the list and adds nothing.
    */
   private openAddMenu(event: MouseEvent, parent: MapNode | null, afterTextId?: string): void {
-    if (this.presentation) return;
+    if (this.presentation || this.bookLock().structure) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
@@ -9941,15 +9943,19 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.whenEditing(action))
       );
     };
-    add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
-    add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
-    add(t("ui.card_menu_add_sibling"), "list-plus", () =>
-      this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
-    );
+    const bookLock = this.bookLock();
+    if (!bookLock.ai) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
+    if (!bookLock.structure) {
+      add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
+      add(t("ui.card_menu_add_sibling"), "list-plus", () =>
+        this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
+      );
+    }
     menu.addSeparator();
-    add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
+    if (!bookLock.structure) add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
     const hasChildren = map.nodes.some(item => item.parentId === node.id);
-    if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
+    if (hasChildren && !node.collapsed && !bookLock.structure)
+      add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
     if (hasChildren)
       add(
         node.collapsed ? t("ui.expand") : t("ui.collapse"),
@@ -10232,7 +10238,7 @@ export class VisualAgentMapView extends ItemView {
               .setIcon("palette")
               .onClick(() => void this.chooseTopicStyle(topic))
           );
-        if (single) {
+        if (single && !this.bookLock().structure) {
           menu.addSeparator();
           menu.addItem(item =>
             item
@@ -12874,7 +12880,8 @@ export class VisualAgentMapView extends ItemView {
         collapse.setAttr("aria-expanded", "false");
       }
     }
-    if (!this.selection.state.multiSelectMode) {
+    const bookLock = this.bookLock();
+    if (!this.selection.state.multiSelectMode && !bookLock.ai) {
       const exploreName = t("ui.ai_explore");
       const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
       explore.addClass("vam-node-tool", "vam-ai-explore");
@@ -12896,7 +12903,7 @@ export class VisualAgentMapView extends ItemView {
       iconTool(t("ui.collapse"), "chevrons-down-up", "vam-fold-tool", () =>
         this.whenEditing(() => this.toggleCollapsed(node))
       );
-    if (!this.selection.state.multiSelectMode) {
+    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
       iconTool(t("ui.structure_and_links"), "git-fork", "vam-structure-tool", () =>
         this.whenEditing(() => this.openNodePanel(node, "structure"))
       );
@@ -12906,7 +12913,7 @@ export class VisualAgentMapView extends ItemView {
           this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode) {
+    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
       const add = this.button(card, "+", () => {});
       add.addEventListener("click", event => this.openAddMenu(event, node));
       add.addClass("vam-add-child");
@@ -13028,7 +13035,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       if (this.onCardSpaceDown(event, node)) return;
-      const editable = !this.selection.state.multiSelectMode && !this.notesLoading();
+      const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -14591,7 +14598,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   private openTopicChat(node: MapNode, opener?: { focus(): void; isConnected?: boolean } | null): void {
-    if (this.closed || !this.map || this.notesLoading() || this.presentation) return;
+    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.bookLock().ai) return;
     if (this.aiLockReason("write", [node.id])) {
       new Notice(t("ui.ai_locked_notice"));
       return;
@@ -17400,12 +17407,24 @@ export class VisualAgentMapView extends ItemView {
     await handle.finished;
     if (failure && !batchSignal.aborted) throw new Error(failure);
   }
-  private bookPipelineSeen: { map: unknown; usable: boolean } | null = null;
+  private bookPipelineSeen: { map: unknown; usable: boolean; phase?: PipelinePhase } | null = null;
   /** True when this map carries a usable `bookPipeline` (memoized per map object: the cards ask once each). */
   private hasBookPipeline(): boolean {
-    if (this.bookPipelineSeen?.map !== this.map)
-      this.bookPipelineSeen = { map: this.map, usable: !!this.map && readBookPipeline(this.map).kind === "usable" };
+    if (this.bookPipelineSeen?.map !== this.map) {
+      const read = this.map ? readBookPipeline(this.map) : undefined;
+      this.bookPipelineSeen = {
+        map: this.map,
+        usable: read?.kind === "usable",
+        ...(read?.kind === "usable" ? { phase: read.data.phase } : {})
+      };
+    }
     return this.bookPipelineSeen.usable;
+  }
+  /** The one check every card AI and structure entry asks: what a picture-book run that owns this map takes away now (bookCardLock). */
+  private bookLock(): { ai: boolean; structure: boolean } {
+    if (!this.hasBookPipeline()) return bookCardLock(undefined);
+    const live = this.path ? this.plugin.getBookPipelineProgress(this.path)?.phase : undefined;
+    return bookCardLock(live ?? this.bookPipelineSeen?.phase);
   }
   /** What a card is doing now: the runner's sub-step (planning, writing, finding pictures, proofreading) or the author call this view runs. */
   private bookWorkingStep(
@@ -18518,19 +18537,23 @@ export class VisualAgentMapView extends ItemView {
     });
     // The main action follows the count: Merge for two or more, Research for one.
     // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
-    const check = this.mergeCheck(),
-      merge = this.button(selection, t("ui.merge"), () => this.openMerge());
-    if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
-    if (count > 1) merge.addClass("mod-cta");
-    if (!check.ok) {
-      merge.setAttr("aria-disabled", "true");
-      merge.setAttr("title", t(check.reason));
+    // A picture-book run that owns the map takes the AI actions away, and while it plans or writes also Move to (bookLock).
+    const bookLock = this.bookLock();
+    if (!bookLock.ai) {
+      const check = this.mergeCheck(),
+        merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
+      if (count > 1) merge.addClass("mod-cta");
+      if (!check.ok) {
+        merge.setAttr("aria-disabled", "true");
+        merge.setAttr("title", t(check.reason));
+      }
+      const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
+      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
+      research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+      if (count === 1) research.addClass("mod-cta");
     }
-    const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
-    const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
-    research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
-    if (count === 1) research.addClass("mod-cta");
-    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
+    if (!bookLock.structure) this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
     const more = this.button(selection, t("ui.card_more"), () => {});
     more.setAttr("aria-label", t("ui.selection_more_hint"));
     more.setAttr("aria-haspopup", "menu");
@@ -18555,13 +18578,15 @@ export class VisualAgentMapView extends ItemView {
     const add = (title: string, icon: string, action: () => void, disabled = false): void => {
       menu.addItem(item => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
     };
-    add(
-      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
-      "git-merge",
-      () => this.integrateSelected(),
-      count < 2
-    );
-    add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
+    const bookLock = this.bookLock();
+    if (!bookLock.ai)
+      add(
+        count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
+        "git-merge",
+        () => this.integrateSelected(),
+        count < 2
+      );
+    if (!bookLock.structure) add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
     add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
     add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
     const nodes = [...this.selection.state.multiSelected]
@@ -18578,7 +18603,7 @@ export class VisualAgentMapView extends ItemView {
     );
     menu.addSeparator();
     add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
-    add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
+    if (!bookLock.structure) add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
     menu.showAtMouseEvent(event);
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */
@@ -23798,7 +23823,7 @@ export class VisualAgentMapView extends ItemView {
         hoverEl = el;
       };
       const targetAt = (e: PointerEvent): { node: MapNode; invalid: boolean } | null => {
-        if (!this.canSelectTopics() || !this.map) return null;
+        if (!this.canSelectTopics() || !this.map || this.bookLock().structure) return null;
         const self = this.map.nodes.find(item => item.id === node.id);
         const roots = group ? this.selectedRoots() : self ? [self] : [];
         const z = this.map.viewport.zoom;

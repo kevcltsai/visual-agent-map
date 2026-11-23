@@ -16279,6 +16279,10 @@ function readBookPipeline(map) {
   }
   return { kind: "usable", data };
 }
+function bookCardLock(phase) {
+  if (phase === void 0 || phase === "done") return { ai: false, structure: false };
+  return { ai: true, structure: phase !== "gate1" };
+}
 function effectiveOrder(data) {
   const gone = data.removed;
   return (gone == null ? void 0 : gone.length) ? data.order.filter((id) => !gone.includes(id)) : data.order;
@@ -80227,7 +80231,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     const cardKey = (sibling) => (event) => {
       var _a2, _b2, _c, _d;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
-      if (this.presentation || this.notesLoading()) return false;
+      if (this.presentation || this.notesLoading() || this.bookLock().structure) return false;
       if (this.selection.state.multiSelectMode) return true;
       const active = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
@@ -82994,7 +82998,7 @@ ${request.requirements}` : preset.text,
    */
   openAddMenu(event, parent, afterTextId) {
     var _a2;
-    if (this.presentation) return;
+    if (this.presentation || this.bookLock().structure) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
@@ -87288,20 +87292,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         (item) => item.setTitle(title).setIcon(icon).onClick(() => this.whenEditing(action))
       );
     };
-    add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
-    add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
-    add(
-      t("ui.card_menu_add_sibling"),
-      "list-plus",
-      () => this.enqueue(() => {
-        var _a2;
-        return this.addNode((_a2 = map.nodes.find((item) => item.id === node.parentId)) != null ? _a2 : null);
-      })
-    );
+    const bookLock = this.bookLock();
+    if (!bookLock.ai) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
+    if (!bookLock.structure) {
+      add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
+      add(
+        t("ui.card_menu_add_sibling"),
+        "list-plus",
+        () => this.enqueue(() => {
+          var _a2;
+          return this.addNode((_a2 = map.nodes.find((item) => item.id === node.parentId)) != null ? _a2 : null);
+        })
+      );
+    }
     menu.addSeparator();
-    add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
+    if (!bookLock.structure) add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
     const hasChildren = map.nodes.some((item) => item.parentId === node.id);
-    if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
+    if (hasChildren && !node.collapsed && !bookLock.structure)
+      add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
     if (hasChildren)
       add(
         node.collapsed ? t("ui.expand") : t("ui.collapse"),
@@ -87544,7 +87552,7 @@ ${t("ui.book_role_running_suffix")}` : first);
           menu2.addItem(
             (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
           );
-        if (single) {
+        if (single && !this.bookLock().structure) {
           menu2.addSeparator();
           menu2.addItem(
             (item) => item.setTitle(t("ui.remove_from_map")).setIcon("trash-2").setWarning(true).onClick(() => this.whenEditing(() => this.removeByKey(single)))
@@ -89895,7 +89903,8 @@ ${t("ui.book_role_running_suffix")}` : first);
         collapse.setAttr("aria-expanded", "false");
       }
     }
-    if (!this.selection.state.multiSelectMode) {
+    const bookLock = this.bookLock();
+    if (!this.selection.state.multiSelectMode && !bookLock.ai) {
       const exploreName = t("ui.ai_explore");
       const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
       explore.addClass("vam-node-tool", "vam-ai-explore");
@@ -89919,7 +89928,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         "vam-fold-tool",
         () => this.whenEditing(() => this.toggleCollapsed(node))
       );
-    if (!this.selection.state.multiSelectMode) {
+    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
       iconTool(
         t("ui.structure_and_links"),
         "git-fork",
@@ -89934,7 +89943,7 @@ ${t("ui.book_role_running_suffix")}` : first);
           () => this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode) {
+    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
       const add = this.button(card, "+", () => {
       });
       add.addEventListener("click", (event) => this.openAddMenu(event, node));
@@ -90033,7 +90042,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         return;
       }
       if (this.onCardSpaceDown(event, node)) return;
-      const editable = !this.selection.state.multiSelectMode && !this.notesLoading();
+      const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -91501,7 +91510,7 @@ ${t("ui.book_role_running_suffix")}` : first);
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   openTopicChat(node, opener) {
     var _a2, _b2, _c;
-    if (this.closed || !this.map || this.notesLoading() || this.presentation) return;
+    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.bookLock().ai) return;
     if (this.aiLockReason("write", [node.id])) {
       new import_obsidian39.Notice(t("ui.ai_locked_notice"));
       return;
@@ -94123,9 +94132,22 @@ ${t("ui.book_role_running_suffix")}` : first);
   /** True when this map carries a usable `bookPipeline` (memoized per map object: the cards ask once each). */
   hasBookPipeline() {
     var _a2;
-    if (((_a2 = this.bookPipelineSeen) == null ? void 0 : _a2.map) !== this.map)
-      this.bookPipelineSeen = { map: this.map, usable: !!this.map && readBookPipeline(this.map).kind === "usable" };
+    if (((_a2 = this.bookPipelineSeen) == null ? void 0 : _a2.map) !== this.map) {
+      const read = this.map ? readBookPipeline(this.map) : void 0;
+      this.bookPipelineSeen = {
+        map: this.map,
+        usable: (read == null ? void 0 : read.kind) === "usable",
+        ...(read == null ? void 0 : read.kind) === "usable" ? { phase: read.data.phase } : {}
+      };
+    }
     return this.bookPipelineSeen.usable;
+  }
+  /** The one check every card AI and structure entry asks: what a picture-book run that owns this map takes away now (bookCardLock). */
+  bookLock() {
+    var _a2, _b2;
+    if (!this.hasBookPipeline()) return bookCardLock(void 0);
+    const live2 = this.path ? (_a2 = this.plugin.getBookPipelineProgress(this.path)) == null ? void 0 : _a2.phase : void 0;
+    return bookCardLock(live2 != null ? live2 : (_b2 = this.bookPipelineSeen) == null ? void 0 : _b2.phase);
   }
   /** What a card is doing now: the runner's sub-step (planning, writing, finding pictures, proofreading) or the author call this view runs. */
   bookWorkingStep(nodeId, path) {
@@ -95125,18 +95147,21 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots, i
       attr: { dir: "auto" },
       text: t("ui.selected_0_1_2", count4, names3.slice(0, 2).join(t("ui.list_separator")), names3.length > 2 ? "\u2026" : "")
     });
-    const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
-    if (count4 > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count4));
-    if (count4 > 1) merge.addClass("mod-cta");
-    if (!check.ok) {
-      merge.setAttr("aria-disabled", "true");
-      merge.setAttr("title", t(check.reason));
+    const bookLock = this.bookLock();
+    if (!bookLock.ai) {
+      const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+      if (count4 > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count4));
+      if (count4 > 1) merge.addClass("mod-cta");
+      if (!check.ok) {
+        merge.setAttr("aria-disabled", "true");
+        merge.setAttr("title", t(check.reason));
+      }
+      const running2 = ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running";
+      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running2);
+      research.setAttr("aria-label", count4 > 1 ? t("ui.research_0_topics", count4) : t("ui.research_one_topic"));
+      if (count4 === 1) research.addClass("mod-cta");
     }
-    const running2 = ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running";
-    const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running2);
-    research.setAttr("aria-label", count4 > 1 ? t("ui.research_0_topics", count4) : t("ui.research_one_topic"));
-    if (count4 === 1) research.addClass("mod-cta");
-    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
+    if (!bookLock.structure) this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
     const more = this.button(selection, t("ui.card_more"), () => {
     });
     more.setAttr("aria-label", t("ui.selection_more_hint"));
@@ -95164,13 +95189,15 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots, i
     const add = (title, icon, action, disabled = false) => {
       menu.addItem((item) => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
     };
-    add(
-      count4 > 1 ? t("ui.synthesize_0_topics", count4) : t("ui.synthesize"),
-      "git-merge",
-      () => this.integrateSelected(),
-      count4 < 2
-    );
-    add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
+    const bookLock = this.bookLock();
+    if (!bookLock.ai)
+      add(
+        count4 > 1 ? t("ui.synthesize_0_topics", count4) : t("ui.synthesize"),
+        "git-merge",
+        () => this.integrateSelected(),
+        count4 < 2
+      );
+    if (!bookLock.structure) add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
     add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
     add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
     const nodes = [...this.selection.state.multiSelected].map((id) => {
@@ -95193,7 +95220,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots, i
     );
     menu.addSeparator();
     add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
-    add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
+    if (!bookLock.structure) add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
     menu.showAtMouseEvent(event);
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */
@@ -99961,7 +99988,7 @@ ${addition}` : addition },
         hoverEl = el;
       };
       const targetAt = (e) => {
-        if (!this.canSelectTopics() || !this.map) return null;
+        if (!this.canSelectTopics() || !this.map || this.bookLock().structure) return null;
         const self = this.map.nodes.find((item) => item.id === node.id);
         const roots = group ? this.selectedRoots() : self ? [self] : [];
         const z = this.map.viewport.zoom;

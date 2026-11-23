@@ -76279,6 +76279,7 @@ function bookChapterCalls() {
     write: writes + BOOK_EXPAND_PASSES,
     images: BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
     look: LOOKS_PER_CHAPTER,
+    diagram: 1,
     proof: writes,
     aiProof: 1 + 2 * MAX_AI_FIX_ROUNDS
   };
@@ -76306,7 +76307,7 @@ function bookStartEstimate(cards, trialCards, models) {
   return {
     cards: n,
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
-    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.look + per.proof + per.aiProof),
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.look + per.diagram + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };

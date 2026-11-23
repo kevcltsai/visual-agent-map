@@ -15886,8 +15886,23 @@ function slotKeywords(explains) {
   return [...out];
 }
 var KEYWORD_HITS = 2;
+var PLACE_WORDS = /* @__PURE__ */ new Set([
+  "after",
+  "before",
+  "paragraph",
+  "section",
+  "chapter",
+  "part",
+  "end",
+  "opening",
+  "\u4E00\u7BC0",
+  "\u6BB5\u843D",
+  "\u958B\u982D",
+  "\u7D50\u5C3E",
+  "\u7AE0\u7BC0"
+]);
 function checkImageText(body, slots, record) {
-  var _a2;
+  var _a2, _b2;
   const empty = { planned: 0, placed: 0, diagrams: 0, imageCount: 0, bad: 0, issues: [] };
   if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
   if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
@@ -15932,7 +15947,9 @@ function checkImageText(body, slots, record) {
     const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
     const words2 = slotKeywords(slot.explains);
     const hits = words2.filter((word) => around.includes(word)).length;
-    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
+    const place = slotKeywords((_b2 = slot.anchor) != null ? _b2 : "").filter((word) => !PLACE_WORDS.has(word));
+    const atPlace = hits > 0 && place.length > 0 && place.filter((word) => around.includes(word)).length >= Math.min(KEYWORD_HITS, place.length);
+    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length) && !atPlace)
       issues.push({ index: item.index, code: "mismatch" });
   }
   return {
@@ -50392,8 +50409,9 @@ function askWords(ask) {
 function wordHits(words2, text11) {
   var _a2;
   const lower6 = text11.toLowerCase().replace(/_/g, " ");
-  const own2 = new Set(((_a2 = lower6.match(/[a-z0-9][a-z0-9'-]*/g)) != null ? _a2 : []).map(stem));
-  return words2.filter((word) => /^[a-z0-9]/.test(word) ? own2.has(word) : lower6.includes(word)).length;
+  const own2 = [...new Set(((_a2 = lower6.match(/[a-z0-9][a-z0-9'-]*/g)) != null ? _a2 : []).map(stem))];
+  const has = (word) => own2.some((have) => have === word || word.length >= 5 && have.length <= word.length + 2 && have.startsWith(word));
+  return words2.filter((word) => /^[a-z0-9]/.test(word) ? has(word) : lower6.includes(word)).length;
 }
 var PHOTO_KIND = /photo|照片|相片|實拍|实拍|攝影|摄影|写真/i;
 var MAP_KIND = /\bmaps?\b|地圖|地图/i;
@@ -50465,13 +50483,27 @@ function plainCredit(value, max = CREDIT_MAX) {
   if (typeof value !== "string") return "";
   return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, max);
 }
+var FORM_WORDS = /* @__PURE__ */ new Set([
+  "diagram",
+  "chart",
+  "graph",
+  "photo",
+  "photograph",
+  "image",
+  "picture",
+  "illustration",
+  "drawing",
+  "figure",
+  "infographic",
+  "schematic",
+  "table"
+]);
 function unfitSlot(slot, said) {
   var _a2, _b2;
   const words2 = askWords(slot);
   if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) return "words";
-  const terms = (((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).map((term) => askWords({ explains: "", search: term })).filter((term) => term.length);
-  const hit = terms.filter((term) => wordHits(term, said) === term.length).length;
-  return !terms.length || hit < Math.ceil(terms.length / 2) ? "caption" : void 0;
+  const terms = (((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).map((term) => askWords({ explains: "", search: term }).filter((word) => !FORM_WORDS.has(word))).filter((term) => term.length);
+  return terms.some((term) => wordHits(term, said) === term.length) ? void 0 : "caption";
 }
 function slotCanBeChecked(slot) {
   var _a2, _b2;
@@ -89670,6 +89702,7 @@ ${t("ui.book_role_running_suffix")}` : first);
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
+    this.syncToolsVisibility();
     const overlay = canvas.createDiv("vam-canvas-overlay");
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);

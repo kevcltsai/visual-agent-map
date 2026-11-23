@@ -128,21 +128,39 @@ function plainCredit(value: unknown, max = CREDIT_MAX): string {
     .slice(0, max);
 }
 
+/** Words of a search term that name the form of a picture, not its subject: a file page rarely says them (live: "sleep cycle diagram"). */
+const FORM_WORDS = new Set([
+  "diagram",
+  "chart",
+  "graph",
+  "photo",
+  "photograph",
+  "image",
+  "picture",
+  "illustration",
+  "drawing",
+  "figure",
+  "infographic",
+  "schematic",
+  "table"
+]);
+
 /**
  * Whether a file's text (its title, description and categories) fits the slot: "words" when it names fewer than {@link FIT_HITS} of
- * the slot's words (all of them when the slot has fewer; none: no fit), "caption" when it names fewer than half (rounded up) of the
- * slot's English terms (the planner's, else the finder's search words as one term; a term counts when the text has all its words);
- * undefined when it fits. The slot's line is the caption only when the file passes the second rule: a file's own name is no caption
- * for a book. A slot with no English terms and no search words cannot be told ({@link slotCanBeChecked}).
+ * the slot's words (all of them when the slot has fewer; none: no fit), "caption" when it names none of the slot's English terms
+ * (the planner's, else the finder's search words as one term; a term counts when the text has all its subject words, form words such
+ * as "diagram" left out); undefined when it fits. The planner's terms are alternatives, so one named in full is enough (live 2026-11-23:
+ * half of them refused the correct hypnogram and circadian diagram). The slot's line is the caption only when the file passes the
+ * second rule: a file's own name is no caption for a book. A slot with no English terms and no search words cannot be told
+ * ({@link slotCanBeChecked}).
  */
 export function unfitSlot(slot: CommonsSlot, said: string): "words" | "caption" | undefined {
   const words = askWords(slot);
   if (wordHits(words, said) < Math.min(FIT_HITS, words.length) || !words.length) return "words";
   const terms = (slot.terms?.length ? slot.terms : [slot.search ?? ""])
-    .map(term => askWords({ explains: "", search: term }))
+    .map(term => askWords({ explains: "", search: term }).filter(word => !FORM_WORDS.has(word)))
     .filter(term => term.length);
-  const hit = terms.filter(term => wordHits(term, said) === term.length).length;
-  return !terms.length || hit < Math.ceil(terms.length / 2) ? "caption" : undefined;
+  return terms.some(term => wordHits(term, said) === term.length) ? undefined : "caption";
 }
 
 /** The slot has English terms or a finder search to compare a file with. */

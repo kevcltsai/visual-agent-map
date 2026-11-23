@@ -4029,17 +4029,16 @@ test('worst-case calls: every chapter redoes once, uses every AI round and nothi
   }
 });
 
-test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate (the covers add nothing), and with a bare root (no picture slots) the cover search stays inside it; within the 300 limit', async () => {
+test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the diagram call, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate (the covers add nothing), and with a bare root (no picture slots) the cover search stays inside it; within the 300 limit', async () => {
   const { bookStartEstimate } = S.load('experiences/visual-map/book-pipeline-start-modal.ts', { obsidian: S.obsidian });
   const counted = new Map();
   for (const variant of ['plain', 'cover', 'cover-bare-root']) {
-  const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n`;
-  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'chart', explains: 'a port', anchor: 'end' }];
+  const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n\n〔圖位 3：the trade cycle〕\n`;
+  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }, { index: 3, kind: 'flow chart', explains: 'the trade cycle', anchor: 'end' }];
   for (const titles of [['R', 'A'], ['R', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']]) {
     const seen = new Set();
     const author = [];
     let imageCalls = 0;
-    let diagramCalls = 0;
     let coverAsked = 0;
     let picked = 0;
     const holder = {};
@@ -4072,24 +4071,24 @@ test('worst-case calls with picture search: every step uses its whole allowance 
         },
         fetchPicture: async url => `data:image/jpeg;base64,${Buffer.from(url).toString('base64')}`,
         lookAtImage: async (request, run) => { imageCalls++; await run.admission.reserve(); return { fits: false, caption: '' }; },
-        // The diagram drawing: one call for every chapter whose diagram slots stay empty (it draws nothing here, the call is what is counted).
-        drawDiagrams: async (request, run) => { diagramCalls++; await run.admission.reserve(); return []; }
+        // The diagram-kind slot 3 finds nothing, so each chapter asks for diagrams once (and gets none: the worst case spends the call).
+        drawDiagrams: async (request, run) => { imageCalls++; await run.admission.reserve(); return []; }
       }
     });
     holder.r = r;
     await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
     await finishAi(r);
     const s = await r.state();
-    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls + diagramCalls;
+    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls;
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 20 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 20 per card (3 of them picture looks, 1 the diagram drawing); the covers add nothing');
+    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 20 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 20 per card (3 of them picture looks, 1 the diagram call); the covers add nothing');
     counted.set(`${variant}:${titles.length}`, calls);
     if (variant === 'cover-bare-root') {
       assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
       assert.ok(calls <= estimate, `${titles.length} cards, bare root: ${calls} calls within the estimate ${estimate}`);
-      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 - 3 - 1 + 2, 'the bare root swaps its own picture searches, looks and diagram drawing (none: no slots) for the one cover search with its language retry');
+      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 - 3 - 1 + 2, 'the bare root swaps its own picture searches, looks and diagram call (none: no slots) for the one cover search with its language retry');
     } else {
       assert.equal(calls, estimate, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none: the real maximum is the estimate`);
       assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');

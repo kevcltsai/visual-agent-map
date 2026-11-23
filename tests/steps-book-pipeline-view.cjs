@@ -584,7 +584,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 44 分鐘 · 最多 67 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 40 分鐘 · 最多 67 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
   assert.ok(all.includes('只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
@@ -786,7 +786,7 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   const start = bundleStart;
   assert.equal(JSON.stringify(start.bookChapterCalls()), JSON.stringify({ plan: 1, write: 4, images: 4, look: 3, diagram: 1, proof: 2, aiProof: 5 }));
   const per = start.bookChapterCalls();
-  assert.equal(per.plan + per.write + per.images + per.look + per.diagram + per.proof + per.aiProof, 20, 'at most 20 calls a chapter (only the first write searches for pictures; at most 3 looks; at most 1 diagram drawing)');
+  assert.equal(per.plan + per.write + per.images + per.look + per.diagram + per.proof + per.aiProof, 20, 'at most 20 calls a chapter (only the first write searches for pictures; at most 3 looks; one diagram call)');
   assert.equal(start.bookWholeCalls(3), 7, 'three cards: one more call, the chief editor\'s pass over the plans');
   assert.equal(start.bookWholeCalls(2), 6, 'the whole-book plan, the whole-book AI proofread and 2 x (fix + re-check)');
   assert.equal(start.bookWholeCalls(1), 1, 'one chapter: nothing to compare across chapters');
@@ -794,18 +794,18 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   assert.equal(start.bookStartEstimate(10, 10).calls, 207, 'the trial size does not change the calls (no second trial fix round)');
   assert.equal(start.bookStartEstimate(2, 2).calls, 46);
   assert.equal(start.bookStartEstimate(1, 1).calls, 21, 'one card: 1 + 20, no whole-book proofread');
-  assert.equal(start.bookStartEstimate(15, 3).calls, 307, 'above the 300 limit: the maximum is shown, the run pauses at 300');
+  assert.equal(start.bookStartEstimate(15, 3).calls, 307, 'the worst case of 15 cards is above the 300 limit: the run pauses there, and the card says so');
   assert.equal(start.bookStartEstimate(15, 3).limit, 300);
   assert.equal(start.bookStartEstimate(20, 99).calls, start.bookStartEstimate(20, 20).calls, 'a trial cannot be larger than the book');
   // Time: the 20 s plan, the trial round and three rounds of five, each card plan + 2 x (write + author check) + 2 searches + 2 expand writes + the AI
   // proofread (1 check + 2 x (fix as a write + check); an assumption, not measured), then the whole-book AI proofread the same way.
   const owner = { plan: 'claude:opus', write: 'claude:sonnet', images: 'claude:haiku', proof: 'claude:sonnet' };
   const aiProof = 19 + 2 * (63 + 19);
-  const perCard = 20 + 2 * (63 + 19) + 2 * 55 + 3 * 55 + 63 + 2 * 63 + aiProof; // 3 picture looks timed like a picture call
+  const perCard = 20 + 2 * (63 + 19) + 2 * 55 + 3 * 55 + 2 * 63 + aiProof; // 3 picture looks timed like a picture call
   assert.equal(start.bookStartEstimate(15, 3, owner).seconds, 20 + 20 + 4 * perCard + aiProof);
   assert.equal(start.bookStartEstimate(15, 3).seconds, 20 + 20 + 4 * perCard + aiProof, 'no models: the measured ones');
   // Another model scales its step: Sonnet for pictures doubles the picture time.
-  assert.equal(start.bookStartEstimate(1, 3, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 19) + 2 * 110 + 3 * 110 + 63 + 2 * 63 + aiProof);
+  assert.equal(start.bookStartEstimate(1, 3, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 19) + 2 * 110 + 3 * 110 + 2 * 63 + aiProof);
   assert.equal(JSON.stringify(start.bookStartEstimate(0, 3)), JSON.stringify({ cards: 0, calls: 1, limit: 300, seconds: 20 }));
   // The chief editor's one pass over the plans (three cards or more) is timed like one plan call; below three cards it adds nothing (two cards: none).
   assert.equal(start.bookStartEstimate(3, 3, owner).seconds - start.bookStartEstimate(2, 2, owner).seconds, 20, 'a third card adds the plan edit (same rounds) and nothing else');
@@ -813,9 +813,9 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
   assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 59 分鐘 · 最多 307 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 55 分鐘 · 最多 307 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 59 minutes · up to 307 AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at 300).");
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 55 minutes · up to 307 AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at 300).");
   lang('zh-TW');
 });
 

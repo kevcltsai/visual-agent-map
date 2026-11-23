@@ -45,8 +45,7 @@ export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
  * The cover adds nothing to the estimate: a chapter's or section's cover rides in the first picture search the card already makes, and the
  * book's own cover (a root with no picture slots) is one search plus its caption-language retry, 2 calls, inside the 4 picture calls
  * bookChapterCalls() already reserves for every card. So the estimate stays the real maximum, 7 + 20 n (6 + 20 n below three cards, where there is no plan edit);
- * the 20 is the 16 plus the {@link LOOKS_PER_CHAPTER} picture looks plus the one diagram-drawing call. That call is counted whether or not the
- * "add diagrams" setting is on (the card does not know it): the estimate is a maximum.
+ * the 20 is the 16 plus the {@link LOOKS_PER_CHAPTER} picture looks plus the one diagram call.
  */
 
 export { BOOK_EXPAND_PASSES };
@@ -56,7 +55,8 @@ export { BOOK_EXPAND_PASSES };
  * redo) runs the author and the author's own check; the {@link BOOK_EXPAND_PASSES} expand passes add writing calls. Only the first
  * write searches for pictures (the redo and the expand passes edit the chapter in place and keep its pictures): the searches, each
  * with its caption-language retry. Then the AI proofread: one check and up to {@link MAX_AI_FIX_ROUNDS}
- * rounds of one fix and one more check. The picture looks ({@link LOOKS_PER_CHAPTER} a chapter at most, over both searches) are one call each; the diagram drawing for slots still without a picture is one call a chapter at most. Failed-step retries are not in it.
+ * rounds of one fix and one more check. The picture looks ({@link LOOKS_PER_CHAPTER} a chapter at most, over both searches) are one call each, and a chapter
+ * whose diagram-kind slots stay empty asks for diagrams once (counted even with diagrams off: still an upper bound). Failed-step retries are not in it.
  */
 export function bookChapterCalls(): {
   plan: number;
@@ -119,7 +119,6 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
     writes * (time("write") + time("proof")) +
     BOOK_IMAGE_SEARCHES * time("images") +
     LOOKS_PER_CHAPTER * time("images") +
-    per.diagram * time("write") +
     BOOK_EXPAND_PASSES * time("write") +
     aiProof;
   // The trial cards run first, the rest follow, BOOK_POOL at a time (nothing waits for the owner any more).

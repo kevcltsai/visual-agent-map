@@ -1839,12 +1839,68 @@ test('look: a picture that does not fit goes to the next candidate; every candid
   assert.ok(!/img1\.example\.org/.test(detail));
   assert.deepEqual(plain(offSlots(detail)), []);
   const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
-  const r2 = await picRig({ ports: bad.ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2)] }) : none() });
+  const r2 = await picRig({ ports: bad.ports, slots: lookSlot('painting'), text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2)] }) : none() });
   await run(r2);
   const detail2 = (await r2.note(0)).detail;
   assert.equal(figures(detail2).length, 1, 'a picture is placed, not left empty');
   assert.deepEqual(plain(offSlots(detail2)), [1]);
   assert.match(detail2, /Finder caption 1/, 'the finder caption stays; an unfit look gives none');
+});
+
+const lookSlot = kind => [{ index: 1, kind, explains: 'explains 1 perspective', anchor: 'after paragraph 1' }];
+const lookText = title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`;
+const lookDiagram = { slot: 1, title: '開場到小結', mermaid: 'flowchart LR\n  A[開場] --> B[小結]' };
+
+test('look + diagram: a diagram-kind slot whose only candidate the look refused is not placed (not even as a last resort); the diagram step is asked for it and draws it', async () => {
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  const asked = [];
+  const r = await picRig({ slots: lookSlot('diagram'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...bad.ports, drawDiagrams: async (request, run) => { if (/SecretRootTitle/.test(request.chapter)) asked.push(request.slots.map(s => s.index)); await run.admission.reserve(); return [lookDiagram]; } } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(bad.seen.looks.length, 1);
+  assert.deepEqual(plain(asked), [[1]], 'the diagram step is asked for the slot');
+  assert.equal(figures(detail).length, 0, 'the refused picture is not placed');
+  assert.ok(!/img1\.example\.org/.test(detail));
+  assert.match(detail, /```mermaid/);
+  assert.deepEqual(plain(offSlots(detail)), []);
+});
+
+test('look + diagram: a diagram-kind slot whose only candidate the look refused and no chart drawn stays not found (no picture, not off)', async () => {
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  const r = await picRig({ slots: lookSlot('diagram'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...bad.ports, drawDiagrams: async () => [] } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 0);
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'missing']]);
+});
+
+test('look + diagram: a non-diagram slot whose only candidate the look refused is still placed as the last resort and recorded off; no chart is asked for', async () => {
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  let drawn = 0;
+  const r = await picRig({ slots: lookSlot('painting'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...bad.ports, drawDiagrams: async request => { if (/SecretRootTitle/.test(request.chapter)) drawn++; return [lookDiagram]; } } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(drawn, 0);
+  assert.equal(figures(detail).length, 1);
+  assert.match(detail, /img1\.example\.org/);
+  assert.deepEqual(plain(offSlots(detail)), [1]);
+});
+
+test('look + diagram: a diagram-kind slot with a look-accepted candidate is placed and nothing is drawn', async () => {
+  const good = lookPorts({ verdict: () => ({ fits: true, caption: '一張畫好的格線圖' }) });
+  let drawn = 0;
+  const r = await picRig({ slots: lookSlot('diagram'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...good.ports, drawDiagrams: async request => { if (/SecretRootTitle/.test(request.chapter)) drawn++; return [lookDiagram]; } } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(drawn, 0);
+  assert.equal(figures(detail).length, 1);
+  assert.match(detail, /img1\.example\.org/);
+  assert.doesNotMatch(detail, /```mermaid/);
+  assert.deepEqual(plain(offSlots(detail)), []);
 });
 
 test('look: at most 3 looks a chapter; the 4th non-Commons candidate is not fetched or looked at and is kept unchecked', async () => {

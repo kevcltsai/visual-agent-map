@@ -5432,6 +5432,7 @@ export class BookPipelineRuns {
             kept.push(fit.caption ? { ...item, candidate: { ...candidate, caption: fit.caption } } : item);
           } else {
             looksUnfit++;
+            if (isDiagramKind(slot.kind)) noLastResort.add(`${slot.index}|${candidate.imageUrl}`);
             const held = heldUnfit.get(slot.index) ?? [];
             if (!held.some(have => have.url === candidate.imageUrl))
               heldUnfit.set(slot.index, [

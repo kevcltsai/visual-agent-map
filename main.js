@@ -61370,6 +61370,7 @@ ${oldDetail}`);
             kept.push(fit.caption ? { ...item, candidate: { ...candidate, caption: fit.caption } } : item);
           } else {
             looksUnfit++;
+            if (isDiagramKind(slot.kind)) noLastResort.add(`${slot.index}|${candidate.imageUrl}`);
             const held = (_a3 = heldUnfit.get(slot.index)) != null ? _a3 : [];
             if (!held.some((have) => have.url === candidate.imageUrl))
               heldUnfit.set(slot.index, [

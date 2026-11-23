@@ -124,6 +124,24 @@ export function isChainSafeFor(action: MapChatAction, trusted: MapChatTrusted = 
   }
 }
 
+/**
+ * An empty-target `research_standard` or `expand` runs on the selection; when an earlier `select_topics` of the same reply named
+ * its cards explicitly (not `all`), the selection is those cards, so its targets resolve to them. Any other empty target stays empty
+ * (the selection is not known here, see {@link isChainSafeFor}).
+ */
+export function resolveSelectionTargets(actions: readonly MapChatAction[]): MapChatAction[] {
+  let selected: string[] | null = null;
+  return actions.map(action => {
+    if (action.kind === "select_topics") {
+      selected = !action.all && action.nodeIds.length ? [...action.nodeIds] : null;
+    } else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selected = [...action.nodeIds];
+      else if (selected && CHAIN_SAFE_RUN.has(action.action)) return { ...action, nodeIds: [...selected] };
+    }
+    return action;
+  });
+}
+
 /** Where the reply sits in an automatic continuation. Absent = an ordinary message (or the first round). */
 export interface MapChatPlanChain {
   /** The round this reply belongs to, from 1; only 2 and up use the chain rules. */
@@ -314,7 +332,8 @@ export function planFor(
   const readsSources = options.chatReadSources === true;
   const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
   const onlySafe =
-    readsResearch && actions.every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
+    readsResearch &&
+    resolveSelectionTargets(actions).every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
   // find_images never needs a plan (owner: pictures are put in without asking), so it does not count toward the action limit or the other-actions rules.
   // read_md_file writes nothing and is never shown (decision 2026-11-15-map-chat-file-bugs#2): it does not count either.

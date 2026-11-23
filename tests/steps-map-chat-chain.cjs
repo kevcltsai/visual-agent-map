@@ -208,6 +208,22 @@ test('R3 B2 plan counterexample: update_summary, set_topic_kind and research_sta
   assert.equal(plan([{ kind: 'set_appearance', nodeIds: ['a'] }, run('expand', { nodeIds: ['a'] })], r2), null, 'appearance and expand stay safe');
   assert.equal(isChainSafeFor(add(1)), true);
 });
+test('R3 plan: an empty-target research or expand after a select_topics with explicit ids (round-3 shape of the image chain) resolves to those ids; any other empty target stays unsafe', () => {
+  const r3 = { round: 3, researchSoFar: 0 };
+  const ids = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+  const created = { trusted: { createdIds: new Set(ids) } };
+  const select = (nodeIds, all = false) => ({ kind: 'select_topics', nodeIds, all });
+  const research = (nodeIds = []) => run('research_standard', { nodeIds });
+  assert.equal(plan([select(ids), research()], r3, created), null, 'real round-3 shape: all created, none researched');
+  assert.equal(plan([select(ids), run('expand', { nodeIds: [] })], r3, created), null, 'expand follows the selection too');
+  assert.ok(reasons([select(ids), research()], r3).includes('auto_round_other_actions'), 'ids the chain did not make');
+  assert.ok(reasons([select([...ids, 'old']), research()], r3, created).includes('auto_round_other_actions'), 'one existing card is enough');
+  assert.ok(reasons([select(ids), research()], r3, { trusted: { createdIds: new Set(ids), researchedIds: new Set(['t1']) } }).includes('auto_round_other_actions'), 'already researched asks again');
+  assert.ok(reasons([research()], r3, created).includes('auto_round_other_actions'), 'no select: unknown selection');
+  assert.ok(reasons([select(ids, true), research()], r3, created).includes('auto_round_other_actions'), 'select all is not explicit ids');
+  assert.ok(reasons([select([]), research()], r3, created).includes('auto_round_other_actions'), 'an empty select is not explicit ids');
+  assert.ok(reasons([research(), select(ids)], r3, created).includes('auto_round_other_actions'), 'select after the research does not count');
+});
 test('R1 L3 plan: an expand counts the ask-again, two outline calls per card', () => {
   assert.equal(plan([run('expand', { nodeIds: ['x', 'y', 'z'] }), { kind: 'create_map', title: 'M' }]).estimatedCalls, 6);
 });

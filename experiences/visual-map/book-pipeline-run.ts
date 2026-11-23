@@ -105,6 +105,7 @@ import {
   backToPlan,
   undoStructure,
   restructureAtReview,
+  samePlanReview,
   stopRun,
   failRun,
   type PipelineAction,
@@ -1576,33 +1577,17 @@ export class BookPipelineRuns {
           map.bookPipeline = keptTrace ? { ...made, gateTrace: keptTrace } : made;
         }
       };
-      drive.structureBusy = true;
-      try {
-        let outcome: StructureResult = { ok: false, code: "cancelled" };
-        await this.ports.mutate(async () => {
-          if (this.dead(drive)) return;
-          outcome = (await this.ports.editBookStructure?.(mapPath, work)) ?? outcome;
-        });
-        if (!outcome.ok) {
-          this.log(drive, "structure_undo_failed", "-", "plan", outcome.code);
-          if (outcome.rollbackFailed) throw new Error("structure_rollback");
-          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
-        }
-        await drive.store.commit(state => ({
-          state: (next as (s: BookPipelineData) => BookPipelineData)(state),
-          accepted: true
-        }));
-        const map = await this.ports.readMap(mapPath);
-        drive.cards.clear();
-        drive.stages.clear();
-        drive.skippedRefreshed = false;
-        await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-        drive.members = new Set(map.nodes.map(node => node.id));
-        const parked = Object.entries(parkedNow).map(([id, path]) => ({ id, path }));
-        if (parked.length && this.ports.callouts?.clearNotes)
-          await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
-      } finally {
-        drive.structureBusy = false;
+      const outcome = await this.writeStructure(
+        drive,
+        work,
+        state => (next as (s: BookPipelineData) => BookPipelineData)(state),
+        parkedNow,
+        () => !this.dead(drive)
+      );
+      if (!outcome.ok) {
+        this.log(drive, "structure_undo_failed", "-", "plan", outcome.code);
+        if (outcome.rollbackFailed) throw new Error("structure_rollback");
+        throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
       }
       await this.pointHomesBack(drive, edit, picked);
       // The other cards' neighbour lines and numbers follow the restored order (a program rewrite; the loop's first round does it).
@@ -1632,14 +1617,7 @@ export class BookPipelineRuns {
       mapPath,
       async drive => {
         const data = await this.openSaved(drive, mapPath);
-        if (
-          data.phase !== "gate1" ||
-          data.status !== "running" ||
-          !data.planReview ||
-          data.runId !== expect.runId ||
-          data.phaseStartedAt !== expect.phaseStartedAt
-        )
-          throw new BookPipelineRunError("not_gate1");
+        if (!samePlanReview(data, expect)) throw new BookPipelineRunError("not_gate1");
         if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
         const order = effectiveOrder(data);
         const baseNodes: StructureNode[] = order.map(id => ({
@@ -1677,30 +1655,11 @@ export class BookPipelineRuns {
             typeof opening === "function" ? opening(affected.length) : opening
           );
         });
-        drive.structureBusy = true;
-        try {
-          let outcome: StructureResult = { ok: false, code: "cancelled" };
-          await this.ports.mutate(async () => {
-            if (this.dead(drive)) return;
-            outcome = (await this.ports.editBookStructure?.(mapPath, work)) ?? outcome;
-          });
-          if (!outcome.ok) {
-            this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
-            if (outcome.rollbackFailed) throw new Error("structure_rollback");
-            throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
-          }
-          await drive.store.commit(state => ({ state: next(state), accepted: true }));
-          const map = await this.ports.readMap(mapPath);
-          drive.cards.clear();
-          drive.stages.clear();
-          drive.skippedRefreshed = false;
-          await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-          drive.members = new Set(map.nodes.map(node => node.id));
-          const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-          if (parked.length && this.ports.callouts?.clearNotes)
-            await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
-        } finally {
-          drive.structureBusy = false;
+        const outcome = await this.writeStructure(drive, work, next, archived, () => !this.dead(drive));
+        if (!outcome.ok) {
+          this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
+          if (outcome.rollbackFailed) throw new Error("structure_rollback");
+          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
         }
         // The other cards' neighbour lines and numbers follow the new order (a program rewrite; the loop's first round does it).
         for (const id of effectiveOrder(drive.store.state))
@@ -4344,51 +4303,67 @@ export class BookPipelineRuns {
       structureEdit: { ...record, applied: parts.applied, archived: parts.archived },
       revision: state.revision + 1
     }));
+    const outcome = await this.writeStructure(drive, work, next, archived, this.authorize(drive, token));
+    if (!outcome.ok) {
+      this.log(drive, "structure_failed", "-", "plan", outcome.code);
+      if (outcome.rollbackFailed) {
+        drive.fatal = new Error("structure_rollback");
+        drive.failure = "structure_rollback";
+        return "fatal";
+      }
+      // Nothing was applied (the map is as it was): the materials' homes go back to the cards as they are (the root's plan was written
+      // with the merge targets' titles).
+      if (sim.applied.some(a => a.op.kind === "merge")) {
+        try {
+          const now = await this.ports.readCard(rootPath);
+          await this.ports.updateNoteRawGuarded(rootPath, content => replaceBookPlanSection(content, plainSection), {
+            expectedContent: now.raw,
+            authorize: this.authorize(drive, token)
+          });
+        } catch {
+          // the homes keep the merge targets' titles; the plan reads the same
+        }
+      }
+    }
+    return "done";
+  }
+
+  /**
+   * Writes one structure change, the same for the editor's proposal, the chat's change and the undo: the drive is marked structure-busy
+   * (a map change it causes is not a reader's), the notes, Map.md and `bookPipeline` go in one transaction in the write queue (`allowed`
+   * is asked there), and on success the run state is committed with `next`, the drive reads the new map and the parked notes lose the
+   * program's callouts. `parked` is filled by the transaction itself. Returns the transaction's outcome; what a failure means is the
+   * caller's.
+   */
+  private async writeStructure(
+    drive: Drive,
+    work: StructureWork,
+    next: (state: BookPipelineData) => BookPipelineData,
+    parked: Readonly<Record<string, string>>,
+    allowed: () => boolean
+  ): Promise<StructureResult> {
     drive.structureBusy = true;
     try {
       let outcome: StructureResult = { ok: false, code: "cancelled" };
       await this.ports.mutate(async () => {
-        if (!this.authorize(drive, token)()) return;
+        if (!allowed()) return;
         outcome = (await this.ports.editBookStructure?.(drive.mapPath, work)) ?? outcome;
       });
-      if (!outcome.ok) {
-        this.log(drive, "structure_failed", "-", "plan", outcome.code);
-        if (outcome.rollbackFailed) {
-          drive.fatal = new Error("structure_rollback");
-          drive.failure = "structure_rollback";
-          return "fatal";
-        }
-        // Nothing was applied: the materials' homes go back to the cards as they are (the root's plan was written with the merge targets' titles).
-        if (sim.applied.some(a => a.op.kind === "merge")) {
-          try {
-            const now = await this.ports.readCard(rootPath);
-            await this.ports.updateNoteRawGuarded(rootPath, content => replaceBookPlanSection(content, plainSection), {
-              expectedContent: now.raw,
-              authorize: this.authorize(drive, token)
-            });
-          } catch {
-            // the homes keep the merge targets' titles; the plan reads the same
-          }
-        }
-        return "done";
-      }
-      await drive.store.commit(state => ({
-        state: next(state),
-        accepted: true
-      }));
+      if (!outcome.ok) return outcome;
+      await drive.store.commit(state => ({ state: next(state), accepted: true }));
       const map = await this.ports.readMap(drive.mapPath);
       drive.cards.clear();
       drive.stages.clear();
       drive.skippedRefreshed = false;
       await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
       drive.members = new Set(map.nodes.map(node => node.id));
-      const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-      if (parked.length && this.ports.callouts?.clearNotes)
-        await this.ports.callouts.clearNotes(drive.mapPath, runId, parked).catch(() => false);
+      const notes = Object.entries(parked).map(([id, path]) => ({ id, path }));
+      if (notes.length && this.ports.callouts?.clearNotes)
+        await this.ports.callouts.clearNotes(drive.mapPath, drive.store.state.runId, notes).catch(() => false);
+      return outcome;
     } finally {
       drive.structureBusy = false;
     }
-    return "done";
   }
 
   /** The one transaction both structure paths write (the notes, Map.md and `bookPipeline`); `compose` makes the new run state from what the edit produced. */

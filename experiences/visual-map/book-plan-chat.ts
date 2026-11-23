@@ -10,6 +10,7 @@ import {
   type BookRole,
   type BookSettings
 } from "../../core/book-pipeline/model";
+import { atPlanReview, samePlanReview } from "../../core/book-pipeline/machine";
 import { bookStructure, type BookStructure, type CardKind } from "../../core/book-pipeline/structure";
 import {
   cardPlanPlaceOf,
@@ -70,8 +71,7 @@ export function reviewRun(map: MapDocument | null): BookPipelineData | undefined
   if (!map) return undefined;
   const read = readBookPipeline(map);
   if (read.kind !== "usable") return undefined;
-  const data = read.data;
-  return data.phase === "gate1" && data.status === "running" && data.planReview ? data : undefined;
+  return atPlanReview(read.data) ? read.data : undefined;
 }
 /** The run of the map while the plan is planned again after a chat structure edit (planning, plan review, edited); undefined otherwise. */
 export function replanRun(map: MapDocument | null): BookPipelineData | undefined {
@@ -172,19 +172,15 @@ export async function applyBookPlanEdit(
   baseline: Pick<MapChatContext, "bookPlan">
 ): Promise<ChatOutcome> {
   const plan = baseline.bookPlan;
-  const stillReview = (map: MapDocument | null): boolean => {
-    const run = reviewRun(map);
-    return !!run && run.runId === plan?.runId && run.phaseStartedAt === plan.phaseStartedAt;
-  };
   const started = (): ChatOutcome => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
   // No plan in the baseline: the turn was not made while the plan waited for the author, so there is nothing to edit from here.
   if (!plan) return started();
   const map = await deps.readMap();
   const rootId = rootOf(map);
   const data = reviewRun(map);
-  if (!rootId || !data || !stillReview(deps.map())) return started();
+  if (!rootId || !data || !sameReview(deps.map(), plan)) return started();
   const structure = structureOfMap(map, effectiveOrder(data), rootId);
-  const authorize = (): boolean => stillReview(deps.map());
+  const authorize = (): boolean => sameReview(deps.map(), plan);
   const pathOf = (id: string): string | undefined => map.nodes.find(node => node.id === id)?.path;
   const seen = new Map<string, { prompt: string; kind: CardKind; title: string }>();
   const locked = new Set<string>();
@@ -248,10 +244,8 @@ const skip = (key: Parameters<typeof t>[0], ...args: (string | number)[]): ChatO
   reason: t(key, ...args)
 });
 /** True while the run is still at the plan review the proposal was made on. */
-const sameReview = (map: MapDocument | null, plan: PlanBaseline): boolean => {
-  const run = reviewRun(map);
-  return !!run && run.runId === plan.runId && run.phaseStartedAt === plan.phaseStartedAt;
-};
+const sameReview = (map: MapDocument | null, plan: PlanBaseline | undefined): boolean =>
+  samePlanReview(reviewRun(map), plan);
 const refusalKey = (code: string): Parameters<typeof t>[0] | undefined =>
   code === "not_gate1"
     ? "ui.map_chat_skip_book_started"

@@ -815,6 +815,20 @@ function resetAffected(next: BookPipelineData, affected: readonly string[]): voi
   next.revision++;
 }
 
+/** The run waits for the author at the plan review: gate 1, running, plan review. */
+export const atPlanReview = (data: BookPipelineData): boolean =>
+  data.phase === "gate1" && data.status === "running" && !!data.planReview;
+
+/**
+ * Still the plan review a proposal was made on: at the plan review, the same run and the same phase start (a re-plan or a new run is a
+ * new review). The chat's apply paths and the runner's structure entry ask this one question.
+ */
+export const samePlanReview = (
+  data: BookPipelineData | undefined,
+  base: { runId: string; phaseStartedAt?: string } | undefined
+): boolean =>
+  !!data && !!base && atPlanReview(data) && data.runId === base.runId && data.phaseStartedAt === base.phaseStartedAt;
+
 /**
  * At the plan review: the owner changed the structure through chat (the runner applied it). The run goes back to planning with the plan
  * review kept; only the cards it touched (`affected`) start over. The editor's pass is NOT rerun (`planEdited` stays, so it cannot

@@ -949,3 +949,67 @@ test('R2/M1 style: the anchor lines are heavier and in the accent colour; a quie
   assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: var\(--interactive-accent\); \}/);
   assert.match(css, /\.vam-view \.vam-relation-label\.is-ring-quiet:not\(\.is-expanded\) \{ display: none; \}/);
 });
+
+// place_image (canvas picture): source-level checks of the view wiring, and the wording of the line and the result block.
+const fsOf = require('node:fs'), pathOf = require('node:path');
+const VIEW_SRC = fsOf.readFileSync(pathOf.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+const CHAT_SRC = fsOf.readFileSync(pathOf.join(__dirname, '..', 'experiences', 'visual-map', 'map-chat.ts'), 'utf8');
+/** The text of one method of the view: from its signature line to the next method at the same indent. */
+const methodOf = (src, name) => {
+  const start = src.search(new RegExp(`\\n  (?:private |async )*${name}\\(`));
+  assert.ok(start >= 0, `${name} exists`);
+  const next = src.slice(start + 1).search(/\n  (?:\/\*\*|private |async |public )/);
+  return src.slice(start, next < 0 ? undefined : start + 1 + next);
+};
+
+test('place_image: the dispatch goes to chatPlaceCanvasImage and hands the id promise to work.canvasImage; no placeholder is left', () => {
+  const dispatch = VIEW_SRC.slice(VIEW_SRC.indexOf('if (action.kind === "place_image")'));
+  const branch = dispatch.slice(0, dispatch.indexOf('continue;', dispatch.indexOf('chatPlaceCanvasImage')) + 10);
+  assert.match(branch, /await this\.chatPlaceCanvasImage\(action\.direction, options\.work\)/);
+  assert.doesNotMatch(branch, /skip_unavailable/, 'no placeholder for place_image');
+  assert.match(methodOf(VIEW_SRC, 'chatPlaceCanvasImage'), /work\.canvasImage = found\.placed/);
+  assert.match(methodOf(VIEW_SRC, 'chatPlaceCanvasImage'), /findCanvas\(/);
+  assert.match(VIEW_SRC, /case "place_image":\s*return t\("ui\.map_chat_do_place_image_0"/);
+});
+
+test('place_image: the chain ports carry imageExists and the finder ports carry the canvas seams', () => {
+  assert.match(methodOf(VIEW_SRC, 'chatChainPorts'), /imageExists: id => !!findAnnotatedImage\(this\.map\?\.canvasItems \?\? \[\], id\)/);
+  assert.match(VIEW_SRC, /canvasPreflight: block => this\.chatCanvasImageRefusal\(block\)/);
+  assert.match(VIEW_SRC, /writeCanvas: \(block, _candidate, file, alive\) => this\.chatCanvasImageWrite\(block, file, alive\)/);
+});
+
+test('place_image: the canvas write is one plugin.mutate, one pushSolo, with the web note, and is fenced before and inside the write', () => {
+  const write = methodOf(VIEW_SRC, 'chatCanvasImageWrite');
+  assert.equal((write.match(/this\.plugin\.mutate\(/g) ?? []).length, 1);
+  assert.equal((write.match(/\.pushSolo\(/g) ?? []).length, 1);
+  assert.equal((write.match(/\.commit\(/g) ?? []).length, 1);
+  assert.match(write, /t\("ui\.canvas_image_web_note_0", block\.query\)/);
+  assert.match(write, /convertToAnnotatedImage\(/);
+  assert.equal((write.match(/stale\(\)/g) ?? []).length >= 2, true, 'checked before and inside the write');
+  assert.match(write, /canvasImageSpot\(/);
+  assert.match(methodOf(VIEW_SRC, 'chatCanvasImageRefusal'), /canEditCanvasItems\(\)/);
+});
+
+test('place_image: settledLine words a canvas block as the canvas picture, not as cards', () => {
+  const { settledLine } = load('experiences/visual-map/map-chat.ts', { obsidian: { ...obsidian, Keymap: {}, setIcon() {} } });
+  const { t } = load('i18n.ts');
+  const block = over => ({ query: 'barn', nodeId: '', nodeTitle: '', canvas: true, state: 'ready', items: [{ candidate: { url: 'https://e.org/a.png', title: 'A' }, inserted: 'A' }], ...over });
+  const line = blocks => ({ status: 'done', text: 'x', imageGroup: blocks });
+  const done = settledLine(line([block()]));
+  assert.equal(done.status, 'done');
+  assert.equal(done.text, t('ui.map_chat_line_canvas_image_done'));
+  const missed = settledLine(line([block({ state: 'empty', items: [] })]));
+  assert.equal(missed.status, 'skipped');
+  assert.equal(missed.text, t('ui.map_chat_line_canvas_image_missed'));
+  assert.equal(settledLine(line([block({ state: 'failed', items: [] })])).status, 'failed');
+  const cards = settledLine(line([block({ canvas: undefined, nodeId: 'a', nodeTitle: 'A' })]));
+  assert.notEqual(cards.text, t('ui.map_chat_line_canvas_image_done'), 'a card block keeps the card wording');
+  assert.equal(settledLine(line([block({ state: 'searching', items: [] })])).status, 'done', 'still searching: progress line');
+});
+
+test('place_image: buildImageResult says the canvas wording in the head and shows the words, not a card title', () => {
+  const build = methodOf(CHAT_SRC, 'buildImageResult');
+  assert.match(build, /blocks\.every\(block => block\.canvas\)\s*\?\s*t\(placed \? "ui\.map_chat_images_canvas_done" : "ui\.map_chat_line_canvas_image_missed"\)/);
+  assert.match(build, /block\.canvas \? block\.query : block\.nodeTitle/);
+  assert.match(build, /current\.nodeTitle \|\| current\.query/, 'a searching canvas block names its words');
+});

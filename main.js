@@ -89702,6 +89702,7 @@ ${t("ui.book_role_running_suffix")}` : first);
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
+    this.syncToolsVisibility();
     const overlay = canvas.createDiv("vam-canvas-overlay");
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);

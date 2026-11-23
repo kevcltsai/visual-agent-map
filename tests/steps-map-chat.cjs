@@ -1888,6 +1888,10 @@ test('auto-apply plan (c): what still needs a plan, whatever else is in the repl
   assert.equal(autoPlan([anchor], { imageMode: 'direct', imageAttached: true }), null, 'an image turn applied directly is as before');
   assert.ok(autoPlan([anchor]), 'an anchor with no image in the turn is not allow-listed');
 });
+test('estimateChatCalls: a place_image is one call, like one find_images target', () => {
+  assert.equal(estimateChatCalls([{ kind: 'place_image', direction: 'a red barn' }], autoCtx), 1);
+  assert.equal(estimateChatCalls([{ kind: 'place_image', direction: 'a' }, { kind: 'place_image', direction: 'b' }], autoCtx), 2);
+});
 test('auto-apply plan (d): estimateChatCalls is what planFor counts; call_budget when callsSoFar + estimate passes 300', () => {
   const acts = [autoRun('research_standard', ['a', 'b'], { mode: 'standard' }), autoRun('expand', ['a']), autoRun('merge', ['a', 'b']), autoRun('synthesize'), autoRun('rate_by_goal'), autoRun('find_images', ['a', 'b', 'a1'])];
   assert.equal(estimateChatCalls(acts, autoCtx, {}), 4 + 2 + 1 + 2 + 1 + 3);

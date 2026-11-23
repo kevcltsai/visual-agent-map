@@ -141,7 +141,7 @@ export interface MapChatPlan {
    * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
    * more, which is a retry and is not counted). Each synthesize is one integration call plus the
    * same diagram call: B2 starts it without a dialog and without the directions step. An expand is {@link MAP_CHAT_EXPAND_CALLS_PER_CARD} outline calls per
-   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets and one for a place_image (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -197,6 +197,7 @@ export function estimateChatCalls(
   let selection = context.selectedCount;
   for (const action of actions) {
     if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "place_image") calls += 1;
     else if (action.kind === "run_map_action") {
       if (action.nodeIds.length) selection = action.nodeIds.length;
       switch (action.action) {

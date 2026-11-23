@@ -9845,6 +9845,25 @@ test('book plan chat: a diff card shows the first two cards open (title, label, 
   eq(findAll(log, i => i.tag === 'button' && /vam-map-chat-plan-(apply|cancel)/.test(i.cls)).map(i => i.text), ['Apply to the plan', 'Not now']);
 });
 
+test('book plan chat: a long field that keeps most of its text shows a one-line summary, only the changed piece, and the whole before and after folded', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const kept = 'step two, step three, step four, step five, step six, step seven, step eight';
+  const field = { label: 'Points', before: kept, after: 'accept it is rough, ' + kept, parts: [{ kind: 'ins', text: 'accept it is rough, ' }, { kind: 'same', text: kept }] };
+  f.panel.begin('a'); f.panel.finish('ok', []); f.panel.showPlan(bookDiffCard([{ title: 'Card 1', fields: [field] }]));
+  const log = f.parts.log();
+  assert.equal(find(log, i => hasClass(i, 'vam-map-chat-diff-sum')).text, 'Changed: Points (1 places)');
+  const parts = find(log, i => hasClass(i, 'vam-map-chat-diff-parts'));
+  eq(findAll(parts, i => i.tag === 'ins').map(i => i.text), ['accept it is rough, ']);
+  eq(findAll(parts, i => i.tag === 'del').length, 0);
+  const full = find(log, i => i.tag === 'details' && hasClass(i, 'vam-map-chat-diff-full'));
+  assert.ok(full && !full.open, 'the whole before and after is folded');
+  eq(findAll(full, i => i.tag === 'del').map(i => i.text), [kept]);
+  const short = panelFixture(); short.panel.setOpen(true);
+  short.panel.begin('a'); short.panel.finish('ok', []);
+  short.panel.showPlan(bookDiffCard([{ title: 'Card 1', fields: [{ label: 'Points', before: 'a', after: 'b, a', parts: [{ kind: 'ins', text: 'b, ' }, { kind: 'same', text: 'a' }] }] }]));
+  assert.equal(find(short.parts.log(), i => hasClass(i, 'vam-map-chat-diff-full')), undefined, 'a short field is shown whole');
+});
+
 test('book plan chat: a diff card with other actions also shows their summary (danger kept) and the folded details; a diff alone has neither', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   f.panel.begin('a'); f.panel.finish('ok', []);

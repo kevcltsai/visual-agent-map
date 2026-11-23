@@ -183,7 +183,8 @@ export interface MapChatPlanCard {
 /** One card of a plan diff: its title and the fields that change (`label` empty = the card's main line, shown without a name). */
 export interface MapChatPlanDiffCard {
   title: string;
-  fields: { label: string; before: string; after: string }[];
+  /** `parts`: the same change as kept / struck-out / added runs, when the field keeps some of its text (the card then shows only what changes). */
+  fields: { label: string; before: string; after: string; parts?: { kind: "same" | "del" | "ins"; text: string }[] }[];
   /** A card of lines instead of fields (a structure change); `small` lines are notes. */
   lines?: { text: string; small?: boolean }[];
   /** One note under the card (the cost, or what a thread change does not do). */
@@ -193,6 +194,8 @@ export interface MapChatPlanDiffCard {
 }
 /** The plan diff cards shown open before the rest fold under "N more cards". */
 export const PLAN_DIFF_OPEN = 2;
+/** A field whose before and after together are at most this long is shown whole; a longer one shows only what changes. */
+export const PLAN_DIFF_SHORT = 120;
 /** Maps (or anything else) the user has to pick from; picking runs `pick` once. */
 export interface MapChatChoices {
   prompt: string;
@@ -3531,17 +3534,57 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const one = (into: HTMLElement, card: MapChatPlanDiffCard): void => {
       const box = into.createDiv("vam-map-chat-diff-card");
       box.createEl("strong", { cls: "vam-map-chat-diff-title", text: card.title });
+      // One line first: which named fields change, and in how many places when only part of a field changes.
+      const named = card.fields.filter(field => field.label);
+      if (named.length)
+        box.createDiv({
+          cls: "vam-map-chat-diff-sum",
+          text: t(
+            "ui.map_chat_diff_changed_0",
+            named
+              .map(field => {
+                const places = field.parts?.filter((part, i, all) => part.kind !== "same" && (i === 0 || all[i - 1].kind === "same")).length;
+                return places ? t("ui.map_chat_diff_places_0_1", field.label, places) : field.label;
+              })
+              .join(t("ui.map_chat_count_separator"))
+          )
+        });
       for (const line of card.lines ?? [])
         box.createDiv({ cls: line.small ? "vam-map-chat-diff-note" : "vam-map-chat-diff-line", text: line.text });
-      for (const field of card.fields) {
-        const row = box.createDiv("vam-map-chat-diff-field");
-        if (field.label) row.createSpan({ cls: "vam-map-chat-diff-label", text: field.label });
+      const whole = (row: HTMLElement, field: MapChatPlanDiffCard["fields"][number]): void => {
         if (field.before) {
           row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_before") });
           row.createEl("del", { cls: "vam-map-chat-diff-old", text: field.before });
         }
         row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_after") });
         row.createEl("ins", { cls: "vam-map-chat-diff-new", text: field.after });
+      };
+      for (const field of card.fields) {
+        const row = box.createDiv("vam-map-chat-diff-field");
+        if (field.label) row.createSpan({ cls: "vam-map-chat-diff-label", text: field.label });
+        // A long field that keeps most of its text shows only what changes; the whole before and after fold under it.
+        if (!field.parts || field.before.length + field.after.length <= PLAN_DIFF_SHORT) {
+          whole(row, field);
+          continue;
+        }
+        const changed = row.createDiv("vam-map-chat-diff-parts");
+        for (const part of field.parts) {
+          if (part.kind === "same") changed.createSpan({ cls: "vam-map-chat-diff-same", text: "…" });
+          else {
+            changed.createSpan({
+              cls: "vam-sr-only",
+              text: t(part.kind === "del" ? "ui.map_chat_diff_before" : "ui.map_chat_diff_after")
+            });
+            changed.createEl(part.kind, {
+              cls: part.kind === "del" ? "vam-map-chat-diff-old" : "vam-map-chat-diff-new",
+              text: part.text
+            });
+          }
+        }
+        changed.createSpan({ cls: "vam-map-chat-diff-same", text: t("ui.map_chat_diff_rest_same") });
+        const full = row.createEl("details", { cls: "vam-map-chat-diff-full" });
+        full.createEl("summary", { text: t("ui.map_chat_diff_full") });
+        whole(full.createDiv("vam-map-chat-diff-field"), field);
       }
       if (card.note) box.createDiv({ cls: "vam-map-chat-diff-note", text: card.note });
     };

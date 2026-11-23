@@ -59,11 +59,59 @@ export function bookPlanDiff(
       const old = text(field, "before") ?? "";
       return after === undefined || after === old
         ? []
-        : [{ label: LABEL[field] && t(LABEL[field]), before: old, after }];
+        : [{ label: LABEL[field] && t(LABEL[field]), before: old, after, ...partsField(old, after) }];
     });
     if (fields.length) cards.push({ title: known.title ?? change.id, fields });
   }
   return cards.length ? cards : undefined;
+}
+
+/** One run of a field's text: kept as it was, struck out, or added. */
+export interface DiffPart {
+  kind: "same" | "del" | "ins";
+  text: string;
+}
+/** A text cut after each clause or list mark, so a changed sentence or list item is one piece. */
+function pieces(text: string): string[] {
+  return text.match(/[^。！？；、，,.;!?\n]+[。！？；、，,.;!?\n]*|[。！？；、，,.;!?\n]+/g) ?? [];
+}
+/** A piece compared without its marks and spaces, so the last list item and the same item followed by a separator match. */
+const key = (piece: string): string => piece.replace(/[。！？；、，,.;!?\s]+/g, "");
+/** Above this many piece pairs the comparison is skipped and the card shows the whole before and after. */
+const MAX_CELLS = 40000;
+/**
+ * Before and after as runs of kept, struck-out and added pieces (longest common subsequence over clauses and list items); runs of one
+ * kind are joined. Undefined when either text is empty or too long to compare.
+ */
+export function diffParts(before: string, after: string): DiffPart[] | undefined {
+  const a = pieces(before);
+  const b = pieces(after);
+  if (!a.length || !b.length || a.length * b.length > MAX_CELLS) return undefined;
+  const lcs: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--)
+    for (let j = b.length - 1; j >= 0; j--)
+      lcs[i][j] = key(a[i]) === key(b[j]) ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const parts: DiffPart[] = [];
+  const push = (kind: DiffPart["kind"], text: string): void => {
+    const last = parts[parts.length - 1];
+    if (last?.kind === kind) last.text += text;
+    else parts.push({ kind, text });
+  };
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && key(a[i]) === key(b[j])) {
+      push("same", b[j++]);
+      i++;
+    } else if (i < a.length && (j >= b.length || lcs[i + 1][j] >= lcs[i][j + 1])) push("del", a[i++]);
+    else push("ins", b[j++]);
+  }
+  return parts;
+}
+/** `parts` for a field only when it keeps something (a full rewrite is shown whole). */
+function partsField(before: string, after: string): { parts?: DiffPart[] } {
+  const parts = diffParts(before, after);
+  return parts?.some(part => part.kind === "same") ? { parts } : {};
 }
 
 /** The thread change as a card (before struck through, after marked); undefined when there is no thread in the baseline or nothing changes. */

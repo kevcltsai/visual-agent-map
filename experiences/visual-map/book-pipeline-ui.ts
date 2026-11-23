@@ -96,6 +96,8 @@ export interface BookStructureItem {
   archivedPath?: string;
 }
 export interface BookStructureEditView {
+  /** Names this set of changes (run, applied and refused ops): an "accept" given to it is dropped when the editor changes something new. */
+  key: string;
   items: BookStructureItem[];
   /** Changes that stand (not undone). */
   active: number;
@@ -336,6 +338,7 @@ function structureEditField(
       : undefined;
   return {
     structureEdit: {
+      key: [edit.runId, ...edit.applied.map(a => a.id), ...rejected.map(r => r.id)].join("|"),
       items,
       active: active.length,
       ...(now ? { chapters: { now: shape(now), before: shape(structureOfNodes(edit.before)) } } : {}),
@@ -485,6 +488,8 @@ export interface BookBarActions {
   /** The plan review's structure list: undo some changes (by id) or all of them; open a parked note by its path. */
   undoStructure?: (ids: string[] | "all") => void;
   openArchived?: (path: string) => void;
+  /** The owner accepted this list: the bar shows one line and a "show again" link instead of it. */
+  structureAccept?: { accepted: boolean; accept: () => void; reopen: () => void };
   /** An undo is running (every undo button waits) or just failed (the map is back as it was; one line says so). Kept by the view. */
   structureUndo?: "busy" | "failed";
 }
@@ -681,6 +686,17 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
   const box = bar.createDiv("vam-book-structure");
   box.setAttr("role", "group");
   box.setAttr("aria-label", t("ui.book_struct_label"));
+  const accept = actions.structureAccept;
+  // Accepted: the changes stay, the list folds to one line until the owner asks to see it again.
+  if (accept?.accepted) {
+    const line = box.createDiv("vam-book-structure-head");
+    line.createSpan({
+      cls: "vam-book-bar-counts",
+      text: view.active ? t("ui.book_struct_accepted_0", view.active) : t("ui.book_struct_accepted_none")
+    });
+    makeButton(line, t("ui.book_struct_reopen"), "vam-book-link vam-book-structure-reopen", accept.reopen);
+    return;
+  }
   const busy = actions.structureUndo === "busy";
   const head = box.createDiv("vam-book-structure-head");
   head.createEl("b", {
@@ -692,6 +708,10 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
       cls: "vam-book-bar-counts",
       text: t("ui.book_struct_now_0_1_2_3", now.chapters, now.sections, before.chapters, before.sections)
     });
+  }
+  if (accept) {
+    const button = makeButton(head, t("ui.book_struct_accept"), "vam-book-structure-accept", accept.accept);
+    if (busy) button.setAttr("disabled", "true");
   }
   const mayUndo = !!actions.undoStructure;
   for (const item of view.items) {

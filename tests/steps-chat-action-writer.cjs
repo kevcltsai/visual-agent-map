@@ -446,6 +446,19 @@ test('bookPlanDiff: a field that is empty before shows an empty before', () => {
   assert.deepEqual(cards[0].fields.map(f => [f.before, f.after]), [['', 'fresh'], ['', 'p1, p2']]);
 });
 
+test('diffParts: a long list that only gains an item at the front keeps the rest; a full rewrite has no kept part', () => {
+  const { diffParts } = load('experiences/visual-map/book-plan-diff.ts', { obsidian: {} });
+  const before = '選一個決定、列出選項、估機率、算期望值';
+  assert.deepEqual(plain(diffParts(before, '先接受不完美、' + before)), [{ kind: 'ins', text: '先接受不完美、' }, { kind: 'same', text: before }]);
+  assert.deepEqual(plain(diffParts('甲。乙。丙。', '甲。改。丙。')), [{ kind: 'same', text: '甲。' }, { kind: 'del', text: '乙。' }, { kind: 'ins', text: '改。' }, { kind: 'same', text: '丙。' }]);
+  assert.equal(diffParts('', 'x'), undefined);
+  const w = planWorld();
+  const baseline = { bookPlan: { ...w.baselineOf(['b']), prompts: { b: { path: 'b.md', prompt: w.prompts.b, kind: 'chapter', title: 'B' } } } };
+  const fields = plain(bookPlanDiff(bookAction([{ id: 'b', entry: 'new entry', points: ['p1', 'p2'] }]), baseline))[0].fields;
+  assert.equal(fields[0].parts, undefined, 'nothing kept: shown whole');
+  assert.deepEqual(fields[1].parts.map(p => p.kind), ['same', 'ins']);
+});
+
 // ---- edit_book_thread / edit_book_structure (P4: the apply paths) ----
 
 const sections = load('core/book-pipeline/note-sections.ts');

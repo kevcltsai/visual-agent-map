@@ -776,6 +776,27 @@ test('structure list: the archived-note link opens the parked note; busy disable
   setUiLanguage('zh-TW');
 });
 
+test('structure list: "accept" folds the list to one line with "show again"; the key changes when the editor changes something new', () => {
+  setUiLanguage('zh-TW');
+  const { data, state, draw } = structureCase();
+  const calls = [];
+  const click = el => el.listeners?.click?.[0]?.({ stopPropagation() {} });
+  const open = draw(state(data()), { undoStructure() {}, structureAccept: { accepted: false, accept: () => calls.push('accept'), reopen() {} } }).bar;
+  const button = one(open, 'vam-book-structure-accept');
+  assert.equal(button.text, '接受調整');
+  click(button);
+  const folded = draw(state(data()), { undoStructure() {}, structureAccept: { accepted: true, accept() {}, reopen: () => calls.push('reopen') } }).bar;
+  const box = one(folded, 'vam-book-structure');
+  assert.equal(all(box, 'vam-book-structure-row').length, 0, 'no rows once accepted');
+  assert.equal(one(box, 'vam-book-structure-undo-all'), undefined);
+  assert.ok(texts(box).includes('已接受總編輯的 5 處結構調整'));
+  click(one(box, 'vam-book-structure-reopen'));
+  assert.deepEqual(calls, ['accept', 'reopen']);
+  const key = state(data()).structureEdit.key;
+  assert.notEqual(state(data({ applied: data().structureEdit.applied.slice(0, 2) })).structureEdit.key, key);
+  assert.equal(state(data({ undone: ['o5'] })).structureEdit.key, key, 'an undo is not a new set of changes');
+});
+
 test('structure undo: the keyboard goes to the next remaining undo button, else to "start writing"; refusals read in plain words; undo all uses the runner\'s affected rule', async () => {
   setUiLanguage('zh-TW');
   const proto = bundle.VisualAgentMapView.prototype;

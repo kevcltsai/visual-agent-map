@@ -901,6 +901,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-diff-label { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-diff-old { color: var(--text-muted); text-decoration: line-through; }
 .vam-map-chat-diff-new { color: var(--text-normal); text-decoration: underline; background: color-mix(in srgb, var(--color-green) 18%, transparent); }
+.vam-map-chat-diff-sum, .vam-map-chat-diff-same { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-diff-full > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-diff-full > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-diff-more > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-diff-more > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-diff-more[open] > .vam-map-chat-diff-card { margin-top: 8px; }
@@ -2303,6 +2306,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-bar button.vam-book-link:hover { color: var(--text-accent-hover); }
 .vam-book-structure { display: grid; gap: 6px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
 .vam-book-structure-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.vam-book-structure-accept { margin-left: auto; }
 .vam-book-structure-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); }
 .vam-book-structure-row.is-undone { border-style: dashed; color: var(--text-muted); }
 .vam-book-structure-kind { padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--font-ui-smaller); font-weight: 600; white-space: nowrap; color: var(--text-muted); }

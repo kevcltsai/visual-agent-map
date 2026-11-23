@@ -17502,6 +17502,7 @@ export class VisualAgentMapView extends ItemView {
       },
       openIssues: () => void this.openBookOpenIssues(),
       undoStructure: ids => void this.undoBookStructure(path, ids),
+      ...(state.structureEdit ? { structureAccept: this.bookStructureAccept(map.id, state.structureEdit.key) } : {}),
       openArchived: archived => void this.openBookArchived(archived),
       ...(this.bookStructureUndo ? { structureUndo: this.bookStructureUndo } : {}),
       ...(rerunAsk ? { rerunAsk } : {})
@@ -17525,7 +17526,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
   private bookBarFocus:
-    "rerun-go" | "rerun-opener" | "map-go" | "structure-undo" | "again-cancel" | "again-opener" | null = null;
+    | "rerun-go"
+    | "rerun-opener"
+    | "map-go"
+    | "structure-undo"
+    | "structure-accept"
+    | "structure-reopen"
+    | "again-cancel"
+    | "again-opener"
+    | null = null;
   /** After an undo: which of the remaining undo buttons takes the keyboard (the one at the place of the pressed row); -1 means "start writing". */
   private bookStructureFocusAt = -1;
   /** The run whose map-changed choice already took the keyboard. */
@@ -17547,6 +17556,8 @@ export class VisualAgentMapView extends ItemView {
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
       "map-go": ".vam-book-map-replan",
+      "structure-accept": ".vam-book-structure-accept",
+      "structure-reopen": ".vam-book-structure-reopen",
       "again-cancel": ".vam-book-fix-again-cancel",
       "again-opener": ".vam-book-fix-again"
     }[focus];
@@ -17791,6 +17802,40 @@ export class VisualAgentMapView extends ItemView {
       new Notice(error instanceof Error ? error.message : String(error));
     }
   }
+  /** The structure list the owner accepted on this device folds to one line; a new set of changes (another key) shows open again. */
+  private bookStructureAccept(
+    mapId: string,
+    key: string
+  ): { accepted: boolean; accept: () => void; reopen: () => void } {
+    const storage = this.app as {
+      loadLocalStorage?(key: string): unknown;
+      saveLocalStorage?(key: string, data: unknown): void;
+    };
+    const slot = `vam-book-structure-accepted:${mapId}`;
+    let saved: unknown;
+    try {
+      saved = storage.loadLocalStorage?.(slot);
+    } catch {
+      saved = undefined;
+    }
+    const set = (value: string | null, focus: "structure-accept" | "structure-reopen"): void => {
+      try {
+        storage.saveLocalStorage?.(slot, value);
+      } catch {
+        // Not saved on this device: the list just shows again on the next open.
+      }
+      this.bookStructureAcceptedNow = value === null ? null : `${mapId}\n${value}`;
+      this.bookBarFocus = focus;
+      if (!this.closed) this.render();
+    };
+    return {
+      accepted: saved === key || this.bookStructureAcceptedNow === `${mapId}\n${key}`,
+      accept: () => set(key, "structure-reopen"),
+      reopen: () => set(null, "structure-accept")
+    };
+  }
+  /** The accept of this session, so the fold holds even where local storage is not available. */
+  private bookStructureAcceptedNow: string | null = null;
   /** The structure list's undo: the buttons wait while it runs; a failure leaves one line (the runner has put the map back as it was). */
   private bookStructureUndo: "busy" | "failed" | undefined;
   private async undoBookStructure(path: string, ids: string[] | "all"): Promise<void> {

@@ -4,7 +4,7 @@
 //   header button   .vam-book-button            opens the start dialog (or answers with a Notice when the map cannot start)
 //   start dialog    .vam-book-start-go          the Start button; .vam-book-start-field are the whole-book setting boxes
 //   progress bar    .vam-book-bar               its data-mode is planning | gate1 | writing | gate2 | done | stopped | budget | changed
-//   gate buttons    the ONLY owner gate is gate 1 (plan review): .vam-book-confirm   plan summary: .vam-book-open-plan   back: .vam-book-back-to-plan
+//   gate buttons    the ONLY owner gate is gate 1 (plan review): .vam-book-confirm
 //                   the trial and gate 2 pass by themselves (the bar reads writing, then done): wait for barMode("done"), never for gate2
 //   done            .vam-book-open-issues (what is still open), .vam-book-abandon then .vam-book-abandon-confirm (remove the book state)
 //   live run        scripts/scenarios/book-live-gates.json (seed with --small; verified: 26 AI calls on claude:haiku)
@@ -23,8 +23,6 @@ export const BOOK_SELECTORS = {
   resume: ".vam-book-resume",
   restart: ".vam-book-restart",
   gate1Confirm: ".vam-book-confirm",
-  openPlan: ".vam-book-open-plan",
-  backToPlan: ".vam-book-back-to-plan",
   addBudget: ".vam-book-add-budget",
   openIssues: ".vam-book-open-issues",
   abandon: ".vam-book-abandon",

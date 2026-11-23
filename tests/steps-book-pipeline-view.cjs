@@ -67,12 +67,18 @@ test('bar: running writing phase shows the phase, one plain sentence with the pr
   assert.equal(d.bar.attrs.role, 'group');
   assert.ok(texts(d.bar).includes('圖文書：寫作、找圖與校對中'));
   assert.equal(dom.findAll(d.bar, i => i.tag === 'li').length, 0, 'no five-stage list');
-  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-text')).text, '正在寫第 1／4 章');
+  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-text')).text, '寫作中 · 已完成 2/4 章');
+  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-at')).text, '正在寫第 1 章');
   const t = track(d.bar);
-  assert.deepEqual([t.attrs['aria-valuemin'], t.attrs['aria-valuemax'], t.attrs['aria-valuenow']], ['0', '4', '1']);
-  assert.equal(t.attrs['aria-valuetext'], '正在寫第 1／4 章');
+  // The fill counts finished chapters only (proofread + needs a person): 1 checked + 1 needs-review.
+  assert.deepEqual([t.attrs['aria-valuemin'], t.attrs['aria-valuemax'], t.attrs['aria-valuenow']], ['0', '4', '2']);
+  assert.equal(t.attrs['aria-valuetext'], '寫作中 · 已完成 2/4 章，正在寫第 1 章');
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
-  assert.equal(dom.findAll(t, i => i.cls.includes('vam-book-seg')).length, 4);
+  const segs = dom.findAll(t, i => i.cls.includes('vam-book-seg'));
+  assert.equal(segs.length, 2, 'only finished chapters fill the track: no planned or written segment');
+  assert.ok(segs.every(seg => /is-checked|is-needs-review/.test(seg.cls)), JSON.stringify(segs.map(seg => seg.cls)));
+  assert.ok(!segs.some(seg => /is-planned|is-written/.test(seg.cls)));
+  assert.equal(dom.findAll(d.bar, i => (i.cls ?? '').includes('mod-warning')).length, 0, 'stop is no longer a warning button');
   buttonsOf(d.bar)[0].click();
   assert.deepEqual(d.log, ['stop']);
   assert.equal(dom.findAll(d.bar, i => /分鐘/.test(i.text ?? '')).length, 0, 'no remaining-time number in stage 1');
@@ -103,7 +109,10 @@ test('bar: a stopped run says stopped, names the phase, and offers "continue fro
   lang('zh-TW');
   const d = draw(bookData({ status: 'stopped' }), progress({ status: 'stopped', active: false }));
   assert.ok(texts(d.bar).includes('圖文書：已停止'));
-  assert.ok(texts(d.bar).includes('停在「寫作、找圖與校對中」階段，已校 1／4'));
+  assert.ok(texts(d.bar).includes('已停止 · 完成 2/4 章'), 'finished = proofread + needs a person, no phase name');
+  assert.ok(!texts(d.bar).some(x => x.includes('停在')), 'the old "stopped in the … phase" line is gone');
+  assert.equal(dom.findAll(d.bar, i => (i.cls ?? '').includes('mod-warning')).length, 0);
+  assert.equal(track(d.bar).attrs['aria-valuenow'], '2');
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['從停處繼續']);
   buttonsOf(d.bar)[0].click();
   assert.deepEqual(d.log, ['resume']);
@@ -584,9 +593,9 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 40 分鐘 · 最多 67 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
-  assert.ok(all.includes('只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。'));
-  assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
+  assert.ok(all.includes('3 張卡 · 約 40 分鐘 · 約 67 次 AI 呼叫'), all.join('|'));
+  assert.ok(all.includes('AI 會企劃、寫作、找圖、校對每一章；企劃好後停下來讓你看方向。'), 'one intro sentence holds the old promise lines');
+  assert.ok(!all.some(x => /只會停一次|重跑那一章|前言 \+|會先停下/.test(x)), 'no promise lines, no breakdown, no pause note');
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
   const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
   assert.equal(areas.length, 6);
@@ -598,12 +607,12 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   for (const select of selects) assert.ok(shown(select), 'the four dropdowns are always shown');
   assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-models-change')), undefined, 'no change link');
   assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
-  // DOM order: intro, estimate, models, stops, settings.
+  // DOM order: intro, estimate, models, settings.
   const order = dom.findAll(modal.modalEl, () => true);
   const at = pred => order.findIndex(pred);
   const iIntro = at(i => i.cls.includes('vam-modal-intro')), iEst = at(i => i.cls.includes('vam-book-start-estimate'));
-  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iStops = at(i => i.cls.includes('vam-book-start-stops')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
-  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iStops && iStops < iSettings, [iIntro, iEst, iModels, iStops, iSettings].join(','));
+  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iSettings, [iIntro, iEst, iModels, iSettings].join(','));
   void s;
   assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
   cardButton(modal, '取消').click();
@@ -619,12 +628,12 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', 'AI 校對（和作者不同）']);
   assert.deepEqual(selects[1].children.map(o => o.optionValue), ['claude:sonnet', 'claude:opus', 'claude:haiku']);
   assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
-  const before = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
+  const before = texts(modal.modalEl).find(x => x.startsWith('3 張卡 · '));
   selects[1].value = 'claude:sonnet'; selects[1].change();
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
-  const after = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
-  assert.match(before, /最多 67 次/); assert.match(after, /最多 67 次/);
+  const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡 · '));
+  assert.match(before, /約 67 次/); assert.match(after, /約 67 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
@@ -687,7 +696,7 @@ test('suggestions: one call on the picture model\'s entry with only the root tit
     assert.ok(area.hasClass('vam-book-start-suggested'));
     assert.ok(shown(area));
   }
-  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), 'the waiting line is gone');
+  assert.ok(!texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'), 'the waiting line is gone');
   // The grey italic look is real CSS on the placeholder (computed look: checked live).
   assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--text-muted\)/);
   modal.close();
@@ -698,10 +707,10 @@ test('suggestions: failure, a timeout (20 s) and a late answer leave the fields 
   let h = await harness({ book: false });
   const failing = pending(); h.ctl.impl = () => failing.promise;
   let modal = await openCard(h);
-  assert.ok(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  assert.ok(texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'));
   failing.reject(new Error('boom')); await dom.tick(); await dom.tick();
   assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定');
-  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  assert.ok(!texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'));
   cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
   assert.equal((await h.plugin.repo.readNote(rootPath(h))).bookSettings, undefined, 'nothing written');
@@ -772,7 +781,7 @@ test('suggestions: a root with all six fields filled opens the card with no call
   const modal = await openCard(h);
   await dom.tick(); await dom.tick();
   assert.equal(h.ctl.calls.length, 0);
-  assert.equal(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), false);
+  assert.equal(texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'), false);
 });
 
 test('suggestions: the patch helper keeps typed text over a suggestion and ignores suggestions for a cleared prefilled field', () => {
@@ -813,10 +822,34 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
   assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 55 分鐘 · 最多 307 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 55 分鐘 · 約 307 次 AI 呼叫');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 55 minutes · up to 307 AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at 300).");
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 55 minutes · about 307 AI calls");
   lang('zh-TW');
+});
+
+test('start card (2026-11-23 mockup 10, 11): an ⓘ beside each model label explains its step (focusable, aria-label, tooltip); while the suggestions load a spinner shows beside the line and the fields shimmer, both gone when they arrive', async () => {
+  const h = await harness({ book: false });
+  const answer = pending(); h.ctl.impl = () => answer.promise;
+  const modal = await openCard(h);
+  const infos = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-info'));
+  assert.equal(infos.length, 4);
+  assert.deepEqual(infos.map(i => i.attrs['aria-label']), ['ui.book_start_tip_plan', 'ui.book_start_tip_write', 'ui.book_start_tip_images', 'ui.book_start_tip_proof'].map(k => tr(k)));
+  assert.ok(infos[0].attrs['aria-label'].startsWith('讀整張心智圖'));
+  for (const info of infos) assert.equal(info.attrs.tabindex, '0', 'reachable by keyboard');
+  const settings = dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(settings.hasClass('is-loading'));
+  assert.ok(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-spinner')));
+  answer.resolve(SUGGEST); await dom.tick(); await dom.tick(); await dom.tick();
+  assert.ok(!settings.hasClass('is-loading'), 'the shimmer stops when the suggestions arrive');
+  assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-spinner')), undefined);
+  assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader);
+  // Motion is CSS, with Obsidian variables, and stops for reduced motion.
+  assert.match(css, /\.vam-book-start-spinner \{[^}]*border-top-color: var\(--interactive-accent\)[^}]*animation: vam-book-start-spin/);
+  assert.match(css, /\.is-loading \.vam-book-start-field-wrap:has\(\.vam-book-start-field:placeholder-shown\)::after \{[^}]*animation: vam-book-start-shimmer/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.vam-book-start-spinner, [^}]*animation: none; \}/);
+  assert.doesNotMatch(css, /\.vam-book-start-estimate \{[^}]*font-weight/, 'the cost line is not bold');
+  modal.close();
 });
 
 test('start card: Start without touching the fields writes nothing to the root topic and starts once, even when pressed twice; the map file is not touched', async () => {
@@ -893,7 +926,9 @@ test('bar: the sentence names the chapter being written out of the total (never 
   const parent = dom.element('div');
   ui.renderBookBar(parent, ui.bookBarState(bookData({ order }), prog, noStage), calls().actions);
   const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
-  assert.equal(now.text, '正在寫第 3／5 章');
+  assert.equal(now.text, '寫作中 · 已完成 1/5 章');
+  assert.equal(dom.find(parent, i => i.cls.includes('vam-book-now-at')).text, '正在寫第 3 章');
+  assert.equal(ui.bookProgressText(ui.bookBarState(bookData({ order }), prog, noStage)), '寫作中 · 已完成 1/5 章，正在寫第 3 章', 'the aria text is both parts');
   const withCurrent = (current, over = {}) => ui.bookBarState(bookData({ phase: 'planning', globalPlanned: false, ...over }), progress({ phase: 'planning', current }), noStage);
   const s = withCurrent([{ nodeId: 'a', step: 'plan', startedAt: 1 }, { nodeId: 'global', step: 'plan', startedAt: 1 }]);
   assert.equal(s.current.step, 'global');
@@ -907,7 +942,7 @@ test('bar: the sentence names the chapter being written out of the total (never 
   assert.equal(dom.find(gate, i => i.cls.includes('vam-book-now')), undefined);
   // Without a current card (a reload) the number comes from the settled cards, never past the total.
   lang('en');
-  assert.equal(ui.bookProgressText(ui.bookBarState(bookData(), progress({ counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 } }), noStage)), 'Writing chapter 4/4');
+  assert.equal(ui.bookProgressText(ui.bookBarState(bookData(), progress({ counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 } }), noStage)), 'Writing · 4/4 chapters done, Now writing chapter 4');
   lang('zh-TW');
 });
 
@@ -917,8 +952,8 @@ test('bar: the remaining time sits on the "now" line and only when the runner ga
   const draw2 = over => { const parent = dom.element('div'); ui.renderBookBar(parent, ui.bookBarState(bookData(), progress({ current: cur, ...over }), noStage), calls().actions); return parent; };
   assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-bar-eta')), undefined);
   assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-bar-eta')).text, '約剩 2 分鐘');
-  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 2, 'the sentence and the AI numbers; no time');
-  assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-now')).children.length, 3);
+  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 3, 'the sentence, the chapter in work and the AI numbers; no time');
+  assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-now')).children.length, 4);
 });
 
 test('bar: a saved v1 map is only read: the data is not changed, and after a reload the progress comes from the cards\' stages', () => {
@@ -1248,8 +1283,6 @@ async function gateRig({ phase, stages = {}, trialNotes = [], planReview = false
   h.plugin.finishBookRun = async p => { h.entries.push(['finish', p]); };
   h.plugin.startBookTrial = async p => { h.entries.push(['trial', p]); };
   h.plugin.backBookToPlan = async p => { h.entries.push(['back', p]); };
-  const opened = [];
-  h.view.openBookNote = async id => { opened.push(id); };
   const vault = h.view.app.vault;
   for (const [key, text] of trialNotes) {
     const file = vault.getAbstractFileByPath(h.view.map.nodes.find(n => n.id === h.ids[key]).path);
@@ -1258,19 +1291,19 @@ async function gateRig({ phase, stages = {}, trialNotes = [], planReview = false
   const drawBar = () => { const t = dom.element('div'); h.view.renderBookPipelineBar(t); return t.children[0]; };
   const click = (bar, text) => buttonsOf(bar).find(b => b.text === text).click();
   const labels = bar => buttonsOf(bar).map(b => b.text);
-  return { ...h, opened, drawBar, click, labels };
+  return { ...h, drawBar, click, labels };
 }
 
-test('toolbar plan review: the plan sentence and hint; "open the whole-book summary" opens the root; "direction is right" confirms; stop goes to the plugin; no trial buttons', async () => {
+test('toolbar plan review: the title and one hint; the only buttons are "direction is right" and stop; no summary button, no counts sentence, no track; stop goes to the plugin; no trial buttons', async () => {
   lang('zh-TW');
   const g = await gateRig({ phase: 'gate1', planReview: true, stages: { root: 'planned', a: 'planned', b: 'planned' } });
   const bar = g.drawBar();
   assert.ok(texts(bar).includes('圖文書：' + tr('ui.book_phase_plan_review')), JSON.stringify(texts(bar)));
-  assert.ok(texts(bar).includes('3 章都企劃好了'));
-  assert.ok(texts(bar).includes('想改：直接跟左邊的總編輯說；也可以自己改筆記裡的「企劃」。改完再按「方向對，開始寫」。'), JSON.stringify(texts(bar)));
-  assert.deepEqual(g.labels(bar), ['打開全書摘要', '方向對，開始寫', '回去改企劃', '停止']);
-  g.click(bar, '打開全書摘要');
-  assert.deepEqual(g.opened, [g.ids.root]);
+  assert.ok(!texts(bar).some(x => x.includes('都企劃好了')), 'the counts sentence is gone');
+  assert.ok(texts(bar).includes('想改就直接跟左邊的總編輯說。'), JSON.stringify(texts(bar)));
+  assert.equal(dom.find(bar, i => (i.cls ?? '').includes('vam-book-plan-hint')).children[0].tag, 'b', 'the hint is one bold line');
+  assert.deepEqual(g.labels(bar), ['方向對，開始寫', '停止']);
+  assert.equal(track(bar), undefined, 'no progress track at the plan review');
   g.click(bar, '停止'); await dom.tick();
   g.click(g.drawBar(), '方向對，開始寫'); await dom.tick();
   assert.equal(JSON.stringify(g.entries), JSON.stringify([['stop', MAP], ['confirm', MAP]]), 'no trial and no back entry: the first press confirms at once');
@@ -1278,15 +1311,15 @@ test('toolbar plan review: the plan sentence and hint; "open the whole-book summ
   assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-panel') || i.cls.includes('vam-book-side')), undefined, 'no panel and no toggle');
 });
 
-test('toolbar plan review: "back to editing the plan" opens the root and shows how to change it; nothing is confirmed, the run stays at the gate', async () => {
+test('toolbar plan review: there is no "open summary" or "back to the plan" button any more; the view has no such actions; the run stays at the gate', async () => {
   lang('zh-TW');
   const g = await gateRig({ phase: 'gate1', planReview: true, stages: { root: 'planned', a: 'planned', b: 'planned' } });
-  g.click(g.drawBar(), '回去改企劃'); await dom.tick();
-  assert.deepEqual(g.opened, [g.ids.root]);
-  assert.ok(notices.includes(tr('ui.book_bar_plan_edit_hint')), JSON.stringify(notices));
-  assert.ok(!g.entries.some(e => e[0] === 'confirm'), 'editing is not confirming');
+  const bar = g.drawBar();
+  for (const cls of ['vam-book-open-plan', 'vam-book-back-to-plan']) assert.equal(dom.find(bar, i => (i.cls ?? '').includes(cls)), undefined, cls);
+  assert.ok(!g.labels(bar).some(x => x === '打開全書摘要' || x === '回去改企劃'));
+  for (const name of ['openPlan', 'editPlan', 'openBookNote']) assert.ok(!view_ts.includes(name), name);
   assert.equal(g.entries.length, 0);
-  assert.deepEqual(g.labels(g.drawBar()), ['打開全書摘要', '方向對，開始寫', '回去改企劃', '停止'], 'still waiting at the gate');
+  assert.deepEqual(g.labels(g.drawBar()), ['方向對，開始寫', '停止'], 'still waiting at the gate');
 });
 
 test('toolbar plan review with notes not applied: "direction is right" confirms at once, there is no ask card', async () => {
@@ -1335,11 +1368,11 @@ test('chat "continue" while the run waits at the plan review confirms the plan t
   assert.deepEqual(writing.entries, []);
 });
 
-test('toolbar writing and planning: one chapter sentence, the stop button, and no ETA without an estimate', () => {
+test('toolbar writing and planning: the done count and the chapter in work, the stop button, and no ETA without an estimate', () => {
   lang('zh-TW');
   const d = draw(bookData(), progress({ current: [{ nodeId: 'a', step: 'write', startedAt: 1 }] }));
-  assert.equal(ui.bookProgressText(d.state), '正在寫第 1／4 章');
-  assert.ok(texts(d.bar).some(x => x.includes('正在寫第 1／4 章')), JSON.stringify(texts(d.bar)));
+  assert.equal(ui.bookProgressText(d.state), '寫作中 · 已完成 2/4 章，正在寫第 1 章');
+  assert.ok(texts(d.bar).includes('寫作中 · 已完成 2/4 章') && texts(d.bar).includes('正在寫第 1 章'), JSON.stringify(texts(d.bar)));
   assert.equal(dom.findAll(d.bar, i => i.cls.includes('vam-book-bar-eta')).length, 0);
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
   d.bar.children.length && buttonsOf(d.bar)[0].click();
@@ -1424,16 +1457,18 @@ test('toolbar done: 看仍有問題 opens the marked "仍有問題" page of the 
 });
 
 test('toolbar words: the plan review and done sentences and buttons read in English and Simplified Chinese; zh-TW never says 地圖', () => {
-  for (const [language, want] of [['en', ['Open the whole-book summary', 'Direction is right, start writing', 'AI fixing 1 · still open 2', '3 chapters · AI fixed 5 places · 2 still open', 'See what is still open']], ['zh-CN', ['打开全书摘要', '方向对，开始写', 'AI 修正中 1・仍有问题 2', '3 章・AI 修了 5 处・仍有问题 2 项', '看仍有问题']]]) {
+  for (const [language, want] of [['en', ['To change anything, just tell the chief editor on the left.', 'Direction is right, start writing', 'AI fixing 1 · still open 2', '3 chapters · AI fixed 5 places · 2 still open', 'See what is still open']], ['zh-CN', ['想改就直接跟左边的总编辑说。', '方向对，开始写', 'AI 修正中 1・仍有问题 2', '3 章・AI 修了 5 处・仍有问题 2 项', '看仍有问题']]]) {
     lang(language);
-    assert.equal(tr('ui.book_bar_open_plan'), want[0]);
+    assert.equal(tr('ui.book_bar_plan_hint'), want[0]);
     assert.equal(tr('ui.book_bar_plan_go'), want[1]);
     assert.equal(tr('ui.book_bar_ai_0_1', 1, 2), want[2]);
     assert.equal(tr('ui.book_bar_done_0_1_2', 3, 5, 2), want[3]);
     assert.equal(tr('ui.book_bar_open_issues'), want[4]);
   }
   lang('zh-TW');
-  for (const key of ['ui.book_bar_open_plan', 'ui.book_bar_plan_go', 'ui.book_bar_plan_edit_hint', 'ui.book_bar_ai_0_1', 'ui.book_bar_done_0_1_2', 'ui.book_bar_open_issues', 'ui.book_bar_open_issues_missing', 'ui.book_bar_plan_hint', 'ui.book_bar_back_to_plan']) assert.ok(!/地圖/.test(tr(key, 1, 2, 3)), key);
+  for (const key of ['ui.book_bar_plan_go', 'ui.book_bar_ai_0_1', 'ui.book_bar_done_0_1_2', 'ui.book_bar_open_issues', 'ui.book_bar_open_issues_missing', 'ui.book_bar_plan_hint', 'ui.book_progress_writing_0_1', 'ui.book_progress_at_chapter_0', 'ui.book_stopped_done_0_1', 'ui.book_struct_show', 'ui.book_struct_hide']) assert.ok(!/地圖/.test(tr(key, 1, 2, 3)), key);
+  // The removed plan-review strings are gone from all three languages.
+  for (const file of ['zh-TW', 'zh-CN', 'en']) for (const key of ['ui.book_bar_open_plan', 'ui.book_bar_back_to_plan', 'ui.book_bar_plan_edit_hint', 'ui.book_bar_plan_ready_0', 'ui.book_bar_plan_ready_struct_0', 'ui.book_bar_plan_ready_struct_0_1', 'ui.book_stopped_at_0_1_2', 'ui.book_struct_undo_all', 'ui.book_struct_reopen', 'ui.book_struct_now_0_1_2_3']) assert.ok(!fs.readFileSync(path.join(root, 'i18n', file + '.ts'), 'utf8').includes(`"${key}"`), `${file} ${key}`);
 });
 
 test('toolbar source: the panel, its toggle and the finish modal are gone from the view, the plugin and the styles', () => {
@@ -1799,8 +1834,8 @@ const gateData = (over = {}) => bookData({ phase: 'gate1', status: 'running', or
 const drawStruct = (data, prog, structure) => {
   const parent = dom.element('div');
   const state = ui.bookBarState(data, prog, noStage, undefined, structure);
-  const bar = ui.renderBookBar(parent, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openPlan() {} });
-  return { state, texts: texts(bar), buttons: buttonsOf(bar).map(b => b.text) };
+  const bar = ui.renderBookBar(parent, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} });
+  return { state, texts: texts(bar), buttons: buttonsOf(bar).map(b => b.text), hasTrack: !!track(bar) };
 };
 
 test('P4 card label: preface / chapter n / section from the structure replace the role chip; no place = old role chip, old card unchanged', () => {
@@ -1842,12 +1877,14 @@ test('P4 gate words: the plan review counts, buttons and progress use the new st
   lang('zh-TW');
   const st = structOf();
   const a = drawStruct(gateData(), progress({ phase: 'gate1', active: false, total: 5 }), st);
-  assert.ok(a.texts.includes('前言、2 章、2 節都企劃好了'), a.texts.join('|'));
-  assert.deepEqual(a.buttons, ['打開全書摘要', '方向對，開始寫', '停止']);
+  assert.ok(!a.texts.some(x => x.includes('都企劃好了')), 'the counts sentence is gone: ' + a.texts.join('|'));
+  assert.deepEqual(a.buttons, ['方向對，開始寫', '停止']);
+  assert.ok(a.texts.includes('想改就直接跟左邊的總編輯說。'), a.texts.join('|'));
+  assert.equal(a.hasTrack, false, 'plan review: no progress track');
   const noSections = structOf(['r', 'a', 'b']);
   const b = drawStruct(gateData({ order: ['r', 'a', 'b'], trial: ['r', 'a'] }), progress({ phase: 'gate1', active: false, total: 3 }), noSections);
-  assert.ok(b.texts.includes('前言、2 章都企劃好了'));
-  assert.deepEqual(b.buttons, ['打開全書摘要', '方向對，開始寫', '停止']);
+  assert.ok(!b.texts.some(x => x.includes('都企劃好了')));
+  assert.deepEqual(b.buttons, ['方向對，開始寫', '停止']);
   // Without a plan review a gate 1 is writing: no plan sentence, no confirm, no trial wording.
   const c = drawStruct(gateData({ planReview: undefined }), progress({ phase: 'gate1', active: false, total: 5 }), st);
   assert.ok(!c.texts.some(x => x.includes('試跑的') || x.includes('都企劃好了')), c.texts.join('|'));
@@ -1858,26 +1895,26 @@ test('P4 gate words: the plan review counts, buttons and progress use the new st
   // Old saved trial (first 3 cards, not the structure's): the old wording stays.
   const old = drawStruct(gateData({ trial: ['r', 'a', 'a1'] }), progress({ phase: 'gate1', active: false, total: 5 }), st);
   assert.equal(old.state.structure, undefined);
-  assert.ok(old.texts.includes('5 章都企劃好了'));
-  assert.deepEqual(old.buttons, ['打開全書摘要', '方向對，開始寫', '停止']);
+  assert.ok(!old.texts.some(x => x.includes('都企劃好了')));
+  assert.deepEqual(old.buttons, ['方向對，開始寫', '停止']);
   // No structure at all: old wording.
   assert.equal(drawStruct(gateData(), progress({ phase: 'gate1', active: false, total: 5 }), undefined).state.structure, undefined);
 });
 
-test('P4 words in en and zh-CN; the start dialog line names preface + chapters + sections and omits 0 sections; card menu line', () => {
-  const est = start => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4), start);
+test('P4 words in en and zh-CN; the start dialog line is the card count, time and calls only (no preface/chapter/section breakdown, 2026-11-23); card menu line', () => {
+  const est = () => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4));
   lang('zh-TW');
-  assert.match(est({ chapters: 3, sections: 6 }), /^前言 \+ 3 章 \+ 6 節（10 張卡）· 約 .+ · 最多 207 次 AI 呼叫（含 AI 校對、自動修正和封面圖/);
-  assert.match(est({ chapters: 3, sections: 0 }), /^前言 \+ 3 章（10 張卡）· 約 /);
-  assert.doesNotMatch(est({ chapters: 3, sections: 0 }), /0 節/);
-  assert.match(est(undefined), /^10 張卡 · 約/);
+  assert.match(est(), /^10 張卡 · 約 \d+ 分鐘 · 約 207 次 AI 呼叫$/);
   lang('en');
-  assert.match(est({ chapters: 3, sections: 6 }), /^Preface \+ 3 chapters \+ 6 sections \(10 cards\)/);
-  assert.equal(tr('ui.book_bar_plan_ready_struct_0_1', 3, 6), 'The preface, 3 chapters and 6 sections are planned');
-  assert.equal(tr('ui.book_bar_open_plan'), 'Open the whole-book summary');
+  assert.match(est(), /^10 cards · about \d+ minutes · about 207 AI calls$/);
   lang('zh-CN');
-  assert.equal(tr('ui.book_bar_plan_ready_struct_0_1', 3, 6), '前言、3 章、6 节都企划好了');
-  assert.equal(tr('ui.book_bar_open_plan'), '打开全书摘要');
+  assert.match(est(), /^10 张卡 · 约 \d+ 分钟 · 约 207 次 AI 调用$/);
+  lang('en');
+  assert.equal(tr('ui.book_progress_writing_cards_0_1', 3, 6), 'Writing · 3/6 cards done');
+  assert.equal(tr('ui.book_stopped_done_cards_0_1', 3, 6), 'Stopped · 3/6 cards done');
+  lang('zh-CN');
+  assert.equal(tr('ui.book_progress_writing_cards_0_1', 3, 6), '写作中 · 已完成 3/6 张卡');
+  assert.equal(tr('ui.book_stopped_done_cards_0_1', 3, 6), '已停止 · 完成 3/6 张卡');
   assert.ok(tr('ui.book_card_menu_rerun_sub').includes('连接行'));
   lang('zh-TW');
   assert.ok(tr('ui.book_card_menu_rerun_sub').includes('只更新前後章節的連接行'));

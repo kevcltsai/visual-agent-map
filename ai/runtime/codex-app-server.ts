@@ -1,5 +1,5 @@
 import type { WebSearchEvent } from "../types";
-import { outputSchemaFor } from "./output-schema";
+import { outputSchemaFor, replyWithoutAddedNulls } from "./output-schema";
 import type { AiMilestones } from "../../ai-exchange-log";
 import { spawn as nodeSpawn } from "node:child_process";
 import { createUtf8StreamDecoder } from "./utf8-stream";
@@ -423,7 +423,7 @@ export class CodexAppServerRuntime {
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if (controls?.signal?.aborted) throw cancelledError();
-      return answer;
+      return outputSchema ? replyWithoutAddedNulls(answer, outputSchema) : answer;
     } catch (error) {
       const state = this.turns.get(threadId);
       if (state) {

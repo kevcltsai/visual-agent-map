@@ -350,3 +350,11 @@ test('an AI slot carries the optional `again` marker: true is kept, anything els
   assert.equal(read(true).data.aiProof.a.again, true);
   for (const bad of [false, 0, 'true', {}]) assert.equal(read(bad).kind, 'unusable', JSON.stringify(bad));
 });
+
+// Owner 2026-11-23: while a picture-book run owns the map, card AI and structure edits are taken away; done (or abandon) gives them back.
+test('bookCardLock: AI off before done, structure off except at the plan review, nothing off when done or without a book', () => {
+  assert.deepEqual(plain(model.bookCardLock(undefined)), { ai: false, structure: false });
+  assert.deepEqual(plain(model.bookCardLock('done')), { ai: false, structure: false });
+  for (const phase of ['planning', 'writing', 'gate2']) assert.deepEqual(plain(model.bookCardLock(phase)), { ai: true, structure: true }, phase);
+  assert.deepEqual(plain(model.bookCardLock('gate1')), { ai: true, structure: false });
+});

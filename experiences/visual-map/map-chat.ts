@@ -324,6 +324,8 @@ export interface MapChatMessage {
   resume?: MapChatResumePoint;
   /** On an assistant message: research notes of the conversation this round did not read (in memory only). */
   unread?: { title: string; oversize: boolean }[];
+  /** On an assistant message: it built a book outline asked for with the book example, so it offers the book start card (in memory only). */
+  bookOffer?: true;
 }
 
 /** What the separator row of an automatic round shows. */
@@ -407,6 +409,10 @@ export interface MapChatHost {
   steer?(): void;
   /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button. */
   createEmptyMap?(): void;
+  /** The book start card (the toolbar's "Picture book"), opened from the button under a reply that built a book outline. */
+  startBook?(): void;
+  /** The map now has the shape a book starts from (one root topic and chapter cards under it). */
+  bookReady?(): boolean;
   /** The opening screen's "Hypothesis research" tab: sending a non-blank claim there starts the research directly. Absent: no tabs. */
   startArgumentResearch?(claim: string): void;
   /** The most AI calls one research can make, for the usage warning of the research tab. */
@@ -530,6 +536,27 @@ let panelSequence = 0;
 
 type HeroTab = "map" | "research";
 const HERO_TABS: readonly HeroTab[] = ["map", "research"];
+/** The opening screen's examples (at most three): the book one first, marked new; `slot` is the blank the field selects. */
+const MAP_CHAT_EXAMPLES = [
+  {
+    book: true,
+    label: "ui.map_chat_example_book",
+    prompt: "ui.map_chat_example_book_prompt",
+    slot: "ui.map_chat_example_book_slot"
+  },
+  {
+    book: false,
+    label: "ui.map_chat_example_compare",
+    prompt: "ui.map_chat_example_compare_prompt",
+    slot: "ui.map_chat_example_compare_slot"
+  },
+  {
+    book: false,
+    label: "ui.map_chat_example_notes",
+    prompt: "ui.map_chat_example_notes_prompt",
+    slot: "ui.map_chat_example_notes_slot"
+  }
+] as const;
 /** The pool of suggested claims of the research tab (each shown text is its i18n key's). */
 export const ARGUMENT_SUGGESTION_KEYS = [
   "ui.argument_suggestion_1",
@@ -618,6 +645,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private suggestionsEl!: HTMLDivElement;
   private usageEl!: HTMLParagraphElement;
   private heroTab: HeroTab = "map";
+  private examplesEl!: HTMLDivElement;
+  /** The book example filled the field in this conversation: the reply that builds a book outline offers the book start card once. */
+  private bookIntent = false;
   private suggestionKeys: (typeof ARGUMENT_SUGGESTION_KEYS)[number][] = [];
   private resizerEl!: HTMLElement;
   private liveEl!: HTMLElement;
@@ -1588,6 +1618,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       last.text = reply;
       last.lines = shown;
       last.streaming = false;
+      // Only a reply that wrote something can have built the outline; one waiting on its plan card is offered when the plan is applied.
+      if (shown.some(line => line.status === "done")) this.offerBook(last);
     }
     this.busy = false;
     this.clearStage();
@@ -1672,6 +1704,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.lateFailures = undefined;
     } else message.lateFailures = undefined;
     if (lines) lines = message.lines = onceImageLines(lines);
+    if (state === "applied" && lines?.some(line => line.status === "done")) this.offerBook(message);
     this.renderLog();
     this.renderHint();
     this.host.stateChanged?.();
@@ -1797,6 +1830,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.restoredText = "";
     this.spokenLater = [];
     this.chips = [];
+    this.bookIntent = false;
     this.dismissedNote = null;
     this.noteChip = null;
     this.busy = false;
@@ -2084,6 +2118,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       attr: { id: `${this.id}-panel-map`, "aria-labelledby": `${this.id}-tab-map` }
     });
     this.heroActionsEl.hidden = true;
+    this.examplesEl = this.heroActionsEl.createDiv({
+      cls: "vam-map-chat-examples",
+      attr: { role: "group", "aria-label": t("ui.map_chat_examples_label") }
+    });
+    this.renderExamples();
     this.emptyMapEl = this.heroActionsEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
@@ -2264,6 +2303,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
+    this.examplesEl.setAttr("aria-label", t("ui.map_chat_examples_label"));
+    this.renderExamples();
     this.tabsEl.setAttr("aria-label", t("ui.argument_tab_label"));
     this.mapTabEl.setText(t("ui.argument_tab_map"));
     this.researchTabLabelEl.setText(t("ui.argument_tab_research"));
@@ -2376,6 +2417,40 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         this.inputEl.setSelectionRange(text.length, text.length);
       });
     }
+  }
+
+  /** The opening screen's examples: each fills the field with a sentence and selects its one blank, so typing replaces it. */
+  private renderExamples(): void {
+    this.examplesEl.empty();
+    for (const example of MAP_CHAT_EXAMPLES) {
+      const button = this.examplesEl.createEl("button", {
+        cls: `vam-map-chat-example${example.book ? " is-new" : ""}`,
+        attr: { type: "button" }
+      });
+      if (example.book)
+        button.createSpan({ cls: "vam-map-chat-example-icon", text: "📖", attr: { "aria-hidden": "true" } });
+      button.createSpan({ text: t(example.label) });
+      if (example.book) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
+      // A click only fills the field; sending is the owner's own Enter or send key.
+      button.addEventListener("click", () => {
+        const text = t(example.prompt);
+        const slot = t(example.slot);
+        this.inputEl.value = text;
+        this.bookIntent = example.book;
+        this.renderSteerHint();
+        this.inputEl.focus();
+        const at = text.indexOf(slot);
+        if (at < 0) this.inputEl.setSelectionRange(text.length, text.length);
+        else this.inputEl.setSelectionRange(at, at + slot.length);
+      });
+    }
+  }
+  /** A reply that ended with the map in a book's shape, after the book example was used, offers the book start card (once). */
+  private offerBook(message: MapChatMessage): void {
+    if (!this.bookIntent || message.role !== "assistant" || message.error || !this.host.startBook) return;
+    if (!this.host.bookReady?.()) return;
+    message.bookOffer = true;
+    this.bookIntent = false;
   }
 
   private onKey(event: KeyboardEvent): void {
@@ -2642,9 +2717,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const showEmptyMap = hero && !!this.host.createEmptyMap && !onResearch;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    this.heroActionsEl.hidden = !showEmptyMap;
-    this.heroActionsEl.toggleClass("is-hidden", !showEmptyMap);
-    this.placeHeadAndEmptyMap(hero, onResearch ? this.researchPanelEl : showEmptyMap ? this.heroActionsEl : null);
+    const showActions = hero && !onResearch;
+    this.heroActionsEl.hidden = !showActions;
+    this.heroActionsEl.toggleClass("is-hidden", !showActions);
+    this.placeHeadAndEmptyMap(hero, onResearch ? this.researchPanelEl : showActions ? this.heroActionsEl : null);
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.
@@ -3010,6 +3086,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.linesOpen ? "o" : "",
       message.seenImage ? `seen:${message.seenImage.note}` : "",
       message.replyUndo ? "undo" : "",
+      message.bookOffer ? `book:${t("ui.map_chat_book_offer")}` : "",
       this.chainWaitingState && this.messages.at(-1) === message
         ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}`
         : "",
@@ -3226,6 +3303,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.batch) this.buildBatch(row, message, message.batch);
     if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
+    if (message.bookOffer) {
+      const book = row.createEl("button", {
+        cls: "mod-cta vam-map-chat-book-offer",
+        text: t("ui.map_chat_book_offer"),
+        attr: { type: "button" }
+      });
+      book.addEventListener("click", () => this.host.startBook?.());
+    }
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;

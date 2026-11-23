@@ -40,6 +40,9 @@
       "eval": "document.querySelector('.vam-book-bar')?.dataset.mode==='gate1'"
     },
     {
+      "click": ".vam-book-structure-toggle"
+    },
+    {
       "assert": "every change has a row, a reason and an undo button",
       "eval": "(()=>{const rows=[...document.querySelectorAll('.vam-book-structure-row')];return rows.length>=1&&rows.every(r=>r.querySelector('.vam-book-structure-text')?.textContent&&r.querySelector('.vam-book-structure-undo'))})()"
     },

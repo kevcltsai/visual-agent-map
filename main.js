@@ -3095,15 +3095,17 @@ var en = {
   "ui.command_book_pipeline": "Picture book",
   "ui.book_button_title": "Start the picture-book pipeline: plan, confirm, write, proofread",
   "ui.book_start_title": "Turn this map into a book with pictures",
-  "ui.book_start_intro": "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
-  "ui.book_start_estimate_0_1_2_3": "{0} cards \xB7 about {1} \xB7 up to {2} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {3}).",
+  "ui.book_start_intro": "The AI plans, writes, finds pictures for and proofreads every chapter; after planning it stops so you can check the direction.",
+  "ui.book_start_estimate_0_1_2": "{0} cards \xB7 about {1} \xB7 about {2} AI calls",
+  "ui.book_start_tip_plan": "Reads the whole map and decides the book's structure, what each chapter covers and how chapters connect. It needs deep thinking: the strongest model is best.",
+  "ui.book_start_tip_write": "Writes each chapter's text from the plan; it decides how well the book reads. A strong model is best.",
+  "ui.book_start_tip_images": "Thinks up picture search words for each chapter and judges whether the pictures found fit. A simple job: a fast, cheap model is enough.",
+  "ui.book_start_tip_proof": "Checks each chapter's facts, sources and consistency. A model different from the author's catches more mistakes.",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
-  "ui.book_start_stops": "It stops only once: after planning, to show you the book's direction. The AI does all the proofreading; you do not need to edit.",
   "ui.book_step_ai_proof": "AI proofread (different from the author)",
   "ui.book_start_proof_same_as_author": "Best a different model from the author",
-  "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
-  "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
+  "ui.book_start_suggesting": "The AI is thinking up suggestions from the subject; they fill the fields below when ready",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
   "ui.book_progress_step_images": "Pictures",
@@ -3253,8 +3255,6 @@ var en = {
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_progress_line_write_cards_0_1": "Writing card {0}/{1}",
   "ui.book_progress_line_done_cards_0_1": "{0}/{1} cards done",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "Preface + {0} chapters + {1} sections ({2} cards) \xB7 about {3} \xB7 up to {4} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {5}).",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "Preface + {0} chapters ({1} cards) \xB7 about {2} \xB7 up to {3} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
@@ -6483,15 +6483,17 @@ var zhCN = {
   "ui.command_book_pipeline": "\u56FE\u6587\u4E66",
   "ui.book_button_title": "\u5F00\u59CB\u56FE\u6587\u4E66\u6D41\u6C34\u7EBF\uFF1A\u4F01\u5212\u3001\u786E\u8BA4\u3001\u4F5C\u8005\u3001\u6821\u5BF9",
   "ui.book_start_title": "\u628A\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u53D8\u6210\u4E00\u672C\u6709\u56FE\u7684\u4E66",
-  "ui.book_start_intro": "\u4F1A\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u4E0E\u5361\u7247\uFF0C\u7531 AI \u4F01\u5212\u3001\u5199\u4F5C\u3001\u627E\u56FE\u3001\u6821\u5BF9\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2_3": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u3001\u81EA\u52A8\u4FEE\u6B63\u548C\u5C01\u9762\u56FE\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {3} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_intro": "AI \u4F1A\u4F01\u5212\u3001\u5199\u4F5C\u3001\u627E\u56FE\u3001\u6821\u5BF9\u6BCF\u4E00\u7AE0\uFF1B\u4F01\u5212\u597D\u540E\u505C\u4E0B\u6765\u8BA9\u4F60\u770B\u65B9\u5411\u3002",
+  "ui.book_start_estimate_0_1_2": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u7EA6 {2} \u6B21 AI \u8C03\u7528",
+  "ui.book_start_tip_plan": "\u8BFB\u6574\u5F20\u601D\u7EF4\u5BFC\u56FE\uFF0C\u51B3\u5B9A\u5168\u4E66\u7ED3\u6784\u3001\u6BCF\u7AE0\u8981\u8BB2\u4EC0\u4E48\u3001\u7AE0\u4E0E\u7AE0\u600E\u4E48\u63A5\u3002\u8981\u60F3\u5F97\u6DF1\uFF0C\u5EFA\u8BAE\u7528\u6700\u5F3A\u7684\u6A21\u578B\u3002",
+  "ui.book_start_tip_write": "\u4F9D\u4F01\u5212\u5199\u6BCF\u4E00\u7AE0\u7684\u6B63\u6587\uFF0C\u51B3\u5B9A\u6587\u5B57\u597D\u4E0D\u597D\u8BFB\u3002\u5EFA\u8BAE\u7528\u5F3A\u6A21\u578B\u3002",
+  "ui.book_start_tip_images": "\u66FF\u6BCF\u7AE0\u60F3\u627E\u56FE\u5173\u952E\u8BCD\uFF0C\u5E76\u5224\u65AD\u627E\u5230\u7684\u56FE\u5408\u4E0D\u5408\u7528\u3002\u5DE5\u4F5C\u7B80\u5355\uFF0C\u7528\u5FEB\u53C8\u7701\u7684\u6A21\u578B\u5C31\u591F\u3002",
+  "ui.book_start_tip_proof": "\u68C0\u67E5\u6BCF\u7AE0\u7684\u4E8B\u5B9E\u3001\u6765\u6E90\u548C\u524D\u540E\u4E00\u81F4\u3002\u7528\u548C\u5199\u4F5C\u4E0D\u540C\u7684\u6A21\u578B\uFF0C\u6BD4\u8F83\u6293\u5F97\u5230\u9519\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_start_minutes_0": "{0} \u5206\u949F",
-  "ui.book_start_stops": "\u53EA\u4F1A\u505C\u4E00\u6B21\uFF1A\u4F01\u5212\u597D\u540E\u8BA9\u4F60\u770B\u5168\u4E66\u65B9\u5411\u3002\u6821\u5BF9\u5168\u90E8\u7531 AI \u505A\uFF0C\u4F60\u4E0D\u7528\u6539\u7A3F\u3002",
   "ui.book_step_ai_proof": "AI \u6821\u5BF9\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
   "ui.book_start_proof_same_as_author": "\u6700\u597D\u548C\u4F5C\u8005\u4E0D\u540C",
-  "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
-  "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u60F3\u5EFA\u8BAE\u2026\u2026",
+  "ui.book_start_suggesting": "AI \u6B63\u5728\u4F9D\u4E3B\u9898\u60F3\u5EFA\u8BAE\uFF0C\u597D\u4E86\u4F1A\u81EA\u52A8\u586B\u8FDB\u4E0B\u9762\u7684\u6846",
   "ui.book_start_settings": "\u5168\u4E66\u8BBE\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8BAE\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u5F00\u59CB",
   "ui.book_progress_step_images": "\u627E\u56FE",
@@ -6641,8 +6643,6 @@ var zhCN = {
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u8282\uFF08{2} \u5F20\u5361\uFF09\xB7 \u7EA6 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u3001\u81EA\u52A8\u4FEE\u6B63\u548C\u5C01\u9762\u56FE\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {5} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F20\u5361\uFF09\xB7 \u7EA6 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u3001\u81EA\u52A8\u4FEE\u6B63\u548C\u5C01\u9762\u56FE\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {4} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5B9E\u9645\u8BB2\u4E86\uFF1A",
   "ui.book_issue_0": "\u9700\u4EBA\u770B\uFF1A{0}",
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u7801\u65E0\u6CD5\u8BC6\u522B\uFF09\u3002",
@@ -9871,15 +9871,17 @@ var zhTW = {
   "ui.command_book_pipeline": "\u5716\u6587\u66F8",
   "ui.book_button_title": "\u958B\u59CB\u5716\u6587\u66F8\u6D41\u6C34\u7DDA\uFF1A\u4F01\u5283\u3001\u78BA\u8A8D\u3001\u4F5C\u8005\u3001\u6821\u5C0D",
   "ui.book_start_title": "\u628A\u9019\u5F35\u5FC3\u667A\u5716\u8B8A\u6210\u4E00\u672C\u6709\u5716\u7684\u66F8",
-  "ui.book_start_intro": "\u6703\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u8207\u5361\u7247\uFF0C\u7531 AI \u4F01\u5283\u3001\u5BEB\u4F5C\u3001\u627E\u5716\u3001\u6821\u5C0D\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2_3": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u3001\u81EA\u52D5\u4FEE\u6B63\u548C\u5C01\u9762\u5716\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {3} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_intro": "AI \u6703\u4F01\u5283\u3001\u5BEB\u4F5C\u3001\u627E\u5716\u3001\u6821\u5C0D\u6BCF\u4E00\u7AE0\uFF1B\u4F01\u5283\u597D\u5F8C\u505C\u4E0B\u4F86\u8B93\u4F60\u770B\u65B9\u5411\u3002",
+  "ui.book_start_estimate_0_1_2": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u7D04 {2} \u6B21 AI \u547C\u53EB",
+  "ui.book_start_tip_plan": "\u8B80\u6574\u5F35\u5FC3\u667A\u5716\uFF0C\u6C7A\u5B9A\u5168\u66F8\u7D50\u69CB\u3001\u6BCF\u7AE0\u8981\u8B1B\u4EC0\u9EBC\u3001\u7AE0\u8207\u7AE0\u600E\u9EBC\u63A5\u3002\u8981\u60F3\u5F97\u6DF1\uFF0C\u5EFA\u8B70\u7528\u6700\u5F37\u7684\u6A21\u578B\u3002",
+  "ui.book_start_tip_write": "\u4F9D\u4F01\u5283\u5BEB\u6BCF\u4E00\u7AE0\u7684\u6B63\u6587\uFF0C\u6C7A\u5B9A\u6587\u5B57\u597D\u4E0D\u597D\u8B80\u3002\u5EFA\u8B70\u7528\u5F37\u6A21\u578B\u3002",
+  "ui.book_start_tip_images": "\u66FF\u6BCF\u7AE0\u60F3\u627E\u5716\u95DC\u9375\u5B57\uFF0C\u4E26\u5224\u65B7\u627E\u5230\u7684\u5716\u5408\u4E0D\u5408\u7528\u3002\u5DE5\u4F5C\u7C21\u55AE\uFF0C\u7528\u5FEB\u53C8\u7701\u7684\u6A21\u578B\u5C31\u5920\u3002",
+  "ui.book_start_tip_proof": "\u6AA2\u67E5\u6BCF\u7AE0\u7684\u4E8B\u5BE6\u3001\u4F86\u6E90\u548C\u524D\u5F8C\u4E00\u81F4\u3002\u7528\u548C\u5BEB\u4F5C\u4E0D\u540C\u7684\u6A21\u578B\uFF0C\u6BD4\u8F03\u6293\u5F97\u5230\u932F\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_start_minutes_0": "{0} \u5206\u9418",
-  "ui.book_start_stops": "\u53EA\u6703\u505C\u4E00\u6B21\uFF1A\u4F01\u5283\u597D\u5F8C\u8B93\u4F60\u770B\u5168\u66F8\u65B9\u5411\u3002\u6821\u5C0D\u5168\u90E8\u7531 AI \u505A\uFF0C\u4F60\u4E0D\u7528\u6539\u7A3F\u3002",
   "ui.book_step_ai_proof": "AI \u6821\u5C0D\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
   "ui.book_start_proof_same_as_author": "\u6700\u597D\u548C\u4F5C\u8005\u4E0D\u540C",
-  "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
-  "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u60F3\u5EFA\u8B70\u22EF\u22EF",
+  "ui.book_start_suggesting": "AI \u6B63\u5728\u4F9D\u4E3B\u984C\u60F3\u5EFA\u8B70\uFF0C\u597D\u4E86\u6703\u81EA\u52D5\u586B\u9032\u4E0B\u9762\u7684\u6846",
   "ui.book_start_settings": "\u5168\u66F8\u8A2D\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8B70\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u958B\u59CB",
   "ui.book_progress_step_images": "\u627E\u5716",
@@ -10029,8 +10031,6 @@ var zhTW = {
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u7BC0\uFF08{2} \u5F35\u5361\uFF09\xB7 \u7D04 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u3001\u81EA\u52D5\u4FEE\u6B63\u548C\u5C01\u9762\u5716\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {5} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F35\u5361\uFF09\xB7 \u7D04 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u3001\u81EA\u52D5\u4FEE\u6B63\u548C\u5C01\u9762\u5716\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {4} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5BE6\u969B\u8B1B\u4E86\uFF1A",
   "ui.book_issue_0": "\u9700\u4EBA\u770B\uFF1A{0}",
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u78BC\u7121\u6CD5\u8FA8\u8B58\uFF09\u3002",
@@ -76384,27 +76384,10 @@ function bookStartEstimate(cards, trialCards, models) {
     seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
-function bookStartEstimateText(estimate, structure2) {
+function bookStartEstimateText(estimate) {
   const minutes = Math.round(estimate.seconds / 60);
   const time = minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes);
-  if (structure2)
-    return structure2.sections ? t(
-      "ui.book_start_estimate_struct_0_1_2_3_4_5",
-      structure2.chapters,
-      structure2.sections,
-      estimate.cards,
-      time,
-      estimate.calls,
-      estimate.limit
-    ) : t(
-      "ui.book_start_estimate_struct_0_1_2_3_4",
-      structure2.chapters,
-      estimate.cards,
-      time,
-      estimate.calls,
-      estimate.limit
-    );
-  return t("ui.book_start_estimate_0_1_2_3", estimate.cards, time, estimate.calls, estimate.limit);
+  return t("ui.book_start_estimate_0_1_2", estimate.cards, time, estimate.calls);
 }
 function bookSettingsPatch(current, typed, suggestions = {}) {
   var _a2, _b2;
@@ -76424,10 +76407,10 @@ function bookSettingsPatch(current, typed, suggestions = {}) {
   return patch;
 }
 var MODEL_ROWS = [
-  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
-  { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
-  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
-  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof" }
+  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan", tip: "ui.book_start_tip_plan" },
+  { key: "bookWriteModel", step: "write", label: "ui.book_step_write", tip: "ui.book_start_tip_write" },
+  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images", tip: "ui.book_start_tip_images" },
+  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof", tip: "ui.book_start_tip_proof" }
 ];
 var FIELD_LABEL = {
   reader: "coffee.book_reader",
@@ -76461,7 +76444,7 @@ function renderBookSettingsFields(parent, current, deletedTitles = [], chapterTi
     const label = t(FIELD_LABEL[field]);
     const id = `vam-book-start-${field}`;
     parent.createEl("label", { text: label, attr: { for: id } });
-    const area = parent.createEl("textarea", {
+    const area = parent.createDiv({ cls: "vam-book-start-field-wrap" }).createEl("textarea", {
       cls: "vam-book-start-field",
       attr: {
         id,
@@ -76508,7 +76491,16 @@ function renderBookModelChoice(parent, input2) {
   for (const row of MODEL_ROWS) {
     const id = `vam-book-start-model-${row.step}`;
     const name2 = t(row.label);
-    parent.createEl("label", { text: name2, attr: { for: id } });
+    const head2 = parent.createDiv({ cls: "vam-book-start-model-label" });
+    head2.createEl("label", { text: name2, attr: { for: id } });
+    const tip = t(row.tip);
+    const info = head2.createSpan({
+      cls: "vam-book-start-info",
+      text: "\u24D8",
+      attr: { tabindex: "0", role: "img", "aria-label": tip }
+    });
+    (0, import_obsidian33.setTooltip)(info, tip);
+    info.addEventListener("focus", () => (0, import_obsidian33.displayTooltip)(info, tip));
     const select = parent.createEl("select", {
       cls: "dropdown vam-book-start-model",
       attr: { id, "aria-label": name2 }
@@ -76540,6 +76532,7 @@ var BookStartModal = class extends import_obsidian33.Modal {
     __publicField(this, "fields", null);
     __publicField(this, "suggested", {});
     __publicField(this, "suggestingEl", null);
+    __publicField(this, "settingsEl", null);
     __publicField(this, "estimateEl", null);
   }
   /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
@@ -76548,17 +76541,18 @@ var BookStartModal = class extends import_obsidian33.Modal {
   }
   /** The suggestion arrived (or did not): the fields show it in grey; a card already started or closed ignores it. */
   setSuggestions(suggestions) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.opened || this.started) return;
-    (_a2 = this.suggestingEl) == null ? void 0 : _a2.remove();
+    (_a2 = this.settingsEl) == null ? void 0 : _a2.removeClass("is-loading");
+    (_b2 = this.suggestingEl) == null ? void 0 : _b2.remove();
     this.suggestingEl = null;
     if (!suggestions) return;
     for (const field of BOOK_SETTING_FIELDS) {
       const text11 = suggestions[field];
-      const typedNow = (_c = (_b2 = this.fields) == null ? void 0 : _b2.areas.get(field)) == null ? void 0 : _c.value.trim();
-      if (text11 && !((_d = this.input.settings[field]) == null ? void 0 : _d.trim()) && !typedNow) this.suggested[field] = text11;
+      const typedNow = (_d = (_c = this.fields) == null ? void 0 : _c.areas.get(field)) == null ? void 0 : _d.value.trim();
+      if (text11 && !((_e = this.input.settings[field]) == null ? void 0 : _e.trim()) && !typedNow) this.suggested[field] = text11;
     }
-    (_e = this.fields) == null ? void 0 : _e.suggest(this.suggested);
+    (_f = this.fields) == null ? void 0 : _f.suggest(this.suggested);
   }
   onOpen() {
     this.opened = true;
@@ -76574,17 +76568,16 @@ var BookStartModal = class extends import_obsidian33.Modal {
       // A pick only changes this card's copy; it is saved when Start is pressed.
       onChange: () => this.refreshEstimate()
     });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
     const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));
     settings.createEl("strong", { text: t("ui.book_start_settings") });
-    this.suggestingEl = settings.createEl("p", {
-      cls: "vam-book-start-suggesting",
-      text: t("ui.book_start_suggesting")
-    });
+    this.suggestingEl = settings.createEl("p", { cls: "vam-book-start-suggesting" });
+    this.suggestingEl.createSpan({ cls: "vam-book-start-spinner", attr: { "aria-hidden": "true" } });
+    this.suggestingEl.createSpan({ text: t("ui.book_start_suggesting") });
     this.suggestingEl.setAttr("role", "status");
+    settings.addClass("is-loading");
+    this.settingsEl = settings;
     this.fields = renderBookSettingsFields(
       settings,
       this.input.settings,
@@ -76607,10 +76600,7 @@ var BookStartModal = class extends import_obsidian33.Modal {
   refreshEstimate() {
     var _a2;
     (_a2 = this.estimateEl) == null ? void 0 : _a2.setText(
-      bookStartEstimateText(
-        bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models),
-        this.input.structure
-      )
+      bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models))
     );
   }
   onClose() {

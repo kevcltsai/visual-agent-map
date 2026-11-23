@@ -3389,17 +3389,22 @@ export const en = {
   "ui.book_button_title": "Start the picture-book pipeline: plan, confirm, write, proofread",
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro":
-    "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
-  "ui.book_start_estimate_0_1_2_3":
-    "{0} cards · about {1} · up to {2} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {3}).",
+    "The AI plans, writes, finds pictures for and proofreads every chapter; after planning it stops so you can check the direction.",
+  "ui.book_start_estimate_0_1_2": "{0} cards · about {1} · about {2} AI calls",
+  "ui.book_start_tip_plan":
+    "Reads the whole map and decides the book's structure, what each chapter covers and how chapters connect. It needs deep thinking: the strongest model is best.",
+  "ui.book_start_tip_write":
+    "Writes each chapter's text from the plan; it decides how well the book reads. A strong model is best.",
+  "ui.book_start_tip_images":
+    "Thinks up picture search words for each chapter and judges whether the pictures found fit. A simple job: a fast, cheap model is enough.",
+  "ui.book_start_tip_proof":
+    "Checks each chapter's facts, sources and consistency. A model different from the author's catches more mistakes.",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
-  "ui.book_start_stops":
-    "It stops only once: after planning, to show you the book's direction. The AI does all the proofreading; you do not need to edit.",
   "ui.book_step_ai_proof": "AI proofread (different from the author)",
   "ui.book_start_proof_same_as_author": "Best a different model from the author",
-  "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
-  "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
+  "ui.book_start_suggesting":
+    "The AI is thinking up suggestions from the subject; they fill the fields below when ready",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
   "ui.book_progress_step_images": "Pictures",
@@ -3561,10 +3566,6 @@ export const en = {
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_progress_line_write_cards_0_1": "Writing card {0}/{1}",
   "ui.book_progress_line_done_cards_0_1": "{0}/{1} cards done",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5":
-    "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {5}).",
-  "ui.book_start_estimate_struct_0_1_2_3_4":
-    "Preface + {0} chapters ({1} cards) · about {2} · up to {3} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",

@@ -656,6 +656,28 @@ export function findFreeOffset(
   return best ?? { dx: 0, dy: 0 };
 }
 
+/**
+ * Where a picture of size `w` x `h` goes on the canvas when the chat puts it there. No topic yet (`obstacles` empty): centred on
+ * `centre`. Otherwise just to the right of the topics, level with their middle, and moved to a free place when something is
+ * in the way. Nothing that exists is moved.
+ */
+export function canvasImageSpot(
+  size: { w: number; h: number },
+  obstacles: readonly Rect[],
+  centre: { x: number; y: number }
+): { x: number; y: number } {
+  if (!obstacles.length) return { x: Math.round(centre.x - size.w / 2), y: Math.round(centre.y - size.h / 2) };
+  const all = ringBounds(obstacles[0], obstacles);
+  const at = {
+    x: Math.round(all.x + all.w + RING_OBSTACLE_GAP),
+    y: Math.round(all.y + all.h / 2 - size.h / 2),
+    w: size.w,
+    h: size.h
+  };
+  const free = findFreeOffset(at, obstacles);
+  return { x: Math.round(at.x + free.dx), y: Math.round(at.y + free.dy) };
+}
+
 /** The whole ring (picture and cards) shifted by `dx`,`dy`. */
 export function moveRing(
   image: Rect,

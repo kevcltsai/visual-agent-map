@@ -103,6 +103,13 @@ export function settledLine(line: MapChatLine): MapChatLine {
   }
   const placed = blocks.filter(block => placedImage(block)).length;
   const missed = total - placed;
+  // A place_image: one picture on the canvas, not pictures in cards.
+  if (blocks.every(block => block.canvas))
+    return {
+      ...line,
+      status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
+      text: t(placed ? "ui.map_chat_line_canvas_image_done" : "ui.map_chat_line_canvas_image_missed") + model
+    };
   return {
     ...line,
     status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
@@ -218,6 +225,8 @@ export interface MapChatImageItem {
 export interface MapChatImages {
   /** The search words. */
   query: string;
+  /** A place_image: the picture went on the canvas as an annotated image, not into a card (`nodeId` and `nodeTitle` are empty). */
+  canvas?: true;
   /** The card the picture is put into, with the map it was found on. */
   nodeId: string;
   nodeTitle: string;
@@ -3787,7 +3796,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     } else {
       const missed = blocks.length - placed;
       head.setText(
-        missed ? t("ui.map_chat_images_summary_0_1", placed, missed) : t("ui.map_chat_images_summary_0", placed)
+        blocks.every(block => block.canvas)
+          ? t(placed ? "ui.map_chat_images_canvas_done" : "ui.map_chat_line_canvas_image_missed")
+          : missed
+            ? t("ui.map_chat_images_summary_0_1", placed, missed)
+            : t("ui.map_chat_images_summary_0", placed)
       );
     }
     const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
@@ -3800,7 +3813,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
         const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
-        text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+        text.createDiv({
+          cls: "vam-map-chat-images-topic",
+          text: clip(block.canvas ? block.query : block.nodeTitle, 80)
+        });
         text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
         if (item.candidate.source)
           text.createEl("a", {
@@ -3817,7 +3833,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
       cell.addClass("is-missed");
       const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
-      text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+      text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle || block.query, 80) });
       const why =
         block.state === "searching"
           ? block.running

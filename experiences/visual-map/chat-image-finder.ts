@@ -57,6 +57,10 @@ function cleanImageQuery(text: string): string {
 }
 
 type PlaceResult = { ok: true } | { ok: false; reason: string };
+type CanvasPlaceResult = { ok: true; id: string } | { ok: false; reason: string };
+/** What one place_image came to: the block (its state changes later) and the id of the new canvas image (null when none was put), or why it did not start. */
+export type ChatCanvasImageFind =
+  { block: MapChatImages; placed: Promise<string | null> } | { skipped: TranslationKey } | { failed: string };
 type CoverBytes = { name: string; data: ArrayBuffer } | null;
 
 /** What one find came to: the blocks (their state changes later), a reason it was skipped, or a failure. */
@@ -80,6 +84,17 @@ export interface ChatImagePorts {
   fetchBytes(url: string): Promise<ArrayBuffer>;
   /** Writes the picture (and the cover, when there is one) into the card's note as one undo step. */
   write(block: MapChatImages, candidate: ImageCandidate, alive: () => boolean, cover: CoverBytes): Promise<PlaceResult>;
+  /** The model a place_image search runs on (it belongs to no card). */
+  canvasModel(): string;
+  /** Why a place_image may not start now (the map cannot take a canvas image), or null. */
+  canvasPreflight(block: MapChatImages): string | null;
+  /** Puts the downloaded picture on the canvas as an annotated image (one write, one undo step); the id of the new image. */
+  writeCanvas(
+    block: MapChatImages,
+    candidate: ImageCandidate,
+    file: { name: string; data: ArrayBuffer },
+    alive: () => boolean
+  ): Promise<CanvasPlaceResult>;
   /** The blocks are shown in the chat (and recorded). */
   added(chat: MapChatPanel, blocks: MapChatImages[]): void;
   running(chat: MapChatPanel, block: MapChatImages): void;
@@ -245,6 +260,147 @@ export class ChatImageFinder {
         }
       })();
     return { blocks: batch.group };
+  }
+
+  /**
+   * place_image: the same search, thumbnail check and download as find_images, but the picture goes on the canvas as an annotated
+   * image and belongs to no card. The block is returned at once; `placed` settles with the new image's id, or null when none was
+   * put (nothing found, Stop, the map changed, the write refused). It never rejects.
+   */
+  async findCanvas(
+    map: MapDocument,
+    chat: MapChatPanel,
+    direction: string,
+    batch: ChatImageBatch
+  ): Promise<ChatCanvasImageFind> {
+    const ports = this.ports;
+    const query = cleanImageQuery(direction);
+    if (!query) return { skipped: "ui.map_chat_skip_unavailable" };
+    if (batch.declined) return { skipped: "ui.map_chat_skip_not_started" };
+    const anchor = { path: ports.where().path, id: map.id };
+    const model = ports.canvasModel();
+    const block: MapChatImages = {
+      query,
+      nodeId: "",
+      nodeTitle: "",
+      canvas: true,
+      modelLabel: ports.modelLabel(model),
+      mapPath: anchor.path,
+      mapId: anchor.id,
+      state: "searching",
+      items: []
+    };
+    const refused = ports.canvasPreflight(block);
+    if (refused) return { failed: refused };
+    if (!batch.asked.has(model)) {
+      let ok = false;
+      try {
+        ok = await ports.confirmUsage(model);
+      } catch (error) {
+        return { failed: errorMessage(error) };
+      }
+      if (!ok) {
+        batch.declined = true;
+        return { skipped: "ui.map_chat_skip_not_started" };
+      }
+      batch.asked.add(model);
+    }
+    const here = ports.where();
+    if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
+      return { skipped: "ui.map_chat_skip_map_changed" };
+    const controller = new AbortController();
+    const key = ++this.sequence;
+    this.searches.set(key, controller);
+    block.stop = () => {
+      if (this.searches.get(key) !== controller) return;
+      this.searches.delete(key);
+      controller.abort();
+      ports.settle(chat, block, { state: "stopped" });
+    };
+    ports.added(chat, [block]);
+    const placed = (async (): Promise<string | null> => {
+      await this.acquireSlot();
+      try {
+        return await this.runCanvas(block, controller, chat, model);
+      } catch {
+        return null;
+      } finally {
+        this.releaseSlot();
+        if (this.searches.get(key) === controller) this.searches.delete(key);
+      }
+    })();
+    return { block, placed };
+  }
+
+  /** One place_image to its end (see {@link run} for the fences): the id of the canvas image, or null with the block saying why. */
+  private async runCanvas(
+    block: MapChatImages,
+    controller: AbortController,
+    chat: MapChatPanel,
+    model: string
+  ): Promise<string | null> {
+    const ports = this.ports;
+    const current = (): boolean => {
+      const here = ports.where();
+      return (
+        !here.closed &&
+        !controller.signal.aborted &&
+        here.chat === chat &&
+        here.path === block.mapPath &&
+        here.mapId === block.mapId
+      );
+    };
+    const dropped = (): null => {
+      const here = ports.where();
+      if (!here.closed && !controller.signal.aborted && here.chat === chat)
+        ports.settle(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+      return null;
+    };
+    if (!current()) return dropped();
+    try {
+      const refused = ports.canvasPreflight(block);
+      if (refused) {
+        ports.settle(chat, block, { state: "empty", reason: refused });
+        return null;
+      }
+      ports.running(chat, block);
+      const found = await ports.searchImages(block.query, model, controller.signal);
+      if (!current()) return dropped();
+      const loadable = (await ports.probe(found, controller.signal)).filter(item => item.url.startsWith("https://"));
+      if (!current()) return dropped();
+      // The first picture that downloads and passes the byte check (a few tries): a thumbnail that loads can still be refused here.
+      for (const candidate of loadable.slice(0, 3)) {
+        let data: ArrayBuffer;
+        try {
+          data = await this.download(candidate.url, controller.signal);
+        } catch {
+          if (!current()) return dropped();
+          continue;
+        }
+        if (!current()) return dropped();
+        const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+        const name = accepted.ok ? safeImageName(candidate.title, accepted.mime) : null;
+        if (!name) continue;
+        const work = (): Promise<CanvasPlaceResult> => ports.writeCanvas(block, candidate, { name, data }, current);
+        const run = this.writes.then(work, work);
+        this.writes = run.catch(() => undefined);
+        const result = await run;
+        // Written is written, even when a Stop came in while the write ran: the block tells the truth.
+        if (result.ok) {
+          ports.settle(chat, block, { state: "ready", items: [{ candidate, inserted: candidate.title }] });
+          return result.id;
+        }
+        if (current()) ports.settle(chat, block, { state: "empty", reason: result.reason });
+        else dropped();
+        return null;
+      }
+      ports.settle(chat, block, { state: "empty" });
+      return null;
+    } catch (error) {
+      if (!current()) return dropped();
+      ports.settle(chat, block, { state: "failed", reason: errorMessage(error) });
+      return null;
+    }
   }
 
   private async acquireSlot(): Promise<void> {

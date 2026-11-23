@@ -21349,6 +21349,9 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_md_0", action.path);
       case "read_md_file":
         return action.path;
+      case "place_image":
+        // The search words as they are; P5 gives it a translated label.
+        return action.direction;
       case "edit_book_plan":
         return t("ui.map_chat_do_edit_book_plan_0", action.changes.length);
       case "edit_book_structure":
@@ -21705,6 +21708,14 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(
             this.chatActionLabel(action, refTitles),
             skipped(verdicts[index] === "out" ? "ui.topic_chat_out_of_scope" : "ui.map_chat_skip_unavailable")
+          );
+          continue;
+        }
+        // P5 puts the picture on the canvas; until then the action is shown as unavailable and writes nothing.
+        if (action.kind === "place_image") {
+          lines[index] = this.chatLine(
+            this.chatActionLabel(action, refTitles),
+            skipped("ui.map_chat_skip_unavailable")
           );
           continue;
         }

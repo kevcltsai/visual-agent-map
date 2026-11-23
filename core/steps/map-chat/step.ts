@@ -62,7 +62,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "link_anchor",
   "read_md_file",
   "edit_book_plan",
-  "edit_book_thread"
+  "edit_book_thread",
+  "place_image"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 /** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */
@@ -169,6 +170,11 @@ export type MapChatAction =
       /** research_standard: true = the user explicitly asked for the whole note to be rewritten; the write-back replaces it ("fresh", with a backup) for this run only. Present only when true. */
       rewrite?: true;
     }
+  /**
+   * Looks for one picture on the web and puts it on the canvas as an annotated image (not into a card: that is `find_images`).
+   * `direction` is the search words. At most one per reply; the view does the search and the placement.
+   */
+  | { kind: "place_image"; direction: string }
   /** Always the first action: a new map, opened for the rest of the reply. */
   | { kind: "create_map"; title: string }
   /** Always the last action: switch to the map the title names (matched by the view, not the model). */
@@ -568,6 +574,7 @@ export function parseMapChat(
   // A book plan under review: the structure items of the reply (grouped into one action, last), the cards an edit_book_plan already
   // changed, and whether a thread was already kept.
   const items: ChatStructureItem[] = [];
+  let placedImage = false;
   const planned = new Set<string>();
   let threaded = false;
   body.actions.forEach((entry: unknown, index: number) => {
@@ -852,6 +859,14 @@ export function parseMapChat(
             ...(research && flag("otherProvider") ? { otherProvider: true as const } : {}),
             ...(research && flag("rewrite") ? { rewrite: true as const } : {})
           });
+          break;
+        }
+        case "place_image": {
+          // The search words come from the model: one picture per reply, the rest is dropped.
+          const direction = text("direction");
+          if (placedImage) throw new Dropped("too_many");
+          placedImage = true;
+          actions.push({ kind: "place_image", direction });
           break;
         }
         case "create_map": {

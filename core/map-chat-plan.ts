@@ -178,6 +178,12 @@ const isFindImages = (action: MapChatAction): boolean =>
   action.kind === "run_map_action" && action.action === "find_images";
 
 /**
+ * A web picture put on the canvas. Kept apart from {@link isFindImages}: it must not inherit that action's exemptions (the search
+ * words come from the model, so a turn that may read web text or sent a picture gets a plan).
+ */
+const isPlaceImage = (action: MapChatAction): boolean => action.kind === "place_image";
+
+/**
  * AI calls the actions start, counted at least (see {@link MapChatPlan.estimatedCalls}). `diagrams` is the "Add diagrams after
  * research" setting (on unless false); `mapAiMode` is the mode a research action falls back to.
  */
@@ -341,6 +347,7 @@ export function planFor(
     ((action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") &&
       isInsideMapFolder(action.path, options.mapFolder)) ||
     (action.kind === "read_md_file" && isReadablePath(action.path, options.readablePaths)) ||
+    (isPlaceImage(action) && !readsResearch && options.imageAttached !== true) ||
     (imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind));
   const allAllowed = auto && actions.every(autoAllowed);
   if (readsResearch && !onlySafe && !allAllowed)

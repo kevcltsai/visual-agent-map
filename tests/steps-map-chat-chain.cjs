@@ -566,3 +566,20 @@ test('continuation: a check round says so with a fixed note; other rounds carry 
   const plainRound = json(context({ continuation: base }));
   assert.equal('checkDone' in plainRound.continuation, false); assert.equal('checkDoneNote' in plainRound, false);
 });
+
+// ---- place_image: the chain waits for the canvas image (canvas-image-anchors P1) ----
+test('place_image: started.image waits for "image", alone or with research and expand; absent counts as none', () => {
+  const image = { research: 0, expand: 0, otherBackground: false, image: 1 };
+  assert.deepEqual(plain(chain.finishRound(at(1), roundEnd({ started: image })).decision), { kind: 'wait', waitFor: ['image'] });
+  assert.deepEqual(plain(chain.finishRound(at(1), roundEnd({ started: { ...image, research: 2, expand: 1 } })).decision), { kind: 'wait', waitFor: ['research', 'expand', 'image'] });
+  assert.equal(chain.finishRound(at(1), roundEnd({ started: { ...image, image: 0 } })).decision.kind, 'next');
+  assert.equal(chain.finishRound(at(1), roundEnd({ started: started() })).decision.kind, 'next', 'a round of an older shape has no image');
+});
+test('place_image: a place_image action that was applied counts as a write, so a failed placement still lets the chain go on', () => {
+  const placed = [{ kind: 'place_image', done: true }];
+  const image = { research: 0, expand: 0, otherBackground: false, image: 1 };
+  const step = chain.finishRound(at(1), roundEnd({ actions: placed, started: image }));
+  assert.equal(step.state.wrote, true);
+  assert.equal(chain.finishWait(step.state, {}).decision.kind, 'next', 'image failed (null): the next round runs');
+  assert.equal(chain.finishWait(step.state, { timedOut: true }).decision.kind, 'end');
+});

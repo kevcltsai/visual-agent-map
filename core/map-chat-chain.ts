@@ -45,7 +45,7 @@ export const chainEndNeedsNotice = (reason: MapChatChainEndReason): boolean => r
 
 /** What the chat panel shows of a chain (the view uses it; P4 implements it). `Origin` and `Turn` are the panel's own types. */
 export interface MapChatChainWaiting {
-  kinds: ("research" | "expand")[];
+  kinds: ("research" | "expand" | "image")[];
   total: number;
   settled: number;
 }
@@ -154,7 +154,7 @@ export type MapChatChainDecision =
   /** Start round `round` now. */
   | { kind: "next"; round: number; remaining: string }
   /** Wait for this work, then call {@link finishWait}. */
-  | { kind: "wait"; waitFor: ("research" | "expand")[] }
+  | { kind: "wait"; waitFor: ("research" | "expand" | "image")[] }
   | { kind: "end"; reason: MapChatChainEndReason; remaining: string }
   /** A late or repeated event for a chain that has moved on: do nothing. */
   | { kind: "ignored" };
@@ -200,6 +200,8 @@ export interface MapChatRoundEnd {
     expand: number;
     /** An integration, a merge or a rating started: these are not waited for. */
     otherBackground: boolean;
+    /** A canvas picture (`place_image`) being fetched and placed; the next round carries it. Absent = 0. */
+    image?: number;
   };
 }
 /**
@@ -232,9 +234,10 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");
   if (state.autoApply && next.calls >= MAP_CHAT_AUTO_MAX_CALLS) return ended(next, "call_limit");
-  const waitFor: ("research" | "expand")[] = [];
+  const waitFor: ("research" | "expand" | "image")[] = [];
   if (end.started.research > 0) waitFor.push("research");
   if (end.started.expand > 0) waitFor.push("expand");
+  if ((end.started.image ?? 0) > 0) waitFor.push("image");
   if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
   if (!next.wrote) {
     // The file it asked to read comes in the next round: that is progress, and the round limit still ends a chain that only reads.

@@ -110,7 +110,14 @@ export type ChatWriteAction = Exclude<
   MapChatAction,
   {
     kind:
-      "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" | "read_md_file";
+      | "select_topics"
+      | "run_map_action"
+      | "create_map"
+      | "rename_map"
+      | "open_map"
+      | "ask_topic_kind"
+      | "read_md_file"
+      | "place_image";
   }
 >;
 export type ChatWriteBaseline = Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths" | "bookPlan">;
@@ -215,7 +222,8 @@ export class ChatActionWriter {
           | "rename_map"
           | "open_map"
           | "ask_topic_kind"
-          | "read_md_file";
+          | "read_md_file"
+          | "place_image";
       }
     >,
     baseline: ChatWriteBaseline,

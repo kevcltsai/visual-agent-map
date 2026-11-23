@@ -9,10 +9,7 @@ import {
   type CardPlace
 } from "../../core/book-pipeline/structure";
 import {
-  applyInverseOps,
-  inverseOps,
   simulateStructure,
-  undoAffected,
   undoClosure,
   type AppliedOp,
   type StructureNode
@@ -101,12 +98,8 @@ export interface BookStructureEditView {
   items: BookStructureItem[];
   /** Changes that stand (not undone). */
   active: number;
-  /** The book now and before the editor changed it; absent when the structure cannot be derived. */
-  chapters?: { now: { chapters: number; sections: number }; before: { chapters: number; sections: number } };
   /** Proposals not applied: over the cap, or counted by why. */
   notApplied?: { overCap: boolean; locked: number; other: number };
-  /** "Undo all" re-plans this many cards and costs about `calls` AI calls. */
-  undoAll?: { cards: number; calls: number };
 }
 export interface BookCurrent {
   /** The whole-book plan, or a chapter step. */
@@ -248,7 +241,7 @@ export function bookBarState(
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(reordered ? { mapChange: reordered } : {}),
     ...(mode === "gate1" && data.planReview ? { planReview: true as const } : {}),
-    ...(mode === "gate1" && data.planReview ? structureEditField(data, structure, titleOf) : {}),
+    ...(mode === "gate1" && data.planReview ? structureEditField(data, titleOf) : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
@@ -256,15 +249,9 @@ export function bookBarState(
   };
 }
 
-const shape = (s: BookStructure): { chapters: number; sections: number } => ({
-  chapters: s.chapters.length,
-  sections: s.chapters.reduce((sum, id) => sum + s.sectionsOf(id).length, 0)
-});
-
 /** The gate's structure list: one item per applied change (reading the saved ops and the tree before), or nothing when the editor changed and refused nothing. */
 function structureEditField(
   data: BookPipelineData,
-  now: BookStructure | undefined,
   titleOf?: (nodeId: string) => string | undefined
 ): { structureEdit?: BookStructureEditView } {
   const edit = data.structureEdit;
@@ -309,27 +296,6 @@ function structureEditField(
     };
   });
   const active = items.filter(i => !i.undone);
-  // Undoing all re-plans the same cards the runner does (one shared rule); needs the current structure to know who changes between chapter and section.
-  let undoAll: BookStructureEditView["undoAll"];
-  if (now) {
-    const rootId = edit.before.rootId;
-    const current: StructureNode[] = effectiveOrder(data).map(id => {
-      const place = now.placeOf(id);
-      return {
-        id,
-        parentId: id === rootId ? null : place?.kind === "section" ? (place.chapterId ?? rootId) : rootId,
-        title: ""
-      };
-    });
-    const picked = undoClosure(
-      edit.applied,
-      edit.applied.map(x => x.id).filter(x => !undone.has(x)),
-      rootId
-    );
-    const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
-    const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;
-    undoAll = { cards, calls: cards + 1 };
-  }
   const rejected = edit.rejected;
   const locked = rejected.filter(r => r.code === "locked").length;
   const notApplied =
@@ -341,9 +307,7 @@ function structureEditField(
       key: [edit.runId, ...edit.applied.map(a => a.id), ...rejected.map(r => r.id)].join("|"),
       items,
       active: active.length,
-      ...(now ? { chapters: { now: shape(now), before: shape(structureOfNodes(edit.before)) } } : {}),
-      ...(notApplied ? { notApplied } : {}),
-      ...(undoAll ? { undoAll } : {})
+      ...(notApplied ? { notApplied } : {})
     }
   };
 }
@@ -476,20 +440,17 @@ export interface BookBarActions {
   abandon?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   addBudget: () => void;
   confirmGate1: () => void;
-  /** The plan review: "open the whole-book summary" (the root note) and "back to editing the plan" (opens it; the run does not move on). */
-  openPlan?: () => void;
-  editPlan?: () => void;
   /** A finished book: "see what is still open" (opens the closing page). */
   openIssues?: () => void;
   /** A finished book with fixable AI proofread problems: "fix again" and its in-bar confirmation card; a bar drawn without it shows no such button. */
   fixAgain?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
   rerunAsk?: { cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
-  /** The plan review's structure list: undo some changes (by id) or all of them; open a parked note by its path. */
-  undoStructure?: (ids: string[] | "all") => void;
+  /** The plan review's structure list: undo some changes (by id); open a parked note by its path. */
+  undoStructure?: (ids: string[]) => void;
   openArchived?: (path: string) => void;
-  /** The owner accepted this list: the bar shows one line and a "show again" link instead of it. */
-  structureAccept?: { accepted: boolean; accept: () => void; reopen: () => void };
+  /** The structure list folds to one line ("N changes · show"); `expanded` opens its rows; once accepted the line is gone. */
+  structureAccept?: { accepted: boolean; expanded: boolean; accept: () => void; toggle: () => void };
   /** An undo is running (every undo button waits) or just failed (the map is back as it was; one line says so). Kept by the view. */
   structureUndo?: "busy" | "failed";
 }
@@ -532,7 +493,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
           ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit)
           : state.failure
             ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure))
-            : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
+            : t(state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1", settledCount(state), total)
     });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.mode === "changed" && state.mapChange) {
@@ -546,25 +507,13 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       makeButton(buttons, t("ui.book_map_replan"), "mod-cta vam-book-map-replan", actions.mapChanged.replan);
       makeButton(buttons, t("ui.book_map_keep"), "vam-book-map-keep", actions.mapChanged.keep);
     }
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   }
   if ((state.mode === "gate1" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
-  if (state.mode === "gate1" && state.planReview) {
-    top.createSpan({
-      cls: "vam-book-bar-counts",
-      text: state.structure
-        ? state.structure.sections
-          ? t("ui.book_bar_plan_ready_struct_0_1", state.structure.chapters, state.structure.sections)
-          : t("ui.book_bar_plan_ready_struct_0", state.structure.chapters)
-        : t("ui.book_bar_plan_ready_0", total)
-    });
-    top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
-    if (actions.openPlan)
-      makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
+  // The plan review: one way on (start writing) and one sentence on how to change the plan.
+  if (state.mode === "gate1" && state.planReview)
     makeButton(buttons, t("ui.book_bar_plan_go"), "mod-cta vam-book-confirm", actions.confirmGate1);
-    if (actions.editPlan) makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.editPlan);
-  }
   if (state.mode === "done") {
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-done-counts",
@@ -572,7 +521,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
         ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open)
         : t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
     });
-    if (state.again) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    if (state.again) makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
     else {
       if (actions.openIssues)
         makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
@@ -595,12 +544,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     if (actions.restart && state.phase !== "done")
       makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
   } else if (state.mode === "planning" || state.mode === "writing")
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   // At a gate nothing runs unless a trial retry or a card rerun does (their own stop is below); stopping only holds the run.
   else if (state.mode === "gate1" && !state.rerun)
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   if (
     actions.abandon &&
     !state.again &&
@@ -636,7 +585,9 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   }
   if (actions.fixAgain?.asking && !actions.abandon?.asking && state.fixAgain && !state.again)
     renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
-  if (state.mode === "gate1" && state.planReview && state.structureEdit)
+  if (state.mode === "gate1" && state.planReview)
+    bar.createDiv("vam-book-plan-hint").createEl("b", { text: t("ui.book_bar_plan_hint") });
+  if (state.mode === "gate1" && state.planReview && state.structureEdit && !actions.structureAccept?.accepted)
     renderStructureEdit(bar, state.structureEdit, actions);
   if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
     renderAsk(
@@ -647,23 +598,24 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       actions.rerunAsk
     );
   const progressText = bookProgressText(state);
-  renderProgressLine(bar, state, progressText);
+  renderProgressLine(bar, state);
   if (state.gateWaiting)
     bar.createDiv("vam-book-now vam-book-gate-waiting").createSpan({
       cls: "vam-book-now-text",
       text: t("ui.book_gate_waiting")
     });
+  // The plan review has nothing finished to show: no track, so the map starts right under the bar.
+  if (state.mode === "gate1" && state.planReview) return bar;
+  // The fill is finished chapters only (proofread, or stopped for a person): planned or written ones do not count yet.
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
   track.setAttr("aria-valuemin", "0");
   track.setAttr("aria-valuemax", String(total));
-  track.setAttr("aria-valuenow", String(counts.checked));
+  track.setAttr("aria-valuenow", String(settledCount(state)));
   track.setAttr("aria-valuetext", progressText);
   const segments: [string, number][] = [
     ["checked", counts.checked],
-    ["written", counts.written],
-    ["planned", counts.planned],
     ["needs-review", counts["needs-review"]]
   ];
   for (const [name, count] of segments) {
@@ -681,41 +633,43 @@ const STRUCTURE_KIND_KEY: Record<BookStructureItem["kind"], TranslationKey> = {
   rename: "ui.book_struct_kind_rename"
 };
 
-/** The plan review's list of what the editor changed in the structure, each with its reason and an undo. Plain text only: nothing here is rendered as Markdown or HTML. */
+/**
+ * The plan review's structure changes, folded to one line ("N changes · show ▸" and "accept"); opened, each change with its reason
+ * and an undo. Accepting removes the line. Plain text only: nothing here is rendered as Markdown or HTML.
+ */
 function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, actions: BookBarActions): void {
   const box = bar.createDiv("vam-book-structure");
   box.setAttr("role", "group");
   box.setAttr("aria-label", t("ui.book_struct_label"));
   const accept = actions.structureAccept;
-  // Accepted: the changes stay, the list folds to one line until the owner asks to see it again.
-  if (accept?.accepted) {
-    const line = box.createDiv("vam-book-structure-head");
-    line.createSpan({
-      cls: "vam-book-bar-counts",
-      text: view.active ? t("ui.book_struct_accepted_0", view.active) : t("ui.book_struct_accepted_none")
-    });
-    makeButton(line, t("ui.book_struct_reopen"), "vam-book-link vam-book-structure-reopen", accept.reopen);
-    return;
-  }
   const busy = actions.structureUndo === "busy";
-  const head = box.createDiv("vam-book-structure-head");
-  head.createEl("b", {
-    text: view.active ? t("ui.book_struct_head_0", view.active) : t("ui.book_struct_head_all_undone")
-  });
-  if (view.chapters) {
-    const { now, before } = view.chapters;
+  // Without a fold state (no view memory) the list shows open, so nothing is hidden behind a button that cannot work.
+  const expanded = !accept || accept.expanded || !view.items.length;
+  if (view.items.length) {
+    const head = box.createDiv("vam-book-structure-head");
     head.createSpan({
-      cls: "vam-book-bar-counts",
-      text: t("ui.book_struct_now_0_1_2_3", now.chapters, now.sections, before.chapters, before.sections)
+      cls: "vam-book-structure-sum",
+      text: view.active ? t("ui.book_struct_head_0", view.active) : t("ui.book_struct_head_all_undone")
     });
+    if (accept) {
+      const toggle = makeButton(
+        head,
+        t(accept.expanded ? "ui.book_struct_hide" : "ui.book_struct_show"),
+        "vam-book-link vam-book-structure-toggle",
+        accept.toggle
+      );
+      toggle.setAttr("aria-expanded", String(accept.expanded));
+      toggle.setAttr("aria-controls", "vam-book-structure-list");
+      const button = makeButton(head, t("ui.book_struct_accept"), "vam-book-structure-accept", accept.accept);
+      if (busy) button.setAttr("disabled", "true");
+    }
   }
-  if (accept) {
-    const button = makeButton(head, t("ui.book_struct_accept"), "vam-book-structure-accept", accept.accept);
-    if (busy) button.setAttr("disabled", "true");
-  }
+  if (!expanded) return;
+  const list = box.createDiv("vam-book-structure-list");
+  list.id = "vam-book-structure-list";
   const mayUndo = !!actions.undoStructure;
   for (const item of view.items) {
-    const row = box.createDiv(`vam-book-structure-row${item.undone ? " is-undone" : ""}`);
+    const row = list.createDiv(`vam-book-structure-row${item.undone ? " is-undone" : ""}`);
     row.dataset.op = item.id;
     row.createSpan({ cls: `vam-book-structure-kind is-${item.kind}`, text: t(STRUCTURE_KIND_KEY[item.kind]) });
     const what = row.createDiv("vam-book-structure-what");
@@ -758,23 +712,14 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
     ];
     if (reasons.length)
       lines.push(t("ui.book_struct_skipped_0_1", na.locked + na.other, reasons.join(t("ui.book_struct_join"))));
-    for (const line of lines) box.createDiv("vam-book-structure-skipped").setText(line);
-  }
-  if (view.active && mayUndo) {
-    const foot = box.createDiv("vam-book-structure-foot");
-    if (view.undoAll)
-      foot.createSpan({ text: t("ui.book_struct_undo_all_note_0_1", view.undoAll.cards, view.undoAll.calls) });
-    const all = makeButton(foot, t("ui.book_struct_undo_all"), "vam-book-structure-undo-all", () =>
-      actions.undoStructure?.("all")
-    );
-    if (busy) all.setAttr("disabled", "true");
+    for (const line of lines) list.createDiv("vam-book-structure-skipped").setText(line);
   }
   if (actions.structureUndo === "busy") {
-    const line = box.createDiv("vam-book-structure-status");
+    const line = list.createDiv("vam-book-structure-status");
     line.setAttr("role", "status");
     line.setText(t("ui.book_struct_busy"));
   } else if (actions.structureUndo === "failed") {
-    const line = box.createDiv("vam-book-structure-status is-failed");
+    const line = list.createDiv("vam-book-structure-status is-failed");
     line.setAttr("role", "status");
     line.setText(t("ui.book_struct_failed"));
   }
@@ -850,16 +795,21 @@ function fixLine(state: BookBarState, done: number, total: number): string {
   return t("ui.book_progress_line_fix_section_0_1_2", place.title ?? "", done, total);
 }
 
-/** The one sentence of the bar: "Writing chapter 3/31 · 2/31 done"; the whole-book plan and the chapter plans have their own words. */
+/** The one sentence of the bar, as screen readers get it: while writing, the done count and then the chapter in work. */
 export function bookProgressText(state: BookBarState): string {
+  const at = writingAtText(state);
+  return at ? `${progressMain(state)}${t("ui.book_progress_line_sep")}${at}` : progressMain(state);
+}
+/** The bar's sentence without the chapter in work: "Writing · 2/31 chapters done"; the whole-book plan and the chapter plans have their own words. */
+function progressMain(state: BookBarState): string {
   const { total } = state;
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
-  // Writing the whole book is one plain line ("Writing chapter 3/31"): the bar below shows how many are done.
+  // Writing: how many are done (the fill below shows the same); the chapter in work is its own muted part.
   if (state.mode === "writing")
     // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix
       ? fixLine(state, settledCount(state), total)
-      : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total);
+      : t(state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1", settledCount(state), total);
   const sentence =
     state.mode === "planning"
       ? !state.globalDone || state.current?.step === "global"
@@ -868,11 +818,19 @@ export function bookProgressText(state: BookBarState): string {
       : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total);
   return `${sentence}${t("ui.book_progress_line_sep")}${t(state.structure ? "ui.book_progress_line_done_cards_0_1" : "ui.book_progress_line_done_0_1", settledCount(state), total)}`;
 }
-function renderProgressLine(bar: HTMLElement, state: BookBarState, text: string): void {
+/** While writing (not in a fix round): which card is in work, the muted half of the line ("now writing chapter 2"). */
+function writingAtText(state: BookBarState): string | undefined {
+  if (state.mode !== "writing" || state.current?.fix) return undefined;
+  const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(state.total, 1));
+  return t(state.structure ? "ui.book_progress_at_card_0" : "ui.book_progress_at_chapter_0", at);
+}
+function renderProgressLine(bar: HTMLElement, state: BookBarState): void {
   const running = state.mode === "planning" || state.mode === "writing";
   if (!running) return;
   const now = bar.createDiv("vam-book-now");
-  now.createSpan({ cls: "vam-book-now-text", text });
+  now.createSpan({ cls: "vam-book-now-text", text: progressMain(state) });
+  const at = writingAtText(state);
+  if (at) now.createSpan({ cls: "vam-book-now-at", text: at });
   // "About N minutes left" only when the runner has a real estimate (at least five finished cards); no number is made up.
   if (state.etaSeconds !== undefined) now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
   if (state.mode === "writing")

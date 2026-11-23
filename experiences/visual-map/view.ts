@@ -9987,7 +9987,10 @@ export class VisualAgentMapView extends ItemView {
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
     // The card button is only for gate 2: once the owner accepted the book it goes away (the right-click item stays).
-    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done") return undefined;
+    // A book stopped in the writing phase (not a map pause) may also rerun one chapter.
+    const stoppedWriting =
+      phase === "writing" && !progress?.active && read.data.status === "stopped" && read.data.pauseReason !== "map";
+    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done" && !stoppedWriting) return undefined;
     // Why it cannot be used right now, in words (it was a grey line with no reason).
     const reason = bookRerunMenuReason({
       nodeId: node.id,
@@ -10005,6 +10008,13 @@ export class VisualAgentMapView extends ItemView {
           : reason === "blocked"
             ? t("ui.book_card_menu_why_blocked")
             : "";
+  }
+  /** The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry. False when this map has no such chapter or cannot rerun it now. */
+  rerunBookChapterFromNote(notePath: string): boolean {
+    const node = this.map?.nodes.find(item => item.path === notePath);
+    if (!node || this.bookRerunWhy(node) !== "") return false;
+    this.runBookCardRerun(node);
+    return true;
   }
   /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
   private runBookCardRerun(node: MapNode): void {

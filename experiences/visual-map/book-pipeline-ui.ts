@@ -638,7 +638,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);
-  if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
+  if ((state.mode === "writing" || state.mode === "done" || state.mode === "stopped") && actions.rerunAsk)
     renderAsk(
       bar,
       "vam-book-rerun-ask",

@@ -1,6 +1,6 @@
 import { EditorView, ViewPlugin } from "@codemirror/view";
 import { editorInfoField, type Plugin } from "obsidian";
-import { translate, type ContentLanguage } from "../../i18n";
+import { t, translate, type ContentLanguage } from "../../i18n";
 import { cardKindOfPrompt, isBookStructureTitle, type PlanDisplayField } from "../../core/book-pipeline/plan-text";
 import {
   foldLabelOf,
@@ -146,14 +146,39 @@ export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
         content.style.removeProperty("display");
       }
     }
-    const locale = planLocale(env.language(), kind.zh);
-    if (kind.zh) relabel(content, locale);
+    const locale = planLocale(env.language());
+    relabel(content, locale);
     title.textContent =
       kind.kind === "book"
         ? translate(locale, "ui.book_plan_title_book", translate(locale, "ui.book_bar_plan_go"))
         : translate(locale, planTitleKey(kind.kind, card));
   }
 }
+
+const ATTENTION_BUTTON = "vam-book-attention-rerun";
+/** Adds the "rerun this chapter" button to the "please look at this chapter" callouts under `root` (once each; the note itself holds no button). */
+export function markAttentionCallouts(root: HTMLElement, rerun: () => void): void {
+  const callouts = root.matches(CALLOUT_REVIEW) ? [root] : [];
+  callouts.push(...Array.from(root.querySelectorAll<HTMLElement>(CALLOUT_REVIEW)));
+  for (const callout of callouts) {
+    const title = callout.querySelector<HTMLElement>(".callout-title-inner")?.textContent?.trim();
+    const content = callout.querySelector<HTMLElement>(".callout-content");
+    if (title !== t("ui.book_note_attention_title") || !content || content.querySelector(`.${ATTENTION_BUTTON}`))
+      continue;
+    const button = content.createEl("button", {
+      cls: `mod-cta ${ATTENTION_BUTTON}`,
+      text: t("ui.book_note_attention_rerun")
+    });
+    // Live preview moves the cursor into the callout on mousedown (the box would turn into source text).
+    button.addEventListener("mousedown", event => event.preventDefault());
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      rerun();
+    });
+  }
+}
+const CALLOUT_REVIEW = '.callout[data-callout="vam-review"]';
 
 const touchesCallout = (mutation: MutationRecord): boolean =>
   Array.from(mutation.addedNodes).some(
@@ -163,7 +188,11 @@ const touchesCallout = (mutation: MutationRecord): boolean =>
   ) || !!(mutation.target as Element).closest?.(".cm-callout");
 
 /** Reading view (a markdown post processor) and live preview (a watcher on each editor, which Obsidian does not hand to post processors). */
-export function registerBookPlanView(plugin: Plugin, language: () => ContentLanguage): void {
+export function registerBookPlanView(
+  plugin: Plugin,
+  language: () => ContentLanguage,
+  rerun: (notePath: string) => void = () => undefined
+): void {
   const envOf = (path: string | undefined): PlanViewEnv => ({
     language,
     stage: (): unknown => {
@@ -173,18 +202,29 @@ export function registerBookPlanView(plugin: Plugin, language: () => ContentLang
       return frontmatter?.["pipeline-stage"];
     }
   });
-  plugin.registerMarkdownPostProcessor((element, ctx) => markPlanCallouts(element, envOf(ctx.sourcePath)));
+  plugin.registerMarkdownPostProcessor((element, ctx) => {
+    markPlanCallouts(element, envOf(ctx.sourcePath));
+    markAttentionCallouts(element, () => rerun(ctx.sourcePath));
+  });
   plugin.registerEditorExtension(
     ViewPlugin.fromClass(
       class {
         private readonly observer: MutationObserver;
         constructor(view: EditorView) {
-          const env = (): PlanViewEnv => envOf(view.state.field(editorInfoField, false)?.file?.path);
+          const path = (): string | undefined => view.state.field(editorInfoField, false)?.file?.path;
+          const env = (): PlanViewEnv => envOf(path());
+          const mark = (): void => {
+            markPlanCallouts(view.dom, env());
+            markAttentionCallouts(view.dom, () => {
+              const notePath = path();
+              if (notePath) rerun(notePath);
+            });
+          };
           this.observer = new MutationObserver(mutations => {
-            if (mutations.some(touchesCallout)) markPlanCallouts(view.dom, env());
+            if (mutations.some(touchesCallout)) mark();
           });
           this.observer.observe(view.dom, { childList: true, subtree: true });
-          markPlanCallouts(view.dom, env());
+          mark();
         }
         destroy(): void {
           this.observer.disconnect();

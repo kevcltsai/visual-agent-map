@@ -3331,6 +3331,9 @@ var en = {
   "ui.book_note_review_title": "This chapter needs a look",
   "ui.book_ai_box_title_0_1_2": "AI proofread: checked {0}, fixed {1}, {2} not fixed",
   "ui.book_ai_box_title_incomplete": "AI proofread: this chapter was not fully checked, listed on the book's last page",
+  "ui.book_note_attention_title": "Please look at this chapter",
+  "ui.book_note_attention_rerun": "Rerun this chapter",
+  "ui.book_note_attention_open_map": "Open this book's mind map first, then try again",
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
   "ui.book_ai_box_fixed_0_1": "Fixed: {0}; now reads \u201C{1}\u201D",
   "ui.book_ai_box_fixed_replaced_0": "Fixed: now reads \u201C{0}\u201D",
@@ -6724,6 +6727,9 @@ var zhCN = {
   "ui.book_note_review_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5BF9\uFF1A\u67E5\u4E86 {0} \u9879\uFF0C\u4FEE\u4E86 {1} \u5904\uFF0C{2} \u5904\u6CA1\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5BF9\uFF1A\u8FD9\u7AE0\u6CA1\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u4E66\u672B",
+  "ui.book_note_attention_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
+  "ui.book_note_attention_rerun": "\u91CD\u8DD1\u8FD9\u4E00\u7AE0",
+  "ui.book_note_attention_open_map": "\u5148\u6253\u5F00\u8FD9\u672C\u4E66\u7684\u5FC3\u667A\u56FE\uFF0C\u518D\u6309\u4E00\u6B21",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
   "ui.book_ai_box_fixed_0_1": "\u4FEE\u4E86\uFF1A{0}\uFF0C\u6539\u4E3A\u201C{1}\u201D",
   "ui.book_ai_box_fixed_replaced_0": "\u4FEE\u4E86\uFF1A\u6539\u4E3A\u201C{0}\u201D",
@@ -10117,6 +10123,9 @@ var zhTW = {
   "ui.book_note_review_title": "\u9019\u7AE0\u8981\u4F60\u770B",
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5C0D\uFF1A\u67E5\u4E86 {0} \u9805\uFF0C\u4FEE\u4E86 {1} \u8655\uFF0C{2} \u8655\u6C92\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5C0D\uFF1A\u9019\u7AE0\u6C92\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u66F8\u672B",
+  "ui.book_note_attention_title": "\u9019\u7AE0\u8981\u4F60\u770B",
+  "ui.book_note_attention_rerun": "\u91CD\u8DD1\u9019\u4E00\u7AE0",
+  "ui.book_note_attention_open_map": "\u5148\u6253\u958B\u9019\u672C\u66F8\u7684\u5FC3\u667A\u5716\uFF0C\u518D\u6309\u4E00\u6B21",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
   "ui.book_ai_box_fixed_0_1": "\u4FEE\u4E86\uFF1A{0}\uFF0C\u6539\u70BA\u300C{1}\u300D",
   "ui.book_ai_box_fixed_replaced_0": "\u4FEE\u4E86\uFF1A\u6539\u70BA\u300C{0}\u300D",
@@ -16751,10 +16760,7 @@ function planCalloutKind(title) {
   if (CARD_TITLES.has(text11)) return { kind: "card", zh: CHINESE_TITLES.has(text11) };
   return void 0;
 }
-function planLocale(language2, storedZh) {
-  if (!storedZh) return "en";
-  return instructionLanguageOf(language2) === "zh" ? language2 : "zh-TW";
-}
+var planLocale = (language2) => language2;
 function planTitleKey(kind, card) {
   if (kind === "book") return "ui.book_plan_title_book";
   return card === "preface" ? "ui.book_plan_title_preface" : card === "section" ? "ui.book_plan_title_section" : "ui.book_plan_title_chapter";
@@ -16879,11 +16885,34 @@ function markPlanCallouts(root, env) {
         content.style.removeProperty("display");
       }
     }
-    const locale = planLocale(env.language(), kind.zh);
-    if (kind.zh) relabel(content, locale);
+    const locale = planLocale(env.language());
+    relabel(content, locale);
     title.textContent = kind.kind === "book" ? translate(locale, "ui.book_plan_title_book", translate(locale, "ui.book_bar_plan_go")) : translate(locale, planTitleKey(kind.kind, card));
   }
 }
+var ATTENTION_BUTTON = "vam-book-attention-rerun";
+function markAttentionCallouts(root, rerun) {
+  var _a2, _b2;
+  const callouts = root.matches(CALLOUT_REVIEW) ? [root] : [];
+  callouts.push(...Array.from(root.querySelectorAll(CALLOUT_REVIEW)));
+  for (const callout2 of callouts) {
+    const title = (_b2 = (_a2 = callout2.querySelector(".callout-title-inner")) == null ? void 0 : _a2.textContent) == null ? void 0 : _b2.trim();
+    const content = callout2.querySelector(".callout-content");
+    if (title !== t("ui.book_note_attention_title") || !content || content.querySelector(`.${ATTENTION_BUTTON}`))
+      continue;
+    const button = content.createEl("button", {
+      cls: `mod-cta ${ATTENTION_BUTTON}`,
+      text: t("ui.book_note_attention_rerun")
+    });
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      rerun();
+    });
+  }
+}
+var CALLOUT_REVIEW = '.callout[data-callout="vam-review"]';
 var touchesCallout = (mutation) => {
   var _a2, _b2;
   return Array.from(mutation.addedNodes).some(
@@ -16893,7 +16922,7 @@ var touchesCallout = (mutation) => {
     }
   ) || !!((_b2 = (_a2 = mutation.target).closest) == null ? void 0 : _b2.call(_a2, ".cm-callout"));
 };
-function registerBookPlanView(plugin, language2) {
+function registerBookPlanView(plugin, language2, rerun = () => void 0) {
   const envOf = (path) => ({
     language: language2,
     stage: () => {
@@ -16902,21 +16931,32 @@ function registerBookPlanView(plugin, language2) {
       return frontmatter2 == null ? void 0 : frontmatter2["pipeline-stage"];
     }
   });
-  plugin.registerMarkdownPostProcessor((element, ctx) => markPlanCallouts(element, envOf(ctx.sourcePath)));
+  plugin.registerMarkdownPostProcessor((element, ctx) => {
+    markPlanCallouts(element, envOf(ctx.sourcePath));
+    markAttentionCallouts(element, () => rerun(ctx.sourcePath));
+  });
   plugin.registerEditorExtension(
     import_view2.ViewPlugin.fromClass(
       class {
         constructor(view) {
           __publicField(this, "observer");
-          const env = () => {
+          const path = () => {
             var _a2, _b2;
-            return envOf((_b2 = (_a2 = view.state.field(import_obsidian3.editorInfoField, false)) == null ? void 0 : _a2.file) == null ? void 0 : _b2.path);
+            return (_b2 = (_a2 = view.state.field(import_obsidian3.editorInfoField, false)) == null ? void 0 : _a2.file) == null ? void 0 : _b2.path;
+          };
+          const env = () => envOf(path());
+          const mark2 = () => {
+            markPlanCallouts(view.dom, env());
+            markAttentionCallouts(view.dom, () => {
+              const notePath = path();
+              if (notePath) rerun(notePath);
+            });
           };
           this.observer = new MutationObserver((mutations) => {
-            if (mutations.some(touchesCallout)) markPlanCallouts(view.dom, env());
+            if (mutations.some(touchesCallout)) mark2();
           });
           this.observer.observe(view.dom, { childList: true, subtree: true });
-          markPlanCallouts(view.dom, env());
+          mark2();
         }
         destroy() {
           this.observer.disconnect();
@@ -58102,7 +58142,7 @@ var BookPipelineRuns = class {
     await this.cardJob(
       mapPath,
       nodeId,
-      ["gate2", "done"],
+      ["gate2", "done", "writing"],
       "not_gate",
       () => ["plan", "write", "proof"],
       swap ? avoidSourcesInstruction((_a2 = options.avoidSources) != null ? _a2 : []) : void 0,
@@ -58145,12 +58185,16 @@ var BookPipelineRuns = class {
   }
   cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish, track = false, swap = false, overwrite) {
     return this.enter(mapPath, async (drive) => {
-      var _a2;
+      var _a2, _b2;
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!effectiveOrder(data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      const stoppedWriting = data.phase === "writing";
+      if (stoppedWriting && (data.status !== "stopped" || data.pauseReason === "map"))
+        throw new BookPipelineRunError(refusal);
+      const savedFailure = data.pauseReason === "failed" ? (_a2 = data.failureCode) != null ? _a2 : "failed" : void 0;
       if (overwrite) {
-        const path = (_a2 = drive.cards.get(nodeId)) == null ? void 0 : _a2.path;
+        const path = (_b2 = drive.cards.get(nodeId)) == null ? void 0 : _b2.path;
         const current = path ? await this.ports.readCard(path).catch(() => void 0) : void 0;
         if (!current) throw new BookPipelineRunError("unreadable");
         if (integrityFpRaw(current.raw) !== overwrite.fingerprint) throw new BookPipelineRunError("text_changed");
@@ -58180,6 +58224,12 @@ var BookPipelineRuns = class {
         if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
         finish == null ? void 0 : finish(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : void 0);
         this.syncReviewNotes(drive);
+        if (stoppedWriting && !this.dead(drive)) {
+          await drive.store.commit((state) => ({
+            state: state.phase === "writing" && state.status === "running" ? savedFailure !== void 0 ? failRun(state, savedFailure) : stopRun(state) : state,
+            accepted: true
+          })).catch(() => void 0);
+        }
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
@@ -62495,7 +62545,7 @@ function renderBookBar(parent, state, actions) {
     renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);
-  if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
+  if ((state.mode === "writing" || state.mode === "done" || state.mode === "stopped") && actions.rerunAsk)
     renderAsk(
       bar,
       "vam-book-rerun-ask",
@@ -63528,6 +63578,21 @@ function aiProofCallout(input2, runId, nodeId) {
     VERSION_LINE
   ]);
 }
+function attentionCallout(reason, runId, nodeId) {
+  const line3 = plainText(reason);
+  const fp = hashText(`attention
+${line3}`);
+  return quoted([
+    `> [!vam-review] ${t("ui.book_note_attention_title")}`,
+    `> ${line3}`,
+    `> %%vam-review:${idPart(runId)}:${idPart(nodeId)}:${idPart(fp)}%%`,
+    VERSION_LINE
+  ]);
+}
+var attentionBoxFingerprint = (reason) => {
+  var _a2, _b2;
+  return (_b2 = (_a2 = /%%vam-review:[^:]*:[^:]*:([\w.-]+)%%/.exec(attentionCallout(reason, "r", "n"))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+};
 var aiProofFingerprint = (input2) => {
   var _a2;
   const marker3 = /%%vam-review:[^:]*:[^:]*:([\w.-]+)%%/.exec(aiProofCallout(input2, "r", "n"));
@@ -63941,7 +64006,7 @@ var BookCallouts = class {
     }
   }
   async align(mapPath, mayCarry) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const clean3 = (id) => (mayCarry == null ? void 0 : mayCarry(id)) === false;
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
@@ -63951,7 +64016,8 @@ var BookCallouts = class {
     }
     if (read.kind !== "usable") return;
     const data = read.data;
-    const gate = data.phase === "gate1" || data.phase === "gate2" || data.phase === "done";
+    const stoppedWriting = data.phase === "writing" && data.status === "stopped";
+    const gate = data.phase === "gate1" || data.phase === "gate2" || data.phase === "done" || stoppedWriting;
     const cards = await this.cardsOf(map, data, gate ? void 0 : clean3);
     const wanted = /* @__PURE__ */ new Map();
     if (data.phase === "gate2" || data.phase === "done") {
@@ -63973,9 +64039,20 @@ var BookCallouts = class {
         });
       }
     }
+    if (gate) {
+      for (const { id, card } of cards) {
+        if (card.fields.pipelineStage !== "needs-review") continue;
+        const reason = reasonLinesOf((_e = card.fields.pipelineIssue) != null ? _e : "", latestStoredProof(card.detail))[0] || t("ui.book_panel_reason_unmet_plain");
+        wanted.set(id, {
+          runId: data.runId,
+          nodeId: id,
+          ai: { fp: attentionBoxFingerprint(reason), build: () => attentionCallout(reason, data.runId, id) }
+        });
+      }
+    }
     for (const { id, card } of cards) {
       if (this.disposed) return;
-      const want = (_e = wanted.get(id)) != null ? _e : {
+      const want = (_f = wanted.get(id)) != null ? _f : {
         runId: data.runId,
         nodeId: id
       };
@@ -87375,7 +87452,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!effectiveOrder(read.data).includes(node.id)) return void 0;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
-    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done") return void 0;
+    const stoppedWriting = phase === "writing" && !(progress == null ? void 0 : progress.active) && read.data.status === "stopped" && read.data.pauseReason !== "map";
+    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done" && !stoppedWriting) return void 0;
     const reason = bookRerunMenuReason({
       nodeId: node.id,
       rerunNodeId: (_b2 = progress == null ? void 0 : progress.rerun) == null ? void 0 : _b2.nodeId,
@@ -87384,6 +87462,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       blocked: this.bookPipelineBlocked()
     });
     return reason === "this" ? t("ui.book_card_menu_why_this") : reason === "other" ? t("ui.book_card_menu_why_other") : reason === "running" ? t("ui.book_card_menu_why_running") : reason === "blocked" ? t("ui.book_card_menu_why_blocked") : "";
+  }
+  /** The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry. False when this map has no such chapter or cannot rerun it now. */
+  rerunBookChapterFromNote(notePath) {
+    var _a2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === notePath);
+    if (!node || this.bookRerunWhy(node) !== "") return false;
+    this.runBookCardRerun(node);
+    return true;
   }
   /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
   runBookCardRerun(node) {
@@ -116310,6 +116396,15 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     this.mutate(work).catch(() => {
     });
   }
+  /** The "rerun this chapter" button in a chapter note: the open map view of that book does the rerun; none open, the reader is told to open it. */
+  rerunBookChapterFromNote(notePath) {
+    for (const view of this.views()) {
+      if (!view.rerunBookChapterFromNote(notePath)) continue;
+      void this.app.workspace.revealLeaf(view.leaf);
+      return;
+    }
+    new import_obsidian53.Notice(t("ui.book_note_attention_open_map"));
+  }
   views() {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof VisualAgentMapView);
   }
@@ -116458,7 +116553,11 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     registerInternalMarkerPresentation(this);
     for (const kind of TOPIC_KINDS) (0, import_obsidian53.addIcon)(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
-    registerBookPlanView(this, () => this.settings.language);
+    registerBookPlanView(
+      this,
+      () => this.settings.language,
+      (notePath) => this.rerunBookChapterFromNote(notePath)
+    );
     const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",

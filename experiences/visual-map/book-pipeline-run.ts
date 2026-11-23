@@ -1757,7 +1757,7 @@ export class BookPipelineRuns {
     await this.cardJob(
       mapPath,
       nodeId,
-      ["gate2", "done"],
+      ["gate2", "done", "writing"],
       "not_gate",
       () => ["plan", "write", "proof"],
       swap ? avoidSourcesInstruction(options.avoidSources ?? []) : undefined,
@@ -1820,6 +1820,11 @@ export class BookPipelineRuns {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!effectiveOrder(data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      // The writing phase is open to a rerun only while the book is stopped (not a map pause): the run goes back to that stop afterwards.
+      const stoppedWriting = data.phase === "writing";
+      if (stoppedWriting && (data.status !== "stopped" || data.pauseReason === "map"))
+        throw new BookPipelineRunError(refusal);
+      const savedFailure = data.pauseReason === "failed" ? (data.failureCode ?? "failed") : undefined;
       if (overwrite) {
         // Bound to the text it was given for: if the chapter changed since, nothing is rewritten (the write checks again inside itself).
         const path = drive.cards.get(nodeId)?.path;
@@ -1853,6 +1858,20 @@ export class BookPipelineRuns {
         if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
         finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
         this.syncReviewNotes(drive);
+        // A rerun beside a stopped book: the book is stopped again (a failed stop keeps its code), unless the rerun ended it another way.
+        if (stoppedWriting && !this.dead(drive)) {
+          await drive.store
+            .commit(state => ({
+              state:
+                state.phase === "writing" && state.status === "running"
+                  ? savedFailure !== undefined
+                    ? failRun(state, savedFailure)
+                    : stopRun(state)
+                  : state,
+              accepted: true
+            }))
+            .catch(() => undefined);
+        }
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });

@@ -515,6 +515,23 @@ export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string)
     VERSION_LINE
   ]);
 }
+/**
+ * The "please look at this chapter" box of a needs-review chapter: a title and the main reason in plain words, no tick box. The button
+ * that reruns the chapter is added at display time (the note holds no button). Same shape as {@link aiProofCallout}, so it is put and taken off the same way.
+ */
+export function attentionCallout(reason: string, runId: string, nodeId: string): string {
+  const line = plainText(reason);
+  const fp = hashText(`attention\n${line}`);
+  return quoted([
+    `> [!vam-review] ${t("ui.book_note_attention_title")}`,
+    `> ${line}`,
+    `> %%vam-review:${idPart(runId)}:${idPart(nodeId)}:${idPart(fp)}%%`,
+    VERSION_LINE
+  ]);
+}
+/** The fingerprint an {@link attentionCallout} carries. */
+export const attentionBoxFingerprint = (reason: string): string =>
+  /%%vam-review:[^:]*:[^:]*:([\w.-]+)%%/.exec(attentionCallout(reason, "r", "n"))?.[1] ?? "";
 /** The fingerprint an {@link aiProofCallout} carries (what the aligner compares to know a box is already as wanted). */
 export const aiProofFingerprint = (input: AiBoxInput): string => {
   const marker = /%%vam-review:[^:]*:[^:]*:([\w.-]+)%%/.exec(aiProofCallout(input, "r", "n"));

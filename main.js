@@ -51367,10 +51367,13 @@ function applySuccess(data, token) {
   next.revision++;
   return { state: next, accepted: true };
 }
-function applyFailure(data, token) {
+function applyFailure(data, token, final = false) {
   if (!isCurrent(data, token)) return { state: data, accepted: false };
   const next = clone2(data);
   next.revision++;
+  if (final && token.kind === "global") next.attempts.global = MAX_STEP_ATTEMPTS;
+  else if (final && token.nodeId)
+    next.attempts[token.nodeId] = { ...attemptsOf(next, token.nodeId), [token.kind]: MAX_STEP_ATTEMPTS };
   if (token.kind !== "global" && token.nodeId && attemptsOf(next, token.nodeId)[token.kind] >= MAX_STEP_ATTEMPTS)
     return { state: next, accepted: true, needsReview: { nodeId: token.nodeId, step: token.kind } };
   return { state: next, accepted: true };
@@ -51671,6 +51674,33 @@ var applyNotesStep = {
   },
   parse: parseApplyNotes
 };
+
+// ai/bad-request.ts
+var ProviderError = class extends Error {
+  constructor(message) {
+    super(message);
+    __publicField(this, "providerError", true);
+    this.name = "ProviderError";
+  }
+};
+var BadRequestError = class extends ProviderError {
+  constructor(message) {
+    super(message);
+    __publicField(this, "badRequest", true);
+    this.name = "BadRequestError";
+  }
+};
+var isProviderError = (error) => (error == null ? void 0 : error.providerError) === true;
+var messageOf = (error) => {
+  const message = typeof error === "string" ? error : error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : "";
+};
+var BAD_REQUEST = /invalid_request_error|invalid_json_schema|\b400 Bad Request\b/i;
+var isBadRequest = (error) => (error == null ? void 0 : error.badRequest) === true || BAD_REQUEST.test(messageOf(error));
+function providerErrorText(error) {
+  const line3 = messageOf(error).replace(/(['"`])(?:[A-Za-z]:\\|~?\/)[^'"`]*\1/g, "<path>").replace(/(?:[A-Za-z]:\\|~?\/)[^\s"'`]*[\\/][^\s"'`]*/g, "<path>").replace(/\s+/g, " ").trim();
+  return line3.length > 200 ? `${line3.slice(0, 199)}\u2026` : line3;
+}
 
 // core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
@@ -53970,15 +54000,23 @@ function inertHtmlText(html) {
   for (const el of Array.from(doc.querySelectorAll("script,style,noscript,template"))) el.remove();
   return (_a2 = doc.documentElement.textContent) != null ? _a2 : "";
 }
+var VIEW_REF = /^turn\d+view\d+$/;
 function openedUrlsFromEvents(events) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const urls = [];
   for (const event of events) {
     const e = event;
     if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
     const item = (_a2 = e.params) == null ? void 0 : _a2.item;
-    if ((item == null ? void 0 : item.type) !== "webSearch" || ((_b2 = item.action) == null ? void 0 : _b2.type) !== "openPage") continue;
-    if (typeof item.action.url === "string" && item.action.url) urls.push(item.action.url);
+    if ((item == null ? void 0 : item.type) !== "webSearch") continue;
+    if (((_b2 = item.action) == null ? void 0 : _b2.type) === "openPage") {
+      if (typeof item.action.url === "string" && item.action.url) urls.push(item.action.url);
+      continue;
+    }
+    if (((_c = item.action) == null ? void 0 : _c.type) !== "other" || !Array.isArray(item.results)) continue;
+    for (const result of item.results)
+      if (typeof (result == null ? void 0 : result.ref_id) === "string" && VIEW_REF.test(result.ref_id) && typeof result.url === "string" && result.url)
+        urls.push(result.url);
   }
   return urls;
 }
@@ -57374,7 +57412,7 @@ function stepCounts(counts, imagesDone = 0, review = {}) {
 }
 var ETA_MIN_CARDS = 5;
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
-var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
+var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : isBadRequest(error) ? "bad_request" : "failed";
 var internalCode = (error) => `internal_${(typeof (error == null ? void 0 : error.name) === "string" ? error.name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 var NO_FAILURE_SECTION = /* @__PURE__ */ new Set([
   "discarded",
@@ -59667,7 +59705,7 @@ var BookPipelineRuns = class {
           await report("map_changed");
           return "cancelled";
         }
-        const failed = await drive.store.commit((state) => applyFailure(state, token));
+        const failed = await drive.store.commit((state) => applyFailure(state, token, outcome.final));
         if (!failed) return "none";
         if (!failed.accepted) {
           await drive.store.commit((state) => applyCancelled(state, token));
@@ -60193,7 +60231,8 @@ var BookPipelineRuns = class {
     if (isBudgetExhausted(error)) return { kind: "budget" };
     if (drive.controller.signal.aborted || error instanceof Error && error.name === "AbortError")
       return { kind: "cancelled" };
-    return { kind: "failed", reason: reasonOf(error) };
+    const reason = reasonOf(error);
+    return { kind: "failed", reason, ...reason === "bad_request" ? { final: true } : {} };
   }
   authorize(drive, token, nodeId) {
     return () => !this.dead(drive) && !drive.controller.signal.aborted && isCurrent(drive.store.state, token) && // A card the reader removed from the map is not written, even by a call already in flight (plan §14-3).
@@ -75442,7 +75481,7 @@ function styleChoiceField(parent, options) {
 }
 
 // experiences/visual-map/outline-import-modal.ts
-var messageOf = (error) => {
+var messageOf2 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
@@ -75779,7 +75818,7 @@ var OutlineImportModal = class extends import_obsidian30.Modal {
         status.setText(t("ui.outline_ai_filled", this.nodes.length));
       }).catch((error) => {
         if (this.detached || this.generation !== controller) return;
-        status.setText(controller.signal.aborted ? t("ui.outline_ai_stopped") : messageOf(error));
+        status.setText(controller.signal.aborted ? t("ui.outline_ai_stopped") : messageOf2(error));
       }).finally(() => {
         if (this.detached || this.generation !== controller) return;
         this.generation = void 0;
@@ -75854,7 +75893,7 @@ var OutlineImportModal = class extends import_obsidian30.Modal {
     } catch (error) {
       this.submitting = false;
       this.refresh();
-      this.status.setText(messageOf(error));
+      this.status.setText(messageOf2(error));
     }
   }
 };
@@ -76286,7 +76325,7 @@ function toFreeMind(map, notes) {
 }
 
 // experiences/visual-map/outline-exchange-io.ts
-var messageOf2 = (error) => {
+var messageOf3 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
@@ -76323,7 +76362,7 @@ async function importExchangeFile(host, file) {
   try {
     await host.importOutline({ nodes: parsed.nodes, source: { file: file.name }, shallowResearch: false });
   } catch (error) {
-    new import_obsidian31.Notice(messageOf2(error));
+    new import_obsidian31.Notice(messageOf3(error));
     return false;
   }
   return true;
@@ -76333,7 +76372,7 @@ function chooseAndImportExchange(host) {
   input2.addEventListener("change", () => {
     var _a2;
     const file = (_a2 = input2.files) == null ? void 0 : _a2[0];
-    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian31.Notice(messageOf2(error)));
+    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian31.Notice(messageOf3(error)));
   });
   input2.click();
 }
@@ -76359,7 +76398,7 @@ async function exportMapExchange(vault, request) {
       await vault.create(path, text11);
       return path;
     } catch (error) {
-      if (/exist/i.test(messageOf2(error))) continue;
+      if (/exist/i.test(messageOf3(error))) continue;
       throw error;
     }
   }
@@ -76371,7 +76410,7 @@ async function exportMapWithNotice(vault, request) {
     new import_obsidian31.Notice(t("ui.exchange_exported", path));
     return path;
   } catch (error) {
-    new import_obsidian31.Notice(t("ui.exchange_export_failed", messageOf2(error)));
+    new import_obsidian31.Notice(t("ui.exchange_export_failed", messageOf3(error)));
     return null;
   }
 }
@@ -77993,7 +78032,7 @@ var TopicPickerModal = class extends import_obsidian35.Modal {
 };
 
 // experiences/visual-map/structure-review-modal.ts
-var messageOf3 = (error) => {
+var messageOf4 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
@@ -78066,7 +78105,7 @@ var StructureReviewModal = class extends import_obsidian36.Modal {
           )) != null ? _b2 : close).focus();
       }).catch((error) => {
         if (this.closed) return;
-        ready(controller.signal.aborted ? t("ui.structure_review_cancelled") : messageOf3(error));
+        ready(controller.signal.aborted ? t("ui.structure_review_cancelled") : messageOf4(error));
       }).finally(() => {
         if (this.controller === controller) this.controller = void 0;
       });
@@ -78167,7 +78206,7 @@ var StructureReviewModal = class extends import_obsidian36.Modal {
             entry.applied = applied;
             message = applied ? t("ui.structure_review_applied_note") : "";
           }).catch((error) => {
-            message = messageOf3(error);
+            message = messageOf4(error);
           }).finally(() => {
             busy = false;
             if (!this.closed) refreshAll();
@@ -102088,7 +102127,12 @@ function sectionSource(text11, lineStart, lineEnd2) {
 var normalSection = (text11) => text11.replace(/\r/g, "").trim();
 
 // core/steps/book-pipeline/run.ts
-var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : "failed";
+var providerFailMessage = (error) => {
+  const text11 = isProviderError(error) ? providerErrorText(error) : "";
+  const code3 = isBadRequest(error) ? "bad_request" : "failed";
+  return text11 ? `${code3}: ${text11}` : code3;
+};
+var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : providerFailMessage(error);
 async function runPlanStep(aiCalls, step, request, run) {
   var _a2;
   const prepared = prepareStep(step, request);
@@ -102211,7 +102255,7 @@ var proofreadStep = {
   },
   parse: (raw) => parseProofread(raw)
 };
-var proofFailMessage = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : "failed";
+var proofFailMessage = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : providerFailMessage(error);
 async function runProofread(aiCalls, request, run) {
   const events = [];
   const prepared = prepareStep(proofreadStep, request);
@@ -110986,6 +111030,15 @@ function codexTurnFailureMessage(turn, translate2 = t) {
   const shown2 = status === "interrupted" ? translate2("ui.codex_status_interrupted") : typeof status === "string" && status !== "failed" ? status : translate2("ui.failed");
   return translate2("ui.codex_turn_0", shown2);
 }
+function codexBadRequest(turn) {
+  var _a2;
+  const info = (_a2 = turn == null ? void 0 : turn.error) == null ? void 0 : _a2.codexErrorInfo;
+  if (info === "badRequest") return true;
+  if (!info || typeof info !== "object") return false;
+  return Object.values(info).some(
+    (detail) => (detail == null ? void 0 : detail.httpStatusCode) === 400
+  );
+}
 function describeFailure(failure) {
   if (typeof failure === "string") return failure;
   const message = failure == null ? void 0 : failure.message;
@@ -111338,7 +111391,8 @@ var CodexAppServerRuntime = class {
       if (!entry) return;
       this.pending.delete(message.id);
       window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(message.error.message || t("ui.codex_app_server_returned_an_error")));
+      if (message.error)
+        entry.reject(new ProviderError(message.error.message || t("ui.codex_app_server_returned_an_error")));
       else entry.resolve(message.result);
       return;
     }
@@ -111427,7 +111481,10 @@ var CodexAppServerRuntime = class {
         state.resolve(
           state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || "" : ((_h = state.messages.at(-1)) == null ? void 0 : _h.trim()) || ""
         );
-      else state.reject(new Error(codexTurnFailureMessage(turn)));
+      else {
+        const message2 = codexTurnFailureMessage(turn);
+        state.reject(codexBadRequest(turn) ? new BadRequestError(message2) : new ProviderError(message2));
+      }
     }
   }
   reportActivity(state, activity) {
@@ -112073,7 +112130,8 @@ function claudeStructuredOutput(stdout, plainText2 = false) {
   const record = final;
   if (record.is_error === true || typeof record.subtype === "string" && record.subtype.startsWith("error_")) {
     const details = Array.isArray(record.errors) ? record.errors.filter((item) => typeof item === "string").join("\n") : "";
-    throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
+    if (details) throw isBadRequest(details) ? new BadRequestError(details) : new ProviderError(details);
+    throw new Error(typeof record.result === "string" ? record.result : t("ui.claude_task_failed"));
   }
   if (plainText2 && typeof record.result === "string") return record.result;
   if (record.structured_output === void 0 || record.structured_output === null)

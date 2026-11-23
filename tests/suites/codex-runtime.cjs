@@ -675,6 +675,19 @@ test('bug bash #32: a Codex turn that ends without an error message reports a tr
   assert.equal(codexTurnFailureMessage({ status: 'failed', error: { message: 'boom' } }, zh), 'boom', 'a real error message still wins');
 });
 
+test('a Codex turn refused as a bad request (codexErrorInfo badRequest or HTTP 400) is marked so the book does not resend it', () => {
+  const { codexBadRequest } = load('ai/runtime/codex-app-server.ts');
+  const { isBadRequest, BadRequestError } = load('ai/bad-request.ts');
+  assert.equal(codexBadRequest({ status: 'failed', error: { message: 'Invalid schema', codexErrorInfo: 'badRequest' } }), true);
+  assert.equal(codexBadRequest({ status: 'failed', error: { message: 'x', codexErrorInfo: { responseStreamConnectionFailed: { httpStatusCode: 400 } } } }), true);
+  assert.equal(codexBadRequest({ status: 'failed', error: { message: 'x', codexErrorInfo: 'serverOverloaded' } }), false);
+  assert.equal(codexBadRequest({ status: 'failed', error: { message: 'x', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 503 } } } }), false);
+  assert.equal(codexBadRequest({ status: 'failed' }), false);
+  assert.equal(isBadRequest(new BadRequestError('x')), true);
+  assert.equal(isBadRequest(new Error('API Error: 400 {"type":"error","error":{"type":"invalid_request_error"}}')), true, 'Claude CLI text');
+  assert.equal(isBadRequest(new Error('timeout')), false);
+});
+
 // Bug bash C #32 through the runtime's real turn-end path: a turn/completed notification that is not "completed" rejects the task
 // with the status in the interface language. The runtime and the language setter come from one bundle (a bundle has its own copy of the language).
 integrationTest('bug bash #32: a Codex turn/completed with status failed or interrupted rejects with a zh-TW status, not the raw English word', async () => {

@@ -19,6 +19,7 @@ import { singleLine } from "../../book-pipeline/text";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { BookStepError, isBookStepError, languageInstruction, overBudget, type BookStepBase } from "./base";
+import { providerFailMessage } from "./run";
 import template from "./proofread.md";
 
 export const PROOF_SEARCH_BUDGET = 4;
@@ -117,9 +118,9 @@ export const proofreadStep: StepDefinition<ProofreadRequest, RawProofItem[]> = {
   parse: raw => parseProofread(raw)
 };
 
-/** What a proofread's exchange-log entry says when it fails: a code, never text. */
+/** What a proofread's exchange-log entry says when it fails: a code, never chapter text (a provider failure adds its own message). */
 export const proofFailMessage = (error: unknown): string =>
-  isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : "failed";
+  isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : providerFailMessage(error);
 
 export interface ProofreadRun {
   signal: AbortSignal;

@@ -235,6 +235,7 @@ import {
   trustedCoverBlock,
   type CoverRecordValue
 } from "../../core/book-pipeline/cover-block";
+import { isBadRequest } from "../../ai/bad-request";
 import type { ReasoningLevel } from "../../ai/types";
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
@@ -689,7 +690,12 @@ type StepResult = "ok" | "failed" | "cancelled" | "budget" | "dropped" | "none";
 
 type Outcome =
   | { kind: "ok"; after?: () => Promise<void> }
-  | { kind: "failed"; reason: string; forceReview?: boolean }
+  | {
+      kind: "failed";
+      reason: string;
+      forceReview?: boolean;
+      /** The same request fails the same way: no attempt is left. */ final?: boolean;
+    }
   | { kind: "cancelled" }
   | { kind: "budget" };
 
@@ -785,7 +791,13 @@ interface Drive {
 
 const code = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 const reasonOf = (error: unknown): string =>
-  isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
+  isProofFailure(error)
+    ? error.code
+    : isBookStepError(error)
+      ? "invalid_reply"
+      : isBadRequest(error)
+        ? "bad_request"
+        : "failed";
 /** An unexpected error's code: only its class name, never its message (which could carry a path or a title). */
 const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
@@ -3397,7 +3409,7 @@ export class BookPipelineRuns {
           await report("map_changed");
           return "cancelled";
         }
-        const failed = await drive.store.commit(state => applyFailure(state, token));
+        const failed = await drive.store.commit(state => applyFailure(state, token, outcome.final));
         if (!failed) return "none";
         if (!failed.accepted) {
           await drive.store.commit(state => applyCancelled(state, token));
@@ -3986,7 +3998,8 @@ export class BookPipelineRuns {
     if (isBudgetExhausted(error)) return { kind: "budget" };
     if (drive.controller.signal.aborted || (error instanceof Error && error.name === "AbortError"))
       return { kind: "cancelled" };
-    return { kind: "failed", reason: reasonOf(error) };
+    const reason = reasonOf(error);
+    return { kind: "failed", reason, ...(reason === "bad_request" ? { final: true } : {}) };
   }
   private authorize(drive: Drive, token: StepToken, nodeId?: string): () => boolean {
     return () =>

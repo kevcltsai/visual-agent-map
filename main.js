@@ -64039,9 +64039,11 @@ var BookCallouts = class {
         });
       }
     }
-    if (gate) {
+    if (data.phase === "gate2" || data.phase === "done" || stoppedWriting) {
       for (const { id, card } of cards) {
         if (card.fields.pipelineStage !== "needs-review") continue;
+        const own2 = readReviewState(card.raw);
+        if ((own2 == null ? void 0 : own2.op) && own2.runId === idPart(data.runId) && own2.nodeId === idPart(id)) continue;
         const reason = reasonLinesOf((_e = card.fields.pipelineIssue) != null ? _e : "", latestStoredProof(card.detail))[0] || t("ui.book_panel_reason_unmet_plain");
         wanted.set(id, {
           runId: data.runId,

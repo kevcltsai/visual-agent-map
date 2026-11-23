@@ -442,9 +442,12 @@ export class BookCallouts {
       }
     }
     // A needs-review chapter (at a gate, when done, or in a stopped writing phase) gets the "please look" box in place of its AI box.
-    if (gate) {
+    if (data.phase === "gate2" || data.phase === "done" || stoppedWriting) {
       for (const { id, card } of cards) {
         if (card.fields.pipelineStage !== "needs-review") continue;
+        // A hand-edited chapter's own box (its rewrite question, maybe queued) stays: the "please look" box never replaces it.
+        const own = readReviewState(card.raw);
+        if (own?.op && own.runId === idPart(data.runId) && own.nodeId === idPart(id)) continue;
         const reason =
           reasonLinesOf(card.fields.pipelineIssue ?? "", latestStoredProof(card.detail))[0] ||
           t("ui.book_panel_reason_unmet_plain");

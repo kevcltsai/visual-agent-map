@@ -40,6 +40,9 @@ function nullable(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema;
   const body = schema as Record<string, unknown>;
   if (typeof body.type === "string") return { ...body, type: [body.type, "null"] };
-  if (Array.isArray(body.type)) return body.type.includes("null") ? body : { ...body, type: [...body.type, "null"] };
+  if (Array.isArray(body.type)) {
+    const types = body.type as unknown[];
+    return types.includes("null") ? body : { ...body, type: [...types, "null"] };
+  }
   return { anyOf: [body, { type: "null" }] };
 }

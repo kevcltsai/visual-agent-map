@@ -128,7 +128,12 @@ export class MapChatTurnRecord {
     const placed = blocks.flatMap(entry => {
       const item = placedImage(entry);
       return item
-        ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: item.candidate.source ?? "" }]
+        ? [
+            {
+              title: entry.canvas ? item.candidate.title : `${entry.nodeTitle}: ${item.candidate.title}`,
+              sourceUrl: item.candidate.source ?? ""
+            }
+          ]
         : [];
     });
     const ended = blocks.filter(entry => entry.state !== "searching");

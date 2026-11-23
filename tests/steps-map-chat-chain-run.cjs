@@ -44,7 +44,7 @@ function rig(options = {}) {
   const runner = new MapChatChainRunner({
     panel: () => state.panel, closed: () => state.closed, applying: () => state.applying, notesLoading: () => state.notesLoading,
     path: () => state.path, map: () => state.map, selectionIds: () => state.selection, autoApply: () => state.autoApply,
-    diagrams: () => state.diagrams, lastRecord: () => state.record, stopResearch: key => state.stops.push(key),
+    diagrams: () => state.diagrams, imageExists: id => (state.imageExists ? state.imageExists(id) : true), lastRecord: () => state.record, stopResearch: key => state.stops.push(key),
     flushSteers: send => { state.flushes++; log.push(['flushSteers', send]); },
     send: (...args) => { state.sends.push(args); log.push(['send', args.length]); }
   });
@@ -474,4 +474,103 @@ test('stopChainWork aborts the controller and stops every research key; without 
   r.runner.stopChainWork(run);
   assert.equal(run.work.controller.signal.aborted, true);
   assert.deepEqual(r.state.stops, ['k1', 'k2']);
+});
+
+// ---- place_image: the runner waits for the canvas image and carries it into the next round once (canvas-image-anchors P2) ----
+const imageRound = (r, gate, extra = {}) => {
+  const run = r.runner.chainForRound(undefined, { ...ANCHOR }, 'one sentence');
+  const work = newWork({ canvasImage: gate ? gate.promise : null, ...extra });
+  run.work = work;
+  r.runner.advanceChain(run, roundOf(work, { result: { reply: '', actions: [{ kind: 'place_image', direction: 'x' }], remaining: 'then look at it' }, lines: [{ status: 'done' }] }));
+  return { run, work };
+};
+const carried = send => send[0].imageId;
+test('image: a round whose place_image is pending waits, then the next round carries the new id once', async () => {
+  const r = rig();
+  const gate = deferred();
+  const { run } = imageRound(r, gate);
+  assert.equal(run.state.phase, 'waiting');
+  assert.deepEqual(r.log.filter(e => e[0] === 'setChainWaiting')[0][1].kinds, ['image']);
+  assert.equal(r.state.sends.length, 0);
+  gate.resolve('img-new');
+  await flush();
+  assert.equal(r.state.sends.length, 1);
+  assert.equal(carried(r.state.sends[0]), 'img-new');
+  assert.equal(run.attachImageId, undefined, 'used up as it is sent');
+  // Round 3 (chain origin of the next round) carries nothing.
+  const run3 = r.runner.chainForRound(r.state.sends[0][0].chain, { ...ANCHOR }, 'one sentence');
+  assert.equal(run3, run);
+  const work = newWork({ expand: [{ id: 'x', title: 'X', path: 'p', done: Promise.resolve({ status: 'succeeded', titles: [] }) }] });
+  run3.work = work;
+  r.runner.advanceChain(run3, roundOf(work));
+  await flush();
+  assert.equal(r.state.sends.length, 2);
+  assert.equal('imageId' in r.state.sends[1][0], false);
+  assert.equal(r.state.sends[1][0].imageId, undefined);
+});
+test('image: a failed placement (null or a rejected promise) goes on without a picture', async () => {
+  for (const settle of [gate => gate.resolve(null), gate => gate.reject(new Error('boom'))]) {
+    const r = rig();
+    const gate = {};
+    gate.promise = new Promise((resolve, reject) => { gate.resolve = resolve; gate.reject = reject; });
+    imageRound(r, gate);
+    settle(gate);
+    await flush();
+    assert.equal(r.state.sends.length, 1);
+    assert.equal(carried(r.state.sends[0]), undefined);
+    assert.equal(ends(r.log).length, 0);
+  }
+});
+test('image: Stop or a new message while waiting carries no picture and starts no next round, even when the placement lands later', async () => {
+  for (const reason of ['stopped', 'user_took_over']) {
+    const r = rig();
+    const gate = deferred();
+    const { run } = imageRound(r, gate);
+    r.runner.interruptChain(run, reason);
+    gate.resolve('late');
+    await flush();
+    assert.equal(r.state.sends.length, 0, reason);
+    assert.equal(run.attachImageId, undefined, reason);
+    assert.equal(ends(r.log).length, 1, reason);
+  }
+});
+test('image: the image deleted before the next round is not carried (the view tells through imageExists)', async () => {
+  const r = rig({ imageExists: id => id !== 'img-gone' });
+  const gate = deferred();
+  imageRound(r, gate);
+  gate.resolve('img-gone');
+  await flush();
+  assert.equal(r.state.sends.length, 1);
+  assert.equal(carried(r.state.sends[0]), undefined);
+});
+test('image: a changed map while waiting ends the chain and carries nothing', async () => {
+  const r = rig();
+  const gate = deferred();
+  imageRound(r, gate);
+  r.state.map = { id: 'other', aiMode: 'standard', nodes: [] };
+  gate.resolve('img-new');
+  await flush();
+  assert.equal(r.state.sends.length, 0);
+});
+test('image: the carried id is the one the chain got, whatever the canvas selection is', async () => {
+  const r = rig({ selection: ['topic-1'] });
+  const gate = deferred();
+  imageRound(r, gate);
+  gate.resolve('img-new');
+  await flush();
+  assert.equal(carried(r.state.sends[0]), 'img-new');
+});
+test('image: research started in the same round is waited for with the image; the picture rides the next round only', async () => {
+  const r = rig();
+  const gate = deferred();
+  const research = deferred();
+  const { run } = imageRound(r, gate, { researchTargets: 1, research: [research.promise] });
+  assert.deepEqual(r.log.filter(e => e[0] === 'setChainWaiting')[0][1].kinds, ['research', 'image']);
+  gate.resolve('img-new');
+  await flush();
+  assert.equal(r.state.sends.length, 0, 'research still running');
+  research.resolve({ kind: 'settled', succeeded: 1, failed: 0, stopped: 0, topics: [{ id: 'a', title: 'A', status: 'succeeded' }] });
+  await flush();
+  assert.equal(carried(r.state.sends[0]), 'img-new');
+  assert.equal(run.attachImageId, undefined);
 });

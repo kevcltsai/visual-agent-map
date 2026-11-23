@@ -367,3 +367,29 @@ test('R1: a member added later is not put on a fixed line either', () => {
     assert.deepEqual(againstFixed(RIMG, more, fixed), []);
   }
 });
+
+test('canvasImageSpot: an empty map centres the picture on the given centre', () => {
+  assert.deepEqual(plain(ring.canvasImageSpot({ w: 200, h: 100 }, [], { x: 500, y: 300 })), { x: 400, y: 250 });
+});
+
+test('canvasImageSpot: with topics it goes to their right, free of every rect, and moves nothing', () => {
+  const rects = [{ x: 0, y: 0, w: 280, h: 110 }, { x: 40, y: 400, w: 280, h: 110 }, { x: 600, y: 200, w: 100, h: 100 }];
+  const before = plain(rects);
+  const size = { w: 320, h: 200 };
+  const spot = ring.canvasImageSpot(size, rects, { x: 0, y: 0 });
+  const box = { x: spot.x, y: spot.y, w: size.w, h: size.h };
+  const right = Math.max(...rects.map(r => r.x + r.w));
+  assert.ok(box.x >= right, 'right of the topics');
+  for (const r of rects) assert.ok(box.x >= r.x + r.w || box.x + box.w <= r.x || box.y >= r.y + r.h || box.y + box.h <= r.y, 'no overlap');
+  assert.deepEqual(plain(rects), before, 'existing rects unchanged');
+  assert.deepEqual(plain(ring.canvasImageSpot(size, rects, { x: 0, y: 0 })), plain(spot), 'deterministic');
+});
+
+test('canvasImageSpot: a picture already sitting right of the topics is not covered', () => {
+  const rects = [{ x: 0, y: 0, w: 280, h: 110 }];
+  const first = ring.canvasImageSpot({ w: 200, h: 100 }, rects, { x: 0, y: 0 });
+  const withFirst = [...rects, { x: first.x, y: first.y, w: 200, h: 100 }];
+  const second = ring.canvasImageSpot({ w: 200, h: 100 }, withFirst, { x: 0, y: 0 });
+  const a = { x: first.x, y: first.y, w: 200, h: 100 }, b = { x: second.x, y: second.y, w: 200, h: 100 };
+  assert.ok(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+});

@@ -288,7 +288,7 @@ import {
   solveRings,
   type TextWidthOf
 } from "../../map-layout-text";
-import { placeNewMember, ringMembers, ringSide, type Rect as RingRect } from "./image-ring";
+import { canvasImageSpot, placeNewMember, ringMembers, ringSide, type Rect as RingRect } from "./image-ring";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
@@ -1397,6 +1397,9 @@ export class VisualAgentMapView extends ItemView {
     },
     fetchBytes: url => this.chatFetchImage(url),
     write: (block, candidate, alive, cover) => this.chatPlaceImageNow(block, candidate, alive, cover),
+    canvasModel: () => this.currentModelId(),
+    canvasPreflight: block => this.chatCanvasImageRefusal(block),
+    writeCanvas: (block, _candidate, file, alive) => this.chatCanvasImageWrite(block, file, alive),
     added: (chat, blocks) => {
       for (const block of blocks) {
         chat.addImages(block);
@@ -20940,6 +20943,7 @@ export class VisualAgentMapView extends ItemView {
       path: () => this.path,
       map: () => this.map,
       selectionIds: () => this.chatSelectionIds(),
+      imageExists: id => !!findAnnotatedImage(this.map?.canvasItems ?? [], id),
       autoApply: () => this.chatAutoApply,
       diagrams: () => this.plugin.settings.addDiagramsAfterResearch,
       lastRecord: () => this.chatLastRecord,
@@ -21366,6 +21370,8 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_md_0", action.path);
       case "read_md_file":
         return action.path;
+      case "place_image":
+        return t("ui.map_chat_do_place_image_0", action.direction || "…");
       case "edit_book_plan":
         return t("ui.map_chat_do_edit_book_plan_0", action.changes.length);
       case "edit_book_structure":
@@ -21723,6 +21729,17 @@ export class VisualAgentMapView extends ItemView {
             this.chatActionLabel(action, refTitles),
             skipped(verdicts[index] === "out" ? "ui.topic_chat_out_of_scope" : "ui.map_chat_skip_unavailable")
           );
+          continue;
+        }
+        // The picture goes on the canvas after the search (in the background); the chain waits for it through work.canvasImage.
+        if (action.kind === "place_image") {
+          const label = this.chatActionLabel(action, refTitles);
+          if (!same()) {
+            stopped = true;
+            lines[index] = this.chatLine(label, lost());
+            continue;
+          }
+          lines[index] = this.chatLine(label, await this.chatPlaceCanvasImage(action.direction, options.work));
           continue;
         }
         if (
@@ -22944,6 +22961,109 @@ export class VisualAgentMapView extends ItemView {
     if ("skipped" in found) return skipped(found.skipped);
     if ("failed" in found) return { status: "failed", reason: found.failed };
     return { status: "done", images: found.blocks };
+  }
+  /**
+   * place_image: searches like find_images, but the picture goes on the canvas as an annotated image. The outcome is "done" once the
+   * search is set up; the image arrives later (see {@link chatCanvasImageWrite}), and `work.canvasImage` settles with its id.
+   */
+  private async chatPlaceCanvasImage(direction: string, work?: ChatRoundWork): Promise<ChatOutcome> {
+    const map = this.map;
+    const chat = this.chat;
+    if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
+    const found = await this.chatImageFinder.findCanvas(
+      map,
+      chat,
+      direction,
+      newChatImageBatch(),
+      work?.controller.signal
+    );
+    if ("skipped" in found) return skipped(found.skipped);
+    if ("failed" in found) return { status: "failed", reason: found.failed };
+    if (work) work.canvasImage = found.placed;
+    return { status: "done", images: [found.block] };
+  }
+  /** Why a canvas picture cannot be put on the map of `block` now, or null. */
+  private chatCanvasImageRefusal(block: MapChatImages): string | null {
+    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
+      return t("ui.map_chat_images_stale_map");
+    return this.canEditCanvasItems() ? null : t("ui.map_chat_skip_unavailable");
+  }
+  /**
+   * Writes the picture of a place_image: the attachment, the image and its conversion to an annotated image (with the note
+   * "web picture: <words>") in one transaction inside one write, so one undo step takes it all back. The spot is free space beside the
+   * topics (the viewport centre on an empty map); no topic moves. Checked again inside the write, where nothing else can change the map.
+   */
+  private async chatCanvasImageWrite(
+    block: MapChatImages,
+    file: { name: string; data: ArrayBuffer },
+    alive: () => boolean
+  ): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+    const stale = (): string | null =>
+      alive() ? this.chatCanvasImageRefusal(block) : t("ui.map_chat_images_stale_map");
+    const first = stale();
+    if (first) return { ok: false, reason: first };
+    const outcome: { result: { ok: true; id: string } | { ok: false; reason: string } } = {
+      result: { ok: false, reason: t("ui.map_chat_images_stale_map") }
+    };
+    try {
+      await this.plugin.mutate(async () => {
+        const again = stale();
+        const map = this.map;
+        if (again || !map) {
+          outcome.result = { ok: false, reason: again ?? t("ui.map_chat_images_stale_map") };
+          return;
+        }
+        const historyMark = this.history.mark();
+        const natural = imageSize(file.data) ?? { width: 240, height: 160 },
+          scale = Math.min(1, 320 / Math.max(natural.width, natural.height)),
+          w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)),
+          h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)),
+          id = `img-${randomUUID().slice(0, 8)}`;
+        const obstacles: RingRect[] = visibleNodes(map.nodes).map(node => ({
+          x: node.x,
+          y: node.y,
+          w: node.width ?? CARD_WIDTH,
+          h: this.cardHeightOf(node.id) ?? node.height ?? DEFAULT_CARD_HEIGHT
+        }));
+        for (const item of map.canvasItems ?? []) {
+          if (item.kind !== "image" && item.kind !== "annotated-image") continue;
+          const box = item as ImageItem | AnnotatedImageItem;
+          obstacles.push({ x: box.x, y: box.y, w: box.w, h: box.h });
+        }
+        const spot = canvasImageSpot({ w, h }, obstacles, this.stagePoint(null) ?? { x: 0, y: 0 });
+        const note = t("ui.canvas_image_web_note_0", block.query);
+        const viewport = clone(map.viewport);
+        try {
+          const entry = await this.beginMapTransaction()
+            .createAttachment("image", { ...file, sourcePath: this.path })
+            .editMap(this.path, (target, _resolve, attachment) => {
+              target.viewport = clone(viewport);
+              const added = addImage(target.canvasItems ?? [], {
+                id,
+                path: attachment("image"),
+                x: spot.x,
+                y: spot.y,
+                w,
+                h
+              });
+              target.canvasItems = convertToAnnotatedImage(added, id, note);
+            })
+            .commit({ deferRebuild: true, label: t("ui.map_chat_canvas_image_undo_label") });
+          // A step of its own: the reply's group or another job's collapse never takes it. Not into another map's history.
+          if (!this.closed && this.history.mark().epoch === historyMark.epoch && this.path === block.mapPath) {
+            this.history.pushSolo(entry);
+            this.updateHistoryButtons();
+          }
+          outcome.result = { ok: true, id };
+        } catch (error) {
+          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+        }
+      });
+    } catch (error) {
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+    }
+    if (outcome.result.ok) await this.refreshAfterSavedChange();
+    return outcome.result;
   }
   /** The thumbnail check of a search (a seam: it loads images, which only a real page can). */
   private chatProbeImages(found: ImageCandidate[], signal: AbortSignal): Promise<ImageCandidate[]> {

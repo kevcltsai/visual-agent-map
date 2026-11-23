@@ -40,7 +40,7 @@ test('schema and kinds carry add_anchor and link_anchor with the new required fi
   assert.equal(item.properties.y.type, 'number');
   assert.equal(item.properties.imageId.type, 'string');
   assert.ok(item.properties.kind.enum.includes('add_anchor'));
-  assert.equal(mapChatStep.version, 28);
+  assert.equal(mapChatStep.version, 31);
 });
 test('add_anchor and link_anchor are parsed with clamped coordinates, a cleaned one-line note and anchor refs', () => {
   const result = parse(reply(
@@ -288,5 +288,61 @@ test('P6: MAP_CHAT_SCHEMA still has add_child parentId as a string and the same 
   const item = MAP_CHAT_SCHEMA.properties.actions.items;
   assert.equal(item.properties.parentId.type, 'string');
   assert.ok(item.required.includes('parentId'));
-  assert.equal(mapChatStep.version, 28);
+  assert.equal(mapChatStep.version, 31);
+});
+
+// ---- place_image (canvas-image-anchors P1) ----
+const placeItem = (fields = {}) => ({ kind: 'place_image', direction: 'human back muscles diagram', ...fields });
+const placeAction = (fields = {}) => ({ kind: 'place_image', direction: 'human back muscles diagram', ...fields });
+test('place_image: a kind of the schema, parsed with its search words in direction', () => {
+  assert.ok(MAP_CHAT_ACTION_KINDS.includes('place_image'));
+  assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.properties.kind.enum.includes('place_image'));
+  const result = parse(reply(placeItem({ direction: '  back muscles  ' })), ctx(undefined));
+  assert.deepEqual(result.actions, [{ kind: 'place_image', direction: 'back muscles' }]);
+  assert.deepEqual(result.rejected, []);
+});
+test('place_image: empty or missing or non-string direction is dropped; no image needs to be selected', () => {
+  for (const [fields, code] of [[{ direction: '  ' }, 'missing_field'], [{ direction: undefined }, 'missing_field'], [{ direction: 5 }, 'bad_value']]) {
+    const result = parse(reply(placeItem(fields)), ctx(undefined));
+    assert.deepEqual(result.actions, [], JSON.stringify(fields));
+    assert.deepEqual(codes(result), [code]);
+  }
+});
+test('place_image: at most one per reply, the later ones are dropped as too_many', () => {
+  const result = parse(reply(placeItem(), placeItem({ direction: 'second' }), placeItem({ direction: 'third' })), ctx(undefined));
+  assert.deepEqual(result.actions, [{ kind: 'place_image', direction: 'human back muscles diagram' }]);
+  assert.deepEqual(codes(result), ['too_many', 'too_many']);
+});
+test('place_image: a map that cannot be edited drops it like any action that is not create_map', () => {
+  const result = parse(reply(placeItem()), buildMapChatContext(base({ noEditableMap: true })));
+  assert.deepEqual(result.actions, []);
+});
+test('place_image plan rules (D2): only the user first round without research, sources or an attached image goes without a plan', () => {
+  const none = (options, why) => assert.equal(planFor([placeAction()], parents, options), null, why);
+  none({}, 'first round, plain');
+  none({ imageMode: 'direct' }, 'direct mode');
+  none({ imageMode: 'preview' }, 'preview mode (no anchors in the reply)');
+  none({ chain: { round: 1, researchSoFar: 0 } }, 'round 1 of a chain');
+  const plans = [
+    ['automatic round', { chain: { round: 2, researchSoFar: 0 } }, 'auto_round_other_actions'],
+    ['conversation started research', { chatStartedResearch: true }, 'research_text_other_actions'],
+    ['conversation read sources', { chatReadSources: true }, 'source_text_other_actions'],
+    ['image attached (preview)', { imageAttached: true, imageMode: 'preview' }, 'image_other_actions'],
+    ['image attached (direct)', { imageAttached: true, imageMode: 'direct' }, 'image_other_actions']
+  ];
+  for (const [name, options, reason] of plans) assert.ok(plain(planFor([placeAction()], parents, options)).reasons.includes(reason), name);
+  // Not weakened by a trusted card set, and not a way around the turn rules of the other actions.
+  assert.ok(planFor([placeAction()], parents, { chain: { round: 3, researchSoFar: 0 }, trusted: { createdIds: new Set(['a']) } }));
+  assert.ok(plain(planFor([placeAction(), { kind: 'delete_topic', nodeId: 'a', branch: true }], parents, { imageAttached: true, imageMode: 'direct' })).reasons.includes('image_other_actions'));
+});
+test('place_image plan rules under autoApply: free only in the same cases; otherwise still a plan', () => {
+  assert.equal(planFor([placeAction()], parents, { autoApply: true }), null);
+  for (const options of [{ chain: { round: 2, researchSoFar: 0 } }, { chatStartedResearch: true }, { chatReadSources: true }, { imageAttached: true, imageMode: 'direct' }])
+    assert.ok(planFor([placeAction()], parents, { autoApply: true, ...options }), JSON.stringify(options));
+});
+test('place_image is not a find_images and not image-safe: the image-attached turn counts it as another action; find_images stays free', () => {
+  const find = { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: '', mode: '', images: false };
+  assert.equal(planFor([find], parents, { imageAttached: true, imageMode: 'direct' }), null);
+  assert.ok(planFor([placeAction(), anchorAction], parents, { imageAttached: true, imageMode: 'direct' }));
+  assert.equal(planFor([anchorAction, linkAction], parents, { imageAttached: true, imageMode: 'direct' }), null);
 });

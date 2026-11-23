@@ -3077,24 +3077,30 @@ const exampleButtons = chat => {
   const input = chat.inputEl; input.setSelectionRange = (a, b) => { input.selectionStart = a; input.selectionEnd = b; };
   return findAll(chat.examplesEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-example'));
 };
-test('Book entry 12: the opening screen shows at most three examples under the field, the book one first and marked new; a click fills the field and selects the blank', () => {
+test('Book entry 12: the opening screen shows two examples under the field (owner 2026-11-23), the picture one first and marked new, then the book one; a click fills the field and selects the blank', () => {
   const f = heroFixture(); const c = f.panel; const buttons = exampleButtons(c);
-  assert.ok(buttons.length >= 2 && buttons.length <= 3, 'two or three examples');
+  assert.equal(buttons.length, 2, 'two examples');
   assert.equal(c.examplesEl.parent, c.heroActionsEl, 'in the mind map tab panel, below the composer'); assert.equal(c.examplesEl.attrs.role, 'group'); assert.equal(c.examplesEl.attrs['aria-label'], 'Examples');
-  assert.ok(hasClass(buttons[0], 'is-new')); assert.match(visibleText(buttons[0]), /Make a picture book.*New/);
-  assert.equal(find(buttons[0], i => i.text === '📖').attrs['aria-hidden'], 'true', 'the book icon is not read out');
+  assert.ok(hasClass(buttons[0], 'is-new')); assert.match(visibleText(buttons[0]), /Start from a picture.*New/);
+  assert.equal(find(buttons[0], i => i.text === '🖼').attrs['aria-hidden'], 'true', 'the picture icon is not read out');
+  assert.equal(hasClass(buttons[1], 'is-new'), false, 'the book one is no longer marked new'); assert.doesNotMatch(visibleText(buttons[1]), /New/);
+  assert.equal(find(buttons[1], i => i.text === '📖').attrs['aria-hidden'], 'true', 'the book icon is not read out');
   assert.equal(c.heroActionsEl.hidden, false);
-  buttons[0].click();
+  buttons[1].click();
   assert.equal(c.inputEl.value, 'I want to make a picture book about “topic”. Build the outline first.');
   assert.equal(f.page.doc.activeElement, c.inputEl, 'the keyboard stays in the field');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), 'topic', 'the blank is selected, so typing replaces it');
   assert.equal(f.calls.send, 0, 'a click does not send');
-  buttons[1].click(); assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), 'option A');
+  buttons[0].click(); assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), 'back stretches');
+  assert.equal(f.calls.send, 0, 'the picture example does not send either');
   c.researchTabEl.click(); assert.equal(c.heroActionsEl.hidden, true, 'the research tab has its own suggestions');
 });
-test('Book entry 12: the examples are in Traditional Chinese with the new tag and the 「主題」 blank', () => {
+test('Book entry 12: the examples are in Traditional Chinese: the picture one with the new tag and the owner\'s sentence, the book one with the 「主題」 blank', () => {
   const f = heroFixture(); f.setLanguage('zh-TW'); f.panel.relabel(); const c = f.panel; const buttons = exampleButtons(c);
-  assert.match(visibleText(buttons[0]), /做一本圖文書.*新/); buttons[0].click();
+  assert.match(visibleText(buttons[0]), /從一張圖展開.*新/); buttons[0].click();
+  assert.equal(c.inputEl.value, '我想做一個「背部伸展」的圖片心智圖，幫我找一個背部肌肉的圖片當作根議題, 在各部位酸痛肌肉部位上面設置錨點. 每個對應的酸痛肌肉部位, 幫我找相關的伸展動作, 包含影片, 跟圖片');
+  assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '背部伸展');
+  assert.doesNotMatch(visibleText(buttons[1]), /新/); buttons[1].click();
   assert.equal(c.inputEl.value, '我想做一本關於「主題」的圖文書，先幫我建大綱');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '主題');
   f.setLanguage('en');
@@ -3104,19 +3110,19 @@ test('Book entry 13: after the book example, a reply that leaves a book outline 
   const f = heroFixture({ bookReady: () => ready, startBook: () => started.push('book') }); const c = f.panel;
   const offers = () => findAll(c.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-book-offer'));
   c.begin('plain question'); c.finish('answer', []); assert.equal(offers().length, 0, 'no book example used: no button');
-  exampleButtons(c)[0].click();
+  exampleButtons(c)[1].click();
   c.begin('book about art'); ready = false; c.finish('not yet a book', [{ status: 'done', text: 'Done: y' }]); assert.equal(offers().length, 0, 'map not in a book shape: no button');
   c.begin('answer only'); ready = true; c.finish('Just an answer.', []); assert.equal(offers().length, 0, 'a reply that wrote nothing: no button');
   c.begin('again'); c.finish('I built the outline: 1 title, 3 chapters.', [{ status: 'done', text: 'Done: x' }]);
   assert.equal(offers().length, 1); assert.equal(offers()[0].text, 'Make it a picture book →');
   offers()[0].click(); assert.deepEqual(started, ['book']);
   c.begin('more'); c.finish('more', []); assert.equal(offers().length, 1, 'offered once per conversation');
-  c.reset(); exampleButtons(c)[1].click(); c.begin('compare'); c.finish('done', [{ status: 'done', text: 'Done: z' }]); assert.equal(offers().length, 0, 'other examples offer nothing');
+  c.reset(); exampleButtons(c)[0].click(); c.begin('picture'); c.finish('done', [{ status: 'done', text: 'Done: z' }]); assert.equal(offers().length, 0, 'other examples offer nothing');
 });
 test('Book entry 13: a reply that waits on its plan card offers the book only once the plan is applied', () => {
   const f = heroFixture({ bookReady: () => true, startBook: () => {} }); const c = f.panel;
   const offers = () => findAll(c.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-book-offer'));
-  exampleButtons(c)[0].click(); c.begin('book');
+  exampleButtons(c)[1].click(); c.begin('book');
   c.finish('Here is the plan.', []);
   const plan = { reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} }; c.showPlan(plan);
   assert.equal(offers().length, 0, 'nothing written yet');
@@ -3266,7 +3272,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
 
 test('map chat composer: the suggestion layout symbols, host.suggestions and the old suggestion / example translation keys are gone', () => {
   const layout = load('core/map-chat-layout.ts'); for (const name of ['chatSuggestionKeys', 'chatSuggestionFill', 'MAP_CHAT_EXAMPLE_KEYS', 'MAP_CHAT_OPEN_ENDED_KEYS']) assert.equal(name in layout, false, name);
-  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_(suggest|example_(research|learn|decide)")/, name);
+  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_(suggest|example_(research|learn|decide|compare|notes)")/, name);
 });
 
 // ---- keyboard ------------------------------------------------------------------------------------------------------
@@ -6696,7 +6702,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 28 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 31 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

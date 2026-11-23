@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 28);
+  assert.equal(mapChatStep.version, 31);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });
@@ -207,6 +207,22 @@ test('R3 B2 plan counterexample: update_summary, set_topic_kind and research_sta
   assert.ok(reasons([run('research_standard', { nodeIds: [] })], r2, created).includes('auto_round_other_actions'));
   assert.equal(plan([{ kind: 'set_appearance', nodeIds: ['a'] }, run('expand', { nodeIds: ['a'] })], r2), null, 'appearance and expand stay safe');
   assert.equal(isChainSafeFor(add(1)), true);
+});
+test('R3 plan: an empty-target research or expand after a select_topics with explicit ids (round-3 shape of the image chain) resolves to those ids; any other empty target stays unsafe', () => {
+  const r3 = { round: 3, researchSoFar: 0 };
+  const ids = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+  const created = { trusted: { createdIds: new Set(ids) } };
+  const select = (nodeIds, all = false) => ({ kind: 'select_topics', nodeIds, all });
+  const research = (nodeIds = []) => run('research_standard', { nodeIds });
+  assert.equal(plan([select(ids), research()], r3, created), null, 'real round-3 shape: all created, none researched');
+  assert.equal(plan([select(ids), run('expand', { nodeIds: [] })], r3, created), null, 'expand follows the selection too');
+  assert.ok(reasons([select(ids), research()], r3).includes('auto_round_other_actions'), 'ids the chain did not make');
+  assert.ok(reasons([select([...ids, 'old']), research()], r3, created).includes('auto_round_other_actions'), 'one existing card is enough');
+  assert.ok(reasons([select(ids), research()], r3, { trusted: { createdIds: new Set(ids), researchedIds: new Set(['t1']) } }).includes('auto_round_other_actions'), 'already researched asks again');
+  assert.ok(reasons([research()], r3, created).includes('auto_round_other_actions'), 'no select: unknown selection');
+  assert.ok(reasons([select(ids, true), research()], r3, created).includes('auto_round_other_actions'), 'select all is not explicit ids');
+  assert.ok(reasons([select([]), research()], r3, created).includes('auto_round_other_actions'), 'an empty select is not explicit ids');
+  assert.ok(reasons([research(), select(ids)], r3, created).includes('auto_round_other_actions'), 'select after the research does not count');
 });
 test('R1 L3 plan: an expand counts the ask-again, two outline calls per card', () => {
   assert.equal(plan([run('expand', { nodeIds: ['x', 'y', 'z'] }), { kind: 'create_map', title: 'M' }]).estimatedCalls, 6);
@@ -572,4 +588,21 @@ test('continuation: a check round says so with a fixed note; other rounds carry 
   assert.match(sent.checkDoneNote, /progress/); assert.match(sent.checkDoneNote, /remaining/);
   const plainRound = json(context({ continuation: base }));
   assert.equal('checkDone' in plainRound.continuation, false); assert.equal('checkDoneNote' in plainRound, false);
+});
+
+// ---- place_image: the chain waits for the canvas image (canvas-image-anchors P1) ----
+test('place_image: started.image waits for "image", alone or with research and expand; absent counts as none', () => {
+  const image = { research: 0, expand: 0, otherBackground: false, image: 1 };
+  assert.deepEqual(plain(chain.finishRound(at(1), roundEnd({ started: image })).decision), { kind: 'wait', waitFor: ['image'] });
+  assert.deepEqual(plain(chain.finishRound(at(1), roundEnd({ started: { ...image, research: 2, expand: 1 } })).decision), { kind: 'wait', waitFor: ['research', 'expand', 'image'] });
+  assert.equal(chain.finishRound(at(1), roundEnd({ started: { ...image, image: 0 } })).decision.kind, 'next');
+  assert.equal(chain.finishRound(at(1), roundEnd({ started: started() })).decision.kind, 'next', 'a round of an older shape has no image');
+});
+test('place_image: a place_image action that was applied counts as a write, so a failed placement still lets the chain go on', () => {
+  const placed = [{ kind: 'place_image', done: true }];
+  const image = { research: 0, expand: 0, otherBackground: false, image: 1 };
+  const step = chain.finishRound(at(1), roundEnd({ actions: placed, started: image }));
+  assert.equal(step.state.wrote, true);
+  assert.equal(chain.finishWait(step.state, {}).decision.kind, 'next', 'image failed (null): the next round runs');
+  assert.equal(chain.finishWait(step.state, { timedOut: true }).decision.kind, 'end');
 });

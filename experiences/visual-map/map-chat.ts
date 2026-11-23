@@ -1,5 +1,5 @@
 import { Keymap, setIcon } from "obsidian";
-import { t } from "../../i18n";
+import { t, type TranslationKey } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
 import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
 import { MAP_CHAT_TURN_CHAR_LIMIT, type MapChatContinuationInput, type MapChatTurn } from "../../core/map-chat-context";
@@ -89,6 +89,11 @@ export interface MapChatLine {
 export function placedImage(block: MapChatImages): MapChatImageItem | undefined {
   return block.state === "ready" ? block.items.find(item => item.inserted) : undefined;
 }
+/** A canvas picture that did not come: the search was stopped, so it says so instead of "no picture was found". */
+const canvasMissedKey = (blocks: MapChatImages[]): TranslationKey =>
+  blocks.every(block => block.state === "stopped")
+    ? "ui.map_chat_note_images_stopped"
+    : "ui.map_chat_line_canvas_image_missed";
 /** The line as it reads now: a picture-search line follows the blocks of its action (one per card); any other line is itself. */
 export function settledLine(line: MapChatLine): MapChatLine {
   const blocks = line.imageGroup;
@@ -103,6 +108,13 @@ export function settledLine(line: MapChatLine): MapChatLine {
   }
   const placed = blocks.filter(block => placedImage(block)).length;
   const missed = total - placed;
+  // A place_image: one picture on the canvas, not pictures in cards.
+  if (blocks.every(block => block.canvas))
+    return {
+      ...line,
+      status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
+      text: t(placed ? "ui.map_chat_line_canvas_image_done" : canvasMissedKey(blocks)) + model
+    };
   return {
     ...line,
     status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
@@ -218,6 +230,8 @@ export interface MapChatImageItem {
 export interface MapChatImages {
   /** The search words. */
   query: string;
+  /** A place_image: the picture went on the canvas as an annotated image, not into a card (`nodeId` and `nodeTitle` are empty). */
+  canvas?: true;
   /** The card the picture is put into, with the map it was found on. */
   nodeId: string;
   nodeTitle: string;
@@ -536,25 +550,23 @@ let panelSequence = 0;
 
 type HeroTab = "map" | "research";
 const HERO_TABS: readonly HeroTab[] = ["map", "research"];
-/** The opening screen's examples (at most three): the book one first, marked new; `slot` is the blank the field selects. */
+/** The opening screen's examples (owner 2026-11-23: two): the picture one first, marked new, then the book one; `slot` is the blank the field selects. */
 const MAP_CHAT_EXAMPLES = [
   {
+    book: false,
+    isNew: true,
+    icon: "🖼",
+    label: "ui.map_chat_example_image",
+    prompt: "ui.map_chat_example_image_prompt",
+    slot: "ui.map_chat_example_image_slot"
+  },
+  {
     book: true,
+    isNew: false,
+    icon: "📖",
     label: "ui.map_chat_example_book",
     prompt: "ui.map_chat_example_book_prompt",
     slot: "ui.map_chat_example_book_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_compare",
-    prompt: "ui.map_chat_example_compare_prompt",
-    slot: "ui.map_chat_example_compare_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_notes",
-    prompt: "ui.map_chat_example_notes_prompt",
-    slot: "ui.map_chat_example_notes_slot"
   }
 ] as const;
 /** The pool of suggested claims of the research tab (each shown text is its i18n key's). */
@@ -2424,13 +2436,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.examplesEl.empty();
     for (const example of MAP_CHAT_EXAMPLES) {
       const button = this.examplesEl.createEl("button", {
-        cls: `vam-map-chat-example${example.book ? " is-new" : ""}`,
+        cls: `vam-map-chat-example${example.isNew ? " is-new" : ""}`,
         attr: { type: "button" }
       });
-      if (example.book)
-        button.createSpan({ cls: "vam-map-chat-example-icon", text: "📖", attr: { "aria-hidden": "true" } });
+      button.createSpan({ cls: "vam-map-chat-example-icon", text: example.icon, attr: { "aria-hidden": "true" } });
       button.createSpan({ text: t(example.label) });
-      if (example.book) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
+      if (example.isNew) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
       // A click only fills the field; sending is the owner's own Enter or send key.
       button.addEventListener("click", () => {
         const text = t(example.prompt);
@@ -3787,7 +3798,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     } else {
       const missed = blocks.length - placed;
       head.setText(
-        missed ? t("ui.map_chat_images_summary_0_1", placed, missed) : t("ui.map_chat_images_summary_0", placed)
+        blocks.every(block => block.canvas)
+          ? t(placed ? "ui.map_chat_images_canvas_done" : canvasMissedKey(blocks))
+          : missed
+            ? t("ui.map_chat_images_summary_0_1", placed, missed)
+            : t("ui.map_chat_images_summary_0", placed)
       );
     }
     const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
@@ -3800,7 +3815,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
         const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
-        text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+        text.createDiv({
+          cls: "vam-map-chat-images-topic",
+          text: clip(block.canvas ? block.query : block.nodeTitle, 80)
+        });
         text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
         if (item.candidate.source)
           text.createEl("a", {
@@ -3817,7 +3835,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
       cell.addClass("is-missed");
       const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
-      text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+      text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle || block.query, 80) });
       const why =
         block.state === "searching"
           ? block.running

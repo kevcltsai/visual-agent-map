@@ -32,6 +32,7 @@ import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
+import { keepOpenedVideoEmbeds } from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -255,7 +256,8 @@ export class AiTaskService {
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {
           if (event.method === "item/completed") retrievals++;
-          if (keepsEvents) webEvents.push(event);
+          // Kept for the argument proof and for the video check below (only the pages this call opened may be embedded).
+          if (keepsEvents || countsWeb) webEvents.push(event);
           onWebSearchEvent?.(event);
         }
       : onWebSearchEvent;
@@ -355,6 +357,13 @@ export class AiTaskService {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
         };
+      // A YouTube embed stays only when this call opened that video's page; a run that opens no pages (Quick) keeps none.
+      // The count repair's detail goes through the same filter below, with this call's opened pages.
+      const videoFilter =
+        (context.mode ?? "task") === "task" && role === undefined && !input.countRepair
+          ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] }
+          : null;
+      if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
@@ -420,7 +429,12 @@ export class AiTaskService {
             );
             // Only the detail comes from the repair; it runs local, so its summary, suggestions and visual
             // references would replace the first reply's with less.
-            result = { ...result, detail: repaired.detail };
+            result = {
+              ...result,
+              detail: videoFilter
+                ? keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail)
+                : repaired.detail
+            };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
             if (signal?.aborted || (error instanceof Error && error.name === "AbortError") || isBudgetExhausted(error))

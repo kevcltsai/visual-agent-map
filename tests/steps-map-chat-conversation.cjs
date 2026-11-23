@@ -304,6 +304,18 @@ test('closed when the apply ends: no settle, record, chain or flush; applying st
   assert.deepEqual(r.record.calls, []);
 });
 
+test('a plan applied for a chain round hands the cards it created to advanceChain through the same work it set on the run', async () => {
+  const r = rig();
+  const run = { state: { round: 2 } };
+  const { card, token, result } = offer(r, [act.child], { run });
+  r.state.apply = async (_result, _baseline, _alive, _anchor, options) => { options.work.created.push('c1', 'c2'); return [{ status: 'done', text: 'ok' }]; };
+  r.log.length = 0;
+  await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, run);
+  const advance = r.log.find(e => e[0] === 'advance')[1];
+  assert.deepEqual(advance.work.created, ['c1', 'c2']);
+  assert.equal(advance.work, run.work);
+  assert.equal(advance.work, r.applyCalls.at(-1)[4].work);
+});
 test('queued steers: user_took_over, no advance, flush(true)', async () => {
   const r = rig({ queued: true });
   const run = { state: { round: 1 } };
@@ -689,6 +701,23 @@ test('turn: an automatic round abandons with a Notice only when it failed', asyn
   const failed = turnRig({ build: () => Promise.reject(new Error('bad')) });
   await start(failed, origin);
   assert.equal(first(failed, 'notice')[1], 'bad');
+});
+
+test('turn: an empty-target research after select_topics is applied with the ids the gate resolved, never the live selection', async () => {
+  const r = turnRig();
+  const seen = [];
+  r.ports.applyActions = (result, ...rest) => { seen.push(JSON.parse(JSON.stringify(result.actions))); return Promise.resolve(r.state.applyLines); };
+  r.state.selection = ['live1', 'live2'];
+  const select = { kind: 'select_topics', nodeIds: ['a', 'gone'], all: false };
+  const research = { kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', mode: '', images: false };
+  const expand = { ...research, action: 'expand' };
+  const other = { ...research, nodeIds: ['z'] };
+  await start(r);
+  r.state.requests[0].resolve(REPLY([select, research, expand, other]));
+  await r.sending;
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].map(action => action.nodeIds), [['a', 'gone'], ['a', 'gone'], ['a', 'gone'], ['z']]);
+  assert.deepEqual(research.nodeIds, [], 'the reply object itself is not mutated');
 });
 
 test('turn: a retry of a chain round keeps its chain: no user_took_over, message and chips set on the run', async () => {

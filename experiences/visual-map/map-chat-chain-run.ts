@@ -62,6 +62,11 @@ export interface ChatRoundWork {
   /** Ids of the cards the round created (the chain keeps them: its later rounds may rewrite and research those without a plan). */
   created: string[];
   expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
+  /**
+   * The picture a `place_image` of the round is fetching and putting on the canvas: the id of the new item, or null when it did not
+   * work out (it never rejects in the view's hands; a rejection is read as null). The chain waits for it and sends it with the next round.
+   */
+  canvasImage?: Promise<string | null> | null;
   /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
   otherBackground: boolean;
   /** The cards a select_topics of the round selected (the chain keeps them for its later rounds). */
@@ -76,6 +81,7 @@ export const newChatWork = (): ChatRoundWork => ({
   researchKeys: new Set(),
   created: [],
   expand: [],
+  canvasImage: null,
   otherBackground: false,
   reads: new Set()
 });
@@ -113,6 +119,11 @@ export interface ChatChainRun {
   /** Research that went on after some of it failed (the next round says so on its separator). */
   partial: { failed: number; succeeded: number } | null;
   work: ChatRoundWork | null;
+  /**
+   * The picture this chain's own `place_image` put on the canvas, set when the wait for it ends. The next round sends it once (it is
+   * deleted as that round is built): never the user's selection, and never a later round.
+   */
+  attachImageId?: string;
   timer: number | null;
   /** The panel was told that the chain waits (and must be told that it does not). */
   waitShown: boolean;
@@ -162,6 +173,8 @@ export interface MapChatChainPorts {
   map(): Pick<MapDocument, "id" | "aiMode" | "nodes"> | null;
   /** The cards selected on the canvas of the moment. */
   selectionIds(): string[];
+  /** The canvas picture `id` is still an annotated image of the map (a deleted or replaced one is not sent). Absent = the next round's own check decides. */
+  imageExists?(id: string): boolean;
   /** "Apply this whole conversation automatically" is on (read live). */
   autoApply(): boolean;
   /** The setting that adds diagrams after research. */
@@ -427,6 +440,7 @@ export class MapChatChainRunner {
       started: {
         research: round.work.researchTargets,
         expand: round.work.expand.length,
+        image: round.work.canvasImage ? 1 : 0,
         otherBackground: round.work.otherBackground
       }
     });
@@ -471,11 +485,16 @@ export class MapChatChainRunner {
     else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
   }
   /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
-  private waitForChain(run: ChatChainRun, waitFor: ("research" | "expand")[], work: ChatRoundWork): void {
+  private waitForChain(run: ChatChainRun, waitFor: ("research" | "expand" | "image")[], work: ChatRoundWork): void {
     const chat = this.ports.panel();
     const research = waitFor.includes("research") ? work.research : [];
     const expand = waitFor.includes("expand") ? work.expand : [];
-    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
+    const image = waitFor.includes("image") ? (work.canvasImage ?? null) : null;
+    const waiting = {
+      kinds: waitFor,
+      total: (research.length ? work.researchTargets : 0) + expand.length + (image ? 1 : 0),
+      settled: 0
+    };
     chat?.setChainWaiting(waiting, run.state.remaining);
     run.waitShown = true;
     const progress = (by: number): void => {
@@ -531,6 +550,20 @@ export class MapChatChainRunner {
           progress(1);
         })
       );
+    // A placement that failed (null) or threw goes on without a picture.
+    let placed: string | null = null;
+    if (image)
+      pending.push(
+        image
+          .then(
+            id => id,
+            () => null
+          )
+          .then(id => {
+            placed = id;
+            progress(1);
+          })
+      );
     void Promise.all(pending).then(() =>
       this.settleChainWait(
         run,
@@ -538,12 +571,18 @@ export class MapChatChainRunner {
           ...(researched ? { research: researched } : {}),
           ...(expand.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {})
         },
-        waited
+        waited,
+        placed
       )
     );
   }
   /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
-  private settleChainWait(run: ChatChainRun, end: MapChatWaitEnd, waited: ChatWorkTopic[]): void {
+  private settleChainWait(
+    run: ChatChainRun,
+    end: MapChatWaitEnd,
+    waited: ChatWorkTopic[],
+    placedImageId: string | null = null
+  ): void {
     if (this.current !== run || run.state.phase !== "waiting") return;
     if (run.timer !== null) window.clearTimeout(run.timer);
     run.timer = null;
@@ -560,6 +599,8 @@ export class MapChatChainRunner {
     }
     chat.setChainWaiting(null);
     run.waitShown = false;
+    // Only an id this chain's own wait handed over, and only for the round that follows at once.
+    if (placedImageId) run.attachImageId = placedImageId;
     run.waited = waited.map(item => ({
       id: item.id,
       title: item.title,
@@ -581,6 +622,9 @@ export class MapChatChainRunner {
   }
   /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
   private startNextRound(run: ChatChainRun, round: number, remaining: string): void {
+    // Used up whatever happens below: a round that is not sent never leaves the picture for a later one.
+    const placed = run.attachImageId;
+    run.attachImageId = undefined;
     const chat = this.ports.panel();
     if (
       this.ports.closed() ||
@@ -599,8 +643,10 @@ export class MapChatChainRunner {
     const origin: MapChatOrigin = {
       text: run.message,
       // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
-      // a picture is sent with the first round only and a follow-up adds no chip.
+      // the user's picture is sent with the first round only, and a follow-up adds no chip. The picture this chain placed itself
+      // goes with the next round once (a deleted one is left out).
       chips: [...run.chips],
+      ...(placed && this.ports.imageExists?.(placed) !== false ? { imageId: placed } : {}),
       selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.ports.selectionIds(),
       chain: {
         seq: run.seq,

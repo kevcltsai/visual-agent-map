@@ -124,6 +124,24 @@ export function isChainSafeFor(action: MapChatAction, trusted: MapChatTrusted = 
   }
 }
 
+/**
+ * An empty-target `research_standard` or `expand` runs on the selection; when an earlier `select_topics` of the same reply named
+ * its cards explicitly (not `all`), the selection is those cards, so its targets resolve to them. Any other empty target stays empty
+ * (the selection is not known here, see {@link isChainSafeFor}).
+ */
+export function resolveSelectionTargets(actions: readonly MapChatAction[]): MapChatAction[] {
+  let selected: string[] | null = null;
+  return actions.map(action => {
+    if (action.kind === "select_topics") {
+      selected = !action.all && action.nodeIds.length ? [...action.nodeIds] : null;
+    } else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selected = [...action.nodeIds];
+      else if (selected && CHAIN_SAFE_RUN.has(action.action)) return { ...action, nodeIds: [...selected] };
+    }
+    return action;
+  });
+}
+
 /** Where the reply sits in an automatic continuation. Absent = an ordinary message (or the first round). */
 export interface MapChatPlanChain {
   /** The round this reply belongs to, from 1; only 2 and up use the chain rules. */
@@ -141,7 +159,7 @@ export interface MapChatPlan {
    * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
    * more, which is a retry and is not counted). Each synthesize is one integration call plus the
    * same diagram call: B2 starts it without a dialog and without the directions step. An expand is {@link MAP_CHAT_EXPAND_CALLS_PER_CARD} outline calls per
-   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets and one for a place_image (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -178,6 +196,12 @@ const isFindImages = (action: MapChatAction): boolean =>
   action.kind === "run_map_action" && action.action === "find_images";
 
 /**
+ * A web picture put on the canvas. Kept apart from {@link isFindImages}: it must not inherit that action's exemptions (the search
+ * words come from the model, so a turn that may read web text or sent a picture gets a plan).
+ */
+const isPlaceImage = (action: MapChatAction): boolean => action.kind === "place_image";
+
+/**
  * AI calls the actions start, counted at least (see {@link MapChatPlan.estimatedCalls}). `diagrams` is the "Add diagrams after
  * research" setting (on unless false); `mapAiMode` is the mode a research action falls back to.
  */
@@ -191,6 +215,7 @@ export function estimateChatCalls(
   let selection = context.selectedCount;
   for (const action of actions) {
     if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "place_image") calls += 1;
     else if (action.kind === "run_map_action") {
       if (action.nodeIds.length) selection = action.nodeIds.length;
       switch (action.action) {
@@ -307,7 +332,8 @@ export function planFor(
   const readsSources = options.chatReadSources === true;
   const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
   const onlySafe =
-    readsResearch && actions.every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
+    readsResearch &&
+    resolveSelectionTargets(actions).every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
   // find_images never needs a plan (owner: pictures are put in without asking), so it does not count toward the action limit or the other-actions rules.
   // read_md_file writes nothing and is never shown (decision 2026-11-15-map-chat-file-bugs#2): it does not count either.
@@ -341,6 +367,7 @@ export function planFor(
     ((action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") &&
       isInsideMapFolder(action.path, options.mapFolder)) ||
     (action.kind === "read_md_file" && isReadablePath(action.path, options.readablePaths)) ||
+    (isPlaceImage(action) && !readsResearch && options.imageAttached !== true) ||
     (imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind));
   const allAllowed = auto && actions.every(autoAllowed);
   if (readsResearch && !onlySafe && !allAllowed)

@@ -76301,7 +76301,7 @@ function bookStartEstimate(cards, trialCards, models) {
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
   const aiProof = time("proof") + MAX_AI_FIX_ROUNDS * (time("write") + time("proof"));
-  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + LOOKS_PER_CHAPTER * time("images") + per.diagram * time("write") + BOOK_EXPAND_PASSES * time("write") + aiProof;
+  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + LOOKS_PER_CHAPTER * time("images") + BOOK_EXPAND_PASSES * time("write") + aiProof;
   const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {

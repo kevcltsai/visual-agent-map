@@ -137,6 +137,16 @@ export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   parse: raw => parseFound(raw)
 };
 
+/** Kinds of picture a program-drawn Mermaid diagram can stand in for (word lists in both Chinese scripts and English). */
+const DIAGRAM_KIND =
+  /示意|圖解|图解|圖表|图表|流程|步驟|步骤|時間軸|时间轴|時間線|时间线|比較|比较|對照|对照|結構|结构|關係|关系|循環|循环|表格|diagram|chart|flow|timeline|table/i;
+/** Kinds that need a real picture; they win over {@link DIAGRAM_KIND} (a "painting of a flow" is a painting). */
+const REAL_PICTURE_KIND = /照片|攝影|摄影|畫|画|地圖|地图|photo|painting|map/i;
+/** Whether a slot's kind is one a diagram can fill when no picture is found. */
+export function isDiagramKind(kind: string): boolean {
+  return !REAL_PICTURE_KIND.test(kind) && DIAGRAM_KIND.test(kind);
+}
+
 /** A Chinese book needs a caption with Chinese characters; other languages are not checked (a Latin script cannot tell them apart reliably). */
 function captionFits(caption: string, language: string): boolean {
   return !/^zh/i.test(language) || /[\u3400-\u9fff]/.test(caption);

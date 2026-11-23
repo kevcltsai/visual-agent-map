@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "diagrams": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slot": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "mermaid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1500
+          }
+        },
+        "required": [
+          "slot",
+          "title",
+          "mermaid"
+        ]
+      }
+    }
+  },
+  "required": [
+    "diagrams"
+  ]
+}

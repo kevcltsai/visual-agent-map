@@ -15396,6 +15396,20 @@ function pickForSlot(ctx, candidates) {
   if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
   return { none: true, reasonCode: "not_found" };
 }
+function diagramCaption(title, language2) {
+  if (/^zh-(?:CN|Hans)/i.test(language2)) return `\u793A\u610F\u56FE\uFF5C${title}\uFF08\u4F9D\u672C\u7AE0\u5185\u6587\u6574\u7406\uFF0C\u975E\u53F2\u6599\u539F\u56FE\uFF09`;
+  if (/^zh/i.test(language2)) return `\u793A\u610F\u5716\uFF5C${title}\uFF08\u4F9D\u672C\u7AE0\u5167\u6587\u6574\u7406\uFF0C\u975E\u53F2\u6599\u539F\u5716\uFF09`;
+  return `Diagram | ${title} (drawn from this chapter's text, not a source image)`;
+}
+function diagramHash(mermaid) {
+  let hash = 2166136261;
+  const text11 = mermaid.replace(/\r\n?/g, "\n").split("\n").map((line3) => line3.replace(/\s+$/, "")).join("\n").trim();
+  for (const char of text11) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
 function plainLine(text11) {
   return text11 && /^[\s\p{P}\p{S}]+$/u.test(text11) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text11) && !text11.startsWith("\\") ? `\\${text11}` : text11;
 }
@@ -15484,12 +15498,13 @@ function choosePictures(chapter, slots, perSlot, taken, language2) {
 }
 var BAD_INDEX = /〔圖位\s*(\d+)/;
 var isBlank = (line3) => line3 === void 0 || !line3.trim();
-function fillSlotMarkers(content, slots, outcomes) {
-  var _a2;
+function fillSlotMarkers(content, slots, outcomes, language2 = "") {
   const lines = content.split("\n");
   const scan3 = scanSlotMarkers(content, slots);
   const cr = content.includes("\r\n") ? "\r" : "";
   const figureAt = /* @__PURE__ */ new Map();
+  const diagramAt = /* @__PURE__ */ new Map();
+  const diagrams = [];
   const missing = [];
   const placed = [];
   const sources = [];
@@ -15510,12 +15525,20 @@ function fillSlotMarkers(content, slots, outcomes) {
       figureAt.set(at, outcome.figure);
       placed.push({ index: slot.index, href: outcome.figure.href });
       if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
+    } else if (outcome && "diagram" in outcome) {
+      diagramAt.set(at, outcome.diagram);
+      diagrams.push({ index: slot.index, mermaid: outcome.diagram.mermaid });
     } else {
-      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
+      missing.push({
+        index: slot.index,
+        reasonCode: outcome && "reasonCode" in outcome ? outcome.reasonCode : "not_found"
+      });
     }
   }
   const dropped = new Set(
-    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
+    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter(
+      (at) => !figureAt.has(at) && !diagramAt.has(at)
+    )
   );
   const inline = new Set(scan3.inlineLines);
   const added = [];
@@ -15545,6 +15568,20 @@ function fillSlotMarkers(content, slots, outcomes) {
       if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
       return;
     }
+    const diagram = diagramAt.get(at);
+    if (diagram) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const written2 = [
+        "```mermaid",
+        ...diagram.mermaid.split("\n"),
+        "```",
+        diagramCaption(diagram.title, language2)
+      ].map((text11) => `${text11}${cr}`);
+      out.push(...written2);
+      added.push(...written2.filter((text11) => !isBlank(text11)));
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
     if (dropped.has(at)) {
       removed = true;
       return;
@@ -15560,7 +15597,7 @@ function fillSlotMarkers(content, slots, outcomes) {
     }
     push(line3);
   });
-  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, sources, added };
+  return { text: out.join("\n"), placed, diagrams, missing, bad: scan3.badLines.length, sources, added };
 }
 function withoutMarkers(text11) {
   const lines = text11.split("\n");
@@ -15578,7 +15615,8 @@ function withoutMarkers(text11) {
   return out.map((line3) => line3.replace(/\s+$/, "")).filter((line3) => line3.trim());
 }
 function verifyFill(original, result, slots) {
-  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
+  var _a2;
+  const seen = [...result.placed, ...(_a2 = result.diagrams) != null ? _a2 : [], ...result.missing].map((item) => item.index).sort((a, b) => a - b);
   const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
   if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
   if (residualMarkerLines(result.text).length) return "residual";
@@ -15609,12 +15647,18 @@ function shortHash(url) {
   return hash.toString(16).padStart(8, "0");
 }
 function composeSlotsRecord(result, off = /* @__PURE__ */ new Set()) {
+  var _a2;
   const slots = [
     ...result.placed.map((item) => ({
       index: item.index,
       state: "placed",
       hash: shortHash(item.href),
       ...off.has(item.index) ? { off: true } : {}
+    })),
+    ...((_a2 = result.diagrams) != null ? _a2 : []).map((item) => ({
+      index: item.index,
+      state: "diagram",
+      hash: diagramHash(item.mermaid)
     })),
     ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
   ].sort((a, b) => a.index - b.index);
@@ -15634,7 +15678,7 @@ function latestSlotsRecord(detail) {
       const items = [];
       for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
         if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
-        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
+        const state = raw.state === "placed" || raw.state === "missing" || raw.state === "diagram" ? raw.state : void 0;
         if (!state) continue;
         const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
         items.push({
@@ -15683,7 +15727,7 @@ function splitImageLines(text11) {
   }
   return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), captions };
 }
-function describeSlots(slots, record, imageUrls) {
+function describeSlots(slots, record, imageUrls, diagramHashes = []) {
   const now = new Set(imageUrls.map(shortHash));
   return slots.map((slot) => {
     const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
@@ -15693,6 +15737,11 @@ function describeSlots(slots, record, imageUrls) {
         index: slot.index,
         state: "missing",
         ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
+      };
+    if (item.state === "diagram")
+      return {
+        index: slot.index,
+        state: item.hash && diagramHashes.includes(item.hash) ? "diagram" : "edited"
       };
     return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
   });
@@ -15735,7 +15784,7 @@ function slotKeywords(explains) {
 var KEYWORD_HITS = 2;
 function checkImageText(body, slots, record) {
   var _a2;
-  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  const empty = { planned: 0, placed: 0, diagrams: 0, imageCount: 0, bad: 0, issues: [] };
   if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
   if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
   const lines = body.split("\n");
@@ -15782,7 +15831,15 @@ function checkImageText(body, slots, record) {
     if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
       issues.push({ index: item.index, code: "mismatch" });
   }
-  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+  return {
+    kind: "checked",
+    planned: slots.length,
+    placed: placedItems.length,
+    diagrams: record.slots.filter((item) => item.state === "diagram").length,
+    imageCount,
+    bad: record.bad,
+    issues
+  };
 }
 function composeImageTextLine(language2, check) {
   const note = noteLanguageOf(language2);
@@ -15798,7 +15855,7 @@ function composeImageTextLine(language2, check) {
     )
   );
   if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
-  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed + check.diagrams));
 }
 function imageIssueTokens(check) {
   const tokens3 = check.issues.map(

@@ -113808,7 +113808,11 @@ var AiTaskService = class {
           searchQueries: searchQueriesFromEvents(webEvents)
         };
       if (((_f = context.mode) != null ? _f : "task") === "task" && role === void 0 && !input2.countRepair)
-        result.detail = keepOpenedVideoEmbeds(result.detail, countsWeb ? openedUrlsFromEvents(webEvents) : [], input2.detail);
+        result.detail = keepOpenedVideoEmbeds(
+          result.detail,
+          countsWeb ? openedUrlsFromEvents(webEvents) : [],
+          input2.detail
+        );
       if (readerFacingDetail(input2)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage2, input2.detailTemplate, input2);

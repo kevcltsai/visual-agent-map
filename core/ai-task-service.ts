@@ -348,7 +348,11 @@ export class AiTaskService {
         };
       // A YouTube embed stays only when this call opened that video's page; a run that opens no pages (Quick) keeps none.
       if ((context.mode ?? "task") === "task" && role === undefined && !input.countRepair)
-        result.detail = keepOpenedVideoEmbeds(result.detail, countsWeb ? openedUrlsFromEvents(webEvents) : [], input.detail);
+        result.detail = keepOpenedVideoEmbeds(
+          result.detail,
+          countsWeb ? openedUrlsFromEvents(webEvents) : [],
+          input.detail
+        );
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);

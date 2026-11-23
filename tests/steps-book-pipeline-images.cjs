@@ -992,7 +992,7 @@ test('quality parse: the finder\'s subject refuses another person\'s work (count
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 2);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'photo', explains: 'p' }], exclude: [], language: 'en', model: 'm', reasoning: 'low', again: true });
-  assert.match(prompt, /"subject":""/); assert.match(prompt, /Category:<name>/); assert.match(prompt, /file description page/); assert.match(prompt, /never an article/);
+  assert.match(prompt, /"subject":""/); assert.match(prompt, /Category:<name>/); assert.match(prompt, /sourceUrl is the https page where you found the image/); assert.doesNotMatch(prompt, /file description page/);
   assert.match(prompt, /second search[^\n]*Commons category and its subcategories/);
 });
 

@@ -12267,6 +12267,8 @@ export class VisualAgentMapView extends ItemView {
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
     if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
+    // A full repaint makes a new viewport, so it takes the several-selected class again (else every selected card shows its row).
+    this.syncToolsVisibility();
     // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
     const overlay = canvas.createDiv("vam-canvas-overlay");
     // Keyboard order is toolbar, then the cards, then the zoom controls (second overlay below): the toolbar comes first in the DOM.

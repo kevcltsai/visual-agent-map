@@ -1260,6 +1260,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_chain_reason_0": "原因：{0}。",
   "ui.map_chat_chain_end_done_0": "已做完，共 {0} 輪。",
   "ui.map_chat_chain_end_no_progress": "這一輪沒有新進度，先停在這裡。",
+  "ui.map_chat_reply_format_rejected":
+    "這一輪 AI 送出的動作格式不符，被退回了，心智圖沒有變動。這一輪沒有完成；請再送一次，或一次只要求一部分。",
   "ui.map_chat_chain_end_max_rounds_0": "已跑滿 {0} 輪，先停在這裡。",
   "ui.map_chat_chain_end_max_rounds_more": "要繼續就說「繼續」。",
   "ui.map_chat_chain_end_research_failed": "研究沒有成功，所以沒有接著補子議題。",

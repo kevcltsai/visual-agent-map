@@ -234,6 +234,13 @@ test('A3 chain: a non-empty remaining opens the next round; "" ends as done; res
   assert.equal(chain.finishRound(at(1), roundEnd({ remaining: '', researchDeferred: 2 })).decision.kind, 'next');
   assert.equal(chain.finishRound(at(2), roundEnd({ remaining: '   ' })).decision.kind, 'end', 'blank is empty');
 });
+test('A3b chain: a reply whose actions were sent back by the format check and came back empty is no progress, never done', () => {
+  // ai-exchanges 985-986: round 1 selected cards and left the work; round 2's 57 actions failed the format check, the retry sent none and remaining "".
+  end(chain.finishRound(at(2, { remaining: 'add an evidence card to each skill' }), roundEnd({ remaining: '', actions: [], droppedOnRetry: true })), 'no_progress', 'add an evidence card to each skill');
+  end(chain.finishRound(at(1), roundEnd({ remaining: '', actions: [], droppedOnRetry: true })), 'no_progress', '');
+  // A retry that kept some actions is judged as before.
+  end(chain.finishRound(at(2), roundEnd({ remaining: '', droppedOnRetry: true })), 'done', '');
+});
 test('A4 chain no_progress: text only, everything skipped, or only view operations is no progress; any write is progress', () => {
   for (const [name, actions] of [['text only', []], ['all skipped', [{ kind: 'add_child', done: false }, { kind: 'delete_topic', done: false }]],
     ['view operations only', ['focus_topic', 'collapse_topic', 'expand_topic', 'auto_layout', 'ask_topic_kind'].map(kind => ({ kind, done: true }))],

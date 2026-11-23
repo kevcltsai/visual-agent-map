@@ -36980,7 +36980,26 @@ function outputSchemaFor(schema, open2) {
     if (key5 === IGNORE_EXTRA_FIELDS || open2 && marked && key5 === "additionalProperties") continue;
     out[key5] = outputSchemaFor(value, open2);
   }
+  if (!open2) strictRequired(out);
   return out;
+}
+function strictRequired(out) {
+  const properties = out.properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return;
+  const required = Array.isArray(out.required) ? out.required : [];
+  const missing = Object.keys(properties).filter((key5) => !required.includes(key5));
+  if (!missing.length) return;
+  const props = { ...properties };
+  for (const key5 of missing) props[key5] = nullable(props[key5]);
+  out.properties = props;
+  out.required = [...required, ...missing];
+}
+function nullable(schema) {
+  if (!schema || typeof schema !== "object") return schema;
+  const body = schema;
+  if (typeof body.type === "string") return { ...body, type: [body.type, "null"] };
+  if (Array.isArray(body.type)) return body.type.includes("null") ? body : { ...body, type: [...body.type, "null"] };
+  return { anyOf: [body, { type: "null" }] };
 }
 
 // ai/context-builder.ts

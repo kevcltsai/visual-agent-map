@@ -132,6 +132,16 @@ test('schema lists exactly the kinds and run actions, and every property is requ
   assert.equal(MAP_CHAT_ACTION_KINDS.length, 28);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
+  // Codex strict output: every object in the schema Codex gets, top level included, lists all its properties as required (a missing one is a 400).
+  const strict = (node, where) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.properties) assert.deepEqual(plain(node.required || []).sort(), Object.keys(node.properties).sort(), where);
+    for (const [key, child] of Object.entries(node.properties || {})) strict(child, `${where}.${key}`);
+    if (node.items) strict(node.items, `${where}[]`);
+  };
+  const { codexOutputSchema } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn() {} } });
+  strict(codexOutputSchema(MAP_CHAT_SCHEMA), 'schema');
+  assert.deepEqual(plain(codexOutputSchema(MAP_CHAT_SCHEMA).properties.progress.type), ['object', 'null'], 'an optional field is sent as null');
 });
 
 // ---- context builder ----

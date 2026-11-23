@@ -12,6 +12,7 @@
 import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImage, FoundImages } from "../../core/steps/book-pipeline/find-images";
+import type { ImageFit, ImageFitRequest } from "../../core/steps/book-pipeline/image-fit-check";
 import type {
   AiBookChapter,
   AiBookProofRequest,
@@ -538,6 +539,16 @@ export interface BookPipelinePorts {
     request: FindImagesRequest,
     run: { signal: AbortSignal; admission?: AdmissionContext }
   ): Promise<FoundImages>;
+  /**
+   * Production: `runImageFitCheck(aiCalls, request, run)`: one AI call that looks at one picture (`request.imageDataUrl`) and answers whether it
+   * shows what its position needs, plus a caption of what is visible. Absent (or no `fetchPicture`): non-Wikimedia candidates are placed unlooked.
+   */
+  lookAtImage?(request: ImageFitRequest, run: { signal: AbortSignal; admission?: AdmissionContext }): Promise<ImageFit>;
+  /**
+   * Production: downloads a candidate picture through `requestUrl` (https only, 8 MB, PNG/JPEG/GIF/WebP by its first bytes, 15 s), shrinks it for
+   * the model's image input and returns it as a data URL; undefined when refused or failed. Never writes to the vault.
+   */
+  fetchPicture?(url: string, model: string, signal: AbortSignal): Promise<string | undefined>;
   /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
   fetchCommons?: CommonsFetch;
   /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
@@ -918,6 +929,20 @@ function safeHref(raw: string): string | undefined {
     else if (c === ")" && --depth < 0) return undefined;
   }
   return depth === 0 ? href : undefined;
+}
+
+/** Pictures of at most this many non-Wikimedia candidates are looked at per chapter (one AI call each). */
+export const LOOKS_PER_CHAPTER = 3;
+/** A candidate on Wikimedia Commons (its file or its page): it keeps the file-page fit test and is never sent to be looked at. */
+function isCommonsCandidate(candidate: { imageUrl: string; sourceUrl: string }): boolean {
+  return [candidate.imageUrl, candidate.sourceUrl].some(raw => {
+    try {
+      const host = new URL(raw).hostname.toLowerCase();
+      return host === "upload.wikimedia.org" || host === "commons.wikimedia.org";
+    } catch {
+      return false;
+    }
+  });
 }
 
 type Resolve = (href: string) => string | undefined;
@@ -5305,12 +5330,107 @@ export class BookPipelineRuns {
       }
       return { ...from, bySlot };
     };
+    // Each loadable non-Commons body candidate (at most LOOKS_PER_CHAPTER a chapter, over both searches) is downloaded by the program (never saved)
+    // and looked at by one AI call: it fits (its caption becomes what the call saw) or it is held back like an unfit Commons file. A picture that
+    // cannot be fetched is dropped without a call; a call that fails leaves the candidate unlooked. Beyond the limit a candidate stays unchecked.
+    const lookedAt = new Set<string>();
+    const lookedFit = new Set<string>();
+    let looks = 0;
+    let looksUnfit = 0;
+    let looksDropped = 0;
+    const looksUnchecked = new Set<string>();
+    const lookRound = async (): Promise<void> => {
+      const ports = this.ports;
+      if (!ports.lookAtImage || !ports.fetchPicture) return;
+      for (const slot of slots) {
+        const list = perSlot.get(slot.index);
+        if (!list) continue;
+        const kept: ProbedCandidate[] = [];
+        let settled = false;
+        for (const item of list) {
+          const { candidate, href } = item;
+          if (settled || !href || !item.loaded || lookedAt.has(href) || taken(imageKey(href))) {
+            kept.push(item);
+            continue;
+          }
+          if (isCommonsCandidate(candidate)) {
+            // A Commons picture ahead of the others is the slot's pick: nothing after it is looked at.
+            settled = true;
+            kept.push(item);
+            continue;
+          }
+          if (looks >= LOOKS_PER_CHAPTER) {
+            looksUnchecked.add(href);
+            kept.push(item);
+            continue;
+          }
+          lookedAt.add(href);
+          const dataUrl = await untilAborted(signal, ports.fetchPicture(href, drive.config.imageModel, signal)).catch(
+            (error: unknown) => {
+              if (signal.aborted) throw error;
+              return undefined;
+            }
+          );
+          if (signal.aborted) throw new Error("aborted");
+          if (!dataUrl) {
+            looksDropped++;
+            continue;
+          }
+          looks++;
+          let fit: ImageFit | undefined;
+          try {
+            fit = await untilAborted(
+              signal,
+              ports.lookAtImage(
+                {
+                  ...this.base(drive, drive.config.imageModel),
+                  chapter: imageSearchText(first),
+                  kind: slot.kind,
+                  explains: slot.explains,
+                  imageDataUrl: dataUrl
+                },
+                { signal, admission: drive.admission }
+              )
+            );
+          } catch (error) {
+            if (isBudgetExhausted(error) || signal.aborted) throw error;
+          }
+          if (signal.aborted) throw new Error("aborted");
+          if (!fit) {
+            looksUnchecked.add(href);
+            kept.push(item);
+          } else if (fit.fits) {
+            settled = true;
+            lookedFit.add(`${slot.index}|${candidate.imageUrl}`);
+            kept.push(fit.caption ? { ...item, candidate: { ...candidate, caption: fit.caption } } : item);
+          } else {
+            looksUnfit++;
+            const held = heldUnfit.get(slot.index) ?? [];
+            if (!held.some(have => have.url === candidate.imageUrl))
+              heldUnfit.set(slot.index, [
+                ...held,
+                {
+                  url: candidate.imageUrl,
+                  source: candidate.sourceUrl,
+                  title: candidate.title,
+                  caption: candidate.caption,
+                  ...(candidate.description !== undefined ? { description: candidate.description } : {}),
+                  ...(candidate.author ? { author: candidate.author } : {}),
+                  ...(candidate.license ? { license: candidate.license } : {})
+                }
+              ]);
+          }
+        }
+        perSlot.set(slot.index, kept);
+      }
+    };
     try {
       const round1 = await search(asked, false, exclude);
       rounds.push(round1);
       keepHints(round1);
       const fit1 = await fitFound(round1);
       for (const [index, list] of await probeFound(asked, coverOnly(fit1))) perSlot.set(index, list);
+      await lookRound();
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
@@ -5327,6 +5447,7 @@ export class BookPipelineRuns {
         if (second) {
           for (const [index, list] of await probeFound(lacking, await fitFound(second)))
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+          await lookRound();
         }
       }
       // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
@@ -5445,7 +5566,8 @@ export class BookPipelineRuns {
       if (unfitKeys.has(`${slot.index}|${placed.imageUrl}`)) {
         off.add(slot.index);
         unfitPlaced++;
-      } else if (words.length && !wordHits(words, about)) off.add(slot.index);
+      } else if (words.length && !wordHits(words, about) && !lookedFit.has(`${slot.index}|${placed.imageUrl}`))
+        off.add(slot.index);
     }
     const release = (): void => {
       for (const key of claimed) drive.usedImages.delete(key);
@@ -5537,6 +5659,10 @@ export class BookPipelineRuns {
             ...(finderUnfit ? { finder_unfit: finderUnfit } : {}),
             ...(unfitPlaced ? { finder_unfit_placed: unfitPlaced } : {}),
             ...(finderUnchecked ? { finder_unchecked: finderUnchecked } : {}),
+            ...(looks ? { look: looks } : {}),
+            ...(looksUnfit ? { look_unfit: looksUnfit } : {}),
+            ...(looksDropped ? { look_dropped: looksDropped } : {}),
+            ...(looksUnchecked.size ? { look_unchecked: looksUnchecked.size } : {}),
             ...Object.fromEntries(
               rounds.flatMap((round, i) =>
                 round

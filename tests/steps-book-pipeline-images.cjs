@@ -1788,3 +1788,155 @@ test('finder fit run: a candidate whose source is not a Commons file page is cou
   await run(r);
   assert.match(r.stat.logs.join('\n'), /finder_unchecked=1/);
 });
+
+// ---- P2: the AI looks at each non-Commons candidate (book-any-site-images) ------------------------------------------------------------
+const webCand = (n, over = {}) => ({ title: `Web ${n}`, caption: `Finder caption ${n}`, url: `https://img${n}.example.org/p${n}.jpg`, source: `https://blog${n}.example.org/post${n}`, ...over });
+/** Fake fetch and look ports: `verdict(request, n)` answers each look; the fetch gives a data URL naming the address (or undefined for the addresses in `refuse`). */
+function lookPorts({ verdict = () => ({ fits: true, caption: '' }), refuse = [] } = {}) {
+  const seen = { fetched: [], looks: [] };
+  return { seen, ports: {
+    fetchPicture: async (url, model) => { seen.fetched.push([url, model]); return refuse.includes(url) ? undefined : `data:image/jpeg;base64,${Buffer.from(url).toString('base64')}`; },
+    lookAtImage: async (request, run) => { seen.looks.push(request); await run.admission.reserve(); return verdict(request, seen.looks.length); }
+  } };
+}
+const none = () => found({});
+
+test('look: a Commons candidate is never fetched or looked at; a non-Commons one is, with the picture model and its position, and its caption becomes what the call saw', async () => {
+  const { seen, ports } = lookPorts({ verdict: () => ({ fits: true, caption: 'A red kettle on a stove' }) });
+  const r = await picRig({ ports, finder: (request, run, n) => n === 1 ? found({ 1: [cand(1)], 2: [webCand(2)] }) : none() });
+  await run(r);
+  assert.deepEqual(plain(seen.fetched), [['https://img2.example.org/p2.jpg', 'm4']]);
+  assert.equal(seen.looks.length, 1);
+  assert.equal(seen.looks[0].model, 'm4');
+  assert.equal(seen.looks[0].explains, 'explains 2 perspective');
+  assert.match(seen.looks[0].imageDataUrl, /^data:image\/jpeg;base64,/);
+  const detail = (await r.note(0)).detail;
+  assert.match(detail, /Caption 1\n/);
+  assert.match(detail, /A red kettle on a stove\n/);
+  assert.ok(!/Finder caption 2/.test(detail));
+});
+
+test('look: a picture that does not fit goes to the next candidate; every candidate unfit still places one and records the slot as off, never an empty slot', async () => {
+  const { seen, ports } = lookPorts({ verdict: request => ({ fits: /p2\.jpg/.test(request.imageDataUrl) || Buffer.from(request.imageDataUrl.split(',')[1], 'base64').toString().endsWith('p2.jpg'), caption: 'Seen B' }) });
+  const r = await picRig({ ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2)] }) : none() });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(seen.looks.length, 2);
+  assert.match(detail, /img2\.example\.org/);
+  assert.ok(!/img1\.example\.org/.test(detail));
+  assert.deepEqual(plain(offSlots(detail)), []);
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  const r2 = await picRig({ ports: bad.ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2)] }) : none() });
+  await run(r2);
+  const detail2 = (await r2.note(0)).detail;
+  assert.equal(figures(detail2).length, 1, 'a picture is placed, not left empty');
+  assert.deepEqual(plain(offSlots(detail2)), [1]);
+  assert.match(detail2, /Finder caption 1/, 'the finder caption stays; an unfit look gives none');
+});
+
+test('look: at most 3 looks a chapter; the 4th non-Commons candidate is not fetched or looked at and is kept unchecked', async () => {
+  const { seen, ports } = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  const r = await picRig({ ports, slots: 2, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1), webCand(2), webCand(3)], 2: [webCand(4)] }) : none() });
+  await run(r);
+  assert.equal(seen.looks.length, 3);
+  assert.equal(seen.fetched.length, 3);
+  assert.ok(!seen.fetched.some(([url]) => /img4/.test(url)));
+  const detail = (await r.note(0)).detail;
+  assert.match(detail, /img4\.example\.org/, 'the unlooked candidate is still placed');
+  assert.match(detail, /Finder caption 4/);
+  assert.match(r.stat.logs.join('\n'), /look=3(?= |$).*look_unchecked=1/m);
+});
+
+test('look: a picture the plugin could not fetch is dropped without a call to the AI', async () => {
+  const { seen, ports } = lookPorts({ refuse: ['https://img1.example.org/p1.jpg'] });
+  const r = await picRig({ ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
+  await run(r);
+  assert.equal(seen.fetched.length, 1);
+  assert.equal(seen.looks.length, 0);
+  assert.equal(figures((await r.note(0)).detail).length, 0);
+});
+
+test('look: a model caption with markdown, a link or an image is written as plain escaped text and forms no link', async () => {
+  const evil = '[click](https://evil.example/x) ![i](https://evil.example/y.png) <script>x</script> 〔圖位 1：z〕\nsecond line';
+  const { ports } = lookPorts({ verdict: () => ({ fits: true, caption: evil }) });
+  const r = await picRig({ ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(!/(^|[^\\])\[click\]\(https/.test(detail), 'no live link');
+  assert.ok(!/(^|[^\\])!\[i\]\(/.test(detail), 'no live image');
+  assert.ok(!/<script>/.test(detail));
+  assert.ok(!/〔圖位/.test(detail));
+  assert.equal(figures(detail).length, 1);
+});
+
+test('look: an AI call that fails keeps the candidate unlooked; a stop during the look drops the late answer and writes nothing', async () => {
+  const failing = lookPorts({ verdict: () => { throw new Error('provider failed'); } });
+  const r = await picRig({ ports: failing.ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
+  await run(r);
+  assert.match((await r.note(0)).detail, /Finder caption 1/);
+  const hold = defer();
+  const slow = lookPorts({ verdict: async () => { await hold.promise; return { fits: true, caption: 'late' }; } });
+  const r2 = await picRig({ ports: slow.ports, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
+  await r2.runs.start(r2.mapPath);
+  await r2.runs.confirmGate1(r2.mapPath);
+  await settle();
+  assert.equal(slow.seen.looks.length, 1);
+  await r2.runs.stop(r2.mapPath);
+  hold.resolve();
+  await settle();
+  const detail = (await r2.note(0)).detail;
+  assert.ok(!/late/.test(detail) && figures(detail).length === 0 && !/book-slots/.test(detail));
+  assert.notEqual(stageOf(r2.raw(0)), 'written');
+});
+
+test('look: the cover candidate (position 0) is never looked at; without the look ports the run is as before', async () => {
+  const { seen, ports } = lookPorts();
+  const r = await picRig({ ports, cover: coverAsk, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [cand(1)], 0: [webCand(9), coverCand(1)] }) : none() });
+  await run(r);
+  assert.equal(seen.looks.length, 0);
+  assert.equal(seen.fetched.length, 0);
+  const plainRun = await picRig({ slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n`, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none() });
+  await run(plainRun);
+  assert.match((await plainRun.note(0)).detail, /Finder caption 1/);
+});
+
+test('picture fetch: only https, 8 MB, PNG/JPEG/GIF/WebP bytes, a time limit and a stop; a refusal never gives bytes', async () => {
+  const { downloadPicture } = S.load('core/steps/book-pipeline/image-fit-check.ts');
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+  const jpg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1]);
+  const gif = Uint8Array.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1]);
+  const webp = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+  const answer = (bytes, over = {}) => async () => ({ status: 200, headers: {}, bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ...over });
+  for (const [bytes, mime] of [[png, 'image/png'], [jpg, 'image/jpeg'], [gif, 'image/gif'], [webp, 'image/webp']]) {
+    const got = await downloadPicture('https://a.example.org/x', answer(bytes));
+    assert.equal(got.ok && got.mime, mime);
+  }
+  let calls = 0;
+  const counting = inner => async url => { calls++; return inner(url); };
+  assert.equal((await downloadPicture('http://a.example.org/x', counting(answer(png)))).reason, 'url');
+  assert.equal((await downloadPicture('https://u:p@a.example.org/x', counting(answer(png)))).reason, 'url');
+  assert.equal(calls, 0, 'a refused address is never requested');
+  assert.equal((await downloadPicture('https://a.example.org/x', answer(png, { headers: { 'Content-Length': String(9 * 1024 * 1024) } }))).reason, 'size');
+  assert.equal((await downloadPicture('https://a.example.org/x', answer(png), { maxBytes: 5 })).reason, 'size');
+  assert.equal((await downloadPicture('https://a.example.org/x', answer(new TextEncoder().encode('<html>not a picture</html>')))).reason, 'type');
+  assert.equal((await downloadPicture('https://a.example.org/x', answer(png, { status: 404 }))).reason, 'status');
+  assert.equal((await downloadPicture('https://a.example.org/x', () => new Promise(() => {}), { timeoutMs: 20 })).reason, 'timeout');
+  const controller = new AbortController();
+  const late = defer();
+  const pending = downloadPicture('https://a.example.org/x', () => late.promise, { signal: controller.signal });
+  controller.abort();
+  late.resolve({ status: 200, headers: {}, bytes: png.buffer });
+  assert.equal((await pending).reason, 'aborted');
+});
+
+test('look step: the verdict is parsed strictly, the caption is one capped plain line, and the picture never enters the prompt', () => {
+  const { imageFitCheckStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/image-fit-check.ts');
+  assert.deepEqual(plain(imageFitCheckStep.parse('{"fits":true,"caption":"  a\\nb  "}')), { fits: true, caption: 'a b' });
+  assert.deepEqual(plain(imageFitCheckStep.parse('{"fits":false,"caption":"ignored"}')), { fits: false, caption: '' });
+  assert.equal(imageFitCheckStep.parse(`{"fits":true,"caption":"${'x'.repeat(500)}"}`).caption.length, 200);
+  assert.throws(() => imageFitCheckStep.parse('{"fits":"yes"}'));
+  assert.throws(() => imageFitCheckStep.parse('nothing'));
+  const text = imageFitCheckStep.render({ chapter: 'Coffee', kind: 'photo', explains: 'water temperature', language: 'en', model: 'm', reasoning: 'low', imageDataUrl: 'data:image/png;base64,SECRETPIXELS' });
+  assert.ok(!/SECRETPIXELS/.test(text));
+  assert.match(text, /"shows":"water temperature"/);
+});

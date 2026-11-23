@@ -59,6 +59,7 @@ import { effectiveOrder, readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
+import { downloadPicture, runImageFitCheck } from "./core/steps/book-pipeline/image-fit-check";
 import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
 import { COMMONS_API } from "./core/book-pipeline/commons-search";
@@ -84,6 +85,7 @@ import {
   type Editor,
   normalizePath,
   requestUrl,
+  arrayBufferToBase64,
   Notice,
   Plugin,
   TFile,
@@ -915,6 +917,28 @@ export default class VisualAgentMapPlugin extends Plugin {
     aiFix: (request, run) => runAiFix(this.aiCalls, request, run),
     aiBookProof: (request, run) => runAiBookProof(this.aiCalls, request, run),
     findImages: (request, run) => runFindImages(this.aiCalls, request, run),
+    lookAtImage: (request, run) => runImageFitCheck(this.aiCalls, request, run),
+    // A candidate picture for the model to look at: https, 8 MB, PNG/JPEG/GIF/WebP, 15 s, shrunk to the model's image input. Held in memory only, never written to the vault.
+    fetchPicture: async (url, model, signal) => {
+      const picture = await downloadPicture(
+        url,
+        async address => {
+          const response = await requestUrl({ url: address, method: "GET", throw: false });
+          return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
+        },
+        { signal }
+      );
+      if (!picture.ok) return undefined;
+      try {
+        return await fitImageForInput(
+          `data:${picture.mime};base64,${arrayBufferToBase64(picture.bytes.buffer as ArrayBuffer)}`,
+          this.aiCalls.capabilitiesFor(model).imageInput,
+          signal
+        );
+      } catch {
+        return undefined;
+      }
+    },
     // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
     fetchCommons: async url => {
       if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");

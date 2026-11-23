@@ -436,6 +436,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-image-fit-check.en": {
+      "builder": "core/steps/book-pipeline/image-fit-check.ts imageFitCheckStep",
+      "language": "en",
+      "schema": false
+    },
+    "book-image-fit-check.zh": {
+      "builder": "core/steps/book-pipeline/image-fit-check.ts imageFitCheckStep",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "book-image-fit-check.zh-CN": {
+      "builder": "core/steps/book-pipeline/image-fit-check.ts imageFitCheckStep",
+      "language": "zh-CN",
+      "schema": false
+    },
     "book-plan-edit.en": {
       "builder": "core/steps/book-pipeline/plan-edit.ts planEditStep",
       "language": "en",

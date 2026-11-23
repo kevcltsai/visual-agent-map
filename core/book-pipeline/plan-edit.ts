@@ -4,7 +4,7 @@
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import { isPlaceholder } from "../note-placeholder";
-import { isUntouched, mayRewriteRaw } from "./body-integrity";
+import { mayRewriteRaw } from "./body-integrity";
 import {
   composeCardPrompt,
   parseCardCover,
@@ -274,7 +274,7 @@ export async function writePlanEdits(
     if (above === undefined || !abovePath || !ownPath) continue;
     if (!authorize()) return { written, cancelled: true };
     const raw = await ports.readCard(abovePath);
-    if (!isUntouched(raw.detail)) continue;
+    if (!mayRewriteRaw(raw.raw)) continue;
     const covers = coversText(parseCardPrompt((await ports.readCard(ownPath)).prompt).covers ?? "").trim();
     const prompt = covers
       ? rewriteNeighbourLine(

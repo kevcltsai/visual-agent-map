@@ -337,7 +337,6 @@ import {
   integrityFpRaw,
   isKept,
   isKeptRaw,
-  isUntouched,
   mayRewriteRaw,
   programStamp,
   programStampRaw,
@@ -2198,7 +2197,7 @@ export class BookPipelineRuns {
         const info = id === undefined ? undefined : drive.cards.get(id);
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
-        if (!isUntouched(raw.detail)) continue;
+        if (!mayRewriteRaw(raw.raw)) continue;
         // A `previous` line's sentence is the plan's own (the earlier ideas the card stands on), so it is kept; only a `next` line is rewritten.
         const prompt = (key === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
           raw.prompt,
@@ -4272,7 +4271,9 @@ export class BookPipelineRuns {
         card => card.raw,
         () => undefined
       );
-      if (raw === undefined || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
+      // The text's owner alone: a one-time permit or the card's own rerun opens only that rewrite, never a structure change (the same
+      // rule as the chat card's lock).
+      if (raw === undefined || !mayRewriteRaw(raw)) locked.add(id);
     }
     return locked;
   }

@@ -3366,6 +3366,23 @@ test('T12 neighbours, open items: an untouched neighbour with an AIM open-items 
   assert.equal((await promptLine(r, 1, '下一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'left neighbour follows');
 });
 
+// 章節文字歸屬: the neighbour line follows the same rule as any rewrite of the card (text-ownership-fixes 02).
+test('T12 neighbours: a neighbour the reader kept is not touched; an older-build chapter (no fingerprint, written stage) follows', async () => {
+  const r = await neighbourRig();
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+  const keptLine = await promptLine(r, 1, '下一章');
+  await rerun(r, 2);
+  assert.equal(await promptLine(r, 1, '下一章'), keptLine, 'the kept neighbour keeps its line');
+  const old = await neighbourRig();
+  const plain = raw => raw.replace(/(<!-- visual-agent-map:detail:start -->\n)[\s\S]*?(\n<!-- visual-agent-map:detail:end -->)/, '$1舊版寫好的正文。$2');
+  await old.repo.updateNoteRawGuarded(old.nodes[1].path, plain, {});
+  assert.equal(readBodyRecord((await old.note(1)).detail), undefined, 'no fingerprint record');
+  assert.equal(bodyStateRaw(old.raw(1)), 'clean', 'the written/checked stage vouches for it');
+  await rerun(old, 2);
+  assert.equal(await promptLine(old, 1, '下一章'), '(2) SecretTitleB — NEWCOVERS 3', 'the older-build neighbour follows');
+});
+
 test('T12 neighbours: a neighbour whose text the reader edited by hand is not touched; its seam is still marked; running the rewrite again changes nothing', async () => {
   const r = await neighbourRig();
   await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${(await r.note(1)).detail}\nreader added this line` }, {});

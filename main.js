@@ -29898,10 +29898,6 @@ function vouched(detail, cardDetail) {
   const fp = (_a2 = readBodyRecord(detail)) == null ? void 0 : _a2.fp;
   return fp ? fp === integrityFp(detail) : !!integrityText(detail) && oldNoteLooksUntouched(detail, cardDetail);
 }
-var isUntouched = (detail) => {
-  const state = bodyState(detail);
-  return state === "clean" || state === "empty";
-};
 var isKept = (detail) => {
   const record = readBodyRecord(detail);
   return !!(record == null ? void 0 : record.kept) && record.kept === integrityFp(detail);
@@ -52142,7 +52138,7 @@ async function writePlanEdits(ports, write) {
     if (above === void 0 || !abovePath || !ownPath) continue;
     if (!authorize()) return { written: written2, cancelled: true };
     const raw = await ports.readCard(abovePath);
-    if (!isUntouched(raw.detail)) continue;
+    if (!mayRewriteRaw(raw.raw)) continue;
     const covers = coversText((_a2 = parseCardPrompt((await ports.readCard(ownPath)).prompt).covers) != null ? _a2 : "").trim();
     const prompt = covers ? rewriteNeighbourLine(
       raw.prompt,
@@ -58467,7 +58463,7 @@ var BookPipelineRuns = class {
         const info = id === void 0 ? void 0 : drive.cards.get(id);
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
-        if (!isUntouched(raw.detail)) continue;
+        if (!mayRewriteRaw(raw.raw)) continue;
         const prompt = (key4 === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
           raw.prompt,
           key4,
@@ -60326,7 +60322,7 @@ var BookPipelineRuns = class {
         (card) => card.raw,
         () => void 0
       );
-      if (raw === void 0 || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
+      if (raw === void 0 || !mayRewriteRaw(raw)) locked.add(id);
     }
     return locked;
   }
@@ -87179,7 +87175,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const file = this.app.vault.getAbstractFileByPath(node.path);
       const raw = file instanceof import_obsidian39.TFile ? await this.app.vault.read(file).catch(() => null) : null;
       if (raw !== null) {
-        if (!mayRewriteRaw(raw)) {
+        if (!mayRewriteRaw(raw, { rerun: true })) {
           this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
           this.bookBarFocus = "rerun-go";
           return;

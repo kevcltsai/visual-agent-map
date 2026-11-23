@@ -307,7 +307,7 @@ export async function applyBookStructureEdit(
     return skip("ui.map_chat_skip_book_started");
   const input = { rootId: plan.nodes[0].id, nodes: plan.nodes };
   const ops = chatStructureOps(action.items, input, Date.now().toString(36));
-  // Only what the card showed as applicable goes to the runner (the card's lock rule and the runner's can differ).
+  // Only what the card showed as applicable goes to the runner (same lock rule, but a card can be edited between the card and Apply).
   const locked = new Set(plan.nodes.map(node => node.id).filter(id => !plan.unlocked.includes(id)));
   const sim = simulateStructure(input, ops, locked);
   const titleOf = (id: string): string => plan.nodes.find(node => node.id === id)?.title || id;

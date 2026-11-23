@@ -59,6 +59,44 @@ test('an id already embedded in the existing note survives a rewrite; a new un-o
   assert.equal(out, `Rewritten\n![](https://www.youtube.com/watch?v=${B})\n`);
   assert.equal(keepOpenedVideoEmbeds(`![](https://www.youtube.com/watch?v=${B})`, [], ''), '');
 });
+const W = id => `![](https://www.youtube.com/watch?v=${id})`;
+test('HTML embeds: iframe, embed and object with a YouTube src follow the same rule (kept as the one form, or removed)', () => {
+  const opened = [`https://www.youtube.com/watch?v=${A}`];
+  const iframe = id => `<iframe width="560" height="315" src="https://www.youtube.com/embed/${id}" frameborder="0" allowfullscreen></iframe>`;
+  assert.equal(keep(`a\n${iframe(A)}\nb`, opened), `a\n${W(A)}\nb`);
+  assert.equal(keep(`a\n${iframe(B)}\nb`, opened), 'a\nb');
+  assert.equal(keep(`a\n<embed src='https://youtu.be/${B}'>\nb`, opened), 'a\nb');
+  assert.equal(keep(`<object data=https://www.youtube.com/v/${B}></object>`, opened), '');
+  assert.equal(keep(`<iframe src="//www.youtube.com/embed/${B}"></iframe>`, opened), '');
+  assert.equal(keep(`<iframe\n  width="1"\n  src="https://www.youtube.com/embed/${B}"\n></iframe>\nafter`, opened), 'after', 'a tag over several lines');
+  assert.equal(keep(`<IFRAME SRC="https://www.youtube-nocookie.com/embed/${A}"></IFRAME>`, opened), '', 'a look-alike host');
+  assert.equal(keep(`x <iframe src="https://www.youtube.com/embed/${B}"></iframe> y`, opened), 'x  y');
+  const other = '<iframe src="https://example.org/page"></iframe>';
+  assert.equal(keep(other, opened), other, 'an iframe of another host is untouched');
+  assert.equal(keepOpenedVideoEmbeds(`<iframe src="https://www.youtube.com/embed/${B}"></iframe>`, [], `![](https://youtu.be/${B})`), W(B), 'already in the existing note');
+});
+test('reference definitions used by an image: kept rewritten when allowed, else the definition and its uses go', () => {
+  const opened = [`https://www.youtube.com/watch?v=${A}`];
+  assert.equal(keep(`See ![demo][v]\n\n[v]: https://youtu.be/${A} "t"\n`, opened), `See ![demo][v]\n\n[v]: https://www.youtube.com/watch?v=${A} "t"\n`);
+  assert.equal(keep(`See\n![demo][v]\n\n[v]: https://youtu.be/${B}\n`, opened), 'See\n\n');
+  assert.equal(keep(`![][V]\n[v]: <https://youtu.be/${B}>`, opened), '', 'labels are case-insensitive');
+  assert.equal(keep(`![v][]\n![v]\n[v]: https://youtu.be/${B}`, opened), '', 'collapsed and shortcut');
+  assert.equal(keep(`![x][v]\n[v]: https://youtube.com.evil.example/watch?v=${A}`, opened), '', 'a look-alike host');
+  const link = `[watch][v]\n\n[v]: https://youtu.be/${B}`;
+  assert.equal(keep(link, opened), link, 'a definition only a plain link uses stays');
+  const plain = '![x][p]\n[p]: https://example.org/a.png';
+  assert.equal(keep(plain, opened), plain, 'an image definition of another host');
+  const fenced = '```\n![x][v]\n[v]: https://youtu.be/' + B + '\n```';
+  assert.equal(keep(fenced, opened), fenced, 'fences stay');
+  assert.equal(keep(`![x][v]\r\n[v]: https://youtu.be/${B}\r\nend`, opened), 'end', 'CRLF');
+});
+test('a list item whose whole content was a removed embed goes with its marker; other items stay', () => {
+  assert.equal(keep(`- one\n- ![](https://youtu.be/${B})\n- two`, []), '- one\n- two');
+  assert.equal(keep(`1. ![](https://youtu.be/${B})\n2. two`, []), '2. two');
+  assert.equal(keep(`  * <iframe src="https://youtu.be/${B}"></iframe>\n  * two`, []), '  * two');
+  assert.equal(keep(`- see ![](https://youtu.be/${B})\n- two`, []), '- see\n- two', 'an item with text stays');
+  assert.equal(keep(`- ![](https://youtu.be/${A})`, [`https://youtu.be/${A}`]), `- ${W(A)}`, 'a kept item stays');
+});
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
   assert.match(source, /opened: countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]/);

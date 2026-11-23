@@ -60,6 +60,7 @@ import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
 import { downloadPicture, runImageFitCheck } from "./core/steps/book-pipeline/image-fit-check";
+import { createPictureFetch } from "./experiences/visual-map/picture-transport";
 import { runDrawDiagrams } from "./core/steps/book-pipeline/draw-diagrams";
 import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
@@ -396,6 +397,9 @@ interface PendingRename {
 }
 /** The plugin's public repository page (the README's address): the contact part of the Wikimedia User-Agent. */
 const PUBLIC_REPO_URL = "https://github.com/kevcltsai/visual-agent-map";
+
+/** One transport for every picture look: Node https, no automatic redirect, no private address (see picture-transport.ts). */
+const pictureFetch = createPictureFetch();
 
 export default class VisualAgentMapPlugin extends Plugin {
   /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -919,16 +923,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     aiBookProof: (request, run) => runAiBookProof(this.aiCalls, request, run),
     findImages: (request, run) => runFindImages(this.aiCalls, request, run),
     lookAtImage: (request, run) => runImageFitCheck(this.aiCalls, request, run),
-    // A candidate picture for the model to look at: https, 8 MB, PNG/JPEG/GIF/WebP, 15 s, shrunk to the model's image input. Held in memory only, never written to the vault.
+    // A candidate picture for the model to look at: https over Node (no silent redirect, no private address), 8 MB cap while streaming, PNG/JPEG/GIF/WebP, 15 s, shrunk to the model's image input. Held in memory only, never written to the vault.
     fetchPicture: async (url, model, signal) => {
-      const picture = await downloadPicture(
-        url,
-        async (address, method) => {
-          const response = await requestUrl({ url: address, method: method ?? "GET", throw: false });
-          return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
-        },
-        { signal }
-      );
+      const picture = await downloadPicture(url, pictureFetch, { signal });
       if (!picture.ok) return undefined;
       try {
         return await fitImageForInput(

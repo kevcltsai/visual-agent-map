@@ -4034,11 +4034,12 @@ test('worst-case calls with picture search: every step uses its whole allowance 
   const counted = new Map();
   for (const variant of ['plain', 'cover', 'cover-bare-root']) {
   const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n`;
-  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }];
+  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'chart', explains: 'a port', anchor: 'end' }];
   for (const titles of [['R', 'A'], ['R', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']]) {
     const seen = new Set();
     const author = [];
     let imageCalls = 0;
+    let diagramCalls = 0;
     let coverAsked = 0;
     let picked = 0;
     const holder = {};
@@ -4070,29 +4071,31 @@ test('worst-case calls with picture search: every step uses its whole allowance 
           return { bySlot: new Map([[1, list]]), found: 3, offTopic: 0 };
         },
         fetchPicture: async url => `data:image/jpeg;base64,${Buffer.from(url).toString('base64')}`,
-        lookAtImage: async (request, run) => { imageCalls++; await run.admission.reserve(); return { fits: false, caption: '' }; }
+        lookAtImage: async (request, run) => { imageCalls++; await run.admission.reserve(); return { fits: false, caption: '' }; },
+        // The diagram drawing: one call for every chapter whose diagram slots stay empty (it draws nothing here, the call is what is counted).
+        drawDiagrams: async (request, run) => { diagramCalls++; await run.admission.reserve(); return []; }
       }
     });
     holder.r = r;
     await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
     await finishAi(r);
     const s = await r.state();
-    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls;
+    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls + diagramCalls;
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 19 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 19 per card (3 of them picture looks); the covers add nothing');
+    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 20 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 20 per card (3 of them picture looks, 1 the diagram drawing); the covers add nothing');
     counted.set(`${variant}:${titles.length}`, calls);
     if (variant === 'cover-bare-root') {
       assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
       assert.ok(calls <= estimate, `${titles.length} cards, bare root: ${calls} calls within the estimate ${estimate}`);
-      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 - 3 + 2, 'the bare root swaps its own picture searches and looks (none: no slots) for the one cover search with its language retry');
+      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 - 3 - 1 + 2, 'the bare root swaps its own picture searches, looks and diagram drawing (none: no slots) for the one cover search with its language retry');
     } else {
       assert.equal(calls, estimate, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none: the real maximum is the estimate`);
       assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');
     }
     assert.ok(calls <= estimate && calls <= 300);
-    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 197);
+    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 207);
   }
   }
 });

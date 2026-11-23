@@ -90,16 +90,34 @@ export const PICTURE_MAX_BYTES = 8 * 1024 * 1024;
 export const PICTURE_TIMEOUT_MS = 15_000;
 export type PictureFailure = "url" | "status" | "size" | "type" | "timeout" | "aborted" | "failed";
 export type PictureDownload = { ok: true; bytes: Uint8Array; mime: string } | { ok: false; reason: PictureFailure };
-/** `finalUrl`, when the transport can tell it (after redirects), is re-checked with the same host rule. */
+/** What a transport says when it refuses or cannot finish a download: the reason the caller reports. */
+export class PictureFetchError extends Error {
+  constructor(readonly reason: PictureFailure) {
+    super(reason);
+    this.name = "PictureFetchError";
+  }
+}
+/** The reason a transport error carries ("failed" for any other error). Matched by name so a copy of the class from another bundle still counts. */
+export function pictureFailureOf(error: unknown): PictureFailure {
+  const named = error as { name?: unknown; reason?: unknown } | null;
+  return typeof named === "object" && named !== null && named.name === "PictureFetchError"
+    ? (named.reason as PictureFailure)
+    : "failed";
+}
+/**
+ * One GET of a picture. The transport owns the network rules: it follows no redirect on its own (at most 3 by hand, each address checked with
+ * {@link isPublicPictureHost}), refuses a host that resolves to a private address, stops reading and destroys the connection as soon as the
+ * body passes `maxBytes` or `signal` aborts, and throws a {@link PictureFetchError} for what it refused. A non-200 answer is returned, not thrown.
+ */
 export type PictureFetch = (
   url: string,
-  method?: "HEAD"
-) => Promise<{ status: number; headers?: Record<string, string>; bytes: ArrayBuffer; finalUrl?: string }>;
+  options: { signal: AbortSignal; maxBytes: number }
+) => Promise<{ status: number; headers?: Record<string, string>; bytes: ArrayBuffer }>;
 
 /**
  * A host a candidate picture may come from: a public-looking DNS name. Refused: IP literals (IPv4, IPv6, bracketed), localhost, *.localhost,
- * *.local, *.internal and single-label names. Limitation: a public name that resolves to a private address is not caught here (requestUrl
- * gives no resolver hook), and requestUrl does not report redirects, so a redirect to a private host is only caught when `finalUrl` is given.
+ * *.local, *.internal and single-label names. A public name that resolves to a private address, and a redirect to a refused host, are the
+ * transport's to refuse (see {@link PictureFetch}); this check is the name rule both use.
  */
 export function isPublicPictureHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, "");
@@ -107,6 +125,11 @@ export function isPublicPictureHost(hostname: string): boolean {
   if (/^[0-9.]+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) return false;
   if (!host.includes(".")) return false;
   return !(host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"));
+}
+
+/** A picture address the program may request: https, no credentials, a public-looking host. */
+export function isPicturePublicUrl(url: URL): boolean {
+  return url.protocol === "https:" && !url.username && !url.password && isPublicPictureHost(url.hostname);
 }
 
 /** The image type by its first bytes: PNG, JPEG, WebP (see sniffImageMime) or GIF; undefined for anything else (SVG, HTML, a short body). */
@@ -117,8 +140,9 @@ function sniffPictureMime(bytes: Uint8Array): string | undefined {
 
 /**
  * Downloads one candidate picture for the model to look at; the bytes are only held in memory, never saved. The fetch is injected (production:
- * `requestUrl`, which cannot be aborted, so an answer that arrives after an abort or the timeout is dropped). Order: https without credentials,
- * status 200, content-length, real size, first bytes are PNG/JPEG/GIF/WebP.
+ * the Node https transport of experiences/visual-map/picture-transport.ts, which enforces the size cap while streaming and the redirect and
+ * address rules). Order: https without credentials, status 200, content-length, real size, first bytes are PNG/JPEG/GIF/WebP. The timeout and
+ * `options.signal` abort the transport's connection.
  */
 export async function downloadPicture(
   url: string,
@@ -128,60 +152,47 @@ export async function downloadPicture(
   const { signal } = options;
   const max = options.maxBytes ?? PICTURE_MAX_BYTES;
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !isPublicPictureHost(parsed.hostname))
-      return { ok: false, reason: "url" };
+    if (!isPicturePublicUrl(new URL(url))) return { ok: false, reason: "url" };
   } catch {
     return { ok: false, reason: "url" };
   }
   if (signal?.aborted) return { ok: false, reason: "aborted" };
+  const connection = new AbortController();
   let onAbort = (): void => undefined;
   let timer: number | undefined;
   const stop = new Promise<PictureDownload>(resolve => {
-    onAbort = () => resolve({ ok: false, reason: "aborted" });
+    onAbort = () => {
+      connection.abort();
+      resolve({ ok: false, reason: "aborted" });
+    };
     signal?.addEventListener("abort", onAbort, { once: true });
-    timer = window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), options.timeoutMs ?? PICTURE_TIMEOUT_MS);
+    timer = window.setTimeout(() => {
+      connection.abort();
+      resolve({ ok: false, reason: "timeout" });
+    }, options.timeoutMs ?? PICTURE_TIMEOUT_MS);
   });
   try {
-    const lengthOf = (headers?: Record<string, string>): number =>
-      Number(Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === "content-length")?.[1]);
-    const redirected = (finalUrl?: string): boolean => {
-      if (!finalUrl) return false;
-      try {
-        return !isPublicPictureHost(new URL(finalUrl).hostname);
-      } catch {
-        return true;
-      }
-    };
-    // Headers first: requestUrl cannot stop a download midway, so an oversize picture is refused before any byte comes.
-    // A HEAD that fails or says nothing about the size is not a verdict; the GET below is judged as ever.
-    const probe = await Promise.race([
-      fetch(url, "HEAD").catch((): PictureDownload => ({ ok: false, reason: "failed" })),
-      stop
-    ]);
-    if (signal?.aborted) return { ok: false, reason: "aborted" };
-    if ("ok" in probe) {
-      if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
-    } else {
-      if (redirected(probe.finalUrl)) return { ok: false, reason: "url" };
-      if (probe.status === 200 && lengthOf(probe.headers) > max) return { ok: false, reason: "size" };
-    }
     const response = await Promise.race([
-      fetch(url).catch((): PictureDownload => ({ ok: false, reason: "failed" })),
+      fetch(url, { signal: connection.signal, maxBytes: max }).catch((error: unknown): PictureDownload => ({
+        ok: false,
+        reason: pictureFailureOf(error)
+      })),
       stop
     ]);
     // The fetch may answer in the same turn as an abort: the abort wins, the bytes are dropped.
     if (signal?.aborted) return { ok: false, reason: "aborted" };
     if ("ok" in response) return response;
-    if (redirected(response.finalUrl)) return { ok: false, reason: "url" };
     if (response.status !== 200) return { ok: false, reason: "status" };
-    const length = lengthOf(response.headers);
+    const length = Number(
+      Object.entries(response.headers ?? {}).find(([name]) => name.toLowerCase() === "content-length")?.[1]
+    );
     if ((Number.isFinite(length) && length > max) || response.bytes.byteLength > max)
       return { ok: false, reason: "size" };
     const bytes = new Uint8Array(response.bytes);
     const mime = sniffPictureMime(bytes);
     return mime ? { ok: true, bytes, mime } : { ok: false, reason: "type" };
   } finally {
+    connection.abort();
     if (timer !== undefined) window.clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
   }

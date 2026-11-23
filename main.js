@@ -76279,6 +76279,7 @@ function bookChapterCalls() {
     write: writes + BOOK_EXPAND_PASSES,
     images: BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
     look: LOOKS_PER_CHAPTER,
+    diagram: 1,
     proof: writes,
     aiProof: 1 + 2 * MAX_AI_FIX_ROUNDS
   };
@@ -76300,13 +76301,13 @@ function bookStartEstimate(cards, trialCards, models) {
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
   const aiProof = time("proof") + MAX_AI_FIX_ROUNDS * (time("write") + time("proof"));
-  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + LOOKS_PER_CHAPTER * time("images") + BOOK_EXPAND_PASSES * time("write") + aiProof;
+  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + LOOKS_PER_CHAPTER * time("images") + per.diagram * time("write") + BOOK_EXPAND_PASSES * time("write") + aiProof;
   const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
-    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.look + per.proof + per.aiProof),
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.look + per.diagram + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
@@ -101950,6 +101951,17 @@ async function runImageFitCheck(aiCalls, request, run) {
 }
 var PICTURE_MAX_BYTES = 8 * 1024 * 1024;
 var PICTURE_TIMEOUT_MS = 15e3;
+var PictureFetchError = class extends Error {
+  constructor(reason) {
+    super(reason);
+    this.reason = reason;
+    this.name = "PictureFetchError";
+  }
+};
+function pictureFailureOf(error) {
+  const named = error;
+  return typeof named === "object" && named !== null && named.name === "PictureFetchError" ? named.reason : "failed";
+}
 function isPublicPictureHost(hostname) {
   const host = hostname.toLowerCase().replace(/\.$/, "");
   if (!host || host.startsWith("[") || host.includes(":")) return false;
@@ -101957,72 +101969,194 @@ function isPublicPictureHost(hostname) {
   if (!host.includes(".")) return false;
   return !(host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal"));
 }
+function isPicturePublicUrl(url) {
+  return url.protocol === "https:" && !url.username && !url.password && isPublicPictureHost(url.hostname);
+}
 function sniffPictureMime(bytes) {
   const gif = bytes.length >= 6 && [71, 73, 70, 56].every((byte, i) => bytes[i] === byte);
   return gif ? "image/gif" : sniffImageMime(bytes);
 }
 async function downloadPicture(url, fetch, options = {}) {
-  var _a2;
+  var _a2, _b2, _c;
   const { signal } = options;
   const max = (_a2 = options.maxBytes) != null ? _a2 : PICTURE_MAX_BYTES;
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !isPublicPictureHost(parsed.hostname))
-      return { ok: false, reason: "url" };
+    if (!isPicturePublicUrl(new URL(url))) return { ok: false, reason: "url" };
   } catch (e) {
     return { ok: false, reason: "url" };
   }
   if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
+  const connection = new AbortController();
   let onAbort = () => void 0;
   let timer;
   const stop = new Promise((resolve) => {
     var _a3;
-    onAbort = () => resolve({ ok: false, reason: "aborted" });
+    onAbort = () => {
+      connection.abort();
+      resolve({ ok: false, reason: "aborted" });
+    };
     signal == null ? void 0 : signal.addEventListener("abort", onAbort, { once: true });
-    timer = window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), (_a3 = options.timeoutMs) != null ? _a3 : PICTURE_TIMEOUT_MS);
+    timer = window.setTimeout(() => {
+      connection.abort();
+      resolve({ ok: false, reason: "timeout" });
+    }, (_a3 = options.timeoutMs) != null ? _a3 : PICTURE_TIMEOUT_MS);
   });
   try {
-    const lengthOf2 = (headers) => {
-      var _a3;
-      return Number((_a3 = Object.entries(headers != null ? headers : {}).find(([name2]) => name2.toLowerCase() === "content-length")) == null ? void 0 : _a3[1]);
-    };
-    const redirected = (finalUrl) => {
-      if (!finalUrl) return false;
-      try {
-        return !isPublicPictureHost(new URL(finalUrl).hostname);
-      } catch (e) {
-        return true;
-      }
-    };
-    const probe = await Promise.race([
-      fetch(url, "HEAD").catch(() => ({ ok: false, reason: "failed" })),
-      stop
-    ]);
-    if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
-    if ("ok" in probe) {
-      if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
-    } else {
-      if (redirected(probe.finalUrl)) return { ok: false, reason: "url" };
-      if (probe.status === 200 && lengthOf2(probe.headers) > max) return { ok: false, reason: "size" };
-    }
     const response = await Promise.race([
-      fetch(url).catch(() => ({ ok: false, reason: "failed" })),
+      fetch(url, { signal: connection.signal, maxBytes: max }).catch((error) => ({
+        ok: false,
+        reason: pictureFailureOf(error)
+      })),
       stop
     ]);
     if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
     if ("ok" in response) return response;
-    if (redirected(response.finalUrl)) return { ok: false, reason: "url" };
     if (response.status !== 200) return { ok: false, reason: "status" };
-    const length = lengthOf2(response.headers);
+    const length = Number(
+      (_c = Object.entries((_b2 = response.headers) != null ? _b2 : {}).find(([name2]) => name2.toLowerCase() === "content-length")) == null ? void 0 : _c[1]
+    );
     if (Number.isFinite(length) && length > max || response.bytes.byteLength > max)
       return { ok: false, reason: "size" };
     const bytes = new Uint8Array(response.bytes);
     const mime = sniffPictureMime(bytes);
     return mime ? { ok: true, bytes, mime } : { ok: false, reason: "type" };
   } finally {
+    connection.abort();
     if (timer !== void 0) window.clearTimeout(timer);
     signal == null ? void 0 : signal.removeEventListener("abort", onAbort);
   }
+}
+
+// experiences/visual-map/picture-transport.ts
+var import_node_dns = require("node:dns");
+var import_node_https = require("node:https");
+var PICTURE_MAX_REDIRECTS = 3;
+var REDIRECT_STATUS = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
+function privateIpv4(a, b) {
+  return a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 192 && b === 0;
+}
+function ipv6Groups2(address) {
+  let text11 = address.split("%")[0].toLowerCase();
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text11);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number);
+    if ([a, b, c, d].some((n) => n > 255)) return void 0;
+    text11 = `${text11.slice(0, dotted.index)}${(a << 8 | b).toString(16)}:${(c << 8 | d).toString(16)}`;
+  }
+  const halves = text11.split("::");
+  if (halves.length > 2) return void 0;
+  const side = (part) => part ? part.split(":") : [];
+  const head2 = side(halves[0]);
+  const tail = halves.length === 2 ? side(halves[1]) : [];
+  if (halves.length === 1 && head2.length !== 8) return void 0;
+  if (halves.length === 2 && head2.length + tail.length > 7) return void 0;
+  const groups = [...head2, ...Array(8 - head2.length - tail.length).fill("0"), ...tail].map(
+    (g) => /^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN
+  );
+  return groups.length === 8 && groups.every((g) => !Number.isNaN(g)) ? groups : void 0;
+}
+function isPrivateAddress(address) {
+  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(address);
+  if (v4) {
+    const parts = v4.slice(1).map(Number);
+    return parts.some((n) => n > 255) || privateIpv4(parts[0], parts[1]);
+  }
+  const g = ipv6Groups2(address);
+  if (!g) return true;
+  if (g.every((n) => n === 0) || g.slice(0, 7).every((n) => n === 0) && g[7] === 1) return true;
+  if ((g[0] & 65024) === 64512 || (g[0] & 65472) === 65152 || (g[0] & 65280) === 65280) return true;
+  const embedded = () => privateIpv4(g[6] >> 8, g[6] & 255) || g[6] === 0 && g[7] === 0;
+  if (g.slice(0, 5).every((n) => n === 0) && (g[5] === 65535 || g[5] === 0)) return embedded();
+  if (g[0] === 100 && g[1] === 65435 && g.slice(2, 6).every((n) => n === 0)) return embedded();
+  return false;
+}
+function createSafeLookup(resolve = import_node_dns.lookup) {
+  return (host, options, done) => {
+    resolve(host, { ...options, all: true }, (error, addresses) => {
+      if (error) return done(error);
+      if (!addresses.length || addresses.some((item) => isPrivateAddress(item.address)))
+        return done(new PictureFetchError("url"));
+      if (options.all) return done(null, addresses);
+      done(null, addresses[0].address, addresses[0].family);
+    });
+  };
+}
+function hop(url, request, lookup, signal, maxBytes) {
+  return new Promise((resolve, reject2) => {
+    let finish = (settle) => settle();
+    const fail4 = (reason, req2) => finish(() => {
+      req2 == null ? void 0 : req2.destroy();
+      reject2(new PictureFetchError(reason));
+    });
+    const req = request(
+      url,
+      {
+        method: "GET",
+        lookup,
+        headers: { Accept: "image/*", "Accept-Encoding": "identity" }
+      },
+      (res) => {
+        var _a2;
+        const status = (_a2 = res.statusCode) != null ? _a2 : 0;
+        const location = res.headers.location;
+        if (REDIRECT_STATUS.has(status) && typeof location === "string") {
+          res.resume();
+          return finish(() => resolve({ redirect: location }));
+        }
+        const length = Number(res.headers["content-length"]);
+        if (status === 200 && Number.isFinite(length) && length > maxBytes) return fail4("size", req);
+        const chunks = [];
+        let total2 = 0;
+        res.on("data", (chunk) => {
+          total2 += chunk.length;
+          if (total2 > maxBytes) return fail4("size", req);
+          chunks.push(chunk);
+        });
+        res.on("end", () => {
+          const bytes = new Uint8Array(total2);
+          let at = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, at);
+            at += chunk.length;
+          }
+          const headers = {};
+          for (const [name2, value] of Object.entries(res.headers)) if (typeof value === "string") headers[name2] = value;
+          finish(() => resolve({ status, headers, bytes: bytes.buffer }));
+        });
+        res.on("error", () => fail4("failed", req));
+        res.on("aborted", () => fail4("failed", req));
+      }
+    );
+    const onAbort = () => fail4("aborted", req);
+    finish = (settle) => {
+      signal.removeEventListener("abort", onAbort);
+      finish = () => void 0;
+      settle();
+    };
+    req.on("error", (error) => fail4(pictureFailureOf(error)));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    req.end();
+  });
+}
+function createPictureFetch(deps = {}) {
+  var _a2, _b2;
+  const request = (_a2 = deps.request) != null ? _a2 : import_node_https.request;
+  const lookup = (_b2 = deps.lookup) != null ? _b2 : createSafeLookup();
+  return async (address, { signal, maxBytes }) => {
+    let url = new URL(address);
+    for (let redirects = 0; ; redirects++) {
+      if (!isPicturePublicUrl(url)) throw new PictureFetchError("url");
+      const result = await hop(url, request, lookup, signal, maxBytes);
+      if (!("redirect" in result)) return result;
+      if (redirects >= PICTURE_MAX_REDIRECTS) throw new PictureFetchError("url");
+      try {
+        url = new URL(result.redirect, url);
+      } catch (e) {
+        throw new PictureFetchError("url");
+      }
+    }
+  };
 }
 
 // core/steps/book-pipeline/ai-proof.md
@@ -115164,6 +115298,7 @@ function noteStylePorts(plugin) {
   };
 }
 var PUBLIC_REPO_URL = "https://github.com/kevcltsai/visual-agent-map";
+var pictureFetch = createPictureFetch();
 var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
   constructor() {
     super(...arguments);
@@ -115454,16 +115589,9 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       aiBookProof: (request, run) => runAiBookProof(this.aiCalls, request, run),
       findImages: (request, run) => runFindImages(this.aiCalls, request, run),
       lookAtImage: (request, run) => runImageFitCheck(this.aiCalls, request, run),
-      // A candidate picture for the model to look at: https, 8 MB, PNG/JPEG/GIF/WebP, 15 s, shrunk to the model's image input. Held in memory only, never written to the vault.
+      // A candidate picture for the model to look at: https over Node (no silent redirect, no private address), 8 MB cap while streaming, PNG/JPEG/GIF/WebP, 15 s, shrunk to the model's image input. Held in memory only, never written to the vault.
       fetchPicture: async (url, model, signal) => {
-        const picture = await downloadPicture(
-          url,
-          async (address, method) => {
-            const response = await (0, import_obsidian53.requestUrl)({ url: address, method: method != null ? method : "GET", throw: false });
-            return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
-          },
-          { signal }
-        );
+        const picture = await downloadPicture(url, pictureFetch, { signal });
         if (!picture.ok) return void 0;
         try {
           return await fitImageForInput(

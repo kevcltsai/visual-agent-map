@@ -102,6 +102,7 @@ const C = {
   addChildAllHaveSummary: () => check("addChildAllHaveSummary", "every new card has a summary", env => (ofKind(env, "add_child").some(a => !a.summary.trim()) ? fail("a card without summary") : ok())),
   addChildMin: n => check(`addChildMin:${n}`, `at least ${n} new cards`, env => (ofKind(env, "add_child").length >= n ? ok() : fail(`${ofKind(env, "add_child").length} cards`))),
   addChildMax: n => check(`addChildMax:${n}`, `at most ${n} new cards`, env => (ofKind(env, "add_child").length <= n ? ok() : fail(`${ofKind(env, "add_child").length} cards`))),
+  noTitleMatches: (re, desc) => check(`noTitleMatches:${desc}`, `no new card title is ${desc}`, env => (ofKind(env, "add_child").some(a => re.test(a.title.trim())) ? fail(`a card titled ${ofKind(env, "add_child").find(a => re.test(a.title.trim())).title}`) : ok())),
   rootOnly: () =>
     check("rootOnly", "only a root card is created (no children yet)", env => {
       const cards = ofKind(env, "add_child");

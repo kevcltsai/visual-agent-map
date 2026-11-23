@@ -13,7 +13,7 @@ export { projectProofBody as projectDirect } from "./core/book-pipeline/book-not
 export { neutralizeDetail, neutralizeText, chapterBody } from "./core/book-pipeline/note-sections";
 export { proofKey } from "./core/book-pipeline/proof";
 export { setUiLanguage, t } from "./i18n";
-export { shortHash } from "./core/book-pipeline/image-slots";
+export { shortHash, diagramHash } from "./core/book-pipeline/image-slots";
 export { bookIssueText } from "./experiences/visual-map/book-pipeline-ui";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
@@ -97,6 +97,15 @@ test('galleryBare: only a gallery chapter whose every slot is missing', () => {
   assert.equal(b.galleryBare('gallery', { prompt, detail: 'plain' }), false, 'no record: not bare');
   assert.equal(b.galleryBare('gallery', { prompt: '圖安排：無\n', detail: missing }), false);
   assert.equal(b.galleryBare('gallery', undefined), false);
+});
+test('galleryBare: a slot filled by a drawn diagram is not bare, and a hand-edited block is not bare either', () => {
+  const prompt = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';
+  const chart = 'flowchart LR\n  A[甲] --> B[乙]';
+  const rec = h => `<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'diagram', hash: h }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n`;
+  const detail = (block, h) => `text\n\n\`\`\`mermaid\n${block}\n\`\`\`\n\n示意圖｜睡眠週期（依本章內文整理，非史料原圖）\n\n${rec(h)}`;
+  assert.equal(b.galleryBare('gallery', { prompt, detail: detail(chart, b.diagramHash(chart)) }), false, 'the chart fills slot 1');
+  assert.equal(b.galleryBare('gallery', { prompt, detail: detail('flowchart LR\n  A[甲] --> B[丙]', b.diagramHash(chart)) }), false, 'edited by hand: still not bare');
+  assert.equal(b.galleryBare('gallery', { prompt, detail: `text\n\n${rec(b.diagramHash(chart))}` }), false, 'record only (block deleted): "edited", not missing');
 });
 
 // ---- fingerprint ----

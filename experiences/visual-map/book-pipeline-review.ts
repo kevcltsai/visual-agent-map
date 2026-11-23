@@ -2,6 +2,7 @@ import { t, type TranslationKey } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import {
   describeSlots,
+  diagramHashesOf,
   latestSlotsRecord,
   splitPictureIssue,
   stripImageLines
@@ -212,10 +213,15 @@ export function galleryBare(role: string | undefined, note: GalleryNote | undefi
   const slots = parseImageSlots(note?.prompt ?? "") ?? [];
   if (!slots.length) return false;
   const detail = note?.detail ?? "";
-  const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
+  const states = describeSlots(
+    slots,
+    latestSlotsRecord(detail),
+    bodyImageUrls(chapterBody(detail)),
+    diagramHashesOf(chapterBody(detail))
+  );
   return (
     states.some(slot => slot.state === "missing") &&
-    !states.some(slot => slot.state === "placed" || slot.state === "edited")
+    !states.some(slot => slot.state === "placed" || slot.state === "edited" || slot.state === "diagram")
   );
 }
 

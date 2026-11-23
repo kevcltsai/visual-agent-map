@@ -240,9 +240,18 @@ import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import {
+  checkDiagram,
+  type DiagramDraft,
+  type DrawDiagramsRequest
+} from "../../core/steps/book-pipeline/draw-diagrams";
+import { isDiagramKind } from "../../core/steps/book-pipeline/find-images";
+import type { MermaidSyntaxCheck } from "../../ai/mermaid-safety";
+import {
   checkImageText,
   choosePictures,
   composeImageTextLine,
+  diagramCaption,
+  diagramTitle,
   composeSlotsRecord,
   imageIssueTokens,
   latestSlotsRecord,
@@ -260,6 +269,7 @@ import {
   type FillResult,
   type ImageSlot,
   type ProbedCandidate,
+  type SlotDiagram,
   type SlotFigure,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
@@ -538,6 +548,18 @@ export interface BookPipelinePorts {
     request: FindImagesRequest,
     run: { signal: AbortSignal; admission?: AdmissionContext }
   ): Promise<FoundImages>;
+  /**
+   * Production: `runDrawDiagrams(aiCalls, request, run)`: one tool-free call that may draw a short Mermaid chart from the chapter text for
+   * each diagram-kind slot still without a picture. Absent: nothing is drawn.
+   */
+  drawDiagrams?(
+    request: DrawDiagramsRequest,
+    run: { signal: AbortSignal; admission?: AdmissionContext }
+  ): Promise<DiagramDraft[]>;
+  /** The "add diagrams" setting: false turns the drawing off. Absent: on. */
+  diagramsOn?(): boolean;
+  /** Production: the Mermaid parser check; a chart it calls invalid is dropped. Absent or "unavailable": the program checks alone. */
+  mermaidSyntax?: MermaidSyntaxCheck;
   /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
   fetchCommons?: CommonsFetch;
   /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
@@ -5252,6 +5274,8 @@ export class BookPipelineRuns {
     // pictures): it is held back here, so its slot still counts as lacking for the second search and the Commons search, and it is placed
     // only when nothing else turned up, recorded as off its text. What cannot be checked is kept as it was. The cover is not touched.
     const heldUnfit = new Map<number, FoundImage[]>();
+    const drawnDiagrams = new Map<number, SlotDiagram>();
+    const diagramStats = { asked: 0, drawn: 0, rejected: {} as Record<string, number> };
     const fitFound = async (from: FoundImages | undefined): Promise<FoundImages | undefined> => {
       const fetchCommons = this.ports.fetchCommons;
       if (!from || !fetchCommons) return from;
@@ -5393,6 +5417,63 @@ export class BookPipelineRuns {
           perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
         }
       }
+      // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
+      if (this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true)) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const want = slots.filter(slot => {
+          const outcome = provisional.get(slot.index);
+          return (
+            marked.has(slot.index) &&
+            isDiagramKind(slot.kind) &&
+            !!outcome &&
+            "reasonCode" in outcome &&
+            outcome.reasonCode === "not_found"
+          );
+        });
+        if (want.length) {
+          diagramStats.asked = want.length;
+          const text = stripImageLines(chapterBody(first.detail));
+          let drafts: DiagramDraft[] = [];
+          try {
+            drafts = await untilAborted(
+              signal,
+              this.ports.drawDiagrams(
+                {
+                  ...this.base(drive, drive.config.authorModel),
+                  chapter: text,
+                  slots: want.map(({ index, kind, explains }) => ({ index, kind, explains }))
+                },
+                { signal, admission: drive.admission }
+              )
+            );
+          } catch (error) {
+            if (isBudgetExhausted(error) || signal.aborted) throw error;
+          }
+          for (const draft of drafts) {
+            const slot = want.find(item => item.index === draft.slot);
+            if (!slot) continue;
+            const checked = checkDiagram(draft, text);
+            let code: string | undefined = checked.ok ? undefined : checked.code;
+            let title = "";
+            if (checked.ok) {
+              title = diagramTitle(draft.title, slot.explains, language);
+              const lines = ["```mermaid", checked.mermaid, "```", "", diagramCaption(title, language)].join("\n");
+              // The fill's exit check refuses a whole chapter for one such line, so a chart it would refuse is dropped alone here.
+              if (this.exitCheck(lines, new Set())) code = "unsafe";
+              else if (this.ports.mermaidSyntax) {
+                const verdict = await untilAborted(signal, this.ports.mermaidSyntax(checked.mermaid));
+                if (verdict === "invalid") code = "syntax";
+              }
+            }
+            if (code || !checked.ok) {
+              diagramStats.rejected[code ?? "unsafe"] = (diagramStats.rejected[code ?? "unsafe"] ?? 0) + 1;
+              continue;
+            }
+            drawnDiagrams.set(slot.index, { title, mermaid: checked.mermaid });
+          }
+          diagramStats.drawn = drawnDiagrams.size;
+        }
+      }
     } catch (error) {
       if (isBudgetExhausted(error)) return { kind: "budget" };
       throw error;
@@ -5415,6 +5496,11 @@ export class BookPipelineRuns {
       },
       language
     );
+    // A slot still not found whose chart passed the checks is filled by the chart (the guarded write refuses a card edited meanwhile).
+    for (const [index, diagram] of drawnDiagrams) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found") outcomes.set(index, { diagram });
+    }
     // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
     for (const index of commonsCut) {
       const outcome = outcomes.get(index);
@@ -5548,6 +5634,17 @@ export class BookPipelineRuns {
               )
             ),
             ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
+            ...(diagramStats.asked
+              ? {
+                  diagram_asked: diagramStats.asked,
+                  diagram_drawn: result.diagrams?.length ?? 0,
+                  diagram_declined:
+                    diagramStats.asked -
+                    drawnDiagrams.size -
+                    Object.values(diagramStats.rejected).reduce((a, b) => a + b, 0)
+                }
+              : {}),
+            ...Object.fromEntries(Object.entries(diagramStats.rejected).map(([code, n]) => [`diagram_rej_${code}`, n])),
             ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
@@ -5679,7 +5776,7 @@ export class BookPipelineRuns {
     off?: ReadonlySet<number>,
     cover?: CoverWrite
   ): Promise<FillResult | string> {
-    const result = fillSlotMarkers(latest.detail, slots, outcomes);
+    const result = fillSlotMarkers(latest.detail, slots, outcomes, language);
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
@@ -5769,8 +5866,8 @@ export class BookPipelineRuns {
       issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
     );
     const pictureIssue = [
-      ...(minimum !== undefined && imageCheck.placed < minimum
-        ? [pictureShortfallToken(imageCheck.placed, minimum)]
+      ...(minimum !== undefined && imageCheck.placed + imageCheck.diagrams < minimum
+        ? [pictureShortfallToken(imageCheck.placed + imageCheck.diagrams, minimum)]
         : []),
       ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
       ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : []),

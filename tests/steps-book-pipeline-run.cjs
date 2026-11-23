@@ -5749,3 +5749,148 @@ test('P1 chapter reasons: English map language says "Picture 2" / "Pictures 2, 3
   assert.match(text, /Picture 2: A picture may not fit this section/);
   assert.match(text, /Pictures 2, 3: A picture may not fit this section/);
 });
+
+// ---- AI-drawn Mermaid for diagram-kind slots that found no picture (plan 2026-11-23-book-ai-diagrams, P2) ----
+const { diagramHash: dHash, diagramHashesOf: dHashes } = S.load('core/book-pipeline/image-slots.ts');
+const GOOD_CHART = 'flowchart LR\n  A[開場] --> B[土壤] --> C[小結]';
+async function diagRig({ kinds = ['圖表'], draw, ports = {}, manual, limitExtra, holder = {} }) {
+  const slots = kinds.map((kind, i) => ({ index: i + 1, kind, explains: `說明${i + 1}`, anchor: 'end' }));
+  const MARKED = `${DRAFT}\n\n${slots.map(s => `〔圖位 ${s.index}：${s.explains}〕`).join('\n\n')}\n`;
+  const calls = [];
+  const r = await rig({
+    titles: ['T0', 'T1'],
+    script: {
+      card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: request.card.title === 'T0' ? slots : [] }),
+      author: async input => {
+        await input.admission.reserve();
+        const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: input.nodeId === holder.r.nodes[0].id ? MARKED : DRAFT }, { authorize: input.authorize, finalize: input.finalize });
+        return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+      }
+    },
+    ports: {
+      findImages: async () => ({ bySlot: new Map(), found: 0, offTopic: 0 }),
+      drawDiagrams: async (request, run) => { calls.push(request); await run.admission.reserve(); return draw(request, run, holder.r); },
+      ...ports
+    }
+  });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  if (limitExtra !== undefined) await setLimit(r, (await r.state()).budget.used + limitExtra);
+  const running = r.runs.confirmGate1(r.mapPath);
+  if (manual) return { r, calls, slots, running };
+  await running.catch(() => undefined);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  return { r, calls, slots };
+}
+const draft = (slot, mermaid, title = '開場到小結') => ({ slot, title, mermaid });
+
+test('diagram slots: a missing diagram-kind slot costs exactly one admitted call and the chart lands at the marker with its caption and a diagram record', async () => {
+  const { r, calls } = await diagRig({ kinds: ['圖表', '流程'], draw: request => request.slots.map(s => draft(s.index, GOOD_CHART)) });
+  assert.equal(calls.length, 1, 'one call for both slots');
+  assert.equal(calls[0].slots.map(s => s.index).join(), '1,2');
+  const detail = (await r.note(0)).detail;
+  assert.equal(detail.split('```mermaid').length - 1, 2);
+  assert.match(detail, /示意圖｜開場到小結（依本章內文整理，非史料原圖）/);
+  assert.doesNotMatch(detail, /〔圖位/);
+  const hash = dHash(GOOD_CHART);
+  assert.match(detail, new RegExp(`"index":1,"state":"diagram","hash":"${hash}"`));
+  assert.ok(dHashes(detail).includes(hash), 'a re-read finds the chart by its hash');
+  const { describeSlots, latestSlotsRecord } = S.load('core/book-pipeline/image-slots.ts');
+  const states = describeSlots([{ index: 1, kind: '圖表', explains: '說明1', anchor: 'end' }, { index: 2, kind: '流程', explains: '說明2', anchor: 'end' }], latestSlotsRecord(detail), [], dHashes(detail));
+  assert.equal(states.map(s => s.state).join(), 'diagram,diagram');
+  const slotsLog = r.stat.logs.find(l => l.includes('slots') && l.includes('diagram_asked'));
+  assert.ok(slotsLog && /diagram_asked=2|diagram_asked":2|diagram_asked:2/.test(slotsLog), `counts only: ${slotsLog}`);
+  assert.doesNotMatch(slotsLog, /flowchart|開場/);
+  assert.equal((await r.state()).phase, 'done');
+});
+
+test('diagram slots: no diagram-kind slot, or a setting turned off, means no call', async () => {
+  const none = await diagRig({ kinds: ['照片', '地圖'], draw: () => [] });
+  assert.equal(none.calls.length, 0);
+  const off = await diagRig({ draw: () => [], ports: { diagramsOn: () => false } });
+  assert.equal(off.calls.length, 0);
+  const absent = await diagRig({ draw: () => [], ports: { drawDiagrams: undefined } });
+  assert.equal(absent.calls.length, 0);
+});
+
+test('diagram slots: an empty reply leaves the chapter as it is without the call', async () => {
+  const base = await diagRig({ draw: () => [], ports: { drawDiagrams: undefined } });
+  const empty = await diagRig({ draw: () => [] });
+  assert.equal(empty.calls.length, 1);
+  const plain = text => text.replace(/<!-- book-proof:v1 .*? -->/g, '').replace(/^> .*book-proof.*$/gm, '');
+  assert.equal(plain((await empty.r.note(0)).detail), plain((await base.r.note(0)).detail));
+  assert.doesNotMatch((await empty.r.note(0)).detail, /mermaid/);
+});
+
+test('diagram slots: an error or timeout of the call draws nothing and the chapter still finishes', async () => {
+  const bad = await diagRig({ draw: () => { throw new Error('boom'); } });
+  assert.equal(bad.calls.length, 1);
+  assert.doesNotMatch((await bad.r.note(0)).detail, /mermaid/);
+  assert.equal((await bad.r.state()).phase, 'done');
+});
+
+test('diagram slots: a chart with <, more than 6 vertical nodes, a number not in the text or a syntax error is dropped alone', async () => {
+  const tall = 'flowchart TD\n  A[一] --> B[二] --> C[三] --> D[四] --> E[五] --> F[六] --> G[七]';
+  const { r } = await diagRig({
+    kinds: ['圖表', '流程', '時間軸', '比較'],
+    draw: request => [draft(1, 'flowchart LR\n  A[a<b] --> B[乙]'), draft(2, tall), draft(3, GOOD_CHART), draft(4, 'flowchart LR\n  A[甲] --> B[乙]', '合法但語法錯')],
+    ports: { mermaidSyntax: async code => (code.includes('甲') ? 'invalid' : 'ok') }
+  });
+  const detail = (await r.note(0)).detail;
+  assert.equal(detail.split('```mermaid').length - 1, 1, 'only the good chart is written');
+  assert.match(detail, new RegExp(`"index":3,"state":"diagram","hash":"${dHash(GOOD_CHART)}"`));
+  assert.match(detail, /"index":1,"state":"missing"/);
+  assert.match(detail, /"index":2,"state":"missing"/);
+  assert.match(detail, /"index":4,"state":"missing"/);
+  const log = r.stat.logs.find(l => l.includes('diagram_asked'));
+  for (const code of ['angle', 'too_tall', 'syntax']) assert.match(log, new RegExp(`diagram_rej_${code}`));
+  const number = await diagRig({ draw: () => [draft(1, 'pie\n  "甲" : 77')] });
+  assert.doesNotMatch((await number.r.note(0)).detail, /mermaid/);
+});
+
+test('diagram slots: stop during the call writes nothing', async () => {
+  const entered = defer();
+  const { r, running } = await diagRig({
+    manual: true,
+    draw: (request, run) => new Promise((resolve, reject) => { run.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }); entered.resolve(); })
+  });
+  await entered.promise;
+  await r.runs.stop(r.mapPath);
+  await running.catch(() => undefined);
+  await settle();
+  const detail = (await r.note(0)).detail;
+  assert.doesNotMatch(detail, /mermaid/);
+  assert.match(detail, /〔圖位 1：說明1〕/, 'the marker is still there: nothing was written');
+});
+
+test('diagram slots: budget exhausted in the call ends the step as budget with nothing drawn', async () => {
+  const { r, calls } = await diagRig({ limitExtra: 2, draw: () => [draft(1, GOOD_CHART)] });
+  const s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'budget');
+  assert.doesNotMatch((await r.note(0)).detail, /mermaid/);
+});
+
+test('diagram slots: a card edited between the re-read and the write is refused by the guarded write and the owner text is kept', async () => {
+  let edited = false;
+  const outcomes = [];
+  const holder = {};
+  const { r } = await diagRig({
+    draw: request => request.slots.map(s => draft(s.index, GOOD_CHART)),
+    ports: {
+      updateNoteGuarded: async (path, patch, options) => {
+        if (!edited && /```mermaid/.test(patch.detail ?? '')) {
+          edited = true;
+          const note = await holder.r.repo.readNote(path);
+          await holder.r.repo.updateNoteGuarded(path, { detail: `${note.detail}\n\n擁有者新增一句。` });
+        }
+        const out = await holder.r.repo.updateNoteGuarded(path, patch, options);
+        if (/```mermaid/.test(patch.detail ?? '')) outcomes.push(out);
+        return out;
+      }
+    },
+    holder
+  });
+  assert.equal(outcomes[0], 'discarded', 'the stale write is refused');
+  assert.match((await r.note(0)).detail, /擁有者新增一句。/, 'the owner text is kept');
+});

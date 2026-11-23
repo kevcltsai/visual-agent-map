@@ -224,6 +224,9 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   const read = readFile(end.actions);
   const progress = mergeProgress(state.progress, end.progress);
   if (progress) next.progress = progress;
+  // The provider sent back a reply with actions (failed the format check) and the one it took has none: the work was lost, not done.
+  // No check round even with auto-apply: it would send the same oversized batch again; the user is told and can resend a smaller part.
+  if (end.droppedOnRetry && !end.actions.length) return ended(next, "no_progress", state.remaining || remaining);
   const nothingLeft = !remaining && end.researchDeferred <= 0 && !read;
   // An auto-apply chain does not take "nothing left" on trust while its own steps are open or its reply lost actions on a retry:
   // a check round compares them first, and the chain is done once a check round writes and starts nothing.

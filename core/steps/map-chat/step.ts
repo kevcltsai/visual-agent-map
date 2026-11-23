@@ -436,7 +436,7 @@ export const MAP_CHAT_SCHEMA = {
           "images",
           "needsWeb",
           "otherProvider",
-          "rewrite",
+          // Left out on purpose: a missing "rewrite" reads as false, so one action that forgets it does not send the whole reply back.
           "topicKind",
           "leaning",
           "strength",

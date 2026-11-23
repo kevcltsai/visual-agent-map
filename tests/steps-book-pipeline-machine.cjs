@@ -107,6 +107,19 @@ test('the whole-book plan failing 3 times stops at planning with no card plan; r
   assert.deepEqual(actionsOf(state, none()), { actions: [{ type: 'global_plan' }] });
 });
 
+test('a bad request (final failure) uses up the attempts at once: no retry of a request that fails the same way', () => {
+  let state = fresh();
+  const g = machine.beginStep(state, 'global');
+  state = machine.applyFailure(g.state, g.token, true).state;
+  assert.equal(state.attempts.global, 3);
+  assert.deepEqual(actionsOf(state, none()), { actions: [], hold: 'global_failed' });
+  let card = fresh();
+  const d = machine.beginStep(card, 'write', 'a');
+  const failed = machine.applyFailure(d.state, d.token, true);
+  assert.deepEqual(plain(failed.needsReview), { nodeId: 'a', step: 'write' });
+  assert.deepEqual(plain(model.attemptsOf(failed.state, 'a')), { plan: 0, write: 3, proof: 0 });
+});
+
 test('a stop is not a failure: the attempt is given back, and resume re-derives the next steps from the stages', () => {
   let state = succeed(fresh(), 'global');
   const d = machine.beginStep(state, 'plan', 'a');
@@ -1293,4 +1306,20 @@ test('R1 abandon: giving up a stuck round of "fix again" leaves a done, incomple
   const slot = machine.abandonAi(opened, 'a').aiProof.a;
   assert.deepEqual([slot.done, slot.incomplete, slot.again, slot.pending], [true, true, undefined, undefined]);
   assert.equal(slot.open.length, 1, 'the problems stay listed');
+});
+
+test('a book step that fails at the provider logs the provider message (one line, no paths), not only "failed"', () => {
+  const { planFailMessage } = S.load('core/steps/book-pipeline/run.ts');
+  const { proofFailMessage } = S.load('core/steps/book-pipeline/proofread.ts');
+  const { BadRequestError, ProviderError } = S.load('ai/bad-request.ts');
+  const schema = new BadRequestError("Invalid schema for response_format 'codex_output_schema': 'required' must list every key");
+  assert.equal(planFailMessage(schema), "bad_request: Invalid schema for response_format 'codex_output_schema': 'required' must list every key");
+  assert.equal(proofFailMessage(new ProviderError('spawn /Users/someone/.local/bin/codex\nexit 1')), 'failed: spawn <path> exit 1');
+  assert.equal(
+    planFailMessage(new ProviderError("ENOENT: no such file, open '/Users/me/Obsidian Vault/Books/My Secret Book/Chapter 3.md'")),
+    'failed: ENOENT: no such file, open <path>', 'a quoted path with spaces goes whole, titles too');
+  assert.equal(planFailMessage(new ProviderError('x'.repeat(500))).length, 'failed: '.length + 200);
+  // An unmarked error (a vault write, or a Claude result that may be the model's words) keeps the bare code.
+  assert.equal(planFailMessage(new Error('the model said: secret chapter text')), 'failed');
+  assert.equal(planFailMessage(new ProviderError('')), 'failed');
 });

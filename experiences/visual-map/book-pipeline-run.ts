@@ -235,6 +235,7 @@ import {
   trustedCoverBlock,
   type CoverRecordValue
 } from "../../core/book-pipeline/cover-block";
+import { isBadRequest } from "../../ai/bad-request";
 import type { ReasoningLevel } from "../../ai/types";
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
@@ -689,7 +690,12 @@ type StepResult = "ok" | "failed" | "cancelled" | "budget" | "dropped" | "none";
 
 type Outcome =
   | { kind: "ok"; after?: () => Promise<void> }
-  | { kind: "failed"; reason: string; forceReview?: boolean }
+  | {
+      kind: "failed";
+      reason: string;
+      forceReview?: boolean;
+      /** The same request fails the same way: no attempt is left. */ final?: boolean;
+    }
   | { kind: "cancelled" }
   | { kind: "budget" };
 
@@ -785,7 +791,13 @@ interface Drive {
 
 const code = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 const reasonOf = (error: unknown): string =>
-  isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
+  isProofFailure(error)
+    ? error.code
+    : isBookStepError(error)
+      ? "invalid_reply"
+      : isBadRequest(error)
+        ? "bad_request"
+        : "failed";
 /** An unexpected error's code: only its class name, never its message (which could carry a path or a title). */
 const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
@@ -1757,7 +1769,7 @@ export class BookPipelineRuns {
     await this.cardJob(
       mapPath,
       nodeId,
-      ["gate2", "done"],
+      ["gate2", "done", "writing"],
       "not_gate",
       () => ["plan", "write", "proof"],
       swap ? avoidSourcesInstruction(options.avoidSources ?? []) : undefined,
@@ -1820,6 +1832,11 @@ export class BookPipelineRuns {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!effectiveOrder(data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      // The writing phase is open to a rerun only while the book is stopped (not a map pause): the run goes back to that stop afterwards.
+      const stoppedWriting = data.phase === "writing";
+      if (stoppedWriting && (data.status !== "stopped" || data.pauseReason === "map"))
+        throw new BookPipelineRunError(refusal);
+      const savedFailure = data.pauseReason === "failed" ? (data.failureCode ?? "failed") : undefined;
       if (overwrite) {
         // Bound to the text it was given for: if the chapter changed since, nothing is rewritten (the write checks again inside itself).
         const path = drive.cards.get(nodeId)?.path;
@@ -1840,19 +1857,37 @@ export class BookPipelineRuns {
       if (extra) drive.expand.delete(nodeId);
       const kinds = steps(data.phase);
       drive.job = async () => {
-        const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
-        const planBefore = drive.plans.get(nodeId);
-        if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
         try {
-          await this.runCardJob(drive, nodeId, kinds);
+          const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
+          const planBefore = drive.plans.get(nodeId);
+          if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
+          try {
+            await this.runCardJob(drive, nodeId, kinds);
+          } finally {
+            drive.rerun = undefined;
+          }
+          if (track) await this.proofAfterRerun(drive, nodeId);
+          // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
+          if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
+          finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
+          this.syncReviewNotes(drive);
         } finally {
-          drive.rerun = undefined;
+          // A rerun beside a stopped book: the book is stopped again (a failed stop keeps its code), unless the rerun ended it another
+          // way. This runs even when the job threw, so the book is never left running.
+          if (stoppedWriting && !this.dead(drive)) {
+            await drive.store
+              .commit(state => ({
+                state:
+                  state.phase === "writing" && state.status === "running"
+                    ? savedFailure !== undefined
+                      ? failRun(state, savedFailure)
+                      : stopRun(state)
+                    : state,
+                accepted: true
+              }))
+              .catch(() => undefined);
+          }
         }
-        if (track) await this.proofAfterRerun(drive, nodeId);
-        // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
-        if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
-        finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
-        this.syncReviewNotes(drive);
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
@@ -3374,7 +3409,7 @@ export class BookPipelineRuns {
           await report("map_changed");
           return "cancelled";
         }
-        const failed = await drive.store.commit(state => applyFailure(state, token));
+        const failed = await drive.store.commit(state => applyFailure(state, token, outcome.final));
         if (!failed) return "none";
         if (!failed.accepted) {
           await drive.store.commit(state => applyCancelled(state, token));
@@ -3963,7 +3998,8 @@ export class BookPipelineRuns {
     if (isBudgetExhausted(error)) return { kind: "budget" };
     if (drive.controller.signal.aborted || (error instanceof Error && error.name === "AbortError"))
       return { kind: "cancelled" };
-    return { kind: "failed", reason: reasonOf(error) };
+    const reason = reasonOf(error);
+    return { kind: "failed", reason, ...(reason === "bad_request" ? { final: true } : {}) };
   }
   private authorize(drive: Drive, token: StepToken, nodeId?: string): () => boolean {
     return () =>

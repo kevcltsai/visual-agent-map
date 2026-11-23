@@ -611,9 +611,14 @@ export class MapChatConversation {
               }
             });
             if (!alive()) return;
+            // The provider sent back the reply's actions (format check) and took one with none: the reply's own words about why
+            // (a model may claim a filter blocked it) are replaced by the real cause, on screen and in the history the next round reads.
             // The empty targets are resolved once, here: the plan gate judges these actions and the same ones are applied, so
             // research never runs on a live selection the gate did not check (a select_topics that partly fails changes nothing).
-            const result = { ...outcome, actions: resolveSelectionTargets(outcome.actions) };
+            const result =
+              outcome.droppedOnRetry && !outcome.actions.length
+                ? { ...outcome, reply: t("ui.map_chat_reply_format_rejected") }
+                : { ...outcome, actions: resolveSelectionTargets(outcome.actions) };
             // The research notes this request carried are "sent before" for the next round (they go last when the budget is short).
             // Only a reply that came back counts: a request that failed read nothing, so a retry still owes them.
             for (const id of request.context.research?.sent ?? []) this.ports.researchSent().add(id);

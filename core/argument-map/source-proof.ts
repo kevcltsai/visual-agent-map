@@ -180,18 +180,38 @@ export function inertHtmlText(html: string): string {
   return doc.documentElement.textContent ?? "";
 }
 
-/** URLs the provider opened successfully, from its web events (Claude WebFetch and Codex openPage carry `action.url`). */
+/** A Codex result that is an opened page (`turn1view0`), not a search snippet (`turn0search0`). */
+const VIEW_REF = /^turn\d+view\d+$/;
+
+/**
+ * URLs the provider opened successfully, from its web events: Claude WebFetch and a Codex openPage by URL carry `action.url`; a Codex
+ * page opened from a search hit reports `action.type: "other"` with the page as a `turnNviewM` result carrying its `url`.
+ */
 export function openedUrlsFromEvents(events: readonly unknown[]): string[] {
   const urls: string[] = [];
   for (const event of events) {
     const e = event as {
       method?: unknown;
-      params?: { item?: { type?: unknown; action?: { type?: unknown; url?: unknown } } };
+      params?: {
+        item?: { type?: unknown; action?: { type?: unknown; url?: unknown } | null; results?: unknown };
+      };
     } | null;
     if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
     const item = e.params?.item;
-    if (item?.type !== "webSearch" || item.action?.type !== "openPage") continue;
-    if (typeof item.action.url === "string" && item.action.url) urls.push(item.action.url);
+    if (item?.type !== "webSearch") continue;
+    if (item.action?.type === "openPage") {
+      if (typeof item.action.url === "string" && item.action.url) urls.push(item.action.url);
+      continue;
+    }
+    if (item.action?.type !== "other" || !Array.isArray(item.results)) continue;
+    for (const result of item.results as { ref_id?: unknown; url?: unknown }[])
+      if (
+        typeof result?.ref_id === "string" &&
+        VIEW_REF.test(result.ref_id) &&
+        typeof result.url === "string" &&
+        result.url
+      )
+        urls.push(result.url);
   }
   return urls;
 }

@@ -1255,6 +1255,20 @@ export default class VisualAgentMapPlugin extends Plugin {
       /* Logged by mutate(). */
     });
   }
+  /** The "rerun this chapter" button in a chapter note: the open map view of that book does the rerun; none open, the reader is told to open it. */
+  rerunBookChapterFromNote(notePath: string): void {
+    let why: string | undefined;
+    for (const view of this.views()) {
+      const result = view.rerunBookChapterFromNote(notePath);
+      if (result === null) continue;
+      if (result === "") {
+        void this.app.workspace.revealLeaf(view.leaf);
+        return;
+      }
+      why ??= result;
+    }
+    new Notice(why ?? t("ui.book_note_attention_open_map"));
+  }
   views(): VisualAgentMapView[] {
     return this.app.workspace
       .getLeavesOfType(VIEW_TYPE)
@@ -1404,7 +1418,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     registerInternalMarkerPresentation(this);
     for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
-    registerBookPlanView(this, () => this.settings.language);
+    registerBookPlanView(
+      this,
+      () => this.settings.language,
+      notePath => this.rerunBookChapterFromNote(notePath)
+    );
     const markdownSelectionAi = (this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",

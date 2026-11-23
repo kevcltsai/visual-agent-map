@@ -32,11 +32,16 @@ export function askWords(ask: SlotAsk): string[] {
   ];
 }
 
-/** How many of `words` the text has: a Latin word as a whole (stemmed) word, a Han pair anywhere. */
+/**
+ * How many of `words` the text has: a Latin word as a whole (stemmed) word, or one of 5+ letters as the start of a word at most two
+ * letters longer (another language's ending: `hypnogram` in `hypnogramme`); a Han pair anywhere.
+ */
 export function wordHits(words: readonly string[], text: string): number {
   const lower = text.toLowerCase().replace(/_/g, " ");
-  const own = new Set((lower.match(/[a-z0-9][a-z0-9'-]*/g) ?? []).map(stem));
-  return words.filter(word => (/^[a-z0-9]/.test(word) ? own.has(word) : lower.includes(word))).length;
+  const own = [...new Set((lower.match(/[a-z0-9][a-z0-9'-]*/g) ?? []).map(stem))];
+  const has = (word: string): boolean =>
+    own.some(have => have === word || (word.length >= 5 && have.length <= word.length + 2 && have.startsWith(word)));
+  return words.filter(word => (/^[a-z0-9]/.test(word) ? has(word) : lower.includes(word))).length;
 }
 
 /** The slot asks for a photograph (its kind line says so). */

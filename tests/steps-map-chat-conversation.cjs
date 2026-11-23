@@ -545,6 +545,24 @@ test('turn: an answer without actions finishes, records done, marks the turn and
   assert.equal(first(r, 'markLogged')[1], 'a');
 });
 
+test('turn: a reply whose actions failed the format check and came back with none shows the real cause, not the model\'s excuse', async () => {
+  // ai-exchanges 986: 57 actions rejected for a missing "rewrite", a retry that did not parse, then an empty reply that blamed a "safety classifier".
+  const r = turnRig();
+  await start(r);
+  r.state.requests[0].resolve(REPLY([], { reply: 'blocked by the safety classifier', remaining: '', droppedOnRetry: true }));
+  await r.sending;
+  const shown = first(r, 'finish')[1];
+  assert.doesNotMatch(shown, /classifier/);
+  assert.match(shown, /did not match the required format/);
+  // A retry that kept actions is the model's reply as it is.
+  const k = turnRig();
+  await start(k);
+  k.state.applyLines = [{ status: 'done', text: 'ok' }];
+  k.state.requests[0].resolve(REPLY([act.child], { droppedOnRetry: true }));
+  await k.sending;
+  assert.equal(first(k, 'finish')[1], 'ans');
+});
+
 test('turn: actions apply (stage applying) and the entry is read before finish', async () => {
   const r = turnRig();
   await start(r);

@@ -8,7 +8,7 @@ const { loadSource } = require('./support-replay.cjs');
 
 const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-callouts";
-export { findProgramCallouts, readReviewState, putProgramCallout, aiProofCallout, aiProofFingerprint } from "./experiences/visual-map/book-pipeline-review";
+export { findProgramCallouts, readReviewState, putProgramCallout, aiProofCallout, aiProofFingerprint, attentionCallout, collapseReviewCallouts, reopenReviewCallouts, markReviewHandled, removeProgramCallouts } from "./experiences/visual-map/book-pipeline-review";
 export { setUiLanguage, t } from "./i18n";
 export { composeProofRecord, proofKey } from "./core/book-pipeline/proof";
 export { replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
@@ -160,16 +160,16 @@ function rig(data, extra = []) {
   for (const id of ['n1', 'n2', ...extra]) { nodes.push({ id, path: `N/${id}.md` }); notes.set(`N/${id}.md`, note(`Body ${id}`)); }
   const map = { id: 'm', nodes };
   if (data) map.bookPipeline = data;
-  const stages = { n1: 'needs-review', n2: 'checked' };
+  const stages = {}; const issues = {};
   const logs = []; const fail = new Set();
   const callouts = new b.BookCallouts({
     readMap: async () => map,
-    readCard: async path => { const raw = notes.get(path); const id = nodes.find(n => n.path === path).id; const detail = raw; return { path, title: id, summary: '', prompt: '', detail, raw, settings: {}, fields: { pipelineStage: stages[id] ?? 'checked', bookRole: 'body', pipelineIssue: 'x' } }; },
+    readCard: async path => { const raw = notes.get(path); const id = nodes.find(n => n.path === path).id; const detail = raw; return { path, title: id, summary: '', prompt: '', detail, raw, settings: {}, fields: { pipelineStage: stages[id] ?? 'checked', bookRole: 'body', pipelineIssue: issues[id] ?? 'x' } }; },
     readText: async path => notes.get(path),
     write: async (path, transform) => { if (fail.has(path)) return 'refused'; const next = transform(notes.get(path)); if (next === notes.get(path)) return 'unchanged'; notes.set(path, next); return 'written'; },
     log: line => logs.push(line)
   });
-  return { callouts, notes, map, logs, fail, kinds: id => kinds(notes.get(`N/${id}.md`)) };
+  return { callouts, notes, map, logs, fail, stages, issues, kinds: id => kinds(notes.get(`N/${id}.md`)) };
 }
 const oldTrial = (id, runId = 'r1') => b.putProgramCallout(note(`Body ${id}`), legacy.trialCallout(1, 2, undefined, undefined, false, { runId, nodeId: id }));
 test('reconcile: gate 1 draws no trial hint and takes an old one off', async () => {
@@ -428,4 +428,52 @@ test('reconcile: no card carries a trial box at the plan gate, nor once the tria
   r.map.bookPipeline = DATA({ phase: 'gate1', trial: ['n1', 'n2'] });
   await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('n1'), []);
+});
+
+test('reconcile: a needs-review chapter gets the "please look" box with a plain reason (no code) in place of the AI box, at gate 2, done and stopped writing; it goes when the chapter is no longer needs-review', async () => {
+  const r = rig(DATA());
+  r.stages.n1 = 'needs-review'; r.issues.n1 = 'images unmet: images:under:0:1 captions:latin';
+  await r.callouts.reconcile('M');
+  const first = r.notes.get('N/n1.md');
+  assert.match(first, /\[!vam-review\|vam-attention\] 這章要你看/);
+  assert.equal(r.kinds('n1').length, 1, 'one box: it replaces the AI box');
+  assert.doesNotMatch(first, /AI 校對/);
+  assert.doesNotMatch(first, /images:under|captions:latin|images unmet/, 'the raw issue code is not shown');
+  assert.match(first, /圖片不足/);
+  assert.doesNotMatch(r.notes.get('N/n2.md'), /這章要你看/, 'a checked chapter gets no such box');
+  await r.callouts.reconcile('M');
+  assert.equal(r.notes.get('N/n1.md'), first, 'idempotent');
+  r.map.bookPipeline = DATA({ phase: 'done' }); await r.callouts.reconcile('M');
+  assert.match(r.notes.get('N/n1.md'), /這章要你看/);
+  r.map.bookPipeline = DATA({ phase: 'writing', status: 'stopped' }); await r.callouts.reconcile('M');
+  assert.match(r.notes.get('N/n1.md'), /這章要你看/, 'stopped writing');
+  r.map.bookPipeline = DATA({ phase: 'writing', status: 'running' }); await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), [], 'a running writing phase wants none');
+});
+
+test('reconcile: gate 1 gets no please-look box even on a needs-review chapter', async () => {
+  const r = rig(DATA({ phase: 'gate1' }));
+  r.stages.n1 = 'needs-review'; r.issues.n1 = 'images unmet: images:under:0:1';
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), []);
+  assert.doesNotMatch(r.notes.get('N/n1.md'), /要你看/);
+});
+
+test('the please-look box carries its own render hook ([!vam-review|vam-attention]) and is still a program review box: found, replaced and taken off; never read as handled (en or zh) and never retitled by the tick-box helpers', () => {
+  for (const lang of ['zh-TW', 'en']) {
+    b.setUiLanguage(lang);
+    const text = b.putProgramCallout(note(), b.attentionCallout('Some reason', 'r1', 'n1'));
+    assert.match(text, /> \[!vam-review\|vam-attention\] /, lang);
+    assert.deepEqual(kinds(text), ['review:r1'], lang);
+    const state = b.readReviewState(text);
+    assert.equal(state.handled, false, `${lang}: not read as a handled box`);
+    assert.equal(b.collapseReviewCallouts(text), text, `${lang}: never folded`);
+    assert.equal(b.reopenReviewCallouts(text), text, `${lang}: never retitled`);
+    assert.equal(b.markReviewHandled(text), text);
+    assert.equal(b.putProgramCallout(text, b.attentionCallout('Some reason', 'r1', 'n1')), text, 'idempotent');
+    assert.equal(b.removeProgramCallouts(text, 'review'), note(), `${lang}: taken off`);
+    const ai = b.putProgramCallout(text, b.aiProofCallout({ checked: 1, fixes: [], open: [] }, 'r1', 'n1'));
+    assert.deepEqual(kinds(ai), ['review:r1'], `${lang}: replaced by one box`);
+  }
+  b.setUiLanguage('zh-TW');
 });

@@ -106,12 +106,10 @@ test('markPlanCallouts: an unwritten note opens its plan through Obsidian\'s own
   assert.equal(w.toggle.clicks, 0); assert.ok(written.classes.has('is-collapsed')); assert.equal(w.style.display, 'none', 'a written note keeps the fold');
 });
 
-test('planLocale: Chinese-stored notes follow the book language (zh-CN is not zh-TW), English-stored notes keep their stored labels', () => {
-  assert.equal(view.planLocale('zh-CN', true), 'zh-CN');
-  assert.equal(view.planLocale('zh-TW', true), 'zh-TW');
-  assert.equal(view.planLocale('en', true), 'zh-TW');
-  assert.equal(view.planLocale('zh-CN', false), 'en');
-  assert.equal(view.planLocale('en', false), 'en');
+test('planLocale: always the book language (an English-stored note in a zh-TW book shows zh-TW titles; a zh-stored note in an English book shows English)', () => {
+  assert.equal(view.planLocale('zh-CN'), 'zh-CN');
+  assert.equal(view.planLocale('zh-TW'), 'zh-TW');
+  assert.equal(view.planLocale('en'), 'en');
 });
 
 test('planTitleKey and the titles: preface / chapter / section, in zh-TW, zh-CN and en; the book plan keeps its own title', () => {

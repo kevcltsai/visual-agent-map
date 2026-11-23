@@ -87,7 +87,7 @@ const authorFor = r => async (input, n) => {
 // The run now finishes by itself (the final gate no longer waits); these tests are about a book saved at gate 2 (an older save), so the finished run is put back there.
 const toGate2 = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'running'; delete d.bookPipeline.pauseReason; }); };
 
-test('rerunCard is refused at gate 1 (the trial screen has its own retry) and in the writing phase', async () => {
+test('rerunCard is refused at gate 1 (the trial screen has its own retry) and while the writing phase is running', async () => {
   const r = await rig();
   await r.runs.start(r.mapPath);
   const planned = r.stat.plan.length;
@@ -100,7 +100,83 @@ test('rerunCard is refused at gate 1 (the trial screen has its own retry) and in
   await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[1].id), e => e.code === 'busy');
   await r.runs.stop(r.mapPath); hold.resolve(); await writing.catch(() => undefined);
   assert.equal((await r.state()).phase, 'writing');
-  await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[1].id), e => e.code === 'not_gate', 'only at the gates');
+  // Intended change: a book stopped in the writing phase may rerun one chapter (see the stopped-writing test below).
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.status = 'running'; delete d.bookPipeline.pauseReason; });
+  await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[1].id), e => e.code === 'not_gate', 'writing and running: not a gate');
+});
+
+test('a book stopped in the writing phase can rerun one chapter: only that card, the phase stays writing, it ends stopped again, budget counted; resume does not redo it; busy, budget and map pause refuse', async () => {
+  const r = await rig();
+  r.script.author = authorFor(r);
+  const hold = defer();
+  const plain = r.script.author;
+  r.script.author = async (input, n) => { if (input.nodeId === r.nodes[2].id) { await hold.promise; return { outcome: 'cancelled' }; } return plain(input, n); };
+  const writing = r.runs.start(r.mapPath).then(() => r.runs.confirmGate1(r.mapPath)); await settle();
+  await r.runs.stop(r.mapPath); hold.resolve(); await writing.catch(() => undefined); await settle();
+  let s = await r.state();
+  assert.equal(s.phase, 'writing'); assert.equal(s.status, 'stopped');
+  r.script.author = plain;
+  const base = { plan: r.stat.plan.length, author: r.stat.author.length };
+  const used = s.budget.used;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  assert.deepEqual(r.stat.plan.slice(base.plan), [r.nodes[1].id]); assert.deepEqual(r.stat.author.slice(base.author), [r.nodes[1].id]);
+  s = await r.state();
+  assert.equal(s.phase, 'writing'); assert.equal(s.status, 'stopped', 'back to stopped'); assert.equal(s.pauseReason, undefined);
+  assert.ok(s.budget.used > used, 'budget counted');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  const authored = r.stat.author.length;
+  await r.runs.resume(r.mapPath); while (r.runs.isRunning(r.mapPath)) await tick();
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal(r.stat.author.slice(authored).filter(id => id === r.nodes[1].id).length, 0, 'resume does not redo the rerun card');
+  // refusals
+  const b = await rig();
+  await b.runs.start(b.mapPath);
+  const hold2 = defer(); b.script.author = async () => { await hold2.promise; return { outcome: 'cancelled' }; };
+  const run2 = b.runs.confirmGate1(b.mapPath); await settle();
+  await assert.rejects(() => b.runs.rerunCard(b.mapPath, b.nodes[1].id), e => e.code === 'busy');
+  await b.runs.stop(b.mapPath); hold2.resolve(); await run2.catch(() => undefined); await settle();
+  await setLimit(b, (await b.state()).budget.used);
+  await assert.rejects(() => b.runs.rerunCard(b.mapPath, b.nodes[1].id), e => e.code === 'budget');
+  await b.repo.updateMap(b.mapPath, d => { d.bookPipeline.budget.limit = 300; d.bookPipeline.pauseReason = 'map'; });
+  await assert.rejects(() => b.runs.rerunCard(b.mapPath, b.nodes[1].id), e => e.code === 'not_gate', 'map pause is not a stop to rerun in');
+});
+
+/** A book stopped in the writing phase (the owner's stop, or a failure with `code`), ready for a rerun of card 1. */
+async function stoppedWriting(code) {
+  const r = await rig();
+  r.script.author = authorFor(r);
+  const hold = defer();
+  const plain = r.script.author;
+  r.script.author = async (input, n) => { if (input.nodeId === r.nodes[2].id) { await hold.promise; return { outcome: 'cancelled' }; } return plain(input, n); };
+  const writing = r.runs.start(r.mapPath).then(() => r.runs.confirmGate1(r.mapPath)); await settle();
+  await r.runs.stop(r.mapPath); hold.resolve(); await writing.catch(() => undefined); await settle();
+  r.script.author = plain;
+  if (code) await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.pauseReason = 'failed'; d.bookPipeline.failureCode = code; });
+  return r;
+}
+
+test('a rerun beside a stopped book: the owner stopping it ends stopped (resume works); a failed stop keeps its code; a throw inside the job never leaves the book running', async () => {
+  // owner stop during the rerun
+  const a = await stoppedWriting();
+  const hold = defer(); const plain = a.script.author;
+  a.script.author = async () => { await hold.promise; return { outcome: 'cancelled' }; };
+  const rerun = a.runs.rerunCard(a.mapPath, a.nodes[1].id); await settle();
+  await a.runs.stop(a.mapPath); hold.resolve(); await rerun.catch(() => undefined); await settle();
+  let s = await a.state(); assert.equal(s.phase, 'writing'); assert.equal(s.status, 'stopped'); assert.equal(a.runs.isRunning(a.mapPath), false);
+  a.script.author = plain;
+  await a.runs.resume(a.mapPath); while (a.runs.isRunning(a.mapPath)) await tick();
+  assert.equal((await a.state()).phase, 'done', 'resume works after the stopped rerun');
+  // a failed stop keeps its code
+  const f = await stoppedWriting('boom_code');
+  await f.runs.rerunCard(f.mapPath, f.nodes[1].id);
+  s = await f.state(); assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'failed'); assert.equal(s.failureCode, 'boom_code');
+  // an unexpected throw inside the job: the first clock read the job makes (its start time) throws
+  const t = await stoppedWriting('boom_code');
+  let armed = false; const log = t.ports.log;
+  t.ports.log = line => { if (/rerun/.test(line)) armed = true; log(line); };
+  t.ports.now = () => { if (armed) { armed = false; throw new Error('unexpected'); } return '2026-11-17T00:00:00.000Z'; };
+  await t.runs.rerunCard(t.mapPath, t.nodes[1].id).catch(() => undefined); await settle();
+  s = await t.state(); assert.notEqual(s.status, 'running', 'a throw never leaves the book running'); assert.equal(s.phase, 'writing'); assert.equal(s.failureCode, 'boom_code', 'a failed stop keeps its code');
 });
 
 test('rerunCard at gate 2 runs plan, author and proofread of that card only; neighbours keep their text; old proof records stay and are marked old; the card is shown running; the phase stays', async () => {

@@ -2,6 +2,8 @@ import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { effectiveOrder, readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
 import type { PipelineCard } from "./book-pipeline-run";
+import { latestStoredProof } from "../../core/book-pipeline/note-sections";
+import { t } from "../../i18n";
 import {
   collapseReviewCallouts,
   markReviewHandled,
@@ -15,6 +17,9 @@ import {
   removeProgramCalloutsWhere,
   aiProofCallout,
   aiProofFingerprint,
+  attentionBoxFingerprint,
+  attentionCallout,
+  reasonLinesOf,
   type AiBoxInput,
   type ReviewState
 } from "./book-pipeline-review";
@@ -411,7 +416,8 @@ export class BookCallouts {
     if (read.kind !== "usable") return;
     const data = read.data;
     // Gates need every chapter read (the old trial hint and review boxes go, the AI box comes); any other phase wants no callout, so a chapter known to have none is left unread.
-    const gate = data.phase === "gate1" || data.phase === "gate2" || data.phase === "done";
+    const stoppedWriting = data.phase === "writing" && data.status === "stopped";
+    const gate = data.phase === "gate1" || data.phase === "gate2" || data.phase === "done" || stoppedWriting;
     const cards = await this.cardsOf(map, data, gate ? undefined : clean);
     const wanted = new Map<string, WantedCallouts>();
     // The AI proofread box of every chapter whose proofread finished (or could not): at gate 2 and once the book is done (a rerun of one chapter
@@ -432,6 +438,23 @@ export class BookCallouts {
           runId: data.runId,
           nodeId: id,
           ai: { fp: aiProofFingerprint(input), build: () => aiProofCallout(input, data.runId, id) }
+        });
+      }
+    }
+    // A needs-review chapter (at a gate, when done, or in a stopped writing phase) gets the "please look" box in place of its AI box.
+    if (data.phase === "gate2" || data.phase === "done" || stoppedWriting) {
+      for (const { id, card } of cards) {
+        if (card.fields.pipelineStage !== "needs-review") continue;
+        // A hand-edited chapter's own box (its rewrite question, maybe queued) stays: the "please look" box never replaces it.
+        const own = readReviewState(card.raw);
+        if (own?.op && own.runId === idPart(data.runId) && own.nodeId === idPart(id)) continue;
+        const reason =
+          reasonLinesOf(card.fields.pipelineIssue ?? "", latestStoredProof(card.detail))[0] ||
+          t("ui.book_panel_reason_unmet_plain");
+        wanted.set(id, {
+          runId: data.runId,
+          nodeId: id,
+          ai: { fp: attentionBoxFingerprint(reason), build: () => attentionCallout(reason, data.runId, id) }
         });
       }
     }

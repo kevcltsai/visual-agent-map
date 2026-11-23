@@ -593,7 +593,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     bar.createDiv("vam-book-plan-hint").createEl("b", { text: t("ui.book_bar_plan_hint") });
   if (state.mode === "gate1" && state.planReview && state.structureEdit && !actions.structureAccept?.accepted)
     renderStructureEdit(bar, state.structureEdit, actions);
-  if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
+  if ((state.mode === "writing" || state.mode === "done" || state.mode === "stopped") && actions.rerunAsk)
     renderAsk(
       bar,
       "vam-book-rerun-ask",

@@ -965,10 +965,14 @@ export interface Failed extends Committed {
   needsReview?: { nodeId: string; step: PipelineStep };
 }
 /** A step failed. The counter was taken at dispatch; the third failure marks the card (or stops at planning for the global plan). */
-export function applyFailure(data: BookPipelineData, token: StepToken): Failed {
+/** `final`: the failure cannot change on a retry (a bad request), so the step's attempts are used up now. */
+export function applyFailure(data: BookPipelineData, token: StepToken, final = false): Failed {
   if (!isCurrent(data, token)) return { state: data, accepted: false };
   const next = clone(data);
   next.revision++;
+  if (final && token.kind === "global") next.attempts.global = MAX_STEP_ATTEMPTS;
+  else if (final && token.nodeId)
+    next.attempts[token.nodeId] = { ...attemptsOf(next, token.nodeId), [token.kind]: MAX_STEP_ATTEMPTS };
   if (token.kind !== "global" && token.nodeId && attemptsOf(next, token.nodeId)[token.kind] >= MAX_STEP_ATTEMPTS)
     return { state: next, accepted: true, needsReview: { nodeId: token.nodeId, step: token.kind } };
   return { state: next, accepted: true };

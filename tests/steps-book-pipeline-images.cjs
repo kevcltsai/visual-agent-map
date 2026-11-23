@@ -1427,11 +1427,11 @@ test('commons queries: the planner\'s English terms first, the finder\'s words s
   assert.deepEqual(plain(C.commonsQueries({ index: 1, explains: '盆底的排水孔', terms: [] , search: 'pot hole' })), ['pot hole', '盆底的排水孔'], 'no planned terms: as before');
 });
 
-test('commons caption: the file is taken with the slot line when it names at least half (rounded up) of the planned terms; fewer is not taken', () => {
+test('commons caption: the file is taken with the slot line when it names one of the planned terms in full (they are alternatives; 2026-11-24, was half); none is not taken', () => {
   const slot = terms => ({ index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', terms });
   const two = C.parseCommonsAnswer(V4_POT_FILE, slot(['flower pot', 'drainage hole', 'gravel layer', 'potting soil']))[0];
   assert.equal(two.caption, '比較有排水孔的盆和只在盆底鋪碎石的盆。', '2 of 4 terms');
-  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil']))), [], '1 of 3 terms (2 needed)');
+  assert.equal(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil'])).length, 1, '1 of 3 terms is enough');
   assert.equal(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer'])).length, 1, '1 of 2 terms is half');
   assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage gravel', 'pot soil', 'clay saucer']))), [], 'a term counts only when the file has all its words');
 });
@@ -1594,6 +1594,56 @@ test('finder fit: the 4 real wrong pictures and (actual outcome, a false unfit) 
     assert.ok(page, name);
     assert.equal(C.unfitSlot(slot, `${page.title} ${page.description} ${page.categories}`) ? 'unfit' : 'fit', outcome, name);
   }
+});
+
+// ---- fixed cases from the live tiny books of 2026-11-23/24 (main f98212c): good chapters ended 需人看 only for 「第 N 張圖和前後文對不上」 ----
+// Expected verdicts were written before the fix. Baseline (f98212c): S1, S2, S3 and T1 wrong (off / mismatch); W1-W5 and T2, T3 right.
+// Real Commons file-page metadata, fetched 2026-11-24 (title, ImageDescription, Categories as the program reads them).
+const SLEEP_PAGES = {
+  'Hypnogramme.svg': { title: 'File:Hypnogramme.svg', cat: 'GFDL|CC-BY-SA-2.5,2.0,1.0|License migration redundant|Self-published work|Sleep stages', desc: "hypnogramme d'un sommeil normal" },
+  'Sleep_Hypnogram.svg': { title: 'File:Sleep Hypnogram.svg', cat: 'GFDL|CC-BY-SA-2.5,2.0,1.0|License migration redundant|Self-published work|Translation possible - SVG|English-language SVG|Sleep stages', desc: 'Hypnogram of sleep between midnight and 6.30 am' },
+  'Circadian_rhythm.svg': { title: 'File:Circadian rhythm.svg', cat: 'Pineal gland|Suprachiasmatic nucleus|Melatonin|Images with annotations|Circadian rhythm|Self-published work|Valid SVG created with Other tools|SVG biology', desc: "Visible light entering the eye and the cascading positive and negative signalling pathways to neuronal structures in the mamallian brain that may follow: When the eyes are exposed to sunlight, the pineal gland's melatonin production is suppressed, resulting in the secretion of hormones that promote wakefulness." }
+};
+// The plan's two picture slots of the sleep book's chapter 1 (its Prompt, verbatim).
+const SLEEP_SLOT_1 = { index: 1, kind: 'diagram', explains: '以睡眠階段圖呈現一夜之中淺睡、深睡與快速動眼期如何循環。', terms: ['hypnogram sleep stages', 'sleep cycle diagram', 'sleep architecture REM NREM'] };
+const SLEEP_SLOT_2 = { index: 2, kind: 'diagram', explains: '說明光線與作息如何影響人體二十四小時的生理時鐘節律。', terms: ['circadian rhythm diagram', 'biological clock 24 hour', 'suprachiasmatic nucleus light'] };
+const FILE_CASES = [
+  // S1: live run 1, chapter 1 picture 1 (a correct sleep hypnogram, French title); the AI proof said everything 達成.
+  ['S1 good: Hypnogramme for the sleep-stage slot', 'Hypnogramme.svg', SLEEP_SLOT_1, 'fit'],
+  // S2: live run 1, chapter 1 picture 2 (light → SCN → melatonin, the circadian diagram the slot asks for).
+  ['S2 good: Circadian rhythm for the biological-clock slot', 'Circadian_rhythm.svg', SLEEP_SLOT_2, 'fit'],
+  // S3: the English hypnogram of the same book (its cover), asked for the sleep-stage slot.
+  ['S3 good: Sleep Hypnogram for the sleep-stage slot', 'Sleep_Hypnogram.svg', SLEEP_SLOT_1, 'fit'],
+  // S4 borderline swap: a hypnogram for the circadian slot and the circadian diagram for the sleep-stage slot stay unfit.
+  ['S4 swap: Sleep Hypnogram for the biological-clock slot', 'Sleep_Hypnogram.svg', SLEEP_SLOT_2, 'unfit'],
+  ['S5 swap: Circadian rhythm for the sleep-stage slot', 'Circadian_rhythm.svg', SLEEP_SLOT_1, 'unfit']
+];
+
+test('image fit fixed cases: correct sleep diagrams fit their slots (S1-S3), swapped ones do not (S4, S5), and the 5 real wrong samples stay unfit (W1-W5)', async () => {
+  const pages = { ...REAL_PAGES, ...SLEEP_PAGES };
+  const got1 = await lookupOf(Object.keys(pages), async () => ({ status: 200, text: lookupAnswer(Object.values(pages)) }));
+  const said = name => { const p = C.commonsInfoFor(got1.info, name); return `${p.title} ${p.description} ${p.categories}`; };
+  const got = [];
+  for (const [label, name, slot, expected] of FILE_CASES) got.push([label, C.unfitSlot(slot, said(name)) ? 'unfit' : 'fit', expected]);
+  SAMPLES.forEach(([name, slot, expected], i) => got.push([`W${i + 1} ${name}`, C.unfitSlot(slot, said(name)) ? 'unfit' : 'fit', expected]));
+  assert.deepEqual(got.map(([label, verdict]) => `${label}: ${verdict}`), got.map(([label, , expected]) => `${label}: ${expected}`));
+});
+
+test('image fit fixed cases: a picture beside the text of its planned place fits (T1, live run 1 preface); a picture beside unrelated text or in the other slot\'s section is a mismatch (T2, T3)', () => {
+  const figure = n => `![P${n}](https://upload.wikimedia.org/p${n}.jpg)\n畫面中昏暗的臥室角落，一盞發光的檯燈。\n來源：example`;
+  const record = IS.latestSlotsRecord(IS.composeSlotsRecord({ placed: [{ index: 1, href: 'https://upload.wikimedia.org/p1.jpg' }], missing: [], bad: 0 }));
+  // T1: the preface of live run 1, verbatim around its picture (a quiet dark bedroom at night); the quote box after it is not text around it.
+  const preface = { index: 1, kind: 'photograph', explains: '夜裡安靜的臥室，呼應前言對睡眠這件日常事的提問。', anchor: '本書要回答的問題', search: ['bedroom at night'] };
+  const t1 = '如果睡眠只是讓身體停機休息，為什麼我們願意把人生大約三分之一的時間交給它？\n\n這本書要回答的問題只有一個，分成兩半：==睡眠為什麼是身體與大腦的必要工作==，以及我們能怎麼睡得更好。前一半談「為什麼」，後一半談「怎麼做」。\n\n'
+    + figure(1) + '\n\n> [!summary] 摘要\n> 睡眠不是被動的關機。\n\n### 先懂原理，做法才有依據\n\n市面上關於睡眠的建議很多。';
+  assert.deepEqual(plain(IS.checkImageText(t1, [preface], record).issues), [], 'T1 fits');
+  // T2: the same picture beside text about something else (coffee prices) stays a mismatch, even where that text names the planned place.
+  const t2 = '咖啡豆的價格今年上漲，產地的雨季延後。這本書要回答的問題在別處。\n\n' + figure(1) + '\n\n烘焙廠開始調整配方。';
+  assert.deepEqual(plain(IS.checkImageText(t2, [preface], record).issues), [{ index: 1, code: 'mismatch' }], 'T2 mismatch');
+  // T3: the sleep-stage picture (slot 1) placed in the circadian-clock section of live chapter 1 is a mismatch.
+  const t3 = '**生理時鐘如何運作**\n\n週期安排一晚的內容，生理時鐘則安排一整天的節奏。大腦下視丘裡有一小群神經細胞，叫做視交叉上核，是全身的主時鐘。它大約以 24 小時為一輪，調控體溫、荷爾蒙與警覺程度的起伏，讓人白天清醒、夜裡想睡。\n\n'
+    + figure(1) + '\n\n**光線與作息的影響**';
+  assert.deepEqual(plain(IS.checkImageText(t3, [{ ...SLEEP_SLOT_1, anchor: '「一夜的睡眠週期」一節' }], record).issues), [{ index: 1, code: 'mismatch' }], 'T3 mismatch');
 });
 
 test('finder fit: unfitSlot is the rule parseCommonsAnswer applies (words, then caption terms); a slot with no English terms or search cannot be checked', () => {

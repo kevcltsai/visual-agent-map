@@ -61475,11 +61475,13 @@ ${oldDetail}`);
             perSlot.set(index, [...(_c = perSlot.get(index)) != null ? _c : [], ...list2]);
         }
       }
+      const canDraw = !!this.ports.drawDiagrams && ((_f = (_e = (_d = this.ports).diagramsOn) == null ? void 0 : _e.call(_d)) != null ? _f : true);
       if (heldUnfit.size) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language2);
         const usable = /* @__PURE__ */ new Map();
         for (const [index, list2] of heldUnfit) {
-          const kept = list2.filter((item) => !noLastResort.has(`${index}|${item.url}`));
+          const willDraw = canDraw && marked.has(index) && !commonsCut.has(index);
+          const kept = willDraw ? list2.filter((item) => !noLastResort.has(`${index}|${item.url}`)) : list2;
           if (kept.length) usable.set(index, kept);
         }
         const last = slots.filter((slot) => {
@@ -61488,11 +61490,11 @@ ${oldDetail}`);
         });
         const asHeld = { bySlot: usable, found: 0, offTopic: 0 };
         for (const [index, list2] of await probeFound(last, asHeld)) {
-          for (const item of (_d = usable.get(index)) != null ? _d : []) unfitKeys.add(`${index}|${item.url}`);
-          perSlot.set(index, [...(_e = perSlot.get(index)) != null ? _e : [], ...list2]);
+          for (const item of (_g = usable.get(index)) != null ? _g : []) unfitKeys.add(`${index}|${item.url}`);
+          perSlot.set(index, [...(_h = perSlot.get(index)) != null ? _h : [], ...list2]);
         }
       }
-      if (this.ports.drawDiagrams && ((_h = (_g = (_f = this.ports).diagramsOn) == null ? void 0 : _g.call(_f)) != null ? _h : true)) {
+      if (this.ports.drawDiagrams && canDraw) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language2);
         const want = slots.filter((slot) => {
           const outcome = provisional.get(slot.index);

@@ -1876,6 +1876,30 @@ test('look + diagram: a diagram-kind slot whose only candidate the look refused 
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'missing']]);
 });
 
+test('look + diagram: with diagrams switched off, a diagram-kind slot whose only candidate the look refused is placed and recorded off, never empty', async () => {
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  let drawn = 0;
+  const r = await picRig({ slots: lookSlot('diagram'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...bad.ports, diagramsOn: () => false, drawDiagrams: async () => { drawn++; return [lookDiagram]; } } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(drawn, 0);
+  assert.equal(figures(detail).length, 1);
+  assert.match(detail, /img1\.example\.org/);
+  assert.deepEqual(plain(offSlots(detail)), [1]);
+});
+
+test('look + diagram: with no drawDiagrams port, a diagram-kind slot whose only candidate the look refused is placed and recorded off, never empty', async () => {
+  const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
+  const r = await picRig({ slots: lookSlot('diagram'), text: lookText, finder: (request, run, n) => n === 1 ? found({ 1: [webCand(1)] }) : none(),
+    ports: { ...bad.ports } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 1);
+  assert.match(detail, /img1\.example\.org/);
+  assert.deepEqual(plain(offSlots(detail)), [1]);
+});
+
 test('look + diagram: a non-diagram slot whose only candidate the look refused is still placed as the last resort and recorded off; no chart is asked for', async () => {
   const bad = lookPorts({ verdict: () => ({ fits: false, caption: '' }) });
   let drawn = 0;

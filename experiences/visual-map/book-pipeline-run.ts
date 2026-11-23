@@ -5295,8 +5295,8 @@ export class BookPipelineRuns {
     // pictures): it is held back here, so its slot still counts as lacking for the second search and the Commons search, and it is placed
     // only when nothing else turned up, recorded as off its text. What cannot be checked is kept as it was. The cover is not touched.
     const heldUnfit = new Map<number, FoundImage[]>();
-    // A diagram-kind slot's picture the look step refused stays held (so the searches skip it) but is never the last resort: the slot
-    // stays not found and the diagram step draws it. Keys are `${slot}|${url}`.
+    // A diagram-kind slot's picture the look step refused stays held (so the searches skip it) but is not the last resort while the
+    // diagram step will be asked for the slot: it stays not found and the step draws it. If no drawing will happen it is placed, off. Keys are `${slot}|${url}`.
     const noLastResort = new Set<string>();
     const drawnDiagrams = new Map<number, SlotDiagram>();
     const diagramStats = { asked: 0, drawn: 0, rejected: {} as Record<string, number> };
@@ -5531,11 +5531,14 @@ export class BookPipelineRuns {
         }
       }
       // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
+      const canDraw = !!this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true);
       if (heldUnfit.size) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
         const usable = new Map<number, FoundImage[]>();
         for (const [index, list] of heldUnfit) {
-          const kept = list.filter(item => !noLastResort.has(`${index}|${item.url}`));
+          // Held back from the last resort only when the diagram step will really be asked for this slot; otherwise it is placed, off.
+          const willDraw = canDraw && marked.has(index) && !commonsCut.has(index);
+          const kept = willDraw ? list.filter(item => !noLastResort.has(`${index}|${item.url}`)) : list;
           if (kept.length) usable.set(index, kept);
         }
         const last = slots.filter(slot => usable.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {})));
@@ -5546,7 +5549,7 @@ export class BookPipelineRuns {
         }
       }
       // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
-      if (this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true)) {
+      if (this.ports.drawDiagrams && canDraw) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
         const want = slots.filter(slot => {
           const outcome = provisional.get(slot.index);

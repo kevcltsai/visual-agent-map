@@ -347,12 +347,12 @@ export class AiTaskService {
           searchQueries: searchQueriesFromEvents(webEvents)
         };
       // A YouTube embed stays only when this call opened that video's page; a run that opens no pages (Quick) keeps none.
-      if ((context.mode ?? "task") === "task" && role === undefined && !input.countRepair)
-        result.detail = keepOpenedVideoEmbeds(
-          result.detail,
-          countsWeb ? openedUrlsFromEvents(webEvents) : [],
-          input.detail
-        );
+      // The count repair's detail goes through the same filter below, with this call's opened pages.
+      const videoFilter =
+        (context.mode ?? "task") === "task" && role === undefined && !input.countRepair
+          ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] }
+          : null;
+      if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
@@ -418,7 +418,12 @@ export class AiTaskService {
             );
             // Only the detail comes from the repair; it runs local, so its summary, suggestions and visual
             // references would replace the first reply's with less.
-            result = { ...result, detail: repaired.detail };
+            result = {
+              ...result,
+              detail: videoFilter
+                ? keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail)
+                : repaired.detail
+            };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
             if (signal?.aborted || (error instanceof Error && error.name === "AbortError") || isBudgetExhausted(error))

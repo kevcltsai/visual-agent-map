@@ -61,6 +61,59 @@ test('an id already embedded in the existing note survives a rewrite; a new un-o
 });
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
-  assert.match(source, /keepOpenedVideoEmbeds\(\s*result\.detail,\s*countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\],\s*input\.detail\s*\)/);
+  assert.match(source, /opened: countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]/);
+  assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, videoFilter\.opened, input\.detail\)/);
   assert.match(source, /if \(keepsEvents \|\| countsWeb\) webEvents\.push\(event\)/);
+});
+
+// ---- AiTaskService behaviour (reviewer R1): a fake runtime with web events ----
+const { load } = require('./support-replay.cjs');
+const { AiTaskService } = load('core/ai-task-service.ts');
+const templates = load('ai/detail-templates.ts');
+const ctx = (extra = {}) => ({ title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do the task', ancestors: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off', ...extra });
+const openPage = url => ({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url } } } });
+const rigService = handler => {
+  const calls = [];
+  const runtime = { runTask: async (prompt, model, effort, schema, controls) => { const call = { n: calls.length + 1, prompt, controls }; calls.push(call); return handler(call); } };
+  const service = new AiTaskService({
+    pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null,
+    codexRuntime: () => runtime, claudeRuntime: () => runtime
+  });
+  return { service, calls };
+};
+const reply = detail => JSON.stringify({ summary: 'S', detail, suggestions: [], visualReferences: [] });
+const countInput = extra => {
+  const template = templates.copyTemplate(templates.standardTemplate('zh-TW'), '教學', 't1');
+  template.sections.splice(2, 0, { id: 'ex', name: '範例', description: '', role: 'none', count: { mode: 'exact', n: 3 }, aliases: [] });
+  return ctx({ language: 'zh-TW', outputLanguage: 'zh-TW', detailTemplate: template, ...extra });
+};
+const items = n => Array.from({ length: n }, (_, i) => `- ${i + 1}`).join('\n');
+const body = (n, extra = '') => `### 核心結論\n\n- a\n\n### 範例\n\n${items(n)}${extra}`;
+
+test('AiTaskService: a research run keeps the embed of an opened video and removes an un-opened one', async () => {
+  const h = rigService(call => {
+    call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${A}`));
+    return reply(`x\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})\n`);
+  });
+  const result = await h.service.askModel(ctx({ researchMode: 'research', researchDepth: 'normal' }), 'gpt-6-luna', 'low');
+  assert.ok(result.detail.includes(`![](https://www.youtube.com/watch?v=${A})`));
+  assert.ok(!result.detail.includes(B));
+});
+test('AiTaskService: a Quick run opens no page, so every embed goes', async () => {
+  const h = rigService(call => reply(`x\n\n![](https://youtu.be/${A})\n`));
+  const result = await h.service.askModel(ctx(), 'gpt-6-luna', 'low');
+  assert.ok(!result.detail.includes(A));
+});
+test('count repair: an un-opened id added by the repair is removed; the opened id of the first call stays', async () => {
+  const h = rigService(call => {
+    if (call.n === 1) {
+      call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${A}`));
+      return reply(body(2, `\n\n![](https://youtu.be/${A})`));
+    }
+    return reply(body(3, `\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})`));
+  });
+  const result = await h.service.askModel(countInput({ researchMode: 'research', researchDepth: 'normal' }), 'gpt-6-luna', 'low');
+  assert.equal(h.calls.length, 2, 'the count repair ran');
+  assert.ok(result.detail.includes(`watch?v=${A}`), 'the opened id stays');
+  assert.ok(!result.detail.includes(B), 'the repair cannot add a video the provider never opened');
 });

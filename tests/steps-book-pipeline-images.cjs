@@ -1333,6 +1333,19 @@ test('commons limit in a run: a slot Commons kept answering 429 for is rate_limi
   assert.match(r.stat.logs.join('\n'), /commons=4 commons_limited=1/);
 });
 
+test('commons limit with the diagram port: a rate-limited diagram-kind slot is not asked for a chart and stays rate_limited', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  let drawn = 0;
+  const r = await picRig({ text, slots: 1,
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
+    ports: { fetchCommons: async () => ({ status: 429, text: '' }), drawDiagrams: async () => { drawn++; return [{ slot: 1, title: 'x', mermaid: 'flowchart LR\n  A[甲] --> B[乙]' }]; } } });
+  await run(r);
+  const note = await r.note(0);
+  assert.equal(drawn, 0);
+  assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'rate_limited']]);
+  assert.match(note.pipelineIssue, /(?:^|\s)images:limited(?:\s|$)/);
+});
+
 test('commons run budget: once a book run has waited 180 s on 429 answers, no chapter asks Commons anything more', async () => {
   let clock = 0;
   const queue = new C.CommonsQueue(0, async ms => { clock += ms; });

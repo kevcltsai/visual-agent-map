@@ -1531,7 +1531,7 @@ test('card (review-a B3): after a tick resolves the chapter, its card hides the 
   assert.equal(after.issues, 0, 'no issue line once resolved');
 });
 // ---- T9: a hand-edited chapter's box (keep / rewrite) and the rerun question (G) ----
-const { stampDetail, integrityFpRaw } = support.load('core/book-pipeline/body-integrity.ts');
+const { stampDetail, keepDetail, integrityFpRaw } = support.load('core/book-pipeline/body-integrity.ts');
 async function handRig() {
   const r = await boxRig();
   await r.plugin.repo.writePipelineFields(r.node.path, { pipelineIssue: 'write failed: hand_edited' });
@@ -1600,6 +1600,21 @@ test('T9 G: rerunning a hand-edited chapter asks first (nothing runs); confirmin
   assert.equal(clean.calls.length, 1);
   assert.equal(JSON.stringify(clean.calls[0][2]), '{}', 'no permission asked for or given');
   assert.equal(clean.asked(), undefined);
+});
+// 章節文字歸屬 (text-ownership-fixes 03): decision G asks only for a hand-edited text; a kept program text holds no edits.
+test('T9 G: a kept program text ("accept as it is") reruns at once; a kept text edited since still asks', async () => {
+  lang('zh-TW');
+  const r = await askRig({ edited: false });
+  await r.type(keepDetail(stampDetail('第一段。\n\n第二段。')));
+  r.view.runBookCardRerun(r.node); await dom.tick(); await dom.tick();
+  assert.equal(r.asked(), undefined, 'no question');
+  assert.equal(r.calls.length, 1);
+  assert.equal(JSON.stringify(r.calls[0][2]), '{}', 'no permission needed');
+  const s = await askRig({ edited: false });
+  await s.type(keepDetail(stampDetail('第一段。\n\n第二段。')).replace('第二段', '第三段'));
+  s.view.runBookCardRerun(s.node); await dom.tick(); await dom.tick();
+  assert.ok(s.asked(), 'edited after the keep: asked');
+  assert.deepEqual(s.calls, []);
 });
 test('T9 G: cancel drops the question and runs nothing', async () => {
   lang('zh-TW');

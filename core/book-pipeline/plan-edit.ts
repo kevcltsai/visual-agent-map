@@ -4,7 +4,7 @@
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import { isPlaceholder } from "../note-placeholder";
-import { bodyStateRaw, isKeptRaw, isUntouched } from "./body-integrity";
+import { mayRewriteRaw } from "./body-integrity";
 import {
   composeCardPrompt,
   parseCardCover,
@@ -169,9 +169,7 @@ const coversText = (summary: string): string => (isPlaceholder(summary.trim()) ?
  * (no plan the planner wrote). A text that is clean or empty and not kept is open.
  */
 export function planLockedRaw(raw: string, prompt: string): boolean {
-  const state = bodyStateRaw(raw);
-  const open = (state === "clean" || state === "empty") && !isKeptRaw(raw);
-  return !open || !readBrief(prompt).covers;
+  return !mayRewriteRaw(raw) || !readBrief(prompt).covers;
 }
 
 /** One card as the chief editor reads it (a card the program may not rewrite is marked locked). */
@@ -276,7 +274,7 @@ export async function writePlanEdits(
     if (above === undefined || !abovePath || !ownPath) continue;
     if (!authorize()) return { written, cancelled: true };
     const raw = await ports.readCard(abovePath);
-    if (!isUntouched(raw.detail)) continue;
+    if (!mayRewriteRaw(raw.raw)) continue;
     const covers = coversText(parseCardPrompt((await ports.readCard(ownPath)).prompt).covers ?? "").trim();
     const prompt = covers
       ? rewriteNeighbourLine(

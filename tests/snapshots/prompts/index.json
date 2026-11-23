@@ -361,6 +361,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-draw-diagrams.en": {
+      "builder": "core/steps/book-pipeline/draw-diagrams.ts drawDiagramsStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-draw-diagrams.zh": {
+      "builder": "core/steps/book-pipeline/draw-diagrams.ts drawDiagramsStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-draw-diagrams.zh-CN": {
+      "builder": "core/steps/book-pipeline/draw-diagrams.ts drawDiagramsStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-expand-requirements.en": {
       "builder": "core/book-pipeline/settings.ts bookExpandRequirements",
       "language": "en",

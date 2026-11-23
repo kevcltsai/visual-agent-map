@@ -60,6 +60,7 @@ import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
 import { downloadPicture, runImageFitCheck } from "./core/steps/book-pipeline/image-fit-check";
+import { runDrawDiagrams } from "./core/steps/book-pipeline/draw-diagrams";
 import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
 import { COMMONS_API } from "./core/book-pipeline/commons-search";
@@ -939,6 +940,9 @@ export default class VisualAgentMapPlugin extends Plugin {
         return undefined;
       }
     },
+    drawDiagrams: (request, run) => runDrawDiagrams(this.aiCalls, request, run),
+    diagramsOn: () => this.settings.addDiagramsAfterResearch,
+    mermaidSyntax: (code: string) => this.mermaidSyntax(code),
     // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
     fetchCommons: async url => {
       if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");

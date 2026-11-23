@@ -351,7 +351,7 @@ import {
   readPipelineStage,
   type BookPipelineData
 } from "../../core/book-pipeline/model";
-import { bodyStateRaw, integrityFp, integrityFpRaw, isKeptRaw } from "../../core/book-pipeline/body-integrity";
+import { integrityFp, integrityFpRaw, mayRewriteRaw } from "../../core/book-pipeline/body-integrity";
 import {
   type BookBarActions,
   bookBarState,
@@ -10015,8 +10015,8 @@ export class VisualAgentMapView extends ItemView {
       const file = this.app.vault.getAbstractFileByPath(node.path);
       const raw = file instanceof TFile ? await this.app.vault.read(file).catch(() => null) : null;
       if (raw !== null) {
-        const state = bodyStateRaw(raw);
-        if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
+        // A kept text the program wrote itself ("accept as it is") holds no edits: the rerun is the reader's ask, no question.
+        if (!mayRewriteRaw(raw, { rerun: true })) {
           this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
           this.bookBarFocus = "rerun-go";
           return;

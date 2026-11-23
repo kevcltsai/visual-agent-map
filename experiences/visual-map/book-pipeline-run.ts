@@ -241,9 +241,18 @@ import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import {
+  checkDiagram,
+  type DiagramDraft,
+  type DrawDiagramsRequest
+} from "../../core/steps/book-pipeline/draw-diagrams";
+import { isDiagramKind } from "../../core/steps/book-pipeline/find-images";
+import type { MermaidSyntaxCheck } from "../../ai/mermaid-safety";
+import {
   checkImageText,
   choosePictures,
   composeImageTextLine,
+  diagramCaption,
+  diagramTitle,
   composeSlotsRecord,
   imageIssueTokens,
   latestSlotsRecord,
@@ -261,6 +270,7 @@ import {
   type FillResult,
   type ImageSlot,
   type ProbedCandidate,
+  type SlotDiagram,
   type SlotFigure,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
@@ -328,10 +338,10 @@ import {
   integrityFpRaw,
   isKept,
   isKeptRaw,
-  isUntouched,
-  pipelineWroteRaw,
+  mayRewriteRaw,
   programStamp,
   programStampRaw,
+  readerSummaryRaw,
   stampRaw
 } from "../../core/book-pipeline/body-integrity";
 
@@ -549,6 +559,18 @@ export interface BookPipelinePorts {
    * the model's image input and returns it as a data URL; undefined when refused or failed. Never writes to the vault.
    */
   fetchPicture?(url: string, model: string, signal: AbortSignal): Promise<string | undefined>;
+  /**
+   * Production: `runDrawDiagrams(aiCalls, request, run)`: one tool-free call that may draw a short Mermaid chart from the chapter text for
+   * each diagram-kind slot still without a picture. Absent: nothing is drawn.
+   */
+  drawDiagrams?(
+    request: DrawDiagramsRequest,
+    run: { signal: AbortSignal; admission?: AdmissionContext }
+  ): Promise<DiagramDraft[]>;
+  /** The "add diagrams" setting: false turns the drawing off. Absent: on. */
+  diagramsOn?(): boolean;
+  /** Production: the Mermaid parser check; a chart it calls invalid is dropped. Absent or "unavailable": the program checks alone. */
+  mermaidSyntax?: MermaidSyntaxCheck;
   /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
   fetchCommons?: CommonsFetch;
   /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
@@ -1997,8 +2019,7 @@ export class BookPipelineRuns {
                   chaptersKey !== undefined
                     ? await this.ports.readCard(drive.cards.get(id)?.path ?? "").catch(() => undefined)
                     : undefined;
-                const state = written ? bodyStateRaw(written.raw) : undefined;
-                const mine = !!written && (state === "clean" || state === "empty") && !isKeptRaw(written.raw);
+                const mine = !!written && mayRewriteRaw(written.raw);
                 const after = mine ? await bookKey() : undefined;
                 if (chaptersKey !== undefined && after !== undefined && after !== chaptersKey) {
                   const rekeyed = await drive.store
@@ -2201,7 +2222,7 @@ export class BookPipelineRuns {
         const info = id === undefined ? undefined : drive.cards.get(id);
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
-        if (!isUntouched(raw.detail)) continue;
+        if (!mayRewriteRaw(raw.raw)) continue;
         // A `previous` line's sentence is the plan's own (the earlier ideas the card stands on), so it is kept; only a `next` line is rewritten.
         const prompt = (key === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
           raw.prompt,
@@ -3536,8 +3557,7 @@ export class BookPipelineRuns {
       }
       const targets = same?.pending ?? [];
       const raw = card.raw;
-      const state = bodyStateRaw(raw);
-      if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
+      if (!mayRewriteRaw(raw)) {
         // The reader's own text (hand-edited, unknown or kept): no call, nothing is rewritten, every problem is left open.
         const refused = Object.fromEntries(targets.map(target => [target.id, "hand_edited"]));
         const done = await drive.store.commit(current =>
@@ -3778,8 +3798,7 @@ export class BookPipelineRuns {
         const mine = targets.filter(target => (target.chapter ?? 1) === at + 1);
         if (!mine.length) continue;
         const chapter = chapters[at];
-        const state = bodyStateRaw(chapter.raw);
-        if ((state !== "clean" && state !== "empty") || isKeptRaw(chapter.raw)) {
+        if (!mayRewriteRaw(chapter.raw)) {
           for (const target of mine) refused[target.id] = "hand_edited";
           continue;
         }
@@ -4277,7 +4296,9 @@ export class BookPipelineRuns {
         card => card.raw,
         () => undefined
       );
-      if (raw === undefined || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
+      // The text's owner alone: a one-time permit or the card's own rerun opens only that rewrite, never a structure change (the same
+      // rule as the chat card's lock).
+      if (raw === undefined || !mayRewriteRaw(raw)) locked.add(id);
     }
     return locked;
   }
@@ -4506,11 +4527,12 @@ export class BookPipelineRuns {
    * one-time permission for exactly this text. A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint.
    */
   private mayOverwriteCard(drive: Drive, nodeId: string, raw: string): boolean {
-    const state = bodyStateRaw(raw);
     // A kept text the program wrote itself ("accept as it is"): only the card's own rerun (the reader's explicit ask) rewrites it.
-    if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || drive.rerun?.nodeId === nodeId)) return true;
     const permit = drive.overwrite.get(nodeId);
-    return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+    return mayRewriteRaw(raw, {
+      rerun: drive.rerun?.nodeId === nodeId,
+      permit: permit?.runId === drive.store.state.runId ? permit.fingerprint : undefined
+    });
   }
 
   private async execPlan(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {
@@ -4520,11 +4542,7 @@ export class BookPipelineRuns {
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text): the plan and the write keep it.
-    if (
-      (isKeptRaw(card.raw) && bodyStateRaw(card.raw) !== "clean") ||
-      (bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
-    )
-      drive.ownSummary.add(nodeId);
+    if (readerSummaryRaw(card.raw)) drive.ownSummary.add(nodeId);
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
@@ -5277,6 +5295,11 @@ export class BookPipelineRuns {
     // pictures): it is held back here, so its slot still counts as lacking for the second search and the Commons search, and it is placed
     // only when nothing else turned up, recorded as off its text. What cannot be checked is kept as it was. The cover is not touched.
     const heldUnfit = new Map<number, FoundImage[]>();
+    // A diagram-kind slot's picture the look step refused stays held (so the searches skip it) but is never the last resort: the slot
+    // stays not found and the diagram step draws it. Keys are `${slot}|${url}`.
+    const noLastResort = new Set<string>();
+    const drawnDiagrams = new Map<number, SlotDiagram>();
+    const diagramStats = { asked: 0, drawn: 0, rejected: {} as Record<string, number> };
     const fitFound = async (from: FoundImages | undefined): Promise<FoundImages | undefined> => {
       const fetchCommons = this.ports.fetchCommons;
       if (!from || !fetchCommons) return from;
@@ -5509,13 +5532,74 @@ export class BookPipelineRuns {
       // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
       if (heldUnfit.size) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
-        const last = slots.filter(
-          slot => heldUnfit.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {}))
-        );
-        const asHeld: FoundImages = { bySlot: heldUnfit, found: 0, offTopic: 0 };
+        const usable = new Map<number, FoundImage[]>();
+        for (const [index, list] of heldUnfit) {
+          const kept = list.filter(item => !noLastResort.has(`${index}|${item.url}`));
+          if (kept.length) usable.set(index, kept);
+        }
+        const last = slots.filter(slot => usable.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {})));
+        const asHeld: FoundImages = { bySlot: usable, found: 0, offTopic: 0 };
         for (const [index, list] of await probeFound(last, asHeld)) {
-          for (const item of heldUnfit.get(index) ?? []) unfitKeys.add(`${index}|${item.url}`);
+          for (const item of usable.get(index) ?? []) unfitKeys.add(`${index}|${item.url}`);
           perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+        }
+      }
+      // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
+      if (this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true)) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const want = slots.filter(slot => {
+          const outcome = provisional.get(slot.index);
+          return (
+            marked.has(slot.index) &&
+            !commonsCut.has(slot.index) &&
+            isDiagramKind(slot.kind) &&
+            !!outcome &&
+            "reasonCode" in outcome &&
+            outcome.reasonCode === "not_found"
+          );
+        });
+        if (want.length) {
+          diagramStats.asked = want.length;
+          const text = stripImageLines(chapterBody(first.detail));
+          let drafts: DiagramDraft[] = [];
+          try {
+            drafts = await untilAborted(
+              signal,
+              this.ports.drawDiagrams(
+                {
+                  ...this.base(drive, drive.config.authorModel),
+                  chapter: text,
+                  slots: want.map(({ index, kind, explains }) => ({ index, kind, explains }))
+                },
+                { signal, admission: drive.admission }
+              )
+            );
+          } catch (error) {
+            if (isBudgetExhausted(error) || signal.aborted) throw error;
+          }
+          for (const draft of drafts) {
+            const slot = want.find(item => item.index === draft.slot);
+            if (!slot) continue;
+            const checked = checkDiagram(draft, text);
+            let code: string | undefined = checked.ok ? undefined : checked.code;
+            let title = "";
+            if (checked.ok) {
+              title = diagramTitle(draft.title, slot.explains, language);
+              const lines = ["```mermaid", checked.mermaid, "```", "", diagramCaption(title, language)].join("\n");
+              // The fill's exit check refuses a whole chapter for one such line, so a chart it would refuse is dropped alone here.
+              if (this.exitCheck(lines, new Set())) code = "unsafe";
+              else if (this.ports.mermaidSyntax) {
+                const verdict = await untilAborted(signal, this.ports.mermaidSyntax(checked.mermaid));
+                if (verdict === "invalid") code = "syntax";
+              }
+            }
+            if (code || !checked.ok) {
+              diagramStats.rejected[code ?? "unsafe"] = (diagramStats.rejected[code ?? "unsafe"] ?? 0) + 1;
+              continue;
+            }
+            drawnDiagrams.set(slot.index, { title, mermaid: checked.mermaid });
+          }
+          diagramStats.drawn = drawnDiagrams.size;
         }
       }
     } catch (error) {
@@ -5540,6 +5624,11 @@ export class BookPipelineRuns {
       },
       language
     );
+    // A slot still not found whose chart passed the checks is filled by the chart (the guarded write refuses a card edited meanwhile).
+    for (const [index, diagram] of drawnDiagrams) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found") outcomes.set(index, { diagram });
+    }
     // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
     for (const index of commonsCut) {
       const outcome = outcomes.get(index);
@@ -5678,6 +5767,17 @@ export class BookPipelineRuns {
               )
             ),
             ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
+            ...(diagramStats.asked
+              ? {
+                  diagram_asked: diagramStats.asked,
+                  diagram_drawn: result.diagrams?.length ?? 0,
+                  diagram_declined:
+                    diagramStats.asked -
+                    drawnDiagrams.size -
+                    Object.values(diagramStats.rejected).reduce((a, b) => a + b, 0)
+                }
+              : {}),
+            ...Object.fromEntries(Object.entries(diagramStats.rejected).map(([code, n]) => [`diagram_rej_${code}`, n])),
             ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
@@ -5809,7 +5909,7 @@ export class BookPipelineRuns {
     off?: ReadonlySet<number>,
     cover?: CoverWrite
   ): Promise<FillResult | string> {
-    const result = fillSlotMarkers(latest.detail, slots, outcomes);
+    const result = fillSlotMarkers(latest.detail, slots, outcomes, language);
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
@@ -5899,8 +5999,8 @@ export class BookPipelineRuns {
       issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
     );
     const pictureIssue = [
-      ...(minimum !== undefined && imageCheck.placed < minimum
-        ? [pictureShortfallToken(imageCheck.placed, minimum)]
+      ...(minimum !== undefined && imageCheck.placed + imageCheck.diagrams < minimum
+        ? [pictureShortfallToken(imageCheck.placed + imageCheck.diagrams, minimum)]
         : []),
       ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
       ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : []),

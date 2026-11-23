@@ -213,3 +213,35 @@ export function pipelineWroteRaw(raw: string): boolean {
 export const bodyStateRaw = (raw: string): BodyState =>
   bodyState(detailBlockOf(raw) ?? "", cardDetailOf(raw), pipelineWroteRaw(raw));
 export const integrityFpRaw = (raw: string): string => integrityFp(detailBlockOf(raw) ?? "");
+
+// ---- whose chapter text this is (product glossary: 章節文字歸屬) ----
+
+/** What lets the program rewrite a chapter text the reader holds: the card's own rerun, or a one-time permit bound to a fingerprint. */
+export interface RewriteAllowance {
+  /** The reader asked for this card's rerun: a kept text the program wrote itself (clean or empty) may be rewritten. */
+  rerun?: boolean;
+  /** The fingerprint a one-time permit was given for (only for the current run); it holds while the text still has it. */
+  permit?: string;
+}
+
+/**
+ * Whether the program may rewrite this chapter text without asking: the text is the program's (clean or empty) and the reader has not
+ * kept it. A kept text the program wrote itself is open to the card's own rerun; any text is open to a permit for exactly this text.
+ */
+export function mayRewriteRaw(raw: string, allow: RewriteAllowance = {}): boolean {
+  const state = bodyStateRaw(raw);
+  if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || allow.rerun)) return true;
+  return !!allow.permit && allow.permit === integrityFpRaw(raw);
+}
+
+/**
+ * Whether the card's Summary is the reader's own, so a plan change keeps it: the reader kept a text that is not the program's untouched
+ * one, or the card has text from before the book (unknown, and the pipeline never wrote it).
+ */
+export function readerSummaryRaw(raw: string): boolean {
+  const state = bodyStateRaw(raw);
+  return (isKeptRaw(raw) && state !== "clean") || (state === "unknown" && !pipelineWroteRaw(raw));
+}
+
+/** The reader kept a text that has been edited since: the keep no longer holds, and the hand-edit question is asked again. */
+export const keepVoided = (detail: string): boolean => !!readBodyRecord(detail)?.kept && !isKept(detail);

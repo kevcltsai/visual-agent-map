@@ -266,7 +266,59 @@ export interface SlotFigure {
   /** The work key (see workKey) when the author is known: the run claims it so no other chapter shows the same work under another file. */
   work?: string;
 }
-export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
+/** A Mermaid diagram the program drew for a slot that found no picture; `title` is final (see {@link diagramTitle}), `mermaid` a chart body that passed `checkDiagram`. */
+export interface SlotDiagram {
+  title: string;
+  mermaid: string;
+}
+export type SlotOutcome =
+  { figure: SlotFigure } | { diagram: SlotDiagram } | { reasonCode: SlotReasonCode; reasonText?: string };
+
+/** What a caption title may keep: letters, digits, spaces and a few plain marks; everything else (markup, links, comments, math) becomes a space. */
+const TITLE_STRIP = /[^\p{L}\p{N}\s·・、，。：:\-–—'"（）]/gu;
+const DIAGRAM_TITLE_MAX = 40;
+const DIAGRAM_FALLBACK_MAX = 20;
+/**
+ * The title of a drawn diagram as written in its caption: the model's title as one plain line (no marker brackets, only letters, digits and a few
+ * plain marks). A Chinese book whose title has no Han character gets the slot's explanation, shortened, instead; an empty result
+ * reads as a generic word.
+ */
+export function diagramTitle(title: string, explains: string, language: string): string {
+  // A run that looks like an address is dropped whole before the character filter (the filter alone would leave its words).
+  const clean = (value: string, max: number): string =>
+    cleanSlotText(
+      value
+        .split(/\s+/)
+        .filter(part => !/:\/\/|www\./i.test(part))
+        .join(" ")
+        .replace(TITLE_STRIP, " "),
+      max
+    );
+  let out = clean(title, DIAGRAM_TITLE_MAX);
+  if (/^zh/i.test(language) && !/\p{Script=Han}/u.test(out)) out = clean(explains, DIAGRAM_FALLBACK_MAX);
+  return out || (/^zh/i.test(language) ? traditionalIf(language, "本章內容") : "chapter content");
+}
+/** The caption line under a drawn diagram (it says the diagram is drawn from the chapter text, not a source picture). */
+export function diagramCaption(title: string, language: string): string {
+  if (/^zh-(?:CN|Hans)/i.test(language)) return `示意图｜${title}（依本章内文整理，非史料原图）`;
+  if (/^zh/i.test(language)) return `示意圖｜${title}（依本章內文整理，非史料原圖）`;
+  return `Diagram | ${title} (drawn from this chapter's text, not a source image)`;
+}
+/** FNV-1a over the chart text with line ends and trailing blanks normalized: 8 hex characters (the record's hash of a drawn diagram). */
+export function diagramHash(mermaid: string): string {
+  let hash = 0x811c9dc5;
+  const text = mermaid
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map(line => line.replace(/\s+$/, ""))
+    .join("\n")
+    .trim();
+  for (const char of text) {
+    hash ^= char.codePointAt(0) as number;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
 
 /** A line of only symbols and blanks (`---`, `===`, `- - -`) can turn the line above into a heading or a rule: a backslash keeps it text (only when it starts with an ASCII punctuation character; `…`, `→`, `★★★` cannot). */
 function plainLine(text: string): string {
@@ -394,6 +446,8 @@ export function choosePictures(
 export interface FillResult {
   text: string;
   placed: { index: number; href: string }[];
+  /** The slots filled by a drawn diagram (the chart text, to hash). Absent on a result made before diagrams existed. */
+  diagrams?: { index: number; mermaid: string }[];
   missing: { index: number; reasonCode: SlotReasonCode }[];
   /** Marker lines refused whole (reworded, or an index the plan does not have). */
   bad: number;
@@ -416,12 +470,16 @@ const isBlank = (line: string | undefined): boolean => line === undefined || !li
 export function fillSlotMarkers(
   content: string,
   slots: readonly Pick<ImageSlot, "index">[],
-  outcomes: ReadonlyMap<number, SlotOutcome>
+  outcomes: ReadonlyMap<number, SlotOutcome>,
+  /** The book language: the caption of a drawn diagram is written in it. */
+  language = ""
 ): FillResult {
   const lines = content.split("\n");
   const scan = scanSlotMarkers(content, slots);
   const cr = content.includes("\r\n") ? "\r" : "";
   const figureAt = new Map<number, SlotFigure>();
+  const diagramAt = new Map<number, SlotDiagram>();
+  const diagrams: NonNullable<FillResult["diagrams"]> = [];
   const missing: FillResult["missing"] = [];
   const placed: FillResult["placed"] = [];
   const sources: FillResult["sources"] = [];
@@ -443,12 +501,20 @@ export function fillSlotMarkers(
       figureAt.set(at, outcome.figure);
       placed.push({ index: slot.index, href: outcome.figure.href });
       if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
+    } else if (outcome && "diagram" in outcome) {
+      diagramAt.set(at, outcome.diagram);
+      diagrams.push({ index: slot.index, mermaid: outcome.diagram.mermaid });
     } else {
-      missing.push({ index: slot.index, reasonCode: outcome?.reasonCode ?? "not_found" });
+      missing.push({
+        index: slot.index,
+        reasonCode: outcome && "reasonCode" in outcome ? outcome.reasonCode : "not_found"
+      });
     }
   }
   const dropped = new Set(
-    [...scan.badLines, ...scan.duplicateLines, ...scan.found.values()].filter(at => !figureAt.has(at))
+    [...scan.badLines, ...scan.duplicateLines, ...scan.found.values()].filter(
+      at => !figureAt.has(at) && !diagramAt.has(at)
+    )
   );
   const inline = new Set(scan.inlineLines);
   const added: string[] = [];
@@ -479,6 +545,20 @@ export function fillSlotMarkers(
       if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
       return;
     }
+    const diagram = diagramAt.get(at);
+    if (diagram) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const written = [
+        "```mermaid",
+        ...diagram.mermaid.split("\n"),
+        "```",
+        diagramCaption(diagram.title, language)
+      ].map(text => `${text}${cr}`);
+      out.push(...written);
+      added.push(...written.filter(text => !isBlank(text)));
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
     if (dropped.has(at)) {
       removed = true;
       return;
@@ -494,7 +574,7 @@ export function fillSlotMarkers(
     }
     push(line);
   });
-  return { text: out.join("\n"), placed, missing, bad: scan.badLines.length, sources, added };
+  return { text: out.join("\n"), placed, diagrams, missing, bad: scan.badLines.length, sources, added };
 }
 
 /** Lines as the independent check compares them: markers out, blank lines out. Lines in fences and quotes are compared as they are. */
@@ -525,7 +605,9 @@ export function verifyFill(
   result: FillResult,
   slots: readonly Pick<ImageSlot, "index">[]
 ): "count" | "residual" | "deleted_text" | undefined {
-  const seen = [...result.placed, ...result.missing].map(item => item.index).sort((a, b) => a - b);
+  const seen = [...result.placed, ...(result.diagrams ?? []), ...result.missing]
+    .map(item => item.index)
+    .sort((a, b) => a - b);
   const want = slots.map(slot => slot.index).sort((a, b) => a - b);
   if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
   if (residualMarkerLines(result.text).length) return "residual";
@@ -543,9 +625,9 @@ export function verifyFill(
 
 export interface SlotRecordItem {
   index: number;
-  state: "placed" | "missing";
+  state: "placed" | "missing" | "diagram";
   reasonCode?: SlotReasonCode;
-  /** A short hash of the placed picture's key: enough to see that the picture is still there, no address. */
+  /** A short hash of the placed picture's key (a drawn diagram: of its normalized chart text, see {@link diagramHash}): enough to see that it is still there, no address. */
   hash?: string;
   /** The placed file names none of the words its slot asks for (decided when it was placed: see the run's fill). */
   off?: true;
@@ -575,9 +657,28 @@ export function shortHash(url: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
+/** {@link diagramHash} of every ```mermaid block in a text, in order (what `describeSlots` compares a recorded diagram with). */
+export function diagramHashesOf(text: string): string[] {
+  const out: string[] = [];
+  let open: { fence: string; body: string[] } | undefined;
+  for (const line of text.split("\n")) {
+    const trimmed = line.replace(/\r$/, "");
+    if (open) {
+      if (new RegExp(`^\\s*${open.fence[0]}{${open.fence.length},}\\s*$`).test(trimmed)) {
+        out.push(diagramHash(open.body.join("\n")));
+        open = undefined;
+      } else open.body.push(trimmed);
+      continue;
+    }
+    const m = /^\s*(`{3,}|~{3,})\s*mermaid\b/.exec(trimmed);
+    if (m) open = { fence: m[1], body: [] };
+  }
+  return out;
+}
+
 /** The one machine line the guarded write puts into the research notes (`replaceResearchRecord` keeps only the latest). It holds numbers, codes and hashes only. */
 export function composeSlotsRecord(
-  result: Pick<FillResult, "placed" | "missing" | "bad">,
+  result: Pick<FillResult, "placed" | "missing" | "bad"> & Partial<Pick<FillResult, "diagrams">>,
   off: ReadonlySet<number> = new Set()
 ): string {
   const slots: SlotRecordItem[] = [
@@ -586,6 +687,11 @@ export function composeSlotsRecord(
       state: "placed" as const,
       hash: shortHash(item.href),
       ...(off.has(item.index) ? { off: true as const } : {})
+    })),
+    ...(result.diagrams ?? []).map(item => ({
+      index: item.index,
+      state: "diagram" as const,
+      hash: diagramHash(item.mermaid)
     })),
     ...result.missing.map(item => ({ index: item.index, state: "missing" as const, reasonCode: item.reasonCode }))
   ].sort((a, b) => a.index - b.index);
@@ -607,7 +713,8 @@ export function latestSlotsRecord(detail: string): SlotsRecord | undefined {
       const items: SlotRecordItem[] = [];
       for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS) as Array<Record<string, unknown> | null>) {
         if (!raw || !Number.isInteger(raw.index) || (raw.index as number) < 1) continue;
-        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : undefined;
+        const state =
+          raw.state === "placed" || raw.state === "missing" || raw.state === "diagram" ? raw.state : undefined;
         if (!state) continue;
         const reasonCode = REASONS.find(code => code === raw.reasonCode);
         items.push({
@@ -674,7 +781,7 @@ function splitImageLines(text: string): { text: string; captions: string[] } {
 }
 
 /** What the slot looks like now, read from the record, the plan and the body: `edited` = the recorded picture is no longer in the text (replaced or deleted by hand). */
-export type SlotState = "placed" | "edited" | "missing" | "unrecorded";
+export type SlotState = "placed" | "edited" | "missing" | "unrecorded" | "diagram";
 export interface SlotStatus {
   index: number;
   state: SlotState;
@@ -684,7 +791,9 @@ export interface SlotStatus {
 export function describeSlots(
   slots: readonly Pick<ImageSlot, "index">[],
   record: SlotsRecord | undefined,
-  imageUrls: readonly string[]
+  imageUrls: readonly string[],
+  /** The hashes ({@link diagramHash}) of the mermaid blocks now in the text; absent: a recorded diagram reads as edited. */
+  diagramHashes: readonly string[] = []
 ): SlotStatus[] {
   const now = new Set(imageUrls.map(shortHash));
   return slots.map(slot => {
@@ -695,6 +804,11 @@ export function describeSlots(
         index: slot.index,
         state: "missing" as const,
         ...(item.reasonCode ? { reasonCode: item.reasonCode } : {})
+      };
+    if (item.state === "diagram")
+      return {
+        index: slot.index,
+        state: item.hash && diagramHashes.includes(item.hash) ? ("diagram" as const) : ("edited" as const)
       };
     return { index: slot.index, state: item.hash && now.has(item.hash) ? ("placed" as const) : ("edited" as const) };
   });
@@ -745,6 +859,8 @@ export interface ImageTextCheck {
   kind: "none" | "unrecorded" | "checked";
   planned: number;
   placed: number;
+  /** Slots filled by a drawn diagram: not a picture (no count or mismatch check), but filled for the picture shortfall floor (`placed + diagrams`). */
+  diagrams: number;
   /** Standard images in the chapter text (outside the old picture section). */
   imageCount: number;
   bad: number;
@@ -763,7 +879,7 @@ export function checkImageText(
   slots: readonly ImageSlot[] | undefined,
   record: SlotsRecord | undefined
 ): ImageTextCheck {
-  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  const empty = { planned: 0, placed: 0, diagrams: 0, imageCount: 0, bad: 0, issues: [] };
   if (!slots?.length) return { kind: "none", ...empty };
   if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
   const lines = body.split("\n");
@@ -816,7 +932,15 @@ export function checkImageText(
     if (words.length && hits < Math.min(KEYWORD_HITS, words.length))
       issues.push({ index: item.index, code: "mismatch" });
   }
-  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+  return {
+    kind: "checked",
+    planned: slots.length,
+    placed: placedItems.length,
+    diagrams: record.slots.filter(item => item.state === "diagram").length,
+    imageCount,
+    bad: record.bad,
+    issues
+  };
 }
 
 /** The one `圖文` line of the proof result section. */
@@ -838,7 +962,7 @@ export function composeImageTextLine(language: ContentLanguage, check: ImageText
   if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
   return parts.length
     ? translate(note, "detail.book_slots_issues_0", parts.join(joiner))
-    : translate(note, "detail.book_slots_ok_0", String(check.placed));
+    : translate(note, "detail.book_slots_ok_0", String(check.placed + check.diagrams));
 }
 
 /** The pipeline issue tokens of a check (they count as "worth a look", never as needs-review): one per issue; `image_N` is a slot with no picture, `image_N_mismatch` a placed picture that does not match its text. */

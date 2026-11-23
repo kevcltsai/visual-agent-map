@@ -89,6 +89,38 @@ test('C7 raw evidence: only what the pipeline wrote on a chapter (a written/chec
   assert.equal(b.bodyStateRaw(rawNote('', '')), 'empty', 'an empty card is rewritable');
   assert.equal(b.bodyStateRaw(rawNote('book-role: "body"\n', '\n\n')), 'empty');
 });
+// ---- whose chapter text this is (章節文字歸屬): the named rules every caller asks, one row per kind of text ----
+test('text ownership table: may the program rewrite it, is the Summary the reader\'s, did a keep lapse (same answers as the inline rules they replaced)', () => {
+  const stamped = b.stampDetail(BODY);
+  const edited = stamped.replace('第二段', '第三段');
+  const rows = [
+    { name: 'program text', raw: rawNote('', stamped), rewrite: true, rerun: true, summary: false },
+    { name: 'empty card', raw: rawNote('', ''), rewrite: true, rerun: true, summary: false },
+    { name: 'hand-edited', raw: rawNote('', edited), rewrite: false, rerun: false, summary: false },
+    { name: 'before the book', raw: rawNote('book-role: "body"\n', BODY), rewrite: false, rerun: false, summary: true },
+    { name: 'unknown, pipeline wrote it', raw: rawNote('pipeline-stage: written\n', withSlots(BODY, 1)), rewrite: false, rerun: false, summary: false },
+    { name: 'kept program text', raw: rawNote('', b.keepDetail(stamped)), rewrite: false, rerun: true, summary: false },
+    { name: 'kept hand-edited text', raw: rawNote('', b.keepDetail(edited)), rewrite: false, rerun: false, summary: true }
+  ];
+  for (const row of rows) {
+    const state = b.bodyStateRaw(row.raw);
+    const kept = b.isKeptRaw(row.raw);
+    // The inline rules the callers used to compose (plan-edit, run, view; run + book plan chat): the named rules must agree.
+    const oldRewrite = (state === 'clean' || state === 'empty') && !kept;
+    const oldSummary = (kept && state !== 'clean') || (state === 'unknown' && !b.pipelineWroteRaw(row.raw));
+    assert.equal(b.mayRewriteRaw(row.raw), row.rewrite, `${row.name}: rewrite`);
+    assert.equal(b.mayRewriteRaw(row.raw), oldRewrite, `${row.name}: rewrite as before`);
+    assert.equal(b.mayRewriteRaw(row.raw, { rerun: true }), row.rerun, `${row.name}: the card's own rerun`);
+    assert.equal(b.mayRewriteRaw(row.raw, { permit: b.integrityFpRaw(row.raw) }), true, `${row.name}: a permit for this text`);
+    assert.equal(b.mayRewriteRaw(row.raw, { permit: '0000000000000000' }), row.rewrite, `${row.name}: a permit for another text`);
+    assert.equal(b.readerSummaryRaw(row.raw), row.summary, `${row.name}: reader's Summary`);
+    assert.equal(b.readerSummaryRaw(row.raw), oldSummary, `${row.name}: reader's Summary as before`);
+  }
+  const kept = b.keepDetail(stamped);
+  assert.equal(b.keepVoided(kept), false, 'a keep that still holds');
+  assert.equal(b.keepVoided(kept.replace('第二段', '第四段')), true, 'kept, then edited');
+  assert.equal(b.keepVoided(stamped), false, 'never kept');
+});
 test('old note, branch 2 (picture hashes): a picture swapped, added or removed against the book-slots record: unknown', () => {
   assert.equal(b.bodyState(OLD.replace(url(1), url(9))), 'unknown', 'swapped');
   assert.equal(b.bodyState(withSlots(proofRecord(BODY), 1, 2)), 'unknown', 'a listed picture is gone from the text');

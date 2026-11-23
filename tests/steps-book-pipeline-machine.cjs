@@ -1063,6 +1063,25 @@ test('restructureAtReview: back to planning, the pass is kept (planEdited), open
   assert.deepEqual(plain(machine.restructureAtReview(state, 'later', [], 'x').pendingReset), [], 'no card: nothing reset');
 });
 
+test('samePlanReview: true only at the running gate 1 plan review of the same run and phase start (structure-change-entry 01)', () => {
+  const state = editState();
+  const base = { runId: state.runId, phaseStartedAt: state.phaseStartedAt };
+  assert.equal(machine.atPlanReview(state), true);
+  assert.equal(machine.samePlanReview(state, base), true);
+  const trial = { ...state }; delete trial.planReview;
+  const rows = [
+    ['another run', state, { ...base, runId: 'other' }],
+    ['another phase start', state, { ...base, phaseStartedAt: 'other' }],
+    ['no phase start in the baseline', state, { runId: state.runId }],
+    ['left gate 1', { ...state, phase: 'planning' }, base],
+    ['stopped', machine.stopRun(state), base],
+    ['not the plan review (trial)', trial, base],
+    ['no run', undefined, base],
+    ['no baseline', state, undefined]
+  ];
+  for (const [name, data, b] of rows) assert.equal(machine.samePlanReview(data, b), false, name);
+});
+
 test('restructureAtReview: a no-op for a stopped run, outside gate 1 and without a plan review', () => {
   const state = editState();
   const stopped = machine.stopRun(state);

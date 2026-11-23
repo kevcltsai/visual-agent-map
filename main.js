@@ -51136,6 +51136,8 @@ function resetAffected(next, affected) {
   }
   next.revision++;
 }
+var atPlanReview = (data) => data.phase === "gate1" && data.status === "running" && !!data.planReview;
+var samePlanReview = (data, base) => !!data && !!base && atPlanReview(data) && data.runId === base.runId && data.phaseStartedAt === base.phaseStartedAt;
 function restructureAtReview(data, now, affected, opening) {
   if (data.phase !== "gate1" || data.status !== "running" || !data.planReview) return data;
   const next = clone2(data);
@@ -57814,7 +57816,7 @@ var BookPipelineRuns = class {
    */
   async undoStructureEdit(mapPath, opIds) {
     return this.gateEnter("undoStructure", mapPath, async (drive) => {
-      var _a2, _b2, _c;
+      var _a2, _b2;
       const data = await this.openSaved(drive, mapPath);
       const edit = data.structureEdit;
       if (data.phase !== "gate1" || data.status !== "running" || !edit) throw new BookPipelineRunError("not_gate1");
@@ -57827,11 +57829,11 @@ var BookPipelineRuns = class {
       const picked = new Set(ids2);
       const order = effectiveOrder(data);
       const current = order.map((id) => {
-        var _a3, _b3, _c2;
+        var _a3, _b3, _c;
         return {
           id,
           parentId: (_a3 = drive.parents.get(id)) != null ? _a3 : null,
-          title: (_c2 = (_b3 = drive.cards.get(id)) == null ? void 0 : _b3.title) != null ? _c2 : ""
+          title: (_c = (_b3 = drive.cards.get(id)) == null ? void 0 : _b3.title) != null ? _c : ""
         };
       });
       const nodes = structureAfterUndo(
@@ -57934,34 +57936,17 @@ var BookPipelineRuns = class {
           map.bookPipeline = keptTrace ? { ...made, gateTrace: keptTrace } : made;
         }
       };
-      drive.structureBusy = true;
-      try {
-        let outcome = { ok: false, code: "cancelled" };
-        await this.ports.mutate(async () => {
-          var _a3, _b3, _c2;
-          if (this.dead(drive)) return;
-          outcome = (_c2 = await ((_b3 = (_a3 = this.ports).editBookStructure) == null ? void 0 : _b3.call(_a3, mapPath, work))) != null ? _c2 : outcome;
-        });
-        if (!outcome.ok) {
-          this.log(drive, "structure_undo_failed", "-", "plan", outcome.code);
-          if (outcome.rollbackFailed) throw new Error("structure_rollback");
-          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
-        }
-        await drive.store.commit((state) => ({
-          state: next(state),
-          accepted: true
-        }));
-        const map = await this.ports.readMap(mapPath);
-        drive.cards.clear();
-        drive.stages.clear();
-        drive.skippedRefreshed = false;
-        await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-        drive.members = new Set(map.nodes.map((node) => node.id));
-        const parked = Object.entries(parkedNow).map(([id, path]) => ({ id, path }));
-        if (parked.length && ((_c = this.ports.callouts) == null ? void 0 : _c.clearNotes))
-          await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
-      } finally {
-        drive.structureBusy = false;
+      const outcome = await this.writeStructure(
+        drive,
+        work,
+        (state) => next(state),
+        parkedNow,
+        () => !this.dead(drive)
+      );
+      if (!outcome.ok) {
+        this.log(drive, "structure_undo_failed", "-", "plan", outcome.code);
+        if (outcome.rollbackFailed) throw new Error("structure_rollback");
+        throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
       }
       await this.pointHomesBack(drive, edit, picked);
       for (const id of effectiveOrder(drive.store.state))
@@ -57983,17 +57968,15 @@ var BookPipelineRuns = class {
       "editStructure",
       mapPath,
       async (drive) => {
-        var _a2;
         const data = await this.openSaved(drive, mapPath);
-        if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || data.runId !== expect.runId || data.phaseStartedAt !== expect.phaseStartedAt)
-          throw new BookPipelineRunError("not_gate1");
+        if (!samePlanReview(data, expect)) throw new BookPipelineRunError("not_gate1");
         if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
         const order = effectiveOrder(data);
         const baseNodes = order.map((id) => {
-          var _a3, _b2, _c;
+          var _a2, _b2, _c;
           return {
             id,
-            parentId: (_a3 = drive.parents.get(id)) != null ? _a3 : null,
+            parentId: (_a2 = drive.parents.get(id)) != null ? _a2 : null,
             title: (_c = (_b2 = drive.cards.get(id)) == null ? void 0 : _b2.title) != null ? _c : ""
           };
         });
@@ -58007,7 +57990,7 @@ var BookPipelineRuns = class {
         if (!sim.applied.length) return;
         let affected = [];
         const { work, next, archived } = this.structureWork(drive, sim, baseNodes, [], (state, parts) => {
-          var _a3;
+          var _a2;
           const old = state.structureEdit;
           affected = [...reviewAffected(drive.rootId, baseNodes, parts.nodes, parts.applied)];
           return restructureAtReview(
@@ -58019,7 +58002,7 @@ var BookPipelineRuns = class {
               ...state.trial ? { trial: parts.trial } : {},
               structureEdit: {
                 ...old != null ? old : { runId: state.runId, rejected: [], before: { rootId: drive.rootId, nodes: baseNodes } },
-                applied: [...(_a3 = old == null ? void 0 : old.applied) != null ? _a3 : [], ...parts.applied],
+                applied: [...(_a2 = old == null ? void 0 : old.applied) != null ? _a2 : [], ...parts.applied],
                 archived: { ...old == null ? void 0 : old.archived, ...parts.archived }
               }
             },
@@ -58028,31 +58011,11 @@ var BookPipelineRuns = class {
             typeof opening === "function" ? opening(affected.length) : opening
           );
         });
-        drive.structureBusy = true;
-        try {
-          let outcome = { ok: false, code: "cancelled" };
-          await this.ports.mutate(async () => {
-            var _a3, _b2, _c;
-            if (this.dead(drive)) return;
-            outcome = (_c = await ((_b2 = (_a3 = this.ports).editBookStructure) == null ? void 0 : _b2.call(_a3, mapPath, work))) != null ? _c : outcome;
-          });
-          if (!outcome.ok) {
-            this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
-            if (outcome.rollbackFailed) throw new Error("structure_rollback");
-            throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
-          }
-          await drive.store.commit((state) => ({ state: next(state), accepted: true }));
-          const map = await this.ports.readMap(mapPath);
-          drive.cards.clear();
-          drive.stages.clear();
-          drive.skippedRefreshed = false;
-          await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-          drive.members = new Set(map.nodes.map((node) => node.id));
-          const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-          if (parked.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
-            await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
-        } finally {
-          drive.structureBusy = false;
+        const outcome = await this.writeStructure(drive, work, next, archived, () => !this.dead(drive));
+        if (!outcome.ok) {
+          this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
+          if (outcome.rollbackFailed) throw new Error("structure_rollback");
+          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
         }
         for (const id of effectiveOrder(drive.store.state))
           if (id !== drive.rootId && !affected.includes(id)) drive.planSkipped.add(id);
@@ -60375,7 +60338,6 @@ var BookPipelineRuns = class {
    * rollback stops the run ("fatal").
    */
   async applyStructure(drive, token, sim, baseNodes, materials, rootPath, plainSection) {
-    var _a2;
     const count4 = (kind) => sim.applied.filter((a) => a.op.kind === kind).length;
     this.log(
       drive,
@@ -60416,50 +60378,59 @@ var BookPipelineRuns = class {
       structureEdit: { ...record, applied: parts.applied, archived: parts.archived },
       revision: state.revision + 1
     }));
+    const outcome = await this.writeStructure(drive, work, next, archived, this.authorize(drive, token));
+    if (!outcome.ok) {
+      this.log(drive, "structure_failed", "-", "plan", outcome.code);
+      if (outcome.rollbackFailed) {
+        drive.fatal = new Error("structure_rollback");
+        drive.failure = "structure_rollback";
+        return "fatal";
+      }
+      if (sim.applied.some((a) => a.op.kind === "merge")) {
+        try {
+          const now = await this.ports.readCard(rootPath);
+          await this.ports.updateNoteRawGuarded(rootPath, (content) => replaceBookPlanSection(content, plainSection), {
+            expectedContent: now.raw,
+            authorize: this.authorize(drive, token)
+          });
+        } catch (e) {
+        }
+      }
+    }
+    return "done";
+  }
+  /**
+   * Writes one structure change, the same for the editor's proposal, the chat's change and the undo: the drive is marked structure-busy
+   * (a map change it causes is not a reader's), the notes, Map.md and `bookPipeline` go in one transaction in the write queue (`allowed`
+   * is asked there), and on success the run state is committed with `next`, the drive reads the new map and the parked notes lose the
+   * program's callouts. `parked` is filled by the transaction itself. Returns the transaction's outcome; what a failure means is the
+   * caller's.
+   */
+  async writeStructure(drive, work, next, parked, allowed) {
+    var _a2;
     drive.structureBusy = true;
     try {
       let outcome = { ok: false, code: "cancelled" };
       await this.ports.mutate(async () => {
         var _a3, _b2, _c;
-        if (!this.authorize(drive, token)()) return;
+        if (!allowed()) return;
         outcome = (_c = await ((_b2 = (_a3 = this.ports).editBookStructure) == null ? void 0 : _b2.call(_a3, drive.mapPath, work))) != null ? _c : outcome;
       });
-      if (!outcome.ok) {
-        this.log(drive, "structure_failed", "-", "plan", outcome.code);
-        if (outcome.rollbackFailed) {
-          drive.fatal = new Error("structure_rollback");
-          drive.failure = "structure_rollback";
-          return "fatal";
-        }
-        if (sim.applied.some((a) => a.op.kind === "merge")) {
-          try {
-            const now = await this.ports.readCard(rootPath);
-            await this.ports.updateNoteRawGuarded(rootPath, (content) => replaceBookPlanSection(content, plainSection), {
-              expectedContent: now.raw,
-              authorize: this.authorize(drive, token)
-            });
-          } catch (e) {
-          }
-        }
-        return "done";
-      }
-      await drive.store.commit((state) => ({
-        state: next(state),
-        accepted: true
-      }));
+      if (!outcome.ok) return outcome;
+      await drive.store.commit((state) => ({ state: next(state), accepted: true }));
       const map = await this.ports.readMap(drive.mapPath);
       drive.cards.clear();
       drive.stages.clear();
       drive.skippedRefreshed = false;
       await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
       drive.members = new Set(map.nodes.map((node) => node.id));
-      const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-      if (parked.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
-        await this.ports.callouts.clearNotes(drive.mapPath, runId, parked).catch(() => false);
+      const notes = Object.entries(parked).map(([id, path]) => ({ id, path }));
+      if (notes.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
+        await this.ports.callouts.clearNotes(drive.mapPath, drive.store.state.runId, notes).catch(() => false);
+      return outcome;
     } finally {
       drive.structureBusy = false;
     }
-    return "done";
   }
   /** The one transaction both structure paths write (the notes, Map.md and `bookPipeline`); `compose` makes the new run state from what the edit produced. */
   structureWork(drive, sim, baseNodes, materials, compose2) {
@@ -63014,8 +62985,7 @@ function reviewRun(map) {
   if (!map) return void 0;
   const read = readBookPipeline(map);
   if (read.kind !== "usable") return void 0;
-  const data = read.data;
-  return data.phase === "gate1" && data.status === "running" && data.planReview ? data : void 0;
+  return atPlanReview(read.data) ? read.data : void 0;
 }
 function replanRun(map) {
   if (!map) return void 0;
@@ -63103,18 +63073,14 @@ async function bookPlanChatInput(deps) {
 async function applyBookPlanEdit(deps, action, baseline) {
   var _a2, _b2, _c, _d;
   const plan = baseline.bookPlan;
-  const stillReview = (map2) => {
-    const run = reviewRun(map2);
-    return !!run && run.runId === (plan == null ? void 0 : plan.runId) && run.phaseStartedAt === plan.phaseStartedAt;
-  };
   const started = () => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
   if (!plan) return started();
   const map = await deps.readMap();
   const rootId = rootOf(map);
   const data = reviewRun(map);
-  if (!rootId || !data || !stillReview(deps.map())) return started();
+  if (!rootId || !data || !sameReview(deps.map(), plan)) return started();
   const structure2 = structureOfMap(map, effectiveOrder(data), rootId);
-  const authorize = () => stillReview(deps.map());
+  const authorize = () => sameReview(deps.map(), plan);
   const pathOf = (id) => {
     var _a3;
     return (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path;
@@ -63170,10 +63136,7 @@ var skip = (key4, ...args) => ({
   status: "skipped",
   reason: t(key4, ...args)
 });
-var sameReview = (map, plan) => {
-  const run = reviewRun(map);
-  return !!run && run.runId === plan.runId && run.phaseStartedAt === plan.phaseStartedAt;
-};
+var sameReview = (map, plan) => samePlanReview(reviewRun(map), plan);
 var refusalKey = (code3) => code3 === "not_gate1" ? "ui.map_chat_skip_book_started" : code3 === "stale" ? "ui.map_chat_skip_book_stale" : ["busy", "blocked", "drive_running", "notes_busy"].includes(code3) ? "ui.map_chat_skip_book_busy" : void 0;
 async function applyBookThreadEdit(deps, action, baseline) {
   const plan = baseline.bookPlan;

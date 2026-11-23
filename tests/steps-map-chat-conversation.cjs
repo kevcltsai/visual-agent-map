@@ -304,6 +304,18 @@ test('closed when the apply ends: no settle, record, chain or flush; applying st
   assert.deepEqual(r.record.calls, []);
 });
 
+test('a plan applied for a chain round hands the cards it created to advanceChain through the same work it set on the run', async () => {
+  const r = rig();
+  const run = { state: { round: 2 } };
+  const { card, token, result } = offer(r, [act.child], { run });
+  r.state.apply = async (_result, _baseline, _alive, _anchor, options) => { options.work.created.push('c1', 'c2'); return [{ status: 'done', text: 'ok' }]; };
+  r.log.length = 0;
+  await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, run);
+  const advance = r.log.find(e => e[0] === 'advance')[1];
+  assert.deepEqual(advance.work.created, ['c1', 'c2']);
+  assert.equal(advance.work, run.work);
+  assert.equal(advance.work, r.applyCalls.at(-1)[4].work);
+});
 test('queued steers: user_took_over, no advance, flush(true)', async () => {
   const r = rig({ queued: true });
   const run = { state: { round: 1 } };

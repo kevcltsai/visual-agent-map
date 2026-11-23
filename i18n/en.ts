@@ -2751,6 +2751,12 @@ export const en = {
   "share.size_large_0": "This file is larger than {0}. Turning off Include images makes it much smaller.",
   "share.email_hint": "Some email services block HTML attachments. If yours does, send the file another way.",
   "share.images_failed_0": "{0} images could not be read and are marked in the text instead.",
+  "share.image_check_title_0": "{0} pictures have an unknown or restricted licence. Please check before you share.",
+  "share.image_chip_unknown": "Unknown licence",
+  "share.image_chip_nc": "No commercial use",
+  "share.image_chip_nd": "No changes allowed",
+  "share.image_chip_restricted": "Restricted",
+  "share.image_check_drop_0": "Leave these {0} pictures out of the file (your notes do not change)",
   "share.mermaid_blocked_warning_0":
     "{0} diagrams are shown as source text because Mermaid is not allowed in this vault. Open a note with a diagram, press Allow, then open this dialog again.",
   "share.mermaid_undrawn_warning_0": "{0} diagrams did not finish drawing in time and are shown as source text.",

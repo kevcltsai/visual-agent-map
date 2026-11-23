@@ -2570,6 +2570,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.size_large_0": "这个文件超过 {0}。关闭“包含图片”可以大幅缩小。",
   "share.email_hint": "部分邮箱会拦截 HTML 附件；若被拦截，请改用其他方式发送文件。",
   "share.images_failed_0": "有 {0} 张图片无法读取，改以文字标示。",
+  "share.image_check_title_0": "有 {0} 张图的授权不明或有限制，分享出去前请确认。",
+  "share.image_chip_unknown": "授权不明",
+  "share.image_chip_nc": "不可商用",
+  "share.image_chip_nd": "不可改作",
+  "share.image_chip_restricted": "有限制",
+  "share.image_check_drop_0": "从分享文件拿掉这 {0} 张图（你的笔记不会变）",
   "share.mermaid_blocked_warning_0":
     "有 {0} 张图表因为这个 vault 尚未允许 Mermaid，只以源码呈现。请打开含图表的笔记并点“Allow”，再重新打开这个窗口。",
   "share.mermaid_undrawn_warning_0": "有 {0} 张图表未能在时限内画完，只以源码呈现。",

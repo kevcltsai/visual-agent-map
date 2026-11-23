@@ -1815,6 +1815,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* Obsidian's warning orange is 2.95:1 on the default light dialog; mixed toward --text-normal it stays orange and readable (5.7 light, 8.9 dark) */
 .vam-share-note.vam-share-warning { color: color-mix(in srgb, var(--text-warning, var(--text-normal)) 60%, var(--text-normal)); }
 .vam-share-note.vam-share-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
+.vam-share-image-check-title { margin: 0 0 6px; font-weight: var(--font-semibold); }
+.vam-share-image-check-list { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 4px; }
+.vam-share-image-check-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+.vam-share-image-check-list li > span:first-child { overflow-wrap: anywhere; }
+.vam-share-image-chip { padding: 0 8px; border-radius: 9px; background: var(--background-modifier-hover); color: var(--text-normal); white-space: nowrap; }
+.vam-share-image-drop { display: flex; gap: 8px; align-items: center; cursor: pointer; }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
 .vam-map-chat-model:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }

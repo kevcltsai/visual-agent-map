@@ -2570,6 +2570,12 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.size_large_0": "這個檔案超過 {0}。關閉「包含圖片」可以大幅縮小。",
   "share.email_hint": "部分信箱會擋 HTML 附件；若被擋，請改用其他方式傳送檔案。",
   "share.images_failed_0": "有 {0} 張圖片無法讀取，改以文字標示。",
+  "share.image_check_title_0": "有 {0} 張圖的授權不明或有限制，分享出去前請確認。",
+  "share.image_chip_unknown": "授權不明",
+  "share.image_chip_nc": "不可商用",
+  "share.image_chip_nd": "不可改作",
+  "share.image_chip_restricted": "有限制",
+  "share.image_check_drop_0": "從分享檔拿掉這 {0} 張圖（你的筆記不會變）",
   "share.mermaid_blocked_warning_0":
     "有 {0} 張圖表因為這個 vault 尚未允許 Mermaid，只以原始碼呈現。請開啟含圖表的筆記並按「Allow」，再重新開啟這個視窗。",
   "share.mermaid_undrawn_warning_0": "有 {0} 張圖表未能在時限內畫完，只以原始碼呈現。",

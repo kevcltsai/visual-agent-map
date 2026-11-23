@@ -57,6 +57,7 @@ import {
 import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
+import { withoutFigures } from "./share-image-check";
 import { topLevelSvgs } from "./share-translate-segments";
 
 /** Everything the exporter reads from the open map. A snapshot: later edits to the map do not change an export in progress. */
@@ -358,6 +359,8 @@ export class ShareExporter {
   private disposed = false;
   private forbidden: ForbiddenString[] | null = null;
   private shellText: { key: string; text: string } | null = null;
+  /** topic id -> indexes of the note's pictures the user chose to leave out of the file (the note itself is never changed). */
+  private dropped = new Map<string, ReadonlySet<number>>();
 
   constructor(
     private readonly app: App,
@@ -365,6 +368,15 @@ export class ShareExporter {
     private readonly config: ExporterConfig
   ) {
     this.component.load();
+  }
+
+  /** Leaves the chosen pictures (topic id -> picture indexes, see share-image-check) out of the file; the topics whose choice changed render again. */
+  dropFigures(choice: ReadonlyMap<string, ReadonlySet<number>>): void {
+    const same = (a: ReadonlySet<number> | undefined, b: ReadonlySet<number> | undefined): boolean =>
+      (a?.size ?? 0) === (b?.size ?? 0) && [...(a ?? [])].every(index => b?.has(index));
+    for (const id of new Set([...this.dropped.keys(), ...choice.keys()]))
+      if (!same(this.dropped.get(id), choice.get(id))) this.rendered.delete(id);
+    this.dropped = new Map(choice);
   }
 
   /** Removes the hidden render container and stops everything the render started. Later results are dropped. */
@@ -404,7 +416,8 @@ export class ShareExporter {
    * matter, not in the detail). A cover the detail already embeds is not shown twice. Empty when there is neither.
    */
   private renderSource(id: string): string {
-    const detail = this.source.notes.get(id)?.detail?.trim() ? (this.source.notes.get(id)?.detail ?? "") : "";
+    const raw = this.source.notes.get(id)?.detail?.trim() ? (this.source.notes.get(id)?.detail ?? "") : "";
+    const detail = withoutFigures(raw, this.dropped.get(id) ?? new Set());
     const cover = this.source.covers?.get(id);
     if (!cover) return detail;
     const base = cover.split("/").pop() ?? cover;

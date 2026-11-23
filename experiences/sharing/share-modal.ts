@@ -28,6 +28,7 @@ import {
 } from "./share-format";
 import type { ForbiddenString } from "./share-leak-scan";
 import { publishInstructions } from "./share-publish";
+import { figuresOf, type FigureProblem } from "./share-image-check";
 import { saveShareFile, type SaveEnvironment } from "./share-save";
 import type { ShareTranslationCache } from "./share-translate-plan";
 import type {
@@ -48,6 +49,8 @@ export interface ShareExporterLike {
     translation?: AttachTranslationsOptions
   ): ShareBuildResult;
   dispose(): void;
+  /** Leaves the chosen pictures (topic id -> picture indexes) out of the file; the notes are never changed. */
+  dropFigures?(choice: ReadonlyMap<string, ReadonlySet<number>>): void;
   /** Translation only: what the service translates, a diagram drawer, and the strings every translated language is scanned for. */
   translationSource?(
     options: { includeDetail: boolean; includeImages: boolean },
@@ -155,6 +158,7 @@ export class ShareModal extends Modal {
   private result: ShareBuildResult | null = null;
   private busy = false;
   private saving = false;
+  private dropImages = false;
   private closed = false;
   private failed = false;
   private detailsEl!: HTMLElement;
@@ -243,6 +247,7 @@ export class ShareModal extends Modal {
     if (this.saving || this.closed || this.phase === "translating") return;
     this.savedText = "";
     this.publishFallback = false;
+    this.applyDrop();
     // The notes or images in the file changed: translated text no longer fits it (the session cache still does).
     this.phase = "idle";
     this.translation = null;
@@ -782,9 +787,68 @@ export class ShareModal extends Modal {
     if (advice.level !== "ok") add(t("share.size_warn_0", formatBytes(thresholds.warn)), "vam-share-warning");
     if (advice.suggestNoImages) add(t("share.size_large_0", formatBytes(thresholds.large)), "vam-share-warning");
     if (result.failedImages) add(t("share.images_failed_0", result.failedImages), "vam-share-warning");
+    this.renderImageCheck();
     if (result.mermaidBlocked) add(t("share.mermaid_blocked_warning_0", result.mermaidBlocked), "vam-share-warning");
     if (result.mermaidUndrawn) add(t("share.mermaid_undrawn_warning_0", result.mermaidUndrawn), "vam-share-warning");
     add(t("share.email_hint"));
+  }
+
+  /** The book's pictures whose licence is unknown or restricted (read from each picture's own source line); empty unless the file carries notes and images. */
+  private licenceProblems(): {
+    topic: string;
+    id: string;
+    index: number;
+    alt: string;
+    host: string;
+    problem: FigureProblem;
+  }[] {
+    if (!this.includeDetail || !this.includeImages) return [];
+    return this.options.source.map.nodes.flatMap(node => {
+      const note = this.options.source.notes.get(node.id);
+      return figuresOf(note?.detail ?? "").flatMap(figure =>
+        figure.problem
+          ? [
+              {
+                topic: note?.title ?? "",
+                id: node.id,
+                index: figure.index,
+                alt: figure.alt,
+                host: figure.host,
+                problem: figure.problem
+              }
+            ]
+          : []
+      );
+    });
+  }
+
+  private renderImageCheck(): void {
+    const problems = this.licenceProblems();
+    if (!problems.length) return;
+    const box = this.warningsEl.createDiv({ cls: "vam-share-note vam-share-warning vam-share-image-check" });
+    box.createEl("p", { text: t("share.image_check_title_0", problems.length), cls: "vam-share-image-check-title" });
+    const list = box.createEl("ul", { cls: "vam-share-image-check-list" });
+    for (const item of problems) {
+      const row = list.createEl("li");
+      row.createSpan({ text: [item.topic, item.alt, item.host].filter(Boolean).join(" · ") });
+      row.createSpan({ text: t(`share.image_chip_${item.problem}`), cls: "vam-share-image-chip" });
+    }
+    const label = box.createEl("label", { cls: "vam-share-image-drop" });
+    const check = label.createEl("input", { type: "checkbox" });
+    check.checked = this.dropImages;
+    label.createSpan({ text: t("share.image_check_drop_0", problems.length) });
+    check.addEventListener("change", () => {
+      this.dropImages = check.checked;
+      this.restart();
+    });
+  }
+
+  private applyDrop(): void {
+    const choice = new Map<string, Set<number>>();
+    if (this.dropImages)
+      for (const item of this.licenceProblems())
+        choice.set(item.id, (choice.get(item.id) ?? new Set()).add(item.index));
+    this.exporter.dropFigures?.(choice);
   }
 
   private async save(): Promise<void> {

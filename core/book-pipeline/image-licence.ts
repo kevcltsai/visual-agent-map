@@ -14,3 +14,11 @@ export function licenceStatus({ source, license }: { source: string; license?: s
   if (COMMONS_FILE_PAGE.test(source.trim()) || OPEN.test(text)) return "open";
   return "unknown";
 }
+
+/** Why a restricted licence is restricted, for the share dialog's chip: NC first, then ND, anything else is "other". */
+export function restrictedKind(license?: string): "nc" | "nd" | "other" {
+  const text = license ?? "";
+  if (/(?:^|[^a-z])nc(?:[^a-z]|$)/i.test(text)) return "nc";
+  if (/(?:^|[^a-z])nd(?:[^a-z]|$)/i.test(text)) return "nd";
+  return "other";
+}

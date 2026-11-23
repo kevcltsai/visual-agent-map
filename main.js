@@ -3139,7 +3139,6 @@ var en = {
   "ui.book_phase_budget": "Call budget used up",
   "ui.book_counts_0_1_2_3_4": "Proofread {0}/{1} \xB7 Written {2} \xB7 Planned {3} \xB7 Needs a look {4}",
   "ui.book_progress_text_0_1_2_3": "Proofread {0}, written {1}, planned {2}, needs a look {3}",
-  "ui.book_stopped_at_0_1_2": "Stopped in the {0} phase, proofread {1}/{2}",
   "ui.book_stop": "Stop",
   "ui.book_failed_at_0_1": "Stopped in the {0} phase: {1}",
   "ui.book_retry": "Retry",
@@ -3174,12 +3173,9 @@ var en = {
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_phase_plan_review": "Whole-book plan ready, check the direction",
-  "ui.book_bar_plan_ready_0": "All {0} chapters are planned",
-  "ui.book_bar_open_plan": "Open the whole-book summary",
   "ui.book_struct_label": "Editor's structure changes",
-  "ui.book_struct_head_0": "The editor changed the structure in {0} places",
-  "ui.book_struct_head_all_undone": "All structure changes are undone",
-  "ui.book_struct_now_0_1_2_3": "Now {0} chapters, {1} sections (was {2} chapters, {3} sections)",
+  "ui.book_struct_head_0": "{0} structure changes \xB7",
+  "ui.book_struct_head_all_undone": "All structure changes are undone \xB7",
   "ui.book_struct_kind_add": "Added",
   "ui.book_struct_kind_remove": "Removed",
   "ui.book_struct_kind_merge": "Merged",
@@ -3205,18 +3201,20 @@ var en = {
   "ui.book_struct_skipped_0_1": "{0} more were not applied: {1}.",
   "ui.book_struct_why_locked": "they touch a card you edited",
   "ui.book_struct_why_rules": "they break the structure rules",
-  "ui.book_struct_undo_all": "Undo all",
   "ui.book_struct_accept": "Accept changes",
-  "ui.book_struct_accepted_0": "Accepted the editor's {0} structure changes",
-  "ui.book_struct_accepted_none": "Structure changes put away",
-  "ui.book_struct_reopen": "Show again",
-  "ui.book_struct_undo_all_note_0_1": "Undoing all plans {0} cards again, about {1} AI calls.",
+  "ui.book_progress_writing_0_1": "Writing \xB7 {0}/{1} chapters done",
+  "ui.book_progress_writing_cards_0_1": "Writing \xB7 {0}/{1} cards done",
+  "ui.book_progress_at_chapter_0": "Now writing chapter {0}",
+  "ui.book_progress_at_card_0": "Now writing card {0}",
+  "ui.book_stopped_done_0_1": "Stopped \xB7 {0}/{1} chapters done",
+  "ui.book_stopped_done_cards_0_1": "Stopped \xB7 {0}/{1} cards done",
+  "ui.book_struct_show": "Show \u25B8",
+  "ui.book_struct_hide": "Hide \u25BE",
   "ui.book_struct_refused_missing": "The archived note was not found, so nothing was undone.",
   "ui.book_struct_refused_stale": "The map was just changed, so nothing was undone. Press undo again.",
   "ui.book_struct_busy": "Undoing, please wait\u2026",
   "ui.book_struct_failed": "The undo did not finish; the map is back as it was before.",
   "ui.book_bar_plan_go": "Direction is right, start writing",
-  "ui.book_bar_plan_edit_hint": 'The whole-book summary is open. Edit the whole-book plan in the root note, or the plan in a chapter or section note, then press "Direction is right, start writing".',
   "ui.book_bar_ai_0_1": "AI fixing {0} \xB7 still open {1}",
   "ui.book_bar_done_0_1_2": "{0} chapters \xB7 AI fixed {1} places \xB7 {2} still open",
   "ui.book_phase_fix_again": "AI fixing",
@@ -3232,7 +3230,6 @@ var en = {
   "ui.book_bar_open_issues": "See what is still open",
   "ui.book_bar_open_issues_missing": 'The "Still open" page was not found; it may have been renamed or moved.',
   "ui.book_step_self_check": "Author self-check",
-  "ui.book_bar_back_to_plan": "Back to the plan",
   "ui.book_plan_title_book": 'Book plan: edit freely, then press "{0}"',
   "ui.book_plan_title_preface": "Preface plan \u2014 you can edit it here",
   "ui.book_plan_title_chapter": "Chapter plan \u2014 you can edit it here",
@@ -3240,7 +3237,7 @@ var en = {
   "ui.book_plan_label_entry": "How it opens",
   "ui.book_plan_label_previous": "Idea carried over",
   "ui.book_plan_label_handoff": "Ending and what is left",
-  "ui.book_bar_plan_hint": 'To change it: tell the chief editor on the left, or edit the plan in the notes yourself. Then press "Direction is right, start writing".',
+  "ui.book_bar_plan_hint": "To change anything, just tell the chief editor on the left.",
   "ui.book_stage_pending": "To plan",
   "ui.book_stage_planned": "Planned",
   "ui.book_stage_written": "Written",
@@ -3255,8 +3252,6 @@ var en = {
   "ui.book_place_preface": "Preface",
   "ui.book_place_chapter_0": "Chapter {0}",
   "ui.book_place_section": "Section",
-  "ui.book_bar_plan_ready_struct_0_1": "The preface, {0} chapters and {1} sections are planned",
-  "ui.book_bar_plan_ready_struct_0": "The preface and {0} chapters are planned",
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_progress_line_write_cards_0_1": "Writing card {0}/{1}",
   "ui.book_progress_line_done_cards_0_1": "{0}/{1} cards done",
@@ -6532,7 +6527,6 @@ var zhCN = {
   "ui.book_phase_budget": "\u989D\u5EA6\u7528\u5B8C",
   "ui.book_counts_0_1_2_3_4": "\u5DF2\u6821 {0}\uFF0F{1} \xB7 \u5DF2\u5199 {2} \xB7 \u5DF2\u4F01\u5212 {3} \xB7 \u9700\u4EBA\u770B {4}",
   "ui.book_progress_text_0_1_2_3": "\u5DF2\u6821 {0}\u3001\u5DF2\u5199 {1}\u3001\u5DF2\u4F01\u5212 {2}\u3001\u9700\u4EBA\u770B {3}",
-  "ui.book_stopped_at_0_1_2": "\u505C\u5728\u201C{0}\u201D\u9636\u6BB5\uFF0C\u5DF2\u6821 {1}\uFF0F{2}",
   "ui.book_stop": "\u505C\u6B62",
   "ui.book_failed_at_0_1": "\u505C\u5728\u201C{0}\u201D\u9636\u6BB5\uFF1A{1}",
   "ui.book_retry": "\u91CD\u8BD5",
@@ -6567,12 +6561,9 @@ var zhCN = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_phase_plan_review": "\u5168\u4E66\u4F01\u5212\u597D\u4E86\uFF0C\u770B\u65B9\u5411\u5BF9\u4E0D\u5BF9",
-  "ui.book_bar_plan_ready_0": "{0} \u7AE0\u90FD\u4F01\u5212\u597D\u4E86",
-  "ui.book_bar_open_plan": "\u6253\u5F00\u5168\u4E66\u6458\u8981",
   "ui.book_struct_label": "\u603B\u7F16\u8F91\u7684\u7ED3\u6784\u8C03\u6574",
-  "ui.book_struct_head_0": "\u603B\u7F16\u8F91\u8C03\u6574\u4E86 {0} \u5904\u7ED3\u6784",
-  "ui.book_struct_head_all_undone": "\u7ED3\u6784\u8C03\u6574\u90FD\u5DF2\u8FD8\u539F",
-  "ui.book_struct_now_0_1_2_3": "\u73B0\u5728 {0} \u7AE0 {1} \u8282\uFF08\u539F\u672C {2} \u7AE0 {3} \u8282\uFF09",
+  "ui.book_struct_head_0": "{0} \u5904\u7ED3\u6784\u8C03\u6574 \xB7",
+  "ui.book_struct_head_all_undone": "\u7ED3\u6784\u8C03\u6574\u90FD\u5DF2\u8FD8\u539F \xB7",
   "ui.book_struct_kind_add": "\u65B0\u589E",
   "ui.book_struct_kind_remove": "\u5220\u9664",
   "ui.book_struct_kind_merge": "\u5408\u5E76",
@@ -6598,18 +6589,20 @@ var zhCN = {
   "ui.book_struct_skipped_0_1": "\u53E6\u6709 {0} \u9879\u6CA1\u5957\u7528\uFF1A{1}\u3002",
   "ui.book_struct_why_locked": "\u78B0\u5230\u4F60\u6539\u8FC7\u7684\u5361",
   "ui.book_struct_why_rules": "\u4E0D\u7B26\u5408\u7ED3\u6784\u89C4\u5219",
-  "ui.book_struct_undo_all": "\u5168\u90E8\u8FD8\u539F",
   "ui.book_struct_accept": "\u63A5\u53D7\u8C03\u6574",
-  "ui.book_struct_accepted_0": "\u5DF2\u63A5\u53D7\u603B\u7F16\u8F91\u7684 {0} \u5904\u7ED3\u6784\u8C03\u6574",
-  "ui.book_struct_accepted_none": "\u7ED3\u6784\u8C03\u6574\u5DF2\u6536\u8D77",
-  "ui.book_struct_reopen": "\u518D\u770B\u4E00\u6B21",
-  "ui.book_struct_undo_all_note_0_1": "\u5168\u90E8\u8FD8\u539F\u4F1A\u91CD\u65B0\u4F01\u5212 {0} \u5F20\u5361\uFF0C\u7EA6 {1} \u6B21 AI \u8C03\u7528\u3002",
+  "ui.book_progress_writing_0_1": "\u5199\u4F5C\u4E2D \xB7 \u5DF2\u5B8C\u6210 {0}/{1} \u7AE0",
+  "ui.book_progress_writing_cards_0_1": "\u5199\u4F5C\u4E2D \xB7 \u5DF2\u5B8C\u6210 {0}/{1} \u5F20\u5361",
+  "ui.book_progress_at_chapter_0": "\u6B63\u5728\u5199\u7B2C {0} \u7AE0",
+  "ui.book_progress_at_card_0": "\u6B63\u5728\u5199\u7B2C {0} \u5F20\u5361",
+  "ui.book_stopped_done_0_1": "\u5DF2\u505C\u6B62 \xB7 \u5B8C\u6210 {0}/{1} \u7AE0",
+  "ui.book_stopped_done_cards_0_1": "\u5DF2\u505C\u6B62 \xB7 \u5B8C\u6210 {0}/{1} \u5F20\u5361",
+  "ui.book_struct_show": "\u67E5\u770B \u25B8",
+  "ui.book_struct_hide": "\u6536\u8D77 \u25BE",
   "ui.book_struct_refused_missing": "\u627E\u4E0D\u5230\u5C01\u5B58\u7684\u7B14\u8BB0\uFF0C\u6CA1\u6709\u8FD8\u539F\u4EFB\u4F55\u4E1C\u897F\u3002",
   "ui.book_struct_refused_stale": "\u5FC3\u667A\u56FE\u521A\u88AB\u6539\u8FC7\uFF0C\u6CA1\u6709\u8FD8\u539F\uFF1B\u8BF7\u518D\u6309\u4E00\u6B21\u3002",
   "ui.book_struct_busy": "\u8FD8\u539F\u4E2D\uFF0C\u8BF7\u7A0D\u5019\u2026",
   "ui.book_struct_failed": "\u8FD8\u539F\u6CA1\u6709\u6210\u529F\uFF0C\u5FC3\u667A\u56FE\u5DF2\u56DE\u5230\u8FD8\u539F\u524D\u7684\u6837\u5B50\u3002",
   "ui.book_bar_plan_go": "\u65B9\u5411\u5BF9\uFF0C\u5F00\u59CB\u5199",
-  "ui.book_bar_plan_edit_hint": "\u5DF2\u6253\u5F00\u5168\u4E66\u6458\u8981\u3002\u76F4\u63A5\u6539\u6839\u7B14\u8BB0\u7684\u201C\u5168\u4E66\u4F01\u5212\u201D\u6216\u5404\u7AE0\u3001\u5404\u8282\u7B14\u8BB0\u91CC\u7684\u201C\u4F01\u5212\u201D\uFF0C\u6539\u597D\u518D\u6309\u201C\u65B9\u5411\u5BF9\uFF0C\u5F00\u59CB\u5199\u201D\u3002",
   "ui.book_bar_ai_0_1": "AI \u4FEE\u6B63\u4E2D {0}\u30FB\u4ECD\u6709\u95EE\u9898 {1}",
   "ui.book_bar_done_0_1_2": "{0} \u7AE0\u30FBAI \u4FEE\u4E86 {1} \u5904\u30FB\u4ECD\u6709\u95EE\u9898 {2} \u9879",
   "ui.book_phase_fix_again": "AI \u4FEE\u6B63\u4E2D",
@@ -6625,7 +6618,6 @@ var zhCN = {
   "ui.book_bar_open_issues": "\u770B\u4ECD\u6709\u95EE\u9898",
   "ui.book_bar_open_issues_missing": "\u627E\u4E0D\u5230\u201C\u4ECD\u6709\u95EE\u9898\u201D\u90A3\u4E00\u9875\uFF0C\u53EF\u80FD\u88AB\u6539\u540D\u6216\u79FB\u8D70\u4E86\u3002",
   "ui.book_step_self_check": "\u4F5C\u8005\u81EA\u67E5",
-  "ui.book_bar_back_to_plan": "\u56DE\u53BB\u6539\u4F01\u5212",
   "ui.book_plan_title_book": "\u5168\u4E66\u4F01\u5212\u3000\u53EF\u4EE5\u76F4\u63A5\u6539\uFF0C\u6539\u5B8C\u6309\u201C{0}\u201D",
   "ui.book_plan_title_preface": "\u524D\u8A00\u7684\u4F01\u5212\u3000\u53EF\u4EE5\u76F4\u63A5\u6539",
   "ui.book_plan_title_chapter": "\u8FD9\u4E00\u7AE0\u7684\u4F01\u5212\u3000\u53EF\u4EE5\u76F4\u63A5\u6539",
@@ -6633,7 +6625,7 @@ var zhCN = {
   "ui.book_plan_label_entry": "\u600E\u4E48\u5F00\u573A",
   "ui.book_plan_label_previous": "\u627F\u63A5\u7684\u89C2\u5FF5",
   "ui.book_plan_label_handoff": "\u7ED3\u5C3E\u4E0E\u7559\u4E0B\u7684",
-  "ui.book_bar_plan_hint": "\u60F3\u6539\uFF1A\u76F4\u63A5\u8DDF\u5DE6\u8FB9\u7684\u603B\u7F16\u8F91\u8BF4\uFF1B\u4E5F\u53EF\u4EE5\u81EA\u5DF1\u6539\u7B14\u8BB0\u91CC\u7684\u201C\u4F01\u5212\u201D\u3002\u6539\u5B8C\u518D\u6309\u201C\u65B9\u5411\u5BF9\uFF0C\u5F00\u59CB\u5199\u201D\u3002",
+  "ui.book_bar_plan_hint": "\u60F3\u6539\u5C31\u76F4\u63A5\u8DDF\u5DE6\u8FB9\u7684\u603B\u7F16\u8F91\u8BF4\u3002",
   "ui.book_stage_pending": "\u5F85\u4F01\u5212",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5212",
   "ui.book_stage_written": "\u5DF2\u5199",
@@ -6648,8 +6640,6 @@ var zhCN = {
   "ui.book_place_preface": "\u524D\u8A00",
   "ui.book_place_chapter_0": "\u7B2C {0} \u7AE0",
   "ui.book_place_section": "\u8282",
-  "ui.book_bar_plan_ready_struct_0_1": "\u524D\u8A00\u3001{0} \u7AE0\u3001{1} \u8282\u90FD\u4F01\u5212\u597D\u4E86",
-  "ui.book_bar_plan_ready_struct_0": "\u524D\u8A00\u3001{0} \u7AE0\u90FD\u4F01\u5212\u597D\u4E86",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
@@ -9925,7 +9915,6 @@ var zhTW = {
   "ui.book_phase_budget": "\u984D\u5EA6\u7528\u5B8C",
   "ui.book_counts_0_1_2_3_4": "\u5DF2\u6821 {0}\uFF0F{1} \xB7 \u5DF2\u5BEB {2} \xB7 \u5DF2\u4F01\u5283 {3} \xB7 \u9700\u4EBA\u770B {4}",
   "ui.book_progress_text_0_1_2_3": "\u5DF2\u6821 {0}\u3001\u5DF2\u5BEB {1}\u3001\u5DF2\u4F01\u5283 {2}\u3001\u9700\u4EBA\u770B {3}",
-  "ui.book_stopped_at_0_1_2": "\u505C\u5728\u300C{0}\u300D\u968E\u6BB5\uFF0C\u5DF2\u6821 {1}\uFF0F{2}",
   "ui.book_stop": "\u505C\u6B62",
   "ui.book_failed_at_0_1": "\u505C\u5728\u300C{0}\u300D\u968E\u6BB5\uFF1A{1}",
   "ui.book_retry": "\u91CD\u8A66",
@@ -9960,12 +9949,9 @@ var zhTW = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_phase_plan_review": "\u5168\u66F8\u4F01\u5283\u597D\u4E86\uFF0C\u770B\u65B9\u5411\u5C0D\u4E0D\u5C0D",
-  "ui.book_bar_plan_ready_0": "{0} \u7AE0\u90FD\u4F01\u5283\u597D\u4E86",
-  "ui.book_bar_open_plan": "\u6253\u958B\u5168\u66F8\u6458\u8981",
   "ui.book_struct_label": "\u7E3D\u7DE8\u8F2F\u7684\u7D50\u69CB\u8ABF\u6574",
-  "ui.book_struct_head_0": "\u7E3D\u7DE8\u8F2F\u8ABF\u6574\u4E86 {0} \u8655\u7D50\u69CB",
-  "ui.book_struct_head_all_undone": "\u7D50\u69CB\u8ABF\u6574\u90FD\u5DF2\u9084\u539F",
-  "ui.book_struct_now_0_1_2_3": "\u73FE\u5728 {0} \u7AE0 {1} \u7BC0\uFF08\u539F\u672C {2} \u7AE0 {3} \u7BC0\uFF09",
+  "ui.book_struct_head_0": "{0} \u8655\u7D50\u69CB\u8ABF\u6574 \xB7",
+  "ui.book_struct_head_all_undone": "\u7D50\u69CB\u8ABF\u6574\u90FD\u5DF2\u9084\u539F \xB7",
   "ui.book_struct_kind_add": "\u65B0\u589E",
   "ui.book_struct_kind_remove": "\u522A\u9664",
   "ui.book_struct_kind_merge": "\u5408\u4F75",
@@ -9991,18 +9977,20 @@ var zhTW = {
   "ui.book_struct_skipped_0_1": "\u53E6\u6709 {0} \u9805\u6C92\u5957\u7528\uFF1A{1}\u3002",
   "ui.book_struct_why_locked": "\u78B0\u5230\u4F60\u6539\u904E\u7684\u5361",
   "ui.book_struct_why_rules": "\u4E0D\u7B26\u5408\u7D50\u69CB\u898F\u5247",
-  "ui.book_struct_undo_all": "\u5168\u90E8\u9084\u539F",
   "ui.book_struct_accept": "\u63A5\u53D7\u8ABF\u6574",
-  "ui.book_struct_accepted_0": "\u5DF2\u63A5\u53D7\u7E3D\u7DE8\u8F2F\u7684 {0} \u8655\u7D50\u69CB\u8ABF\u6574",
-  "ui.book_struct_accepted_none": "\u7D50\u69CB\u8ABF\u6574\u5DF2\u6536\u8D77",
-  "ui.book_struct_reopen": "\u518D\u770B\u4E00\u6B21",
-  "ui.book_struct_undo_all_note_0_1": "\u5168\u90E8\u9084\u539F\u6703\u91CD\u65B0\u4F01\u5283 {0} \u5F35\u5361\uFF0C\u7D04 {1} \u6B21 AI \u547C\u53EB\u3002",
+  "ui.book_progress_writing_0_1": "\u5BEB\u4F5C\u4E2D \xB7 \u5DF2\u5B8C\u6210 {0}/{1} \u7AE0",
+  "ui.book_progress_writing_cards_0_1": "\u5BEB\u4F5C\u4E2D \xB7 \u5DF2\u5B8C\u6210 {0}/{1} \u5F35\u5361",
+  "ui.book_progress_at_chapter_0": "\u6B63\u5728\u5BEB\u7B2C {0} \u7AE0",
+  "ui.book_progress_at_card_0": "\u6B63\u5728\u5BEB\u7B2C {0} \u5F35\u5361",
+  "ui.book_stopped_done_0_1": "\u5DF2\u505C\u6B62 \xB7 \u5B8C\u6210 {0}/{1} \u7AE0",
+  "ui.book_stopped_done_cards_0_1": "\u5DF2\u505C\u6B62 \xB7 \u5B8C\u6210 {0}/{1} \u5F35\u5361",
+  "ui.book_struct_show": "\u6AA2\u8996 \u25B8",
+  "ui.book_struct_hide": "\u6536\u8D77 \u25BE",
   "ui.book_struct_refused_missing": "\u627E\u4E0D\u5230\u5C01\u5B58\u7684\u7B46\u8A18\uFF0C\u6C92\u6709\u9084\u539F\u4EFB\u4F55\u6771\u897F\u3002",
   "ui.book_struct_refused_stale": "\u5FC3\u667A\u5716\u525B\u88AB\u6539\u904E\uFF0C\u6C92\u6709\u9084\u539F\uFF1B\u8ACB\u518D\u6309\u4E00\u6B21\u3002",
   "ui.book_struct_busy": "\u9084\u539F\u4E2D\uFF0C\u8ACB\u7A0D\u5019\u2026",
   "ui.book_struct_failed": "\u9084\u539F\u6C92\u6709\u6210\u529F\uFF0C\u5FC3\u667A\u5716\u5DF2\u56DE\u5230\u9084\u539F\u524D\u7684\u6A23\u5B50\u3002",
   "ui.book_bar_plan_go": "\u65B9\u5411\u5C0D\uFF0C\u958B\u59CB\u5BEB",
-  "ui.book_bar_plan_edit_hint": "\u5DF2\u6253\u958B\u5168\u66F8\u6458\u8981\u3002\u76F4\u63A5\u6539\u6839\u7B46\u8A18\u7684\u300C\u5168\u66F8\u4F01\u5283\u300D\u6216\u5404\u7AE0\u3001\u5404\u7BC0\u7B46\u8A18\u88E1\u7684\u300C\u4F01\u5283\u300D\uFF0C\u6539\u597D\u518D\u6309\u300C\u65B9\u5411\u5C0D\uFF0C\u958B\u59CB\u5BEB\u300D\u3002",
   "ui.book_bar_ai_0_1": "AI \u4FEE\u6B63\u4E2D {0}\u30FB\u4ECD\u6709\u554F\u984C {1}",
   "ui.book_bar_done_0_1_2": "{0} \u7AE0\u30FBAI \u4FEE\u4E86 {1} \u8655\u30FB\u4ECD\u6709\u554F\u984C {2} \u9805",
   "ui.book_phase_fix_again": "AI \u4FEE\u6B63\u4E2D",
@@ -10018,7 +10006,6 @@ var zhTW = {
   "ui.book_bar_open_issues": "\u770B\u4ECD\u6709\u554F\u984C",
   "ui.book_bar_open_issues_missing": "\u627E\u4E0D\u5230\u300C\u4ECD\u6709\u554F\u984C\u300D\u90A3\u4E00\u9801\uFF0C\u53EF\u80FD\u88AB\u6539\u540D\u6216\u79FB\u8D70\u4E86\u3002",
   "ui.book_step_self_check": "\u4F5C\u8005\u81EA\u67E5",
-  "ui.book_bar_back_to_plan": "\u56DE\u53BB\u6539\u4F01\u5283",
   "ui.book_plan_title_book": "\u5168\u66F8\u4F01\u5283\u3000\u53EF\u4EE5\u76F4\u63A5\u6539\uFF0C\u6539\u5B8C\u6309\u300C{0}\u300D",
   "ui.book_plan_title_preface": "\u524D\u8A00\u7684\u4F01\u5283\u3000\u53EF\u4EE5\u76F4\u63A5\u6539",
   "ui.book_plan_title_chapter": "\u9019\u4E00\u7AE0\u7684\u4F01\u5283\u3000\u53EF\u4EE5\u76F4\u63A5\u6539",
@@ -10026,7 +10013,7 @@ var zhTW = {
   "ui.book_plan_label_entry": "\u600E\u9EBC\u958B\u5834",
   "ui.book_plan_label_previous": "\u627F\u63A5\u7684\u89C0\u5FF5",
   "ui.book_plan_label_handoff": "\u7D50\u5C3E\u8207\u7559\u4E0B\u7684",
-  "ui.book_bar_plan_hint": "\u60F3\u6539\uFF1A\u76F4\u63A5\u8DDF\u5DE6\u908A\u7684\u7E3D\u7DE8\u8F2F\u8AAA\uFF1B\u4E5F\u53EF\u4EE5\u81EA\u5DF1\u6539\u7B46\u8A18\u88E1\u7684\u300C\u4F01\u5283\u300D\u3002\u6539\u5B8C\u518D\u6309\u300C\u65B9\u5411\u5C0D\uFF0C\u958B\u59CB\u5BEB\u300D\u3002",
+  "ui.book_bar_plan_hint": "\u60F3\u6539\u5C31\u76F4\u63A5\u8DDF\u5DE6\u908A\u7684\u7E3D\u7DE8\u8F2F\u8AAA\u3002",
   "ui.book_stage_pending": "\u5F85\u4F01\u5283",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5283",
   "ui.book_stage_written": "\u5DF2\u5BEB",
@@ -10041,8 +10028,6 @@ var zhTW = {
   "ui.book_place_preface": "\u524D\u8A00",
   "ui.book_place_chapter_0": "\u7B2C {0} \u7AE0",
   "ui.book_place_section": "\u7BC0",
-  "ui.book_bar_plan_ready_struct_0_1": "\u524D\u8A00\u3001{0} \u7AE0\u3001{1} \u7BC0\u90FD\u4F01\u5283\u597D\u4E86",
-  "ui.book_bar_plan_ready_struct_0": "\u524D\u8A00\u3001{0} \u7AE0\u90FD\u4F01\u5283\u597D\u4E86",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
@@ -34119,8 +34104,8 @@ function removeCoverCredit(detail, href, language2) {
   ).split(/[\uE000\uE001]/);
   const escape = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const link = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-  const shape3 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(link)}\\).*${escape(after)}\\r?$`);
-  return detail.split("\n").filter((line3) => !shape3.test(line3)).join("\n");
+  const shape2 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(link)}\\).*${escape(after)}\\r?$`);
+  return detail.split("\n").filter((line3) => !shape2.test(line3)).join("\n");
 }
 function migrateLegacyCover(raw, language2, title) {
   var _a2, _b2, _c, _d;
@@ -40913,10 +40898,10 @@ function arrangeCover(card, frame, position) {
     text11.appendChild(child);
   }
 }
-function placeCoverFrame(parts, shape3, mask) {
-  const win = coverWindow(shape3, 1, mask, 1);
+function placeCoverFrame(parts, shape2, mask) {
+  const win = coverWindow(shape2, 1, mask, 1);
   if (!win) return null;
-  parts.frame.style.setProperty("aspect-ratio", String(coverFrameRatio(shape3, 1, mask)));
+  parts.frame.style.setProperty("aspect-ratio", String(coverFrameRatio(shape2, 1, mask)));
   parts.frame.addClass("is-sized");
   if (!mask || !parts.window) return win;
   const style = parts.window.style;
@@ -41290,9 +41275,9 @@ var CoverFrameModal = class extends import_obsidian17.Modal {
       this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
     });
     img.addEventListener("load", () => {
-      const shape3 = img.naturalWidth / img.naturalHeight;
+      const shape2 = img.naturalWidth / img.naturalHeight;
       if (this.shape || !coverWindow(img.naturalWidth, img.naturalHeight, null, 1)) return;
-      this.shape = shape3;
+      this.shape = shape2;
       this.setDraft(this.draft);
     });
     const box = cover.createDiv({ cls: "vam-card-frame-box" });
@@ -41444,16 +41429,16 @@ function kindIconSvg(kind) {
   const inset = (points) => points.split(" ").map(
     (pair5) => pair5.split(",").map((value) => String(10 + Number(value) * 0.8)).join(",")
   ).join(" ");
-  const shape3 = TOPIC_KIND_SHAPES[kind].shape;
-  const drawn = shape3 === "rounded" || shape3 === "rect" ? tag("rect", { x: 10, y: 14, width: 80, height: 72, rx: shape3 === "rect" ? 6 : 20 }) : shape3 === "ellipse" ? tag("circle", { cx: 50, cy: 50, r: 40 }) : shape3 === "diamond" ? tag("polygon", { points: inset(DIAMOND) }) : shape3 === "hexagon" ? tag("polygon", { points: inset(HEXAGON) }) : tag("polygon", { points: inset(FOLDED) }) + tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  const drawn = shape2 === "rounded" || shape2 === "rect" ? tag("rect", { x: 10, y: 14, width: 80, height: 72, rx: shape2 === "rect" ? 6 : 20 }) : shape2 === "ellipse" ? tag("circle", { cx: 50, cy: 50, r: 40 }) : shape2 === "diamond" ? tag("polygon", { points: inset(DIAMOND) }) : shape2 === "hexagon" ? tag("polygon", { points: inset(HEXAGON) }) : tag("polygon", { points: inset(FOLDED) }) + tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
   return `<g class="vam-kind-shape vam-kind-icon" data-kind="${kind}">${drawn}</g>`;
 }
 function hasSvgShape(kind) {
-  const shape3 = TOPIC_KIND_SHAPES[kind].shape;
-  return shape3 !== "rounded" && shape3 !== "rect";
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  return shape2 !== "rounded" && shape2 !== "rect";
 }
 function renderShapeBackground(card, kind) {
-  const shape3 = TOPIC_KIND_SHAPES[kind].shape;
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
   if (!hasSvgShape(kind)) return void 0;
   const svg = createSvg("svg");
   svg.addClass("vam-kind-shape");
@@ -41461,17 +41446,17 @@ function renderShapeBackground(card, kind) {
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("focusable", "false");
-  const outline = createSvg(shape3 === "ellipse" ? "ellipse" : "polygon");
+  const outline = createSvg(shape2 === "ellipse" ? "ellipse" : "polygon");
   outline.addClass("vam-kind-outline");
-  if (shape3 === "ellipse") {
+  if (shape2 === "ellipse") {
     outline.setAttribute("cx", "50");
     outline.setAttribute("cy", "50");
     outline.setAttribute("rx", "50");
     outline.setAttribute("ry", "50");
-  } else outline.setAttribute("points", shape3 === "diamond" ? DIAMOND : shape3 === "hexagon" ? HEXAGON : FOLDED);
+  } else outline.setAttribute("points", shape2 === "diamond" ? DIAMOND : shape2 === "hexagon" ? HEXAGON : FOLDED);
   outline.setAttribute("vector-effect", "non-scaling-stroke");
   svg.appendChild(outline);
-  if (shape3 === "folded") {
+  if (shape2 === "folded") {
     const fold3 = createSvg("polyline");
     fold3.addClass("vam-kind-fold");
     fold3.setAttribute("points", FOLD_LINE);
@@ -41494,9 +41479,9 @@ var FIT = {
 var SAFETY = 4;
 var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
 function shapeInsets(kind, content) {
-  const shape3 = TOPIC_KIND_SHAPES[kind].shape;
-  if (shape3 === "rounded" || shape3 === "rect") return { ...BASE_PADDING };
-  const fit = FIT[shape3];
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  if (shape2 === "rounded" || shape2 === "rect") return { ...BASE_PADDING };
+  const fit = FIT[shape2];
   const side = content.width * (1 - fit.width) / 2;
   const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
   return { top: vertical, right: side, bottom: vertical, left: side };
@@ -62207,16 +62192,12 @@ function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
     ...reordered ? { mapChange: reordered } : {},
     ...mode === "gate1" && data.planReview ? { planReview: true } : {},
-    ...mode === "gate1" && data.planReview ? structureEditField(data, structure2, titleOf) : {},
+    ...mode === "gate1" && data.planReview ? structureEditField(data, titleOf) : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
 }
-var shape2 = (s) => ({
-  chapters: s.chapters.length,
-  sections: s.chapters.reduce((sum2, id) => sum2 + s.sectionsOf(id).length, 0)
-});
-function structureEditField(data, now, titleOf) {
+function structureEditField(data, titleOf) {
   var _a2;
   const edit = data.structureEdit;
   if (!edit || !edit.applied.length && !edit.rejected.length && !edit.overCap) return {};
@@ -62255,27 +62236,6 @@ function structureEditField(data, now, titleOf) {
     };
   });
   const active = items.filter((i) => !i.undone);
-  let undoAll;
-  if (now) {
-    const rootId = edit.before.rootId;
-    const current = effectiveOrder(data).map((id) => {
-      var _a3;
-      const place = now.placeOf(id);
-      return {
-        id,
-        parentId: id === rootId ? null : (place == null ? void 0 : place.kind) === "section" ? (_a3 = place.chapterId) != null ? _a3 : rootId : rootId,
-        title: ""
-      };
-    });
-    const picked = undoClosure(
-      edit.applied,
-      edit.applied.map((x) => x.id).filter((x) => !undone.has(x)),
-      rootId
-    );
-    const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
-    const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;
-    undoAll = { cards, calls: cards + 1 };
-  }
   const rejected = edit.rejected;
   const locked = rejected.filter((r) => r.code === "locked").length;
   const notApplied = edit.overCap || rejected.length ? { overCap: edit.overCap === true, locked, other: rejected.length - locked } : void 0;
@@ -62284,9 +62244,7 @@ function structureEditField(data, now, titleOf) {
       key: [edit.runId, ...edit.applied.map((a) => a.id), ...rejected.map((r) => r.id)].join("|"),
       items,
       active: active.length,
-      ...now ? { chapters: { now: shape2(now), before: shape2(structureOfNodes(edit.before)) } } : {},
-      ...notApplied ? { notApplied } : {},
-      ...undoAll ? { undoAll } : {}
+      ...notApplied ? { notApplied } : {}
     }
   };
 }
@@ -62390,7 +62348,7 @@ function bookEtaText(seconds) {
   return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
 }
 function renderBookBar(parent, state, actions) {
-  var _a2, _b2, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e, _f;
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
   bar.dataset.mode = state.mode;
@@ -62401,7 +62359,11 @@ function renderBookBar(parent, state, actions) {
   if (state.mode === "budget" || state.mode === "stopped")
     top.createSpan({
       cls: "vam-book-bar-counts",
-      text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2)
+      text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t(
+        state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1",
+        settledCount(state),
+        total2
+      )
     });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.mode === "changed" && state.mapChange) {
@@ -62415,27 +62377,18 @@ function renderBookBar(parent, state, actions) {
       makeButton(buttons, t("ui.book_map_replan"), "mod-cta vam-book-map-replan", actions.mapChanged.replan);
       makeButton(buttons, t("ui.book_map_keep"), "vam-book-map-keep", actions.mapChanged.keep);
     }
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   }
   if ((state.mode === "gate1" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
-  if (state.mode === "gate1" && state.planReview) {
-    top.createSpan({
-      cls: "vam-book-bar-counts",
-      text: state.structure ? state.structure.sections ? t("ui.book_bar_plan_ready_struct_0_1", state.structure.chapters, state.structure.sections) : t("ui.book_bar_plan_ready_struct_0", state.structure.chapters) : t("ui.book_bar_plan_ready_0", total2)
-    });
-    top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
-    if (actions.openPlan)
-      makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
+  if (state.mode === "gate1" && state.planReview)
     makeButton(buttons, t("ui.book_bar_plan_go"), "mod-cta vam-book-confirm", actions.confirmGate1);
-    if (actions.editPlan) makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.editPlan);
-  }
   if (state.mode === "done") {
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-done-counts",
       text: state.again ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open) : t("ui.book_bar_done_0_1_2", (_b2 = (_a2 = state.structure) == null ? void 0 : _a2.chapters) != null ? _b2 : total2, state.ai.fixed, state.ai.open)
     });
-    if (state.again) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    if (state.again) makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
     else {
       if (actions.openIssues)
         makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
@@ -62458,11 +62411,11 @@ function renderBookBar(parent, state, actions) {
     if (actions.restart && state.phase !== "done")
       makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
   } else if (state.mode === "planning" || state.mode === "writing")
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   else if (state.mode === "gate1" && !state.rerun)
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
-    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   if (actions.abandon && !state.again && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
     const ask = makeButton(
@@ -62493,7 +62446,9 @@ function renderBookBar(parent, state, actions) {
   }
   if (((_d = actions.fixAgain) == null ? void 0 : _d.asking) && !((_e = actions.abandon) == null ? void 0 : _e.asking) && state.fixAgain && !state.again)
     renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
-  if (state.mode === "gate1" && state.planReview && state.structureEdit)
+  if (state.mode === "gate1" && state.planReview)
+    bar.createDiv("vam-book-plan-hint").createEl("b", { text: t("ui.book_bar_plan_hint") });
+  if (state.mode === "gate1" && state.planReview && state.structureEdit && !((_f = actions.structureAccept) == null ? void 0 : _f.accepted))
     renderStructureEdit(bar, state.structureEdit, actions);
   if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
     renderAsk(
@@ -62504,23 +62459,22 @@ function renderBookBar(parent, state, actions) {
       actions.rerunAsk
     );
   const progressText = bookProgressText(state);
-  renderProgressLine(bar, state, progressText);
+  renderProgressLine(bar, state);
   if (state.gateWaiting)
     bar.createDiv("vam-book-now vam-book-gate-waiting").createSpan({
       cls: "vam-book-now-text",
       text: t("ui.book_gate_waiting")
     });
+  if (state.mode === "gate1" && state.planReview) return bar;
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
   track.setAttr("aria-valuemin", "0");
   track.setAttr("aria-valuemax", String(total2));
-  track.setAttr("aria-valuenow", String(counts.checked));
+  track.setAttr("aria-valuenow", String(settledCount(state)));
   track.setAttr("aria-valuetext", progressText);
   const segments = [
     ["checked", counts.checked],
-    ["written", counts.written],
-    ["planned", counts.planned],
     ["needs-review", counts["needs-review"]]
   ];
   for (const [name2, count4] of segments) {
@@ -62541,34 +62495,33 @@ function renderStructureEdit(bar, view, actions) {
   box.setAttr("role", "group");
   box.setAttr("aria-label", t("ui.book_struct_label"));
   const accept = actions.structureAccept;
-  if (accept == null ? void 0 : accept.accepted) {
-    const line3 = box.createDiv("vam-book-structure-head");
-    line3.createSpan({
-      cls: "vam-book-bar-counts",
-      text: view.active ? t("ui.book_struct_accepted_0", view.active) : t("ui.book_struct_accepted_none")
-    });
-    makeButton(line3, t("ui.book_struct_reopen"), "vam-book-link vam-book-structure-reopen", accept.reopen);
-    return;
-  }
   const busy = actions.structureUndo === "busy";
-  const head2 = box.createDiv("vam-book-structure-head");
-  head2.createEl("b", {
-    text: view.active ? t("ui.book_struct_head_0", view.active) : t("ui.book_struct_head_all_undone")
-  });
-  if (view.chapters) {
-    const { now, before } = view.chapters;
+  const expanded = !accept || accept.expanded || !view.items.length;
+  if (view.items.length) {
+    const head2 = box.createDiv("vam-book-structure-head");
     head2.createSpan({
-      cls: "vam-book-bar-counts",
-      text: t("ui.book_struct_now_0_1_2_3", now.chapters, now.sections, before.chapters, before.sections)
+      cls: "vam-book-structure-sum",
+      text: view.active ? t("ui.book_struct_head_0", view.active) : t("ui.book_struct_head_all_undone")
     });
+    if (accept) {
+      const toggle = makeButton(
+        head2,
+        t(accept.expanded ? "ui.book_struct_hide" : "ui.book_struct_show"),
+        "vam-book-link vam-book-structure-toggle",
+        accept.toggle
+      );
+      toggle.setAttr("aria-expanded", String(accept.expanded));
+      toggle.setAttr("aria-controls", "vam-book-structure-list");
+      const button = makeButton(head2, t("ui.book_struct_accept"), "vam-book-structure-accept", accept.accept);
+      if (busy) button.setAttr("disabled", "true");
+    }
   }
-  if (accept) {
-    const button = makeButton(head2, t("ui.book_struct_accept"), "vam-book-structure-accept", accept.accept);
-    if (busy) button.setAttr("disabled", "true");
-  }
+  if (!expanded) return;
+  const list2 = box.createDiv("vam-book-structure-list");
+  list2.id = "vam-book-structure-list";
   const mayUndo = !!actions.undoStructure;
   for (const item of view.items) {
-    const row = box.createDiv(`vam-book-structure-row${item.undone ? " is-undone" : ""}`);
+    const row = list2.createDiv(`vam-book-structure-row${item.undone ? " is-undone" : ""}`);
     row.dataset.op = item.id;
     row.createSpan({ cls: `vam-book-structure-kind is-${item.kind}`, text: t(STRUCTURE_KIND_KEY[item.kind]) });
     const what = row.createDiv("vam-book-structure-what");
@@ -62617,29 +62570,14 @@ function renderStructureEdit(bar, view, actions) {
     ];
     if (reasons.length)
       lines.push(t("ui.book_struct_skipped_0_1", na.locked + na.other, reasons.join(t("ui.book_struct_join"))));
-    for (const line3 of lines) box.createDiv("vam-book-structure-skipped").setText(line3);
-  }
-  if (view.active && mayUndo) {
-    const foot = box.createDiv("vam-book-structure-foot");
-    if (view.undoAll)
-      foot.createSpan({ text: t("ui.book_struct_undo_all_note_0_1", view.undoAll.cards, view.undoAll.calls) });
-    const all = makeButton(
-      foot,
-      t("ui.book_struct_undo_all"),
-      "vam-book-structure-undo-all",
-      () => {
-        var _a2;
-        return (_a2 = actions.undoStructure) == null ? void 0 : _a2.call(actions, "all");
-      }
-    );
-    if (busy) all.setAttr("disabled", "true");
+    for (const line3 of lines) list2.createDiv("vam-book-structure-skipped").setText(line3);
   }
   if (actions.structureUndo === "busy") {
-    const line3 = box.createDiv("vam-book-structure-status");
+    const line3 = list2.createDiv("vam-book-structure-status");
     line3.setAttr("role", "status");
     line3.setText(t("ui.book_struct_busy"));
   } else if (actions.structureUndo === "failed") {
-    const line3 = box.createDiv("vam-book-structure-status is-failed");
+    const line3 = list2.createDiv("vam-book-structure-status is-failed");
     line3.setAttr("role", "status");
     line3.setText(t("ui.book_struct_failed"));
   }
@@ -62690,19 +62628,35 @@ function fixLine(state, done, total2) {
   return t("ui.book_progress_line_fix_section_0_1_2", (_e = place.title) != null ? _e : "", done, total2);
 }
 function bookProgressText(state) {
+  const at = writingAtText(state);
+  return at ? `${progressMain(state)}${t("ui.book_progress_line_sep")}${at}` : progressMain(state);
+}
+function progressMain(state) {
   var _a2, _b2, _c, _d;
   const { total: total2 } = state;
   const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
-    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total2);
+    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t(
+      state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1",
+      settledCount(state),
+      total2
+    );
   const sentence2 = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total2);
   return `${sentence2}${t("ui.book_progress_line_sep")}${t(state.structure ? "ui.book_progress_line_done_cards_0_1" : "ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
-function renderProgressLine(bar, state, text11) {
+function writingAtText(state) {
+  var _a2, _b2, _c;
+  if (state.mode !== "writing" || ((_a2 = state.current) == null ? void 0 : _a2.fix)) return void 0;
+  const at = Math.min((_c = (_b2 = state.current) == null ? void 0 : _b2.chapter) != null ? _c : settledCount(state) + 1, Math.max(state.total, 1));
+  return t(state.structure ? "ui.book_progress_at_card_0" : "ui.book_progress_at_chapter_0", at);
+}
+function renderProgressLine(bar, state) {
   const running2 = state.mode === "planning" || state.mode === "writing";
   if (!running2) return;
   const now = bar.createDiv("vam-book-now");
-  now.createSpan({ cls: "vam-book-now-text", text: text11 });
+  now.createSpan({ cls: "vam-book-now-text", text: progressMain(state) });
+  const at = writingAtText(state);
+  if (at) now.createSpan({ cls: "vam-book-now-at", text: at });
   if (state.etaSeconds !== void 0) now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
   if (state.mode === "writing")
     now.createSpan({ cls: "vam-book-ai-counts", text: t("ui.book_bar_ai_0_1", state.ai.fixing, state.ai.open) });
@@ -79534,6 +79488,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     __publicField(this, "bookAbandonAsking", null);
     /** The map whose bar shows the "fix again" confirmation card. Cancel and Escape hand the keyboard back to the button that opened it. */
     __publicField(this, "bookFixAgainAsking", null);
+    /** The structure list opened with "show" (memory only: every open of the view starts folded). */
+    __publicField(this, "bookStructureExpanded", null);
     /** The accept of this session, so the fold holds even where local storage is not available. */
     __publicField(this, "bookStructureAcceptedNow", null);
     /** The structure list's undo: the buttons wait while it runs; a failure leaves one line (the runner has put the map back as it was). */
@@ -89660,10 +89616,10 @@ ${t("ui.book_role_running_suffix")}` : first);
       background.setAttribute("preserveAspectRatio", "none");
       background.setAttribute("aria-hidden", "true");
       background.setAttribute("focusable", "false");
-      const shape3 = createSvg("polygon");
-      shape3.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50");
-      shape3.setAttribute("vector-effect", "non-scaling-stroke");
-      background.appendChild(shape3);
+      const shape2 = createSvg("polygon");
+      shape2.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50");
+      shape2.setAttribute("vector-effect", "non-scaling-stroke");
+      background.appendChild(shape2);
       card.appendChild(background);
     }
     const kind = this.topicKindOf(node.id);
@@ -90748,10 +90704,10 @@ ${t("ui.book_role_running_suffix")}` : first);
       arrangeCover(card, null, "top");
     });
     img.addEventListener("load", () => {
-      const shape3 = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
-      if (!shape3 || frame.hasClass("is-sized")) return;
-      coverShapes.set(imagePath, shape3);
-      placeCoverFrame(parts, shape3, mask);
+      const shape2 = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
+      if (!shape2 || frame.hasClass("is-sized")) return;
+      coverShapes.set(imagePath, shape2);
+      placeCoverFrame(parts, shape2, mask);
       this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img, position });
@@ -94243,18 +94199,6 @@ ${t("ui.book_role_running_suffix")}` : first);
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      openPlan: () => {
-        var _a2;
-        const root = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => !node.parentId);
-        if (root) void this.openBookNote(root.id);
-      },
-      // "Back to editing the plan" only opens the plan and says how to change it; the run stays at the gate.
-      editPlan: () => {
-        var _a2;
-        const root = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => !node.parentId);
-        if (root) void this.openBookNote(root.id);
-        new import_obsidian39.Notice(t("ui.book_bar_plan_edit_hint"));
-      },
       openIssues: () => void this.openBookOpenIssues(),
       undoStructure: (ids2) => void this.undoBookStructure(path, ids2),
       ...state.structureEdit ? { structureAccept: this.bookStructureAccept(map.id, state.structureEdit.key) } : {},
@@ -94292,8 +94236,8 @@ ${t("ui.book_role_running_suffix")}` : first);
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
       "map-go": ".vam-book-map-replan",
-      "structure-accept": ".vam-book-structure-accept",
-      "structure-reopen": ".vam-book-structure-reopen",
+      "structure-toggle": ".vam-book-structure-toggle",
+      "plan-go": ".vam-book-confirm",
       "again-cancel": ".vam-book-fix-again-cancel",
       "again-opener": ".vam-book-fix-again"
     }[focus];
@@ -94482,21 +94426,6 @@ ${t("ui.book_role_running_suffix")}` : first);
     }
     new import_obsidian39.Notice(t("ui.book_bar_open_issues_missing"));
   }
-  /** A card's note opens in a tab. */
-  async openBookNote(id) {
-    var _a2;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
-    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
-    if (!(file instanceof import_obsidian39.TFile)) {
-      new import_obsidian39.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
-      return;
-    }
-    try {
-      await this.app.workspace.getLeaf("tab").openFile(file);
-    } catch (error) {
-      new import_obsidian39.Notice(error instanceof Error ? error.message : String(error));
-    }
-  }
   /** A parked (archived) note opens in a tab. */
   async openBookArchived(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
@@ -94510,7 +94439,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       new import_obsidian39.Notice(error instanceof Error ? error.message : String(error));
     }
   }
-  /** The structure list the owner accepted on this device folds to one line; a new set of changes (another key) shows open again. */
+  /** The structure line the owner accepted on this device is gone; a new set of changes (another key) shows again, folded. */
   bookStructureAccept(mapId, key5) {
     var _a2;
     const storage = this.app;
@@ -94521,22 +94450,26 @@ ${t("ui.book_role_running_suffix")}` : first);
     } catch (e) {
       saved = void 0;
     }
-    const set = (value, focus) => {
-      var _a3;
-      try {
-        (_a3 = storage.saveLocalStorage) == null ? void 0 : _a3.call(storage, slot, value);
-      } catch (e) {
-      }
-      this.bookStructureAcceptedNow = value === null ? null : `${mapId}
-${value}`;
-      this.bookBarFocus = focus;
-      if (!this.closed) this.render();
-    };
+    const id = `${mapId}
+${key5}`;
     return {
-      accepted: saved === key5 || this.bookStructureAcceptedNow === `${mapId}
-${key5}`,
-      accept: () => set(key5, "structure-reopen"),
-      reopen: () => set(null, "structure-accept")
+      accepted: saved === key5 || this.bookStructureAcceptedNow === id,
+      expanded: this.bookStructureExpanded === id,
+      accept: () => {
+        var _a3;
+        try {
+          (_a3 = storage.saveLocalStorage) == null ? void 0 : _a3.call(storage, slot, key5);
+        } catch (e) {
+        }
+        this.bookStructureAcceptedNow = id;
+        this.bookBarFocus = "plan-go";
+        if (!this.closed) this.render();
+      },
+      toggle: () => {
+        this.bookStructureExpanded = this.bookStructureExpanded === id ? null : id;
+        this.bookBarFocus = "structure-toggle";
+        if (!this.closed) this.render();
+      }
     };
   }
   async undoBookStructure(path, ids2) {
@@ -113246,20 +113179,20 @@ var AiTaskService = class {
     if (!input2.countRepair) (_c = input2.onWorkingFindingsSent) == null ? void 0 : _c.call(input2, (_b2 = context.workingFindings) != null ? _b2 : "");
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage2 = (_d = context.outputLanguage) != null ? _d : this.options.language();
-    const shape3 = taskResponseShape(context, outputLanguage2);
-    const step = prepareStep(createTaskStep(taskStepId(context, role), shape3.schema), {
+    const shape2 = taskResponseShape(context, outputLanguage2);
+    const step = prepareStep(createTaskStep(taskStepId(context, role), shape2.schema), {
       context,
       language: outputLanguage2,
       provider,
       providerLabel: provider === "claude" ? "Claude Code" : "Codex App Server",
-      argumentEvidenceNeedIds: shape3.argumentEvidenceNeedIds
+      argumentEvidenceNeedIds: shape2.argumentEvidenceNeedIds
     });
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const countsWeb = ((_e = context.mode) != null ? _e : "task") === "task" && context.researchMode === "research" && role === void 0 && !input2.countRepair;
     const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
     const webEvents = [];
-    const keepsEvents = shape3.argumentEvidenceNeedIds !== void 0;
+    const keepsEvents = shape2.argumentEvidenceNeedIds !== void 0;
     const webHook = countsWeb ? (event) => {
       if (event.method === "item/completed") retrievals++;
       if (keepsEvents) webEvents.push(event);

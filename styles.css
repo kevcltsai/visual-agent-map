@@ -2273,6 +2273,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-seg.is-written, .vam-book-legend-item.is-written::before { background: var(--color-cyan); }
 .vam-book-seg.is-planned, .vam-book-legend-item.is-planned::before { background: var(--color-blue); }
 .vam-book-seg.is-needs-review, .vam-book-legend-item.is-needs-review::before { background: var(--color-orange); }
+.vam-book-seg.is-checked { background: var(--interactive-accent); }
+.vam-book-bar[data-mode="stopped"] .vam-book-seg, .vam-book-bar[data-mode="budget"] .vam-book-seg { background: var(--text-faint); }
+.vam-book-now-at { color: var(--text-muted); }
+.vam-book-bar button.vam-book-stop { border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; color: var(--text-muted); }
+.vam-book-bar button.vam-book-stop:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.vam-book-plan-hint { padding: 6px 10px; border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--text-accent); font-size: var(--font-ui-small); }
 .vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
 .vam-book-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: var(--font-ui-small); min-width: 0; overflow-wrap: anywhere; }
@@ -2316,6 +2322,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-bar button.vam-book-link:hover { color: var(--text-accent-hover); }
 .vam-book-structure { display: grid; gap: 6px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
 .vam-book-structure-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.vam-book-structure-sum { color: var(--text-muted); }
+.vam-book-structure-list { display: grid; gap: 6px; min-width: 0; }
 .vam-book-structure-accept { margin-left: auto; }
 .vam-book-structure-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); }
 .vam-book-structure-row.is-undone { border-style: dashed; color: var(--text-muted); }

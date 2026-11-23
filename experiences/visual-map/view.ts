@@ -17490,16 +17490,6 @@ export class VisualAgentMapView extends ItemView {
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      openPlan: () => {
-        const root = this.map?.nodes.find(node => !node.parentId);
-        if (root) void this.openBookNote(root.id);
-      },
-      // "Back to editing the plan" only opens the plan and says how to change it; the run stays at the gate.
-      editPlan: () => {
-        const root = this.map?.nodes.find(node => !node.parentId);
-        if (root) void this.openBookNote(root.id);
-        new Notice(t("ui.book_bar_plan_edit_hint"));
-      },
       openIssues: () => void this.openBookOpenIssues(),
       undoStructure: ids => void this.undoBookStructure(path, ids),
       ...(state.structureEdit ? { structureAccept: this.bookStructureAccept(map.id, state.structureEdit.key) } : {}),
@@ -17530,8 +17520,8 @@ export class VisualAgentMapView extends ItemView {
     | "rerun-opener"
     | "map-go"
     | "structure-undo"
-    | "structure-accept"
-    | "structure-reopen"
+    | "structure-toggle"
+    | "plan-go"
     | "again-cancel"
     | "again-opener"
     | null = null;
@@ -17556,8 +17546,8 @@ export class VisualAgentMapView extends ItemView {
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
       "map-go": ".vam-book-map-replan",
-      "structure-accept": ".vam-book-structure-accept",
-      "structure-reopen": ".vam-book-structure-reopen",
+      "structure-toggle": ".vam-book-structure-toggle",
+      "plan-go": ".vam-book-confirm",
       "again-cancel": ".vam-book-fix-again-cancel",
       "again-opener": ".vam-book-fix-again"
     }[focus];
@@ -17775,20 +17765,6 @@ export class VisualAgentMapView extends ItemView {
     }
     new Notice(t("ui.book_bar_open_issues_missing"));
   }
-  /** A card's note opens in a tab. */
-  private async openBookNote(id: string): Promise<void> {
-    const node = this.map?.nodes.find(item => item.id === id);
-    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
-    if (!(file instanceof TFile)) {
-      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
-      return;
-    }
-    try {
-      await this.app.workspace.getLeaf("tab").openFile(file);
-    } catch (error) {
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
-  }
   /** A parked (archived) note opens in a tab. */
   private async openBookArchived(path: string): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(path);
@@ -17802,11 +17778,11 @@ export class VisualAgentMapView extends ItemView {
       new Notice(error instanceof Error ? error.message : String(error));
     }
   }
-  /** The structure list the owner accepted on this device folds to one line; a new set of changes (another key) shows open again. */
+  /** The structure line the owner accepted on this device is gone; a new set of changes (another key) shows again, folded. */
   private bookStructureAccept(
     mapId: string,
     key: string
-  ): { accepted: boolean; accept: () => void; reopen: () => void } {
+  ): { accepted: boolean; expanded: boolean; accept: () => void; toggle: () => void } {
     const storage = this.app as {
       loadLocalStorage?(key: string): unknown;
       saveLocalStorage?(key: string, data: unknown): void;
@@ -17818,22 +17794,29 @@ export class VisualAgentMapView extends ItemView {
     } catch {
       saved = undefined;
     }
-    const set = (value: string | null, focus: "structure-accept" | "structure-reopen"): void => {
-      try {
-        storage.saveLocalStorage?.(slot, value);
-      } catch {
-        // Not saved on this device: the list just shows again on the next open.
-      }
-      this.bookStructureAcceptedNow = value === null ? null : `${mapId}\n${value}`;
-      this.bookBarFocus = focus;
-      if (!this.closed) this.render();
-    };
+    const id = `${mapId}\n${key}`;
     return {
-      accepted: saved === key || this.bookStructureAcceptedNow === `${mapId}\n${key}`,
-      accept: () => set(key, "structure-reopen"),
-      reopen: () => set(null, "structure-accept")
+      accepted: saved === key || this.bookStructureAcceptedNow === id,
+      expanded: this.bookStructureExpanded === id,
+      accept: () => {
+        try {
+          storage.saveLocalStorage?.(slot, key);
+        } catch {
+          // Not saved on this device: the line just shows again on the next open.
+        }
+        this.bookStructureAcceptedNow = id;
+        this.bookBarFocus = "plan-go";
+        if (!this.closed) this.render();
+      },
+      toggle: () => {
+        this.bookStructureExpanded = this.bookStructureExpanded === id ? null : id;
+        this.bookBarFocus = "structure-toggle";
+        if (!this.closed) this.render();
+      }
     };
   }
+  /** The structure list opened with "show" (memory only: every open of the view starts folded). */
+  private bookStructureExpanded: string | null = null;
   /** The accept of this session, so the fold holds even where local storage is not available. */
   private bookStructureAcceptedNow: string | null = null;
   /** The structure list's undo: the buttons wait while it runs; a failure leaves one line (the runner has put the map back as it was). */

@@ -947,3 +947,11 @@ test('card tool rows: stay clickable below 60% zoom, and with several cards sele
   assert.doesNotMatch(css, /is-zoomed-out \.vam-node > \.vam-node-tools/, 'a zoomed-out row is never shown-but-dead: no rule hides or disables it');
   assert.match(css, /\.vam-viewport\.is-multi-selected:not\(\.is-selecting\) \.vam-node\.is-selected:not\(:hover\):not\(:focus-within\) > \.vam-node-tools \{[^}]*visibility: hidden/);
 });
+
+test('card tool rows: a full repaint keeps the several-selected class on the new viewport', () => {
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const made = src.indexOf('this.viewportEl = canvas.createDiv("vam-viewport");');
+  assert.ok(made > 0, 'render makes the viewport');
+  const next = src.slice(made, src.indexOf('const overlay = canvas.createDiv', made));
+  assert.match(next, /this\.syncToolsVisibility\(\);/, 'the new viewport gets is-multi-selected before cards show');
+});

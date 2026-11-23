@@ -22,16 +22,18 @@ export const FETCH_TIMEOUT_MS = 15_000;
 /** Words that ask for the original text rather than a summary. */
 const FULL_TEXT_WORDS = /全文|原文|逐字|完整原始|full[\s-]?text|verbatim|word[\s-]for[\s-]word/i;
 /** A named file (`SKILL.md`, `config.yaml`) or a GitHub address: a full-text request is about a file, not a phrase like 「原文指出」. */
-const NAMED_FILE = /[\w-]\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w.])|github(?:usercontent)?\.com\//i;
+const NAMED_FILE =
+  /[\w-]\.(?:md|markdown|mdx|txt|rst|ya?ml|json|toml|ini|cfg|csv|py|sh|ipynb)(?![\w./])|github(?:usercontent)?\.com\//i;
 
 /**
- * True when one of the topic's fields (title, current understanding, task) both names a file and asks for its full or original
- * text. Inherited rules are not read, so a parent's rule never turns every child research into a full-text one.
+ * True when the Detail already holds a VAM full-text block (as its placeholder), or when one of the topic's own fields both
+ * names a file and asks for its full or original text. The fields are the title and the task, plus the current understanding
+ * only before the first research (afterwards the AI writes it). Inherited rules are never read.
  */
-export function wantsFullText(context: Pick<TaskContext, "title" | "summary" | "task">): boolean {
-  return [context.title, context.summary, context.task].some(
-    field => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field)
-  );
+export function wantsFullText(context: Pick<TaskContext, "title" | "summary" | "task" | "detail">): boolean {
+  if (placeholderPattern().test(context.detail ?? "")) return true;
+  const fields = [context.title, context.task, ...(context.detail?.trim() ? [] : [context.summary])];
+  return fields.some(field => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field));
 }
 
 const GITHUB_PART = /^[A-Za-z0-9._-]+$/;
@@ -219,7 +221,7 @@ export function attachFullText(
   prior: readonly PriorFullText[] = [],
   requested = true
 ): string {
-  const base = tidy(detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), ""));
+  const stripped = detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), "");
   const fetched = files.filter((file): file is Extract<FullTextFile, { ok: true }> => file.ok);
   const failed = files.filter((file): file is Extract<FullTextFile, { ok: false }> => !file.ok);
   const replaced = new Set(fetched.map(file => file.url));
@@ -237,5 +239,6 @@ export function attachFullText(
       if (!keptUrls.has(file.url))
         parts.push(`${prefix}${translateNote(language, `detail.full_text_reason_${file.reason}`, file.name)}`);
   }
-  return parts.length ? insert(base, parts.join("\n\n")) : base;
+  if (!parts.length) return stripped === detail ? detail : tidy(stripped);
+  return insert(tidy(stripped), parts.join("\n\n"));
 }

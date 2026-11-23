@@ -19856,11 +19856,12 @@ var MAX_FILES = 3;
 var MAX_FILE_BYTES = 200 * 1024;
 var FETCH_TIMEOUT_MS = 15e3;
 var FULL_TEXT_WORDS = /全文|原文|逐字|完整原始|full[\s-]?text|verbatim|word[\s-]for[\s-]word/i;
-var NAMED_FILE = /[\w-]\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w.])|github(?:usercontent)?\.com\//i;
+var NAMED_FILE = /[\w-]\.(?:md|markdown|mdx|txt|rst|ya?ml|json|toml|ini|cfg|csv|py|sh|ipynb)(?![\w./])|github(?:usercontent)?\.com\//i;
 function wantsFullText(context) {
-  return [context.title, context.summary, context.task].some(
-    (field) => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field)
-  );
+  var _a2, _b2;
+  if (placeholderPattern().test((_a2 = context.detail) != null ? _a2 : "")) return true;
+  const fields = [context.title, context.task, ...((_b2 = context.detail) == null ? void 0 : _b2.trim()) ? [] : [context.summary]];
+  return fields.some((field) => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field));
 }
 var GITHUB_PART = /^[A-Za-z0-9._-]+$/;
 function rawFileUrl(opened) {
@@ -19985,7 +19986,7 @@ function insert(detail, addition) {
 ${addition}`;
 }
 function attachFullText(detail, files, language2, prior = [], requested = true) {
-  const base = tidy(detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), ""));
+  const stripped = detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), "");
   const fetched = files.filter((file) => file.ok);
   const failed = files.filter((file) => !file.ok);
   const replaced = new Set(fetched.map((file) => file.url));
@@ -20001,7 +20002,8 @@ function attachFullText(detail, files, language2, prior = [], requested = true) 
       if (!keptUrls.has(file.url))
         parts.push(`${prefix}${translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)}`);
   }
-  return parts.length ? insert(base, parts.join("\n\n")) : base;
+  if (!parts.length) return stripped === detail ? detail : tidy(stripped);
+  return insert(tidy(stripped), parts.join("\n\n"));
 }
 
 // ai/task-policy.ts
@@ -113892,7 +113894,7 @@ var AiTaskService = class {
         }
         result.formatIssues = issues;
       }
-      if (ownsFullText && (fullText || priorFullText.blocks.length)) {
+      if (ownsFullText) {
         const opened = fullText ? openedUrlsFromEvents(webEvents) : [];
         let files = this.options.fetchPage && opened.length ? await fetchFullTexts(opened, this.options.fetchPage) : [];
         const top = input2.updateMode === "top";

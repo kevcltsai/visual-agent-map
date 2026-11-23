@@ -434,7 +434,8 @@ export class AiTaskService {
         result.formatIssues = issues;
       }
       // After the count repair, so the repair never sees (or rewrites) the fetched text.
-      if (ownsFullText && (fullText || priorFullText.blocks.length)) {
+      // Every reader-facing reply passes here: a block the model wrote under the VAM label is never kept as the program's.
+      if (ownsFullText) {
         const opened = fullText ? openedUrlsFromEvents(webEvents) : [];
         let files = this.options.fetchPage && opened.length ? await fetchFullTexts(opened, this.options.fetchPage) : [];
         // A top reply is put above the old Detail, which keeps its blocks: only files it does not have yet are added.

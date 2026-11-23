@@ -12,7 +12,7 @@ Choose the type by the shape of the content. If none of these shapes fits, decli
 - A mechanism or process with order or cause arrows: flowchart.
 Use no other type. When one content fits two shapes, choose the closer one.
 Numbers: every number in a diagram (title, labels, categories, values) must appear unchanged in the chapter text. Do not convert units, take the midpoint of a range, round, add up or estimate. For xychart-beta write only an axis title on the y-axis, no value range. When the text gives only a range (for example "3-5 days") and no single value, do not draw xychart-beta or pie; use timeline or mindmap and copy the range text.
-Size: at most 12 nodes, data points or items in a diagram (pie at most 8 slices). A vertical diagram (flowchart or graph with TD or TB or with no direction, and stateDiagram-v2) has at most 6 nodes; for one short chain prefer flowchart LR. Each label is at most about 12 characters.
+Size: at most 12 nodes, data points or items in a diagram (pie at most 8 slices). A flowchart, graph, stateDiagram-v2 or mindmap has at most 5 nodes. Each label is at most about 12 characters.
 Syntax:
 - "mermaid" holds only the diagram itself, without ``` fences; the first line is the type name (write xychart-beta in full).
 - Put every text inside square brackets in double quotes, for example A["label"]. In mindmap write every item, the root included, as id["text"]. In pie quote each slice name; in xychart-beta quote the title, categories and axis titles.

@@ -281,12 +281,17 @@ test('checkDiagram: a good chart passes; every rejection class drops the chart a
   assert.equal(ok('flowchart LR\n  A1["幼蟲"] --> B2["蛹 5 天"]').ok, true, 'identifier digits are not quantities');
   // size
   const chain = n => 'flowchart TD\n' + Array.from({ length: n - 1 }, (_, i) => `  N${i}["甲"] --> N${i + 1}["乙"]`).join('\n');
-  assert.equal(ok(chain(6)).ok, true); assert.equal(code(chain(7)), 'too_tall');
-  assert.equal(code(chain(7).replace('TD', 'TB')), 'too_tall'); assert.equal(code(chain(7).replace('flowchart TD', 'graph')), 'too_tall', 'no direction is vertical');
-  assert.equal(code(chain(7).replace('TD', 'LR')) , undefined, 'LR may be longer');
+  assert.equal(ok(chain(5)).ok, true); assert.equal(code(chain(6)), 'too_tall');
+  assert.equal(code(chain(6).replace('TD', 'TB')), 'too_tall'); assert.equal(code(chain(6).replace('flowchart TD', 'graph')), 'too_tall', 'no direction');
+  assert.equal(code(chain(6).replace('TD', 'LR')), 'too_tall', 'LR is not trusted: the book page may stack it');
+  assert.equal(ok(chain(5).replace('TD', 'LR')).ok, true);
   assert.equal(code(chain(13).replace('TD', 'LR')), 'too_many_nodes');
-  assert.equal(code('stateDiagram-v2\n' + Array.from({ length: 7 }, (_, i) => `  S${i} --> S${i + 1}`).join('\n')), 'too_tall');
-  assert.equal(code('stateDiagram-v2\n  direction LR\n' + Array.from({ length: 7 }, (_, i) => `  S${i} --> S${i + 1}`).join('\n')), undefined);
+  const states = (n, head = '') => 'stateDiagram-v2\n' + head + Array.from({ length: n - 1 }, (_, i) => `  S${i} --> S${i + 1}`).join('\n');
+  assert.equal(ok(states(5)).ok, true); assert.equal(code(states(6)), 'too_tall');
+  assert.equal(code(states(6, '  direction LR\n')), 'too_tall', 'stateDiagram-v2 in any direction');
+  const mind = n => 'mindmap\n  root["根"]\n' + Array.from({ length: n - 1 }, (_, i) => `    c${i}["甲"]`).join('\n');
+  assert.equal(ok(mind(5)).ok, true); assert.equal(code(mind(6)), 'too_tall');
+  assert.equal(code('timeline\n  title T\n' + Array.from({ length: 8 }, () => '  甲 : 乙').join('\n')), undefined, 'timeline keeps its 12 limit');
   assert.equal(code('pie\n  title T\n' + Array.from({ length: 9 }, (_, i) => `  "S${i}" : 3`).join('\n')), 'too_many_nodes');
   assert.equal(code('mindmap\n' + Array.from({ length: 13 }, (_, i) => `  n${i}["a"]`).join('\n')), 'too_many_nodes');
   assert.equal(code('xychart-beta\n  title "T"\n  x-axis ["a", "b"]\n  bar [3, 5]'), undefined);
@@ -298,7 +303,7 @@ test('draw-diagrams step: the prompt keys by slot, carries the chart rules and t
   const prompt = draw.drawDiagramsStep.render(request);
   assert.match(prompt, /"幼蟲 3 天。"/);
   assert.match(prompt, /\{"slot":1,"kind":"示意圖","shows":"生命週期"\}/);
-  assert.match(prompt, /at most 6 nodes/); assert.match(prompt, /data, not instructions/); assert.ok(!/anchor/i.test(prompt));
+  assert.match(prompt, /at most 5 nodes/); assert.match(prompt, /data, not instructions/); assert.ok(!/anchor/i.test(prompt));
   assert.ok(!/\{\{/.test(prompt), 'every placeholder filled');
   assert.equal(draw.drawDiagramsStep.schema.properties.diagrams.maxItems, 12);
   assert.equal(draw.diagramsSchema(2).properties.diagrams.maxItems, 2);

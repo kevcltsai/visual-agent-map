@@ -142,7 +142,7 @@ const TYPES = new Set([
 ]);
 const MAX_NODES = 12;
 const MAX_PIE = 8;
-export const MAX_VERTICAL_NODES = 6;
+export const MAX_VERTICAL_NODES = 5;
 const FLOW_WORDS = new Set([
   "subgraph",
   "end",
@@ -226,11 +226,9 @@ function countNodes(type: string, lines: string[]): number {
   }
 }
 
-/** Whether the chart grows downwards: flowchart or graph with TD, TB, BT or no direction, and stateDiagram-v2 unless it says `direction LR|RL`. */
-function isVertical(type: string, header: string[], lines: string[]): boolean {
-  if (type === "flowchart" || type === "graph") return !/^(LR|RL)$/.test(header[1] ?? "");
-  if (type === "stateDiagram-v2") return !lines.some(line => /^\s*direction\s+(LR|RL)\b/.test(line));
-  return false;
+/** Whether the chart grows tall in the book page whatever its direction word says (flowchart, graph, stateDiagram-v2 and mindmap). */
+function isTall(type: string): boolean {
+  return type === "flowchart" || type === "graph" || type === "stateDiagram-v2" || type === "mindmap";
 }
 
 export type DiagramCheck = { ok: true; mermaid: string } | { ok: false; code: DiagramRejectCode };
@@ -239,7 +237,7 @@ export type DiagramCheck = { ok: true; mermaid: string } | { ok: false; code: Di
  * Pure per-chart check, so one failing chart is dropped alone. `chapterText` is the chapter without its picture lines (the text the
  * model saw). A chart passes only when: its type is in the whitelist; it passes the shared chart body limits and
  * `neutralizeUnsafeMermaid`; no `<` (the fill's exit check refuses a whole chapter for one) and no marker bracket in the chart or title;
- * every number of the chart and title is in the text; a vertical chart has at most {@link MAX_VERTICAL_NODES} nodes, any chart at most 12, a pie 8.
+ * every number of the chart and title is in the text; a flowchart, graph, stateDiagram-v2 or mindmap (any direction: the book page may stack it) has at most {@link MAX_VERTICAL_NODES} nodes, any chart at most 12, a pie 8.
  * The parser check (`mermaidSyntax`) is the caller's. Returns the normalized chart body.
  */
 export function checkDiagram(draft: Pick<DiagramDraft, "title" | "mermaid">, chapterText: string): DiagramCheck {
@@ -259,6 +257,6 @@ export function checkDiagram(draft: Pick<DiagramDraft, "title" | "mermaid">, cha
     return { ok: false, code: "number_not_in_text" };
   const nodes = countNodes(type, lines.slice(1));
   if (nodes > (type === "pie" ? MAX_PIE : MAX_NODES)) return { ok: false, code: "too_many_nodes" };
-  if (isVertical(type, header, lines.slice(1)) && nodes > MAX_VERTICAL_NODES) return { ok: false, code: "too_tall" };
+  if (isTall(type) && nodes > MAX_VERTICAL_NODES) return { ok: false, code: "too_tall" };
   return { ok: true, mermaid: body };
 }

@@ -1013,3 +1013,27 @@ test('place_image: buildImageResult says the canvas wording in the head and show
   assert.match(build, /block\.canvas \? block\.query : block\.nodeTitle/);
   assert.match(build, /current\.nodeTitle \|\| current\.query/, 'a searching canvas block names its words');
 });
+
+test('place_image write (behaviour): one transaction adds an annotated image with the web note; one undo takes it back, redo returns it; a stale map or a dead alive() writes nothing', async () => {
+  const h = await harness();
+  const before = plain(await h.saved());
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const block = { query: 'red barn', nodeId: '', nodeTitle: '', canvas: true, mapPath: MAP, mapId: 'map-a', state: 'searching', items: [] };
+  const file = { name: 'barn.png', data: PNG.buffer.slice(0) };
+  const stale = await h.view.chatCanvasImageWrite({ ...block, mapId: 'other' }, file, () => true);
+  assert.equal(stale.ok, false);
+  const dead = await h.view.chatCanvasImageWrite(block, file, () => false);
+  assert.equal(dead.ok, false);
+  assert.deepEqual(plain(await h.saved()), before, 'a refused write leaves the map as it was');
+  const written = await h.view.chatCanvasImageWrite(block, file, () => true);
+  assert.equal(written.ok, true);
+  const added = (await h.saved()).canvasItems.find(i => i.id === written.id);
+  assert.equal(added.kind, 'annotated-image');
+  assert.match(added.note, /red barn/);
+  assert.equal(h.view.history.undoEntry.label, 'AI picture on the canvas');
+  await h.view.travel(false);
+  assert.deepEqual(plain(await h.saved()), before, 'one undo step takes the picture back');
+  assert.equal(h.view.history.undoEntry.label, 'earlier');
+  await h.view.travel(true);
+  assert.ok((await h.saved()).canvasItems.some(i => i.id === written.id), 'redo brings it back');
+});

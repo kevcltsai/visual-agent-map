@@ -89,6 +89,11 @@ export interface MapChatLine {
 export function placedImage(block: MapChatImages): MapChatImageItem | undefined {
   return block.state === "ready" ? block.items.find(item => item.inserted) : undefined;
 }
+/** A canvas picture that did not come: the search was stopped, so it says so instead of "no picture was found". */
+const canvasMissedKey = (blocks: MapChatImages[]): string =>
+  blocks.every(block => block.state === "stopped")
+    ? "ui.map_chat_note_images_stopped"
+    : "ui.map_chat_line_canvas_image_missed";
 /** The line as it reads now: a picture-search line follows the blocks of its action (one per card); any other line is itself. */
 export function settledLine(line: MapChatLine): MapChatLine {
   const blocks = line.imageGroup;
@@ -108,7 +113,7 @@ export function settledLine(line: MapChatLine): MapChatLine {
     return {
       ...line,
       status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
-      text: t(placed ? "ui.map_chat_line_canvas_image_done" : "ui.map_chat_line_canvas_image_missed") + model
+      text: t(placed ? "ui.map_chat_line_canvas_image_done" : canvasMissedKey(blocks)) + model
     };
   return {
     ...line,
@@ -3794,7 +3799,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       const missed = blocks.length - placed;
       head.setText(
         blocks.every(block => block.canvas)
-          ? t(placed ? "ui.map_chat_images_canvas_done" : "ui.map_chat_line_canvas_image_missed")
+          ? t(placed ? "ui.map_chat_images_canvas_done" : canvasMissedKey(blocks))
           : missed
             ? t("ui.map_chat_images_summary_0_1", placed, missed)
             : t("ui.map_chat_images_summary_0", placed)

@@ -1001,6 +1001,11 @@ test('place_image: settledLine words a canvas block as the canvas picture, not a
   const missed = settledLine(line([block({ state: 'empty', items: [] })]));
   assert.equal(missed.status, 'skipped');
   assert.equal(missed.text, t('ui.map_chat_line_canvas_image_missed'));
+  const stopped = settledLine(line([block({ state: 'stopped', items: [] })]));
+  assert.equal(stopped.status, 'skipped');
+  for (const file of ['zh-TW', 'en', 'zh-CN']) assert.match(require('node:fs').readFileSync(`i18n/${file}.ts`, 'utf8'), /"ui\.map_chat_note_images_stopped"/, file);
+  assert.equal(stopped.text, t('ui.map_chat_note_images_stopped'), 'a stopped canvas search does not say nothing was found');
+  assert.notEqual(stopped.text, missed.text);
   assert.equal(settledLine(line([block({ state: 'failed', items: [] })])).status, 'failed');
   const cards = settledLine(line([block({ canvas: undefined, nodeId: 'a', nodeTitle: 'A' })]));
   assert.notEqual(cards.text, t('ui.map_chat_line_canvas_image_done'), 'a card block keeps the card wording');
@@ -1009,7 +1014,7 @@ test('place_image: settledLine words a canvas block as the canvas picture, not a
 
 test('place_image: buildImageResult says the canvas wording in the head and shows the words, not a card title', () => {
   const build = methodOf(CHAT_SRC, 'buildImageResult');
-  assert.match(build, /blocks\.every\(block => block\.canvas\)\s*\?\s*t\(placed \? "ui\.map_chat_images_canvas_done" : "ui\.map_chat_line_canvas_image_missed"\)/);
+  assert.match(build, /blocks\.every\(block => block\.canvas\)\s*\?\s*t\(placed \? "ui\.map_chat_images_canvas_done" : canvasMissedKey\(blocks\)\)/);
   assert.match(build, /block\.canvas \? block\.query : block\.nodeTitle/);
   assert.match(build, /current\.nodeTitle \|\| current\.query/, 'a searching canvas block names its words');
 });

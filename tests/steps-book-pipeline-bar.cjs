@@ -129,7 +129,7 @@ test('bar ETA: shown only while planning or writing and only with an estimate (t
   const progress = over => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 6, counts: { pending: 0, planned: 0, written: 6, checked: 0, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], ...over });
   const draw = p => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, p, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} }); return bar; };
   assert.equal(all(draw(progress({})), 'vam-book-bar-eta').length, 0, 'under five finished cards: no ETA');
-  assert.equal(bundle.bookProgressText(bundle.bookBarState(data, progress({}), () => undefined)), '正在寫第 1／6 章', 'the writing line is the one chapter sentence, with no done count');
+  assert.equal(bundle.bookProgressText(bundle.bookBarState(data, progress({}), () => undefined)), '寫作中 · 已完成 0/6 章，正在寫第 1 章', 'the writing line is the done count plus the chapter in work');
   const shown = all(draw(progress({ etaSeconds: 600 })), 'vam-book-bar-eta');
   assert.equal(shown.length, 1);
   assert.ok(shown[0].text.includes('10'));
@@ -142,8 +142,8 @@ test('bar: the automatic fix round keeps the whole-book count; a first-time chap
   const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 0, planned: 1, written: 0, checked: 2, 'needs-review': 1 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
   assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／4 章', 'only the fix of chapter 1: named fix line with the whole-book count');
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'd', step: 'write', startedAt: 2 }]), '正在寫第 4／4 章', 'a first-time chapter in work is the one named');
-  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／4 章', 'no fix round: unchanged');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'd', step: 'write', startedAt: 2 }]), '寫作中 · 已完成 3/4 章，正在寫第 4 章', 'a first-time chapter in work is the one named');
+  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '寫作中 · 已完成 3/4 章，正在寫第 2 章', 'no fix round: the done count and the chapter in work');
 });
 
 test('bar: a run saved in the old trial planning step reads as writing: the fix round keeps the whole-book done count; an initial write is still named', () => {
@@ -152,8 +152,8 @@ test('bar: a run saved in the old trial planning step reads as writing: the fix 
   const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 5, counts: { pending: 2, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
   assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／5 章', 'fix only: named fix line with the whole-book done count');
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }]), '正在寫第 3／5 章', 'initial write alongside a fix is named');
-  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／5 章', 'a chapter in its first write is named');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }]), '寫作中 · 已完成 3/5 章，正在寫第 3 章', 'initial write alongside a fix is named');
+  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '寫作中 · 已完成 3/5 章，正在寫第 2 章', 'a chapter in its first write is named');
 });
 
 test('bar (live v6): in the fix round the fix line names the chapter still being fixed as the fixes finish out of order, also for fixes that are not the first chapters', () => {
@@ -206,7 +206,7 @@ test('bar: the fix line follows the chapter still being fixed and keeps the fix 
   assert.equal(wtext([]), '正在修正第 6 章・已完成 5／6 章');
   // once chapter 6 is done, no fix line is left
   stages.f = 'needs-review';
-  assert.equal(wtext(undefined), '正在寫第 6／6 章');
+  assert.equal(wtext(undefined), '寫作中 · 已完成 5/6 章，正在寫第 6 章');
 });
 
 test('bar: a map change shows the changed mode with the counts, three real buttons and no card id', () => {
@@ -555,19 +555,27 @@ test('P8c bar: while running the bar says how many chapters the AI is fixing and
   assert.equal(bundle.bookBarState(aiData({ phase: 'gate1', trial: ['a'] }), { ...writingProgress, phase: 'gate1' }, () => undefined).mode, 'writing');
 });
 
-test('P8c bar: the plan review has three buttons; "back to editing" is its own action and never the confirm', () => {
+test('P8c bar: the plan review has two buttons (go and stop) and one hint line; no summary or back-to-plan button, no counts sentence, no progress track', () => {
   setUiLanguage('zh-TW');
   const state = bundle.bookBarState(aiData({ phase: 'gate1', planReview: true, trial: ['a', 'b'] }), undefined, () => undefined);
   assert.equal(state.mode, 'gate1');
   assert.equal(state.planReview, true);
   const calls = [];
   const bar = dom.element('div');
-  bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1: () => calls.push('go'), openPlan: () => calls.push('open'), editPlan: () => calls.push('edit') });
+  bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1: () => calls.push('go') });
   assert.equal(bundle.bookTitleText(state), '圖文書：全書企劃好了，看方向對不對');
   const buttons = dom.findAll(bar, i => i.tag === 'button').map(i => i.text);
-  assert.deepEqual(buttons, ['打開全書摘要', '方向對，開始寫', '回去改企劃', '停止']);
-  for (const cls of ['vam-book-open-plan', 'vam-book-confirm', 'vam-book-back-to-plan']) one(bar, cls).click();
-  assert.deepEqual(calls, ['open', 'go', 'edit']);
+  assert.deepEqual(buttons, ['方向對，開始寫', '停止']);
+  one(bar, 'vam-book-confirm').click();
+  assert.deepEqual(calls, ['go']);
+  for (const cls of ['vam-book-open-plan', 'vam-book-back-to-plan']) assert.equal(one(bar, cls), undefined, cls + ' is gone');
+  assert.equal(all(bar, 'mod-warning').length, 0, 'stop is no longer a warning button');
+  const hint = one(bar, 'vam-book-plan-hint');
+  assert.equal(hint.children.length, 1);
+  assert.equal(hint.children[0].tag, 'b');
+  assert.equal(hint.children[0].text, '想改就直接跟左邊的總編輯說。');
+  assert.equal(texts(bar).filter(x => x.includes('都企劃好了')).length, 0, 'no counts sentence');
+  assert.equal(one(bar, 'vam-book-track'), undefined, 'nothing is finished yet: no track');
   assert.ok(!/試跑|跳過/.test(texts(bar).join('|')), 'no trial buttons');
 });
 
@@ -639,11 +647,11 @@ test('bar: with a book structure the writing and done counts say cards, not chap
   const base = { v: 1, runId: 'r', status: 'running', order, trial: ['p', 'c1', 's1'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
   const progress = phase => ({ runId: 'r', phase, status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current: [{ nodeId: 'c2', step: 'write', startedAt: 1 }] });
   const text = (language, phase, struct) => { setUiLanguage(language); return bundle.bookProgressText(bundle.bookBarState({ ...base, phase }, progress(phase), () => undefined, undefined, struct, id => id)); };
-  assert.equal(text('zh-TW', 'writing', structure), '正在寫第 4／4 張卡');
-  assert.equal(text('en', 'writing', structure), 'Writing card 4/4');
+  assert.equal(text('zh-TW', 'writing', structure), '寫作中 · 已完成 3/4 張卡，正在寫第 4 張卡');
+  assert.equal(text('en', 'writing', structure), 'Writing · 3/4 cards done, Now writing card 4');
   assert.equal(text('zh-TW', 'planning', structure), '正在企劃第 4／4 張卡，已完成 3／4 張卡');
   assert.equal(text('zh-CN', 'planning', structure), '正在企划第 4／4 张卡，已完成 3／4 张卡');
-  assert.equal(text('zh-TW', 'writing', undefined), '正在寫第 4／4 章', 'no structure: unchanged');
+  assert.equal(text('zh-TW', 'writing', undefined), '寫作中 · 已完成 3/4 章，正在寫第 4 章', 'no structure: unchanged');
   assert.equal(text('zh-TW', 'planning', undefined), '正在企劃第 4／4 章，已完成 3／4 章', 'no structure: unchanged');
 });
 
@@ -689,10 +697,15 @@ test('structure list: gate 1 lists each change with its kind, where it went and 
   assert.equal(whys[0].children?.[0]?.text ?? texts(whys[0])[0], 'trust first');
   assert.ok(texts(whys[1]).includes(evil), 'reason stays literal text, never markup');
   assert.equal(dom.findAll(whys[1], i => i.tag === 'img' || i.tagName === 'IMG').length, 0);
-  assert.deepEqual(texts(box).filter(x => x.includes('調整了')), ['總編輯調整了 5 處結構']);
-  assert.ok(texts(box).includes('現在 4 章 1 節（原本 4 章 1 節）'), 'the count is read from the current structure and from the tree before');
+  assert.deepEqual(all(box, 'vam-book-structure-sum').map(k => k.text), ['5 處結構調整 ·']);
   assert.ok(texts(box).includes('另有 2 項沒套用：碰到你改過的卡、不符合結構規則。'));
-  assert.ok(texts(box).includes('全部還原會重新企劃 2 張卡，約 3 次 AI 呼叫。'), 'the put-back card and the merge target are planned again (the runner\'s rule); moves and renames are not');
+  // The chapter-count line and "undo all" (with its cost note) are gone; only per-item undo is left.
+  assert.ok(!texts(box).some(x => x.includes('現在 ') || x.includes('全部還原')), 'no now/before count line, no undo-all note');
+  assert.equal(one(box, 'vam-book-structure-undo-all'), undefined);
+  assert.equal(all(box, 'vam-book-structure-undo').length, 5, 'every change keeps its own undo');
+  // With no fold state the rows are shown, in the list container; no toggle or accept can exist without handlers.
+  assert.ok(one(box, 'vam-book-structure-list'));
+  assert.equal(one(box, 'vam-book-structure-toggle'), undefined);
 });
 
 test('structure list: a change made after an undone one is shown against the tree without the undone one (undo, then a chat move of the same card)', () => {
@@ -727,6 +740,8 @@ test('structure list: nothing shows without changes, outside the plan review, or
   const text = texts(one(draw(capOnly).bar, 'vam-book-structure'));
   assert.ok(text.includes('總編輯提的修改超過上限（每本最多 6 項），這次都沒套用。'));
   assert.ok(!text.some(x => x.includes('全部還原')), 'no undo-all when nothing stands');
+  assert.equal(one(draw(capOnly, { structureAccept: { accepted: false, expanded: false, accept() {}, toggle() {} } }).bar, 'vam-book-structure-head'), undefined, 'cap-only: no head line, the sentence stays visible even when folded');
+  assert.ok(texts(one(draw(capOnly, { structureAccept: { accepted: false, expanded: false, accept() {}, toggle() {} } }).bar, 'vam-book-structure')).includes('總編輯提的修改超過上限（每本最多 6 項），這次都沒套用。'));
 });
 
 test('structure list: a change that leans on another names it for the undo button; an undone change shows "已還原" and no button', () => {
@@ -745,10 +760,14 @@ test('structure list: a change that leans on another names it for the undo butto
   const done = rows.find(r => r.dataset.op === 'o5');
   assert.equal(one(done, 'vam-book-structure-undo'), undefined);
   assert.ok(texts(done).some(x => x.includes('已還原')));
-  assert.deepEqual(texts(one(bar, 'vam-book-structure')).filter(x => x.includes('調整了')), ['總編輯調整了 4 處結構'], 'an undone change no longer counts');
+  assert.deepEqual(all(one(bar, 'vam-book-structure'), 'vam-book-structure-sum').map(k => k.text), ['4 處結構調整 ·'], 'an undone change no longer counts');
+  assert.equal(one(bar, 'vam-book-structure-undo-all'), undefined, 'there is no undo-all');
   button.listeners?.click?.[0]?.({ stopPropagation() {} });
-  one(bar, 'vam-book-structure-undo-all').listeners?.click?.[0]?.({ stopPropagation() {} });
-  assert.equal(JSON.stringify(calls), JSON.stringify([['o3'], 'all']));
+  assert.equal(JSON.stringify(calls), JSON.stringify([['o3']]));
+  // Every change undone: the head says so and no undo stays.
+  const allUndone = draw(state(data({ undone: ['o1', 'o2', 'o3', 'o4', 'o5'] })), { undoStructure() {} }).bar;
+  assert.deepEqual(all(allUndone, 'vam-book-structure-sum').map(k => k.text), ['結構調整都已還原 ·']);
+  assert.equal(all(allUndone, 'vam-book-structure-undo').length, 0);
 });
 
 test('structure list: the archived-note link opens the parked note; busy disables every undo; a failed undo leaves one line; no undo handler, no undo buttons', () => {
@@ -763,35 +782,57 @@ test('structure list: the archived-note link opens the parked note; busy disable
   click(archived[0]);
   assert.deepEqual(opened, ['Archive/Digital.md']);
   const busy = draw(state(data()), { undoStructure() {}, structureUndo: 'busy' }).bar;
-  assert.ok([...all(busy, 'vam-book-structure-undo'), ...all(busy, 'vam-book-structure-undo-all')].every(b => b.attrs.disabled === 'true'));
+  assert.ok(all(busy, 'vam-book-structure-undo').length > 0 && all(busy, 'vam-book-structure-undo').every(b => b.attrs.disabled === 'true'));
+  assert.equal(all(busy, 'vam-book-structure-undo-all').length, 0, 'no undo-all button to disable');
   assert.ok(texts(busy).includes('還原中，請稍候…'));
   const failed = draw(state(data()), { undoStructure() {}, structureUndo: 'failed' }).bar;
   assert.ok(texts(failed).includes('還原沒有成功，心智圖已回到還原前的樣子。'));
   assert.equal(all(failed, 'vam-book-structure-undo').some(b => b.attrs.disabled), false, 'the owner can try again');
   const none = draw(state(data())).bar;
-  assert.equal(all(none, 'vam-book-structure-undo').length + all(none, 'vam-book-structure-undo-all').length, 0);
+  assert.equal(all(none, 'vam-book-structure-undo').length, 0);
+  assert.equal(all(none, 'vam-book-structure-undo-all').length, 0);
   setUiLanguage('en');
   const en = draw(state(data()), { undoStructure() {} }).bar;
-  assert.ok(texts(en).includes('The editor changed the structure in 5 places'));
+  assert.ok(texts(en).includes('5 structure changes ·'));
   setUiLanguage('zh-TW');
 });
 
-test('structure list: "accept" folds the list to one line with "show again"; the key changes when the editor changes something new', () => {
+test('structure list: folded it is one head line with a toggle and "accept"; the toggle opens the rows; accepted renders nothing; the key changes when the editor changes something new', () => {
   setUiLanguage('zh-TW');
   const { data, state, draw } = structureCase();
   const calls = [];
   const click = el => el.listeners?.click?.[0]?.({ stopPropagation() {} });
-  const open = draw(state(data()), { undoStructure() {}, structureAccept: { accepted: false, accept: () => calls.push('accept'), reopen() {} } }).bar;
-  const button = one(open, 'vam-book-structure-accept');
-  assert.equal(button.text, '接受調整');
-  click(button);
-  const folded = draw(state(data()), { undoStructure() {}, structureAccept: { accepted: true, accept() {}, reopen: () => calls.push('reopen') } }).bar;
+  const accept = (accepted, expanded) => ({ accepted, expanded, accept: () => calls.push('accept'), toggle: () => calls.push('toggle') });
+  // Folded: head (sum + toggle + accept), no rows, no list.
+  const folded = draw(state(data()), { undoStructure() {}, structureAccept: accept(false, false) }).bar;
   const box = one(folded, 'vam-book-structure');
-  assert.equal(all(box, 'vam-book-structure-row').length, 0, 'no rows once accepted');
-  assert.equal(one(box, 'vam-book-structure-undo-all'), undefined);
-  assert.ok(texts(box).includes('已接受總編輯的 5 處結構調整'));
-  click(one(box, 'vam-book-structure-reopen'));
-  assert.deepEqual(calls, ['accept', 'reopen']);
+  const head = one(box, 'vam-book-structure-head');
+  assert.equal(one(head, 'vam-book-structure-sum').text, '5 處結構調整 ·');
+  const toggle = one(head, 'vam-book-structure-toggle');
+  assert.equal(toggle.text, '檢視 ▸');
+  assert.equal(toggle.attrs['aria-expanded'], 'false');
+  assert.equal(toggle.attrs['aria-controls'], 'vam-book-structure-list');
+  const button = one(head, 'vam-book-structure-accept');
+  assert.equal(button.text, '接受調整');
+  assert.equal(all(box, 'vam-book-structure-row').length, 0, 'no rows while folded');
+  assert.equal(one(box, 'vam-book-structure-list'), undefined);
+  assert.equal(one(box, 'vam-book-structure-skipped'), undefined, 'the not-applied lines are inside the list too');
+  click(toggle);
+  click(button);
+  assert.deepEqual(calls, ['toggle', 'accept']);
+  // Expanded: the rows, the not-applied line and the list container the toggle points at; the toggle reads "hide".
+  const open = one(draw(state(data()), { undoStructure() {}, structureAccept: accept(false, true) }).bar, 'vam-book-structure');
+  assert.equal(all(open, 'vam-book-structure-row').length, 5);
+  assert.equal(one(open, 'vam-book-structure-list').id, 'vam-book-structure-list');
+  assert.equal(one(open, 'vam-book-structure-toggle').text, '收起 ▾');
+  assert.equal(one(open, 'vam-book-structure-toggle').attrs['aria-expanded'], 'true');
+  assert.ok(texts(open).includes('另有 2 項沒套用：碰到你改過的卡、不符合結構規則。'));
+  // Accepted: the structure block is gone altogether (no reopen).
+  const done = draw(state(data()), { undoStructure() {}, structureAccept: accept(true, false) }).bar;
+  assert.equal(one(done, 'vam-book-structure'), undefined);
+  assert.equal(one(done, 'vam-book-structure-reopen'), undefined);
+  assert.equal(one(done, 'vam-book-structure-head'), undefined);
+  assert.ok(one(done, 'vam-book-confirm'), 'the plan review itself stays');
   const key = state(data()).structureEdit.key;
   assert.notEqual(state(data({ applied: data().structureEdit.applied.slice(0, 2) })).structureEdit.key, key);
   assert.equal(state(data({ undone: ['o5'] })).structureEdit.key, key, 'an undo is not a new set of changes');
@@ -810,6 +851,12 @@ test('structure undo: the keyboard goes to the next remaining undo button, else 
   world.undos = [];
   proto.applyBookBarFocus.call(fake(0, 'structure-undo'));
   assert.equal(JSON.stringify(focused), JSON.stringify(['u1', 'u2', 'go', 'go']));
+  // The fold toggle and the accepted plan review have their own targets.
+  const asked = [];
+  const sel = focus => ({ closed: false, bookBarFocus: focus, contentEl: { querySelector: s => ({ focus: () => asked.push(s) }) } });
+  proto.applyBookBarFocus.call(sel('structure-toggle'));
+  proto.applyBookBarFocus.call(sel('plan-go'));
+  assert.deepEqual(asked, ['.vam-book-structure-toggle', '.vam-book-confirm']);
   const text = code => proto.structureUndoRefusalText.call({}, new bundle.BookPipelineRunError(code));
   assert.equal(text('missing'), '找不到封存的筆記，沒有還原任何東西。');
   assert.equal(text('stale'), '心智圖剛被改過，沒有還原；請再按一次。');

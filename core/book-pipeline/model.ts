@@ -519,6 +519,16 @@ export function readBookPipeline(map: { bookPipeline?: unknown }): BookPipelineR
   return { kind: "usable", data };
 }
 
+/**
+ * What a picture-book run takes away from the map's cards while it owns the map (any phase before "done", running or stopped; abandon
+ * deletes `bookPipeline`): card AI until the book is done, and structure edits while the program plans, writes or checks. Gate 1 keeps
+ * structure edits: the plan review detects hand-made changes and asks to replan or keep.
+ */
+export function bookCardLock(phase: PipelinePhase | undefined): { ai: boolean; structure: boolean } {
+  if (phase === undefined || phase === "done") return { ai: false, structure: false };
+  return { ai: true, structure: phase !== "gate1" };
+}
+
 /** The cards the run works on: `order` without the cards the map lost. The one list scheduling, completion, counts, neighbours and the chapter list share. */
 export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">): string[] {
   const gone = data.removed;

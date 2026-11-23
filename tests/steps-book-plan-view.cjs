@@ -141,14 +141,18 @@ test('foldLabelOf: a lone 圖安排 / 驗收清單 line folds (either language, 
   for (const other of ['圖安排：無', '角色：', '驗收清單', '- C1 [結構型] t', '']) assert.equal(view.foldLabelOf(other), undefined, other);
 });
 
-test('the bar hints name what the owner now sees (root 全書企劃, the 企劃 of each chapter / section), not 提示', () => {
-  for (const dict of [zhTW, zhCN]) for (const key of ['ui.book_bar_plan_edit_hint']) assert.ok(!dict[key].includes('提示') && /企[劃划]/.test(dict[key]) && /各节|各節/.test(dict[key]), key);
-  for (const key of ['ui.book_bar_plan_edit_hint']) assert.ok(!/hint box/.test(en[key]) && /section note/.test(en[key]), key);
+test('the plan-review bar has one hint key; the old "edit hint", "open summary" and "back to plan" strings are gone and no hint says 提示', () => {
+  for (const dict of [zhTW, zhCN, en]) for (const key of ['ui.book_bar_plan_edit_hint', 'ui.book_bar_open_plan', 'ui.book_bar_back_to_plan']) assert.ok(!(key in dict), key);
+  for (const dict of [zhTW, zhCN]) assert.ok(!dict['ui.book_bar_plan_hint'].includes('提示'));
+  assert.ok(!/hint box/.test(en['ui.book_bar_plan_hint']));
 });
 
-// Requirement change (owner-approved mockup 2026-11-22): the plan-review hint now points at the chief editor in the chat, not at the section notes.
-test('the plan-review bar hint sends the owner to the chief editor, then to the plan notes, then to "direction is right"', () => {
-  for (const [dict, editor, plan, go] of [[zhTW, '總編輯', '企劃', '方向對，開始寫'], [zhCN, '总编辑', '企划', '方向对，开始写'], [en, 'chief editor', 'plan', 'Direction is right, start writing']])
-    for (const word of [editor, plan, go]) assert.ok(dict['ui.book_bar_plan_hint'].includes(word), `${word} in ${dict['ui.book_bar_plan_hint']}`);
-  assert.ok(!zhTW['ui.book_bar_plan_hint'].includes('提示'));
+// Requirement change (owner-approved mockup 2026-11-22): the plan-review hint points at the chief editor in the chat, as one sentence.
+test('the plan-review bar hint sends the owner to the chief editor in one sentence', () => {
+  for (const [dict, editor, exact] of [[zhTW, '總編輯', '想改就直接跟左邊的總編輯說。'], [zhCN, '总编辑', '想改就直接跟左边的总编辑说。'], [en, 'chief editor', 'To change anything, just tell the chief editor on the left.']]) {
+    const hint = dict['ui.book_bar_plan_hint'];
+    assert.equal(hint, exact);
+    assert.ok(hint.includes(editor));
+    assert.equal(hint.split(/[。.!?！？]/).filter(x => x.trim()).length, 1, 'one sentence');
+  }
 });

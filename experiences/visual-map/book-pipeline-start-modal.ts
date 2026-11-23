@@ -1,4 +1,4 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, displayTooltip, setTooltip } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
 import { modalActions } from "../../ui/modals/action-bar";
 import {
@@ -133,32 +133,11 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
     seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
-export function bookStartEstimateText(
-  estimate: BookStartEstimate,
-  structure?: { chapters: number; sections: number }
-): string {
+/** The one cost line: cards, about how long, about how many AI calls (the breakdown, the retry note and the pause limit are not shown). */
+export function bookStartEstimateText(estimate: BookStartEstimate): string {
   const minutes = Math.round(estimate.seconds / 60);
   const time = minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes);
-  if (structure)
-    return structure.sections
-      ? t(
-          "ui.book_start_estimate_struct_0_1_2_3_4_5",
-          structure.chapters,
-          structure.sections,
-          estimate.cards,
-          time,
-          estimate.calls,
-          estimate.limit
-        )
-      : t(
-          "ui.book_start_estimate_struct_0_1_2_3_4",
-          structure.chapters,
-          estimate.cards,
-          time,
-          estimate.calls,
-          estimate.limit
-        );
-  return t("ui.book_start_estimate_0_1_2_3", estimate.cards, time, estimate.calls, estimate.limit);
+  return t("ui.book_start_estimate_0_1_2", estimate.cards, time, estimate.calls);
 }
 
 /**
@@ -195,11 +174,11 @@ export interface BookStartModels {
 }
 /** The settings key of each step's model (the settings page uses the same keys). */
 export type BookModelKey = "bookPlanModel" | "bookWriteModel" | "bookImageModel" | "bookProofModel";
-const MODEL_ROWS: { key: BookModelKey; step: keyof BookStartModels; label: TranslationKey }[] = [
-  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
-  { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
-  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
-  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof" }
+const MODEL_ROWS: { key: BookModelKey; step: keyof BookStartModels; label: TranslationKey; tip: TranslationKey }[] = [
+  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan", tip: "ui.book_start_tip_plan" },
+  { key: "bookWriteModel", step: "write", label: "ui.book_step_write", tip: "ui.book_start_tip_write" },
+  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images", tip: "ui.book_start_tip_images" },
+  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof", tip: "ui.book_start_tip_proof" }
 ];
 export interface BookModelChoiceInput {
   /** The model id each step uses now. */
@@ -215,7 +194,7 @@ export interface BookStartInput {
   cards: number;
   /** How many of the cards the trial covers (`bookStructure().trialOf()`). */
   trialCards: number;
-  /** The preface + chapters + sections the estimate names (`bookStructure()`); absent: the plain card count. */
+  /** The preface + chapters + sections (`bookStructure()`); no longer shown: the cost line names the card count only. */
   structure?: { chapters: number; sections: number };
   /** The model ids the four steps use (from the settings). */
   models: BookStartModels;
@@ -288,7 +267,8 @@ export function renderBookSettingsFields(
     const label = t(FIELD_LABEL[field]);
     const id = `vam-book-start-${field}`;
     parent.createEl("label", { text: label, attr: { for: id } });
-    const area = parent.createEl("textarea", {
+    // The wrapper carries the loading shimmer over an empty field (CSS only; typing hides it).
+    const area = parent.createDiv({ cls: "vam-book-start-field-wrap" }).createEl("textarea", {
       cls: "vam-book-start-field",
       attr: {
         id,
@@ -340,7 +320,17 @@ export function renderBookModelChoice(parent: HTMLElement, input: BookModelChoic
   for (const row of MODEL_ROWS) {
     const id = `vam-book-start-model-${row.step}`;
     const name = t(row.label);
-    parent.createEl("label", { text: name, attr: { for: id } });
+    // The label and an ⓘ that says what the step does (hover, or keyboard focus).
+    const head = parent.createDiv({ cls: "vam-book-start-model-label" });
+    head.createEl("label", { text: name, attr: { for: id } });
+    const tip = t(row.tip);
+    const info = head.createSpan({
+      cls: "vam-book-start-info",
+      text: "ⓘ",
+      attr: { tabindex: "0", role: "img", "aria-label": tip }
+    });
+    setTooltip(info, tip);
+    info.addEventListener("focus", () => displayTooltip(info, tip));
     const select = parent.createEl("select", {
       cls: "dropdown vam-book-start-model",
       attr: { id, "aria-label": name }
@@ -370,6 +360,7 @@ export class BookStartModal extends Modal {
   private fields: BookSettingsFields | null = null;
   private suggested: BookSettings = {};
   private suggestingEl: HTMLElement | null = null;
+  private settingsEl: HTMLElement | null = null;
   private estimateEl: HTMLElement | null = null;
   constructor(
     app: App,
@@ -384,6 +375,7 @@ export class BookStartModal extends Modal {
   /** The suggestion arrived (or did not): the fields show it in grey; a card already started or closed ignores it. */
   setSuggestions(suggestions: BookSettings | null): void {
     if (!this.opened || this.started) return;
+    this.settingsEl?.removeClass("is-loading");
     this.suggestingEl?.remove();
     this.suggestingEl = null;
     if (!suggestions) return;
@@ -409,17 +401,17 @@ export class BookStartModal extends Modal {
       // A pick only changes this card's copy; it is saved when Start is pressed.
       onChange: () => this.refreshEstimate()
     });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
     const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));
     settings.createEl("strong", { text: t("ui.book_start_settings") });
-    this.suggestingEl = settings.createEl("p", {
-      cls: "vam-book-start-suggesting",
-      text: t("ui.book_start_suggesting")
-    });
+    // While the suggestions are being made: a spinner beside the line and a shimmer in each empty field (CSS, .is-loading).
+    this.suggestingEl = settings.createEl("p", { cls: "vam-book-start-suggesting" });
+    this.suggestingEl.createSpan({ cls: "vam-book-start-spinner", attr: { "aria-hidden": "true" } });
+    this.suggestingEl.createSpan({ text: t("ui.book_start_suggesting") });
     this.suggestingEl.setAttr("role", "status");
+    settings.addClass("is-loading");
+    this.settingsEl = settings;
     this.fields = renderBookSettingsFields(
       settings,
       this.input.settings,
@@ -442,10 +434,7 @@ export class BookStartModal extends Modal {
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {
     this.estimateEl?.setText(
-      bookStartEstimateText(
-        bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models),
-        this.input.structure
-      )
+      bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models))
     );
   }
   onClose(): void {

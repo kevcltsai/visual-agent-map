@@ -3543,7 +3543,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
             "ui.map_chat_diff_changed_0",
             named
               .map(field => {
-                const places = field.parts?.filter((part, i, all) => part.kind !== "same" && (i === 0 || all[i - 1].kind === "same")).length;
+                const places = field.parts?.filter(
+                  (part, i, all) => part.kind !== "same" && (i === 0 || all[i - 1].kind === "same")
+                ).length;
                 return places ? t("ui.map_chat_diff_places_0_1", field.label, places) : field.label;
               })
               .join(t("ui.map_chat_count_separator"))

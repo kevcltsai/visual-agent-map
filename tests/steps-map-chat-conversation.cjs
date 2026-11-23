@@ -685,6 +685,23 @@ test('turn: an automatic round abandons with a Notice only when it failed', asyn
   assert.equal(first(failed, 'notice')[1], 'bad');
 });
 
+test('turn: an empty-target research after select_topics is applied with the ids the gate resolved, never the live selection', async () => {
+  const r = turnRig();
+  const seen = [];
+  r.ports.applyActions = (result, ...rest) => { seen.push(JSON.parse(JSON.stringify(result.actions))); return Promise.resolve(r.state.applyLines); };
+  r.state.selection = ['live1', 'live2'];
+  const select = { kind: 'select_topics', nodeIds: ['a', 'gone'], all: false };
+  const research = { kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', mode: '', images: false };
+  const expand = { ...research, action: 'expand' };
+  const other = { ...research, nodeIds: ['z'] };
+  await start(r);
+  r.state.requests[0].resolve(REPLY([select, research, expand, other]));
+  await r.sending;
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].map(action => action.nodeIds), [['a', 'gone'], ['a', 'gone'], ['a', 'gone'], ['z']]);
+  assert.deepEqual(research.nodeIds, [], 'the reply object itself is not mutated');
+});
+
 test('turn: a retry of a chain round keeps its chain: no user_took_over, message and chips set on the run', async () => {
   const run = { state: { round: 1, maxRounds: 3, remaining: 0, autoApply: false, calls: 0 }, createdIds: new Set() };
   const r = turnRig();

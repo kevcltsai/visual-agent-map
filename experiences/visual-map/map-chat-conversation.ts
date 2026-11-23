@@ -8,7 +8,13 @@ import {
 } from "../../core/map-chat-chain";
 import type { MapChatContext } from "../../core/map-chat-context";
 import { CHAT_PLAN_GROUP_ORDER, chatPlanGroupOf } from "../../core/map-chat-layout";
-import { planFor, researchTargetsOf, type MapChatPlan, type MapChatPlanReason } from "../../core/map-chat-plan";
+import {
+  planFor,
+  researchTargetsOf,
+  resolveSelectionTargets,
+  type MapChatPlan,
+  type MapChatPlanReason
+} from "../../core/map-chat-plan";
 import type { RecordTurnStatus } from "../../core/map-chat-records";
 import type { MapChatRequest, MapChatResult, MapChatService } from "../../core/map-chat-service";
 import type { MapChatAction } from "../../core/steps/map-chat/step";
@@ -605,7 +611,9 @@ export class MapChatConversation {
               }
             });
             if (!alive()) return;
-            const result = outcome;
+            // The empty targets are resolved once, here: the plan gate judges these actions and the same ones are applied, so
+            // research never runs on a live selection the gate did not check (a select_topics that partly fails changes nothing).
+            const result = { ...outcome, actions: resolveSelectionTargets(outcome.actions) };
             // The research notes this request carried are "sent before" for the next round (they go last when the budget is short).
             // Only a reply that came back counts: a request that failed read nothing, so a retry still owes them.
             for (const id of request.context.research?.sent ?? []) this.ports.researchSent().add(id);

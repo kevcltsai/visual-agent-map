@@ -545,25 +545,23 @@ let panelSequence = 0;
 
 type HeroTab = "map" | "research";
 const HERO_TABS: readonly HeroTab[] = ["map", "research"];
-/** The opening screen's examples (at most three): the book one first, marked new; `slot` is the blank the field selects. */
+/** The opening screen's examples (owner 2026-11-23: two): the picture one first, marked new, then the book one; `slot` is the blank the field selects. */
 const MAP_CHAT_EXAMPLES = [
   {
+    book: false,
+    isNew: true,
+    icon: "🖼",
+    label: "ui.map_chat_example_image",
+    prompt: "ui.map_chat_example_image_prompt",
+    slot: "ui.map_chat_example_image_slot"
+  },
+  {
     book: true,
+    isNew: false,
+    icon: "📖",
     label: "ui.map_chat_example_book",
     prompt: "ui.map_chat_example_book_prompt",
     slot: "ui.map_chat_example_book_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_compare",
-    prompt: "ui.map_chat_example_compare_prompt",
-    slot: "ui.map_chat_example_compare_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_notes",
-    prompt: "ui.map_chat_example_notes_prompt",
-    slot: "ui.map_chat_example_notes_slot"
   }
 ] as const;
 /** The pool of suggested claims of the research tab (each shown text is its i18n key's). */
@@ -2433,13 +2431,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.examplesEl.empty();
     for (const example of MAP_CHAT_EXAMPLES) {
       const button = this.examplesEl.createEl("button", {
-        cls: `vam-map-chat-example${example.book ? " is-new" : ""}`,
+        cls: `vam-map-chat-example${example.isNew ? " is-new" : ""}`,
         attr: { type: "button" }
       });
-      if (example.book)
-        button.createSpan({ cls: "vam-map-chat-example-icon", text: "📖", attr: { "aria-hidden": "true" } });
+      button.createSpan({ cls: "vam-map-chat-example-icon", text: example.icon, attr: { "aria-hidden": "true" } });
       button.createSpan({ text: t(example.label) });
-      if (example.book) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
+      if (example.isNew) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
       // A click only fills the field; sending is the owner's own Enter or send key.
       button.addEventListener("click", () => {
         const text = t(example.prompt);

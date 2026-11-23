@@ -1489,15 +1489,12 @@ var en = {
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
   "ui.map_chat_examples_label": "Examples",
   "ui.map_chat_example_new": "New",
+  "ui.map_chat_example_image": "Start from a picture",
+  "ui.map_chat_example_image_prompt": "I want a picture mind map on \u201Cback stretches\u201D: find a picture of the back muscles as the centre, put an anchor on each sore muscle, and for each muscle find matching stretches, with videos and pictures.",
+  "ui.map_chat_example_image_slot": "back stretches",
   "ui.map_chat_example_book": "Make a picture book",
   "ui.map_chat_example_book_prompt": "I want to make a picture book about \u201Ctopic\u201D. Build the outline first.",
   "ui.map_chat_example_book_slot": "topic",
-  "ui.map_chat_example_compare": "Compare two options",
-  "ui.map_chat_example_compare_prompt": "Compare \u201Coption A\u201D with \u201Coption B\u201D: the pros and cons of each.",
-  "ui.map_chat_example_compare_slot": "option A",
-  "ui.map_chat_example_notes": "Organize reading notes",
-  "ui.map_chat_example_notes_prompt": "Organize my reading notes on \u201Cbook title\u201D into a mind map.",
-  "ui.map_chat_example_notes_slot": "book title",
   "ui.map_chat_book_offer": "Make it a picture book \u2192",
   "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it.",
   "ui.map_chat_canvas_building": "Building the map\u2026",
@@ -4895,15 +4892,12 @@ var zhCN = {
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
   "ui.map_chat_examples_label": "\u793A\u4F8B",
   "ui.map_chat_example_new": "\u65B0",
+  "ui.map_chat_example_image": "\u4ECE\u4E00\u5F20\u56FE\u5C55\u5F00",
+  "ui.map_chat_example_image_prompt": "\u6211\u60F3\u505A\u4E00\u4E2A\u201C\u80CC\u90E8\u4F38\u5C55\u201D\u7684\u56FE\u7247\u601D\u7EF4\u5BFC\u56FE\uFF0C\u5E2E\u6211\u627E\u4E00\u5F20\u80CC\u90E8\u808C\u8089\u7684\u56FE\u7247\u4F5C\u4E3A\u4E2D\u5FC3\uFF0C\u5728\u5404\u4E2A\u9178\u75DB\u7684\u808C\u8089\u90E8\u4F4D\u4E0A\u8BBE\u7F6E\u951A\u70B9\u3002\u4E3A\u6BCF\u4E2A\u5BF9\u5E94\u7684\u9178\u75DB\u808C\u8089\u90E8\u4F4D\u627E\u76F8\u5173\u7684\u4F38\u5C55\u52A8\u4F5C\uFF0C\u5305\u62EC\u89C6\u9891\u548C\u56FE\u7247",
+  "ui.map_chat_example_image_slot": "\u80CC\u90E8\u4F38\u5C55",
   "ui.map_chat_example_book": "\u505A\u4E00\u672C\u56FE\u6587\u4E66",
   "ui.map_chat_example_book_prompt": "\u6211\u60F3\u505A\u4E00\u672C\u5173\u4E8E\u201C\u4E3B\u9898\u201D\u7684\u56FE\u6587\u4E66\uFF0C\u5148\u5E2E\u6211\u5EFA\u5927\u7EB2",
   "ui.map_chat_example_book_slot": "\u4E3B\u9898",
-  "ui.map_chat_example_compare": "\u6BD4\u8F83\u4E24\u4E2A\u9009\u62E9",
-  "ui.map_chat_example_compare_prompt": "\u5E2E\u6211\u6BD4\u8F83\u201C\u9009\u9879 A\u201D\u548C\u201C\u9009\u9879 B\u201D\uFF0C\u5217\u51FA\u5404\u81EA\u7684\u4F18\u7F3A\u70B9",
-  "ui.map_chat_example_compare_slot": "\u9009\u9879 A",
-  "ui.map_chat_example_notes": "\u6574\u7406\u8BFB\u4E66\u7B14\u8BB0",
-  "ui.map_chat_example_notes_prompt": "\u5E2E\u6211\u628A\u201C\u4E66\u540D\u201D\u7684\u8BFB\u4E66\u7B14\u8BB0\u6574\u7406\u6210\u5FC3\u667A\u56FE",
-  "ui.map_chat_example_notes_slot": "\u4E66\u540D",
   "ui.map_chat_book_offer": "\u505A\u6210\u56FE\u6587\u4E66 \u2192",
   "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
@@ -8301,15 +8295,12 @@ var zhTW = {
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
   "ui.map_chat_examples_label": "\u7BC4\u4F8B",
   "ui.map_chat_example_new": "\u65B0",
+  "ui.map_chat_example_image": "\u5F9E\u4E00\u5F35\u5716\u5C55\u958B",
+  "ui.map_chat_example_image_prompt": "\u6211\u60F3\u505A\u4E00\u500B\u300C\u80CC\u90E8\u4F38\u5C55\u300D\u7684\u5716\u7247\u5FC3\u667A\u5716\uFF0C\u5E6B\u6211\u627E\u4E00\u500B\u80CC\u90E8\u808C\u8089\u7684\u5716\u7247\u7576\u4F5C\u6839\u8B70\u984C, \u5728\u5404\u90E8\u4F4D\u9178\u75DB\u808C\u8089\u90E8\u4F4D\u4E0A\u9762\u8A2D\u7F6E\u9328\u9EDE. \u6BCF\u500B\u5C0D\u61C9\u7684\u9178\u75DB\u808C\u8089\u90E8\u4F4D, \u5E6B\u6211\u627E\u76F8\u95DC\u7684\u4F38\u5C55\u52D5\u4F5C, \u5305\u542B\u5F71\u7247, \u8DDF\u5716\u7247",
+  "ui.map_chat_example_image_slot": "\u80CC\u90E8\u4F38\u5C55",
   "ui.map_chat_example_book": "\u505A\u4E00\u672C\u5716\u6587\u66F8",
   "ui.map_chat_example_book_prompt": "\u6211\u60F3\u505A\u4E00\u672C\u95DC\u65BC\u300C\u4E3B\u984C\u300D\u7684\u5716\u6587\u66F8\uFF0C\u5148\u5E6B\u6211\u5EFA\u5927\u7DB1",
   "ui.map_chat_example_book_slot": "\u4E3B\u984C",
-  "ui.map_chat_example_compare": "\u6BD4\u8F03\u5169\u500B\u9078\u64C7",
-  "ui.map_chat_example_compare_prompt": "\u5E6B\u6211\u6BD4\u8F03\u300C\u9078\u9805 A\u300D\u548C\u300C\u9078\u9805 B\u300D\uFF0C\u5217\u51FA\u5404\u81EA\u7684\u512A\u7F3A\u9EDE",
-  "ui.map_chat_example_compare_slot": "\u9078\u9805 A",
-  "ui.map_chat_example_notes": "\u6574\u7406\u8B80\u66F8\u7B46\u8A18",
-  "ui.map_chat_example_notes_prompt": "\u5E6B\u6211\u628A\u300C\u66F8\u540D\u300D\u7684\u8B80\u66F8\u7B46\u8A18\u6574\u7406\u6210\u5FC3\u667A\u5716",
-  "ui.map_chat_example_notes_slot": "\u66F8\u540D",
   "ui.map_chat_book_offer": "\u505A\u6210\u5716\u6587\u66F8 \u2192",
   "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
@@ -67165,22 +67156,20 @@ var panelSequence = 0;
 var HERO_TABS = ["map", "research"];
 var MAP_CHAT_EXAMPLES = [
   {
+    book: false,
+    isNew: true,
+    icon: "\u{1F5BC}",
+    label: "ui.map_chat_example_image",
+    prompt: "ui.map_chat_example_image_prompt",
+    slot: "ui.map_chat_example_image_slot"
+  },
+  {
     book: true,
+    isNew: false,
+    icon: "\u{1F4D6}",
     label: "ui.map_chat_example_book",
     prompt: "ui.map_chat_example_book_prompt",
     slot: "ui.map_chat_example_book_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_compare",
-    prompt: "ui.map_chat_example_compare_prompt",
-    slot: "ui.map_chat_example_compare_slot"
-  },
-  {
-    book: false,
-    label: "ui.map_chat_example_notes",
-    prompt: "ui.map_chat_example_notes_prompt",
-    slot: "ui.map_chat_example_notes_slot"
   }
 ];
 var ARGUMENT_SUGGESTION_KEYS = [
@@ -68981,13 +68970,12 @@ ${typed}` : draft;
     this.examplesEl.empty();
     for (const example of MAP_CHAT_EXAMPLES) {
       const button = this.examplesEl.createEl("button", {
-        cls: `vam-map-chat-example${example.book ? " is-new" : ""}`,
+        cls: `vam-map-chat-example${example.isNew ? " is-new" : ""}`,
         attr: { type: "button" }
       });
-      if (example.book)
-        button.createSpan({ cls: "vam-map-chat-example-icon", text: "\u{1F4D6}", attr: { "aria-hidden": "true" } });
+      button.createSpan({ cls: "vam-map-chat-example-icon", text: example.icon, attr: { "aria-hidden": "true" } });
       button.createSpan({ text: t(example.label) });
-      if (example.book) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
+      if (example.isNew) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
       button.addEventListener("click", () => {
         const text11 = t(example.prompt);
         const slot = t(example.slot);

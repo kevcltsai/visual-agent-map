@@ -164,9 +164,9 @@ const LIFE = 'timeline\n  title 生命週期\n  幼蟲 : 3 天\n  蛹 : 5 天\n 
 const MARKED = `前文。\n\n〔圖位 1：生命週期〕\n\n後文。`;
 
 test('isDiagramKind: diagram words in both scripts and English pass; real-picture words always win', () => {
-  for (const kind of ['示意圖', '流程圖', '时间轴', '步骤', '比較表', '對照', '結構圖', '关系', '循環', '表格', 'diagram', 'Flow chart', 'timeline', 'comparison table', '圖解', '图表'])
+  for (const kind of ['示意圖', '流程圖', '时间轴', '步骤', '比較表', '對照', '結構圖', '关系', '循環', '表格', 'diagram', 'Flow chart', 'timeline', 'comparison table', '圖解', '图表', 'Flowchart', 'charts', 'flows'])
     assert.equal(find.isDiagramKind(kind), true, kind);
-  for (const kind of ['照片', '攝影', '畫作', '插畫', '地圖', '地图', 'photo', 'painting', 'map', '照片的示意圖', 'photo of a flow chart', 'painting', '', 'cover', '肖像'])
+  for (const kind of ['照片', '攝影', '畫作', '插畫', '地圖', '地图', 'photo', 'painting', 'map', '照片的示意圖', 'photo of a flow chart', 'painting', '', 'cover', '肖像', 'mindmap', 'flower', 'tablet', 'photograph', 'Maps'])
     assert.equal(find.isDiagramKind(kind), false, kind);
 });
 
@@ -176,6 +176,13 @@ test('diagramTitle and diagramCaption: markup stripped, Chinese book without Han
   assert.equal(slots.diagramTitle('Life cycle', 'x', 'en'), 'Life cycle');
   assert.equal(slots.diagramTitle('〔｜〕 [] ()', '', 'en'), 'chapter content', 'nothing left reads as a generic word');
   assert.equal(slots.diagramTitle('<b>', '', 'zh-TW'), '本章內容');
+  // Whitelist: nothing that renders as a link, comment, math, highlight, strike, wikilink or table survives.
+  for (const bad of ['參考 https://evil.example/x', '參考 www.evil.example', '%% 隱藏 %%', '$x$ 公式', '==重點==', '~~刪~~', '[[頁面]]', 'a|b', 'x\\y', 'a^b'])
+    assert.doesNotMatch(slots.diagramTitle(bad, '', 'en'), /:\/\/|www\.|%|\$|=|~|\[|\]|\||\\|\^/, bad);
+  assert.equal(slots.diagramTitle('參考 https://evil.example/x 生命週期', '', 'zh-TW'), '參考 生命週期');
+  assert.equal(slots.diagramTitle('%%隱藏%%生命', '', 'en'), '隱藏 生命');
+  assert.equal(slots.diagramTitle('Life https://evil.example', '蝴蝶 $x$ 一生', 'zh-TW'), '蝴蝶 x 一生', 'the fallback is cleaned the same way');
+  assert.equal(slots.diagramTitle('蝴蝶的一生：卵、幼蟲（四階段）', 'x', 'zh-TW'), '蝴蝶的一生：卵、幼蟲（四階段）', 'a normal Chinese title is unchanged');
   assert.equal(slots.diagramCaption('生命週期', 'zh-TW'), '示意圖｜生命週期（依本章內文整理，非史料原圖）');
   assert.equal(slots.diagramCaption('生命周期', 'zh-CN'), '示意图｜生命周期（依本章内文整理，非史料原图）');
   assert.equal(slots.diagramCaption('Life cycle', 'en'), "Diagram | Life cycle (drawn from this chapter's text, not a source image)");

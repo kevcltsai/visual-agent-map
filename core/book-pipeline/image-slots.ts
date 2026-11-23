@@ -274,16 +274,26 @@ export interface SlotDiagram {
 export type SlotOutcome =
   { figure: SlotFigure } | { diagram: SlotDiagram } | { reasonCode: SlotReasonCode; reasonText?: string };
 
-const TITLE_STRIP = /[[\]()!<>*_#`]/g;
+/** What a caption title may keep: letters, digits, spaces and a few plain marks; everything else (markup, links, comments, math) becomes a space. */
+const TITLE_STRIP = /[^\p{L}\p{N}\s·・、，。：:\-–—'"（）]/gu;
 const DIAGRAM_TITLE_MAX = 40;
 const DIAGRAM_FALLBACK_MAX = 20;
 /**
- * The title of a drawn diagram as written in its caption: the model's title as one plain line (no marker brackets, no markup
- * characters). A Chinese book whose title has no Han character gets the slot's explanation, shortened, instead; an empty result
+ * The title of a drawn diagram as written in its caption: the model's title as one plain line (no marker brackets, only letters, digits and a few
+ * plain marks). A Chinese book whose title has no Han character gets the slot's explanation, shortened, instead; an empty result
  * reads as a generic word.
  */
 export function diagramTitle(title: string, explains: string, language: string): string {
-  const clean = (value: string, max: number): string => cleanSlotText(value.replace(TITLE_STRIP, " "), max);
+  // A run that looks like an address is dropped whole before the character filter (the filter alone would leave its words).
+  const clean = (value: string, max: number): string =>
+    cleanSlotText(
+      value
+        .split(/\s+/)
+        .filter(part => !/:\/\/|www\./i.test(part))
+        .join(" ")
+        .replace(TITLE_STRIP, " "),
+      max
+    );
   let out = clean(title, DIAGRAM_TITLE_MAX);
   if (/^zh/i.test(language) && !/\p{Script=Han}/u.test(out)) out = clean(explains, DIAGRAM_FALLBACK_MAX);
   return out || (/^zh/i.test(language) ? traditionalIf(language, "本章內容") : "chapter content");

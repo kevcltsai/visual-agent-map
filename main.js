@@ -15396,11 +15396,14 @@ function pickForSlot(ctx, candidates) {
   if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
   return { none: true, reasonCode: "not_found" };
 }
-var TITLE_STRIP = /[[\]()!<>*_#`]/g;
+var TITLE_STRIP = /[^\p{L}\p{N}\s·・、，。：:\-–—'"（）]/gu;
 var DIAGRAM_TITLE_MAX = 40;
 var DIAGRAM_FALLBACK_MAX = 20;
 function diagramTitle(title, explains, language2) {
-  const clean3 = (value, max) => cleanSlotText(value.replace(TITLE_STRIP, " "), max);
+  const clean3 = (value, max) => cleanSlotText(
+    value.split(/\s+/).filter((part) => !/:\/\/|www\./i.test(part)).join(" ").replace(TITLE_STRIP, " "),
+    max
+  );
   let out = clean3(title, DIAGRAM_TITLE_MAX);
   if (/^zh/i.test(language2) && !/\p{Script=Han}/u.test(out)) out = clean3(explains, DIAGRAM_FALLBACK_MAX);
   return out || (/^zh/i.test(language2) ? traditionalIf(language2, "\u672C\u7AE0\u5167\u5BB9") : "chapter content");
@@ -51923,8 +51926,8 @@ var findImagesStep = {
   }),
   parse: (raw) => parseFound(raw)
 };
-var DIAGRAM_KIND = /示意|圖解|图解|圖表|图表|流程|步驟|步骤|時間軸|时间轴|時間線|时间线|比較|比较|對照|对照|結構|结构|關係|关系|循環|循环|表格|diagram|chart|flow|timeline|table/i;
-var REAL_PICTURE_KIND = /照片|攝影|摄影|畫|画|地圖|地图|photo|painting|map/i;
+var DIAGRAM_KIND = /示意|圖解|图解|圖表|图表|流程|步驟|步骤|時間軸|时间轴|時間線|时间线|比較|比较|對照|对照|結構|结构|關係|关系|循環|循环|表格|\b(?:diagram|chart|flow|timeline|table)s?\b|flowchart/i;
+var REAL_PICTURE_KIND = /照片|攝影|摄影|畫|画|地圖|地图|\b(?:photo\w*|painting|map)s?\b/i;
 function isDiagramKind(kind) {
   return !REAL_PICTURE_KIND.test(kind) && DIAGRAM_KIND.test(kind);
 }
@@ -61362,7 +61365,7 @@ ${oldDetail}`);
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language2);
         const want = slots.filter((slot) => {
           const outcome = provisional.get(slot.index);
-          return marked.has(slot.index) && isDiagramKind(slot.kind) && !!outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found";
+          return marked.has(slot.index) && !commonsCut.has(slot.index) && isDiagramKind(slot.kind) && !!outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found";
         });
         if (want.length) {
           diagramStats.asked = want.length;

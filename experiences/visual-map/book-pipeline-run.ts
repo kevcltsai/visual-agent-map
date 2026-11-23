@@ -5424,6 +5424,7 @@ export class BookPipelineRuns {
           const outcome = provisional.get(slot.index);
           return (
             marked.has(slot.index) &&
+            !commonsCut.has(slot.index) &&
             isDiagramKind(slot.kind) &&
             !!outcome &&
             "reasonCode" in outcome &&

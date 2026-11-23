@@ -61,6 +61,6 @@ test('an id already embedded in the existing note survives a rewrite; a new un-o
 });
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
-  assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\], input\.detail\)/);
+  assert.match(source, /keepOpenedVideoEmbeds\(\s*result\.detail,\s*countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\],\s*input\.detail\s*\)/);
   assert.match(source, /if \(keepsEvents \|\| countsWeb\) webEvents\.push\(event\)/);
 });

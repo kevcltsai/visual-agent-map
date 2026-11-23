@@ -493,7 +493,11 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
           ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit)
           : state.failure
             ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure))
-            : t(state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1", settledCount(state), total)
+            : t(
+                state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1",
+                settledCount(state),
+                total
+              )
     });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.mode === "changed" && state.mapChange) {
@@ -809,7 +813,11 @@ function progressMain(state: BookBarState): string {
     // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix
       ? fixLine(state, settledCount(state), total)
-      : t(state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1", settledCount(state), total);
+      : t(
+          state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1",
+          settledCount(state),
+          total
+        );
   const sentence =
     state.mode === "planning"
       ? !state.globalDone || state.current?.step === "global"

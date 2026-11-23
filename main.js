@@ -62359,7 +62359,11 @@ function renderBookBar(parent, state, actions) {
   if (state.mode === "budget" || state.mode === "stopped")
     top.createSpan({
       cls: "vam-book-bar-counts",
-      text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t(state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1", settledCount(state), total2)
+      text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t(
+        state.structure ? "ui.book_stopped_done_cards_0_1" : "ui.book_stopped_done_0_1",
+        settledCount(state),
+        total2
+      )
     });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.mode === "changed" && state.mapChange) {
@@ -62632,7 +62636,11 @@ function progressMain(state) {
   const { total: total2 } = state;
   const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
-    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t(state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1", settledCount(state), total2);
+    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t(
+      state.structure ? "ui.book_progress_writing_cards_0_1" : "ui.book_progress_writing_0_1",
+      settledCount(state),
+      total2
+    );
   const sentence2 = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total2);
   return `${sentence2}${t("ui.book_progress_line_sep")}${t(state.structure ? "ui.book_progress_line_done_cards_0_1" : "ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }

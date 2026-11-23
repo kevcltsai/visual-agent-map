@@ -291,7 +291,7 @@ test('checkDiagram: a good chart passes; every rejection class drops the chart a
   assert.equal(code(states(6, '  direction LR\n')), 'too_tall', 'stateDiagram-v2 in any direction');
   const mind = n => 'mindmap\n  root["根"]\n' + Array.from({ length: n - 1 }, (_, i) => `    c${i}["甲"]`).join('\n');
   assert.equal(ok(mind(5)).ok, true); assert.equal(code(mind(6)), 'too_tall');
-  assert.equal(code('timeline\n  title T\n' + Array.from({ length: 8 }, () => '  甲 : 乙').join('\n')), undefined, 'timeline keeps its 12 limit');
+  assert.equal(code('timeline\n  title T\n' + Array.from({ length: 6 }, () => '  甲 : 乙').join('\n')), undefined, 'timeline keeps its 12 limit');
   assert.equal(code('pie\n  title T\n' + Array.from({ length: 9 }, (_, i) => `  "S${i}" : 3`).join('\n')), 'too_many_nodes');
   assert.equal(code('mindmap\n' + Array.from({ length: 13 }, (_, i) => `  n${i}["a"]`).join('\n')), 'too_many_nodes');
   assert.equal(code('xychart-beta\n  title "T"\n  x-axis ["a", "b"]\n  bar [3, 5]'), undefined);

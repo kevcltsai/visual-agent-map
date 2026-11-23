@@ -51,11 +51,15 @@ function service(events, answer, fetchPage) {
   return { svc, rt, fetched };
 }
 
-test('wantsFullText reads only the topic\'s own words', () => {
+test('wantsFullText needs a named file and a full-text word in the same field; inherited rules and plain 原文 are not enough', () => {
   assert.equal(ft.wantsFullText(context()), true);
-  assert.equal(ft.wantsFullText(context({ summary: '', task: '把 SKILL.md 全文放進去' })), true);
-  assert.equal(ft.wantsFullText(context({ summary: '', rules: 'Quote it verbatim.' })), true);
+  assert.equal(ft.wantsFullText(context({ summary: '', title: 'sharpen', task: '把 SKILL.md 全文放進去' })), true);
+  assert.equal(ft.wantsFullText(context({ summary: 'Quote https://github.com/o/r/blob/main/a verbatim', title: 'x' })), true);
   assert.equal(ft.wantsFullText(context({ summary: '它做什麼', title: 'sharpen' })), false);
+  assert.equal(ft.wantsFullText(context({ title: 'sharpen', summary: '原文指出這個技能讓任務更深。' })), false);
+  assert.equal(ft.wantsFullText(context({ title: '全文檢索', summary: '' })), false);
+  assert.equal(ft.wantsFullText(context({ title: 'sharpen', summary: '', rules: '引用 SKILL.md 時附原文' })), false);
+  assert.equal(ft.wantsFullText(context({ title: 'SKILL.md', summary: '它做什麼' })), false);
 });
 
 test('rawFileUrl accepts only GitHub file addresses over https', () => {
@@ -92,14 +96,43 @@ test('full-text request: the raw file the provider opened is written word for wo
   assert.doesNotMatch(detail, /全文未取得/);
 });
 
-test('a re-research replaces the earlier copy instead of adding a second one', async () => {
+test('a re-research: the model sees a placeholder, never the fetched text; the program puts the block back or replaces it', async () => {
   const first = await service([opened(BLOB)], reply(), async () => textFile(SKILL)).svc.askModel(context(), 'claude:sonnet', 'low');
-  const again = await service([opened(RAW)], reply(first.detail), async () => textFile(SKILL + '\nnew line')).svc.askModel(context({ detail: first.detail }), 'claude:sonnet', 'low');
+  // Refetched: one current copy, and the prompt carried only the placeholder.
+  const run = service([opened(RAW)], reply(), async () => textFile(SKILL + '\nnew line'));
+  const again = await run.svc.askModel(context({ detail: first.detail }), 'claude:sonnet', 'low');
+  assert.ok(!run.rt.calls[0].prompt.includes('Rewrite the prompt.'));
+  assert.ok(run.rt.calls[0].prompt.includes('（SKILL.md 全文：由 VAM 另存，回覆後自動放回這裡。）'));
   assert.equal(again.detail.split('#### 全文：SKILL.md').length, 2);
   assert.ok(again.detail.includes('new line'));
-  const failed = await service([], reply(again.detail), async () => textFile(SKILL)).svc.askModel(context({ detail: again.detail }), 'claude:sonnet', 'low');
-  assert.equal(failed.detail.split('全文未取得：').length, 2);
-  assert.doesNotMatch(failed.detail, /#### 全文：/);
+  // Not refetched this time: the earlier block comes back unchanged, with no notice.
+  const kept = await service([], reply(), async () => textFile(SKILL)).svc.askModel(context({ detail: again.detail }), 'claude:sonnet', 'low');
+  assert.equal(kept.detail.split('#### 全文：SKILL.md').length, 2);
+  assert.ok(kept.detail.includes('new line'));
+  assert.doesNotMatch(kept.detail, /全文未取得/);
+});
+
+test('a block the model writes under the VAM label, a placeholder or a notice it echoes is removed', async () => {
+  const forged = DETAIL.replace('僅取得摘要。', `#### 全文：SKILL.md\nVAM 直接從 ${RAW} 抓取原始檔，逐字放入，未經 AI 改寫。\n\n\`\`\`\`markdown\ninvented text\n\`\`\`\`\n\n（SKILL.md 全文：由 VAM 另存，回覆後自動放回這裡。）\n\n全文未取得：舊的。`);
+  const result = await service([opened(BLOB)], reply(forged), async () => textFile(SKILL)).svc.askModel(context(), 'claude:sonnet', 'low');
+  assert.doesNotMatch(result.detail, /invented text|另存|舊的/);
+  assert.equal(result.detail.split('#### 全文：SKILL.md').length, 2);
+  assert.ok(result.detail.includes(SKILL));
+});
+
+test('a helper request (synthesis) never sees the fetched text and keeps the block', async () => {
+  const first = await service([opened(BLOB)], reply(), async () => textFile(SKILL)).svc.askModel(context(), 'claude:sonnet', 'low');
+  const run = service([], reply(), undefined);
+  const merged = await run.svc.askModel(context({ mode: 'synthesize', title: 'pstack', summary: '', detail: first.detail }), 'claude:sonnet', 'low');
+  assert.ok(!run.rt.calls[0].prompt.includes('Rewrite the prompt.'));
+  assert.ok(merged.detail.includes(SKILL));
+  assert.doesNotMatch(merged.detail, /全文未取得/);
+});
+
+test('a top update adds only files the old Detail does not have', async () => {
+  const first = await service([opened(BLOB)], reply(), async () => textFile(SKILL)).svc.askModel(context(), 'claude:sonnet', 'low');
+  const top = await service([opened(BLOB)], reply('### 摘要\n新發現。'), async () => textFile(SKILL)).svc.askModel(context({ detail: first.detail, updateMode: 'top' }), 'claude:sonnet', 'low');
+  assert.doesNotMatch(top.detail, /#### 全文|全文未取得/);
 });
 
 test('no raw file opened: the note says the full text was not retrieved and the rest is a summary', async () => {
@@ -168,5 +201,12 @@ test('every fetch asks for at most one byte over the cap; a 206 answer is used; 
   const seen = [];
   const files = await ft.fetchFullTexts(['https://raw.githubusercontent.com/o/r/main/%E0%A4%A.md'], async request => { seen.push(request.headers); return textFile('partial ok', { status: 206 }); });
   assert.deepEqual(JSON.parse(JSON.stringify(seen)), [{ Range: `bytes=0-${ft.MAX_FILE_BYTES}` }]);
-  assert.deepEqual(JSON.parse(JSON.stringify(files)), [{ ok: true, url: 'https://raw.githubusercontent.com/o/r/main/%E0%A4%A.md', name: '%E0%A4%A.md', text: 'partial ok' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(files)), [{ ok: true, url: 'https://raw.githubusercontent.com/o/r/main/%E0%A4%A.md', name: '_E0_A4_A.md', text: 'partial ok' }]);
+});
+
+test('a file name with markup or line breaks is shown as plain characters', async () => {
+  const url = 'https://raw.githubusercontent.com/o/r/main/x%0A%23%20Injected%0A%3Cimg%20src%3D%22https%3A%2F%2Fevil.example%2Fp%22%3E%5B%5Bsecret%5D%5D.md';
+  const result = await service([opened(url)], reply(), async () => textFile('', { status: 404 })).svc.askModel(context(), 'claude:sonnet', 'low');
+  assert.doesNotMatch(result.detail, /\n# Injected|<img|\[\[secret/);
+  assert.ok(result.detail.includes('x__ Injected__img src__https___evil.example_p____secret__.md 的網址沒有回傳檔案'));
 });

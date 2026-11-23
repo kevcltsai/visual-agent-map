@@ -1797,6 +1797,7 @@ export const en = {
   "detail.sources_heading": "Sources",
   "detail.full_text_heading": "Full text: {0}",
   "detail.full_text_origin": "Fetched by VAM directly from {0} and inserted word for word; not rewritten by the AI.",
+  "detail.full_text_placeholder": "(Full text of {0}: kept by VAM and put back here after the reply.)",
   "detail.full_text_missing_prefix": "Full text not retrieved: ",
   "detail.full_text_missing": "{0}. The rest of this note is the AI's summary of the page, not the original text.",
   "detail.full_text_reason_network": "{0} could not be reached or timed out",

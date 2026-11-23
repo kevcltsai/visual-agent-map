@@ -1705,6 +1705,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "detail.sources_heading": "來源",
   "detail.full_text_heading": "全文：{0}",
   "detail.full_text_origin": "VAM 直接從 {0} 抓取原始檔，逐字放入，未經 AI 改寫。",
+  "detail.full_text_placeholder": "（{0} 全文：由 VAM 另存，回覆後自動放回這裡。）",
   "detail.full_text_missing_prefix": "全文未取得：",
   "detail.full_text_missing": "{0}。這則筆記的其他內容是 AI 依網頁整理的摘要，不是原文。",
   "detail.full_text_reason_network": "{0} 連線失敗或逾時",

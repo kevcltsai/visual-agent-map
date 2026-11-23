@@ -1704,6 +1704,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "detail.sources_heading": "来源",
   "detail.full_text_heading": "全文：{0}",
   "detail.full_text_origin": "VAM 直接从 {0} 抓取原始文件，逐字放入，未经 AI 改写。",
+  "detail.full_text_placeholder": "（{0} 全文：由 VAM 另存，回复后自动放回这里。）",
   "detail.full_text_missing_prefix": "全文未取得：",
   "detail.full_text_missing": "{0}。这则笔记的其他内容是 AI 依网页整理的摘要，不是原文。",
   "detail.full_text_reason_network": "{0} 连接失败或超时",

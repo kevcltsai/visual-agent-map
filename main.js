@@ -1675,6 +1675,7 @@ var en = {
   "detail.sources_heading": "Sources",
   "detail.full_text_heading": "Full text: {0}",
   "detail.full_text_origin": "Fetched by VAM directly from {0} and inserted word for word; not rewritten by the AI.",
+  "detail.full_text_placeholder": "(Full text of {0}: kept by VAM and put back here after the reply.)",
   "detail.full_text_missing_prefix": "Full text not retrieved: ",
   "detail.full_text_missing": "{0}. The rest of this note is the AI's summary of the page, not the original text.",
   "detail.full_text_reason_network": "{0} could not be reached or timed out",
@@ -5089,6 +5090,7 @@ var zhCN = {
   "detail.sources_heading": "\u6765\u6E90",
   "detail.full_text_heading": "\u5168\u6587\uFF1A{0}",
   "detail.full_text_origin": "VAM \u76F4\u63A5\u4ECE {0} \u6293\u53D6\u539F\u59CB\u6587\u4EF6\uFF0C\u9010\u5B57\u653E\u5165\uFF0C\u672A\u7ECF AI \u6539\u5199\u3002",
+  "detail.full_text_placeholder": "\uFF08{0} \u5168\u6587\uFF1A\u7531 VAM \u53E6\u5B58\uFF0C\u56DE\u590D\u540E\u81EA\u52A8\u653E\u56DE\u8FD9\u91CC\u3002\uFF09",
   "detail.full_text_missing_prefix": "\u5168\u6587\u672A\u53D6\u5F97\uFF1A",
   "detail.full_text_missing": "{0}\u3002\u8FD9\u5219\u7B14\u8BB0\u7684\u5176\u4ED6\u5185\u5BB9\u662F AI \u4F9D\u7F51\u9875\u6574\u7406\u7684\u6458\u8981\uFF0C\u4E0D\u662F\u539F\u6587\u3002",
   "detail.full_text_reason_network": "{0} \u8FDE\u63A5\u5931\u8D25\u6216\u8D85\u65F6",
@@ -8503,6 +8505,7 @@ var zhTW = {
   "detail.sources_heading": "\u4F86\u6E90",
   "detail.full_text_heading": "\u5168\u6587\uFF1A{0}",
   "detail.full_text_origin": "VAM \u76F4\u63A5\u5F9E {0} \u6293\u53D6\u539F\u59CB\u6A94\uFF0C\u9010\u5B57\u653E\u5165\uFF0C\u672A\u7D93 AI \u6539\u5BEB\u3002",
+  "detail.full_text_placeholder": "\uFF08{0} \u5168\u6587\uFF1A\u7531 VAM \u53E6\u5B58\uFF0C\u56DE\u8986\u5F8C\u81EA\u52D5\u653E\u56DE\u9019\u88E1\u3002\uFF09",
   "detail.full_text_missing_prefix": "\u5168\u6587\u672A\u53D6\u5F97\uFF1A",
   "detail.full_text_missing": "{0}\u3002\u9019\u5247\u7B46\u8A18\u7684\u5176\u4ED6\u5167\u5BB9\u662F AI \u4F9D\u7DB2\u9801\u6574\u7406\u7684\u6458\u8981\uFF0C\u4E0D\u662F\u539F\u6587\u3002",
   "detail.full_text_reason_network": "{0} \u9023\u7DDA\u5931\u6557\u6216\u903E\u6642",
@@ -19853,9 +19856,10 @@ var MAX_FILES = 3;
 var MAX_FILE_BYTES = 200 * 1024;
 var FETCH_TIMEOUT_MS = 15e3;
 var FULL_TEXT_WORDS = /全文|原文|逐字|完整原始|full[\s-]?text|verbatim|word[\s-]for[\s-]word/i;
+var NAMED_FILE = /[\w-]\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w.])|github(?:usercontent)?\.com\//i;
 function wantsFullText(context) {
-  return [context.title, context.summary, context.task, context.rules].some(
-    (field) => typeof field === "string" && FULL_TEXT_WORDS.test(field)
+  return [context.title, context.summary, context.task].some(
+    (field) => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field)
   );
 }
 var GITHUB_PART = /^[A-Za-z0-9._-]+$/;
@@ -19884,11 +19888,12 @@ function rawFileUrl(opened) {
 }
 var nameOf2 = (url) => {
   const last = url.split("/").pop() || url;
+  let decoded3 = last;
   try {
-    return decodeURIComponent(last);
+    decoded3 = decodeURIComponent(last);
   } catch (e) {
-    return last;
   }
+  return decoded3.replace(/[^\p{L}\p{N}._ -]/gu, "_").slice(0, 120) || "file";
 };
 async function fetchFullTexts(openedUrls, fetchPage, timeoutMs = FETCH_TIMEOUT_MS) {
   const raws = [...new Set(openedUrls.map(rawFileUrl).filter((url) => !!url))].slice(0, MAX_FILES);
@@ -19922,16 +19927,30 @@ async function fetchFullTexts(openedUrls, fetchPage, timeoutMs = FETCH_TIMEOUT_M
 }
 var LANGUAGES2 = ["zh-TW", "zh-CN", "en"];
 var escapeRegExp = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function withoutPriorFullText(detail) {
-  const heads = LANGUAGES2.map((language2) => escapeRegExp(translateNote(language2, "detail.full_text_heading", "")));
-  const missing = LANGUAGES2.map((language2) => escapeRegExp(translateNote(language2, "detail.full_text_missing_prefix")));
-  return detail.replace(
-    new RegExp(
-      `^#### (?:${heads.join("|")})[^\\n]*\\n[^\\n]*\\n\\n(\`{4,})[^\\n]*\\n[\\s\\S]*?\\n\\1[ \\t]*(?:\\n|$)\\n?`,
-      "gm"
-    ),
-    ""
-  ).replace(new RegExp(`^(?:${missing.join("|")})[^\\n]*(?:\\n|$)\\n?`, "gm"), "");
+var alternatives = (key5) => LANGUAGES2.map((language2) => escapeRegExp(translateNote(language2, key5, "\0")).replace("\0", "[^\\n]*")).join(
+  "|"
+);
+var blockPattern = () => new RegExp(
+  `^#### (?:${alternatives("detail.full_text_heading")})\\n(?:${alternatives("detail.full_text_origin")})\\n\\n(\`{4,})[^\\n]*\\n[\\s\\S]*?\\n\\1[ \\t]*$`,
+  "gm"
+);
+var noticePattern = () => new RegExp(`^(?:${alternatives("detail.full_text_missing_prefix")})[^\\n]*$`, "gm");
+var placeholderPattern = () => new RegExp(`^(?:${alternatives("detail.full_text_placeholder")})[ \\t]*$`, "gm");
+var tidy = (detail) => detail.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+function splitFullText(detail, language2) {
+  const blocks = [];
+  let notices = 0;
+  const stripped = detail.replace(blockPattern(), (block2) => {
+    var _a2, _b2, _c;
+    const url = (_c = (_b2 = /https:\/\/\S+/.exec((_a2 = block2.split("\n")[1]) != null ? _a2 : "")) == null ? void 0 : _b2[0]) != null ? _c : "";
+    const name2 = url ? nameOf2(url) : "file";
+    blocks.push({ url, block: block2 });
+    return translateNote(language2, "detail.full_text_placeholder", name2);
+  }).replace(noticePattern(), () => {
+    notices++;
+    return "";
+  });
+  return { detail: blocks.length || notices ? tidy(stripped) : detail, blocks, notices };
 }
 function fence(text11) {
   var _a2;
@@ -19965,23 +19984,24 @@ function insert(detail, addition) {
 
 ${addition}`;
 }
-function attachFullText(detail, files, language2) {
-  const base = withoutPriorFullText(detail);
+function attachFullText(detail, files, language2, prior = [], requested = true) {
+  const base = tidy(detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), ""));
   const fetched = files.filter((file) => file.ok);
   const failed = files.filter((file) => !file.ok);
-  const parts = fetched.map((file) => block(file, language2));
-  if (!fetched.length) {
+  const replaced = new Set(fetched.map((file) => file.url));
+  const kept = prior.filter((item) => !replaced.has(item.url));
+  const keptUrls = new Set(kept.map((item) => item.url));
+  const parts = [...fetched.map((file) => block(file, language2)), ...kept.map((item) => item.block)];
+  const prefix = translateNote(language2, "detail.full_text_missing_prefix");
+  if (requested && !parts.length) {
     const why2 = failed.length ? failed.map((file) => translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)).join("\uFF1B") : translateNote(language2, "detail.full_text_reason_no_url");
-    parts.push(
-      `${translateNote(language2, "detail.full_text_missing_prefix")}${translateNote(language2, "detail.full_text_missing", why2)}`
-    );
+    parts.push(`${prefix}${translateNote(language2, "detail.full_text_missing", why2)}`);
   } else {
     for (const file of failed)
-      parts.push(
-        `${translateNote(language2, "detail.full_text_missing_prefix")}${translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)}`
-      );
+      if (!keptUrls.has(file.url))
+        parts.push(`${prefix}${translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)}`);
   }
-  return insert(base, parts.join("\n\n"));
+  return parts.length ? insert(base, parts.join("\n\n")) : base;
 }
 
 // ai/task-policy.ts
@@ -67238,12 +67258,12 @@ function inlineMarkdown(nodes) {
   }
   return out;
 }
-var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
+var tidy2 = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
 var indentOf = (text11, pad3, first) => text11.split("\n").map((line3, at) => at === 0 ? `${first}${line3}` : line3 ? `${pad3}${line3}` : line3).join("\n");
 function listMarkdown(block2) {
   return block2.items.map((item, index) => {
     const marker3 = block2.ordered ? `${index + 1}. ` : "- ";
-    let body = tidy(inlineMarkdown(item.c));
+    let body = tidy2(inlineMarkdown(item.c));
     if (item.sub) body += `
 ${listMarkdown(item.sub)}`;
     return indentOf(body, " ".repeat(marker3.length), marker3);
@@ -67253,9 +67273,9 @@ function blockMarkdown(block2) {
   var _a2;
   switch (block2.t) {
     case "p":
-      return tidy(inlineMarkdown(block2.c));
+      return tidy2(inlineMarkdown(block2.c));
     case "h":
-      return `${"#".repeat(Math.min(6, Math.max(1, block2.level)))} ${tidy(inlineMarkdown(block2.c).replace(/\\\n/g, " "))}`;
+      return `${"#".repeat(Math.min(6, Math.max(1, block2.level)))} ${tidy2(inlineMarkdown(block2.c).replace(/\\\n/g, " "))}`;
     case "hr":
       return "---";
     case "code": {
@@ -113649,7 +113669,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     if (input2.timeoutMs !== void 0 && (!Number.isInteger(input2.timeoutMs) || input2.timeoutMs < 18e4 || input2.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
@@ -113659,8 +113679,11 @@ var AiTaskService = class {
     if (estimateTokens(input2.sourceContext) > SOURCE_CONTEXT_TOKEN_BUDGET)
       throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input2;
+    const ownsFullText = readerFacingDetail(input2) && !input2.countRepair;
+    const priorFullText = ownsFullText ? splitFullText((_a2 = input2.detail) != null ? _a2 : "", (_b2 = input2.outputLanguage) != null ? _b2 : this.options.language()) : { detail: input2.detail, blocks: [], notices: 0 };
+    if (priorFullText.detail !== input2.detail) context = { ...context, detail: priorFullText.detail };
     let accepted = onRequestAccepted;
-    const referenceGroups = (_a2 = context.referenceGroups) != null ? _a2 : [];
+    const referenceGroups = (_c = context.referenceGroups) != null ? _c : [];
     if (referenceGroups.some((group) => group.documents.length)) {
       let acceptedOnce = false;
       accepted = onRequestAccepted ? () => {
@@ -113695,9 +113718,9 @@ var AiTaskService = class {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
     context = prepared.context;
-    if (!input2.countRepair) (_c = input2.onWorkingFindingsSent) == null ? void 0 : _c.call(input2, (_b2 = context.workingFindings) != null ? _b2 : "");
+    if (!input2.countRepair) (_e = input2.onWorkingFindingsSent) == null ? void 0 : _e.call(input2, (_d = context.workingFindings) != null ? _d : "");
     const pluginDirectory = this.options.pluginDirectory();
-    const outputLanguage2 = (_d = context.outputLanguage) != null ? _d : this.options.language();
+    const outputLanguage2 = (_f = context.outputLanguage) != null ? _f : this.options.language();
     const shape2 = taskResponseShape(context, outputLanguage2);
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape2.schema), {
       context,
@@ -113707,7 +113730,7 @@ var AiTaskService = class {
       argumentEvidenceNeedIds: shape2.argumentEvidenceNeedIds
     });
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
-    const countsWeb = ((_e = context.mode) != null ? _e : "task") === "task" && context.researchMode === "research" && role === void 0 && !input2.countRepair;
+    const countsWeb = ((_g = context.mode) != null ? _g : "task") === "task" && context.researchMode === "research" && role === void 0 && !input2.countRepair;
     const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
     const webEvents = [];
@@ -113816,7 +113839,7 @@ var AiTaskService = class {
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
       const aiDecides = input2.aiSections === "decide";
-      if (aiDecides && ((_f = input2.mode) != null ? _f : "task") === "task" && !input2.countRepair && !((_g = input2.detail) == null ? void 0 : _g.trim())) {
+      if (aiDecides && ((_h = input2.mode) != null ? _h : "task") === "task" && !input2.countRepair && !((_i = input2.detail) == null ? void 0 : _i.trim())) {
         const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage2));
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;
@@ -113869,10 +113892,19 @@ var AiTaskService = class {
         }
         result.formatIssues = issues;
       }
-      if (fullText) {
-        const opened = openedUrlsFromEvents(webEvents);
-        const files = this.options.fetchPage ? await fetchFullTexts(opened, this.options.fetchPage) : [];
-        result.detail = attachFullText(result.detail, files, outputLanguage2);
+      if (ownsFullText && (fullText || priorFullText.blocks.length)) {
+        const opened = fullText ? openedUrlsFromEvents(webEvents) : [];
+        let files = this.options.fetchPage && opened.length ? await fetchFullTexts(opened, this.options.fetchPage) : [];
+        const top = input2.updateMode === "top";
+        if (top) files = files.filter((file) => !priorFullText.blocks.some((item) => item.url === file.url));
+        const requested = fullText && !(top && priorFullText.blocks.length);
+        result.detail = attachFullText(
+          result.detail,
+          files,
+          outputLanguage2,
+          top ? [] : priorFullText.blocks,
+          requested
+        );
       }
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,

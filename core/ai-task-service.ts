@@ -31,7 +31,7 @@ import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondense
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
-import { attachFullText, fetchFullTexts, wantsFullText, type FetchFile } from "./full-text";
+import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -170,6 +170,12 @@ export class AiTaskService {
     if (estimateTokens(input.sourceContext) > SOURCE_CONTEXT_TOKEN_BUDGET)
       throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input;
+    // Full-text blocks are program-owned: the model sees a placeholder, never the fetched text, and the blocks go back after the reply.
+    const ownsFullText = readerFacingDetail(input) && !input.countRepair;
+    const priorFullText = ownsFullText
+      ? splitFullText(input.detail ?? "", input.outputLanguage ?? this.options.language())
+      : { detail: input.detail, blocks: [], notices: 0 };
+    if (priorFullText.detail !== input.detail) context = { ...context, detail: priorFullText.detail };
     let accepted = onRequestAccepted;
     const referenceGroups = context.referenceGroups ?? [];
     if (referenceGroups.some(group => group.documents.length)) {
@@ -428,10 +434,20 @@ export class AiTaskService {
         result.formatIssues = issues;
       }
       // After the count repair, so the repair never sees (or rewrites) the fetched text.
-      if (fullText) {
-        const opened = openedUrlsFromEvents(webEvents);
-        const files = this.options.fetchPage ? await fetchFullTexts(opened, this.options.fetchPage) : [];
-        result.detail = attachFullText(result.detail, files, outputLanguage);
+      if (ownsFullText && (fullText || priorFullText.blocks.length)) {
+        const opened = fullText ? openedUrlsFromEvents(webEvents) : [];
+        let files = this.options.fetchPage && opened.length ? await fetchFullTexts(opened, this.options.fetchPage) : [];
+        // A top reply is put above the old Detail, which keeps its blocks: only files it does not have yet are added.
+        const top = input.updateMode === "top";
+        if (top) files = files.filter(file => !priorFullText.blocks.some(item => item.url === file.url));
+        const requested = fullText && !(top && priorFullText.blocks.length);
+        result.detail = attachFullText(
+          result.detail,
+          files,
+          outputLanguage,
+          top ? [] : priorFullText.blocks,
+          requested
+        );
       }
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,

@@ -6,10 +6,12 @@
  * be fetched, the Detail says plainly that it holds a summary, not the original text.
  *
  * Trust boundary: only GitHub file addresses are fetched (an allowlist of hosts and URL shapes, https only), at most
- * {@link MAX_FILES} per call, each refused above {@link MAX_FILE_BYTES} or when it is not text. The fetched text is never sent
- * to the model and is written only inside a code fence longer than any backtick run in it, so it renders as inert text.
+ * {@link MAX_FILES} per call, each refused above {@link MAX_FILE_BYTES} or when it is not text. The fetched text is written only
+ * inside a code fence longer than any backtick run in it, so it renders as inert text. The blocks are program-owned: before a
+ * request they are taken out of the Detail the model sees ({@link splitFullText}) and after the reply the program puts them
+ * back ({@link attachFullText}), so the model never reads the fetched text and cannot rewrite a block under the VAM label.
  */
-import { translateNote, type ContentLanguage } from "../i18n";
+import { translateNote, type ContentLanguage, type TranslationKey } from "../i18n";
 import type { FetchResponse } from "./argument-map/source-proof";
 import type { TaskContext } from "../ai/types";
 
@@ -17,13 +19,18 @@ export const MAX_FILES = 3;
 export const MAX_FILE_BYTES = 200 * 1024;
 export const FETCH_TIMEOUT_MS = 15_000;
 
-/** Words that ask for the original text rather than a summary, in the request fields the user wrote. */
+/** Words that ask for the original text rather than a summary. */
 const FULL_TEXT_WORDS = /全文|原文|逐字|完整原始|full[\s-]?text|verbatim|word[\s-]for[\s-]word/i;
+/** A named file (`SKILL.md`, `config.yaml`) or a GitHub address: a full-text request is about a file, not a phrase like 「原文指出」. */
+const NAMED_FILE = /[\w-]\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w.])|github(?:usercontent)?\.com\//i;
 
-/** True when the topic's own words (title, current understanding, task, topic rules) ask for the full or original text. */
-export function wantsFullText(context: Pick<TaskContext, "title" | "summary" | "task" | "rules">): boolean {
-  return [context.title, context.summary, context.task, context.rules].some(
-    field => typeof field === "string" && FULL_TEXT_WORDS.test(field)
+/**
+ * True when one of the topic's fields (title, current understanding, task) both names a file and asks for its full or original
+ * text. Inherited rules are not read, so a parent's rule never turns every child research into a full-text one.
+ */
+export function wantsFullText(context: Pick<TaskContext, "title" | "summary" | "task">): boolean {
+  return [context.title, context.summary, context.task].some(
+    field => typeof field === "string" && FULL_TEXT_WORDS.test(field) && NAMED_FILE.test(field)
   );
 }
 
@@ -69,13 +76,16 @@ export type FetchFile = (request: {
   headers: Record<string, string>;
 }) => Promise<FetchResponse>;
 
+/** The file name shown in the note: decoded, then only letters, digits and `._ -` (no markup, links or line breaks). */
 const nameOf = (url: string): string => {
   const last = url.split("/").pop() || url;
+  let decoded = last;
   try {
-    return decodeURIComponent(last);
+    decoded = decodeURIComponent(last);
   } catch {
-    return last;
+    /* A malformed escape keeps the raw segment. */
   }
+  return decoded.replace(/[^\p{L}\p{N}._ -]/gu, "_").slice(0, 120) || "file";
 };
 
 /** Fetches each distinct raw GitHub file the provider opened (at most {@link MAX_FILES}); never throws. */
@@ -118,20 +128,50 @@ export async function fetchFullTexts(
 
 const LANGUAGES: ContentLanguage[] = ["zh-TW", "zh-CN", "en"];
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const alternatives = (key: TranslationKey): string =>
+  LANGUAGES.map(language => escapeRegExp(translateNote(language, key, "\u0000")).replace("\u0000", "[^\\n]*")).join(
+    "|"
+  );
 
-/** Removes the blocks and notices an earlier run put in, so a re-research keeps exactly one current copy. */
-function withoutPriorFullText(detail: string): string {
-  const heads = LANGUAGES.map(language => escapeRegExp(translateNote(language, "detail.full_text_heading", "")));
-  const missing = LANGUAGES.map(language => escapeRegExp(translateNote(language, "detail.full_text_missing_prefix")));
-  return detail
-    .replace(
-      new RegExp(
-        `^#### (?:${heads.join("|")})[^\\n]*\\n[^\\n]*\\n\\n(\`{4,})[^\\n]*\\n[\\s\\S]*?\\n\\1[ \\t]*(?:\\n|$)\\n?`,
-        "gm"
-      ),
-      ""
-    )
-    .replace(new RegExp(`^(?:${missing.join("|")})[^\\n]*(?:\\n|$)\\n?`, "gm"), "");
+/** A block VAM wrote: heading, origin line with the address, blank line, fence … closing fence. */
+const blockPattern = (): RegExp =>
+  new RegExp(
+    `^#### (?:${alternatives("detail.full_text_heading")})\\n(?:${alternatives("detail.full_text_origin")})\\n\\n(\`{4,})[^\\n]*\\n[\\s\\S]*?\\n\\1[ \\t]*$`,
+    "gm"
+  );
+const noticePattern = (): RegExp => new RegExp(`^(?:${alternatives("detail.full_text_missing_prefix")})[^\\n]*$`, "gm");
+const placeholderPattern = (): RegExp =>
+  new RegExp(`^(?:${alternatives("detail.full_text_placeholder")})[ \\t]*$`, "gm");
+
+export interface PriorFullText {
+  url: string;
+  block: string;
+}
+
+const tidy = (detail: string): string => detail.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+
+/**
+ * The Detail as the model may see it: each VAM full-text block becomes a one-line placeholder and each "not retrieved" notice
+ * is dropped. The blocks are returned so {@link attachFullText} can put them back after the reply.
+ */
+export function splitFullText(
+  detail: string,
+  language: ContentLanguage
+): { detail: string; blocks: PriorFullText[]; notices: number } {
+  const blocks: PriorFullText[] = [];
+  let notices = 0;
+  const stripped = detail
+    .replace(blockPattern(), block => {
+      const url = /https:\/\/\S+/.exec(block.split("\n")[1] ?? "")?.[0] ?? "";
+      const name = url ? nameOf(url) : "file";
+      blocks.push({ url, block });
+      return translateNote(language, "detail.full_text_placeholder", name);
+    })
+    .replace(noticePattern(), () => {
+      notices++;
+      return "";
+    });
+  return { detail: blocks.length || notices ? tidy(stripped) : detail, blocks, notices };
 }
 
 function fence(text: string): string {
@@ -168,26 +208,34 @@ function insert(detail: string, addition: string): string {
 }
 
 /**
- * The Detail with the fetched files written in word for word, or, when none could be fetched, with a notice that the note
- * holds a summary and not the original text. Earlier copies and notices are replaced.
+ * The reply's Detail with the full text put back by the program: what the model wrote under the VAM label, any placeholder and
+ * any notice are removed; then the files fetched this time, the earlier blocks this run did not replace, and, for a full-text
+ * request that has neither, a notice that the note holds a summary and not the original text.
  */
-export function attachFullText(detail: string, files: readonly FullTextFile[], language: ContentLanguage): string {
-  const base = withoutPriorFullText(detail);
+export function attachFullText(
+  detail: string,
+  files: readonly FullTextFile[],
+  language: ContentLanguage,
+  prior: readonly PriorFullText[] = [],
+  requested = true
+): string {
+  const base = tidy(detail.replace(blockPattern(), "").replace(noticePattern(), "").replace(placeholderPattern(), ""));
   const fetched = files.filter((file): file is Extract<FullTextFile, { ok: true }> => file.ok);
   const failed = files.filter((file): file is Extract<FullTextFile, { ok: false }> => !file.ok);
-  const parts = fetched.map(file => block(file, language));
-  if (!fetched.length) {
+  const replaced = new Set(fetched.map(file => file.url));
+  const kept = prior.filter(item => !replaced.has(item.url));
+  const keptUrls = new Set(kept.map(item => item.url));
+  const parts = [...fetched.map(file => block(file, language)), ...kept.map(item => item.block)];
+  const prefix = translateNote(language, "detail.full_text_missing_prefix");
+  if (requested && !parts.length) {
     const why = failed.length
       ? failed.map(file => translateNote(language, `detail.full_text_reason_${file.reason}`, file.name)).join("；")
       : translateNote(language, "detail.full_text_reason_no_url");
-    parts.push(
-      `${translateNote(language, "detail.full_text_missing_prefix")}${translateNote(language, "detail.full_text_missing", why)}`
-    );
+    parts.push(`${prefix}${translateNote(language, "detail.full_text_missing", why)}`);
   } else {
     for (const file of failed)
-      parts.push(
-        `${translateNote(language, "detail.full_text_missing_prefix")}${translateNote(language, `detail.full_text_reason_${file.reason}`, file.name)}`
-      );
+      if (!keptUrls.has(file.url))
+        parts.push(`${prefix}${translateNote(language, `detail.full_text_reason_${file.reason}`, file.name)}`);
   }
-  return insert(base, parts.join("\n\n"));
+  return parts.length ? insert(base, parts.join("\n\n")) : base;
 }

@@ -1127,7 +1127,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     claudeRuntime: (directory: string) => this.claudeCli(directory),
     mermaidSyntax: this.mermaidSyntax,
     // Full-text requests: core/full-text.ts only asks for raw GitHub file addresses and caps size and time itself.
-    fetchPage: async (request: { url: string; method: "GET"; throw: false }) => {
+    fetchPage: async (request: { url: string; method: "GET"; throw: false; headers: Record<string, string> }) => {
       const response = await requestUrl(request);
       return {
         status: response.status,

@@ -163,3 +163,10 @@ test('the fetched text survives the note write path word for word (headings, htm
   const written = ns.neutralizeText(mi.intakeAiMarkdown(detail, { kind: 'task-detail', compose: fresh => ru.canonicalDetail(fresh, 'zh-TW', template) }));
   assert.ok(written.includes('````markdown\n' + text + '\n````'));
 });
+
+test('every fetch asks for at most one byte over the cap; a 206 answer is used; a bad escape in the name does not throw', async () => {
+  const seen = [];
+  const files = await ft.fetchFullTexts(['https://raw.githubusercontent.com/o/r/main/%E0%A4%A.md'], async request => { seen.push(request.headers); return textFile('partial ok', { status: 206 }); });
+  assert.deepEqual(JSON.parse(JSON.stringify(seen)), [{ Range: `bytes=0-${ft.MAX_FILE_BYTES}` }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(files)), [{ ok: true, url: 'https://raw.githubusercontent.com/o/r/main/%E0%A4%A.md', name: '%E0%A4%A.md', text: 'partial ok' }]);
+});

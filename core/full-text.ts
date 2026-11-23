@@ -10,7 +10,7 @@
  * to the model and is written only inside a code fence longer than any backtick run in it, so it renders as inert text.
  */
 import { translateNote, type ContentLanguage } from "../i18n";
-import type { FetchPage } from "./argument-map/source-proof";
+import type { FetchResponse } from "./argument-map/source-proof";
 import type { TaskContext } from "../ai/types";
 
 export const MAX_FILES = 3;
@@ -61,12 +61,27 @@ export type FullTextFile =
   | { ok: true; url: string; name: string; text: string }
   | { ok: false; url: string; name: string; reason: "network" | "status" | "not_text" | "too_large" };
 
-const nameOf = (url: string): string => decodeURIComponent(url.split("/").pop() ?? url);
+/** Obsidian `requestUrl` with a Range header, so the server sends at most one byte over the cap. */
+export type FetchFile = (request: {
+  url: string;
+  method: "GET";
+  throw: false;
+  headers: Record<string, string>;
+}) => Promise<FetchResponse>;
+
+const nameOf = (url: string): string => {
+  const last = url.split("/").pop() || url;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+};
 
 /** Fetches each distinct raw GitHub file the provider opened (at most {@link MAX_FILES}); never throws. */
 export async function fetchFullTexts(
   openedUrls: readonly string[],
-  fetchPage: FetchPage,
+  fetchPage: FetchFile,
   timeoutMs = FETCH_TIMEOUT_MS
 ): Promise<FullTextFile[]> {
   const raws = [...new Set(openedUrls.map(rawFileUrl).filter((url): url is string => !!url))].slice(0, MAX_FILES);
@@ -76,12 +91,13 @@ export async function fetchFullTexts(
       let timer: number | undefined;
       try {
         const response = await Promise.race([
-          fetchPage({ url, method: "GET", throw: false }),
+          fetchPage({ url, method: "GET", throw: false, headers: { Range: `bytes=0-${MAX_FILE_BYTES}` } }),
           new Promise<never>((_, reject) => {
             timer = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
           })
         ]);
-        if (response.status !== 200) return { ok: false, url, name, reason: "status" };
+        // 206: the Range answer. A file over the cap arrives as cap + 1 bytes and is refused below; a server that ignores Range sends 200.
+        if (response.status !== 200 && response.status !== 206) return { ok: false, url, name, reason: "status" };
         const type =
           Object.entries(response.headers ?? {}).find(([key]) => key.toLowerCase() === "content-type")?.[1] ?? "";
         // requestUrl gives the body size; a transport without it is judged by the text length (never more than the bytes).

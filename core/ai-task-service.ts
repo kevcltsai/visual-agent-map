@@ -30,8 +30,8 @@ import { aiRuntimeForModel } from "./ai-runtime-service";
 import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondenseCalls } from "./source-gateway";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
-import { openedUrlsFromEvents, searchQueriesFromEvents, type FetchPage } from "./argument-map/source-proof";
-import { attachFullText, fetchFullTexts, wantsFullText } from "./full-text";
+import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
+import { attachFullText, fetchFullTexts, wantsFullText, type FetchFile } from "./full-text";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -91,7 +91,7 @@ export interface AiTaskServiceOptions {
   /** The "Add diagrams after research" setting. Absent: diagrams are on. */
   diagramsEnabled?: () => boolean;
   /** GET of a raw GitHub file for a full-text request (Obsidian requestUrl). Absent: nothing is fetched and the note says so. */
-  fetchPage?: FetchPage;
+  fetchPage?: FetchFile;
 }
 
 /** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds and count repairs are "other"; chart calls name their own. */

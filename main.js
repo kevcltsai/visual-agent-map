@@ -19883,8 +19883,12 @@ function rawFileUrl(opened) {
   return void 0;
 }
 var nameOf2 = (url) => {
-  var _a2;
-  return decodeURIComponent((_a2 = url.split("/").pop()) != null ? _a2 : url);
+  const last = url.split("/").pop() || url;
+  try {
+    return decodeURIComponent(last);
+  } catch (e) {
+    return last;
+  }
 };
 async function fetchFullTexts(openedUrls, fetchPage, timeoutMs = FETCH_TIMEOUT_MS) {
   const raws = [...new Set(openedUrls.map(rawFileUrl).filter((url) => !!url))].slice(0, MAX_FILES);
@@ -19895,12 +19899,12 @@ async function fetchFullTexts(openedUrls, fetchPage, timeoutMs = FETCH_TIMEOUT_M
       let timer;
       try {
         const response = await Promise.race([
-          fetchPage({ url, method: "GET", throw: false }),
+          fetchPage({ url, method: "GET", throw: false, headers: { Range: `bytes=0-${MAX_FILE_BYTES}` } }),
           new Promise((_, reject2) => {
             timer = window.setTimeout(() => reject2(new Error("timeout")), timeoutMs);
           })
         ]);
-        if (response.status !== 200) return { ok: false, url, name: name2, reason: "status" };
+        if (response.status !== 200 && response.status !== 206) return { ok: false, url, name: name2, reason: "status" };
         const type = (_c = (_b2 = Object.entries((_a2 = response.headers) != null ? _a2 : {}).find(([key5]) => key5.toLowerCase() === "content-type")) == null ? void 0 : _b2[1]) != null ? _c : "";
         const bytes = (_f = (_d = response.arrayBuffer) == null ? void 0 : _d.byteLength) != null ? _f : ((_e = response.text) != null ? _e : "").length;
         if (bytes > MAX_FILE_BYTES) return { ok: false, url, name: name2, reason: "too_large" };

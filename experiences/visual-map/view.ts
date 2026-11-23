@@ -22953,7 +22953,13 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
-    const found = await this.chatImageFinder.findCanvas(map, chat, direction, newChatImageBatch());
+    const found = await this.chatImageFinder.findCanvas(
+      map,
+      chat,
+      direction,
+      newChatImageBatch(),
+      work?.controller.signal
+    );
     if ("skipped" in found) return skipped(found.skipped);
     if ("failed" in found) return { status: "failed", reason: found.failed };
     if (work) work.canvasImage = found.placed;

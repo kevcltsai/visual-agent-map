@@ -114,7 +114,7 @@ const PNG = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]).buffe
 const canvasWorld = () => {
   const w = world([]);
   w.ports.fetchBytes = async () => PNG.slice(0);
-  w.canvas = (direction = 'a red barn', batch = newChatImageBatch()) => w.finder.findCanvas({ id: 'm', nodes: [] }, w.state.chat, direction, batch);
+  w.canvas = (direction = 'a red barn', batch = newChatImageBatch(), signal) => w.finder.findCanvas({ id: 'm', nodes: [] }, w.state.chat, direction, batch, signal);
   return w;
 };
 const canvasWrites = w => w.writes.filter(x => x[0] === 'canvas');
@@ -150,6 +150,29 @@ test('findCanvas: Stop resolves null, writes nothing, the block stays stopped', 
   assert.equal(w.probes.length, 0);
   assert.deepEqual(w.settles.map(s => s.patch.state), ['stopped']);
   assert.equal(w.finder.running, 0);
+});
+
+test('findCanvas: aborting the chain signal (Stop) during the search or the download writes nothing and resolves null', async () => {
+  const early = canvasWorld(), c1 = new AbortController();
+  const f1 = await early.canvas('a red barn', newChatImageBatch(), c1.signal);
+  await flush();
+  c1.abort();
+  early.searches[0].resolve([CANDIDATE]);
+  assert.equal(await f1.placed, null);
+  assert.equal(canvasWrites(early).length, 0);
+  assert.equal(early.finder.running, 0);
+  const late = canvasWorld(), c2 = new AbortController();
+  late.ports.fetchBytes = async () => { c2.abort(); return PNG.slice(0); };
+  const f2 = await late.canvas('a red barn', newChatImageBatch(), c2.signal);
+  await flush();
+  late.searches[0].resolve([CANDIDATE]);
+  assert.equal(await f2.placed, null);
+  assert.equal(canvasWrites(late).length, 0, 'a Stop during the download writes nothing');
+  const done = new AbortController(); done.abort();
+  const w3 = canvasWorld();
+  const f3 = await w3.canvas('a red barn', newChatImageBatch(), done.signal);
+  assert.ok('skipped' in f3 || (await f3.placed) === null, 'an already stopped chain starts nothing');
+  assert.equal(canvasWrites(w3).length, 0);
 });
 
 test('findCanvas: the map changed while the search was out resolves null, writes nothing, the block says so', async () => {

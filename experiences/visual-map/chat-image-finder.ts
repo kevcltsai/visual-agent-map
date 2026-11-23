@@ -271,7 +271,9 @@ export class ChatImageFinder {
     map: MapDocument,
     chat: MapChatPanel,
     direction: string,
-    batch: ChatImageBatch
+    batch: ChatImageBatch,
+    /** The chain's Stop signal: aborting it stops this search like the block's own Stop. */
+    signal?: AbortSignal
   ): Promise<ChatCanvasImageFind> {
     const ports = this.ports;
     const query = cleanImageQuery(direction);
@@ -308,6 +310,7 @@ export class ChatImageFinder {
     const here = ports.where();
     if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
       return { skipped: "ui.map_chat_skip_map_changed" };
+    if (signal?.aborted) return { skipped: "ui.map_chat_skip_not_started" };
     const controller = new AbortController();
     const key = ++this.sequence;
     this.searches.set(key, controller);
@@ -318,6 +321,7 @@ export class ChatImageFinder {
       ports.settle(chat, block, { state: "stopped" });
     };
     ports.added(chat, [block]);
+    signal?.addEventListener("abort", () => block.stop?.(), { once: true });
     const placed = (async (): Promise<string | null> => {
       await this.acquireSlot();
       try {

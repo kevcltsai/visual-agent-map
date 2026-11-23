@@ -2114,6 +2114,7 @@ test('picture transport: redirects by hand (at most 3, each checked), the 8 MB c
   assert.equal(Buffer.from(got.bytes).equals(png), true);
   assert.equal(r.seen[0].options.method, 'GET');
   assert.equal(typeof r.seen[0].options.lookup, 'function', 'the request carries the address-checking lookup');
+  assert.equal(r.seen[0].options.headers['User-Agent'], 'VisualAgentMap-Obsidian-plugin', 'Node sends no User-Agent of its own; sites such as Wikimedia answer 403 without one');
   // A redirect to a public https host is followed by hand; a relative Location is resolved.
   r = rig((asked, res, onResponse, req) => (asked.url.endsWith('/p.png') ? sends(302, { location: '/q.png' }) : sends(200, {}, [png]))(asked, res, onResponse, req));
   assert.equal((await r.fetch('https://a.example.org/p.png', opts())).status, 200);

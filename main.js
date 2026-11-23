@@ -102081,7 +102081,7 @@ function createSafeLookup(resolve = import_node_dns.lookup) {
     });
   };
 }
-function hop(url, request, lookup, signal, maxBytes) {
+function hop(url, request, lookup, signal, maxBytes, userAgent) {
   return new Promise((resolve, reject2) => {
     let finish = (settle) => settle();
     const fail4 = (reason, req2) => finish(() => {
@@ -102093,7 +102093,7 @@ function hop(url, request, lookup, signal, maxBytes) {
       {
         method: "GET",
         lookup,
-        headers: { Accept: "image/*", "Accept-Encoding": "identity" }
+        headers: { Accept: "image/*", "Accept-Encoding": "identity", "User-Agent": userAgent }
       },
       (res) => {
         var _a2;
@@ -102141,14 +102141,15 @@ function hop(url, request, lookup, signal, maxBytes) {
   });
 }
 function createPictureFetch(deps = {}) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const request = (_a2 = deps.request) != null ? _a2 : import_node_https.request;
-  const lookup = (_b2 = deps.lookup) != null ? _b2 : createSafeLookup();
+  const userAgent = (_b2 = deps.userAgent) != null ? _b2 : "VisualAgentMap-Obsidian-plugin";
+  const lookup = (_c = deps.lookup) != null ? _c : createSafeLookup();
   return async (address, { signal, maxBytes }) => {
     let url = new URL(address);
     for (let redirects = 0; ; redirects++) {
       if (!isPicturePublicUrl(url)) throw new PictureFetchError("url");
-      const result = await hop(url, request, lookup, signal, maxBytes);
+      const result = await hop(url, request, lookup, signal, maxBytes, userAgent);
       if (!("redirect" in result)) return result;
       if (redirects >= PICTURE_MAX_REDIRECTS) throw new PictureFetchError("url");
       try {
@@ -115299,7 +115300,7 @@ function noteStylePorts(plugin) {
   };
 }
 var PUBLIC_REPO_URL = "https://github.com/kevcltsai/visual-agent-map";
-var pictureFetch = createPictureFetch();
+var pictureFetch = createPictureFetch({ userAgent: `VisualAgentMap-Obsidian-plugin (${PUBLIC_REPO_URL})` });
 var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
   constructor() {
     super(...arguments);

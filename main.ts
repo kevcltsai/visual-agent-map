@@ -399,7 +399,7 @@ interface PendingRename {
 const PUBLIC_REPO_URL = "https://github.com/kevcltsai/visual-agent-map";
 
 /** One transport for every picture look: Node https, no automatic redirect, no private address (see picture-transport.ts). */
-const pictureFetch = createPictureFetch();
+const pictureFetch = createPictureFetch({ userAgent: `VisualAgentMap-Obsidian-plugin (${PUBLIC_REPO_URL})` });
 
 export default class VisualAgentMapPlugin extends Plugin {
   /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */

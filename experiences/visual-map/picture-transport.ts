@@ -106,7 +106,8 @@ function hop(
   request: Request,
   lookup: ReturnType<typeof createSafeLookup>,
   signal: AbortSignal,
-  maxBytes: number
+  maxBytes: number,
+  userAgent: string
 ): Promise<Hop> {
   return new Promise<Hop>((resolve, reject) => {
     let finish = (settle: () => void): void => settle();
@@ -120,7 +121,7 @@ function hop(
       {
         method: "GET",
         lookup: lookup as unknown as LookupFunction,
-        headers: { Accept: "image/*", "Accept-Encoding": "identity" }
+        headers: { Accept: "image/*", "Accept-Encoding": "identity", "User-Agent": userAgent }
       },
       res => {
         const status = res.statusCode ?? 0;
@@ -174,15 +175,17 @@ function hop(
  * body streams (the request is destroyed at the first byte over the cap). Injectable for tests.
  */
 export function createPictureFetch(
-  deps: { request?: Request; lookup?: ReturnType<typeof createSafeLookup> } = {}
+  deps: { request?: Request; lookup?: ReturnType<typeof createSafeLookup>; userAgent?: string } = {}
 ): PictureFetch {
   const request = deps.request ?? httpsRequest;
+  // Node sends no User-Agent of its own, and sites such as Wikimedia refuse a request without one (403).
+  const userAgent = deps.userAgent ?? "VisualAgentMap-Obsidian-plugin";
   const lookup = deps.lookup ?? createSafeLookup();
   return async (address, { signal, maxBytes }) => {
     let url = new URL(address);
     for (let redirects = 0; ; redirects++) {
       if (!isPicturePublicUrl(url)) throw new PictureFetchError("url");
-      const result = await hop(url, request, lookup, signal, maxBytes);
+      const result = await hop(url, request, lookup, signal, maxBytes, userAgent);
       if (!("redirect" in result)) return result;
       if (redirects >= PICTURE_MAX_REDIRECTS) throw new PictureFetchError("url");
       try {

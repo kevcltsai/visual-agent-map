@@ -106,6 +106,20 @@ const cards = Array.from({ length: 31 }, (_, i) => ({ id: `n${i + 1}`, title: `C
 const globalRequest = (extra = {}) => ({ ...base, bookTitle: 'Western art', settings: { reader: 'Owner reader' }, cards, ...extra });
 const globalReply = (over = {}) => JSON.stringify({ thread: 'One thread\n## x', cards: cards.map((c, i) => ({ id: c.id, role: i === 0 ? 'intro' : 'body' })), materials: [{ name: 'Mona Lisa', use: 'opens' }], decisions: { reader: 'Model reader', goal: 'Goal', angle: '', tone: 'Tone', length: '', style: '' }, ...over });
 
+test('global plan on Codex: the nulls strict output adds for unused structure fields are taken out, so the change is kept', () => {
+  const { codexOutputSchema } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn() {} } });
+  const { replyWithoutAddedNulls } = load('ai/runtime/output-schema.ts');
+  const schema = globalPlan.GLOBAL_PLAN_SCHEMA;
+  const strictItem = codexOutputSchema(schema).properties.structure.items;
+  assert.deepEqual(plain(strictItem.required).sort(), Object.keys(strictItem.properties).sort(), 'Codex gets every field required');
+  const reply = JSON.parse(globalReply());
+  reply.structure = [{ id: 's1', kind: 'rename', reason: 'clearer', card: 'n2', title: 'New title', into: null, summary: null, parent: null, after: null, ref: null }];
+  const text = replyWithoutAddedNulls(JSON.stringify(reply), schema);
+  const result = plain(globalPlan.globalPlanStep.parse(text, globalRequest()));
+  assert.deepEqual(result.structure.map(op => [op.kind, op.card, op.title]), [['rename', 'n2', 'New title']]);
+  assert.equal(replyWithoutAddedNulls('not json', schema), 'not json');
+});
+
 test('global plan: every card once with a role, only empty settings decided, structure of the reply enforced', () => {
   const request = globalRequest();
   const prompt = globalPlan.globalPlanStep.render(request);

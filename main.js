@@ -36993,6 +36993,30 @@ function nullable(schema) {
   }
   return { anyOf: [body, { type: "null" }] };
 }
+function withoutAddedNulls(value, schema) {
+  if (!schema || typeof schema !== "object") return value;
+  const body = schema;
+  if (Array.isArray(value)) return value.map((item) => withoutAddedNulls(item, body.items));
+  if (!value || typeof value !== "object" || !body.properties || typeof body.properties !== "object") return value;
+  const properties = body.properties;
+  const required = Array.isArray(body.required) ? body.required : [];
+  const out = {};
+  for (const [key5, item] of Object.entries(value)) {
+    if (item === null && key5 in properties && !required.includes(key5)) continue;
+    out[key5] = withoutAddedNulls(item, properties[key5]);
+  }
+  return out;
+}
+function replyWithoutAddedNulls(text11, schema) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text11);
+  } catch (e) {
+    return text11;
+  }
+  const cleaned = JSON.stringify(withoutAddedNulls(parsed, schema));
+  return cleaned === JSON.stringify(parsed) ? text11 : cleaned;
+}
 
 // ai/context-builder.ts
 var SOURCE_CONTEXT_TOKEN_BUDGET = 48e3;
@@ -110985,7 +111009,7 @@ var CodexAppServerRuntime = class {
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if ((_m = controls == null ? void 0 : controls.signal) == null ? void 0 : _m.aborted) throw cancelledError();
-      return answer;
+      return outputSchema ? replyWithoutAddedNulls(answer, outputSchema) : answer;
     } catch (error) {
       const state2 = this.turns.get(threadId);
       if (state2) {

@@ -46,3 +46,34 @@ function nullable(schema: unknown): unknown {
   }
   return { anyOf: [body, { type: "null" }] };
 }
+
+/**
+ * The reply with the nulls strict output put in for optional properties (see strictRequired) taken out again, read against the
+ * original schema: a parser then sees those fields absent, as from a provider that may leave them out.
+ */
+export function withoutAddedNulls(value: unknown, schema: unknown): unknown {
+  if (!schema || typeof schema !== "object") return value;
+  const body = schema as { properties?: unknown; required?: unknown; items?: unknown };
+  if (Array.isArray(value)) return value.map(item => withoutAddedNulls(item, body.items));
+  if (!value || typeof value !== "object" || !body.properties || typeof body.properties !== "object") return value;
+  const properties = body.properties as Record<string, unknown>;
+  const required = Array.isArray(body.required) ? (body.required as unknown[]) : [];
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item === null && key in properties && !required.includes(key)) continue;
+    out[key] = withoutAddedNulls(item, properties[key]);
+  }
+  return out;
+}
+
+/** A JSON reply text without the added nulls; any other text (not JSON, nothing removed) comes back unchanged. */
+export function replyWithoutAddedNulls(text: string, schema: unknown): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return text;
+  }
+  const cleaned = JSON.stringify(withoutAddedNulls(parsed, schema));
+  return cleaned === JSON.stringify(parsed) ? text : cleaned;
+}

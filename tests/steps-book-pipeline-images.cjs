@@ -2019,6 +2019,9 @@ test('picture fetch: only https, 8 MB, PNG/JPEG/GIF/WebP bytes, a time limit and
   assert.equal(calls, 0, 'a refused address is never requested');
   assert.equal((await downloadPicture('https://a.example.org/x', answer(png, { headers: { 'Content-Length': String(9 * 1024 * 1024) } }))).reason, 'size');
   assert.equal((await downloadPicture('https://a.example.org/x', answer(png), { maxBytes: 5 })).reason, 'size');
+  const { PictureFetchError } = S.load('core/steps/book-pipeline/image-fit-check.ts');
+  assert.equal((await downloadPicture('https://a.example.org/x', async () => { throw new PictureFetchError('size'); })).reason, 'size', "the transport's own refusal is the reason given");
+  assert.equal((await downloadPicture('https://a.example.org/x', async () => { throw new Error('boom'); })).reason, 'failed');
   assert.equal((await downloadPicture('https://a.example.org/x', answer(new TextEncoder().encode('<html>not a picture</html>')))).reason, 'type');
   assert.equal((await downloadPicture('https://a.example.org/x', answer(png, { status: 404 }))).reason, 'status');
   assert.equal((await downloadPicture('https://a.example.org/x', () => new Promise(() => {}), { timeoutMs: 20 })).reason, 'timeout');
@@ -2028,31 +2031,153 @@ test('picture fetch: only https, 8 MB, PNG/JPEG/GIF/WebP bytes, a time limit and
   controller.abort();
   late.resolve({ status: 200, headers: {}, bytes: png.buffer });
   assert.equal((await pending).reason, 'aborted');
+  // The transport is handed a signal and the cap; a timeout and an abort both fire that signal (the socket is destroyed there).
+  let handed;
+  const hang = (url, options) => { handed = options; return new Promise(() => {}); };
+  assert.equal((await downloadPicture('https://a.example.org/x', hang, { timeoutMs: 20 })).reason, 'timeout');
+  assert.equal(handed.maxBytes, 8 * 1024 * 1024);
+  assert.equal(handed.signal.aborted, true, 'a timeout aborts the connection');
+  const c2 = new AbortController();
+  const p2 = downloadPicture('https://a.example.org/x', hang, { signal: c2.signal });
+  c2.abort();
+  assert.equal((await p2).reason, 'aborted');
+  assert.equal(handed.signal.aborted, true, 'an abort aborts the connection');
 });
 
-test('picture fetch: IP literals, localhost, .local, .internal and single-label hosts are refused before any request; HEAD asks first; a redirect to such a host is refused', async () => {
+test('picture fetch: IP literals, localhost, .local, .internal and single-label hosts are refused before any request', async () => {
   const { downloadPicture } = S.load('core/steps/book-pipeline/image-fit-check.ts');
   const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
   const buf = png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength);
-  const sent = [];
-  const fetchOf = (over = {}) => async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: {}, bytes: buf, ...(method === 'HEAD' ? {} : over) }; };
+  let sent = 0;
+  const fetchOf = async () => { sent++; return { status: 200, headers: {}, bytes: buf }; };
   for (const host of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', '2130706433', '0x7f000001', '[::1]', '[fd00::1]', '[::ffff:127.0.0.1]', 'localhost', 'a.localhost', 'printer.local', 'db.internal', 'intranet', 'example.org.local']) {
-    sent.length = 0;
-    assert.equal((await downloadPicture(`https://${host}/x.png`, fetchOf())).reason, 'url', host);
-    assert.equal(sent.length, 0, `${host}: no request at all`);
+    assert.equal((await downloadPicture(`https://${host}/x.png`, fetchOf)).reason, 'url', host);
+    assert.equal(sent, 0, `${host}: no request at all`);
   }
-  sent.length = 0;
-  const ok = await downloadPicture('https://a.example.org/x', fetchOf());
-  assert.ok(ok.ok);
-  assert.deepEqual(sent, ['HEAD', 'GET'], 'the headers are asked first');
-  sent.length = 0;
-  const big = async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: method === 'HEAD' ? { 'content-length': String(9 * 1024 * 1024) } : {}, bytes: buf }; };
-  assert.equal((await downloadPicture('https://a.example.org/x', big)).reason, 'size');
-  assert.deepEqual(sent, ['HEAD'], 'an oversize HEAD answer means no GET');
-  sent.length = 0;
-  const redirected = async (url, method) => { sent.push(method ?? 'GET'); return { status: 200, headers: {}, bytes: buf, finalUrl: 'https://192.168.0.1/p.png' }; };
-  assert.equal((await downloadPicture('https://a.example.org/x', redirected)).reason, 'url');
-  assert.ok(!sent.includes('GET'), 'a redirect to a private host seen on the HEAD stops before the GET');
+  assert.ok((await downloadPicture('https://a.example.org/x', fetchOf)).ok);
+  assert.equal(sent, 1, 'one GET, no HEAD');
+});
+
+test('picture transport: private addresses are refused by the lookup (loopback, private, link-local, CGNAT, unique-local, mapped forms)', async () => {
+  const { isPrivateAddress, createSafeLookup } = S.load('experiences/visual-map/picture-transport.ts');
+  for (const bad of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.0.9', '169.254.169.254', '100.64.0.1', '100.127.1.1', '0.0.0.0', '::1', '::', 'fe80::1', 'febf::1', 'fc00::1', 'fd12:3456::1', '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::ffff:7f00:1', '::ffff:c0a8:1', '0:0:0:0:0:ffff:a9fe:a9fe', '::127.0.0.1', '64:ff9b::7f00:1', 'ff02::1', 'not-an-ip', '1.2.3.999']) assert.equal(isPrivateAddress(bad), true, bad);
+  for (const good of ['8.8.8.8', '93.184.216.34', '172.15.0.1', '172.32.0.1', '100.63.0.1', '100.128.0.1', '2606:4700:4700::1111', '::ffff:808:808']) assert.equal(isPrivateAddress(good), false, good);
+  const resolving = list => (host, options, done) => { assert.equal(options.all, true); done(null, list.map(address => ({ address, family: address.includes(':') ? 6 : 4 }))); };
+  const ask = (list, options = {}) => new Promise(resolve => createSafeLookup(resolving(list))('a.example.org', options, (error, address, family) => resolve({ error, address, family })));
+  for (const list of [['127.0.0.1'], ['10.0.0.8'], ['::1'], ['93.184.216.34', '10.0.0.8'], ['::ffff:127.0.0.1'], []]) {
+    const got = await ask(list);
+    assert.equal(got.error?.reason, 'url', list.join());
+    assert.equal(got.address, undefined);
+  }
+  assert.deepEqual(plain(await ask(['93.184.216.34'])), { error: null, address: '93.184.216.34', family: 4 });
+  assert.equal((await ask(['93.184.216.34'], { all: true })).address.length, 1, 'the all-form answers the list');
+  const failed = await new Promise(resolve => createSafeLookup((h, o, done) => done(new Error('ENOTFOUND'), []))('a.example.org', {}, error => resolve(error)));
+  assert.match(failed.message, /ENOTFOUND/);
+  // The real dns.lookup: localhost resolves to loopback and is refused.
+  const real = await new Promise(resolve => createSafeLookup()('localhost', {}, error => resolve(error)));
+  assert.equal(real?.reason, 'url');
+});
+
+test('picture transport: redirects by hand (at most 3, each checked), the 8 MB cap while streaming, a stopped socket on abort', async () => {
+  const { createPictureFetch } = S.load('experiences/visual-map/picture-transport.ts');
+  const { downloadPicture, PictureFetchError } = S.load('core/steps/book-pipeline/image-fit-check.ts');
+  const { EventEmitter } = require('node:events');
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+  // A fake https.request: `script(asked, res, onResponse, req)` says what the server does once the request is sent (end()).
+  const rig = script => {
+    const seen = [];
+    const request = (url, options, onResponse) => {
+      const req = new EventEmitter();
+      req.destroyed = false;
+      req.destroy = () => { req.destroyed = true; };
+      req.end = () => {
+        const asked = { url: String(url), options, req };
+        seen.push(asked);
+        const res = new EventEmitter();
+        script(asked, res, onResponse, req);
+      };
+      return req;
+    };
+    return { seen, fetch: createPictureFetch({ request, lookup: () => {} }) };
+  };
+  const sends = (status, headers, chunks = []) => (asked, res, onResponse, req) => {
+    res.statusCode = status;
+    res.headers = headers;
+    onResponse(res);
+    for (const chunk of chunks) { if (req.destroyed) break; asked.read = (asked.read ?? 0) + chunk.length; res.emit('data', chunk); }
+    if (!req.destroyed) res.emit('end');
+  };
+  const opts = (over = {}) => ({ signal: new AbortController().signal, maxBytes: 8 * 1024 * 1024, ...over });
+  let r = rig(sends(200, {}, [png]));
+  const got = await r.fetch('https://a.example.org/p.png', opts());
+  assert.equal(got.status, 200);
+  assert.equal(Buffer.from(got.bytes).equals(png), true);
+  assert.equal(r.seen[0].options.method, 'GET');
+  assert.equal(typeof r.seen[0].options.lookup, 'function', 'the request carries the address-checking lookup');
+  assert.equal(r.seen[0].options.headers['User-Agent'], 'VisualAgentMap-Obsidian-plugin', 'Node sends no User-Agent of its own; sites such as Wikimedia answer 403 without one');
+  // A redirect to a public https host is followed by hand; a relative Location is resolved.
+  r = rig((asked, res, onResponse, req) => (asked.url.endsWith('/p.png') ? sends(302, { location: '/q.png' }) : sends(200, {}, [png]))(asked, res, onResponse, req));
+  assert.equal((await r.fetch('https://a.example.org/p.png', opts())).status, 200);
+  assert.deepEqual(r.seen.map(x => x.url), ['https://a.example.org/p.png', 'https://a.example.org/q.png']);
+  assert.equal(r.seen[0].req.destroyed, true, 'the redirect connection is ended, its body not read');
+  const bigBody = Array.from({ length: 50 }, () => Buffer.alloc(1024 * 1024, 1));
+  r = rig((asked, res, onResponse, req) => (asked.url.endsWith('/p.png') ? sends(302, { location: '/q.png' }, bigBody) : sends(200, {}, [png]))(asked, res, onResponse, req));
+  assert.equal((await r.fetch('https://a.example.org/p.png', opts())).status, 200);
+  assert.equal(r.seen[0].read, undefined, 'a 3xx answer with a huge body: the connection ends at once, no byte read');
+  // A redirect to a private host, an IP, localhost, plain http, a credentialed URL: refused, nothing requested at the target.
+  for (const target of ['https://127.0.0.1/x.png', 'https://[::1]/x.png', 'https://localhost/x.png', 'https://printer.local/x.png', 'http://b.example.org/x.png', 'https://u:p@b.example.org/x.png', 'https://10.0.0.5/x.png', 'file:///etc/passwd']) {
+    r = rig(sends(301, { location: target }));
+    await assert.rejects(r.fetch('https://a.example.org/p.png', opts()), error => error.reason === 'url', target);
+    assert.equal(r.seen.length, 1, `${target}: only the first address was requested`);
+  }
+  r = rig(sends(302, { location: 'https://192.168.1.1/x.png' }));
+  assert.equal((await downloadPicture('https://a.example.org/p.png', r.fetch)).reason, 'url', 'the reason reaches the caller');
+  // Three redirects are followed, the fourth is refused.
+  let n = 0;
+  r = rig((asked, res, onResponse, req) => (++n <= 3 ? sends(302, { location: `https://h${n}.example.org/` }) : sends(200, {}, [png]))(asked, res, onResponse, req));
+  assert.equal((await r.fetch('https://a.example.org/', opts())).status, 200);
+  assert.equal(r.seen.length, 4, '3 redirects then the picture');
+  r = rig((asked, res, onResponse, req) => sends(302, { location: `https://h${r.seen.length}.example.org/` })(asked, res, onResponse, req));
+  await assert.rejects(r.fetch('https://a.example.org/', opts()), error => error.reason === 'url');
+  assert.equal(r.seen.length, 4, 'the chain stops after 3 redirects');
+  // A redirect status without a Location is an answer; a non-200 answer is "status".
+  r = rig(sends(302, {}));
+  assert.equal((await r.fetch('https://a.example.org/', opts())).status, 302);
+  r = rig(sends(404, {}, [png]));
+  assert.equal((await downloadPicture('https://a.example.org/', r.fetch)).reason, 'status');
+  // Size: a content-length over the cap reads nothing; a stream over the cap is destroyed at the chunk that passes it, no more is read.
+  r = rig(sends(200, { 'content-length': String(9 * 1024 * 1024) }, [png]));
+  await assert.rejects(r.fetch('https://a.example.org/', opts()), error => error.reason === 'size');
+  assert.equal(r.seen[0].req.destroyed, true);
+  assert.equal(r.seen[0].read, undefined, 'an oversize content-length reads no byte');
+  const chunk = Buffer.alloc(1024 * 1024, 1);
+  r = rig(sends(200, {}, Array.from({ length: 20 }, () => chunk)));
+  await assert.rejects(r.fetch('https://a.example.org/', opts()), error => error.reason === 'size');
+  assert.equal(r.seen[0].req.destroyed, true, 'the connection is destroyed');
+  assert.equal(r.seen[0].read, 9 * 1024 * 1024, 'reading stops at the chunk that passes 8 MB; the 11 after it are never read');
+  r = rig(sends(200, {}, Array.from({ length: 8 }, () => chunk)));
+  assert.equal((await r.fetch('https://a.example.org/', opts())).bytes.byteLength, 8 * 1024 * 1024, 'exactly 8 MB is allowed');
+  r = rig(sends(200, { 'content-length': '10' }, Array.from({ length: 20 }, () => chunk)));
+  assert.equal((await downloadPicture('https://a.example.org/', r.fetch)).reason, 'size', 'a lying content-length does not widen the cap');
+  // A connection error is "failed"; a refusal by the lookup is "url".
+  const erroring = error => rig((asked, res, onResponse, req) => req.emit('error', error));
+  await assert.rejects(erroring(new Error('ECONNRESET')).fetch('https://a.example.org/', opts()), error => error.reason === 'failed');
+  await assert.rejects(erroring(new PictureFetchError('url')).fetch('https://a.example.org/', opts()), error => error.reason === 'url');
+  // Abort: an already aborted signal and an abort while waiting both reject 'aborted' and destroy the socket.
+  const done = new AbortController();
+  done.abort();
+  r = rig(() => {});
+  await assert.rejects(r.fetch('https://a.example.org/', opts({ signal: done.signal })), error => error.reason === 'aborted');
+  const live = new AbortController();
+  r = rig(() => {});
+  const waiting = r.fetch('https://a.example.org/', opts({ signal: live.signal }));
+  live.abort();
+  await assert.rejects(waiting, error => error.reason === 'aborted');
+  assert.equal(r.seen[0].req.destroyed, true, 'the socket is destroyed on abort');
+  // Timeout through downloadPicture: the transport is aborted and its socket destroyed.
+  r = rig(() => {});
+  assert.equal((await downloadPicture('https://a.example.org/', r.fetch, { timeoutMs: 20 })).reason, 'timeout');
+  assert.equal(r.seen[0].req.destroyed, true, 'a timeout destroys the socket');
 });
 
 test('look step: the verdict is parsed strictly, the caption is one capped plain line, and the picture never enters the prompt', () => {

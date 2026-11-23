@@ -2094,7 +2094,6 @@ test('picture transport: redirects by hand (at most 3, each checked), the 8 MB c
         const asked = { url: String(url), options, req };
         seen.push(asked);
         const res = new EventEmitter();
-        res.resume = () => { asked.resumed = true; };
         script(asked, res, onResponse, req);
       };
       return req;
@@ -2119,7 +2118,11 @@ test('picture transport: redirects by hand (at most 3, each checked), the 8 MB c
   r = rig((asked, res, onResponse, req) => (asked.url.endsWith('/p.png') ? sends(302, { location: '/q.png' }) : sends(200, {}, [png]))(asked, res, onResponse, req));
   assert.equal((await r.fetch('https://a.example.org/p.png', opts())).status, 200);
   assert.deepEqual(r.seen.map(x => x.url), ['https://a.example.org/p.png', 'https://a.example.org/q.png']);
-  assert.equal(r.seen[0].resumed, true, 'the redirect body is drained, not read');
+  assert.equal(r.seen[0].req.destroyed, true, 'the redirect connection is ended, its body not read');
+  const bigBody = Array.from({ length: 50 }, () => Buffer.alloc(1024 * 1024, 1));
+  r = rig((asked, res, onResponse, req) => (asked.url.endsWith('/p.png') ? sends(302, { location: '/q.png' }, bigBody) : sends(200, {}, [png]))(asked, res, onResponse, req));
+  assert.equal((await r.fetch('https://a.example.org/p.png', opts())).status, 200);
+  assert.equal(r.seen[0].read, undefined, 'a 3xx answer with a huge body: the connection ends at once, no byte read');
   // A redirect to a private host, an IP, localhost, plain http, a credentialed URL: refused, nothing requested at the target.
   for (const target of ['https://127.0.0.1/x.png', 'https://[::1]/x.png', 'https://localhost/x.png', 'https://printer.local/x.png', 'http://b.example.org/x.png', 'https://u:p@b.example.org/x.png', 'https://10.0.0.5/x.png', 'file:///etc/passwd']) {
     r = rig(sends(301, { location: target }));

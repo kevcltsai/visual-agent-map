@@ -126,8 +126,10 @@ function hop(
         const status = res.statusCode ?? 0;
         const location = res.headers.location;
         if (REDIRECT_STATUS.has(status) && typeof location === "string") {
-          res.resume();
-          return finish(() => resolve({ redirect: location }));
+          // The body of a redirect is never read: the connection is ended at once (a server may send an endless one).
+          finish(() => resolve({ redirect: location }));
+          req.destroy();
+          return;
         }
         const length = Number(res.headers["content-length"]);
         if (status === 200 && Number.isFinite(length) && length > maxBytes) return fail("size", req);

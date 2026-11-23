@@ -102100,8 +102100,9 @@ function hop(url, request, lookup, signal, maxBytes) {
         const status = (_a2 = res.statusCode) != null ? _a2 : 0;
         const location = res.headers.location;
         if (REDIRECT_STATUS.has(status) && typeof location === "string") {
-          res.resume();
-          return finish(() => resolve({ redirect: location }));
+          finish(() => resolve({ redirect: location }));
+          req.destroy();
+          return;
         }
         const length = Number(res.headers["content-length"]);
         if (status === 200 && Number.isFinite(length) && length > maxBytes) return fail4("size", req);

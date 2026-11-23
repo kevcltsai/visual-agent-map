@@ -20361,6 +20361,17 @@ export class VisualAgentMapView extends ItemView {
   private chatHost(): MapChatHost {
     return {
       createEmptyMap: () => this.startBlankMap(),
+      startBook: () => void this.startBookPipelineFromUi(),
+      bookReady: () => {
+        const map = this.map;
+        const roots = map?.nodes.filter(node => !node.parentId) ?? [];
+        // One root topic with chapter cards under it, and no book run on the map yet.
+        return (
+          roots.length === 1 &&
+          !!map?.nodes.some(node => node.parentId === roots[0].id) &&
+          readBookPipeline(map).kind === "absent"
+        );
+      },
       ...(argumentEnabled(this.plugin)
         ? { startArgumentResearch: (claim: string) => this.startArgumentFromTab(claim) }
         : {}),

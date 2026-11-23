@@ -2757,7 +2757,8 @@ const counting = () => {
 };
 const press = (el, event) => { let prevented = false; el.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
 const resizerOf = chat => chat.resizerEl;
-const noSuggestions = chat => findAll(chat.el, i => ['vam-map-chat-suggest', 'vam-map-chat-suggestion', 'vam-map-chat-example'].some(c => hasClass(i, c)));
+// The old suggested messages stay gone; the opening screen's examples came back as the book entry (owner, 2026-11-23, 方案甲) and are checked on their own.
+const noSuggestions = chat => findAll(chat.el, i => ['vam-map-chat-suggest', 'vam-map-chat-suggestion'].some(c => hasClass(i, c)));
 const sendOf = chat => findAll(chat.el, i => hasClass(i, 'vam-map-chat-send'));
 const stopOf = chat => findAll(chat.el, i => hasClass(i, 'vam-map-chat-stop'));
 const layoutModule = () => load('core/map-chat-layout.ts');
@@ -2871,13 +2872,13 @@ integrationTest('B1 ui: the real view close path disposes the panel (the drag li
 
 // ---- opening screen ----------------------------------------------------------------------------------------------
 
-integrationTest('B1 ui: an empty map shows the opening screen: the question and the message field, with no example or suggestion buttons; the window is not docked', async () => {
+integrationTest('B1 ui: an empty map shows the opening screen: the question and the message field, with no suggestion buttons; the window is not docked', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   assert.equal(chat.isHero, true); assert.ok(chat.el.hasClass('is-hero')); assert.equal(chat.isOpen, true);
   assert.equal(chat.heroTitleEl.text, 'What do you want to research or organize?'); assert.equal(chat.heroTitleEl.hidden, false); assert.equal(chat.heroTitleEl.attrs.role, 'heading');
   const slot = find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')); assert.ok(slot && find(slot, i => i === chat.el), 'in the middle of the canvas overlay');
   assert.equal(find(h.workspace(), i => i === chat.el) !== undefined, true);
-  eq(noSuggestions(chat).length, 0, 'no example buttons or container on the opening screen'); assert.equal(chat.suggestEl, undefined);
+  eq(noSuggestions(chat).length, 0, 'no suggestion buttons or container on the opening screen'); assert.equal(chat.suggestEl, undefined);
   assert.equal(chat.resizerEl.hidden, true, 'no width handle on the opening screen'); assert.equal(h.page.doc.activeElement, chat.inputEl, 'the keyboard starts in the message field');
   assert.equal(chat.logEl.attrs.role, 'group');
   // DOM order = reading order: heading, then the message field.
@@ -2937,7 +2938,7 @@ integrationTest('opening screen: removing the only item does not take the keyboa
 integrationTest('UX B6: on the opening screen the model menu is in the composer after the message field (never in the head row); the head row is hidden there and shows again in the window', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
   const body = () => chat.bodyEl.children;
-  if (chat.emptyMapEl.hidden === false) { assert.equal(body().at(-2), chat.heroActionsEl, 'the button row is second to last in the body'); assert.equal(chat.heroActionsEl.children[0], chat.emptyMapEl, 'the empty-map button leads the row'); }
+  if (chat.emptyMapEl.hidden === false) { assert.equal(body().at(-2), chat.heroActionsEl, 'the button row is second to last in the body'); assert.equal(chat.heroActionsEl.children[0], chat.examplesEl, 'the examples lead the row'); assert.equal(chat.heroActionsEl.children[1], chat.emptyMapEl, 'the empty-map button follows them'); }
   assert.ok(chat.headEl.hasClass('is-hero'), 'the head row is hidden on the opening screen'); assert.equal(find(chat.headEl, i => i === chat.modelEl), undefined, 'the model menu is not in the head row');
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'model');
   eq(order, ['title', 'input', 'model'], 'reading and Tab order: the question, the field, then the model');
@@ -2949,9 +2950,11 @@ integrationTest('UX B6: on the opening screen the model menu is in the composer 
   assert.equal(chat.isHero, false); assert.equal(chat.bodyEl.children[0], chat.headEl, 'in the window the head row is on top again'); assert.equal(chat.headEl.hasClass('is-hero'), false);
 });
 
-integrationTest('map chat composer: neither the opening screen nor the window has example or suggestion buttons', async () => {
+integrationTest('map chat composer: neither the opening screen nor the window has suggestion buttons; the window shows no examples', async () => {
   const empty = await harness({ empty: true }); await empty.view.hydrate(); empty.repaint(); eq(noSuggestions(empty.view.chat).length, 0, 'opening screen');
+  assert.equal(empty.view.chat.heroActionsEl.hidden, false, 'the opening screen shows its examples');
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); eq(noSuggestions(chat).length, 0, 'window');
+  assert.equal(chat.heroActionsEl.hidden, true, 'the window hides the opening screen examples');
   h.view.selection.setSelected(h.ids.a); chat.refreshSelection(); h.setActive('Notes/Research.md', ''); chat.refreshNote(); eq(noSuggestions(chat).length, 0, 'still none after a selection and a note');
 });
 
@@ -3068,6 +3071,57 @@ test('P8: a host without startArgumentResearch shows no tabs and no research pan
   const f = panelFixture({ createEmptyMap: () => {} }); f.panel.mount(f.overlay, 'hero');
   assert.equal(f.panel.tabsEl.hidden, true); assert.equal(f.panel.researchPanelEl.hidden, true); assert.equal(f.panel.heroActionsEl.hidden, false); assert.equal(f.panel.heroTitleEl.hidden, false);
   f.panel.inputEl.value = 'x'; key(f.panel.inputEl, { key: 'Enter' }); assert.equal(f.calls.send, 1);
+});
+
+const exampleButtons = chat => {
+  const input = chat.inputEl; input.setSelectionRange = (a, b) => { input.selectionStart = a; input.selectionEnd = b; };
+  return findAll(chat.examplesEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-example'));
+};
+test('Book entry 12: the opening screen shows at most three examples under the field, the book one first and marked new; a click fills the field and selects the blank', () => {
+  const f = heroFixture(); const c = f.panel; const buttons = exampleButtons(c);
+  assert.ok(buttons.length >= 2 && buttons.length <= 3, 'two or three examples');
+  assert.equal(c.examplesEl.parent, c.heroActionsEl, 'in the mind map tab panel, below the composer'); assert.equal(c.examplesEl.attrs.role, 'group'); assert.equal(c.examplesEl.attrs['aria-label'], 'Examples');
+  assert.ok(hasClass(buttons[0], 'is-new')); assert.match(visibleText(buttons[0]), /Make a picture book.*New/);
+  assert.equal(find(buttons[0], i => i.text === '📖').attrs['aria-hidden'], 'true', 'the book icon is not read out');
+  assert.equal(c.heroActionsEl.hidden, false);
+  buttons[0].click();
+  assert.equal(c.inputEl.value, 'I want to make a picture book about “topic”. Build the outline first.');
+  assert.equal(f.page.doc.activeElement, c.inputEl, 'the keyboard stays in the field');
+  assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), 'topic', 'the blank is selected, so typing replaces it');
+  assert.equal(f.calls.send, 0, 'a click does not send');
+  buttons[1].click(); assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), 'option A');
+  c.researchTabEl.click(); assert.equal(c.heroActionsEl.hidden, true, 'the research tab has its own suggestions');
+});
+test('Book entry 12: the examples are in Traditional Chinese with the new tag and the 「主題」 blank', () => {
+  const f = heroFixture(); f.setLanguage('zh-TW'); f.panel.relabel(); const c = f.panel; const buttons = exampleButtons(c);
+  assert.match(visibleText(buttons[0]), /做一本圖文書.*新/); buttons[0].click();
+  assert.equal(c.inputEl.value, '我想做一本關於「主題」的圖文書，先幫我建大綱');
+  assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '主題');
+  f.setLanguage('en');
+});
+test('Book entry 13: after the book example, a reply that leaves a book outline offers "Make it a picture book" once; it opens the book start card', () => {
+  let ready = false; const started = [];
+  const f = heroFixture({ bookReady: () => ready, startBook: () => started.push('book') }); const c = f.panel;
+  const offers = () => findAll(c.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-book-offer'));
+  c.begin('plain question'); c.finish('answer', []); assert.equal(offers().length, 0, 'no book example used: no button');
+  exampleButtons(c)[0].click();
+  c.begin('book about art'); ready = false; c.finish('not yet a book', [{ status: 'done', text: 'Done: y' }]); assert.equal(offers().length, 0, 'map not in a book shape: no button');
+  c.begin('answer only'); ready = true; c.finish('Just an answer.', []); assert.equal(offers().length, 0, 'a reply that wrote nothing: no button');
+  c.begin('again'); c.finish('I built the outline: 1 title, 3 chapters.', [{ status: 'done', text: 'Done: x' }]);
+  assert.equal(offers().length, 1); assert.equal(offers()[0].text, 'Make it a picture book →');
+  offers()[0].click(); assert.deepEqual(started, ['book']);
+  c.begin('more'); c.finish('more', []); assert.equal(offers().length, 1, 'offered once per conversation');
+  c.reset(); exampleButtons(c)[1].click(); c.begin('compare'); c.finish('done', [{ status: 'done', text: 'Done: z' }]); assert.equal(offers().length, 0, 'other examples offer nothing');
+});
+test('Book entry 13: a reply that waits on its plan card offers the book only once the plan is applied', () => {
+  const f = heroFixture({ bookReady: () => true, startBook: () => {} }); const c = f.panel;
+  const offers = () => findAll(c.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-book-offer'));
+  exampleButtons(c)[0].click(); c.begin('book');
+  c.finish('Here is the plan.', []);
+  const plan = { reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} }; c.showPlan(plan);
+  assert.equal(offers().length, 0, 'nothing written yet');
+  c.settlePlan(plan, 'applied'); assert.equal(offers().length, 0, 'still being applied');
+  c.settlePlan(plan, 'applied', [{ status: 'done', text: 'Done: x' }]); assert.equal(offers().length, 1, 'offered after the plan wrote the outline');
 });
 
 integrationTest('P9a counterexample: the map chat cannot start a hypothesis research run, however the message is worded', async () => {
@@ -3193,7 +3247,7 @@ test('map chat composer: the styles put the keys inside the box with theme varia
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden]'), /display: none/, 'a hidden key is not drawn');
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-stop'), /background: transparent; color: var\(--text-muted\)/, 'working: the stop key has no accent disc (chat layout)');
   for (const line of lines.filter(l => l.includes('.vam-map-chat-composer'))) assert.doesNotMatch(line, /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'theme variables only');
-  for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
+  for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
 });
 
 integrationTest('UX B9: an empty map leaves out "Select several topics", the goal bar and the gesture hint; a map with topics has them', async () => {
@@ -3210,9 +3264,9 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
 });
 
 
-test('map chat composer: the suggestion layout symbols, host.suggestions and the suggestion / example translation keys are gone', () => {
+test('map chat composer: the suggestion layout symbols, host.suggestions and the old suggestion / example translation keys are gone', () => {
   const layout = load('core/map-chat-layout.ts'); for (const name of ['chatSuggestionKeys', 'chatSuggestionFill', 'MAP_CHAT_EXAMPLE_KEYS', 'MAP_CHAT_OPEN_ENDED_KEYS']) assert.equal(name in layout, false, name);
-  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_(suggest|example|examples_label)/, name);
+  for (const name of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(fs.readFileSync(path.join(root, 'i18n', `${name}.ts`), 'utf8'), /"ui\.map_chat_(suggest|example_(research|learn|decide)")/, name);
 });
 
 // ---- keyboard ------------------------------------------------------------------------------------------------------

@@ -1487,6 +1487,18 @@ var en = {
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
+  "ui.map_chat_examples_label": "Examples",
+  "ui.map_chat_example_new": "New",
+  "ui.map_chat_example_book": "Make a picture book",
+  "ui.map_chat_example_book_prompt": "I want to make a picture book about \u201Ctopic\u201D. Build the outline first.",
+  "ui.map_chat_example_book_slot": "topic",
+  "ui.map_chat_example_compare": "Compare two options",
+  "ui.map_chat_example_compare_prompt": "Compare \u201Coption A\u201D with \u201Coption B\u201D: the pros and cons of each.",
+  "ui.map_chat_example_compare_slot": "option A",
+  "ui.map_chat_example_notes": "Organize reading notes",
+  "ui.map_chat_example_notes_prompt": "Organize my reading notes on \u201Cbook title\u201D into a mind map.",
+  "ui.map_chat_example_notes_slot": "book title",
+  "ui.map_chat_book_offer": "Make it a picture book \u2192",
   "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it.",
   "ui.map_chat_canvas_building": "Building the map\u2026",
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
@@ -4875,6 +4887,18 @@ var zhCN = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
+  "ui.map_chat_examples_label": "\u793A\u4F8B",
+  "ui.map_chat_example_new": "\u65B0",
+  "ui.map_chat_example_book": "\u505A\u4E00\u672C\u56FE\u6587\u4E66",
+  "ui.map_chat_example_book_prompt": "\u6211\u60F3\u505A\u4E00\u672C\u5173\u4E8E\u201C\u4E3B\u9898\u201D\u7684\u56FE\u6587\u4E66\uFF0C\u5148\u5E2E\u6211\u5EFA\u5927\u7EB2",
+  "ui.map_chat_example_book_slot": "\u4E3B\u9898",
+  "ui.map_chat_example_compare": "\u6BD4\u8F83\u4E24\u4E2A\u9009\u62E9",
+  "ui.map_chat_example_compare_prompt": "\u5E2E\u6211\u6BD4\u8F83\u201C\u9009\u9879 A\u201D\u548C\u201C\u9009\u9879 B\u201D\uFF0C\u5217\u51FA\u5404\u81EA\u7684\u4F18\u7F3A\u70B9",
+  "ui.map_chat_example_compare_slot": "\u9009\u9879 A",
+  "ui.map_chat_example_notes": "\u6574\u7406\u8BFB\u4E66\u7B14\u8BB0",
+  "ui.map_chat_example_notes_prompt": "\u5E2E\u6211\u628A\u201C\u4E66\u540D\u201D\u7684\u8BFB\u4E66\u7B14\u8BB0\u6574\u7406\u6210\u5FC3\u667A\u56FE",
+  "ui.map_chat_example_notes_slot": "\u4E66\u540D",
+  "ui.map_chat_book_offer": "\u505A\u6210\u56FE\u6587\u4E66 \u2192",
   "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
@@ -8263,6 +8287,18 @@ var zhTW = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5FC3\u667A\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
+  "ui.map_chat_examples_label": "\u7BC4\u4F8B",
+  "ui.map_chat_example_new": "\u65B0",
+  "ui.map_chat_example_book": "\u505A\u4E00\u672C\u5716\u6587\u66F8",
+  "ui.map_chat_example_book_prompt": "\u6211\u60F3\u505A\u4E00\u672C\u95DC\u65BC\u300C\u4E3B\u984C\u300D\u7684\u5716\u6587\u66F8\uFF0C\u5148\u5E6B\u6211\u5EFA\u5927\u7DB1",
+  "ui.map_chat_example_book_slot": "\u4E3B\u984C",
+  "ui.map_chat_example_compare": "\u6BD4\u8F03\u5169\u500B\u9078\u64C7",
+  "ui.map_chat_example_compare_prompt": "\u5E6B\u6211\u6BD4\u8F03\u300C\u9078\u9805 A\u300D\u548C\u300C\u9078\u9805 B\u300D\uFF0C\u5217\u51FA\u5404\u81EA\u7684\u512A\u7F3A\u9EDE",
+  "ui.map_chat_example_compare_slot": "\u9078\u9805 A",
+  "ui.map_chat_example_notes": "\u6574\u7406\u8B80\u66F8\u7B46\u8A18",
+  "ui.map_chat_example_notes_prompt": "\u5E6B\u6211\u628A\u300C\u66F8\u540D\u300D\u7684\u8B80\u66F8\u7B46\u8A18\u6574\u7406\u6210\u5FC3\u667A\u5716",
+  "ui.map_chat_example_notes_slot": "\u66F8\u540D",
+  "ui.map_chat_book_offer": "\u505A\u6210\u5716\u6587\u66F8 \u2192",
   "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
@@ -67124,6 +67160,26 @@ function droppedLinkTarget(text11) {
 }
 var panelSequence = 0;
 var HERO_TABS = ["map", "research"];
+var MAP_CHAT_EXAMPLES = [
+  {
+    book: true,
+    label: "ui.map_chat_example_book",
+    prompt: "ui.map_chat_example_book_prompt",
+    slot: "ui.map_chat_example_book_slot"
+  },
+  {
+    book: false,
+    label: "ui.map_chat_example_compare",
+    prompt: "ui.map_chat_example_compare_prompt",
+    slot: "ui.map_chat_example_compare_slot"
+  },
+  {
+    book: false,
+    label: "ui.map_chat_example_notes",
+    prompt: "ui.map_chat_example_notes_prompt",
+    slot: "ui.map_chat_example_notes_slot"
+  }
+];
 var ARGUMENT_SUGGESTION_KEYS = [
   "ui.argument_suggestion_1",
   "ui.argument_suggestion_2",
@@ -67207,6 +67263,9 @@ var MapChatPanel = class {
     __publicField(this, "suggestionsEl");
     __publicField(this, "usageEl");
     __publicField(this, "heroTab", "map");
+    __publicField(this, "examplesEl");
+    /** The book example filled the field in this conversation: the reply that builds a book outline offers the book start card once. */
+    __publicField(this, "bookIntent", false);
     __publicField(this, "suggestionKeys", []);
     __publicField(this, "resizerEl");
     __publicField(this, "liveEl");
@@ -68133,6 +68192,7 @@ ${typed}` : draft;
       last.text = reply;
       last.lines = shown2;
       last.streaming = false;
+      if (shown2.some((line3) => line3.status === "done")) this.offerBook(last);
     }
     this.busy = false;
     this.clearStage();
@@ -68214,6 +68274,7 @@ ${typed}` : draft;
       message.lateFailures = void 0;
     } else message.lateFailures = void 0;
     if (lines) lines = message.lines = onceImageLines(lines);
+    if (state === "applied" && (lines == null ? void 0 : lines.some((line3) => line3.status === "done"))) this.offerBook(message);
     this.renderLog();
     this.renderHint();
     (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
@@ -68351,6 +68412,7 @@ ${typed}` : draft;
     this.restoredText = "";
     this.spokenLater = [];
     this.chips = [];
+    this.bookIntent = false;
     this.dismissedNote = null;
     this.noteChip = null;
     this.busy = false;
@@ -68625,6 +68687,11 @@ ${typed}` : draft;
       attr: { id: `${this.id}-panel-map`, "aria-labelledby": `${this.id}-tab-map` }
     });
     this.heroActionsEl.hidden = true;
+    this.examplesEl = this.heroActionsEl.createDiv({
+      cls: "vam-map-chat-examples",
+      attr: { role: "group", "aria-label": t("ui.map_chat_examples_label") }
+    });
+    this.renderExamples();
     this.emptyMapEl = this.heroActionsEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
@@ -68802,6 +68869,8 @@ ${typed}` : draft;
     this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
+    this.examplesEl.setAttr("aria-label", t("ui.map_chat_examples_label"));
+    this.renderExamples();
     this.tabsEl.setAttr("aria-label", t("ui.argument_tab_label"));
     this.mapTabEl.setText(t("ui.argument_tab_map"));
     this.researchTabLabelEl.setText(t("ui.argument_tab_research"));
@@ -68903,6 +68972,39 @@ ${typed}` : draft;
         this.inputEl.setSelectionRange(text11.length, text11.length);
       });
     }
+  }
+  /** The opening screen's examples: each fills the field with a sentence and selects its one blank, so typing replaces it. */
+  renderExamples() {
+    this.examplesEl.empty();
+    for (const example of MAP_CHAT_EXAMPLES) {
+      const button = this.examplesEl.createEl("button", {
+        cls: `vam-map-chat-example${example.book ? " is-new" : ""}`,
+        attr: { type: "button" }
+      });
+      if (example.book)
+        button.createSpan({ cls: "vam-map-chat-example-icon", text: "\u{1F4D6}", attr: { "aria-hidden": "true" } });
+      button.createSpan({ text: t(example.label) });
+      if (example.book) button.createSpan({ cls: "vam-map-chat-example-new", text: t("ui.map_chat_example_new") });
+      button.addEventListener("click", () => {
+        const text11 = t(example.prompt);
+        const slot = t(example.slot);
+        this.inputEl.value = text11;
+        this.bookIntent = example.book;
+        this.renderSteerHint();
+        this.inputEl.focus();
+        const at = text11.indexOf(slot);
+        if (at < 0) this.inputEl.setSelectionRange(text11.length, text11.length);
+        else this.inputEl.setSelectionRange(at, at + slot.length);
+      });
+    }
+  }
+  /** A reply that ended with the map in a book's shape, after the book example was used, offers the book start card (once). */
+  offerBook(message) {
+    var _a2, _b2;
+    if (!this.bookIntent || message.role !== "assistant" || message.error || !this.host.startBook) return;
+    if (!((_b2 = (_a2 = this.host).bookReady) == null ? void 0 : _b2.call(_a2))) return;
+    message.bookOffer = true;
+    this.bookIntent = false;
   }
   onKey(event) {
     var _a2, _b2;
@@ -69148,9 +69250,10 @@ ${typed}` : draft;
     const showEmptyMap = hero && !!this.host.createEmptyMap && !onResearch;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    this.heroActionsEl.hidden = !showEmptyMap;
-    this.heroActionsEl.toggleClass("is-hidden", !showEmptyMap);
-    this.placeHeadAndEmptyMap(hero, onResearch ? this.researchPanelEl : showEmptyMap ? this.heroActionsEl : null);
+    const showActions = hero && !onResearch;
+    this.heroActionsEl.hidden = !showActions;
+    this.heroActionsEl.toggleClass("is-hidden", !showActions);
+    this.placeHeadAndEmptyMap(hero, onResearch ? this.researchPanelEl : showActions ? this.heroActionsEl : null);
     this.renderGuide();
     this.refreshSave();
     if (shown2 && hadUnread) this.scrollToEnd();
@@ -69500,6 +69603,7 @@ ${shown2}` : t("ui.map_chat_model_label"));
       message.linesOpen ? "o" : "",
       message.seenImage ? `seen:${message.seenImage.note}` : "",
       message.replyUndo ? "undo" : "",
+      message.bookOffer ? `book:${t("ui.map_chat_book_offer")}` : "",
       this.chainWaitingState && this.messages.at(-1) === message ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}` : "",
       message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
       message.batch ? `batch:${message.batch.topics.length}:${message.batch.succeeded.length}:${message.batch.failed.length}:${message.batch.ended ? 1 : 0}:${message.batch.running ? 1 : 0}:${message.batch.restored ? 1 : 0}:${message.batch.topics.map((topic) => topic.id).join(",")}:${this.host.rerunBatch ? 1 : 0}` : "",
@@ -69699,6 +69803,17 @@ ${shown2}` : t("ui.map_chat_model_label"));
     if (message.batch) this.buildBatch(row, message, message.batch);
     if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
+    if (message.bookOffer) {
+      const book = row.createEl("button", {
+        cls: "mod-cta vam-map-chat-book-offer",
+        text: t("ui.map_chat_book_offer"),
+        attr: { type: "button" }
+      });
+      book.addEventListener("click", () => {
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.host).startBook) == null ? void 0 : _b3.call(_a3);
+      });
+    }
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -96873,6 +96988,13 @@ ${note.detail.trim()}` : "",
   chatHost() {
     return {
       createEmptyMap: () => this.startBlankMap(),
+      startBook: () => void this.startBookPipelineFromUi(),
+      bookReady: () => {
+        var _a2;
+        const map = this.map;
+        const roots = (_a2 = map == null ? void 0 : map.nodes.filter((node) => !node.parentId)) != null ? _a2 : [];
+        return roots.length === 1 && !!(map == null ? void 0 : map.nodes.some((node) => node.parentId === roots[0].id)) && readBookPipeline(map).kind === "absent";
+      },
       ...argumentEnabled(this.plugin) ? { startArgumentResearch: (claim2) => this.startArgumentFromTab(claim2) } : {},
       argumentCalls: () => WORST_CASE_AI_CALLS,
       topicTitle: (id) => {

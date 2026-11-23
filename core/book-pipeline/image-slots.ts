@@ -853,6 +853,22 @@ export function slotKeywords(explains: string): string[] {
 }
 /** At least this many of a slot's keywords (all of them when it has fewer) must be in the text around the picture. */
 const KEYWORD_HITS = 2;
+/** Words of a slot's place line that say where, not what (「…一節」, "after the paragraph on …"). */
+const PLACE_WORDS = new Set([
+  "after",
+  "before",
+  "paragraph",
+  "section",
+  "chapter",
+  "part",
+  "end",
+  "opening",
+  "一節",
+  "段落",
+  "開頭",
+  "結尾",
+  "章節"
+]);
 
 export interface ImageTextCheck {
   /** `none`: the plan arranged no picture (or the Prompt has no image plan); `unrecorded`: slots planned but no record; else `checked`. */
@@ -929,7 +945,14 @@ export function checkImageText(
       .join("\n");
     const words = slotKeywords(slot.explains);
     const hits = words.filter(word => around.includes(word)).length;
-    if (words.length && hits < Math.min(KEYWORD_HITS, words.length))
+    // Or the text around it names the slot's planned place and at least one word of what it explains (live 2026-11-23: a mood
+    // photograph whose line was mostly about its purpose, 「呼應前言…的提問」, sat right after 「這本書要回答的問題」, its planned place).
+    const place = slotKeywords(slot.anchor ?? "").filter(word => !PLACE_WORDS.has(word));
+    const atPlace =
+      hits > 0 &&
+      place.length > 0 &&
+      place.filter(word => around.includes(word)).length >= Math.min(KEYWORD_HITS, place.length);
+    if (words.length && hits < Math.min(KEYWORD_HITS, words.length) && !atPlace)
       issues.push({ index: item.index, code: "mismatch" });
   }
   return {

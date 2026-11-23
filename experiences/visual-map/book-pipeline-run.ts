@@ -328,9 +328,10 @@ import {
   isKept,
   isKeptRaw,
   isUntouched,
-  pipelineWroteRaw,
+  mayRewriteRaw,
   programStamp,
   programStampRaw,
+  readerSummaryRaw,
   stampRaw
 } from "../../core/book-pipeline/body-integrity";
 
@@ -1972,8 +1973,7 @@ export class BookPipelineRuns {
                   chaptersKey !== undefined
                     ? await this.ports.readCard(drive.cards.get(id)?.path ?? "").catch(() => undefined)
                     : undefined;
-                const state = written ? bodyStateRaw(written.raw) : undefined;
-                const mine = !!written && (state === "clean" || state === "empty") && !isKeptRaw(written.raw);
+                const mine = !!written && mayRewriteRaw(written.raw);
                 const after = mine ? await bookKey() : undefined;
                 if (chaptersKey !== undefined && after !== undefined && after !== chaptersKey) {
                   const rekeyed = await drive.store
@@ -3511,8 +3511,7 @@ export class BookPipelineRuns {
       }
       const targets = same?.pending ?? [];
       const raw = card.raw;
-      const state = bodyStateRaw(raw);
-      if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
+      if (!mayRewriteRaw(raw)) {
         // The reader's own text (hand-edited, unknown or kept): no call, nothing is rewritten, every problem is left open.
         const refused = Object.fromEntries(targets.map(target => [target.id, "hand_edited"]));
         const done = await drive.store.commit(current =>
@@ -3753,8 +3752,7 @@ export class BookPipelineRuns {
         const mine = targets.filter(target => (target.chapter ?? 1) === at + 1);
         if (!mine.length) continue;
         const chapter = chapters[at];
-        const state = bodyStateRaw(chapter.raw);
-        if ((state !== "clean" && state !== "empty") || isKeptRaw(chapter.raw)) {
+        if (!mayRewriteRaw(chapter.raw)) {
           for (const target of mine) refused[target.id] = "hand_edited";
           continue;
         }
@@ -4481,11 +4479,12 @@ export class BookPipelineRuns {
    * one-time permission for exactly this text. A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint.
    */
   private mayOverwriteCard(drive: Drive, nodeId: string, raw: string): boolean {
-    const state = bodyStateRaw(raw);
     // A kept text the program wrote itself ("accept as it is"): only the card's own rerun (the reader's explicit ask) rewrites it.
-    if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || drive.rerun?.nodeId === nodeId)) return true;
     const permit = drive.overwrite.get(nodeId);
-    return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+    return mayRewriteRaw(raw, {
+      rerun: drive.rerun?.nodeId === nodeId,
+      permit: permit?.runId === drive.store.state.runId ? permit.fingerprint : undefined
+    });
   }
 
   private async execPlan(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {
@@ -4495,11 +4494,7 @@ export class BookPipelineRuns {
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text): the plan and the write keep it.
-    if (
-      (isKeptRaw(card.raw) && bodyStateRaw(card.raw) !== "clean") ||
-      (bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
-    )
-      drive.ownSummary.add(nodeId);
+    if (readerSummaryRaw(card.raw)) drive.ownSummary.add(nodeId);
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");

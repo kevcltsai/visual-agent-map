@@ -1,5 +1,5 @@
 import { Keymap, setIcon } from "obsidian";
-import { t } from "../../i18n";
+import { t, type TranslationKey } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
 import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
 import { MAP_CHAT_TURN_CHAR_LIMIT, type MapChatContinuationInput, type MapChatTurn } from "../../core/map-chat-context";
@@ -90,7 +90,7 @@ export function placedImage(block: MapChatImages): MapChatImageItem | undefined 
   return block.state === "ready" ? block.items.find(item => item.inserted) : undefined;
 }
 /** A canvas picture that did not come: the search was stopped, so it says so instead of "no picture was found". */
-const canvasMissedKey = (blocks: MapChatImages[]): string =>
+const canvasMissedKey = (blocks: MapChatImages[]): TranslationKey =>
   blocks.every(block => block.state === "stopped")
     ? "ui.map_chat_note_images_stopped"
     : "ui.map_chat_line_canvas_image_missed";

@@ -1673,6 +1673,16 @@ var en = {
   "detail.disagreements_and_limits": "Disagreements and limits",
   "detail.open_questions_to_check": "Open questions to check",
   "detail.sources_heading": "Sources",
+  "detail.full_text_heading": "Full text: {0}",
+  "detail.full_text_origin": "Fetched by VAM directly from {0} and inserted word for word; not rewritten by the AI.",
+  "detail.full_text_missing_prefix": "Full text not retrieved: ",
+  "detail.full_text_missing": "{0}. The rest of this note is the AI's summary of the page, not the original text.",
+  "detail.full_text_reason_network": "{0} could not be reached or timed out",
+  "detail.full_text_reason_status": "the address of {0} returned no file",
+  "detail.full_text_reason_not_text": "{0} is not a text file",
+  "detail.full_text_reason_too_large": "{0} is over the 200 KB limit and was not inserted",
+  "detail.full_text_reason_no_url": "the AI did not open a raw file address this time (only GitHub files are supported)",
+  "research.full_text": "The user wants the full original text of a file. Open the file itself with the page tool; for a GitHub file use its raw address (https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>). After your reply, VAM fetches that raw file itself and inserts it word for word with its address. Do not paste the file yourself, and never present a summary as the full text: say it is a summary.",
   "detail.update_log": "Update log",
   "detail.description_core_conclusions": "Answer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.",
   "detail.description_key_knowledge": "The concepts, data, mechanisms and background needed to understand the conclusions.",
@@ -5077,6 +5087,16 @@ var zhCN = {
   "detail.disagreements_and_limits": "\u4E0D\u540C\u770B\u6CD5\u4E0E\u9650\u5236",
   "detail.open_questions_to_check": "\u5F85\u786E\u8BA4\u95EE\u9898",
   "detail.sources_heading": "\u6765\u6E90",
+  "detail.full_text_heading": "\u5168\u6587\uFF1A{0}",
+  "detail.full_text_origin": "VAM \u76F4\u63A5\u4ECE {0} \u6293\u53D6\u539F\u59CB\u6587\u4EF6\uFF0C\u9010\u5B57\u653E\u5165\uFF0C\u672A\u7ECF AI \u6539\u5199\u3002",
+  "detail.full_text_missing_prefix": "\u5168\u6587\u672A\u53D6\u5F97\uFF1A",
+  "detail.full_text_missing": "{0}\u3002\u8FD9\u5219\u7B14\u8BB0\u7684\u5176\u4ED6\u5185\u5BB9\u662F AI \u4F9D\u7F51\u9875\u6574\u7406\u7684\u6458\u8981\uFF0C\u4E0D\u662F\u539F\u6587\u3002",
+  "detail.full_text_reason_network": "{0} \u8FDE\u63A5\u5931\u8D25\u6216\u8D85\u65F6",
+  "detail.full_text_reason_status": "{0} \u7684\u7F51\u5740\u6CA1\u6709\u8FD4\u56DE\u6587\u4EF6",
+  "detail.full_text_reason_not_text": "{0} \u4E0D\u662F\u6587\u672C\u6587\u4EF6",
+  "detail.full_text_reason_too_large": "{0} \u8D85\u8FC7 200 KB \u4E0A\u9650\uFF0C\u6CA1\u6709\u653E\u5165",
+  "detail.full_text_reason_no_url": "\u8FD9\u6B21 AI \u6CA1\u6709\u6253\u5F00\u53EF\u76F4\u63A5\u4E0B\u8F7D\u7684\u539F\u59CB\u6587\u4EF6\u7F51\u5740\uFF08\u76EE\u524D\u53EA\u652F\u6301 GitHub \u6587\u4EF6\uFF09",
+  "research.full_text": "\u7528\u6237\u8981\u7684\u662F\u6587\u4EF6\u539F\u6587\u5168\u6587\u3002\u7528\u7F51\u9875\u5DE5\u5177\u76F4\u63A5\u6253\u5F00\u90A3\u4E2A\u6587\u4EF6\uFF1BGitHub \u6587\u4EF6\u7528\u539F\u59CB\u6587\u4EF6\u7F51\u5740\uFF08https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>\uFF09\u3002\u56DE\u590D\u540E VAM \u4F1A\u81EA\u5DF1\u6293\u90A3\u4EFD\u539F\u59CB\u6587\u4EF6\uFF0C\u9010\u5B57\u653E\u5165\u5E76\u9644\u7F51\u5740\u3002\u4E0D\u8981\u81EA\u5DF1\u8F6C\u8D34\u6587\u4EF6\u5185\u5BB9\uFF0C\u4E5F\u4E0D\u53EF\u628A\u6458\u8981\u5199\u6210\u5168\u6587\uFF1B\u53EA\u6709\u6458\u8981\u5C31\u5199\u660E\u662F\u6458\u8981\u3002",
   "detail.update_log": "\u66F4\u65B0\u8BB0\u5F55",
   "detail.description_core_conclusions": "\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002",
   "detail.description_key_knowledge": "\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002",
@@ -8481,6 +8501,16 @@ var zhTW = {
   "detail.disagreements_and_limits": "\u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236",
   "detail.open_questions_to_check": "\u5F85\u78BA\u8A8D\u554F\u984C",
   "detail.sources_heading": "\u4F86\u6E90",
+  "detail.full_text_heading": "\u5168\u6587\uFF1A{0}",
+  "detail.full_text_origin": "VAM \u76F4\u63A5\u5F9E {0} \u6293\u53D6\u539F\u59CB\u6A94\uFF0C\u9010\u5B57\u653E\u5165\uFF0C\u672A\u7D93 AI \u6539\u5BEB\u3002",
+  "detail.full_text_missing_prefix": "\u5168\u6587\u672A\u53D6\u5F97\uFF1A",
+  "detail.full_text_missing": "{0}\u3002\u9019\u5247\u7B46\u8A18\u7684\u5176\u4ED6\u5167\u5BB9\u662F AI \u4F9D\u7DB2\u9801\u6574\u7406\u7684\u6458\u8981\uFF0C\u4E0D\u662F\u539F\u6587\u3002",
+  "detail.full_text_reason_network": "{0} \u9023\u7DDA\u5931\u6557\u6216\u903E\u6642",
+  "detail.full_text_reason_status": "{0} \u7684\u7DB2\u5740\u6C92\u6709\u56DE\u50B3\u6A94\u6848",
+  "detail.full_text_reason_not_text": "{0} \u4E0D\u662F\u6587\u5B57\u6A94",
+  "detail.full_text_reason_too_large": "{0} \u8D85\u904E 200 KB \u4E0A\u9650\uFF0C\u6C92\u6709\u653E\u5165",
+  "detail.full_text_reason_no_url": "\u9019\u6B21 AI \u6C92\u6709\u6253\u958B\u53EF\u76F4\u63A5\u4E0B\u8F09\u7684\u539F\u59CB\u6A94\u7DB2\u5740\uFF08\u76EE\u524D\u53EA\u652F\u63F4 GitHub \u6A94\u6848\uFF09",
+  "research.full_text": "\u4F7F\u7528\u8005\u8981\u7684\u662F\u6A94\u6848\u539F\u6587\u5168\u6587\u3002\u7528\u7DB2\u9801\u5DE5\u5177\u76F4\u63A5\u6253\u958B\u90A3\u500B\u6A94\u6848\uFF1BGitHub \u6A94\u6848\u7528\u539F\u59CB\u6A94\u7DB2\u5740\uFF08https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>\uFF09\u3002\u56DE\u8986\u5F8C VAM \u6703\u81EA\u5DF1\u6293\u90A3\u4EFD\u539F\u59CB\u6A94\uFF0C\u9010\u5B57\u653E\u5165\u4E26\u9644\u7DB2\u5740\u3002\u4E0D\u8981\u81EA\u5DF1\u8F49\u8CBC\u6A94\u6848\u5167\u5BB9\uFF0C\u4E5F\u4E0D\u53EF\u628A\u6458\u8981\u5BEB\u6210\u5168\u6587\uFF1B\u53EA\u6709\u6458\u8981\u5C31\u5BEB\u660E\u662F\u6458\u8981\u3002",
   "detail.update_log": "\u66F4\u65B0\u7D00\u9304",
   "detail.description_core_conclusions": "\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002",
   "detail.description_key_knowledge": "\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002",
@@ -11484,11 +11514,11 @@ function composePositions(input2) {
       const slots = Math.max(1, Math.ceil((maxX - minX + column - width) / column));
       return { node, root, placed: placed2, minX, maxX, minY, maxY, slots };
     });
-    const byHead = new Map(blocks.map((block) => [block.node.id, block]));
+    const byHead = new Map(blocks.map((block2) => [block2.node.id, block2]));
     const padOf = (node) => {
-      const block = byHead.get(node.id);
-      if (!block || !vertical) return [];
-      return Array.from({ length: block.slots }, (_, index) => ({ id: `${node.id}\0pad${index}` }));
+      const block2 = byHead.get(node.id);
+      if (!block2 || !vertical) return [];
+      return Array.from({ length: block2.slots }, (_, index) => ({ id: `${node.id}\0pad${index}` }));
     };
     const pads = /* @__PURE__ */ new Set();
     const outer = {
@@ -11502,25 +11532,25 @@ function composePositions(input2) {
       joinsOf: (node) => byHead.has(node.id) ? [] : input2.joinsOf(node),
       heightFor: (node) => {
         if (pads.has(node.id)) return 0;
-        const block = byHead.get(node.id);
-        return block && !vertical ? block.maxY - block.minY : input2.heightFor(node);
+        const block2 = byHead.get(node.id);
+        return block2 && !vertical ? block2.maxY - block2.minY : input2.heightFor(node);
       }
     };
     const placed = engine(direction, outer);
     const result = /* @__PURE__ */ new Map();
     for (const [id, point] of placed) if (!pads.has(id) && !byHead.has(id)) result.set(id, point);
-    for (const block of blocks) {
-      const at = placed.get(block.node.id);
+    for (const block2 of blocks) {
+      const at = placed.get(block2.node.id);
       let dx, dy;
       if (vertical) {
-        dx = at.x + column / 2 - (block.minX + block.maxX) / 2;
-        dy = direction === "down" ? at.y - block.minY : at.y + input2.heightFor(block.node) - block.maxY;
+        dx = at.x + column / 2 - (block2.minX + block2.maxX) / 2;
+        dy = direction === "down" ? at.y - block2.minY : at.y + input2.heightFor(block2.node) - block2.maxY;
       } else {
-        const toRight = direction === "right" || direction === "balanced" && at.x >= ((_b2 = (_a2 = placed.get(block.root.id)) == null ? void 0 : _a2.x) != null ? _b2 : at.x);
-        dx = toRight ? at.x - block.minX : at.x + width - block.maxX;
-        dy = at.y - block.minY;
+        const toRight = direction === "right" || direction === "balanced" && at.x >= ((_b2 = (_a2 = placed.get(block2.root.id)) == null ? void 0 : _a2.x) != null ? _b2 : at.x);
+        dx = toRight ? at.x - block2.minX : at.x + width - block2.maxX;
+        dy = at.y - block2.minY;
       }
-      for (const [id, point] of block.placed) result.set(id, { x: point.x + dx, y: point.y + dy });
+      for (const [id, point] of block2.placed) result.set(id, { x: point.x + dx, y: point.y + dy });
     }
     return result;
   };
@@ -12673,11 +12703,11 @@ function removeNodes(nodes, id, branch) {
 }
 function parseMap(content, log) {
   var _a2, _b2;
-  const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
-  if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
+  const block2 = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
+  if (!block2) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   let parsed;
   try {
-    parsed = JSON.parse(block[1]);
+    parsed = JSON.parse(block2[1]);
   } catch (e) {
     throw new Error(t("ui.map_data_block_invalid"));
   }
@@ -13526,17 +13556,17 @@ var markerLine = INTERNAL_MARKER_LINE;
 function decorations(view) {
   const builder = new import_state.RangeSetBuilder();
   if (!view.state.field(import_obsidian2.editorLivePreviewField, false)) return builder.finish();
-  let fence = null;
+  let fence2 = null;
   for (let number = 1; number <= view.state.doc.lines; number++) {
     const line3 = view.state.doc.line(number);
     const delimiter2 = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line3.text);
     if (delimiter2) {
-      if (!fence) fence = { character: delimiter2[1][0], length: delimiter2[1].length };
-      else if (delimiter2[1][0] === fence.character && delimiter2[1].length >= fence.length && !delimiter2[2].trim())
-        fence = null;
+      if (!fence2) fence2 = { character: delimiter2[1][0], length: delimiter2[1].length };
+      else if (delimiter2[1][0] === fence2.character && delimiter2[1].length >= fence2.length && !delimiter2[2].trim())
+        fence2 = null;
       continue;
     }
-    if (!fence && markerLine.test(line3.text) && !/^ {4}|^\t/.test(line3.text)) {
+    if (!fence2 && markerLine.test(line3.text) && !/^ {4}|^\t/.test(line3.text)) {
       builder.add(line3.from, line3.from, import_view.Decoration.line({ class: "vam-internal-marker-line" }));
     }
   }
@@ -14491,18 +14521,18 @@ function hideResearchSection(text11) {
     const blocks = calloutBlocks(lines, fenced, section3.at + 1, section3.end);
     const name2 = section3.text.trim().toLowerCase();
     const mine = blocks.filter(
-      (block) => {
+      (block2) => {
         var _a2;
-        return ((_a2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1].toLowerCase()) === name2 || lines.slice(block.start, block.end).some((line3) => ANY_RECORD.test(line3));
+        return ((_a2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block2.start]))) == null ? void 0 : _a2[1].toLowerCase()) === name2 || lines.slice(block2.start, block2.end).some((line3) => ANY_RECORD.test(line3));
       }
     );
     if (!mine.length) {
       from = section3.at + 1;
       continue;
     }
-    for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
+    for (const block2 of mine) lines[block2.start] = asHidden(lines[block2.start]);
     const covered = new Set(
-      blocks.flatMap((block) => lines.slice(block.start, block.end).map((_, k) => block.start + k))
+      blocks.flatMap((block2) => lines.slice(block2.start, block2.end).map((_, k) => block2.start + k))
     );
     const others = lines.slice(section3.at + 1, section3.end).some((line3, k) => line3.trim() && !covered.has(section3.at + 1 + k));
     if (mine.length < blocks.length || others) {
@@ -14578,14 +14608,14 @@ function dropRecordCopies(text11) {
     older.push(section3);
     from = section3.at + 1;
   }
-  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter((block) => {
+  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter((block2) => {
     var _a2, _b2;
-    if (older.some((section3) => block.start > section3.at && block.start < section3.end)) return false;
-    if (HIDDEN_HEAD.test(bare(lines[block.start]))) return false;
-    const title = (_b2 = (_a2 = /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-    return isResearchNotesHeading(title) && lines.slice(block.start, block.end).some((line3) => RECORD_COPY.test(line3));
+    if (older.some((section3) => block2.start > section3.at && block2.start < section3.end)) return false;
+    if (HIDDEN_HEAD.test(bare(lines[block2.start]))) return false;
+    const title = (_b2 = (_a2 = /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block2.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+    return isResearchNotesHeading(title) && lines.slice(block2.start, block2.end).some((line3) => RECORD_COPY.test(line3));
   });
-  for (const block of drop.reverse()) lines = spliceBlock(lines, block.start, block.end, []);
+  for (const block2 of drop.reverse()) lines = spliceBlock(lines, block2.start, block2.end, []);
   return lines.join("\n");
 }
 function normalizeWorkRecords(detail) {
@@ -14758,7 +14788,7 @@ ${quoteAll(body)}`.split("\n");
   const apart = callout2 && !(section3 && callout2.start > section3.at && callout2.end <= section3.end);
   if (section3) {
     const kept = hiddenRanges(lines, fenced).filter((range) => range.start > section3.at && range.end <= section3.end && !isPlan(range)).map((range) => lines.slice(range.start, range.end));
-    const middle = kept.flatMap((block, i) => i ? ["", ...block] : block);
+    const middle = kept.flatMap((block2, i) => i ? ["", ...block2] : block2);
     edits.push({
       at: section3.at,
       end: section3.end,
@@ -14796,7 +14826,7 @@ function findImageSection(lines) {
     from = s.at + 1;
   }
 }
-function withImageBlock(lines, block) {
+function withImageBlock(lines, block2) {
   var _a2, _b2, _c;
   const fenced = fencedLines(lines);
   const sources = findSection(lines, fenced, (text11) => isSourcesHeading(text11));
@@ -14811,7 +14841,7 @@ function withImageBlock(lines, block) {
   const tail = lines.slice(at).join("\n");
   return `${head2 ? `${head2}
 
-` : ""}${block}
+` : ""}${block2}
 ${tail ? `
 ${tail}` : ""}`;
 }
@@ -14850,8 +14880,8 @@ function carryImageSection(oldDetail, newDetail) {
   const oldLines = oldDetail.split("\n");
   const old = findImageSection(oldLines);
   if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
-  const block = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
-  return withImageBlock(newDetail.split("\n"), block);
+  const block2 = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
+  return withImageBlock(newDetail.split("\n"), block2);
 }
 function chapterBody(detail) {
   var _a2;
@@ -14866,7 +14896,7 @@ function chapterBody(detail) {
 function readerCallouts(detail) {
   const lines = withoutHiddenCallouts(detail.split("\n"));
   const body = chapterBody(detail);
-  return calloutBlocks(lines, fencedLines(lines), 0, lines.length).filter((block) => !/^[ \t]{0,3}>[ \t]?\[!\s*vam-/i.test(bare(lines[block.start]))).map((block) => lines.slice(block.start, block.end).join("\n")).filter((text11) => !body.includes(text11)).map((text11) => unquoted(text11).replace(/\r/g, "").trim()).join("\n\n");
+  return calloutBlocks(lines, fencedLines(lines), 0, lines.length).filter((block2) => !/^[ \t]{0,3}>[ \t]?\[!\s*vam-/i.test(bare(lines[block2.start]))).map((block2) => lines.slice(block2.start, block2.end).join("\n")).filter((text11) => !body.includes(text11)).map((text11) => unquoted(text11).replace(/\r/g, "").trim()).join("\n\n");
 }
 var IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 function chapterTextMask(lines) {
@@ -15369,19 +15399,19 @@ var INDENTED_CODE = /^(?: {4}|\t)/;
 var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
 function protectedLines2(lines) {
   const out = [];
-  let fence;
+  let fence2;
   let quote3 = false;
   let code3 = false;
   for (const line3 of lines) {
-    if (fence) {
+    if (fence2) {
       out.push(true);
       const close = OPEN_FENCE.exec(line3);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
+      if (close && close[1][0] === fence2.char && close[1].length >= fence2.size && !close[2].trim()) fence2 = void 0;
       continue;
     }
     const open2 = OPEN_FENCE.exec(line3);
     if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
-      fence = { char: open2[1][0], size: open2[1].length };
+      fence2 = { char: open2[1][0], size: open2[1].length };
       out.push(true);
       quote3 = false;
       code3 = false;
@@ -15915,21 +15945,21 @@ function checkImageText(body, slots, record) {
     }
   });
   close();
-  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
+  const imageCount = blocks.reduce((sum2, block2) => sum2 + block2.hashes.length, 0);
   const placedItems = record.slots.filter((item) => item.state === "placed");
   const issues = [];
   for (const item of record.slots)
     if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
   if (imageCount !== placedItems.length) issues.push({ code: "count" });
   for (const item of placedItems) {
-    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
+    const at = blocks.findIndex((block2) => item.hash !== void 0 && block2.hashes.includes(item.hash));
     const slot = slots.find((entry) => entry.index === item.index);
     if (at < 0 || !slot) continue;
     if (item.off || blocks[at].docs.includes(item.hash)) {
       issues.push({ index: item.index, code: "mismatch" });
       continue;
     }
-    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
+    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block2) => block2 && !block2.hashes.length).map((block2) => block2.text.toLowerCase()).join("\n");
     const words2 = slotKeywords(slot.explains);
     const hits = words2.filter((word) => around.includes(word)).length;
     if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
@@ -17686,7 +17716,7 @@ function parseOne(markdown) {
   let current;
   let legacyInsightHeader = false;
   let legacyGrouped = false;
-  let fence;
+  let fence2;
   const items = [];
   const flush = () => {
     if ((current == null ? void 0 : current.summary) && category) items.push({ ...current, category });
@@ -17694,13 +17724,13 @@ function parseOne(markdown) {
     legacyInsightHeader = false;
   };
   for (const line3 of lines) {
-    if (fence) {
-      if (new RegExp(`^\\s*${fence.marker}{${fence.width},}\\s*$`).test(line3)) fence = void 0;
+    if (fence2) {
+      if (new RegExp(`^\\s*${fence2.marker}{${fence2.width},}\\s*$`).test(line3)) fence2 = void 0;
       continue;
     }
     const fenceStart = /^\s*(`{3,}|~{3,})/.exec(line3);
     if (fenceStart) {
-      fence = { marker: fenceStart[1][0], width: fenceStart[1].length };
+      fence2 = { marker: fenceStart[1][0], width: fenceStart[1].length };
       continue;
     }
     const heading = /^(?:\*\*##\s+(.+?)\*\*|##\s+(.+?)\s*)$/.exec(line3.trim());
@@ -19433,8 +19463,8 @@ var CoffeeConvergenceModal = class extends import_obsidian7.Modal {
         var _a3;
         return (_a3 = engine.session.pinnedInsightIds) == null ? void 0 : _a3.includes(id);
       });
-      const block = content.createEl("section", { cls: "ct-convergence-proposal" });
-      const label = block.createEl("label");
+      const block2 = content.createEl("section", { cls: "ct-convergence-proposal" });
+      const label = block2.createEl("label");
       const checkbox = label.createEl("input", { attr: { type: "checkbox" } });
       checkbox.checked = !unchanged && !pinned;
       checkbox.disabled = pinned || unchanged;
@@ -19446,17 +19476,17 @@ var CoffeeConvergenceModal = class extends import_obsidian7.Modal {
         if (checkbox.checked) selected.add(index);
         else selected.delete(index);
       };
-      const before = block.createEl("details");
+      const before = block2.createEl("details");
       before.createEl("summary", { text: t2("coffee.original_viewpoints") });
       for (const source of prior) {
         before.createEl("p", { text: source.summary });
         if (source.detail) before.createEl("p", { cls: "ct-muted", text: source.detail });
       }
-      const summaryLabel = block.createEl("label", { text: t2("coffee.suggested_viewpoint") });
+      const summaryLabel = block2.createEl("label", { text: t2("coffee.suggested_viewpoint") });
       const summary = summaryLabel.createEl("textarea", { attr: { rows: "2", maxlength: "1000" } });
       summary.value = item.summary;
       summary.disabled = pinned || unchanged;
-      const detailLabel = block.createEl("label", { text: t2("coffee.context_and_differences") });
+      const detailLabel = block2.createEl("label", { text: t2("coffee.context_and_differences") });
       const detail = detailLabel.createEl("textarea", { attr: { rows: "4", maxlength: "12000" } });
       detail.value = item.detail;
       detail.disabled = pinned || unchanged;
@@ -19818,6 +19848,138 @@ var ExperienceRouter = class {
   }
 };
 
+// core/full-text.ts
+var MAX_FILES = 3;
+var MAX_FILE_BYTES = 200 * 1024;
+var FETCH_TIMEOUT_MS = 15e3;
+var FULL_TEXT_WORDS = /全文|原文|逐字|完整原始|full[\s-]?text|verbatim|word[\s-]for[\s-]word/i;
+function wantsFullText(context) {
+  return [context.title, context.summary, context.task, context.rules].some(
+    (field) => typeof field === "string" && FULL_TEXT_WORDS.test(field)
+  );
+}
+var GITHUB_PART = /^[A-Za-z0-9._-]+$/;
+function rawFileUrl(opened) {
+  let url;
+  try {
+    url = new URL(opened);
+  } catch (e) {
+    return void 0;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return void 0;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.some((part) => part === "." || part === "..")) return void 0;
+  const host = url.hostname.toLowerCase();
+  if (host === "raw.githubusercontent.com" || host === "gist.githubusercontent.com") {
+    if (parts.length < 4) return void 0;
+    return `https://${host}/${parts.join("/")}`;
+  }
+  if (host === "github.com" || host === "www.github.com") {
+    const [owner, repo, kind, ...rest] = parts;
+    if (!owner || !repo || kind !== "blob" && kind !== "raw" || rest.length < 2) return void 0;
+    if (!GITHUB_PART.test(owner) || !GITHUB_PART.test(repo)) return void 0;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${rest.join("/")}`;
+  }
+  return void 0;
+}
+var nameOf2 = (url) => {
+  var _a2;
+  return decodeURIComponent((_a2 = url.split("/").pop()) != null ? _a2 : url);
+};
+async function fetchFullTexts(openedUrls, fetchPage, timeoutMs = FETCH_TIMEOUT_MS) {
+  const raws = [...new Set(openedUrls.map(rawFileUrl).filter((url) => !!url))].slice(0, MAX_FILES);
+  return Promise.all(
+    raws.map(async (url) => {
+      var _a2, _b2, _c, _d, _e, _f;
+      const name2 = nameOf2(url);
+      let timer;
+      try {
+        const response = await Promise.race([
+          fetchPage({ url, method: "GET", throw: false }),
+          new Promise((_, reject2) => {
+            timer = window.setTimeout(() => reject2(new Error("timeout")), timeoutMs);
+          })
+        ]);
+        if (response.status !== 200) return { ok: false, url, name: name2, reason: "status" };
+        const type = (_c = (_b2 = Object.entries((_a2 = response.headers) != null ? _a2 : {}).find(([key5]) => key5.toLowerCase() === "content-type")) == null ? void 0 : _b2[1]) != null ? _c : "";
+        const bytes = (_f = (_d = response.arrayBuffer) == null ? void 0 : _d.byteLength) != null ? _f : ((_e = response.text) != null ? _e : "").length;
+        if (bytes > MAX_FILE_BYTES) return { ok: false, url, name: name2, reason: "too_large" };
+        const text11 = typeof response.text === "string" ? response.text : "";
+        if (!/^text\//i.test(type.trim()) || text11.includes("\0"))
+          return { ok: false, url, name: name2, reason: "not_text" };
+        return { ok: true, url, name: name2, text: text11.replace(/\r\n?/g, "\n").replace(/\n+$/, "") };
+      } catch (e) {
+        return { ok: false, url, name: name2, reason: "network" };
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+    })
+  );
+}
+var LANGUAGES2 = ["zh-TW", "zh-CN", "en"];
+var escapeRegExp = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function withoutPriorFullText(detail) {
+  const heads = LANGUAGES2.map((language2) => escapeRegExp(translateNote(language2, "detail.full_text_heading", "")));
+  const missing = LANGUAGES2.map((language2) => escapeRegExp(translateNote(language2, "detail.full_text_missing_prefix")));
+  return detail.replace(
+    new RegExp(
+      `^#### (?:${heads.join("|")})[^\\n]*\\n[^\\n]*\\n\\n(\`{4,})[^\\n]*\\n[\\s\\S]*?\\n\\1[ \\t]*(?:\\n|$)\\n?`,
+      "gm"
+    ),
+    ""
+  ).replace(new RegExp(`^(?:${missing.join("|")})[^\\n]*(?:\\n|$)\\n?`, "gm"), "");
+}
+function fence(text11) {
+  var _a2;
+  const longest = Math.max(0, ...((_a2 = text11.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+  return "`".repeat(Math.max(4, longest + 1));
+}
+function block(file, language2) {
+  const marks = fence(file.text);
+  const lang = /\.(md|markdown)$/i.test(file.name) ? "markdown" : "";
+  return [
+    `#### ${translateNote(language2, "detail.full_text_heading", file.name)}`,
+    translateNote(language2, "detail.full_text_origin", file.url),
+    "",
+    `${marks}${lang}`,
+    file.text,
+    marks
+  ].join("\n");
+}
+function insert(detail, addition) {
+  const lines = detail.split("\n");
+  const original = lines.findIndex((line3) => /^###\s+.*(原文|Source text)/i.test(line3));
+  if (original >= 0) {
+    let end = lines.findIndex((line3, index) => index > original && /^###\s/.test(line3));
+    if (end < 0) end = lines.length;
+    while (end > original + 1 && !lines[end - 1].trim()) end--;
+    return [...lines.slice(0, end), "", addition, ...end < lines.length ? ["", ...lines.slice(end)] : []].join("\n");
+  }
+  const sources = lines.findIndex((line3) => /^###\s+(出處|出处|來源|来源|Sources?)\s*$/i.test(line3));
+  if (sources >= 0) return [...lines.slice(0, sources), addition, "", ...lines.slice(sources)].join("\n");
+  return `${detail.replace(/\s+$/, "")}
+
+${addition}`;
+}
+function attachFullText(detail, files, language2) {
+  const base = withoutPriorFullText(detail);
+  const fetched = files.filter((file) => file.ok);
+  const failed = files.filter((file) => !file.ok);
+  const parts = fetched.map((file) => block(file, language2));
+  if (!fetched.length) {
+    const why2 = failed.length ? failed.map((file) => translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)).join("\uFF1B") : translateNote(language2, "detail.full_text_reason_no_url");
+    parts.push(
+      `${translateNote(language2, "detail.full_text_missing_prefix")}${translateNote(language2, "detail.full_text_missing", why2)}`
+    );
+  } else {
+    for (const file of failed)
+      parts.push(
+        `${translateNote(language2, "detail.full_text_missing_prefix")}${translateNote(language2, `detail.full_text_reason_${file.reason}`, file.name)}`
+      );
+  }
+  return insert(base, parts.join("\n\n"));
+}
+
 // ai/task-policy.ts
 function normalizeReasoningLevel(value) {
   return value === "auto" || value === "medium" || value === "high" ? value : "low";
@@ -19836,7 +19998,9 @@ function researchGuidance(context, language2 = "zh-TW") {
   if (context.researchMode === "local") return `${depth} ${translate(language2, "research.local")}`;
   const web = `${depth} ${translate(language2, "research.web")}`;
   const standard = ((_a2 = context.mode) != null ? _a2 : "task") === "task";
-  return standard ? `${web} ${translate(language2, "research.web_required")}` : web;
+  if (!standard) return web;
+  const required = `${web} ${translate(language2, "research.web_required")}`;
+  return wantsFullText(context) ? `${required} ${translate(language2, "research.full_text")}` : required;
 }
 
 // experiences/coffee-tables/handoff-source.ts
@@ -22229,15 +22393,15 @@ function conversationBoundary(raw) {
       throw new Error("Cannot reliably locate the reference boundary; original data was preserved");
     }
   }
-  let fence = "", offset = start;
+  let fence2 = "", offset = start;
   for (const line3 of raw.slice(start).split("\n")) {
     const match = /^\s*(`{3,}|~{3,})/.exec(line3);
     if (match) {
-      if (!fence) fence = match[1];
-      else if (match[1][0] === fence[0] && match[1].length >= fence.length && !line3.slice(match[0].length).trim())
-        fence = "";
+      if (!fence2) fence2 = match[1];
+      else if (match[1][0] === fence2[0] && match[1].length >= fence2.length && !line3.slice(match[0].length).trim())
+        fence2 = "";
     }
-    if (!fence && /^## (?:對話紀錄|Conversation)\s*$/.test(line3)) {
+    if (!fence2 && /^## (?:對話紀錄|Conversation)\s*$/.test(line3)) {
       const navigation = /<!-- coffee-tables-navigation:([^\n]+) -->[\r\n]*$/.exec(raw.slice(0, offset));
       return { index: offset, heading: line3, ...navigation ? { navigation } : {} };
     }
@@ -22594,14 +22758,14 @@ var CoffeeStorage = class {
         `<!-- coffee-tables-references:${encodeURIComponent(JSON.stringify(files))} -->`
       );
       for (const [index, file] of files.entries()) {
-        const fence = "`".repeat(Math.max(3, ...[...file.content.matchAll(/`+/g)].map((match) => match[0].length + 1)));
+        const fence2 = "`".repeat(Math.max(3, ...[...file.content.matchAll(/`+/g)].map((match) => match[0].length + 1)));
         lines.push(
           "",
           `### ${t2(`\u6587\u4EF6 ${index + 1}\uFF1A${file.name}`, `File ${index + 1}: ${file.name}`)}`,
           "",
-          `${fence}text`,
+          `${fence2}text`,
           file.content,
-          fence
+          fence2
         );
       }
     }
@@ -28709,16 +28873,16 @@ function customDetailCallout(language2, values) {
 
 // ai/markdown-blocks.ts
 function fencedLines2(lines) {
-  let fence = null;
+  let fence2 = null;
   return lines.map((line3) => {
     const open2 = /^\s*(`{3,}|~{3,})/.exec(line3);
-    if (fence) {
+    if (fence2) {
       const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line3);
-      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      if (close && close[1][0] === fence2[0] && close[1].length >= fence2.length) fence2 = null;
       return true;
     }
     if (open2) {
-      fence = open2[1];
+      fence2 = open2[1];
       return true;
     }
     return false;
@@ -29206,8 +29370,8 @@ function core(line3) {
   return rest;
 }
 function fenceOf(line3) {
-  const fence = FENCE2.exec(core(line3));
-  return fence && !(fence[1][0] === "`" && fence[2].includes("`")) ? fence : null;
+  const fence2 = FENCE2.exec(core(line3));
+  return fence2 && !(fence2[1][0] === "`" && fence2[2].includes("`")) ? fence2 : null;
 }
 function unsafeMermaid(body) {
   const lines = body.map((line3) => line3.trim()).filter(Boolean);
@@ -29225,14 +29389,14 @@ var BR_TAG = /<br\s*\/?>/gi;
 function neutralizeUnsafeMermaid(markdown) {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
   lines.forEach((line3, index) => {
-    const fence = fenceOf(line3);
-    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const fence2 = fenceOf(line3);
+    if (!fence2 || !/^mermaid\b/i.test(fence2[2].trim())) return;
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
       lines[next] = lines[next].replace(BR_TAG, " ");
       const content = core(lines[next]);
       const close = FENCE2.exec(content);
-      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      if (close && close[1][0] === fence2[1][0] && close[1].length >= fence2[1].length && !close[2].trim()) break;
       body.push(content);
     }
     if (unsafeMermaid(body)) lines[index] = line3.replace(/mermaid/i, "text");
@@ -29275,14 +29439,14 @@ async function demoteUnparsableMermaid(markdown, check) {
   const demote = [];
   let outer = null;
   for (let index = 0; index < count4; index++) {
-    const fence = fenceOf(parts[at(index)]);
+    const fence2 = fenceOf(parts[at(index)]);
     if (outer) {
-      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      if (fence2 && fence2[1][0] === outer[1][0] && fence2[1].length >= outer[1].length && !fence2[2].trim()) outer = null;
       continue;
     }
-    if (!fence) continue;
-    if (!/^mermaid\b/i.test(fence[2].trim())) {
-      outer = fence;
+    if (!fence2) continue;
+    if (!/^mermaid\b/i.test(fence2[2].trim())) {
+      outer = fence2;
       continue;
     }
     const opening = parts[at(index)];
@@ -29297,7 +29461,7 @@ async function demoteUnparsableMermaid(markdown, check) {
       const raw = parts[at(next)];
       const content = core(raw);
       const close = FENCE2.exec(content);
-      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      if (close && close[1][0] === fence2[1][0] && close[1].length >= fence2[1].length && !close[2].trim()) break;
       body.push(
         raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
       );
@@ -29321,14 +29485,14 @@ function mermaidBlocks(markdown) {
   const codes = /* @__PURE__ */ new Map();
   let outer = null;
   for (let index = 0; index < lines.length; index++) {
-    const fence = fenceOf(lines[index]);
+    const fence2 = fenceOf(lines[index]);
     if (outer) {
-      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      if (fence2 && fence2[1][0] === outer[1][0] && fence2[1].length >= outer[1].length && !fence2[2].trim()) outer = null;
       continue;
     }
-    if (!fence) continue;
-    if (!/^mermaid\b/i.test(fence[2].trim())) {
-      outer = fence;
+    if (!fence2) continue;
+    if (!/^mermaid\b/i.test(fence2[2].trim())) {
+      outer = fence2;
       continue;
     }
     const opening = lines[index];
@@ -29343,7 +29507,7 @@ function mermaidBlocks(markdown) {
       const raw = lines[next];
       const content = core(raw);
       const close = FENCE2.exec(content);
-      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      if (close && close[1][0] === fence2[1][0] && close[1].length >= fence2[1].length && !close[2].trim()) break;
       body.push(
         raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
       );
@@ -29354,20 +29518,20 @@ function mermaidBlocks(markdown) {
   const blocks = [];
   lines.forEach((line3, index) => {
     var _a2;
-    const fence = fenceOf(line3);
-    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const fence2 = fenceOf(line3);
+    if (!fence2 || !/^mermaid\b/i.test(fence2[2].trim())) return;
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
       const content = core(lines[next]);
       const close = FENCE2.exec(content);
-      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      if (close && close[1][0] === fence2[1][0] && close[1].length >= fence2[1].length && !close[2].trim()) break;
       body.push(content);
     }
     const code3 = (_a2 = codes.get(index)) != null ? _a2 : null;
     blocks.push({
       unsafe: unsafeMermaid(body),
       code: code3,
-      key: `${fence[2].trim()}${body.join("\n")}\0${code3 != null ? code3 : ""}`
+      key: `${fence2[2].trim()}${body.join("\n")}\0${code3 != null ? code3 : ""}`
     });
   });
   return blocks;
@@ -29375,7 +29539,7 @@ function mermaidBlocks(markdown) {
 function addedMermaidBlocks(before, after) {
   var _a2, _b2;
   const had = /* @__PURE__ */ new Map();
-  for (const block of mermaidBlocks(before)) had.set(block.key, ((_a2 = had.get(block.key)) != null ? _a2 : 0) + 1);
+  for (const block2 of mermaidBlocks(before)) had.set(block2.key, ((_a2 = had.get(block2.key)) != null ? _a2 : 0) + 1);
   const added = [];
   for (const { key: key5, unsafe, code: code3 } of mermaidBlocks(after)) {
     const left = (_b2 = had.get(key5)) != null ? _b2 : 0;
@@ -29454,12 +29618,12 @@ function anchorCheck(lines, mask, anchor) {
   });
   if (hits.length === 0) return { code: "anchor_missing" };
   if (hits.length > 1) return { code: "anchor_not_unique" };
-  const block = blockOf(lines, mask, hits[0]);
-  const blk = lines.slice(block[0], block[1] + 1);
-  if (blk.some((l) => BAD_LINE.test(l))) return { code: "anchor_bad_block", block };
+  const block2 = blockOf(lines, mask, hits[0]);
+  const blk = lines.slice(block2[0], block2[1] + 1);
+  if (blk.some((l) => BAD_LINE.test(l))) return { code: "anchor_bad_block", block: block2 };
   const tableLines = blk.filter((l) => /^\s*\|/.test(l)).length;
-  if (tableLines !== 0 && tableLines !== blk.length) return { code: "anchor_bad_block", block };
-  return { code: null, block };
+  if (tableLines !== 0 && tableLines !== blk.length) return { code: "anchor_bad_block", block: block2 };
+  return { code: null, block: block2 };
 }
 var SEQ_ALIAS = /^(\s*(?:participant|actor)\s+\S+\s+as\s+)"([^"]+)"(\s*)$/;
 var SEQ_MESSAGE = /^(\s*[^:\n]*?(?:-->>|->>|--x|-x|--\)|-\)|-->|->)[^:\n]*:\s*)"([^"]+)"(\s*)$/;
@@ -29488,8 +29652,8 @@ async function applyCharts(detail, charts, options) {
     const fail4 = (code3) => ({ ok: false, code: code3, index });
     const nonBlank = body.split("\n").filter((l) => l.trim()).length;
     if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail4("bad_body");
-    const fence = "```mermaid\n" + body + "\n```";
-    if (neutralizeUnsafeMermaid(fence) !== fence) return fail4("unsafe_or_header");
+    const fence2 = "```mermaid\n" + body + "\n```";
+    if (neutralizeUnsafeMermaid(fence2) !== fence2) return fail4("unsafe_or_header");
     if (options.parses) {
       let ok = true;
       try {
@@ -29503,11 +29667,11 @@ async function applyCharts(detail, charts, options) {
     if (tokens3.some((n) => !noteNums.has(n))) return fail4("number_not_in_note");
     const anchor = anchorCheck(lines, mask, chart.anchor);
     if (anchor.code) return fail4(anchor.code);
-    const block = anchor.block;
-    const key5 = block.join("-");
+    const block2 = anchor.block;
+    const key5 = block2.join("-");
     if (used.has(key5)) return fail4("anchor_shared");
     used.add(key5);
-    items.push({ body, block });
+    items.push({ body, block: block2 });
   }
   const out = [...lines];
   for (const item of [...items].sort((a, b) => b.block[1] - a.block[1])) {
@@ -29749,20 +29913,20 @@ function keptTitles() {
 function mermaidLines(lines) {
   const out = lines.map(() => false);
   let start = -1;
-  let fence = "";
+  let fence2 = "";
   let mermaid = false;
   lines.forEach((line3, index) => {
-    if (fence) {
+    if (fence2) {
       const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line3);
-      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) {
+      if (close && close[1][0] === fence2[0] && close[1].length >= fence2.length) {
         if (mermaid) for (let at = start; at <= index; at++) out[at] = true;
-        fence = "";
+        fence2 = "";
       }
       return;
     }
     const open2 = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line3);
     if (open2) {
-      fence = open2[1];
+      fence2 = open2[1];
       start = index;
       mermaid = open2[2].startsWith("mermaid");
     }
@@ -29777,8 +29941,8 @@ function withoutMermaid(text11) {
 function inlineCode(text11) {
   var _a2;
   const longest = Math.max(0, ...((_a2 = text11.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
-  const fence = "`".repeat(longest + 1);
-  return longest ? `${fence} ${text11} ${fence}` : `${fence}${text11}${fence}`;
+  const fence2 = "`".repeat(longest + 1);
+  return longest ? `${fence2} ${text11} ${fence2}` : `${fence2}${text11}${fence2}`;
 }
 var FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
 var FOOTNOTE_REF = /\[\^([^\]\s]+)\](?!\(|:)/g;
@@ -29865,12 +30029,12 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
   let out = detail;
   const title = translateNote(language2, "note.kept_from_earlier_version");
   for (const [index, lines] of groups) {
-    const block = [`> [!note] ${title}`, ...lines.map((line3) => `> ${line3}`)];
-    out = insertIntoSection(out, index, block, template2, lookup);
+    const block2 = [`> [!note] ${title}`, ...lines.map((line3) => `> ${line3}`)];
+    out = insertIntoSection(out, index, block2, template2, lookup);
   }
   return out;
 }
-function insertIntoSection(detail, index, block, template2, lookup) {
+function insertIntoSection(detail, index, block2, template2, lookup) {
   const lines = detail.split("\n");
   const code3 = fencedLines2(lines);
   const sections = [];
@@ -29892,14 +30056,14 @@ function insertIntoSection(detail, index, block, template2, lookup) {
   }
   if (target < 0) return `${detail.trimEnd()}
 
-${block.join("\n")}
+${block2.join("\n")}
 `;
   let end = target + 1 < sections.length ? sections[target + 1].at : lines.length;
   while (end > sections[target].at + 1 && !lines[end - 1].trim()) end--;
   return [
     ...lines.slice(0, end),
     "",
-    ...block,
+    ...block2,
     ...end < lines.length && lines[end].trim() ? [""] : [],
     ...lines.slice(end)
   ].join("\n");
@@ -29909,8 +30073,8 @@ function withSourceSupplement(detail, supplement, template2, language2) {
   while (lines.length && !lines[0].trim()) lines.shift();
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
   if (!lines.length) return detail;
-  const block = [`> [!note] ${translateNote(language2, "note.merge_data_sources")}`, ...lines.map((line3) => `> ${line3}`)];
-  return insertIntoSection(detail, -1, block, template2, sectionLookup(template2));
+  const block2 = [`> [!note] ${translateNote(language2, "note.merge_data_sources")}`, ...lines.map((line3) => `> ${line3}`)];
+  return insertIntoSection(detail, -1, block2, template2, sectionLookup(template2));
 }
 
 // experiences/visual-map/merge-topics.ts
@@ -30031,9 +30195,9 @@ var DETAIL_START2 = "<!-- visual-agent-map:detail:start -->";
 var DETAIL_END2 = "<!-- visual-agent-map:detail:end -->";
 function cardDetailOf(raw) {
   var _a2;
-  const block = detailBlockOf(raw);
-  if (block === void 0) return void 0;
-  const detail = block.trim();
+  const block2 = detailBlockOf(raw);
+  if (block2 === void 0) return void 0;
+  const detail = block2.trim();
   if (OPEN_ITEMS_MARKER.test(detail)) return detail;
   const end = raw.indexOf(DETAIL_END2, raw.indexOf(DETAIL_START2) + 1);
   const after = raw.slice(end + DETAIL_END2.length);
@@ -31797,23 +31961,23 @@ function splitFrontmatter(text11) {
 }
 function codeRanges(text11) {
   const ranges = [];
-  let offset = 0, fence = null;
+  let offset = 0, fence2 = null;
   for (const line3 of text11.split(/(?<=\n)/)) {
     const open2 = /^ {0,3}(`{3,}|~{3,})/.exec(line3);
     if (open2) {
       const marker3 = open2[1];
-      if (!fence) fence = { marker: marker3, start: offset };
-      else if (marker3[0] === fence.marker[0] && marker3.length >= fence.marker.length && !/\S/.test(line3.slice(open2[0].length))) {
-        ranges.push([fence.start, offset + line3.length]);
-        fence = null;
+      if (!fence2) fence2 = { marker: marker3, start: offset };
+      else if (marker3[0] === fence2.marker[0] && marker3.length >= fence2.marker.length && !/\S/.test(line3.slice(open2[0].length))) {
+        ranges.push([fence2.start, offset + line3.length]);
+        fence2 = null;
       }
-    } else if (!fence) {
+    } else if (!fence2) {
       for (const span of line3.matchAll(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g))
         ranges.push([offset + span.index, offset + span.index + span[0].length]);
     }
     offset += line3.length;
   }
-  if (fence) ranges.push([fence.start, text11.length]);
+  if (fence2) ranges.push([fence2.start, text11.length]);
   return ranges;
 }
 function findWikilinks(text11) {
@@ -31979,10 +32143,10 @@ function keyLine(line3) {
   if (!match) return null;
   return { key: (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3], value: match[4].replace(/^(["'])(.*)\1$/, "$2") };
 }
-function topLevelValues(block, keys) {
+function topLevelValues(block2, keys) {
   const found = /* @__PURE__ */ new Map();
-  if (block === null) return found;
-  for (const line3 of block.split(YAML_LINE_BREAK)) {
+  if (block2 === null) return found;
+  for (const line3 of block2.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line3);
     if (!entry || !keys.includes(entry.key) || found.has(entry.key)) continue;
     found.set(entry.key, entry.value);
@@ -31990,19 +32154,19 @@ function topLevelValues(block, keys) {
   return found;
 }
 var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-leaning", "hypothesis-strength"];
-function hypothesisLines(block) {
-  if (block === null) return [];
+function hypothesisLines(block2) {
+  if (block2 === null) return [];
   const found = [];
-  for (const line3 of block.split(YAML_LINE_BREAK)) {
+  for (const line3 of block2.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line3);
     if (entry && HYPOTHESIS_KEYS.includes(entry.key)) found.push(`${entry.key}=${entry.value}`);
   }
   return found;
 }
-function hasDuplicateIdentityKey(block) {
-  if (block === null) return false;
+function hasDuplicateIdentityKey(block2) {
+  if (block2 === null) return false;
   const seen = /* @__PURE__ */ new Set();
-  for (const line3 of block.split(YAML_LINE_BREAK)) {
+  for (const line3 of block2.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line3);
     if (!entry || !TOPIC_IDENTITY_KEYS.includes(entry.key)) continue;
     if (seen.has(entry.key)) return true;
@@ -32670,10 +32834,10 @@ function readAiLocked(fm) {
 }
 function noteTextAiLocked(text11, parse2) {
   var _a2;
-  const block = (_a2 = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a2[1];
-  if (block === void 0 || !/ai-locked/.test(block)) return false;
+  const block2 = (_a2 = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a2[1];
+  if (block2 === void 0 || !/ai-locked/.test(block2)) return false;
   try {
-    const fm = parse2(block);
+    const fm = parse2(block2);
     return !!fm && typeof fm === "object" && readAiLocked(fm);
   } catch (e) {
     return false;
@@ -33312,7 +33476,7 @@ async function listExternalSource(source, scope, signal) {
   await visit(check.real, "", 0);
   return { real: check.real, files };
 }
-var escapeRegExp = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var escapeRegExp2 = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 function scrubExternalPaths(text11, roots) {
   const spellings2 = /* @__PURE__ */ new Set();
   for (const root of roots) {
@@ -33323,7 +33487,7 @@ function scrubExternalPaths(text11, roots) {
   }
   const ordered = [...spellings2].filter(Boolean).sort((a, b) => b.length - a.length);
   if (!ordered.length) return text11;
-  return text11.replace(new RegExp(ordered.map(escapeRegExp).join("|"), "g"), EXTERNAL_PATH_PLACEHOLDER);
+  return text11.replace(new RegExp(ordered.map(escapeRegExp2).join("|"), "g"), EXTERNAL_PATH_PLACEHOLDER);
 }
 var DEFAULT_FILE_IO = { realpath: import_promises.realpath, lstat: import_promises.lstat, stat: import_promises.stat, open: import_promises.open };
 async function readExternalFile(absolute, rootReal, io = DEFAULT_FILE_IO) {
@@ -34121,13 +34285,13 @@ function frontmatterRecord(raw) {
 function readCoverRecord(raw) {
   const own2 = frontmatterRecord(raw);
   if (own2) return own2;
-  const block = readCoverBlock(raw);
-  return block ? {
-    ...block.file ? { file: block.file } : {},
-    ...block.key ? { key: block.key } : {},
-    missing: block.missing,
-    off: block.off,
-    block
+  const block2 = readCoverBlock(raw);
+  return block2 ? {
+    ...block2.file ? { file: block2.file } : {},
+    ...block2.key ? { key: block2.key } : {},
+    missing: block2.missing,
+    off: block2.off,
+    block: block2
   } : void 0;
 }
 function coverSourceKey(raw) {
@@ -34135,8 +34299,8 @@ function coverSourceKey(raw) {
   return (_a2 = readCoverRecord(raw)) == null ? void 0 : _a2.key;
 }
 function trustedCoverBlock(raw) {
-  const block = readCoverBlock(raw);
-  return block ? raw.slice(block.from, block.to).replace(/\r$/, "") : void 0;
+  const block2 = readCoverBlock(raw);
+  return block2 ? raw.slice(block2.from, block2.to).replace(/\r$/, "") : void 0;
 }
 function coverIsOff(raw) {
   const record = readCoverRecord(raw);
@@ -34190,11 +34354,11 @@ function removeCoverCredit(detail, href, language2) {
 }
 function migrateLegacyCover(raw, language2, title) {
   var _a2, _b2, _c, _d;
-  const block = readCoverBlock(raw);
-  if (!block || !block.intact || frontmatterRecord(raw)) return void 0;
-  if (block.missing) return { record: { missing: 1 } };
-  if (!block.file || !block.key) return void 0;
-  const inner = raw.slice(block.from, block.to).replace(/\r/g, "").split("\n").slice(1, -1);
+  const block2 = readCoverBlock(raw);
+  if (!block2 || !block2.intact || frontmatterRecord(raw)) return void 0;
+  if (block2.missing) return { record: { missing: 1 } };
+  if (!block2.file || !block2.key) return void 0;
+  const inner = raw.slice(block2.from, block2.to).replace(/\r/g, "").split("\n").slice(1, -1);
   const href = commonsFilePage((_c = (_b2 = /\]\((https:[^)\s]+)\)$/.exec((_a2 = inner[inner.length - 1]) != null ? _a2 : "")) == null ? void 0 : _b2[1]) != null ? _c : "");
   if (!href) return void 0;
   const caption = (_d = inner.slice(1, -1).filter((value) => value !== OFF_TEXT.zh && value !== OFF_TEXT.en)[0]) != null ? _d : "";
@@ -34202,11 +34366,11 @@ function migrateLegacyCover(raw, language2, title) {
   const link = `[${translateNote(lang, "note.image_link")}](${href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`;
   return {
     record: {
-      file: block.file,
-      key: block.key,
+      file: block2.file,
+      key: block2.key,
       ...caption ? { caption } : {},
       source: href,
-      ...block.off ? { off: 1 } : {}
+      ...block2.off ? { off: 1 } : {}
     },
     credit: {
       href,
@@ -34236,16 +34400,16 @@ function titleLine(raw) {
 }
 var eolOf = (raw) => raw.includes("\r\n") ? "\r\n" : "\n";
 function stripCoverBlock(raw) {
-  const block = readCoverBlock(raw);
-  if (!block) return raw;
-  let to = block.to;
+  const block2 = readCoverBlock(raw);
+  if (!block2) return raw;
+  let to = block2.to;
   const tail = /^(?:\r?\n)+/.exec(raw.slice(to));
   to += tail ? tail[0].length : 0;
-  return raw.slice(0, block.from) + raw.slice(to);
+  return raw.slice(0, block2.from) + raw.slice(to);
 }
-function putCoverBlock(raw, block) {
+function putCoverBlock(raw, block2) {
   const eol2 = eolOf(raw);
-  const text11 = block.replace(/\n/g, eol2);
+  const text11 = block2.replace(/\n/g, eol2);
   const bare3 = stripCoverBlock(raw);
   const title = titleLine(bare3);
   if (!title) return raw;
@@ -34759,12 +34923,12 @@ function detailWithVisualReferences(detail, visualReferences, template2, keepTex
     const repeated = keepText ? imageKeysIn(current).has(imageKey2(image[1])) : current.includes(`](${image[1]})`);
     if (repeated && !keepText) continue;
     const written2 = repeated ? dedupeImageEmbeds(reference, { seen: [imageKey2(image[1])] }) : reference;
-    const block = written2.replace(/^### (.+)$/gm, "**$1**").trim();
-    const title = (_a2 = block.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a2[1];
+    const block2 = written2.replace(/^### (.+)$/gm, "**$1**").trim();
+    const title = (_a2 = block2.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a2[1];
     const paragraphs = current.split("\n\n");
     const related = title ? paragraphs.findIndex((text11) => !/^#{1,6} /.test(text11) && text11.includes(title)) : -1;
     if (related >= 0) {
-      paragraphs.splice(related + 1, 0, block);
+      paragraphs.splice(related + 1, 0, block2);
       current = paragraphs.join("\n\n");
     } else {
       const keys = sourcesHeadingKeys(template2);
@@ -34774,7 +34938,7 @@ function detailWithVisualReferences(detail, visualReferences, template2, keepTex
         const heading = code3[index] ? null : /^###\s+(.+?)\s*$/.exec(line3);
         return !!heading && keys.has(heading[1].toLocaleLowerCase());
       });
-      current = at < 0 ? [current.trimEnd(), block].filter(Boolean).join("\n\n") : [lines.slice(0, at).join("\n").trimEnd(), block, lines.slice(at).join("\n").trimStart()].filter(Boolean).join("\n\n");
+      current = at < 0 ? [current.trimEnd(), block2].filter(Boolean).join("\n\n") : [lines.slice(0, at).join("\n").trimEnd(), block2, lines.slice(at).join("\n").trimStart()].filter(Boolean).join("\n\n");
     }
   }
   return current;
@@ -36056,8 +36220,8 @@ ${body}`);
       const cache = this.app.metadataCache.getFileCache(file);
       if (!(cache == null ? void 0 : cache.frontmatterPosition) || cache.frontmatter) continue;
       const content = await this.app.vault.cachedRead(file);
-      const block = (_b2 = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-      if (!/^["']?visual-agent-map["']?\s*:/m.test(block)) continue;
+      const block2 = (_b2 = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+      if (!/^["']?visual-agent-map["']?\s*:/m.test(block2)) continue;
       try {
         frontmatter(content);
       } catch (error) {
@@ -38936,11 +39100,11 @@ var ChatActionWriter = class {
         const tail = source.text.length - at - action.find.length;
         const next = intakeAiMarkdown(raw, { kind: "chat-file-edit", at, insertedLength: action.replace.length, tail });
         const added = addedMermaidBlocks(source.text, next);
-        if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
+        if (added.some((block2) => block2.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
         const check = this.plugin.mermaidSyntax;
-        const codes = added.flatMap((block) => {
+        const codes = added.flatMap((block2) => {
           var _a3;
-          return ((_a3 = block.code) == null ? void 0 : _a3.trim()) ? [block.code] : [];
+          return ((_a3 = block2.code) == null ? void 0 : _a3.trim()) ? [block2.code] : [];
         });
         if (check && codes.length) {
           for (const code3 of codes) {
@@ -38954,9 +39118,9 @@ var ChatActionWriter = class {
           const again = await this.ports.readChatFile(action.path);
           if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
           source = again;
-        } else if (added.some((block) => {
+        } else if (added.some((block2) => {
           var _a3;
-          return (_a3 = block.code) == null ? void 0 : _a3.trim();
+          return (_a3 = block2.code) == null ? void 0 : _a3.trim();
         })) {
           console.warn("Visual Agent Map edit mermaid unchecked");
         }
@@ -40836,8 +41000,8 @@ function withCover(content, link) {
   return safe2 ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe2}]]`, [COVER_FRAME_KEY]: null }) : content;
 }
 function declaredCover2(content) {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
-  const line3 = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
+  const block2 = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  const line3 = block2 ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block2[1]) : null;
   return line3 ? line3[1].replace(/^["']|["']$/g, "") : null;
 }
 function withCoverOff(content) {
@@ -41924,8 +42088,8 @@ function drawMapSourcesPanel(parent, host, focus) {
   let pathInput = null;
   const externals = (_c = host.externals) != null ? _c : [];
   if (host.addExternal) {
-    const block = panel.createDiv({ cls: "vam-map-sources-external" });
-    const line3 = block.createDiv({ cls: "vam-map-sources-path-row" });
+    const block2 = panel.createDiv({ cls: "vam-map-sources-external" });
+    const line3 = block2.createDiv({ cls: "vam-map-sources-path-row" });
     const input2 = line3.createEl("input", {
       cls: "vam-map-sources-path",
       attr: {
@@ -41942,7 +42106,7 @@ function drawMapSourcesPanel(parent, host, focus) {
       cls: "vam-map-sources-path-add",
       text: t("ui.map_sources_external_add")
     });
-    const reject2 = block.createDiv({ cls: "vam-map-sources-external-reject", attr: { role: "status" } });
+    const reject2 = block2.createDiv({ cls: "vam-map-sources-external-reject", attr: { role: "status" } });
     const paintReject = () => {
       reject2.empty();
       reject2.toggleClass("is-visible", !!session.externalRejected);
@@ -41951,7 +42115,7 @@ function drawMapSourcesPanel(parent, host, focus) {
       reject2.createDiv({ text: session.externalRejected });
     };
     paintReject();
-    block.createEl("p", { text: t("ui.map_sources_external_note"), cls: "vam-hint vam-map-sources-external-note" });
+    block2.createEl("p", { text: t("ui.map_sources_external_note"), cls: "vam-hint vam-map-sources-external-note" });
     input2.addEventListener("input", () => {
       session.pathDraft = input2.value;
     });
@@ -43384,8 +43548,8 @@ function parseOutline(input2) {
   const errors = [];
   const warnings = [];
   let headingLines2 = 0, ignoredLines = 0, blankLines = 0, skippedLines = 0;
-  let fence = null;
-  let block = null;
+  let fence2 = null;
+  let block2 = null;
   let start = 0;
   let vamNote = false;
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
@@ -43404,38 +43568,38 @@ function parseOutline(input2) {
     const line3 = lines[index];
     const lineNumber = index + 1;
     if (line3.includes("<!-- visual-agent-map:")) vamNote = true;
-    if (fence) {
+    if (fence2) {
       skippedLines++;
       const close = FENCE_CLOSE.exec(line3);
-      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      if (close && close[1][0] === fence2[0] && close[1].length >= fence2.length) fence2 = null;
       continue;
     }
-    if (block) {
+    if (block2) {
       skippedLines++;
-      const end = block === "html" ? "-->" : block === "obsidian" ? "%%" : "$$";
-      if (line3.includes(end)) block = null;
+      const end = block2 === "html" ? "-->" : block2 === "obsidian" ? "%%" : "$$";
+      if (line3.includes(end)) block2 = null;
       continue;
     }
     const open2 = FENCE_OPEN.exec(line3);
     if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
       skippedLines++;
-      fence = open2[1];
+      fence2 = open2[1];
       continue;
     }
     const trimmed2 = line3.trim();
     if (trimmed2.startsWith("<!--")) {
       skippedLines++;
-      if (!trimmed2.includes("-->", 4)) block = "html";
+      if (!trimmed2.includes("-->", 4)) block2 = "html";
       continue;
     }
     if (trimmed2.startsWith("%%")) {
       skippedLines++;
-      if (!trimmed2.slice(2).includes("%%")) block = "obsidian";
+      if (!trimmed2.slice(2).includes("%%")) block2 = "obsidian";
       continue;
     }
     if (trimmed2.startsWith("$$")) {
       skippedLines++;
-      if (!trimmed2.slice(2).includes("$$")) block = "math";
+      if (!trimmed2.slice(2).includes("$$")) block2 = "math";
       continue;
     }
     if (!trimmed2) {
@@ -44282,19 +44446,19 @@ var COMMENT_MARK = "%%";
 function stripNoteStyleComments(text11) {
   const lines = text11.split("\n");
   const out = [];
-  let fence = null;
+  let fence2 = null;
   let open2;
   lines.forEach((line3, index) => {
     if (open2 === void 0) {
-      if (fence) {
+      if (fence2) {
         const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line3);
-        if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+        if (close && close[1][0] === fence2[0] && close[1].length >= fence2.length) fence2 = null;
         out.push(line3);
         return;
       }
       const fenceOpen = /^\s*(`{3,}|~{3,})/.exec(line3);
       if (fenceOpen) {
-        fence = fenceOpen[1];
+        fence2 = fenceOpen[1];
         out.push(line3);
         return;
       }
@@ -44857,9 +45021,9 @@ function lookupBuiltinFormat(id, language2) {
   return format.text(language2);
 }
 function findBuiltinBlock(category, id) {
-  const block = BUILTIN_BLOCKS.find((item) => item.category === category && item.id === id);
-  if (!block) throw new Error(`Unknown built-in block: ${category}/${id}`);
-  return block;
+  const block2 = BUILTIN_BLOCKS.find((item) => item.category === category && item.id === id);
+  if (!block2) throw new Error(`Unknown built-in block: ${category}/${id}`);
+  return block2;
 }
 function lookupBuiltinBlock(category, id, language2) {
   return findBuiltinBlock(category, id).body(language2);
@@ -45035,7 +45199,7 @@ function templateParts(selection, context, language2, topicAnchor, options) {
   const { id } = selection.template;
   const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
   const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
-  const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block) => block.category === "template" && block.id === id) : findBuiltinBlock("template", id);
+  const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block2) => block2.category === "template" && block2.id === id) : findBuiltinBlock("template", id);
   const unmodified = body === void 0 || builtin !== void 0 && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language2));
   const structure2 = (template3) => detailStructurePrompt(template3, language2, (headings) => detailStructure(language2, headings), topicAnchor);
   if (unmodified) {
@@ -45060,7 +45224,7 @@ function templateParts(selection, context, language2, topicAnchor, options) {
       id,
       ...selection.template.fileName ? { fileName: selection.template.fileName } : {}
     }));
-    const fallbackId = BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id) ? id : STANDARD_TEMPLATE_ID;
+    const fallbackId = BUILTIN_BLOCKS.some((block2) => block2.category === "template" && block2.id === id) ? id : STANDARD_TEMPLATE_ID;
     const { body: _body, fileName: _fileName, ...choice } = selection.template;
     const detailTemplate = ((_g = context.detailTemplate) == null ? void 0 : _g.id) === id && fallbackId !== id ? void 0 : context.detailTemplate;
     const fallback = templateParts(
@@ -45156,9 +45320,9 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   {
     const body = (_c = selection.tone.body) != null ? _c : bodyOf("tone", selection.tone.id);
     if (body) {
-      const block = { kind: "block", category: "tone", id: selection.tone.id };
+      const block2 = { kind: "block", category: "tone", id: selection.tone.id };
       const [before, after] = toneBlock(TONE_MARKER, language2).split(TONE_MARKER);
-      add(fixed(before != null ? before : "", "tone-rule"), [body, block], fixed(after != null ? after : "", "tone-rule"));
+      add(fixed(before != null ? before : "", "tone-rule"), [body, block2], fixed(after != null ? after : "", "tone-rule"));
     }
   }
   add(fixed(voiceBaseline(language2), "voice-baseline"));
@@ -45242,7 +45406,7 @@ ${context.task}`, "task"));
 function sectionPieces(parts, id) {
   var _a2;
   const text11 = parts.sections;
-  const block = (part) => [part, { kind: "block", category: "template", id, part: "sections" }];
+  const block2 = (part) => [part, { kind: "block", category: "template", id, part: "sections" }];
   const pieces2 = [];
   let cursor = 0;
   for (const item of parts.owned) {
@@ -45251,10 +45415,10 @@ function sectionPieces(parts, id) {
     if (at < 0) continue;
     const start = item.rule ? at + item.rule.lastIndexOf(item.text) : at;
     if (start > cursor) pieces2.push(fixed(text11.slice(cursor, start), "detail-structure"));
-    pieces2.push(block(item.text));
+    pieces2.push(block2(item.text));
     cursor = start + item.text.length;
   }
-  if (!pieces2.length) return [block(text11)];
+  if (!pieces2.length) return [block2(text11)];
   if (cursor < text11.length) pieces2.push(fixed(text11.slice(cursor), "detail-structure"));
   return pieces2;
 }
@@ -45295,8 +45459,8 @@ function resolveBlockFolder(parent, role, exists, language2) {
 }
 function builtinBlockNames(category, id) {
   var _a2;
-  const block = findBuiltinBlock(category, id);
-  const keys = [block.nameKey, ...(_a2 = block.legacyNameKeys) != null ? _a2 : []];
+  const block2 = findBuiltinBlock(category, id);
+  const keys = [block2.nameKey, ...(_a2 = block2.legacyNameKeys) != null ? _a2 : []];
   return [...new Set(keys.flatMap((key5) => CANONICAL_LANGUAGES.map((language2) => translate(language2, key5))))];
 }
 function builtinBlockText(category, id, language2) {
@@ -45332,9 +45496,9 @@ function headingLines(detail) {
 }
 function builtinStructures(language2) {
   const templates = [standardTemplate(language2)];
-  for (const block of BUILTIN_BLOCKS) {
-    if (block.category !== "template" || block.id === "standard") continue;
-    const parsed = parseTemplateBlock(builtinTemplateText(block.id, language2), { id: block.id, name: block.id });
+  for (const block2 of BUILTIN_BLOCKS) {
+    if (block2.category !== "template" || block2.id === "standard") continue;
+    const parsed = parseTemplateBlock(builtinTemplateText(block2.id, language2), { id: block2.id, name: block2.id });
     if (parsed.ok) templates.push(parsed.template);
   }
   return templates;
@@ -45552,12 +45716,12 @@ var GLOBAL_PART_DEFAULT = {
   voice: "builtin:academic",
   format: "builtin:standard"
 };
-var LANGUAGES2 = ["zh-TW", "zh-CN", "en"];
+var LANGUAGES3 = ["zh-TW", "zh-CN", "en"];
 function builtinNames(category) {
   if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
   if (category === "format") return BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
   const wanted = category === "structure" ? "template" : "tone";
-  return BUILTIN_BLOCKS.filter((block) => block.category === wanted).map(({ id, nameKey, legacyNameKeys }) => ({
+  return BUILTIN_BLOCKS.filter((block2) => block2.category === wanted).map(({ id, nameKey, legacyNameKeys }) => ({
     id,
     nameKeys: [nameKey, ...legacyNameKeys != null ? legacyNameKeys : []]
   }));
@@ -45567,7 +45731,7 @@ function builtinPartIdOf(category, name2) {
   var _a2;
   const key5 = folded(name2);
   return (_a2 = builtinNames(category).find(
-    ({ id, nameKeys }) => id === name2 || nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key5))
+    ({ id, nameKeys }) => id === name2 || nameKeys.some((nameKey) => LANGUAGES3.some((language2) => folded(translate(language2, nameKey)) === key5))
   )) == null ? void 0 : _a2.id;
 }
 function validatePartName(name2, category) {
@@ -45577,7 +45741,7 @@ function validatePartName(name2, category) {
   if (name2.includes("..")) return { ok: false, reason: "dots" };
   const key5 = folded(name2);
   const taken = builtinNames(category).some(
-    ({ nameKeys }) => nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key5))
+    ({ nameKeys }) => nameKeys.some((nameKey) => LANGUAGES3.some((language2) => folded(translate(language2, nameKey)) === key5))
   );
   return taken ? { ok: false, reason: "builtin" } : { ok: true };
 }
@@ -45605,7 +45769,7 @@ function partRef(category, name2) {
 function updateModeOf(value) {
   const key5 = folded(value.trim());
   return UPDATE_MODES.find(
-    (mode) => mode === key5 || LANGUAGES2.some((language2) => folded(translate(language2, UPDATE_MODE_KEYS[mode])) === key5)
+    (mode) => mode === key5 || LANGUAGES3.some((language2) => folded(translate(language2, UPDATE_MODE_KEYS[mode])) === key5)
   );
 }
 function parseRecipeFile(text11) {
@@ -45990,8 +46154,8 @@ var NoteStyleStore = class {
   }
   /** The base name of the file that overrides a built-in block, if the block folder holds one (the interface language's name first). */
   overrideBase(category, id) {
-    const block = findBuiltinBlock(category, id);
-    const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
+    const block2 = findBuiltinBlock(category, id);
+    const names3 = [translate(this.settings.language, block2.nameKey), ...builtinBlockNames(category, id)];
     for (const name2 of names3) {
       const base = [...this.blocks[category].keys()].find((key5) => lower3(key5) === lower3(name2));
       if (base !== void 0) return base;
@@ -45999,7 +46163,7 @@ var NoteStyleStore = class {
     return void 0;
   }
   isBuiltinBlockId(category, id) {
-    return BUILTIN_BLOCKS.some((block) => block.category === category && block.id === id);
+    return BUILTIN_BLOCKS.some((block2) => block2.category === category && block2.id === id);
   }
   /** Every block of `category` for the picker: the built-ins first (marked when their file was changed), then the user's own files. */
   listBlocks(category) {
@@ -46012,18 +46176,18 @@ var NoteStyleStore = class {
     };
     const items = [];
     const used = /* @__PURE__ */ new Set();
-    for (const block of BUILTIN_BLOCKS.filter((item) => item.category === category)) {
-      const base = this.overrideBase(category, block.id);
+    for (const block2 of BUILTIN_BLOCKS.filter((item) => item.category === category)) {
+      const base = this.overrideBase(category, block2.id);
       const text11 = base === void 0 ? void 0 : map.get(base);
-      const modified = text11 !== void 0 && !isUnmodifiedBlock(category, block.id, category === "tone" ? stripToneComments(text11) : text11);
+      const modified = text11 !== void 0 && !isUnmodifiedBlock(category, block2.id, category === "tone" ? stripToneComments(text11) : text11);
       if (base !== void 0) used.add(base);
       items.push({
-        ref: builtinRef(block.id),
+        ref: builtinRef(block2.id),
         kind: "builtin",
-        name: translate(language2, block.nameKey),
+        name: translate(language2, block2.nameKey),
         ...base !== void 0 ? { fileName: `${base}.md` } : {},
         modified,
-        issues: modified && text11 !== void 0 && base !== void 0 ? issuesOf(text11, block.id, base) : []
+        issues: modified && text11 !== void 0 && base !== void 0 ? issuesOf(text11, block2.id, base) : []
       });
     }
     for (const [base, text11] of [...map].sort(([a], [b]) => a.localeCompare(b)))
@@ -46315,7 +46479,7 @@ var NoteStyleStore = class {
       const part = this.structurePart(mapped[id], language2);
       if (part) return part;
     }
-    if (BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id))
+    if (BUILTIN_BLOCKS.some((block2) => block2.category === "template" && block2.id === id))
       return this.structurePart(`builtin:${id}`, language2);
     const custom = this.settings.detailTemplates.find((template2) => template2.id === id);
     return custom ? { template: custom, name: custom.name, issues: [], notices: [] } : void 0;
@@ -46330,7 +46494,7 @@ var NoteStyleStore = class {
       const part = this.voicePart(mapped[id], language2);
       if (part) return part;
     }
-    if (BUILTIN_BLOCKS.some((block) => block.category === "tone" && block.id === id))
+    if (BUILTIN_BLOCKS.some((block2) => block2.category === "tone" && block2.id === id))
       return this.voicePart(`builtin:${id}`, language2);
     const preset = findPreset(this.settings.promptPresets, "tone", id, language2);
     return preset ? {
@@ -46347,17 +46511,17 @@ var NoteStyleStore = class {
     const parsed = parseRecipeRef(ref, "structure");
     if (!parsed) return void 0;
     if (parsed.kind === "builtin") {
-      const block = BUILTIN_BLOCKS.find((item) => item.category === "template" && item.id === parsed.id);
-      if (!block) return void 0;
-      const name2 = translate(this.settings.language, block.nameKey);
-      if (isBuiltinTemplateId(block.id)) {
-        const template2 = builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === block.id);
+      const block2 = BUILTIN_BLOCKS.find((item) => item.category === "template" && item.id === parsed.id);
+      if (!block2) return void 0;
+      const name2 = translate(this.settings.language, block2.nameKey);
+      if (isBuiltinTemplateId(block2.id)) {
+        const template2 = builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === block2.id);
         return { template: template2, name: name2, issues: [], notices: [] };
       }
-      const built = parseTemplateBlock(builtinTemplateText(block.id, language2), { id: block.id, name: name2 });
-      if (!built.ok) throw new Error(`Built-in template ${block.id} does not parse`);
+      const built = parseTemplateBlock(builtinTemplateText(block2.id, language2), { id: block2.id, name: name2 });
+      if (!built.ok) throw new Error(`Built-in template ${block2.id} does not parse`);
       return {
-        template: { ...built.template, ...block.omitEmpty ? { omitEmpty: true } : {} },
+        template: { ...built.template, ...block2.omitEmpty ? { omitEmpty: true } : {} },
         name: name2,
         issues: [],
         notices: []
@@ -46395,11 +46559,11 @@ var NoteStyleStore = class {
     const parsed = parseRecipeRef(ref, "voice");
     if (!parsed) return void 0;
     if (parsed.kind === "builtin") {
-      const block = BUILTIN_BLOCKS.find((item) => item.category === "tone" && item.id === parsed.id);
-      if (!block) return void 0;
+      const block2 = BUILTIN_BLOCKS.find((item) => item.category === "tone" && item.id === parsed.id);
+      if (!block2) return void 0;
       return {
-        text: block.id === DEFAULT_TONE_ID ? void 0 : block.body(language2).trim() || void 0,
-        name: translate(this.settings.language, block.nameKey),
+        text: block2.id === DEFAULT_TONE_ID ? void 0 : block2.body(language2).trim() || void 0,
+        name: translate(this.settings.language, block2.nameKey),
         issues: []
       };
     }
@@ -46509,9 +46673,9 @@ var NoteStyleStore = class {
       const override = this.overrideBase(category, parsed.id);
       if (override !== void 0) return { path: `${dir}/${override}.md`, base: override, created: false };
       const language2 = this.settings.language;
-      const block = findBuiltinBlock(category, parsed.id);
+      const block2 = findBuiltinBlock(category, parsed.id);
       const base = uniqueBlockName(
-        cleanBlockName(translate(language2, block.nameKey)) || parsed.id,
+        cleanBlockName(translate(language2, block2.nameKey)) || parsed.id,
         this.takenNames(category)
       );
       const text11 = category === "tone" && parsed.id === "academic" ? academicToneNote(language2) : builtinBlockText(category, parsed.id, language2);
@@ -46560,7 +46724,7 @@ var NoteStyleStore = class {
   listParts(category) {
     const language2 = this.settings.language;
     const { files } = this.partStore(category);
-    const builtins = category === "format" ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey, retired: false })) : BUILTIN_BLOCKS.filter((block) => block.category === (category === "structure" ? "template" : "tone")).map(
+    const builtins = category === "format" ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey, retired: false })) : BUILTIN_BLOCKS.filter((block2) => block2.category === (category === "structure" ? "template" : "tone")).map(
       ({ id, nameKey, retired }) => ({ id, nameKey, retired: retired === true })
     );
     const items = builtins.map(({ id, nameKey, retired }) => ({
@@ -47134,10 +47298,10 @@ var NoteStyleStore = class {
    */
   migrateLegacy(input2) {
     const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
-    const fence = run.catch(() => void 0).then(() => {
-      if (this.migration === fence) this.migration = void 0;
+    const fence2 = run.catch(() => void 0).then(() => {
+      if (this.migration === fence2) this.migration = void 0;
     });
-    this.migration = fence;
+    this.migration = fence2;
     return run;
   }
   async runMigration(mapsWithStyle) {
@@ -47624,9 +47788,9 @@ ${text11}`, order: -1 });
 function recordOf2(detail, inserts) {
   const kept = [];
   let position = 0;
-  for (const insert of inserts) {
-    kept.push(detail.slice(position, insert.offset));
-    position = insert.offset + insert.text.length;
+  for (const insert2 of inserts) {
+    kept.push(detail.slice(position, insert2.offset));
+    position = insert2.offset + insert2.text.length;
   }
   kept.push(detail.slice(position));
   return { inserts, kept };
@@ -47634,11 +47798,11 @@ function recordOf2(detail, inserts) {
 function verifyInserts(oldDetail, detail, inserts) {
   const pieces2 = [];
   let position = 0;
-  for (const insert of inserts) {
-    if (!insert.text || insert.offset < position || insert.offset + insert.text.length > detail.length) return false;
-    if (detail.slice(insert.offset, insert.offset + insert.text.length) !== insert.text) return false;
-    pieces2.push(detail.slice(position, insert.offset));
-    position = insert.offset + insert.text.length;
+  for (const insert2 of inserts) {
+    if (!insert2.text || insert2.offset < position || insert2.offset + insert2.text.length > detail.length) return false;
+    if (detail.slice(insert2.offset, insert2.offset + insert2.text.length) !== insert2.text) return false;
+    pieces2.push(detail.slice(position, insert2.offset));
+    position = insert2.offset + insert2.text.length;
   }
   pieces2.push(detail.slice(position));
   return pieces2.join("") === oldDetail;
@@ -49482,8 +49646,8 @@ function subjectsOf(chapters) {
 var SKIP_LINE = /^\s*(?:#{1,6}\s|\||>|<!--)/;
 function sentencesOf2(chapter, text11) {
   const out = [];
-  text11.split(/\n\s*\n/).forEach((block, paragraph) => {
-    const lines = block.split("\n").filter((line3) => line3.trim() && !SKIP_LINE.test(line3));
+  text11.split(/\n\s*\n/).forEach((block2, paragraph) => {
+    const lines = block2.split("\n").filter((line3) => line3.trim() && !SKIP_LINE.test(line3));
     const parts = lines.join("\n").split(/(?<=[。！？!?；;])|\n/u).map((part) => part.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, "").trim()).filter(Boolean);
     parts.forEach((part, at) => {
       if (!quantitiesIn(part).length) return;
@@ -51935,8 +52099,8 @@ function checkDiagram(draft, chapterText) {
   if (!TYPES.has(type)) return { ok: false, code: "type" };
   if (body.includes("<") || draft.title.includes("<")) return { ok: false, code: "angle" };
   if (/[〔〕]/.test(body + draft.title)) return { ok: false, code: "marker" };
-  const fence = "```mermaid\n" + body + "\n```";
-  if (neutralizeUnsafeMermaid(fence) !== fence) return { ok: false, code: "unsafe" };
+  const fence2 = "```mermaid\n" + body + "\n```";
+  if (neutralizeUnsafeMermaid(fence2) !== fence2) return { ok: false, code: "unsafe" };
   const known = noteNumbers(chapterText);
   if ([...numberTokens(body.replace(/^\s*\S+/, "")), ...numberTokens(draft.title)].some((n) => !known.has(n)))
     return { ok: false, code: "number_not_in_text" };
@@ -53909,7 +54073,7 @@ function arrangeUnarrangedArgumentMap(nodes, state) {
 var QUOTE_MIN = 12;
 var QUOTE_MAX2 = 200;
 var QUOTE_FOLDED_MIN = 8;
-var FETCH_TIMEOUT_MS = 15e3;
+var FETCH_TIMEOUT_MS2 = 15e3;
 var MAX_PAGE_BYTES = 2 * 1024 * 1024;
 var SHELL_TEXT_MAX = 200;
 var TIMED_OUT = Symbol("timed out");
@@ -54103,7 +54267,7 @@ async function verifySource(input2) {
   const blocked = () => openedByProvider ? proof("provider_read") : fail4("blocked_unverified");
   let response;
   try {
-    response = await fetchWithTimeout(input2.fetch, requested.href, (_a2 = input2.timeoutMs) != null ? _a2 : FETCH_TIMEOUT_MS);
+    response = await fetchWithTimeout(input2.fetch, requested.href, (_a2 = input2.timeoutMs) != null ? _a2 : FETCH_TIMEOUT_MS2);
   } catch (e) {
     return fail4("network_error");
   }
@@ -57207,10 +57371,10 @@ function undoClosure(applied, opIds, rootId) {
     ...op.kind === "add" || op.kind === "move" ? [op.parent, ...op.after !== void 0 ? [op.after] : []] : [],
     ...op.kind === "merge" ? [op.into] : []
   ];
-  const nameOf2 = (op) => op.kind === "add" ? op.ref : op.card;
+  const nameOf3 = (op) => op.kind === "add" ? op.ref : op.card;
   const touch = (a) => {
-    touched.add(nameOf2(a.op));
-    named.add(nameOf2(a.op));
+    touched.add(nameOf3(a.op));
+    named.add(nameOf3(a.op));
     if (a.op.kind === "rename") return;
     if (a.before.parent && a.before.parent !== rootId) touched.add(a.before.parent);
     if (a.before.after) touched.add(a.before.after);
@@ -62383,11 +62547,11 @@ function structureEditField(data, titleOf) {
   const undone = new Set((_a2 = edit.undone) != null ? _a2 : []);
   const names3 = new Map(edit.before.nodes.map((n) => [n.id, n.title]));
   for (const a of edit.applied) if (a.op.kind === "add") names3.set(a.op.ref, a.op.title);
-  const nameOf2 = (id) => {
+  const nameOf3 = (id) => {
     var _a3, _b2;
     return (_b2 = (_a3 = titleOf == null ? void 0 : titleOf(id)) != null ? _a3 : names3.get(id)) != null ? _b2 : "";
   };
-  const before = placer(edit.before.rootId, edit.before.nodes, nameOf2);
+  const before = placer(edit.before.rootId, edit.before.nodes, nameOf3);
   const placeAfter = (ops) => placer(
     edit.before.rootId,
     simulateStructure(
@@ -62395,7 +62559,7 @@ function structureEditField(data, titleOf) {
       ops.map((a) => a.op),
       /* @__PURE__ */ new Set()
     ).result,
-    nameOf2
+    nameOf3
   );
   const afterActive = placeAfter(edit.applied.filter((a) => !undone.has(a.id)));
   const items = edit.applied.map((a, index) => {
@@ -62403,11 +62567,11 @@ function structureEditField(data, titleOf) {
     const after = undone.has(a.id) ? placeAfter(edit.applied.slice(0, index + 1).filter((x) => x.id === a.id || !undone.has(x.id))) : afterActive;
     const id = op.kind === "add" ? op.ref : op.card;
     const archivedPath = (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : void 0;
-    const dependents = [...undoClosure(edit.applied, [a.id], edit.before.rootId)].filter((other) => other !== a.id && !undone.has(other)).map((other) => edit.applied.find((x) => x.id === other)).map((x) => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf2(x.op.card) }));
+    const dependents = [...undoClosure(edit.applied, [a.id], edit.before.rootId)].filter((other) => other !== a.id && !undone.has(other)).map((other) => edit.applied.find((x) => x.id === other)).map((x) => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf3(x.op.card) }));
     return {
       id: a.id,
       kind: op.kind,
-      text: itemText(a, nameOf2(id), edit.before.rootId, before, after, nameOf2),
+      text: itemText(a, nameOf3(id), edit.before.rootId, before, after, nameOf3),
       reason: op.reason,
       undone: undone.has(a.id),
       dependents,
@@ -62435,7 +62599,7 @@ var structureOfNodes = (input2) => {
     input2.rootId
   );
 };
-function placer(rootId, nodes, nameOf2) {
+function placer(rootId, nodes, nameOf3) {
   const structure2 = structureOfNodes({ rootId, nodes });
   return (id) => {
     var _a2;
@@ -62443,15 +62607,15 @@ function placer(rootId, nodes, nameOf2) {
     if (!place) return "";
     if (place.kind === "preface") return t("ui.book_struct_place_preface");
     if (place.kind === "chapter") return t("ui.book_struct_place_chapter_0", (_a2 = place.chapter) != null ? _a2 : 0);
-    return t("ui.book_struct_place_section_0", nameOf2(place.chapterId));
+    return t("ui.book_struct_place_section_0", nameOf3(place.chapterId));
   };
 }
-function itemText(a, title, rootId, before, after, nameOf2) {
+function itemText(a, title, rootId, before, after, nameOf3) {
   const { op } = a;
   if (op.kind === "add")
-    return op.parent === rootId ? t("ui.book_struct_add_chapter_0_1", after(op.ref), op.title) : t("ui.book_struct_add_section_0_1", nameOf2(op.parent), op.title);
+    return op.parent === rootId ? t("ui.book_struct_add_chapter_0_1", after(op.ref), op.title) : t("ui.book_struct_add_section_0_1", nameOf3(op.parent), op.title);
   if (op.kind === "rename") return t("ui.book_struct_rename_0_1", a.before.title, op.title);
-  if (op.kind === "merge") return t("ui.book_struct_merge_0_1_2", title, before(op.card), nameOf2(op.into));
+  if (op.kind === "merge") return t("ui.book_struct_merge_0_1_2", title, before(op.card), nameOf3(op.into));
   if (op.kind === "remove") return t("ui.book_struct_remove_0_1", title, before(op.card));
   const from = before(op.card);
   const to = after(op.card);
@@ -63158,14 +63322,14 @@ function bookStructureCard(action, baseline) {
   const sim = simulateStructure(input2, ops, locked);
   const names3 = new Map(plan.nodes.map((node) => [node.id, node.title]));
   for (const a of sim.applied) if (a.op.kind === "add") names3.set(a.op.ref, a.op.title);
-  const nameOf2 = (id) => {
+  const nameOf3 = (id) => {
     var _a2;
     return (_a2 = names3.get(id)) != null ? _a2 : "";
   };
-  const before = placer(rootId, plan.nodes, nameOf2);
-  const after = placer(rootId, sim.result, nameOf2);
+  const before = placer(rootId, plan.nodes, nameOf3);
+  const after = placer(rootId, sim.result, nameOf3);
   const lines = sim.applied.map((a) => ({
-    text: itemText(a, nameOf2(a.op.kind === "add" ? a.op.ref : a.op.card), rootId, before, after, nameOf2)
+    text: itemText(a, nameOf3(a.op.kind === "add" ? a.op.ref : a.op.card), rootId, before, after, nameOf3)
   }));
   if (sim.applied.some((a) => a.op.kind === "remove" || a.op.kind === "merge"))
     lines.push({ text: t("ui.map_chat_book_struct_archive_note"), small: true });
@@ -63174,7 +63338,7 @@ function bookStructureCard(action, baseline) {
     lines.push({
       text: structureRefusal(
         rejected.code,
-        rejected.op.kind === "add" ? rejected.op.title : nameOf2(rejected.op.card)
+        rejected.op.kind === "add" ? rejected.op.title : nameOf3(rejected.op.card)
       )
     });
   const cards = reviewAffected(rootId, plan.nodes, sim.result, sim.applied).size;
@@ -63727,8 +63891,8 @@ function putProgramCallout(text11, callout2) {
   const span = detailSpan(lines);
   if (!span) return text11;
   const cr = text11.includes("\r\n") ? "\r" : "";
-  const block = [...callout2.split("\n").map((line3) => line3 + cr), cr];
-  return [...lines.slice(0, span.from + 1), ...block, ...lines.slice(span.from + 1)].join("\n");
+  const block2 = [...callout2.split("\n").map((line3) => line3 + cr), cr];
+  return [...lines.slice(0, span.from + 1), ...block2, ...lines.slice(span.from + 1)].join("\n");
 }
 var retitle = (line3, title, sign) => {
   const cr = line3.endsWith("\r") ? "\r" : "";
@@ -64346,12 +64510,12 @@ function openInWindowOf(modal, anchor) {
 
 // experiences/visual-map/note-style-picker.ts
 function builtinRecipeItems() {
-  const nameOf2 = (list2, id) => {
+  const nameOf3 = (list2, id) => {
     const found = list2.find((item) => item.id === id);
     return found ? t(found.nameKey) : id;
   };
-  const templates = BUILTIN_BLOCKS.filter((block) => block.category === "template");
-  const tones = BUILTIN_BLOCKS.filter((block) => block.category === "tone");
+  const templates = BUILTIN_BLOCKS.filter((block2) => block2.category === "template");
+  const tones = BUILTIN_BLOCKS.filter((block2) => block2.category === "tone");
   return BUILTIN_RECIPES.map((recipe) => {
     const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
     return {
@@ -64361,10 +64525,10 @@ function builtinRecipeItems() {
       ...aim ? { aimOnly: true } : {},
       ...recipe.aiDecidesSections ? { topicOnly: true } : {},
       structure: {
-        name: aim ? t(recipe.nameKey) : recipe.aiDecidesSections ? t("ui.note_style_ai_sections_decide") : nameOf2(templates, recipe.structure)
+        name: aim ? t(recipe.nameKey) : recipe.aiDecidesSections ? t("ui.note_style_ai_sections_decide") : nameOf3(templates, recipe.structure)
       },
-      voice: { name: nameOf2(tones, recipe.voice) },
-      format: { name: nameOf2(BUILTIN_FORMATS, recipe.format) },
+      voice: { name: nameOf3(tones, recipe.voice) },
+      format: { name: nameOf3(BUILTIN_FORMATS, recipe.format) },
       update: recipe.update,
       issues: []
     };
@@ -66715,10 +66879,10 @@ var startsBlock = (line3) => !!isFenceOpen(line3) || !!headingAt(line3) || RULE.
 function parseBlocks(lines, depth = 0, starts, budget) {
   var _a2;
   const blocks = [];
-  const emit = (block) => {
-    blocks.push(block);
+  const emit = (block2) => {
+    blocks.push(block2);
     if (!budget) return true;
-    const cost = blockCost(block);
+    const cost = blockCost(block2);
     if (budget.used + cost > budget.room) budget.over = true;
     else budget.used += cost;
     return !budget.over;
@@ -66822,21 +66986,21 @@ function inlineCost(nodes) {
 function nodeCost(node) {
   return node.t === "fmt" || node.t === "link" ? 1 + inlineCost(node.c) : 1;
 }
-function blockCost(block) {
-  switch (block.t) {
+function blockCost(block2) {
+  switch (block2.t) {
     case "p":
-      return 1 + inlineCost(block.c);
+      return 1 + inlineCost(block2.c);
     case "h":
-      return 1 + inlineCost(block.c);
+      return 1 + inlineCost(block2.c);
     case "hr":
       return 1;
     case "code":
       return 2;
     case "quote":
-      return 1 + blocksCost(block.c);
+      return 1 + blocksCost(block2.c);
     case "list": {
       let cost = 1;
-      for (const item of block.items) cost += itemCost(item);
+      for (const item of block2.items) cost += itemCost(item);
       return cost;
     }
   }
@@ -66844,7 +67008,7 @@ function blockCost(block) {
 function itemCost(item) {
   return 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
 }
-var blocksCost = (blocks) => blocks.reduce((sum2, block) => sum2 + blockCost(block), 0);
+var blocksCost = (blocks) => blocks.reduce((sum2, block2) => sum2 + blockCost(block2), 0);
 function layoutReply(text11, budget = MAX_REPLY_NODES) {
   const clean3 = text11.replace(/\r\n?/g, "\n");
   let head2 = clean3;
@@ -66919,26 +67083,26 @@ function renderInline(parent, nodes) {
   }
 }
 function renderBlocks(parent, blocks) {
-  for (const block of blocks) {
-    switch (block.t) {
+  for (const block2 of blocks) {
+    switch (block2.t) {
       case "p":
-        renderInline(parent.createEl("p"), block.c);
+        renderInline(parent.createEl("p"), block2.c);
         break;
       case "h":
-        renderInline(parent.createEl(`h${block.level}`, { cls: "vam-map-chat-heading" }), block.c);
+        renderInline(parent.createEl(`h${block2.level}`, { cls: "vam-map-chat-heading" }), block2.c);
         break;
       case "hr":
         parent.createEl("hr");
         break;
       case "code":
-        parent.createEl("pre").createEl("code", { text: block.text });
+        parent.createEl("pre").createEl("code", { text: block2.text });
         break;
       case "quote":
-        renderBlocks(parent.createEl("blockquote"), block.c);
+        renderBlocks(parent.createEl("blockquote"), block2.c);
         break;
       case "list": {
-        const list2 = parent.createEl(block.ordered ? "ol" : "ul");
-        for (const item of block.items) {
+        const list2 = parent.createEl(block2.ordered ? "ol" : "ul");
+        for (const item of block2.items) {
           const row = list2.createEl("li");
           renderInline(row, item.c);
           if (item.sub) renderBlocks(row, [item.sub]);
@@ -67031,10 +67195,10 @@ function codeSpan(text11) {
   var _a2;
   const body = defuseCode(text11.replace(/\r?\n|\r/g, " "));
   const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
-  const fence = "`".repeat(longest + 1);
+  const fence2 = "`".repeat(longest + 1);
   const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
   const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
-  return `${fence}${padded}${fence}`;
+  return `${fence2}${padded}${fence2}`;
 }
 function defuseCode(text11) {
   return stripControl(text11).replace(/!(?=\[)/g, `!${ZERO_WIDTH}`);
@@ -67072,36 +67236,36 @@ function inlineMarkdown(nodes) {
 }
 var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
 var indentOf = (text11, pad3, first) => text11.split("\n").map((line3, at) => at === 0 ? `${first}${line3}` : line3 ? `${pad3}${line3}` : line3).join("\n");
-function listMarkdown(block) {
-  return block.items.map((item, index) => {
-    const marker3 = block.ordered ? `${index + 1}. ` : "- ";
+function listMarkdown(block2) {
+  return block2.items.map((item, index) => {
+    const marker3 = block2.ordered ? `${index + 1}. ` : "- ";
     let body = tidy(inlineMarkdown(item.c));
     if (item.sub) body += `
 ${listMarkdown(item.sub)}`;
     return indentOf(body, " ".repeat(marker3.length), marker3);
   }).join("\n");
 }
-function blockMarkdown(block) {
+function blockMarkdown(block2) {
   var _a2;
-  switch (block.t) {
+  switch (block2.t) {
     case "p":
-      return tidy(inlineMarkdown(block.c));
+      return tidy(inlineMarkdown(block2.c));
     case "h":
-      return `${"#".repeat(Math.min(6, Math.max(1, block.level)))} ${tidy(inlineMarkdown(block.c).replace(/\\\n/g, " "))}`;
+      return `${"#".repeat(Math.min(6, Math.max(1, block2.level)))} ${tidy(inlineMarkdown(block2.c).replace(/\\\n/g, " "))}`;
     case "hr":
       return "---";
     case "code": {
-      const text11 = defuseCode(block.text);
+      const text11 = defuseCode(block2.text);
       const longest = Math.max(2, ...((_a2 = text11.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
-      const fence = "`".repeat(longest + 1);
-      return `${fence}
+      const fence2 = "`".repeat(longest + 1);
+      return `${fence2}
 ${text11}
-${fence}`;
+${fence2}`;
     }
     case "quote":
-      return blocksMarkdown(block.c).split("\n").map((line3) => line3 ? `> ${line3}` : ">").join("\n");
+      return blocksMarkdown(block2.c).split("\n").map((line3) => line3 ? `> ${line3}` : ">").join("\n");
     case "list":
-      return listMarkdown(block);
+      return listMarkdown(block2);
   }
 }
 function blocksMarkdown(blocks) {
@@ -67118,22 +67282,22 @@ function refMarkdown(ref) {
   const quote3 = ref.text ? escapeLine([...ref.text.replace(/\s+/g, " ")].slice(0, 200).join("")) : "";
   return [link, quote3].filter(Boolean).join(" ");
 }
-function imagesMarkdown(block, labels) {
+function imagesMarkdown(block2, labels) {
   var _a2;
-  const head2 = `**${fill(labels.images, block.nodeTitle)}**`;
-  if (block.state === "searching") return `${head2}
+  const head2 = `**${fill(labels.images, block2.nodeTitle)}**`;
+  if (block2.state === "searching") return `${head2}
 
-${fill(labels.imagesSearching, block.query)}`;
-  if (block.state === "empty") return `${head2}
+${fill(labels.imagesSearching, block2.query)}`;
+  if (block2.state === "empty") return `${head2}
 
-${escapeLine(block.reason || labels.imagesNone)}`;
-  if (block.state === "stopped") return `${head2}
+${escapeLine(block2.reason || labels.imagesNone)}`;
+  if (block2.state === "stopped") return `${head2}
 
 ${escapeLine(labels.imagesStopped)}`;
-  if (block.state === "failed") return `${head2}
+  if (block2.state === "failed") return `${head2}
 
-${fill(labels.imagesFailed, (_a2 = block.reason) != null ? _a2 : "")}`;
-  const rows2 = block.items.map(
+${fill(labels.imagesFailed, (_a2 = block2.reason) != null ? _a2 : "")}`;
+  const rows2 = block2.items.map(
     (item) => `- ${pageLink(item.title, item.source)}${item.inserted ? ` ${fill(labels.inserted, item.inserted)}` : ""}`
   );
   return `${head2}
@@ -67173,7 +67337,7 @@ ${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
           turn.plan === "pending" ? labels.planPending : turn.plan === "applied" ? labels.planApplied : labels.planCancelled
         )
       );
-    for (const block of turn.images) parts.push(imagesMarkdown(block, labels));
+    for (const block2 of turn.images) parts.push(imagesMarkdown(block2, labels));
   });
   return parts.join("\n\n").replace(/!(?=\[)/g, `!${ZERO_WIDTH}`).split(/(\[\[[^\]\n]*\]\])/).map(
     (part, at) => at % 2 ? part : part.replace(FRONT_MATTER_KEYS, (match) => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`)
@@ -67199,24 +67363,24 @@ ${body}`;
   while (text11.length > MAP_CHAT_TURN_CHAR_LIMIT && earlier > 0) text11 = render3(earlier = Math.floor(earlier / 2));
   return text11;
 }
-function placedImage(block) {
-  return block.state === "ready" ? block.items.find((item) => item.inserted) : void 0;
+function placedImage(block2) {
+  return block2.state === "ready" ? block2.items.find((item) => item.inserted) : void 0;
 }
 function settledLine(line3) {
   const blocks = line3.imageGroup;
   if (!blocks) return line3;
   const total2 = blocks.length;
-  const pending2 = blocks.filter((block) => block.state === "searching").length;
-  const labels = [...new Set(blocks.flatMap((block) => block.modelLabel ? [block.modelLabel] : []))];
+  const pending2 = blocks.filter((block2) => block2.state === "searching").length;
+  const labels = [...new Set(blocks.flatMap((block2) => block2.modelLabel ? [block2.modelLabel] : []))];
   const model = labels.length ? t("ui.map_chat_model_suffix_0", labels.join(t("ui.map_chat_model_separator"))) : "";
   if (pending2) {
     return { ...line3, status: "done", text: t("ui.map_chat_line_images_progress_0_1", total2 - pending2, total2) + model };
   }
-  const placed = blocks.filter((block) => placedImage(block)).length;
+  const placed = blocks.filter((block2) => placedImage(block2)).length;
   const missed = total2 - placed;
   return {
     ...line3,
-    status: placed ? "done" : blocks.some((block) => block.state === "failed") ? "failed" : "skipped",
+    status: placed ? "done" : blocks.some((block2) => block2.state === "failed") ? "failed" : "skipped",
     text: (missed ? t("ui.map_chat_line_images_group_0_1", placed, missed) : t("ui.map_chat_line_images_group_0", placed)) + model
   };
 }
@@ -68486,28 +68650,28 @@ ${typed}` : draft;
     if (batch && summary && batch.ended && !batch.running) this.announce(this.batchTitle(summary));
   }
   /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
-  addImages(block) {
+  addImages(block2) {
     var _a2;
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
-    last.images = [...(_a2 = last.images) != null ? _a2 : [], block];
+    last.images = [...(_a2 = last.images) != null ? _a2 : [], block2];
     this.renderLog();
   }
   /**
    * A picture search ended (or was stopped): the block takes `patch` and its row is laid out again. The keyboard stays where it
    * is, and the reader hears one sentence (after the reply that is streaming now, if one is).
    */
-  settleImages(block, patch) {
+  settleImages(block2, patch) {
     var _a2, _b2, _c;
     const message = this.messages.find((candidate) => {
       var _a3;
-      return (_a3 = candidate.images) == null ? void 0 : _a3.includes(block);
+      return (_a3 = candidate.images) == null ? void 0 : _a3.includes(block2);
     });
     if (!message) return;
-    Object.assign(block, patch);
-    if (block.state !== "searching") block.stop = void 0;
+    Object.assign(block2, patch);
+    if (block2.state !== "searching") block2.stop = void 0;
     this.renderLog();
-    if (block.state === "searching" || ((_a2 = message.images) != null ? _a2 : []).some((other) => other.state === "searching")) return;
+    if (block2.state === "searching" || ((_a2 = message.images) != null ? _a2 : []).some((other) => other.state === "searching")) return;
     const placed = ((_b2 = message.images) != null ? _b2 : []).filter((other) => placedImage(other)).length;
     const missed = ((_c = message.images) != null ? _c : []).length - placed;
     this.announceImages(
@@ -68515,12 +68679,12 @@ ${typed}` : draft;
     );
   }
   /** A queued search got a free place and starts: its row says so. */
-  markImagesRunning(block) {
+  markImagesRunning(block2) {
     if (!this.messages.some((message) => {
       var _a2;
-      return (_a2 = message.images) == null ? void 0 : _a2.includes(block);
+      return (_a2 = message.images) == null ? void 0 : _a2.includes(block2);
     })) return;
-    block.running = true;
+    block2.running = true;
     this.renderLog();
   }
   /** Back to an empty conversation (a different map was opened). */
@@ -69766,9 +69930,9 @@ ${shown2}` : t("ui.map_chat_model_label"));
       message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${(_r = (_q = message.plan.groups) == null ? void 0 : _q.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _r : ""}` : "",
       message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_s = message.images) != null ? _s : []).map(
-        (block) => {
+        (block2) => {
           var _a3;
-          return `images:${block.stale ? "stale:" : ""}${block.state}:${block.running ? 1 : 0}:${block.nodeTitle}:${(_a3 = block.reason) != null ? _a3 : ""}:${block.items.map((item) => {
+          return `images:${block2.stale ? "stale:" : ""}${block2.state}:${block2.running ? 1 : 0}:${block2.nodeTitle}:${(_a3 = block2.reason) != null ? _a3 : ""}:${block2.items.map((item) => {
             var _a4;
             return [item.candidate.url, (_a4 = item.inserted) != null ? _a4 : ""].join("~");
           }).join(",")}`;
@@ -70083,7 +70247,7 @@ ${shown2}` : t("ui.map_chat_model_label"));
   /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
   needsLook(line3) {
     var _a2;
-    return line3.status !== "done" || !!line3.loud || !!((_a2 = line3.imageGroup) == null ? void 0 : _a2.some((block) => !placedImage(block)));
+    return line3.status !== "done" || !!line3.loud || !!((_a2 = line3.imageGroup) == null ? void 0 : _a2.some((block2) => !placedImage(block2)));
   }
   /** The toggle of "View details": one per reply, for the plan card and the results alike. Focus follows the rebuilt button. */
   buildDetailToggle(parent, message, open2) {
@@ -70107,7 +70271,7 @@ ${shown2}` : t("ui.map_chat_model_label"));
   buildOutcome(row, message, applied) {
     const shownLines = message.lines.filter((line3) => {
       var _a2;
-      return !((_a2 = line3.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
+      return !((_a2 = line3.imageGroup) == null ? void 0 : _a2.some((block2) => block2.state === "searching"));
     });
     const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
     const folded2 = results.filter((line3) => !this.needsLook(line3));
@@ -70350,22 +70514,22 @@ ${shown2}` : t("ui.map_chat_model_label"));
    * which are https images shown without a referrer. All text goes in as text.
    */
   buildImages(row, blocks) {
-    const live2 = blocks.filter((block) => !block.stale);
+    const live2 = blocks.filter((block2) => !block2.stale);
     if (live2.length) this.buildImageResult(row, live2);
-    const old = blocks.filter((block) => block.stale);
+    const old = blocks.filter((block2) => block2.stale);
     if (old.length) this.buildStaleImages(row, old);
   }
   buildImageResult(row, blocks) {
     var _a2, _b2, _c;
-    const pending2 = blocks.filter((block) => block.state === "searching");
+    const pending2 = blocks.filter((block2) => block2.state === "searching");
     const box = row.createDiv({
       cls: `vam-map-chat-images ${pending2.length ? "is-searching" : "is-done"}`,
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
-    const placed = blocks.filter((block) => placedImage(block)).length;
+    const placed = blocks.filter((block2) => placedImage(block2)).length;
     const head2 = box.createDiv({ cls: "vam-map-chat-images-status" });
     if (pending2.length) {
-      const current = (_a2 = pending2.find((block) => block.running)) != null ? _a2 : pending2[0];
+      const current = (_a2 = pending2.find((block2) => block2.running)) != null ? _a2 : pending2[0];
       head2.setText(t("ui.map_chat_images_searching_0", clip4(current.nodeTitle || current.query, 80)));
       box.createDiv({
         cls: "vam-map-chat-images-progress",
@@ -70378,7 +70542,7 @@ ${shown2}` : t("ui.map_chat_model_label"));
       });
       stop.addEventListener("click", () => {
         var _a3;
-        for (const block of pending2) (_a3 = block.stop) == null ? void 0 : _a3.call(block);
+        for (const block2 of pending2) (_a3 = block2.stop) == null ? void 0 : _a3.call(block2);
       });
     } else {
       const missed = blocks.length - placed;
@@ -70387,16 +70551,16 @@ ${shown2}` : t("ui.map_chat_model_label"));
       );
     }
     const list2 = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-    for (const block of blocks) {
+    for (const block2 of blocks) {
       const cell2 = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
-      const item = placedImage(block);
+      const item = placedImage(block2);
       if (item) {
         cell2.createEl("img", {
           cls: "vam-map-chat-images-thumb",
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
         const text12 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-        text12.createDiv({ cls: "vam-map-chat-images-topic", text: clip4(block.nodeTitle, 80) });
+        text12.createDiv({ cls: "vam-map-chat-images-topic", text: clip4(block2.nodeTitle, 80) });
         text12.createDiv({ cls: "vam-map-chat-images-title", text: clip4(item.candidate.title, 80) });
         if (item.candidate.source)
           text12.createEl("a", {
@@ -70413,8 +70577,8 @@ ${shown2}` : t("ui.map_chat_model_label"));
       }
       cell2.addClass("is-missed");
       const text11 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-      text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip4(block.nodeTitle, 80) });
-      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip4(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip4((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
+      text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip4(block2.nodeTitle, 80) });
+      const why2 = block2.state === "searching" ? block2.running ? t("ui.map_chat_images_searching_0", clip4(block2.query, 80)) : t("ui.map_chat_images_queued") : block2.state === "stopped" ? t("ui.map_chat_images_stopped") : block2.state === "failed" ? t("ui.map_chat_images_failed_0", clip4((_b2 = block2.reason) != null ? _b2 : "", 160)) : (_c = block2.reason) != null ? _c : t("ui.map_chat_images_none");
       text11.createDiv({ cls: "vam-map-chat-images-reason", text: why2 });
     }
   }
@@ -70426,8 +70590,8 @@ ${shown2}` : t("ui.map_chat_model_label"));
     });
     box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
     const list2 = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-    for (const block of blocks)
-      for (const item of block.items) {
+    for (const block2 of blocks)
+      for (const item of block2.items) {
         const cell2 = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
         const text11 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
         if (item.inserted)
@@ -70633,7 +70797,7 @@ var ChatImageFinder = class {
         (readsResearch ? [parentTitle, title] : ids2.length > 1 ? [words2, title] : [words2 || title]).filter(Boolean).join(" ")
       );
       const query = title ? joined || title : "";
-      const block = {
+      const block2 = {
         query,
         nodeId: node.id,
         nodeTitle: note.title,
@@ -70643,14 +70807,14 @@ var ChatImageFinder = class {
         state: "searching",
         items: []
       };
-      blocks.push(block);
-      const reason = query ? await ports.preflight(block) : t("ui.map_chat_skip_unavailable");
+      blocks.push(block2);
+      const reason = query ? await ports.preflight(block2) : t("ui.map_chat_skip_unavailable");
       if (reason) {
-        block.state = "empty";
-        block.reason = reason;
+        block2.state = "empty";
+        block2.reason = reason;
         continue;
       }
-      jobs.push({ block, controller: new AbortController(), model: note.model });
+      jobs.push({ block: block2, controller: new AbortController(), model: note.model });
     }
     if (!blocks.length) return { skipped: "ui.map_chat_skip_topic_gone" };
     if (batch.declined) return { skipped: "ui.map_chat_skip_not_started" };
@@ -70672,8 +70836,8 @@ var ChatImageFinder = class {
     if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
       return { skipped: "ui.map_chat_skip_map_changed" };
     for (const job of jobs) {
-      const { block, controller } = job;
-      const topic = chatImageTopicKey(anchor.id, block.nodeId);
+      const { block: block2, controller } = job;
+      const topic = chatImageTopicKey(anchor.id, block2.nodeId);
       this.topics.set(topic, controller);
       const release2 = () => {
         if (this.topics.get(topic) === controller) this.topics.delete(topic);
@@ -70683,11 +70847,11 @@ var ChatImageFinder = class {
       const key5 = ++this.sequence;
       this.searches.set(key5, controller);
       job.key = key5;
-      block.stop = () => {
+      block2.stop = () => {
         if (this.searches.get(key5) !== controller) return;
         this.searches.delete(key5);
         controller.abort();
-        ports.settle(chat, block, { state: "stopped" });
+        ports.settle(chat, block2, { state: "stopped" });
       };
     }
     batch.group.push(...blocks);
@@ -70722,43 +70886,43 @@ var ChatImageFinder = class {
    * Runs one card's picture search to its end: the first loadable picture is put into the card, or the block says why none was.
    * Nothing is written when the view, the panel or the map is not the same any more, or the search was stopped.
    */
-  async run(block, controller, chat, model) {
+  async run(block2, controller, chat, model) {
     var _a2;
     const ports = this.ports;
     const sameMap = () => {
       const here = ports.where();
-      return here.path === block.mapPath && here.mapId === block.mapId;
+      return here.path === block2.mapPath && here.mapId === block2.mapId;
     };
     const current = () => !ports.where().closed && !controller.signal.aborted && ports.where().chat === chat && sameMap();
     const dropped = () => {
       const here = ports.where();
       if (here.closed || controller.signal.aborted || here.chat !== chat) return;
-      ports.settle(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+      ports.settle(chat, block2, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
     };
     if (!current()) return dropped();
     try {
-      const refused = await ports.preflight(block);
+      const refused = await ports.preflight(block2);
       if (!current()) return dropped();
-      if (refused) return ports.settle(chat, block, { state: "empty", reason: refused });
-      ports.running(chat, block);
-      const found = await ports.searchImages(block.query, model, controller.signal);
+      if (refused) return ports.settle(chat, block2, { state: "empty", reason: refused });
+      ports.running(chat, block2);
+      const found = await ports.searchImages(block2.query, model, controller.signal);
       if (!current()) return dropped();
       const loadable = (await ports.probe(found, controller.signal)).filter((item) => item.url.startsWith("https://"));
       const used = ports.usedImageKeys();
       const first = (_a2 = loadable.find((item) => !used.has(imageKey2(item.url)))) != null ? _a2 : loadable[0];
       if (!current()) return dropped();
-      if (!first) return ports.settle(chat, block, { state: "empty" });
-      const placed = await this.place(block, first, current, controller.signal);
+      if (!first) return ports.settle(chat, block2, { state: "empty" });
+      const placed = await this.place(block2, first, current, controller.signal);
       if (placed.ok) {
-        ports.settle(chat, block, {
+        ports.settle(chat, block2, {
           state: "ready",
-          items: [{ candidate: first, inserted: block.nodeTitle }]
+          items: [{ candidate: first, inserted: block2.nodeTitle }]
         });
-      } else if (current()) ports.settle(chat, block, { state: "empty", reason: placed.reason });
+      } else if (current()) ports.settle(chat, block2, { state: "empty", reason: placed.reason });
       else dropped();
     } catch (error) {
       if (!current()) return dropped();
-      ports.settle(chat, block, { state: "failed", reason: errorMessage3(error) });
+      ports.settle(chat, block2, { state: "failed", reason: errorMessage3(error) });
     }
   }
   /**
@@ -70770,10 +70934,10 @@ var ChatImageFinder = class {
    * view's write refuses (the map in view is not the one the search came from, the card is gone, locked, being merged or being
    * worked on by an AI task, the map cannot be edited). The same checks run again inside the write, where nothing else can change the map.
    */
-  async place(block, candidate, alive, signal = new AbortController().signal) {
-    const cover = await this.coverBytes(block, candidate, signal);
+  async place(block2, candidate, alive, signal = new AbortController().signal) {
+    const cover = await this.coverBytes(block2, candidate, signal);
     if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
-    const work = () => this.ports.write(block, candidate, alive, cover);
+    const work = () => this.ports.write(block2, candidate, alive, cover);
     const run = this.writes.then(work, work);
     this.writes = run.catch(() => void 0);
     return run;
@@ -70811,8 +70975,8 @@ var ChatImageFinder = class {
    * The cover picture of a placed picture, downloaded before the write: only when the card has no cover and has not turned it
    * off (nothing is downloaded otherwise). The picture is checked by its bytes ({@link acceptImage}). Null when there is none to write.
    */
-  async coverBytes(block, candidate, signal) {
-    if (!this.ports.coverWanted(block)) return null;
+  async coverBytes(block2, candidate, signal) {
+    if (!this.ports.coverWanted(block2)) return null;
     let data;
     try {
       data = await this.download(candidate.url, signal);
@@ -71536,14 +71700,14 @@ function parseDefinitionsTable(detail) {
   const lines = detail.split(/\r?\n/);
   const start = lines.findIndex((line3) => line3.trim().startsWith("|"));
   if (start < 0) return null;
-  const block = [];
+  const block2 = [];
   for (const line3 of lines.slice(start)) {
     if (!line3.trim().startsWith("|")) break;
-    block.push(line3);
+    block2.push(line3);
   }
-  if (block.length < 3 || cells(block[0]).length !== 3 || !isSeparator(block[1])) return null;
+  if (block2.length < 3 || cells(block2[0]).length !== 3 || !isSeparator(block2[1])) return null;
   const items = [];
-  for (const row of block.slice(2)) {
+  for (const row of block2.slice(2)) {
     const parts = cells(row);
     if (parts.length !== 3) return null;
     const [label, value, reason] = parts.map((part) => decode(part.trim()));
@@ -73783,11 +73947,11 @@ var MapChatConversation = class {
 };
 
 // experiences/visual-map/map-chat-turn-record.ts
-var missedImageRows = (blocks) => blocks.flatMap((block) => {
+var missedImageRows = (blocks) => blocks.flatMap((block2) => {
   var _a2, _b2;
-  if (block.state === "searching" || placedImage(block)) return [];
-  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
-  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
+  if (block2.state === "searching" || placedImage(block2)) return [];
+  const why2 = block2.state === "stopped" ? t("ui.map_chat_images_stopped") : block2.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block2.reason) != null ? _a2 : "") : (_b2 = block2.reason) != null ? _b2 : t("ui.map_chat_images_none");
+  return [{ status: block2.state === "failed" ? "failed" : "skipped", text: `${block2.nodeTitle}: ${why2}` }];
 });
 var plainLines = (lines) => onceImageLines(lines).flatMap((line3) => {
   const settled2 = settledLine(line3);
@@ -73867,9 +74031,9 @@ var MapChatTurnRecord = class {
    * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
    * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
    */
-  images(block) {
+  images(block2) {
     var _a2;
-    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block)) ? this.answer.images : [block];
+    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block2)) ? this.answer.images : [block2];
     const placed = blocks.flatMap((entry) => {
       var _a3;
       const item = placedImage(entry);
@@ -76096,8 +76260,8 @@ function richText(element) {
       out += "\n";
       return;
     }
-    const block = BLOCK_TAGS.has(name2);
-    if (block) newline();
+    const block2 = BLOCK_TAGS.has(name2);
+    if (block2) newline();
     for (const child of current.children) {
       if (typeof child !== "string") {
         walk2(child);
@@ -76107,7 +76271,7 @@ function richText(element) {
       if (!out || out.endsWith("\n") || out.endsWith(" ")) piece = piece.trimStart();
       out += piece;
     }
-    if (block) newline();
+    if (block2) newline();
   };
   walk2(element);
   return out.split("\n").map((part) => part.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -79411,28 +79575,28 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
       },
       readNote: (path, map) => this.plugin.repo.readNote(path, map),
       modelLabel: (model) => this.plugin.modelLabel(model),
-      preflight: (block) => this.chatImagePreflight(block),
+      preflight: (block2) => this.chatImagePreflight(block2),
       confirmUsage: (model) => this.plugin.confirmAiUsage(model, async () => void 0),
       searchImages: (query, model, signal) => this.plugin.searchImages(query, model, signal),
       probe: (found, signal) => this.chatProbeImages(found, signal),
       usedImageKeys: () => this.imageKeysOfMap(),
-      coverWanted: (block) => {
-        const node = this.chatCoverTarget(block);
+      coverWanted: (block2) => {
+        const node = this.chatCoverTarget(block2);
         return !!node && this.chatHasNoCover(node);
       },
       fetchBytes: (url) => this.chatFetchImage(url),
-      write: (block, candidate, alive, cover) => this.chatPlaceImageNow(block, candidate, alive, cover),
+      write: (block2, candidate, alive, cover) => this.chatPlaceImageNow(block2, candidate, alive, cover),
       added: (chat, blocks) => {
         var _a2;
-        for (const block of blocks) {
-          chat.addImages(block);
-          if (this.chatLastRecord) this.chatRecordSession.images.set(block, this.chatLastRecord);
+        for (const block2 of blocks) {
+          chat.addImages(block2);
+          if (this.chatLastRecord) this.chatRecordSession.images.set(block2, this.chatLastRecord);
         }
-        for (const block of blocks)
-          if (block.state !== "searching") (_a2 = this.chatRecordSession.images.get(block)) == null ? void 0 : _a2.images(block);
+        for (const block2 of blocks)
+          if (block2.state !== "searching") (_a2 = this.chatRecordSession.images.get(block2)) == null ? void 0 : _a2.images(block2);
       },
-      running: (chat, block) => chat.markImagesRunning(block),
-      settle: (chat, block, patch) => this.settleChatImages(chat, block, patch)
+      running: (chat, block2) => chat.markImagesRunning(block2),
+      settle: (chat, block2, patch) => this.settleChatImages(chat, block2, patch)
     }));
     /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
     __publicField(this, "renderHold", 0);
@@ -98021,10 +98185,10 @@ ${note.detail.trim()}` : "",
     for (const item of chat.completedTurns()) this.chatRecordSession.markLogged(item.answer);
     this.relocateMapChat();
   }
-  settleChatImages(chat, block, patch) {
-    chat.settleImages(block, patch);
-    const record = this.chatRecordSession.images.get(block);
-    record == null ? void 0 : record.images(block);
+  settleChatImages(chat, block2, patch) {
+    chat.settleImages(block2, patch);
+    const record = this.chatRecordSession.images.get(block2);
+    record == null ? void 0 : record.images(block2);
     record == null ? void 0 : record.relines();
   }
   releaseChatTask() {
@@ -99458,10 +99622,10 @@ ${note.detail.trim()}` : "",
     return keys;
   }
   /** Whether a picture can go into the card of `block` now: the card, or the reason in words. */
-  chatImageFence(block) {
-    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
+  chatImageFence(block2) {
+    if (this.closed || !this.map || this.path !== block2.mapPath || this.map.id !== block2.mapId)
       return { reason: "ui.map_chat_images_stale_map" };
-    const node = this.map.nodes.find((candidate) => candidate.id === block.nodeId);
+    const node = this.map.nodes.find((candidate) => candidate.id === block2.nodeId);
     if (!node) return { reason: "ui.map_chat_images_stale_gone" };
     if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
     if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
@@ -99469,16 +99633,16 @@ ${note.detail.trim()}` : "",
     return { node };
   }
   /** Why no search may start for the card of `block` (map switched, AI lock, being merged, an AI task on it), or null. No AI call is spent. */
-  async chatImagePreflight(block) {
+  async chatImagePreflight(block2) {
     var _a2;
-    const fence = this.chatImageFence(block);
-    if ("reason" in fence) return t(fence.reason);
-    const note = await this.plugin.repo.readNote(fence.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const fence2 = this.chatImageFence(block2);
+    if ("reason" in fence2) return t(fence2.reason);
+    const note = await this.plugin.repo.readNote(fence2.node.path, (_a2 = this.map) != null ? _a2 : void 0);
     return note.aiLocked ? t("ui.ai_locked_notice") : null;
   }
-  async chatPlaceImageNow(block, candidate, alive, cover) {
-    const fence = () => alive() ? this.chatImageFence(block) : { reason: "ui.map_chat_images_stale_map" };
-    const first = fence();
+  async chatPlaceImageNow(block2, candidate, alive, cover) {
+    const fence2 = () => alive() ? this.chatImageFence(block2) : { reason: "ui.map_chat_images_stale_map" };
+    const first = fence2();
     if ("reason" in first) return { ok: false, reason: t(first.reason) };
     const outcome = {
       result: { ok: false, reason: t("ui.map_chat_images_stale_map") },
@@ -99491,7 +99655,7 @@ ${note.detail.trim()}` : "",
         var _a2, _b2;
         const historyMark = this.history.mark();
         try {
-          const again = fence();
+          const again = fence2();
           if ("reason" in again) {
             outcome.result = { ok: false, reason: t(again.reason) };
             return;
@@ -99506,7 +99670,7 @@ ${note.detail.trim()}` : "",
             const addition = dedupeImageEmbeds(
               imageMarkdown({
                 ...candidate,
-                title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+                title: cleanImageTitle(candidate.title) || cleanImageTitle(block2.nodeTitle) || t("ui.map_chat_image_alt")
               }),
               { seen: imageKeysIn(note.detail) }
             );
@@ -99523,7 +99687,7 @@ ${addition}` : addition },
             return;
           }
           if (cover) {
-            const coverEntry = await this.chatCoverWrite(block, cover, alive).catch(() => null);
+            const coverEntry = await this.chatCoverWrite(block2, cover, alive).catch(() => null);
             if (coverEntry) {
               collected.push(coverEntry);
               outcome.coverWritten = true;
@@ -99532,7 +99696,7 @@ ${addition}` : addition },
         } finally {
           collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
           const entry = collected.undoEntry;
-          const sameHistory = !this.closed && this.history.mark().epoch === historyMark.epoch && this.path === block.mapPath && ((_b2 = this.map) == null ? void 0 : _b2.id) === block.mapId;
+          const sameHistory = !this.closed && this.history.mark().epoch === historyMark.epoch && this.path === block2.mapPath && ((_b2 = this.map) == null ? void 0 : _b2.id) === block2.mapId;
           if (entry && sameHistory) {
             this.history.pushSolo(entry);
             this.updateHistoryButtons();
@@ -99550,9 +99714,9 @@ ${addition}` : addition },
     return (await (0, import_obsidian39.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
   }
   /** The card of `block` when it may take a cover picture now (same map, not locked by AIM, not merging), else null. */
-  chatCoverTarget(block) {
-    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId) return null;
-    const node = this.map.nodes.find((item) => item.id === block.nodeId);
+  chatCoverTarget(block2) {
+    if (this.closed || !this.map || this.path !== block2.mapPath || this.map.id !== block2.mapId) return null;
+    const node = this.map.nodes.find((item) => item.id === block2.nodeId);
     return node && !this.isMerging(node.id) ? node : null;
   }
   /** A cover set by hand (or `topic-cover: none`, or a link that does not resolve now) is the owner's and stays. */
@@ -99569,8 +99733,8 @@ ${addition}` : addition },
    * Makes the downloaded picture the card's cover: stored beside the note, embedded in `## User Notes` and set as `topic-cover`
    * (one transaction). Runs inside the write of the picture; the card is checked again here, its AI lock too.
    */
-  async chatCoverWrite(block, cover, alive) {
-    const node = this.chatCoverTarget(block);
+  async chatCoverWrite(block2, cover, alive) {
+    const node = this.chatCoverTarget(block2);
     if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return null;
     if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return null;
     const viewport = clone(this.map.viewport);
@@ -99620,12 +99784,12 @@ ${addition}` : addition },
       answer: answer.text,
       lines: answer.lines.map((line3) => settledLine(line3).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
-      images: ((_f = answer.images) != null ? _f : []).map((block) => ({
-        nodeTitle: block.nodeTitle,
-        query: block.query,
-        state: block.state,
-        ...block.reason ? { reason: block.reason } : {},
-        items: block.items.map((entry) => ({
+      images: ((_f = answer.images) != null ? _f : []).map((block2) => ({
+        nodeTitle: block2.nodeTitle,
+        query: block2.query,
+        state: block2.state,
+        ...block2.reason ? { reason: block2.reason } : {},
+        items: block2.items.map((entry) => ({
           title: entry.candidate.title,
           source: entry.candidate.source,
           ...entry.inserted ? { inserted: entry.inserted } : {}
@@ -105046,7 +105210,7 @@ function missingStyleRef(plugin, kind) {
 }
 function isRetiredVoice(ref) {
   const parsed = parseRecipeRef(ref, "voice");
-  return (parsed == null ? void 0 : parsed.kind) === "builtin" && BUILTIN_BLOCKS.some((block) => block.category === "tone" && block.id === parsed.id && block.retired === true);
+  return (parsed == null ? void 0 : parsed.kind) === "builtin" && BUILTIN_BLOCKS.some((block2) => block2.category === "tone" && block2.id === parsed.id && block2.retired === true);
 }
 function kindStyleLine(item) {
   const apart = (name2, source) => !item.aimOnly && source === "style" ? t("ui.note_style_set_apart_0", name2) : name2;
@@ -106564,14 +106728,14 @@ function splitWikilink(inner) {
   const alias = inner.slice(bar).replace(/^\\?\|/, "").trim();
   return { target, alias: alias || void 0 };
 }
-var escapeRegExp2 = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var escapeRegExp3 = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 var WRITEBACK_BACKUP_LINE = (() => {
   const marker3 = "\0";
   const shapes = NOTE_LANGUAGES.map(
     (language2) => translate(language2, "note.writeback_fresh_replaced_0", marker3).split(marker3)
   ).filter((parts) => parts.length === 2);
   const path = "[^\\n]+ \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md";
-  const texts = shapes.map(([head2, tail]) => `${escapeRegExp2(head2)}${path}${escapeRegExp2(tail)}`).join("|");
+  const texts = shapes.map(([head2, tail]) => `${escapeRegExp3(head2)}${path}${escapeRegExp3(tail)}`).join("|");
   return new RegExp(`^(?:[ \\t]*>[ \\t]?)*(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000(?:${texts})[ \\t]*$`);
 })();
 function dropWritebackBackupLines(text11) {
@@ -109040,10 +109204,10 @@ ${detail}`;
     const child = new import_obsidian47.Component();
     this.component.addChild(child);
     try {
-      const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian47.MarkdownRenderer.render(this.app, `${fence}mermaid
+      const fence2 = source.includes("```") ? "~~~~" : "```";
+      await import_obsidian47.MarkdownRenderer.render(this.app, `${fence2}mermaid
 ${source}
-${fence}`, host, "", child);
+${fence2}`, host, "", child);
       await this.settleMermaid(host, ticket);
       const unit2 = topLevelMermaid(host)[0];
       const svg = unit2 ? drawnSvg(unit2) : null;
@@ -110370,8 +110534,8 @@ function mermaidLabelSpans(source) {
       if (note) add(tailSpan(text11, note[0].length, offset));
       const message = /^\s*[^\s:]+\s*(?:-->>|->>|--x|-x|--\)|-\)|-->|->)[+-]?\s*[^\s:]+\s*:/.exec(text11);
       if (message) add(tailSpan(text11, message[0].length, offset));
-      const block = /^\s*(?:loop|alt|else|opt|par|and|critical|option|break|rect)\b/i.exec(text11);
-      if (block && !/^\s*rect\b/i.test(text11)) add(tailSpan(text11, block[0].length, offset));
+      const block2 = /^\s*(?:loop|alt|else|opt|par|and|critical|option|break|rect)\b/i.exec(text11);
+      if (block2 && !/^\s*rect\b/i.test(text11)) add(tailSpan(text11, block2[0].length, offset));
     }
     const titled = /^\s*(?:pie\s+(?:showData\s+)?)?(?:title|accTitle)\s/i.exec(text11);
     if (type !== "flowchart" && type !== "graph" && titled) add(tailSpan(text11, titled[0].length, offset));
@@ -111795,10 +111959,10 @@ var ClaudeTranscriptFacts = class {
     }
     if (record.parent_tool_use_id) return;
     if (record.type === "assistant") {
-      for (const block of (_f = (_e = record.message) == null ? void 0 : _e.content) != null ? _f : []) {
-        if (block.type === "tool_use" && block.name === "StructuredOutput") this.structured = true;
-        else if (!this.fromStream && block.type === "text" && !this.structured && typeof block.text === "string") {
-          this.texts.push(block.text.slice(0, TEXT_KEEP_CHARS));
+      for (const block2 of (_f = (_e = record.message) == null ? void 0 : _e.content) != null ? _f : []) {
+        if (block2.type === "tool_use" && block2.name === "StructuredOutput") this.structured = true;
+        else if (!this.fromStream && block2.type === "text" && !this.structured && typeof block2.text === "string") {
+          this.texts.push(block2.text.slice(0, TEXT_KEEP_CHARS));
         }
       }
     } else if (record.type === "user" && JSON.stringify((_g = record.message) != null ? _g : "").includes("structured-output-enforce"))
@@ -111899,16 +112063,16 @@ var ClaudeStreamObserver = class {
     if (record.type === "system") this.system(record);
     else if (record.type === "stream_event") this.event(record.event);
     else if (record.type === "assistant") {
-      for (const block of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : [])
-        if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
-          this.toolStart(block.id, block.name);
-          this.toolInput(block.id, block.input);
-          if (block.name === "StructuredOutput") this.structuredInput(block.id, block.input);
+      for (const block2 of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : [])
+        if (block2.type === "tool_use" && typeof block2.id === "string" && typeof block2.name === "string") {
+          this.toolStart(block2.id, block2.name);
+          this.toolInput(block2.id, block2.input);
+          if (block2.name === "StructuredOutput") this.structuredInput(block2.id, block2.input);
         }
     } else if (record.type === "user") {
-      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : [])
-        if (block.type === "tool_result" && typeof block.tool_use_id === "string")
-          this.toolResult(block.tool_use_id, block.is_error === true, block.content);
+      for (const block2 of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : [])
+        if (block2.type === "tool_result" && typeof block2.tool_use_id === "string")
+          this.toolResult(block2.tool_use_id, block2.is_error === true, block2.content);
     }
   }
   /** The CLI's own retries: a request retried after an API error, a turn switched to the fallback model. */
@@ -111939,24 +112103,24 @@ var ClaudeStreamObserver = class {
     if (!event) return;
     if (event.type === "message_start") this.blocks.clear();
     else if (event.type === "content_block_start" && typeof event.index === "number") {
-      const block = event.content_block;
-      if ((block == null ? void 0 : block.type) === "text") this.facts.textStart();
-      if ((block == null ? void 0 : block.type) === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
-        this.blocks.set(event.index, { id: block.id, name: block.name, json: "" });
-        this.toolStart(block.id, block.name);
+      const block2 = event.content_block;
+      if ((block2 == null ? void 0 : block2.type) === "text") this.facts.textStart();
+      if ((block2 == null ? void 0 : block2.type) === "tool_use" && typeof block2.id === "string" && typeof block2.name === "string") {
+        this.blocks.set(event.index, { id: block2.id, name: block2.name, json: "" });
+        this.toolStart(block2.id, block2.name);
       }
     } else if (event.type === "content_block_delta" && event.delta) {
       if (event.delta.type === "text_delta") {
         (_b2 = (_a2 = this.milestoneData).firstTextAt) != null ? _b2 : _a2.firstTextAt = this.now();
         if (typeof event.delta.text === "string") this.facts.textDelta(event.delta.text);
       } else if (event.delta.type === "input_json_delta" && typeof event.delta.partial_json === "string" && typeof event.index === "number") {
-        const block = this.blocks.get(event.index);
-        if (!block) return;
-        block.json += event.delta.partial_json;
-        if (block.id !== this.structuredId) return;
+        const block2 = this.blocks.get(event.index);
+        if (!block2) return;
+        block2.json += event.delta.partial_json;
+        if (block2.id !== this.structuredId) return;
         this.preview.append(event.delta.partial_json);
         this.structuredJson += event.delta.partial_json;
-        const attempt = this.attempts.get(block.id);
+        const attempt = this.attempts.get(block2.id);
         if (attempt) attempt.chars = this.structuredJson.length;
         const json = this.structuredJson;
         this.call(() => {
@@ -111971,10 +112135,10 @@ var ClaudeStreamObserver = class {
         });
       }
     } else if (event.type === "content_block_stop" && typeof event.index === "number") {
-      const block = this.blocks.get(event.index);
-      if (block && block.name !== "StructuredOutput" && block.json) {
+      const block2 = this.blocks.get(event.index);
+      if (block2 && block2.name !== "StructuredOutput" && block2.json) {
         try {
-          this.toolInput(block.id, JSON.parse(block.json));
+          this.toolInput(block2.id, JSON.parse(block2.json));
         } catch (e) {
         }
       }
@@ -113543,7 +113707,8 @@ var AiTaskService = class {
     const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
     const webEvents = [];
-    const keepsEvents = shape2.argumentEvidenceNeedIds !== void 0;
+    const fullText = countsWeb && readerFacingDetail(input2) && wantsFullText(context);
+    const keepsEvents = shape2.argumentEvidenceNeedIds !== void 0 || fullText;
     const webHook = countsWeb ? (event) => {
       if (event.method === "item/completed") retrievals++;
       if (keepsEvents) webEvents.push(event);
@@ -113631,7 +113796,7 @@ var AiTaskService = class {
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
-      if (keepsEvents)
+      if (keepsEvents && shape2.argumentEvidenceNeedIds !== void 0)
         result.evidence = {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
@@ -113699,6 +113864,11 @@ var AiTaskService = class {
           }
         }
         result.formatIssues = issues;
+      }
+      if (fullText) {
+        const opened = openedUrlsFromEvents(webEvents);
+        const files = this.options.fetchPage ? await fetchFullTexts(opened, this.options.fetchPage) : [];
+        result.detail = attachFullText(result.detail, files, outputLanguage2);
       }
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,
@@ -114840,15 +115010,15 @@ function locateImageToken(view, image, markdown, matches2) {
     return { text: match[0], occurrence: same2.indexOf(match), count: same2.length };
   };
   if (matches2.length === 1) return toToken(matches2[0]);
-  const block = image.closest("[data-vam-line-start]");
-  if (block) {
+  const block2 = image.closest("[data-vam-line-start]");
+  if (block2) {
     const lineOffset = (line3) => {
       let offset = 0;
       for (let index = 0; index < line3 && offset >= 0; index++) offset = markdown.indexOf("\n", offset) + 1 || -1;
       return offset < 0 ? markdown.length : offset;
     };
-    const from = lineOffset(Number(block.dataset.vamLineStart));
-    const to = lineOffset(Number(block.dataset.vamLineEnd) + 1);
+    const from = lineOffset(Number(block2.dataset.vamLineStart));
+    const to = lineOffset(Number(block2.dataset.vamLineEnd) + 1);
     const inside2 = matches2.filter((match) => {
       var _a2, _b2;
       return ((_a2 = match.index) != null ? _a2 : -1) >= from && ((_b2 = match.index) != null ? _b2 : -1) < to;
@@ -116176,6 +116346,16 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       codexRuntime: (directory, local) => this.runtime(directory, local),
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidSyntax: this.mermaidSyntax,
+      // Full-text requests: core/full-text.ts only asks for raw GitHub file addresses and caps size and time itself.
+      fetchPage: async (request) => {
+        const response = await (0, import_obsidian53.requestUrl)(request);
+        return {
+          status: response.status,
+          headers: response.headers,
+          text: response.text,
+          arrayBuffer: response.arrayBuffer
+        };
+      },
       mermaidParses: async (code3) => {
         try {
           const mermaid = await (0, import_obsidian53.loadMermaid)();

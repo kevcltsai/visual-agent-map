@@ -1795,6 +1795,18 @@ export const en = {
   "detail.disagreements_and_limits": "Disagreements and limits",
   "detail.open_questions_to_check": "Open questions to check",
   "detail.sources_heading": "Sources",
+  "detail.full_text_heading": "Full text: {0}",
+  "detail.full_text_origin": "Fetched by VAM directly from {0} and inserted word for word; not rewritten by the AI.",
+  "detail.full_text_missing_prefix": "Full text not retrieved: ",
+  "detail.full_text_missing": "{0}. The rest of this note is the AI's summary of the page, not the original text.",
+  "detail.full_text_reason_network": "{0} could not be reached or timed out",
+  "detail.full_text_reason_status": "the address of {0} returned no file",
+  "detail.full_text_reason_not_text": "{0} is not a text file",
+  "detail.full_text_reason_too_large": "{0} is over the 200 KB limit and was not inserted",
+  "detail.full_text_reason_no_url":
+    "the AI did not open a raw file address this time (only GitHub files are supported)",
+  "research.full_text":
+    "The user wants the full original text of a file. Open the file itself with the page tool; for a GitHub file use its raw address (https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>). After your reply, VAM fetches that raw file itself and inserts it word for word with its address. Do not paste the file yourself, and never present a summary as the full text: say it is a summary.",
   "detail.update_log": "Update log",
   "detail.description_core_conclusions":
     "Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.",

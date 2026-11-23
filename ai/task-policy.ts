@@ -1,6 +1,7 @@
 import type { ReasoningLevel } from "./types";
 import type { TaskContext } from "./types";
 import { translate, type ContentLanguage } from "../i18n";
+import { wantsFullText } from "../core/full-text";
 
 export function normalizeReasoningLevel(value: unknown): ReasoningLevel {
   return value === "auto" || value === "medium" || value === "high" ? value : "low";
@@ -27,5 +28,8 @@ export function researchGuidance(context: TaskContext, language: ContentLanguage
   const web = `${depth} ${translate(language, "research.web")}`;
   // A standard research (Research mode, whatever its answer length) must search; the service also checks it did. Every helper request (synthesis, merge, decompose) keep the text above.
   const standard = (context.mode ?? "task") === "task";
-  return standard ? `${web} ${translate(language, "research.web_required")}` : web;
+  if (!standard) return web;
+  const required = `${web} ${translate(language, "research.web_required")}`;
+  // Asked for the original text: the service fetches the raw file the provider opens, so the model is told to open it, not copy it.
+  return wantsFullText(context) ? `${required} ${translate(language, "research.full_text")}` : required;
 }

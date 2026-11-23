@@ -30,7 +30,8 @@ import { aiRuntimeForModel } from "./ai-runtime-service";
 import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondenseCalls } from "./source-gateway";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
-import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
+import { openedUrlsFromEvents, searchQueriesFromEvents, type FetchPage } from "./argument-map/source-proof";
+import { attachFullText, fetchFullTexts, wantsFullText } from "./full-text";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -89,6 +90,8 @@ export interface AiTaskServiceOptions {
   mermaidSyntax?: MermaidSyntaxCheck;
   /** The "Add diagrams after research" setting. Absent: diagrams are on. */
   diagramsEnabled?: () => boolean;
+  /** GET of a raw GitHub file for a full-text request (Obsidian requestUrl). Absent: nothing is fetched and the note says so. */
+  fetchPage?: FetchPage;
 }
 
 /** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds and count repairs are "other"; chart calls name their own. */
@@ -240,7 +243,9 @@ export class AiTaskService {
     let retrievals = 0;
     // Argument-evidence only: this call's web events, kept so the pages the provider opened can back a source proof.
     const webEvents: CodexWebSearchEvent[] = [];
-    const keepsEvents = shape.argumentEvidenceNeedIds !== undefined;
+    // A standard research that asks for a file's full text: the raw files the provider opened are fetched after the reply.
+    const fullText = countsWeb && readerFacingDetail(input) && wantsFullText(context);
+    const keepsEvents = shape.argumentEvidenceNeedIds !== undefined || fullText;
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {
           if (event.method === "item/completed") retrievals++;
@@ -339,7 +344,7 @@ export class AiTaskService {
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
-      if (keepsEvents)
+      if (keepsEvents && shape.argumentEvidenceNeedIds !== undefined)
         result.evidence = {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
@@ -421,6 +426,12 @@ export class AiTaskService {
           }
         }
         result.formatIssues = issues;
+      }
+      // After the count repair, so the repair never sees (or rewrites) the fetched text.
+      if (fullText) {
+        const opened = openedUrlsFromEvents(webEvents);
+        const files = this.options.fetchPage ? await fetchFullTexts(opened, this.options.fetchPage) : [];
+        result.detail = attachFullText(result.detail, files, outputLanguage);
       }
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,

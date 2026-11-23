@@ -39,9 +39,16 @@ const looksLikeYoutube = (rawUrl: string): boolean => {
   }
 };
 
-/** `detail` with only the YouTube embeds of pages in `openedUrls` kept (rewritten to `https://www.youtube.com/watch?v=ID`). */
-export function keepOpenedVideoEmbeds(detail: string, openedUrls: readonly string[]): string {
+/**
+ * `detail` with only the YouTube embeds of pages in `openedUrls` kept (rewritten to `https://www.youtube.com/watch?v=ID`).
+ * A video already embedded in `existingDetail` (the note this task rewrites: pasted by the user or kept by earlier research) stays too.
+ */
+export function keepOpenedVideoEmbeds(detail: string, openedUrls: readonly string[], existingDetail = ""): string {
   const opened = new Set<string>();
+  for (const m of existingDetail.matchAll(EMBED)) {
+    const id = youtubeVideoId(m[2] ?? m[3] ?? "");
+    if (id) opened.add(id);
+  }
   for (const url of openedUrls) {
     const id = youtubeVideoId(url);
     if (id) opened.add(id);

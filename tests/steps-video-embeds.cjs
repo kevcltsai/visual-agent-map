@@ -52,8 +52,15 @@ test('an embed inside a sentence is removed alone; nothing else changes', () => 
   assert.equal(keep(`Watch ![](https://youtu.be/${B}) now`, []), 'Watch  now');
   assert.equal(keep('', []), '');
 });
+test('an id already embedded in the existing note survives a rewrite; a new un-opened id is still removed', () => {
+  const C = 'abcdefghijk';
+  const existing = `Intro\n![](https://youtu.be/${B})\n`;
+  const out = keepOpenedVideoEmbeds(`Rewritten\n![](https://www.youtube.com/watch?v=${B})\n![](https://www.youtube.com/watch?v=${C})\n`, [], existing);
+  assert.equal(out, `Rewritten\n![](https://www.youtube.com/watch?v=${B})\n`);
+  assert.equal(keepOpenedVideoEmbeds(`![](https://www.youtube.com/watch?v=${B})`, [], ''), '');
+});
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
-  assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]\)/);
+  assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\], input\.detail\)/);
   assert.match(source, /if \(keepsEvents \|\| countsWeb\) webEvents\.push\(event\)/);
 });

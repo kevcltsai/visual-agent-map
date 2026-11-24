@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, root, load, plain } = require('../support.cjs');
+const { test, root, load } = require('../support.cjs');
 test('product architecture keeps shell, core, and experiences separated', () => {
   const shell = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.doesNotMatch(shell, /class VisualAgentMapView/);
@@ -19,28 +19,6 @@ test('product architecture keeps shell, core, and experiences separated', () => 
     assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `ai/${sharedAi} must stay experience-independent`);
     assert.doesNotMatch(source, /experiences\//, `ai/${sharedAi} must not import an experience`);
   }
-});
-test('thinking artifacts route through shared core without view coupling', async () => {
-  const artifacts = load('core/thinking-artifact.ts');
-  const { ExperienceRouter } = load('core/experience-router.ts');
-  const artifact = artifacts.createThinkingArtifact({
-    id: 'artifact-1',
-    kind: 'insight',
-    title: 'A useful insight',
-    content: 'The discussion exposed a tradeoff.',
-    origin: { experience: 'coffee-tables', sessionId: 'table-1' },
-    sources: [{ label: 'Coffee Table', experience: 'coffee-tables', sessionId: 'table-1' }]
-  });
-  assert.equal(artifact.version, 1);
-  const router = new ExperienceRouter();
-  let received;
-  const unregister = router.register('visual-map', async value => { received = value; });
-  assert.equal(router.canHandoff('visual-map'), true);
-  await router.handoff({ target: 'visual-map', artifact });
-  assert.deepEqual(plain(received), plain(artifact));
-  unregister();
-  assert.equal(router.canHandoff('visual-map'), false);
-  await assert.rejects(() => router.handoff({ target: 'visual-map', artifact }), /not available/);
 });
 
 test('shared error message preserves the raw message across realms and stringifies other thrown values', () => {

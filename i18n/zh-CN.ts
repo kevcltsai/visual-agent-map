@@ -2074,8 +2074,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.batch_remove_rollback_failed": "批量移除失败，且无法完整恢复",
   "error.copy_rollback_restore_failed": "复原复制失败，且无法完整回复",
   "error.batch_copy_rollback_failed": "批量复制失败，且无法完整恢复",
-  "error.reframing_stopped": "整理已停止。",
-  "error.reframing_over_budget": "来源超过整理预算；请选单条洞见，或手动编辑创建。",
   "note.copy_suffix": "副本",
   "note.source_topic_label": "来源议题：",
   "error.outline_generate_empty_topic": "请先输入研究主题，再生成大纲。",

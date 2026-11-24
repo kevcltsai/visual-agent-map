@@ -1,8 +1,6 @@
 {
   "dirs": [
-    "core/steps/reframe",
     "ai/runtime/messages",
-    "core/reframing-service.ts",
     "main.ts"
   ],
   "allow": [

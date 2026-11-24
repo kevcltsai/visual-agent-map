@@ -206,11 +206,9 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
   }
 });
 
-test('collect snapshots: Reframe, Markdown context', async () => {
+test('collect snapshots: Markdown context and shared services', async () => {
   const { i18n } = loadSource(`export * as i18n from './i18n';`);
   i18n.setUiLanguage('en');
-  const { buildReframePrompt } = support.load('core/reframing-service.ts', { obsidian: support.obsidian });
-  for (const [language, tag] of LANGUAGES) record(`reframe.${tag}`, 'core/reframing-service.ts buildReframePrompt', language, buildReframePrompt({ language, question: 'Direction question', context: 'Direction context', source: 'Source thinking text' }));
   // Share translation prompts are written in English for every target; the target and source languages are named inside.
   const { buildShareTranslatePrompt, buildShareTranslateLabelsPrompt, SHARE_TRANSLATE_SCHEMA } = support.load('experiences/sharing/share-translate-service.ts', { obsidian: support.obsidian });
   const shareItems = [{ id: '1', text: 'Heat changes \u27e61/\u27e7 and \u27e62\u27e7starches\u27e6/2\u27e7.' }, { id: '2', text: 'Roast' }];

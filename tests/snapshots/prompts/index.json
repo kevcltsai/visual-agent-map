@@ -876,21 +876,6 @@
       "language": "zh-CN",
       "schema": false
     },
-    "reframe.en": {
-      "builder": "core/reframing-service.ts buildReframePrompt",
-      "language": "en",
-      "schema": false
-    },
-    "reframe.zh": {
-      "builder": "core/reframing-service.ts buildReframePrompt",
-      "language": "zh-TW",
-      "schema": false
-    },
-    "reframe.zh-CN": {
-      "builder": "core/reframing-service.ts buildReframePrompt",
-      "language": "zh-CN",
-      "schema": false
-    },
     "service.argument-evidence-context.en": {
       "builder": "AiTaskService instructions: argument-evidence contract, one need carries a scope context (period and definitions)",
       "language": "en",

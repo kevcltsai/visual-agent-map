@@ -2074,8 +2074,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.batch_remove_rollback_failed": "批次移除失敗，且無法完整復原",
   "error.copy_rollback_restore_failed": "復原複製失敗，且無法完整回復",
   "error.batch_copy_rollback_failed": "批次複製失敗，且無法完整復原",
-  "error.reframing_stopped": "整理已停止。",
-  "error.reframing_over_budget": "來源超過整理預算；請選單條洞見，或手動編輯建立。",
   "note.copy_suffix": "副本",
   "note.source_topic_label": "來源議題：",
   "error.outline_generate_empty_topic": "請先輸入研究主題，再生成大綱。",

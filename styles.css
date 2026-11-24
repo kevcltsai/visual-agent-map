@@ -2410,3 +2410,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-figure .fig-box { fill: var(--interactive-accent); fill-opacity: 0.25; stroke: var(--interactive-accent); stroke-width: 1.5; }
 .vam-figure .fig-arc { stroke: var(--interactive-accent); stroke-width: 1.5; fill: none; }
 .vam-figure .vam-figure-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+
+/* Facebook and Instagram video card in rendered Markdown (experiences/markdown-context/social-video-cards.ts). */
+.vam-social-video-card { margin: 8px 0; }
+.vam-social-video-stage { border-radius: 8px; background: var(--background-modifier-hover); aspect-ratio: 16 / 9; max-width: 560px; display: grid; place-items: center; overflow: hidden; }
+.vam-social-video-stage.vam-social-video-tall { aspect-ratio: 9 / 16; max-width: 360px; }
+.vam-social-video-frame { width: 100%; height: 100%; border: 0; }
+.vam-social-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }

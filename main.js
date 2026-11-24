@@ -108019,6 +108019,17 @@ function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
   flush();
   return out.join("");
 }
+async function dropUnplayableVideos(detail, existingDetail, check, signal) {
+  if (!check) return detail;
+  const existing = embeddedIds(existingDetail);
+  const ids2 = [...embeddedIds(detail)].filter((id) => !existing.has(id));
+  if (!ids2.length) return detail;
+  const verdicts = await Promise.all(ids2.map((id) => check(id, signal).catch(() => null)));
+  const bad2 = new Set(ids2.filter((_, i) => verdicts[i] === false));
+  if (!bad2.size) return detail;
+  const good = ids2.filter((id) => !bad2.has(id)).map((id) => `https://www.youtube.com/watch?v=${id}`);
+  return keepOpenedVideoEmbeds(detail, good, existingDetail);
+}
 
 // experiences/sharing/share-code.ts
 var FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
@@ -116158,7 +116169,10 @@ var AiTaskService = class {
           searchQueries: searchQueriesFromEvents(webEvents)
         };
       const videoFilter = ((_h = context.mode) != null ? _h : "task") === "task" && role === void 0 && !input2.countRepair ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] } : null;
-      if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input2.detail);
+      if (videoFilter) {
+        result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input2.detail);
+        result.detail = await dropUnplayableVideos(result.detail, input2.detail, this.options.videoPlayable, signal);
+      }
       if (readerFacingDetail(input2)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage2, input2.detailTemplate, input2);
@@ -116213,7 +116227,12 @@ var AiTaskService = class {
             );
             result = {
               ...result,
-              detail: videoFilter ? keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input2.detail) : repaired.detail
+              detail: videoFilter ? await dropUnplayableVideos(
+                keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input2.detail),
+                input2.detail,
+                this.options.videoPlayable,
+                signal
+              ) : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage2), template2), template2);
           } catch (error) {
@@ -118725,6 +118744,22 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
           text: response.text,
           arrayBuffer: response.arrayBuffer
         };
+      },
+      // YouTube oEmbed: only the video address goes to youtube.com. 401/403/404 = private, embedding off or deleted; anything else cannot be told.
+      videoPlayable: async (id, signal) => {
+        if (signal == null ? void 0 : signal.aborted) return null;
+        try {
+          const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+          const response = await Promise.race([
+            (0, import_obsidian53.requestUrl)({ url, method: "GET", throw: false }),
+            new Promise((resolve) => window.setTimeout(() => resolve(null), 5e3))
+          ]);
+          if (!response) return null;
+          if (response.status === 401 || response.status === 403 || response.status === 404) return false;
+          return response.status === 200 ? true : null;
+        } catch (e) {
+          return null;
+        }
       },
       mermaidParses: async (code3) => {
         try {

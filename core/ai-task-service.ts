@@ -32,7 +32,7 @@ import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
-import { keepOpenedVideoEmbeds } from "./video-embeds";
+import { dropUnplayableVideos, keepOpenedVideoEmbeds, type VideoPlayableCheck } from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -93,6 +93,8 @@ export interface AiTaskServiceOptions {
   diagramsEnabled?: () => boolean;
   /** GET of a raw GitHub file for a full-text request (Obsidian requestUrl). Absent: nothing is fetched and the note says so. */
   fetchPage?: FetchFile;
+  /** YouTube oEmbed check of a video the research opened: false (private, deleted, embedding off) removes its embed; null (cannot tell) keeps it. Absent: no check. */
+  videoPlayable?: VideoPlayableCheck;
 }
 
 /** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds and count repairs are "other"; chart calls name their own. */
@@ -363,7 +365,10 @@ export class AiTaskService {
         (context.mode ?? "task") === "task" && role === undefined && !input.countRepair
           ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] }
           : null;
-      if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
+      if (videoFilter) {
+        result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
+        result.detail = await dropUnplayableVideos(result.detail, input.detail, this.options.videoPlayable, signal);
+      }
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
@@ -432,7 +437,12 @@ export class AiTaskService {
             result = {
               ...result,
               detail: videoFilter
-                ? keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail)
+                ? await dropUnplayableVideos(
+                    keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail),
+                    input.detail,
+                    this.options.videoPlayable,
+                    signal
+                  )
                 : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);

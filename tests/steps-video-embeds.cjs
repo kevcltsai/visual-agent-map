@@ -110,12 +110,12 @@ const { AiTaskService } = load('core/ai-task-service.ts');
 const templates = load('ai/detail-templates.ts');
 const ctx = (extra = {}) => ({ title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do the task', ancestors: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off', ...extra });
 const openPage = url => ({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url } } } });
-const rigService = handler => {
+const rigService = (handler, videoPlayable) => {
   const calls = [];
   const runtime = { runTask: async (prompt, model, effort, schema, controls) => { const call = { n: calls.length + 1, prompt, controls }; calls.push(call); return handler(call); } };
   const service = new AiTaskService({
     pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null,
-    codexRuntime: () => runtime, claudeRuntime: () => runtime
+    codexRuntime: () => runtime, claudeRuntime: () => runtime, ...(videoPlayable ? { videoPlayable } : {})
   });
   return { service, calls };
 };
@@ -154,4 +154,47 @@ test('count repair: an un-opened id added by the repair is removed; the opened i
   assert.equal(h.calls.length, 2, 'the count repair ran');
   assert.ok(result.detail.includes(`watch?v=${A}`), 'the opened id stays');
   assert.ok(!result.detail.includes(B), 'the repair cannot add a video the provider never opened');
+});
+
+// ---- playable check (oEmbed port) ----
+const openBoth = call => {
+  call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${A}`));
+  call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${B}`));
+};
+const researchCtx = extra => ctx({ researchMode: 'research', researchDepth: 'normal', ...extra });
+test('playable check: an opened video the port calls unplayable is removed, the playable one stays', async () => {
+  const asked = [];
+  const h = rigService(call => { openBoth(call); return reply(`x\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})\n`); }, async id => { asked.push(id); return id === A; });
+  const result = await h.service.askModel(researchCtx(), 'gpt-6-luna', 'low');
+  assert.ok(result.detail.includes(`watch?v=${A}`));
+  assert.ok(!result.detail.includes(B));
+  assert.deepEqual(asked.sort(), [A, B].sort());
+});
+test('playable check: null (cannot tell) and a throwing port keep the embed', async () => {
+  for (const port of [async () => null, async () => { throw new Error('offline'); }]) {
+    const h = rigService(call => { openBoth(call); return reply(`x\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})\n`); }, port);
+    const result = await h.service.askModel(researchCtx(), 'gpt-6-luna', 'low');
+    assert.ok(result.detail.includes(A) && result.detail.includes(B));
+  }
+});
+test('playable check: a video already in the note is never checked and stays', async () => {
+  const asked = [];
+  const h = rigService(call => reply(`x\n\n![](https://youtu.be/${A})\n`), async id => { asked.push(id); return false; });
+  const result = await h.service.askModel(researchCtx({ detail: `old\n\n![](https://www.youtube.com/watch?v=${A})\n` }), 'gpt-6-luna', 'low');
+  assert.ok(result.detail.includes(`watch?v=${A}`));
+  assert.deepEqual(asked, []);
+});
+test('playable check: no port means no check', async () => {
+  const h = rigService(call => { openBoth(call); return reply(`![](https://youtu.be/${B})\n`); });
+  assert.ok((await h.service.askModel(researchCtx(), 'gpt-6-luna', 'low')).detail.includes(B));
+});
+test('playable check: the count repair also drops an unplayable video', async () => {
+  const h = rigService(call => {
+    if (call.n === 1) { openBoth(call); return reply(body(2, `\n\n![](https://youtu.be/${A})`)); }
+    return reply(body(3, `\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})`));
+  }, async id => id === A);
+  const result = await h.service.askModel(countInput({ researchMode: 'research', researchDepth: 'normal' }), 'gpt-6-luna', 'low');
+  assert.equal(h.calls.length, 2);
+  assert.ok(result.detail.includes(`watch?v=${A}`));
+  assert.ok(!result.detail.includes(B));
 });

@@ -766,6 +766,11 @@ var en = {
   "ui.anchor_aria_0_1": "{0}. {1}",
   "ui.anchor_links": "Linked to {0} topic(s)",
   "ui.anchor_unlinked": "Not linked to any topic",
+  "ui.anchor_click_to_hide": " \xB7 click to hide them",
+  "ui.anchor_topics_hidden": "{0} topic(s) hidden \xB7 click to show",
+  "ui.anchor_show_all": "Show all ({0} hidden)",
+  "ui.anchor_hid_topics": "Topics hidden",
+  "ui.anchor_showed_topics": "Topics shown",
   "ui.anchor_relation_end_0": "Annotated image \xB7 {0}",
   "ui.anchor_relation_end_empty": "Annotated image \xB7 anchor",
   "ui.card_image_relations_0": "{0} image relation(s)",
@@ -4201,6 +4206,11 @@ var zhCN = {
   "ui.anchor_aria_0_1": "{0}\u3002{1}",
   "ui.anchor_links": "\u8FDE\u5230 {0} \u4E2A\u8BAE\u9898",
   "ui.anchor_unlinked": "\u5C1A\u672A\u8FDE\u5230\u8BAE\u9898",
+  "ui.anchor_click_to_hide": "\uFF0C\u70B9\u4E00\u4E0B\u9690\u85CF",
+  "ui.anchor_topics_hidden": "\u5DF2\u9690\u85CF {0} \u4E2A\u8BAE\u9898\uFF0C\u70B9\u4E00\u4E0B\u663E\u793A",
+  "ui.anchor_show_all": "\u5168\u90E8\u663E\u793A\uFF08\u5DF2\u85CF {0}\uFF09",
+  "ui.anchor_hid_topics": "\u5DF2\u9690\u85CF\u8BAE\u9898",
+  "ui.anchor_showed_topics": "\u5DF2\u663E\u793A\u8BAE\u9898",
   "ui.anchor_relation_end_0": "\u6807\u6CE8\u56FE\u30FB{0}",
   "ui.anchor_relation_end_empty": "\u6807\u6CE8\u56FE\u30FB\u951A\u70B9",
   "ui.card_image_relations_0": "{0} \u4E2A\u56FE\u7247\u5173\u7CFB",
@@ -7636,6 +7646,11 @@ var zhTW = {
   "ui.anchor_aria_0_1": "{0}\u3002{1}",
   "ui.anchor_links": "\u9023\u5230 {0} \u500B\u8B70\u984C",
   "ui.anchor_unlinked": "\u5C1A\u672A\u9023\u5230\u8B70\u984C",
+  "ui.anchor_click_to_hide": "\uFF0C\u9EDE\u4E00\u4E0B\u96B1\u85CF",
+  "ui.anchor_topics_hidden": "\u5DF2\u96B1\u85CF {0} \u500B\u8B70\u984C\uFF0C\u9EDE\u4E00\u4E0B\u986F\u793A",
+  "ui.anchor_show_all": "\u5168\u90E8\u986F\u793A\uFF08\u5DF2\u85CF {0}\uFF09",
+  "ui.anchor_hid_topics": "\u5DF2\u96B1\u85CF\u8B70\u984C",
+  "ui.anchor_showed_topics": "\u5DF2\u986F\u793A\u8B70\u984C",
   "ui.anchor_relation_end_0": "\u6A19\u8A3B\u5716\u30FB{0}",
   "ui.anchor_relation_end_empty": "\u6A19\u8A3B\u5716\u30FB\u9328\u9EDE",
   "ui.card_image_relations_0": "{0} \u500B\u5716\u7247\u95DC\u4FC2",
@@ -45147,6 +45162,47 @@ function anchorContextFor(items, topicId, titleOf, language2) {
   return blocks.join("\n\n");
 }
 
+// experiences/visual-map/anchor-hide.ts
+var anchorRef = (imageId, anchorId) => `${imageId}\0${anchorId}`;
+function anchorTopicIds(items, imageId, anchorId) {
+  var _a2;
+  const image = items.find((item) => item.id === imageId);
+  if (!image || !isAnnotatedImage(image)) return [];
+  const ids2 = /* @__PURE__ */ new Set();
+  for (const relation of (_a2 = image.relations) != null ? _a2 : []) {
+    if (relation.from === anchorId) ids2.add(relation.to);
+    else if (relation.to === anchorId) ids2.add(relation.from);
+  }
+  return [...ids2];
+}
+function anchorHiddenTopicIds(items, nodes, hidden, imageId) {
+  var _a2;
+  const out = /* @__PURE__ */ new Set();
+  if (!hidden.size) return out;
+  const stack = [];
+  for (const item of items) {
+    if (!isAnnotatedImage(item) || imageId !== void 0 && item.id !== imageId) continue;
+    for (const anchor of item.anchors)
+      if (hidden.has(anchorRef(item.id, anchor.id))) stack.push(...anchorTopicIds(items, item.id, anchor.id));
+  }
+  if (!stack.length) return out;
+  const known = new Set(nodes.map((node) => node.id));
+  const kids = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const list2 = kids.get(node.parentId);
+    if (list2) list2.push(node.id);
+    else kids.set(node.parentId, [node.id]);
+  }
+  while (stack.length) {
+    const id = stack.pop();
+    if (out.has(id) || !known.has(id)) continue;
+    out.add(id);
+    stack.push(...(_a2 = kids.get(id)) != null ? _a2 : []);
+  }
+  return out;
+}
+
 // ai/visual-guidance.ts
 function visualGuidance(context, language2) {
   const synthesis = context.mode === "synthesize";
@@ -80998,6 +81054,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     __publicField(this, "anchorLinks", /* @__PURE__ */ new Map());
     /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
     __publicField(this, "hoverAnchor", null);
+    /** Anchors clicked to hide their topics (`imageId NUL anchorId`). View state only: never saved, cleared when another map opens. */
+    __publicField(this, "hiddenAnchors", /* @__PURE__ */ new Set());
+    /** Set when an anchor drag ends, so the click that follows the release does not toggle the anchor. */
+    __publicField(this, "anchorClickSuppressed", false);
     /** The topic card under the pointer or keyboard focus: its anchor lines are emphasised like a selected topic's. View state only. */
     __publicField(this, "hoverTopic", null);
     /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
@@ -83044,6 +83104,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
+    if (this.path !== path) this.hiddenAnchors.clear();
     this.path = path;
     this.map = map;
     this.selection.exitMultiSelect("openMap");
@@ -86584,20 +86645,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
   renderAnchors(el2, image, editable) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     for (const anchor of image.anchors) {
       if (!isImage2dAnchor(anchor)) continue;
       const links = ((_a2 = image.relations) != null ? _a2 : []).filter((r) => r.from === anchor.id || r.to === anchor.id).length;
+      const ref = `${image.id}\0${anchor.id}`;
+      const topicsHidden = links > 0 && !!((_b2 = this.hiddenAnchors) == null ? void 0 : _b2.has(ref));
       const dot = el2.createEl("button", {
-        cls: links ? "vam-anchor is-linked" : "vam-anchor",
+        cls: links ? topicsHidden ? "vam-anchor is-linked is-topics-hidden" : "vam-anchor is-linked" : "vam-anchor",
         attr: { type: "button" }
       });
+      if (links) dot.setAttr("aria-pressed", topicsHidden ? "true" : "false");
       dot.dataset.anchorId = anchor.id;
       this.anchorDots.set(`${image.id}\0${anchor.id}`, dot);
       dot.tabIndex = 0;
       dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
       dot.style.top = `${Math.round(anchor.at.y * 1e6) / 1e4}%`;
-      const state = links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
+      const hiddenCount = topicsHidden ? anchorHiddenTopicIds((_d = (_c = this.map) == null ? void 0 : _c.canvasItems) != null ? _d : [], (_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : [], /* @__PURE__ */ new Set([ref])).size : 0;
+      const state = topicsHidden ? t("ui.anchor_topics_hidden", hiddenCount) : links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
       dot.setAttr(
         "aria-label",
         t("ui.anchor_aria_0_1", anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty"), state)
@@ -86607,11 +86672,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       tip.setAttr("id", tip.id);
       tip.setAttr("role", "tooltip");
       if (anchor.note) tip.createSpan({ text: anchor.note, cls: "vam-anchor-tip-note" });
-      tip.createSpan({ text: state, cls: "vam-anchor-tip-links" });
+      tip.createSpan({
+        text: links && !topicsHidden ? `${state}${t("ui.anchor_click_to_hide")}` : state,
+        cls: "vam-anchor-tip-links"
+      });
       dot.setAttr("aria-describedby", tip.id);
       dot.addEventListener("pointerdown", (event) => event.stopPropagation());
-      dot.addEventListener("click", (event) => event.stopPropagation());
-      const ref = `${image.id}\0${anchor.id}`;
+      dot.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (this.anchorClickSuppressed) {
+          this.anchorClickSuppressed = false;
+          return;
+        }
+        if (links) this.toggleAnchorTopics(image.id, anchor.id);
+      });
       const mark2 = (on) => {
         if (on) this.hoverAnchor = ref;
         else if (this.hoverAnchor === ref) this.hoverAnchor = null;
@@ -86645,7 +86719,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         }
       });
     }
-    this.paintAnchorPreview(el2, image, image.note || ((_b2 = image.path.split("/").pop()) != null ? _b2 : image.path));
+    this.paintAnchorPreview(el2, image, image.note || ((_g = image.path.split("/").pop()) != null ? _g : image.path));
   }
   /**
    * Drags an existing anchor with the mouse. The dot and the lines that leave it follow the pointer on screen only; Map.md is
@@ -86719,6 +86793,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         const at = { x: unitStep(to.x), y: unitStep(to.y) };
         const write = active && dot.isConnected !== false && this.canEditCanvasItems() && (at.x !== origin.x || at.y !== origin.y);
         settle();
+        if (active) this.anchorClickSuppressed = true;
         if (!write) {
           if (active) paint(origin);
           return;
@@ -87231,12 +87306,44 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** The title bar above an annotated image: pill with the map-pin icon, the one-line note, the anchor count. */
   renderAnnotatedBar(el2, image, name2) {
+    var _a2, _b2, _c, _d, _e;
     const bar = el2.createDiv("vam-annotated-bar");
     const pill = bar.createSpan("vam-annotated-pill");
     (0, import_obsidian39.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name2, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
+    if (!((_a2 = this.hiddenAnchors) == null ? void 0 : _a2.size)) return;
+    const hidden = anchorHiddenTopicIds(
+      (_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [],
+      (_e = (_d = this.map) == null ? void 0 : _d.nodes) != null ? _e : [],
+      this.hiddenAnchors,
+      image.id
+    );
+    if (!hidden.size) return;
+    const all = bar.createEl("button", {
+      cls: "vam-annotated-showall",
+      text: t("ui.anchor_show_all", hidden.size),
+      attr: { type: "button" }
+    });
+    all.addEventListener("pointerdown", (event) => event.stopPropagation());
+    all.addEventListener("click", (event) => {
+      event.stopPropagation();
+      for (const anchor of image.anchors) this.hiddenAnchors.delete(`${image.id}\0${anchor.id}`);
+      this.render();
+    });
+  }
+  /** Hides the topics one anchor links to (with their branches), or shows them again; a view state, nothing is written. */
+  toggleAnchorTopics(imageId, anchorId) {
+    var _a2, _b2, _c;
+    if (!anchorTopicIds((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], imageId, anchorId).length) return;
+    const ref = `${imageId}\0${anchorId}`;
+    const hide = !this.hiddenAnchors.has(ref);
+    if (hide) this.hiddenAnchors.add(ref);
+    else this.hiddenAnchors.delete(ref);
+    this.focusAnchorRef = ref;
+    this.render();
+    (_c = this.announcer) == null ? void 0 : _c.setText(t(hide ? "ui.anchor_hid_topics" : "ui.anchor_showed_topics"));
   }
   /** The right-click / Shift+F10 / Menu-key menu of one anchor: edit it, or delete only it (with its relations, one undo step). */
   openAnchorMenu(event, imageId, anchorId, dot) {
@@ -91919,19 +92026,20 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   canvasNodes() {
-    var _a2;
+    var _a2, _b2, _c;
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
     const shown2 = visibleNodes(this.map.nodes);
-    const nodes = superseded.size ? shown2.filter((node) => !superseded.has(node.id)) : shown2;
+    const byAnchor = ((_a2 = this.hiddenAnchors) == null ? void 0 : _a2.size) ? anchorHiddenTopicIds((_b2 = this.map.canvasItems) != null ? _b2 : [], this.map.nodes, this.hiddenAnchors) : null;
+    const nodes = superseded.size || (byAnchor == null ? void 0 : byAnchor.size) ? shown2.filter((node) => !superseded.has(node.id) && !(byAnchor == null ? void 0 : byAnchor.has(node.id))) : shown2;
     if (!this.relevanceSortOn()) return nodes;
-    const trees = ringTreeIds(this.map.nodes, (_a2 = this.map.canvasItems) != null ? _a2 : []);
+    const trees = ringTreeIds(this.map.nodes, (_c = this.map.canvasItems) != null ? _c : []);
     const kept = trees.size ? /* @__PURE__ */ new Set([...superseded, ...trees]) : superseded;
     return relevanceDisplayNodes(
       nodes,
       (id) => {
-        var _a3, _b2;
-        return (_b2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.relevance) == null ? void 0 : _b2.tier;
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.relevance) == null ? void 0 : _b3.tier;
       },
       kept,
       layoutOf(this.map),
@@ -110636,6 +110744,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-view .vam-anchor-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; display: none; flex-direction: column; gap: 2px; width: max-content; max-width: 240px; padding: 4px 8px; transform: translateX(-50%); font-size: var(--font-ui-smaller); line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 4px; box-shadow: var(--shadow-s); pointer-events: none; }
 .vam-view .vam-anchor:hover .vam-anchor-tip, .vam-view .vam-anchor:focus-visible .vam-anchor-tip { display: flex; }
 .vam-view .vam-anchor.is-draggable { cursor: grab; touch-action: none; }
+.vam-view .vam-anchor.is-linked.is-topics-hidden { border: 2px dashed var(--text-muted); background: var(--background-primary); box-shadow: none; }
+.vam-view .vam-anchor.is-linked.is-topics-hidden::after { content: ""; position: absolute; left: 50%; top: -3px; width: 2px; height: 16px; margin-left: -1px; background: var(--text-muted); transform: rotate(45deg); pointer-events: none; }
 .vam-view .vam-anchor.is-draggable.is-dragging { cursor: grabbing; }
 .vam-view .vam-anchor.is-dragging .vam-anchor-tip { display: none; }
 .vam-view .vam-anchor-tip-links { color: var(--text-muted); }

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -546,6 +546,32 @@ test('--owner-idle-confirmed only goes with --update-current; --which-installed 
   assert.match(text, /branch at install: main/);
   writeFileSync(join(vault, '.obsidian/plugins/visual-agent-map/main.js'), 'hand edited');
   assert.match(whichInstalled(vault), /commit: unknown \(main\.js changed after the recorded install\)/);
+});
+
+test('owner install reuses full CI only for the exact clean landed commit with matching artifacts', t => {
+  const { folder } = environment(t);
+  const { main: checkout } = repoWithWorktree(folder);
+  const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  for (const name of ['main.js', 'manifest.json', 'styles.css']) writeFileSync(join(checkout, name), 'committed ' + name);
+  git('add', 'main.js', 'manifest.json', 'styles.css'); git('commit', '-qm', 'artifacts'); git('push', '-q', 'origin', 'main'); git('fetch', '-q', 'origin');
+  const sha = git('rev-parse', 'HEAD');
+  const lookup = (dir, candidate) => { assert.equal(dir, checkout); assert.equal(candidate, sha); return '12345'; };
+  assert.deepEqual(greenInstallRun(checkout, lookup), { sha, id: '12345' });
+  assert.equal(greenInstallRun(checkout, () => { throw new Error('no full green CI'); }), null);
+  assert.equal(greenInstallRun(checkout, () => 'not a run id'), null);
+  for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', 'new.ts']) {
+    const path = join(checkout, name);
+    const original = existsSync(path) ? readFileSync(path) : null;
+    writeFileSync(path, 'dirty');
+    let called = false;
+    assert.equal(greenInstallRun(checkout, () => { called = true; return '12345'; }), null);
+    assert.equal(called, false);
+    if (original) writeFileSync(path, original); else rmSync(path);
+  }
+  assert.equal(greenInstallRun(checkout, () => { writeFileSync(join(checkout, 'a.txt'), 'changed during lookup'); return '12345'; }), null);
+  git('restore', 'a.txt');
+  writeFileSync(join(checkout, 'a.txt'), 'new candidate'); git('commit', '-qam', 'ahead');
+  assert.equal(greenInstallRun(checkout, () => '12345'), null);
 });
 
 test('fetchDepsTable fetches the latest green full main run once and fails soft', t => {

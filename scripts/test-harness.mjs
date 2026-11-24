@@ -307,6 +307,25 @@ export function fetchDepsTable(directory = root, exec = execFileSync) {
   } catch { return false; } finally { if (scratch) rmSync(scratch, { recursive: true, force: true }); }
 }
 
+// Only reuse full CI for a clean, already-landed candidate whose locally built install artifacts
+// are byte-identical to the commit. The existing full-CI lookup rejects affected runs and fails closed.
+// Any local edit (including generated output), missing proof or lookup failure retains targeted verification.
+export function greenInstallRun(directory = root, lookup = (dir, sha) => execFileSync("sh", ["scripts/find-green-ci-run.sh", sha], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()) {
+  const git = (...args) => execFileSync("git", args, { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try {
+    const sha = git("rev-parse", "HEAD");
+    if (!/^[0-9a-f]{40}$/.test(sha) || sha !== git("rev-parse", "refs/remotes/origin/main")) return null;
+    if (git("status", "--porcelain", "--untracked-files=all")) return null;
+    for (const name of assets) {
+      const committed = execFileSync("git", ["show", `${sha}:${name}`], { cwd: directory, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+      if (hash(committed) !== hash(readFileSync(join(directory, name)))) return null;
+    }
+    const id = lookup(directory, sha);
+    if (!/^\d+$/.test(id || "") || git("rev-parse", "HEAD") !== sha || git("rev-parse", "refs/remotes/origin/main") !== sha || git("status", "--porcelain", "--untracked-files=all")) return null;
+    return { sha, id };
+  } catch { return null; }
+}
+
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
   if (result.error || result.status !== 0) throw new Error(`Failed: ${command} ${args.join(" ")}`, { cause: result.error });
@@ -355,19 +374,24 @@ export function main(args = process.argv.slice(2)) {
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });
     else assertOwnerIdle(canonicalVault);
-    fetchDepsTable();
     run("npm", ["run", "build"]);
     const builtHashes = hashes(root);
     // The build regenerates ignored artifacts; anchor the non-destructive update
-    // check after those expected outputs exist, then protect them through tests.
+    // check after those expected outputs exist, then protect them through verification.
     const fingerprint = sourceFingerprint();
-    // Only the tests this change can reach; test:affected answers every doubt (missing/stale table, unknown file) with the full suite.
-    run("npm", ["run", "test:affected"]);
+    const green = greenInstallRun();
+    if (green) process.stdout.write(`Owner vault verification: reusing full CI run ${green.id} for ${green.sha} (clean commit, matching artifacts).\n`);
+    else {
+      fetchDepsTable();
+      // Every doubt (missing/stale table, unknown file) is answered with the full suite.
+      run("npm", ["run", "test:affected"]);
+    }
     assertSourceUnchanged(fingerprint);
     if (JSON.stringify(hashes(root)) !== JSON.stringify(builtHashes)) throw new Error("Build artifacts changed during tests.");
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
     const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint: sourceFingerprint() };
     const runtime = installedObsidianRuntime();
+    source.verification = green ? { kind: "ci-full", ...green } : { kind: "local-affected" };
     source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
     const record = updateCurrentTestVault({ source, ownerIdleConfirmed });

@@ -7,6 +7,8 @@
  * No imports of Obsidian, so a unit test can load it directly.
  */
 
+import { socialVideoOf } from "../../core/social-video";
+
 export const NODE_LINK_START = "\uE000";
 export const NODE_LINK_MID = "\uE001";
 export const NODE_LINK_END = "\uE002";
@@ -85,8 +87,10 @@ export function applyNodeLinks(
     const kept = (link.getAttribute("class") ?? "").split(/\s+/).filter(name => name && name !== VIDEO_LINK_CLASS);
     if (kept.length) link.setAttribute("class", kept.join(" "));
     else link.removeAttribute("class");
-    if (!textOf(link).includes(VIDEO_MARK)) continue;
-    if (/^https:\/\//i.test(link.getAttribute("href") ?? "")) link.setAttribute("class", VIDEO_LINK_CLASS);
+    const href = link.getAttribute("href") ?? "";
+    // A Facebook or Instagram video link is a video card however it was written (Obsidian shows it only as a link).
+    if (!textOf(link).includes(VIDEO_MARK) && !socialVideoOf(href)) continue;
+    if (/^https:\/\//i.test(href)) link.setAttribute("class", VIDEO_LINK_CLASS);
   }
   for (const node of texts) {
     const value = node.nodeValue ?? "";

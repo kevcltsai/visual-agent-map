@@ -95,7 +95,11 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     frameNamed: "枠：{0}",
     videoPlay: "クリックして YouTube 動画を再生",
     videoNote: "再生したときだけ YouTube に接続します（Cookie を記録しない版）",
-    videoOpen: "YouTube で開く"
+    videoNoteLocal: "ファイルから開いたときは、新しいタブの YouTube で再生します",
+    videoOpen: "YouTube で開く",
+    videoPlaySite: "クリックして {0} の動画を再生",
+    videoNoteSite: "再生したときだけ {0} に接続します",
+    videoOpenSite: "{0} で開く"
   },
   ko: {
     lang: "ko",
@@ -184,7 +188,11 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     frameNamed: "프레임: {0}",
     videoPlay: "클릭하여 YouTube 동영상 재생",
     videoNote: "재생할 때만 YouTube에 연결됩니다(쿠키를 기록하지 않는 버전)",
-    videoOpen: "YouTube에서 열기"
+    videoNoteLocal: "파일에서 열면 새 탭의 YouTube에서 재생됩니다",
+    videoOpen: "YouTube에서 열기",
+    videoPlaySite: "클릭하여 {0} 동영상 재생",
+    videoNoteSite: "재생할 때만 {0}에 연결됩니다",
+    videoOpenSite: "{0}에서 열기"
   },
   es: {
     lang: "es",
@@ -279,6 +287,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     frameNamed: "Marco: {0}",
     videoPlay: "Haz clic para reproducir el vídeo de YouTube",
     videoNote: "El vídeo solo se conecta a YouTube al reproducirlo (versión sin cookies)",
-    videoOpen: "Abrir en YouTube"
+    videoNoteLocal: "Al abrir el archivo desde el disco, el vídeo se reproduce en YouTube en una pestaña nueva",
+    videoOpen: "Abrir en YouTube",
+    videoPlaySite: "Haz clic para reproducir el vídeo de {0}",
+    videoNoteSite: "El vídeo solo se conecta a {0} al reproducirlo",
+    videoOpenSite: "Abrir en {0}"
   }
 };

@@ -1,6 +1,7 @@
 import { createBookStructurePort } from "./experiences/visual-map/book-structure-port";
 import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
+import { upgradeSocialVideoLinks } from "./experiences/markdown-context/social-video-cards";
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
@@ -1137,6 +1138,22 @@ export default class VisualAgentMapPlugin extends Plugin {
         arrayBuffer: response.arrayBuffer
       };
     },
+    // YouTube oEmbed: only the video address goes to youtube.com. 401/403/404 = private, embedding off or deleted; anything else cannot be told.
+    videoPlayable: async (id: string, signal?: AbortSignal): Promise<boolean | null> => {
+      if (signal?.aborted) return null;
+      try {
+        const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+        const response = await Promise.race([
+          requestUrl({ url, method: "GET", throw: false }),
+          new Promise<null>(resolve => window.setTimeout(() => resolve(null), 5000))
+        ]);
+        if (!response) return null;
+        if (response.status === 401 || response.status === 403 || response.status === 404) return false;
+        return response.status === 200 ? true : null;
+      } catch {
+        return null;
+      }
+    },
     mermaidParses: async (code: string): Promise<boolean> => {
       // The same mermaid Obsidian renders with; a missing or failing parser refuses the diagram rather than trusting it.
       try {
@@ -1427,6 +1444,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
+    // Facebook and Instagram videos in notes and card previews play in a card (Obsidian itself embeds only YouTube).
+    this.registerMarkdownPostProcessor(element => {
+      upgradeSocialVideoLinks(element, {
+        play: site => t("share.viewer_video_play_site").replace("{0}", site),
+        note: site => t("share.viewer_video_note_site").replace("{0}", site),
+        open: site => t("share.viewer_video_open_site").replace("{0}", site)
+      });
+    });
     for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     registerBookFigures(this);

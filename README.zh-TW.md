@@ -37,7 +37,7 @@
 
 ## 隱私
 
-VAM 不含遙測，也不儲存 API key。AI 功能會執行你安裝的 Codex 或 Claude Code 程式，把相關筆記、地圖內容與你選的圖片傳送至 OpenAI 或 Anthropic（可能使用帳號額度或產生費用），並在標準模式與找圖時上網搜尋。圖文書也可能直接向 Wikimedia Commons 搜尋圖片。分享檔不會被上傳。完整說明：[資料與權限](INSTALL.md#資料與權限)。
+VAM 不含遙測，也不儲存 API key。AI 功能會執行你安裝的 Codex 或 Claude Code 程式，把相關筆記、地圖內容與你選的圖片傳送至 OpenAI 或 Anthropic（可能使用帳號額度或產生費用），並在標準模式與找圖時上網搜尋。圖文書也可能直接向 Wikimedia Commons 搜尋圖片，研究也會向 YouTube 的 oEmbed 服務確認影片。分享檔不會被上傳。完整說明：[資料與權限](INSTALL.md#資料與權限)。
 
 ## 致謝與授權
 

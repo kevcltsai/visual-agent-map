@@ -982,6 +982,34 @@ test('share viewer video: the viewer id parser agrees with the plugin parser on 
   assert.equal(viewerVideo.viewerYoutubeId('https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ'), null);
 });
 
+test('share social video: Facebook and Instagram video addresses are recognised strictly; look-alikes and other pages are not', () => {
+  const social = load('core/social-video.ts');
+  const fb = 'https://www.facebook.com/plugins/video.php?href=';
+  assert.deepEqual(plain(social.socialVideoOf('https://www.facebook.com/facebook/videos/1128464476453508/')), { source: 'facebook', embed: `${fb}https%3A%2F%2Fwww.facebook.com%2Ffacebook%2Fvideos%2F1128464476453508%2F&show_text=false`, watch: 'https://www.facebook.com/facebook/videos/1128464476453508/' });
+  assert.equal(social.socialVideoOf('https://m.facebook.com/watch/?v=1128464476453508').watch, 'https://www.facebook.com/watch/?v=1128464476453508');
+  assert.equal(social.socialVideoOf('https://www.facebook.com/reel/1128464476453508').watch, 'https://www.facebook.com/reel/1128464476453508');
+  assert.equal(social.socialVideoOf('https://www.facebook.com/facebook/videos/some-title/1128464476453508/').watch, 'https://www.facebook.com/facebook/videos/1128464476453508/');
+  assert.equal(social.socialVideoOf('https://fb.watch/abcDEF12/').watch, 'https://fb.watch/abcDEF12/');
+  assert.deepEqual(plain(social.socialVideoOf('https://www.instagram.com/reel/DgF28H6PcXh/?igsh=x')), { source: 'instagram', embed: 'https://www.instagram.com/reel/DgF28H6PcXh/embed', watch: 'https://www.instagram.com/reel/DgF28H6PcXh/' });
+  assert.equal(social.socialVideoOf('https://instagram.com/p/Df7khkFoAZq').embed, 'https://www.instagram.com/p/Df7khkFoAZq/embed');
+  assert.equal(social.socialVideoOf('https://www.instagram.com/reels/DgF28H6PcXh/').watch, 'https://www.instagram.com/reel/DgF28H6PcXh/');
+  for (const url of ['https://www.facebook.com.evil.example/facebook/videos/1128464476453508/', 'https://evil.example/www.facebook.com/watch/?v=1', 'https://www.facebook.com/facebook', 'https://www.facebook.com/watch/?v=abc', 'https://www.facebook.com/plugins/video.php?href=x',
+    'https://www.instagram.com/instagram/', 'https://www.instagram.com/p/', 'https://www.instagram.com/p/Df7khkFoAZq/comments', 'https://www.instagram.com/p/Df7"onload=1/', 'javascript:alert(1)', 'ftp://www.instagram.com/p/Df7khkFoAZq/', 'not a url', '', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'])
+    assert.equal(social.socialVideoOf(url), null, url);
+});
+
+test('share social video: a Facebook or Instagram video written as an image or a plain link becomes a video link, never a web image', () => {
+  const ctx = { titleOf: () => undefined, assets: clean.createAssetRegistry() };
+  const result = clean.cleanShareMarkdown('A ![Reel](https://www.instagram.com/reel/DgF28H6PcXh/) B ![](https://www.facebook.com/facebook/videos/1128464476453508/)', ctx);
+  assert.equal(result.markdown, 'A [▶ Reel](https://www.instagram.com/reel/DgF28H6PcXh/) B [▶ https://www.facebook.com/facebook/videos/1128464476453508/](https://www.facebook.com/facebook/videos/1128464476453508/)');
+  assert.deepEqual(plain(result.webImages), [], 'a video is never fetched as a web image');
+  const out = applyLinks('<p><a href="https://www.instagram.com/reel/DgF28H6PcXh/">my reel</a> <a href="https://www.facebook.com/watch/?v=1128464476453508">fb</a> <a href="https://www.facebook.com/facebook">page</a> <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">yt</a></p>', []);
+  assert.ok(out.includes('<a href="https://www.instagram.com/reel/DgF28H6PcXh/" class="vam-video-link">my reel</a>'), out);
+  assert.ok(out.includes('<a href="https://www.facebook.com/watch/?v=1128464476453508" class="vam-video-link">fb</a>'), out);
+  assert.ok(out.includes('<a href="https://www.facebook.com/facebook">page</a>'), 'a page that is not a video stays a link');
+  assert.ok(out.includes('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">yt</a>'), 'a hand-written YouTube link keeps its old behaviour');
+});
+
 // ---- share-complete P6b: math as MathML ----
 const shareMath = load('experiences/sharing/share-math.ts');
 const viewerMath = load('experiences/sharing/viewer/math.ts');

@@ -262,6 +262,31 @@ test('D6: image file without a selected topic becomes a canvas image at the last
   assert.deepEqual([items[1].x, items[1].y], [25, 10]);
 });
 
+test('paste with no focused element (focus on body) reaches the map only when the map is the active view', async () => {
+  // Regression: a map just opened, or a window switched back to without a click, has focus on body; Cmd+V did nothing.
+  const h = await harness();
+  h.view.selection.setSelected(null);
+  const body = { tagName: 'BODY', closest: () => null };
+  h.view.contentEl.ownerDocument = { body };
+  h.view.app.workspace = { ...(h.view.app.workspace ?? {}), getActiveViewOfType: () => null };
+  const elsewhere = clipboardEvent({}, [file(png(300, 150), { name: 'a.png' })], body);
+  h.view.onClipboardEvent('paste', elsewhere);
+  await h.settle();
+  assert.equal(elsewhere.defaultPrevented, false, 'another view is active: not ours');
+  assert.equal(h.counts.createBinary, 0);
+  h.view.app.workspace.getActiveViewOfType = () => h.view;
+  const here = clipboardEvent({}, [file(png(300, 150), { name: 'b.png' })], body);
+  h.view.onClipboardEvent('paste', here);
+  await h.settle();
+  assert.equal(here.defaultPrevented, true, 'the active map takes the picture');
+  assert.equal((await h.onDisk()).length, 1, 'a free image is on the canvas');
+  const field = { tagName: 'TEXTAREA', closest: () => ({}) };
+  const typed = clipboardEvent({}, [file(png(300, 150), { name: 'c.png' })], field);
+  h.view.onClipboardEvent('paste', typed);
+  await h.settle();
+  assert.equal(typed.defaultPrevented, false, 'a text field outside the map keeps its paste');
+});
+
 test('D6: image file with a selected topic goes to the card (P5), not the canvas; text next to it still reaches the outline', async () => {
   const h = await harness();
   h.view.selection.setSelected(h.root.id);

@@ -32,7 +32,13 @@ import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
-import { keepOpenedVideoEmbeds, videoUrlsInText } from "./video-embeds";
+import {
+  dropUnplayableVideos,
+  keepOpenedVideoEmbeds,
+  restoreDroppedMedia,
+  videoUrlsInText,
+  type VideoPlayableCheck
+} from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -93,6 +99,8 @@ export interface AiTaskServiceOptions {
   diagramsEnabled?: () => boolean;
   /** GET of a raw GitHub file for a full-text request (Obsidian requestUrl). Absent: nothing is fetched and the note says so. */
   fetchPage?: FetchFile;
+  /** YouTube oEmbed check of a video the research opened: false (private, deleted, embedding off) removes its embed; null (cannot tell) keeps it. Absent: no check. */
+  videoPlayable?: VideoPlayableCheck;
 }
 
 /** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds and count repairs are "other"; chart calls name their own. */
@@ -368,7 +376,23 @@ export class AiTaskService {
               ]
             }
           : null;
-      if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
+      if (videoFilter) {
+        result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
+        // Research rewrites the note and may drop its videos and pictures; an edit task may delete them on purpose.
+        let restored = new Set<string>();
+        if (countsWeb && input.detail?.trim()) {
+          const back = restoreDroppedMedia(result.detail, input.detail);
+          result.detail = back.detail;
+          restored = back.restoredVideoIds;
+        }
+        result.detail = await dropUnplayableVideos(
+          result.detail,
+          input.detail,
+          this.options.videoPlayable,
+          signal,
+          restored
+        );
+      }
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
@@ -437,7 +461,16 @@ export class AiTaskService {
             result = {
               ...result,
               detail: videoFilter
-                ? keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail)
+                ? await (async () => {
+                    let kept = keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail);
+                    let restored = new Set<string>();
+                    if (countsWeb && input.detail?.trim()) {
+                      const back = restoreDroppedMedia(kept, input.detail);
+                      kept = back.detail;
+                      restored = back.restoredVideoIds;
+                    }
+                    return dropUnplayableVideos(kept, input.detail, this.options.videoPlayable, signal, restored);
+                  })()
                 : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);

@@ -3095,12 +3095,12 @@ test('Book entry 12: the opening screen shows two examples under the field (owne
   assert.equal(f.calls.send, 0, 'the picture example does not send either');
   c.researchTabEl.click(); assert.equal(c.heroActionsEl.hidden, true, 'the research tab has its own suggestions');
 });
-test('Book entry 12: the examples are in Traditional Chinese: the picture one with the new tag and the owner\'s sentence, the book one with the 「主題」 blank', () => {
+test('Book entry 12: the examples are in Traditional Chinese: both with the new tag, the picture one with the owner\'s sentence, the book one with the 「主題」 blank', () => {
   const f = heroFixture(); f.setLanguage('zh-TW'); f.panel.relabel(); const c = f.panel; const buttons = exampleButtons(c);
   assert.match(visibleText(buttons[0]), /從一張圖展開.*新/); buttons[0].click();
   assert.equal(c.inputEl.value, '我想做一個「背部伸展」的圖片心智圖，幫我找一個背部肌肉的圖片當作根議題, 在各部位酸痛肌肉部位上面設置錨點. 每個對應的酸痛肌肉部位, 幫我找相關的伸展動作, 包含影片, 跟圖片');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '背部伸展');
-  assert.doesNotMatch(visibleText(buttons[1]), /新/); buttons[1].click();
+  assert.match(visibleText(buttons[1]), /做一本圖文書新/); buttons[1].click();
   assert.equal(c.inputEl.value, '我想做一本關於「主題」的圖文書，先幫我建大綱');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '主題');
   f.setLanguage('en');

@@ -1158,9 +1158,12 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
     { path: 'Agent/Topics/Other/Notes/X.md', extension: 'md', name: 'X.md', text: 'OTHER-MAP-SECRET', stat: { size: 16 } },
     { path: 'Agent/Topics/M/Attachments/s.pdf', extension: 'pdf', name: 's.pdf', stat: { size: 3 } },
     { path: 'Agent/Records/r.pdf', extension: 'pdf', name: 'r.pdf', stat: { size: 3 } },
-    { path: 'Agent/Topics/M/Attachments/board.canvas', extension: 'canvas', name: 'board.canvas', stat: { size: 3 } }
+    { path: 'Agent/Topics/M/Attachments/board.canvas', extension: 'canvas', name: 'board.canvas', stat: { size: 3 } },
+    { path: 'Agent/Topics/M/Chats/records/c1.jsonl', extension: 'jsonl', name: 'c1.jsonl', stat: { size: 30 } },
+    { path: 'Agent/Topics/M/Chats/topics/t1.jsonl', extension: 'jsonl', name: 't1.jsonl', stat: { size: 30 } },
+    { path: 'Agent/Topics/M/Chats/records/Talk.md', extension: 'md', name: 'Talk.md', text: 'CHAT-RECORD-SECRET', stat: { size: 18 } }
   ];
-  const byKey = { Src: list[0], X: list[1], 's.pdf': list[2], 'r.pdf': list[3], 'board.canvas': list[4] };
+  const byKey = { Src: list[0], X: list[1], 's.pdf': list[2], 'r.pdf': list[3], 'board.canvas': list[4], 'c1.jsonl': list[5], 't1.jsonl': list[6], Talk: list[7] };
   const reads = [];
   const app = {
     vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; }, readBinary: async () => new TextEncoder().encode('ABC').buffer, getFileByPath: path => list.find(file => file.path === path) ?? null },
@@ -1168,7 +1171,7 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
   };
   const node = { id: 'a', path: 'Agent/Topics/M/Notes/A.md', parentId: null, x: 0, y: 0, collapsed: false };
   const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
-  const detail = '![[Src]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]';
+  const detail = '![[Src]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
   const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
   const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Agent/Topics/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
   let markdown = '';
@@ -1180,8 +1183,9 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
   assert.deepEqual([...new Set(reads)], ['Agent/Topics/M/Notes/Src.md'], 'only the shared map\'s own note is read');
   assert.ok(markdown.includes('> Map body'), markdown);
   assert.equal(markdown.includes('OTHER-MAP-SECRET'), false);
+  assert.equal(markdown.includes('CHAT-RECORD-SECRET'), false, 'a chat record note in the map folder is not embedded');
   const files = [...exporter.files.values()];
-  assert.deepEqual(files.map(file => [file.file, file.size > 0]), [['s.pdf', true], ['r.pdf', false], ['board.canvas', true]], 'map attachments are found, a VAM record is not, a canvas is an attachment');
+  assert.deepEqual(files.map(file => [file.file, file.size > 0]), [['s.pdf', true], ['r.pdf', false], ['board.canvas', true], ['c1.jsonl', false], ['t1.jsonl', false]], 'map attachments are found; VAM records and the map\'s chat records are not; a canvas is an attachment');
 });
 
 test('share viewer acceptance fix: buttons with click handlers are built after the note is imported into the page', () => {

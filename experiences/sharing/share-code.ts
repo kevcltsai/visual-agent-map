@@ -179,6 +179,7 @@ const SHARE_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 export function classifyShareTarget(path: string): "note" | "image" | "attachment" {
   const clean = path.split(/[?#]/)[0].trim();
   if (SHARE_IMAGE_EXT.test(clean)) return "image";
-  const ext = /\.([a-z0-9]{1,10})$/i.exec(clean);
+  // Short extensions are files; a longer word after a dot is a note title (`Q3.Planning`) unless it is a known file type.
+  const ext = /\.([a-z0-9]{1,5}|canvas|keynote|numbers|sketch|excalidraw)$/i.exec(clean);
   return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
 }

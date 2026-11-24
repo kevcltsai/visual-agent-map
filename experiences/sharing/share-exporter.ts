@@ -63,6 +63,7 @@ import {
   type LeakCategory
 } from "./share-leak-scan";
 import { readArgumentMap, managedNodeIds } from "../../core/argument-map/model";
+import { RECORDS_SUBPATH } from "../../core/map-chat-records";
 import { TOPIC_KIND_SHAPES, shapeKindFor } from "../visual-map/topic-kind-shape";
 import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
@@ -169,6 +170,9 @@ const platformRebuildDom: RebuildDom = {
   serialize: root => root.innerHTML,
   createDiv: () => createDiv()
 };
+
+/** The map folder's subfolder that holds map and topic chat records (RECORDS_SUBPATH, TOPIC_CHAT_SUBPATH). */
+const MAP_CHATS_FOLDER = RECORDS_SUBPATH.split("/")[0];
 
 const IMAGE_MIME: Record<string, string> = {
   png: "image/png",
@@ -844,17 +848,17 @@ export class ShareExporter {
     });
   }
 
-  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
   /**
    * True for a file in one of VAM's own folders, except the folder of the map being shared: that map's notes and
-   * attachments are its content. Files elsewhere in VAM's folders (other maps, records) stay out of the share.
+   * attachments are its content. Its chat records (map and topic chats) and every other VAM folder stay out.
    */
   private isInternalFile(path: string): boolean {
     const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
-    if (mapFolder && path.startsWith(`${mapFolder}/`)) return false;
+    if (mapFolder && path.startsWith(`${mapFolder}/`)) return path.startsWith(`${mapFolder}/${MAP_CHATS_FOLDER}/`);
     return (this.config.internalFolders ?? []).some(folder => path === folder || path.startsWith(`${folder}/`));
   }
 
+  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
   private registerFile(ref: string, fromPath: string): string {
     let found: TFile | null = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
     if (found && this.isInternalFile(found.path)) found = null;

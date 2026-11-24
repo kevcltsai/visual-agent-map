@@ -1092,6 +1092,8 @@ test('sharing acceptance fix: long extensions such as .canvas are attachments, n
   const sharing = load('experiences/sharing/share-clean.ts');
   assert.equal(sharing.classifyShareTarget('board.canvas'), 'attachment');
   assert.equal(sharing.classifyShareTarget('deck.keynote'), 'attachment');
+  assert.equal(sharing.classifyShareTarget('Q3.Planning'), 'note', 'a long word after a dot is a note title');
+  assert.equal(sharing.classifyShareTarget('Notes.Conclusion'), 'note');
   const embeds = load('experiences/sharing/share-embeds.ts');
   const anchored = embeds.anchorEmbeddedFiles('![](<my doc.pdf> "t") ![[board.canvas]]', ref => `Here/${ref}`);
   assert.ok(anchored.includes('![[Here/my doc.pdf]]'), anchored);

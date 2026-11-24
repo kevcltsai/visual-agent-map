@@ -107406,7 +107406,7 @@ var SHARE_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 function classifyShareTarget(path) {
   const clean3 = path.split(/[?#]/)[0].trim();
   if (SHARE_IMAGE_EXT.test(clean3)) return "image";
-  const ext = /\.([a-z0-9]{1,10})$/i.exec(clean3);
+  const ext = /\.([a-z0-9]{1,5}|canvas|keynote|numbers|sketch|excalidraw)$/i.exec(clean3);
   return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
 }
 
@@ -110199,6 +110199,7 @@ var platformRebuildDom = {
   serialize: (root) => root.innerHTML,
   createDiv: () => createDiv()
 };
+var MAP_CHATS_FOLDER = RECORDS_SUBPATH.split("/")[0];
 var IMAGE_MIME = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -110767,17 +110768,17 @@ ${fence2}`, host, "", child);
       slot.replaceWith(wrap);
     });
   }
-  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
   /**
    * True for a file in one of VAM's own folders, except the folder of the map being shared: that map's notes and
-   * attachments are its content. Files elsewhere in VAM's folders (other maps, records) stay out of the share.
+   * attachments are its content. Its chat records (map and topic chats) and every other VAM folder stay out.
    */
   isInternalFile(path) {
     var _a2;
     const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
-    if (mapFolder && path.startsWith(`${mapFolder}/`)) return false;
+    if (mapFolder && path.startsWith(`${mapFolder}/`)) return path.startsWith(`${mapFolder}/${MAP_CHATS_FOLDER}/`);
     return ((_a2 = this.config.internalFolders) != null ? _a2 : []).some((folder) => path === folder || path.startsWith(`${folder}/`));
   }
+  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
   registerFile(ref, fromPath) {
     var _a2, _b2, _c, _d;
     let found = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);

@@ -254,7 +254,10 @@ function mediaOf(text: string): { videos: Map<string, string>; images: Array<{ a
  * `detail` is added again. Added lines go in their own paragraphs before the update log, or at the end. `detail` is returned
  * unchanged when nothing is missing.
  */
-export function restoreDroppedMedia(detail: string, existingDetail: string): { detail: string; restoredVideoIds: Set<string> } {
+export function restoreDroppedMedia(
+  detail: string,
+  existingDetail: string
+): { detail: string; restoredVideoIds: Set<string> } {
   const restoredVideoIds = new Set<string>();
   const old = mediaOf(existingDetail);
   if (!old.videos.size && !old.images.length) return { detail, restoredVideoIds };

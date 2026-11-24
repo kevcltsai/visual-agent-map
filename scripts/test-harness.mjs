@@ -49,6 +49,15 @@ export function sameRepoCleanMain(owner, checkout) {
   } catch { return false; }
 }
 
+// A candidate must contain origin/main (main itself, or a branch with its own commits on top), or the install would drop fixes
+// already merged. Fetches first so the comparison is never against a stale remote ref.
+export function assertContainsOriginMain(checkout = root) {
+  const git = (...args) => execFileSync("git", ["-C", checkout, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  git("fetch", "-q", "origin");
+  try { git("merge-base", "--is-ancestor", "refs/remotes/origin/main", "HEAD"); }
+  catch { throw new Error(`Refusing to install: ${checkout} does not contain origin/main (${git("rev-list", "--count", "HEAD..refs/remotes/origin/main").trim()} commit(s) missing), so it would drop fixes already merged. Run git fetch origin && git rebase origin/main (or merge origin/main), then rerun --update-current.`); }
+}
+
 // The owner's canonical vault holds their own maps; the regression fixture maps are neither seeded into nor required of it.
 // Session and --prepare vaults keep both. `owner` is a parameter only so tests can designate a temp vault.
 const isOwnerVault = (vault, owner = canonicalVault) => resolve(vault) === resolve(owner);
@@ -341,6 +350,7 @@ export function main(args = process.argv.slice(2)) {
   for (const name of ["VAM_TEST_TARGET_VERSION", "VAM_TEST_VAULT_PARENT", "VAM_TEST_ARTIFACT_DIR", "VAM_TEST_WORKSPACE_ROOT"]) if (process.env[name]) throw new Error(`${name} is retired in the current-branch harness; unset it to avoid testing a stale target.`);
   if (prepare) assertObsidianClosed();
   if (update) {
+    assertContainsOriginMain();
     // Checked before the build so a busy owner is not kept waiting, and again right before the files are replaced.
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });

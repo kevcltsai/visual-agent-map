@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, ensureSessionProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
 import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readViewerCache, saveViewerCache } from '../scripts/viewer-cache.mjs';
@@ -724,7 +725,7 @@ test('session preparation selects exactly one verification policy, preserves ful
   const green = { sha: 'a'.repeat(40), id: '123' };
   for (const [mode, proof, env, expected, calls] of [
     ['affected', green, {}, 'ci-full', ['lookup', '--test tests/test-vault.mjs']],
-    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'lookup', 'run test:affected']],
+    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'run test:affected']],
     ['affected', green, { VAM_CLEAN_BUILD: '1' }, 'local-affected', ['run build', 'run test:affected']],
     ['affected', green, { CI: 'true' }, 'local-affected', ['run build', 'run test:affected']],
     ['preview', green, {}, 'preview-unverified', ['run build']],
@@ -878,4 +879,28 @@ test('hot reload refuses busy/unknown instances, restores files and record on fa
   assert.match(sessionDisableExpression('/test', runtime.version), /p\.activeTasks/);
   assert.match(sessionDisableExpression('/test', runtime.version), /wrong-vault/);
   assert.throws(() => main(['--session=a', '--stop', '--reload']), /Conflicting session options/);
+});
+
+test('an explicit owned session can reload after completed work without the owner quiet-time wait', t => {
+  const vault = busyVault(t, { ...one([start(1, 4), end(1, 'done', 3)]), exchanges: [{ startedAt: ago(4), completedAt: ago(3) }] });
+  assert.ok(ownerBusyReasons(vault, { now: NOW }).length > 0);
+  assert.deepEqual(ownerBusyReasons(vault, { now: NOW, requireQuietWindow: false }), []);
+  const active = busyVault(t, one([start(1, 3)]));
+  assert.match(ownerBusyReasons(active, { now: NOW, requireQuietWindow: false }).join('\n'), /還沒結束/);
+});
+test('session runtime profile reuses matching bytes, refuses running mismatch and repairs only stopped runtime', t => {
+  const { folder, vault } = environment(t);
+  prepareTestVault({ vault });
+  const path = join(folder, 'runtime.asar');
+  const bytes = Buffer.from('runtime bytes');
+  writeFileSync(path, bytes);
+  const runtime = { version: '1.14.0', path, hash: createHash('sha256').update(bytes).digest('hex') };
+  const profile = ensureSessionProfile(vault, runtime);
+  assert.equal(ensureSessionProfile(vault, runtime, { running: true }), profile);
+  const asar = join(profile, 'obsidian-1.14.0.asar');
+  writeFileSync(asar, 'tampered');
+  assert.throws(() => ensureSessionProfile(vault, runtime, { running: true }), /archive changed/);
+  assert.equal(readFileSync(asar, 'utf8'), 'tampered');
+  ensureSessionProfile(vault, runtime);
+  assert.deepEqual(readFileSync(asar), bytes);
 });

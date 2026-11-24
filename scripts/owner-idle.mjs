@@ -34,7 +34,7 @@ function parseLines(path) {
 const time = value => { const ms = typeof value === "string" ? Date.parse(value) : NaN; return Number.isFinite(ms) ? ms : null; };
 
 // Returns the reasons the owner may be using the vault; an empty list means installing is allowed.
-export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
+export function ownerBusyReasons(vault, { now = Date.now(), requireQuietWindow = true } = {}) {
   const reasons = [];
   const since = now - OWNER_IDLE_WINDOW_MS, running = now - OWNER_RUNNING_WINDOW_MS;
   let directories;
@@ -46,22 +46,23 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
     if (!files.length) continue;
     const newest = files[files.length - 1];
     // The newest conversation decides plan and chain state; any conversation written in the window can hold a recent turn.
-    const recent = files.filter(name => { try { return name === newest || statSync(join(directory, name)).mtimeMs >= since; } catch { return true; } });
+    const recent = files.filter(name => { try { return name === newest || statSync(join(directory, name)).mtimeMs >= (requireQuietWindow ? since : running); } catch { return true; } });
     for (const name of recent) {
       let lines;
       try { lines = parseLines(join(directory, name)); } catch (error) { reasons.push(`${map}：對話紀錄 ${name} 格式不對（${error.message}），判斷不出狀態`); continue; }
       for (const line of lines) if (line?.type === "turn_start") {
         const at = time(line.at);
         if (at === null) reasons.push(`${map}：對話紀錄 ${name} 有一輪 turn_start 沒有可讀的時間，判斷不出狀態`);
-        else if (at >= since) reasons.push(`${map}：${taiwanTime(at)} 剛開始一輪對話（15 分鐘內）`);
+        else if (requireQuietWindow && at >= since) reasons.push(`${map}：${taiwanTime(at)} 剛開始一輪對話（15 分鐘內）`);
       }
-      if (name !== newest) continue;
+      if (name !== newest && requireQuietWindow) continue;
       const lastIndex = predicate => { for (let i = lines.length - 1; i >= 0; i--) if (predicate(lines[i])) return i; return -1; };
       const chainEnd = lastIndex(line => line?.type === "event" && line.kind === "chain_end");
       const turnEnd = lastIndex(line => line?.type === "turn_end");
       const lastTurnStart = lastIndex(line => line?.type === "turn_start");
       if (lastTurnStart > turnEnd && (time(lines[lastTurnStart].at) ?? now) >= running)
         reasons.push(`${map}：第 ${lines[lastTurnStart].turn} 輪（${taiwanTime(time(lines[lastTurnStart].at) ?? now)} 開始）還沒結束`);
+      if (name !== newest) continue;
       if (turnEnd >= 0 && lines[turnEnd].status === "plan" && chainEnd < turnEnd && lastIndex(line => line?.type === "plan") < turnEnd)
         reasons.push(`${map}：最後一輪（第 ${lines[turnEnd].turn} 輪）有待套用的計畫，還沒套用或取消`);
       // A turn the user typed after an automatic round ends that continuation even when an older build wrote no chain_end.
@@ -82,7 +83,7 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
       if (time(entry.completedAt) === null && at >= running) reasons.push(`ai-exchanges.json：${taiwanTime(at)} 開始的 AI 呼叫還沒結束`);
       if (latest === null || at > latest) latest = at;
     }
-    if (latest !== null && latest >= since) reasons.push(`ai-exchanges.json：${taiwanTime(latest)} 有 AI 呼叫（15 分鐘內）`);
+    if (requireQuietWindow && latest !== null && latest >= since) reasons.push(`ai-exchanges.json：${taiwanTime(latest)} 有 AI 呼叫（15 分鐘內）`);
   } catch (error) {
     reasons.push(`讀不到或看不懂 ${existsSync(exchanges) ? "ai-exchanges.json" : "ai-exchanges.json（檔案不存在）"}（${error.message}），判斷不出狀態`);
   }

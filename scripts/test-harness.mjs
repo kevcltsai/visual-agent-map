@@ -213,6 +213,42 @@ export function selectObsidianRuntime(minVersion, candidates) {
   return runtime;
 }
 
+export function ensureSessionProfile(vault, runtime, { running = false } = {}) {
+  const profile = join(vault, ".vam-app");
+  if (!existsSync(profile)) {
+    if (running) throw new Error("Running session has no owned runtime profile.");
+    return prepareObsidianProfile(vault, runtime, { cli: false });
+  }
+  if (!lstatSync(profile).isDirectory() || lstatSync(profile).isSymbolicLink()) throw new Error("Invalid session runtime profile.");
+  const configPath = join(profile, "obsidian.json");
+  if (!existsSync(configPath) || !lstatSync(configPath).isFile() || lstatSync(configPath).isSymbolicLink()) throw new Error("Missing or invalid session profile configuration.");
+  const config = json(configPath), entries = Object.values(config.vaults || {});
+  if (config.cli !== false || entries.length !== 1 || !entries[0]?.path || realpathSync(entries[0].path) !== realpathSync(vault)) throw new Error("Session profile does not identify only the owned vault.");
+  const name = "obsidian-" + runtime.version + ".asar";
+  const current = join(profile, name);
+  const compare = (a, b) => {
+    const x = a.split(".").map(Number), y = b.split(".").map(Number);
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  };
+  for (const file of readdirSync(profile)) {
+    const version = /^obsidian-(\d+\.\d+\.\d+)\.asar$/.exec(file)?.[1];
+    if (version && compare(version, runtime.version) > 0) throw new Error("Session profile contains a newer runtime; inspect before reuse.");
+  }
+  if (existsSync(current)) {
+    if (!lstatSync(current).isFile() || lstatSync(current).isSymbolicLink()) throw new Error("Invalid session runtime archive.");
+    if (hash(readFileSync(current)) === runtime.hash) return profile;
+  }
+  if (running) throw new Error("Session runtime archive changed; stop and restart instead.");
+  const staging = mkdtempSync(join(profile, ".vam-runtime-"));
+  try {
+    const file = join(staging, name);
+    copyFileSync(runtime.path, file);
+    if (hash(readFileSync(file)) !== runtime.hash) throw new Error("Obsidian runtime changed during preparation.");
+    renameSync(file, current);
+    return profile;
+  } finally { rmSync(staging, { recursive: true, force: true }); }
+}
+
 function installedObsidianRuntime() {
   const updates = join(homedir(), "Library/Application Support/obsidian");
   const candidates = ["/Applications/Obsidian.app/Contents/Resources/obsidian.asar"];
@@ -269,7 +305,7 @@ export function sessionVault(name) {
 
 // Only the exact owning checkout can operate on an isolated session.
 export function assertSessionOwner(vault) {
-  if (isOwnerVault(vault) || !existsSync(vault) || !lstatSync(vault).isDirectory() || lstatSync(vault).isSymbolicLink()) throw new Error("Refusing an unowned session vault.");
+  if (isOwnerVault(vault) || !existsSync(vault) || (existsSync(canonicalVault) && realpathSync(vault) === realpathSync(canonicalVault)) || !lstatSync(vault).isDirectory() || lstatSync(vault).isSymbolicLink()) throw new Error("Refusing an unowned session vault.");
   const path = join(vault, marker);
   if (!existsSync(path) || !lstatSync(path).isFile() || lstatSync(path).isSymbolicLink()) throw new Error("Refusing an unowned session vault.");
   const record = json(path);
@@ -287,7 +323,7 @@ export function withSessionLock(vault, work) {
   return result;
 }
 function assertSessionIdle(vault) {
-  const reasons = ownerBusyReasons(vault);
+  const reasons = ownerBusyReasons(vault, { requireQuietWindow: false });
   if (reasons.length) throw new Error("Session reload refused: possible pending work or unknown state; finish work or stop the session. " + reasons.join("; "));
 }
 // Missing/unknown runtime state is not permission to unload. Deliberately
@@ -370,16 +406,20 @@ export function prepareSessionCandidate({
   const canReuse = mode === "affected" && env.CI !== "true" && env.VAM_CLEAN_BUILD !== "1";
   let green = canReuse ? lookup() : null;
   const buildReused = !!green;
+  let beforeBuild;
   if (!green) {
+    if (canReuse) try { beforeBuild = artifactHashes(); } catch { /* missing artifacts */ }
     execute("npm", ["run", "build"]);
-    if (canReuse) green = lookup();
   }
+  const built = artifactHashes();
+  // A second lookup is worthwhile only when the build restored/changed bytes.
+  // A missing CI proof for identical artifacts must not cause two network waits.
+  if (!green && canReuse && JSON.stringify(beforeBuild) !== JSON.stringify(built)) green = lookup();
   const testEnv = { ...env };
   for (const key of ["VAM_AFFECTED_TESTS", "VAM_ISOLATED_SUITES", "VAM_ISOLATED_TEST_LAYER", "VAM_CI_SHARD", "VAM_CI_REPORT_DIR"]) delete testEnv[key];
-  const built = artifactHashes();
   let verification;
   if (green) {
-    process.stdout.write(`Session vault: reusing committed artifacts from full CI run ${green.id} for ${green.sha}; checking the local vault harness.\n`);
+    process.stdout.write(`Vault: reusing full CI run ${green.id} for ${green.sha}; checking the local vault harness.\n`);
     timedSync("local-vault-test", () => execute(process.execPath, ["--test", "tests/test-vault.mjs"], testEnv));
     recordDevEvent("ci-reuse-install", 0, "ok", { commit: green.sha, runId: green.id });
     verification = { kind: "ci-full", ...green, localVaultTest: true, buildReused };
@@ -437,13 +477,16 @@ function sessionMainLocked(args, vault, mode) {
     if (JSON.stringify(buildHashes(root)) !== JSON.stringify(artifacts)) throw new Error("Build artifacts changed before installation.");
   };
   checkCandidate();
-  if (reload) return reloadSessionVault({ vault, source, checkCandidate }).then(record => {
+  if (reload) {
+    ensureSessionProfile(vault, runtime, { running: true });
+    return reloadSessionVault({ vault, source, checkCandidate }).then(record => {
     process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
-  });
+    });
+  }
   const record = timedSync("install", () => exists
     ? updateCurrentTestVault({ vault, source })
     : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source }));
-  if (!existsSync(join(appProfile, "obsidian.json"))) prepareObsidianProfile(vault, runtime, { cli: false });
+  ensureSessionProfile(vault, runtime);
   launchObsidian(appProfile);
   const cdp = `node scripts/obsidian-cdp.mjs --vault=${vault}`;
   process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING", next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`, `Test Obsidian stays in the background for its whole life; to watch it, create ${join(appProfile, "allow-focus")} (delete it to hide again)`] }, null, 2)}\n`);
@@ -456,19 +499,21 @@ export function assertSourceUnchanged(expected, directory = root) {
 // Only reuse full CI for a clean, already-landed candidate whose locally built install artifacts
 // are byte-identical to the commit. The existing full-CI lookup rejects affected runs and fails closed.
 // Any local edit (including generated output), missing proof or lookup failure retains targeted verification.
-export function greenInstallRun(directory = root, lookup = (dir, sha) => execFileSync("sh", ["scripts/find-green-ci-run.sh", sha], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()) {
+export function greenInstallRun(directory = root, lookup = (dir, sha) => execFileSync("sh", ["scripts/find-green-ci-run.sh", sha], { cwd: dir, encoding: "utf8", timeout: 20_000, stdio: ["ignore", "pipe", "ignore"] }).trim()) {
   const git = (...args) => execFileSync("git", args, { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   try {
     const sha = git("rev-parse", "HEAD");
     if (!/^[0-9a-f]{40}$/.test(sha) || sha !== git("rev-parse", "refs/remotes/origin/main")) return null;
-    if (git("status", "--porcelain", "--untracked-files=all")) return null;
+    const clean = () => !git("status", "--porcelain", "--untracked-files=all") &&
+      git("ls-files", "-v").split("\n").every(line => !line || line.startsWith("H "));
+    if (!clean()) return null;
     const matches = () => [...assets, viewerArtifact].every(name => {
       const committed = execFileSync("git", ["show", `${sha}:${name}`], { cwd: directory, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
       return hash(committed) === hash(readFileSync(join(directory, name)));
     });
     if (!matches()) return null;
     const id = lookup(directory, sha);
-    if (!/^\d+$/.test(id || "") || git("rev-parse", "HEAD") !== sha || git("rev-parse", "refs/remotes/origin/main") !== sha || git("status", "--porcelain", "--untracked-files=all") || !matches()) return null;
+    if (!/^\d+$/.test(id || "") || git("rev-parse", "HEAD") !== sha || git("rev-parse", "refs/remotes/origin/main") !== sha || !clean() || !matches()) return null;
     return { sha, id };
   } catch { return null; }
 }
@@ -525,13 +570,15 @@ export function main(args = process.argv.slice(2)) {
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });
     else assertOwnerIdle(canonicalVault);
-    const { fingerprint, verification } = prepareSessionCandidate();
+    const { fingerprint, verification, artifacts } = prepareSessionCandidate();
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
     const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint };
     const runtime = installedObsidianRuntime();
     source.verification = verification;
     source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
+    assertSourceUnchanged(fingerprint);
+    if (JSON.stringify(buildHashes(root)) !== JSON.stringify(artifacts)) throw new Error("Build artifacts changed before owner installation.");
     const record = timedSync("install", () => updateCurrentTestVault({ source, ownerIdleConfirmed }));
     const appProfile = join(canonicalVault, ".vam-app");
     if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, runtime);

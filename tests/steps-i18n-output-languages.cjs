@@ -14,7 +14,7 @@ const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
 const content = load('core/content-language.ts');
 const result = load('ai/result-utils.ts');
-const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, cardOutputLanguage, noteLanguageFromBody, mapChatLanguageSources } = content;
+const { detectContentLanguage, chooseContentLanguage, resolveMapOutputLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, cardOutputLanguage, noteLanguageFromBody, mapChatLanguageSources } = content;
 // The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).
 const CLAUSE_EN = "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)";
 const CLAUSE_ZH = '使用者自己輸入的文字（主題、問題或選取文字）所使用的語言（不是這些指示或固定標題的語言）';
@@ -109,44 +109,44 @@ test('output languages: detection follows the table data (kana rule, hangul, Ara
     ['Plan a trip', 'same-as-input'], ['What does 侘寂 mean', 'same-as-input'], ['Planificar un viaje', 'same-as-input'], ['Какой маршрут', 'same-as-input'], ['Τι είναι', 'same-as-input'], ['מה זה', 'same-as-input'],
     ['', undefined], ['2026', undefined], ['🍜', undefined]
   ];
-  for (const [text, expected] of cases) assert.equal(detectAimContentLanguage(text), expected, text);
+  for (const [text, expected] of cases) assert.equal(detectContentLanguage(text), expected, text);
   // Vietnamese: a lone đ or ă does not count (Tagalog-free Latin text, Romanian), the stacked-diacritic block and ơ ư do.
-  for (const text of ['Đà', 'Ma ăn', 'dap', 'Dien Bien Phu']) assert.equal(detectAimContentLanguage(text), 'same-as-input', text);
-  for (const letter of ['ơ', 'Ơ', 'ư', 'Ư', '\u1EA0', '\u1EF9']) assert.equal(detectAimContentLanguage(`abc ${letter}`), 'vi', `U+${letter.codePointAt(0).toString(16)}`);
-  assert.equal(detectAimContentLanguage('abc \u1EFA'), 'same-as-input', 'U+1EFA is outside the block');
+  for (const text of ['Đà', 'Ma ăn', 'dap', 'Dien Bien Phu']) assert.equal(detectContentLanguage(text), 'same-as-input', text);
+  for (const letter of ['ơ', 'Ơ', 'ư', 'Ư', '\u1EA0', '\u1EF9']) assert.equal(detectContentLanguage(`abc ${letter}`), 'vi', `U+${letter.codePointAt(0).toString(16)}`);
+  assert.equal(detectContentLanguage('abc \u1EFA'), 'same-as-input', 'U+1EFA is outside the block');
   // Persian and Urdu write Arabic script; their own letters mean it is not Arabic, so the model follows the text (D-2026-10-85).
-  for (const letter of ['پ', 'چ', 'ژ', 'گ', 'ک', 'ی', 'ٹ', 'ڈ', 'ڑ', 'ں', 'ے']) assert.equal(detectAimContentLanguage(`رحلة ${letter}`), 'same-as-input', `Arabic script with ${letter} follows the input`);
-  for (const text of ['東京の旅行', '한국 여행']) assert.notEqual(detectAimContentLanguage(text), 'unsupported');
+  for (const letter of ['پ', 'چ', 'ژ', 'گ', 'ک', 'ی', 'ٹ', 'ڈ', 'ڑ', 'ں', 'ے']) assert.equal(detectContentLanguage(`رحلة ${letter}`), 'same-as-input', `Arabic script with ${letter} follows the input`);
+  for (const text of ['東京の旅行', '한국 여행']) assert.notEqual(detectContentLanguage(text), 'unsupported');
   for (const ui of ['en', 'zh-TW', 'zh-CN']) {
-    assert.equal(chooseAimContentLanguage(ui, '한국 여행', '中文'), 'ko');
-    assert.equal(chooseAimContentLanguage(ui, 'رحلة گ', 'Some English context'), 'same-as-input', 'the topic has letters nothing recognises: follow the input, not the later context');
-    assert.equal(chooseAimContentLanguage(ui, '🍜', 'Some English context'), 'same-as-input', 'no letters in the topic: the context decides');
-    assert.equal(chooseAimContentLanguage(ui, '🍜'), ui, 'no letters anywhere: the interface language');
-    assert.equal(chooseAimContentLanguage(ui, 'Plan a trip'), 'same-as-input');
+    assert.equal(chooseContentLanguage(ui, '한국 여행', '中文'), 'ko');
+    assert.equal(chooseContentLanguage(ui, 'رحلة گ', 'Some English context'), 'same-as-input', 'the topic has letters nothing recognises: follow the input, not the later context');
+    assert.equal(chooseContentLanguage(ui, '🍜', 'Some English context'), 'same-as-input', 'no letters in the topic: the context decides');
+    assert.equal(chooseContentLanguage(ui, '🍜'), ui, 'no letters anywhere: the interface language');
+    assert.equal(chooseContentLanguage(ui, 'Plan a trip'), 'same-as-input');
   }
-  assert.equal(chooseAimContentLanguage('zh-CN', '中文主题'), 'zh-CN');
-  assert.equal(chooseAimContentLanguage('zh-TW', '中文主题'), 'zh-CN', 'Simplified characters in a Traditional interface: Simplified (D-2026-10-87)');
-  assert.equal(chooseAimContentLanguage('zh-CN', '東京五天自由行怎麼排'), 'zh-TW', 'Traditional characters in a Simplified interface: Traditional');
-  assert.equal(chooseAimContentLanguage('zh-CN', '中文背景'), 'zh-CN', 'only shared characters: the interface decides');
-  assert.equal(chooseAimContentLanguage('zh-TW', '中文背景'), 'zh-TW');
-  assert.equal(chooseAimContentLanguage('en', '中文背景'), 'zh-TW');
+  assert.equal(chooseContentLanguage('zh-CN', '中文主题'), 'zh-CN');
+  assert.equal(chooseContentLanguage('zh-TW', '中文主题'), 'zh-CN', 'Simplified characters in a Traditional interface: Simplified (D-2026-10-87)');
+  assert.equal(chooseContentLanguage('zh-CN', '東京五天自由行怎麼排'), 'zh-TW', 'Traditional characters in a Simplified interface: Traditional');
+  assert.equal(chooseContentLanguage('zh-CN', '中文背景'), 'zh-CN', 'only shared characters: the interface decides');
+  assert.equal(chooseContentLanguage('zh-TW', '中文背景'), 'zh-TW');
+  assert.equal(chooseContentLanguage('en', '中文背景'), 'zh-TW');
 });
 
 test('output languages: the kana rule needs two kana besides の and kana plus Han of at least twice the Latin words (D-2026-10-86)', () => {
   // Chinese titles borrow の; one or only の is not a Japanese signal.
-  for (const text of ['小確幸の生活', '台灣の旅', '東京の旅行', '日本語の勉強', 'の', 'ののの', '台灣のみ']) assert.notEqual(detectAimContentLanguage(text), 'ja', text);
+  for (const text of ['小確幸の生活', '台灣の旅', '東京の旅行', '日本語の勉強', 'の', 'ののの', '台灣のみ']) assert.notEqual(detectContentLanguage(text), 'ja', text);
   for (const ui of ['en', 'zh-TW']) {
-    assert.equal(chooseAimContentLanguage(ui, '小確幸の生活'), 'zh-TW'); assert.equal(chooseAimContentLanguage(ui, '台灣の旅'), 'zh-TW'); assert.equal(chooseAimContentLanguage(ui, '東京の旅行'), 'zh-TW');
-    assert.equal(chooseAimContentLanguage(ui, 'Notes on ラーメン shops'), 'same-as-input', 'a Latin sentence quoting katakana');
-    assert.equal(chooseAimContentLanguage(ui, '東京ラーメン guide'), 'ja');
+    assert.equal(chooseContentLanguage(ui, '小確幸の生活'), 'zh-TW'); assert.equal(chooseContentLanguage(ui, '台灣の旅'), 'zh-TW'); assert.equal(chooseContentLanguage(ui, '東京の旅行'), 'zh-TW');
+    assert.equal(chooseContentLanguage(ui, 'Notes on ラーメン shops'), 'same-as-input', 'a Latin sentence quoting katakana');
+    assert.equal(chooseContentLanguage(ui, '東京ラーメン guide'), 'ja');
   }
-  assert.equal(detectAimContentLanguage('ひらがな'), 'ja');
-  assert.equal(detectAimContentLanguage('東京ラーメン'), 'ja');
-  assert.equal(detectAimContentLanguage('ラメン'), 'ja', 'exactly two kana besides の');
-  assert.equal(detectAimContentLanguage('ラの'), 'zh-TW' === 'ja' ? 'ja' : detectAimContentLanguage('ラの'), 'one kana besides の is not enough');
-  assert.notEqual(detectAimContentLanguage('ラの'), 'ja');
+  assert.equal(detectContentLanguage('ひらがな'), 'ja');
+  assert.equal(detectContentLanguage('東京ラーメン'), 'ja');
+  assert.equal(detectContentLanguage('ラメン'), 'ja', 'exactly two kana besides の');
+  assert.equal(detectContentLanguage('ラの'), 'zh-TW' === 'ja' ? 'ja' : detectContentLanguage('ラの'), 'one kana besides の is not enough');
+  assert.notEqual(detectContentLanguage('ラの'), 'ja');
   // Boundary of the Latin ratio: kana + Han = 2 * words passes, one short does not.
-  assert.equal(detectAimContentLanguage('東京ラメン A'), 'ja'); assert.equal(detectAimContentLanguage('東京ラメン A B'), 'ja'); assert.notEqual(detectAimContentLanguage('東京ラメン A B C'), 'ja');
+  assert.equal(detectContentLanguage('東京ラメン A'), 'ja'); assert.equal(detectContentLanguage('東京ラメン A B'), 'ja'); assert.notEqual(detectContentLanguage('東京ラメン A B C'), 'ja');
 });
 
 test('output languages: ja task prompt equals the en prompt except the language name and heading clauses', async () => {
@@ -222,25 +222,24 @@ test('output languages: same-as-input outline and structure-review prompts equal
 
 test('output languages: a map records its output language in map.outputLanguage and resolves it first (D-2026-10-88)', () => {
   const ja = { title: '東京の旅行', outputLanguage: 'ja', aim: { version: 1, contentLanguage: 'en' } };
-  for (const ui of ['en', 'zh-TW', 'zh-CN']) assert.equal(resolveAimContentLanguage(ja, ui), 'ja');
-  assert.equal(i18n.noteLanguageOf(resolveAimContentLanguage(ja, 'zh-TW')), 'en', 'fixed note text is English');
+  for (const ui of ['en', 'zh-TW', 'zh-CN']) assert.equal(resolveMapOutputLanguage(ja, ui), 'ja');
+  assert.equal(i18n.noteLanguageOf(resolveMapOutputLanguage(ja, 'zh-TW')), 'en', 'fixed note text is English');
   // A map without an AIM extension remembers too, and any content language is valid, including the follow-the-input row.
-  for (const id of ['same-as-input', 'zh-CN', 'zh-TW', 'en', 'es', 'ko']) for (const ui of ['en', 'zh-TW']) assert.equal(resolveAimContentLanguage({ title: 'Plan', outputLanguage: id }, ui), id);
+  for (const id of ['same-as-input', 'zh-CN', 'zh-TW', 'en', 'es', 'ko']) for (const ui of ['en', 'zh-TW']) assert.equal(resolveMapOutputLanguage({ title: 'Plan', outputLanguage: id }, ui), id);
   // Compatibility: a map saved before output-only languages existed stored the note language only.
-  assert.equal(resolveAimContentLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'ja', 'English-interface Japanese map upgrades to Japanese');
-  assert.equal(resolveAimContentLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'zh-TW'), 'zh-TW', 'Chinese-interface map keeps Chinese');
-  assert.equal(resolveAimContentLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'en'), 'zh-TW');
-  assert.equal(resolveAimContentLanguage({ title: '東京の旅行', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en', 'no longer detected as Japanese (D-2026-10-86): the stored value stands');
-  assert.equal(resolveAimContentLanguage({ title: 'Plan a trip', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en', 'a stored note language is not upgraded to the follow-the-input row');
+  assert.equal(resolveMapOutputLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'ja', 'English-interface Japanese map upgrades to Japanese');
+  assert.equal(resolveMapOutputLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'zh-TW'), 'zh-TW', 'Chinese-interface map keeps Chinese');
+  assert.equal(resolveMapOutputLanguage({ title: '東京ラーメンの旅', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'en'), 'zh-TW');
+  assert.equal(resolveMapOutputLanguage({ title: '東京の旅行', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en', 'no longer detected as Japanese (D-2026-10-86): the stored value stands');
+  assert.equal(resolveMapOutputLanguage({ title: 'Plan a trip', aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en', 'a stored note language is not upgraded to the follow-the-input row');
   // An unknown stored value is ignored, never thrown on.
   for (const bad of ['xx', '', 7, null, {}, [], true]) {
-    assert.doesNotThrow(() => resolveAimContentLanguage({ title: 'Plan', outputLanguage: bad, aim: { version: 1, contentLanguage: 'en' } }, 'en'));
-    assert.equal(resolveAimContentLanguage({ title: 'Plan', outputLanguage: bad, aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en');
+    assert.doesNotThrow(() => resolveMapOutputLanguage({ title: 'Plan', outputLanguage: bad, aim: { version: 1, contentLanguage: 'en' } }, 'en'));
+    assert.equal(resolveMapOutputLanguage({ title: 'Plan', outputLanguage: bad, aim: { version: 1, contentLanguage: 'en' } }, 'en'), 'en');
     assert.equal(i18n.isContentLanguage(bad), false);
   }
-  assert.equal(resolveAimContentLanguage({ title: 'Plan a trip', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'en'), 'zh-TW');
+  assert.equal(resolveMapOutputLanguage({ title: 'Plan a trip', aim: { version: 1, contentLanguage: 'zh-TW' } }, 'en'), 'zh-TW');
   // The hook for other code (default names, labels): one function returning the map's ContentLanguage.
-  assert.equal(content.resolveMapOutputLanguage, resolveAimContentLanguage);
   assert.equal(content.rememberedOutputLanguage({ outputLanguage: 'ja' }), 'ja'); assert.equal(content.rememberedOutputLanguage({ outputLanguage: 'xx' }), undefined); assert.equal(content.rememberedOutputLanguage(undefined), undefined);
   // A map-level run without a dialog: remembered first, then the user's own text, then the interface.
   assert.equal(outputLanguageForMap({ outputLanguage: 'ko' }, 'en', 'Plan a trip'), 'ko');
@@ -314,16 +313,16 @@ test('output languages: an English topic with function words is the en path; one
   const task = title => ({ title, summary: 'S', rules: '', detail: '', task: `Research ${title}`, ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' });
   // Function words and no foreign function word: detected as English, so the prompt is exactly the explicit-en prompt.
   const plain = task('How to plan a 5-day Taipei trip');
-  assert.equal(chooseAimContentLanguage('zh-TW', plain.title), 'en');
-  const detectedEn = (await promptsFor({ ...plain, outputLanguage: chooseAimContentLanguage('en', plain.title) }, { language: 'en' }))[0].prompt;
+  assert.equal(chooseContentLanguage('zh-TW', plain.title), 'en');
+  const detectedEn = (await promptsFor({ ...plain, outputLanguage: chooseContentLanguage('en', plain.title) }, { language: 'en' }))[0].prompt;
   const explicitEn = (await promptsFor({ ...plain, outputLanguage: 'en' }, { language: 'en' }))[0].prompt;
   assert.equal(normalizeText(detectedEn), normalizeText(explicitEn));
   assert.doesNotMatch(detectedEn, /the language in which the user's/);
   // No function word either way: the model follows the quoted text.
   const bare = task('Plan a 5-day Taipei trip');
-  assert.equal(chooseAimContentLanguage('en', bare.title), 'same-as-input');
+  assert.equal(chooseContentLanguage('en', bare.title), 'same-as-input');
   const en = (await promptsFor({ ...bare, outputLanguage: 'en' }, { language: 'en' }))[0].prompt;
-  const follow = (await promptsFor({ ...bare, outputLanguage: chooseAimContentLanguage('en', bare.title) }, { language: 'en' }))[0].prompt;
+  const follow = (await promptsFor({ ...bare, outputLanguage: chooseContentLanguage('en', bare.title) }, { language: 'en' }))[0].prompt;
   assert.notEqual(normalizeText(follow), normalizeText(en), 'the runtime prompt of such a topic changed: the anchored clause replaces the language name');
   assertReduces('english topic', follow, en, undefined, followFlavour('topic', bare.title));
   assert.equal(i18n.noteLanguageOf('same-as-input'), i18n.noteLanguageOf('en'));
@@ -331,7 +330,7 @@ test('output languages: an English topic with function words is the en path; one
 
 test('output languages: plain English is told from other Latin text by function words (D-2026-10-94)', () => {
   const expectEn = ['How do vaccines work', 'Why do cats purr', 'Do you need a VPN', 'Smith et al. 2020 review of the evidence', 'History of Los Angeles', 'MIT courses for beginners', 'How to come up with ideas', 'The Da Vinci Code analysis', 'Visit the Des Moines zoo', 'Non-profit management for the arts', 'Why cells die', 'How to plan a trip', 'What is the best way to learn', 'Why are bridges built with arches', 'The history of Rome', 'My notes from this trip', 'Plan for the week'];
-  for (const text of expectEn) assert.equal(detectAimContentLanguage(text), 'en', text);
+  for (const text of expectEn) assert.equal(detectContentLanguage(text), 'en', text);
   const expectFollow = [
     'Ancient Egypt', // no function word either way
     'Historia de Roma', // Spanish function word
@@ -343,11 +342,11 @@ test('output languages: plain English is told from other Latin text by function 
     'Notes on ラーメン shops', // the kana rule says no (too many Latin words); non-ASCII, so no English
     'Что is the', 'a in no', 'on an as' // other script; shared words are in neither list
   ];
-  for (const text of expectFollow) assert.equal(detectAimContentLanguage(text), 'same-as-input', text);
+  for (const text of expectFollow) assert.equal(detectContentLanguage(text), 'same-as-input', text);
   // Digits, punctuation and spaces around ASCII letters do not matter; the rest of the priority order is unchanged.
-  assert.equal(detectAimContentLanguage('  How-to: 5 steps for 2026!  '), 'en');
-  assert.equal(detectAimContentLanguage('東京の旅 and the food'), 'zh-TW', 'Han text outweighing Latin words stays Chinese');
-  assert.equal(detectAimContentLanguage('🍜 123'), undefined);
+  assert.equal(detectContentLanguage('  How-to: 5 steps for 2026!  '), 'en');
+  assert.equal(detectContentLanguage('東京の旅 and the food'), 'zh-TW', 'Han text outweighing Latin words stays Chinese');
+  assert.equal(detectContentLanguage('🍜 123'), undefined);
   // Every word list entry is a lower-case ASCII word, the two lists never overlap, and shared words are in neither.
   const { LATIN_TEXT_DETECTION: data } = load('i18n/languages.ts');
   for (const word of [...data.words, ...data.foreign]) assert.match(word, /^[a-z]+$/, word);
@@ -427,19 +426,19 @@ const T06_BODY = "你目前的文件是一份有明確價值觀的「產品哲�
 
 test('ticket 06: Chinese text with a little Japanese (link titles, quoted words, ー dashes) is not Japanese', () => {
   for (const ui of ['zh-TW', 'en']) {
-    assert.equal(chooseAimContentLanguage(ui, T06_HEAD + T06_BODY + T06_RU_LINK), 'zh-TW', '原文去掉日文連結');
-    assert.equal(chooseAimContentLanguage(ui, T06_HEAD + T06_BODY + T06_JA_LINK + T06_RU_LINK), 'zh-TW', '原文含日文連結');
-    assert.equal(chooseAimContentLanguage(ui, '幫我依照以下回應產生心智圖：\n品味系統的五個盲點。\n[作品集 : くうろときろ](https://example.com/a.png)'), 'zh-TW', '最小重現');
-    assert.equal(chooseAimContentLanguage(ui, '品味系統需要審美判斷。アート'), 'zh-TW', '最小重現(只有アート)');
-    assert.equal(chooseAimContentLanguage(ui, '品味系統 ー 從價值清單到判斷規則ー三層結構'), 'zh-TW');
-    assert.equal(chooseAimContentLanguage(ui, '這個介面設計參考侘寂（わびさび）與留白的美學'), 'zh-TW');
-    assert.equal(chooseAimContentLanguage(ui, '台灣の旅：VAM 的品味系統'), 'zh-TW');
-    assert.equal(chooseAimContentLanguage(ui, '形・色・節奏・質感・動態'), 'zh-TW');
+    assert.equal(chooseContentLanguage(ui, T06_HEAD + T06_BODY + T06_RU_LINK), 'zh-TW', '原文去掉日文連結');
+    assert.equal(chooseContentLanguage(ui, T06_HEAD + T06_BODY + T06_JA_LINK + T06_RU_LINK), 'zh-TW', '原文含日文連結');
+    assert.equal(chooseContentLanguage(ui, '幫我依照以下回應產生心智圖：\n品味系統的五個盲點。\n[作品集 : くうろときろ](https://example.com/a.png)'), 'zh-TW', '最小重現');
+    assert.equal(chooseContentLanguage(ui, '品味系統需要審美判斷。アート'), 'zh-TW', '最小重現(只有アート)');
+    assert.equal(chooseContentLanguage(ui, '品味系統 ー 從價值清單到判斷規則ー三層結構'), 'zh-TW');
+    assert.equal(chooseContentLanguage(ui, '這個介面設計參考侘寂（わびさび）與留白的美學'), 'zh-TW');
+    assert.equal(chooseContentLanguage(ui, '台灣の旅：VAM 的品味系統'), 'zh-TW');
+    assert.equal(chooseContentLanguage(ui, '形・色・節奏・質感・動態'), 'zh-TW');
   }
   const long = '這是一段關於產品設計與個人判斷系統的長文，內容反覆討論取捨與原則。'.repeat(100) + 'シンプル';
   assert.ok(long.length > 2000);
-  assert.equal(chooseAimContentLanguage('zh-TW', long), 'zh-TW', 'long Chinese ending with one katakana word');
-  assert.equal(detectAimContentLanguage('品味系統需要審美判斷。アート'), 'zh-TW');
+  assert.equal(chooseContentLanguage('zh-TW', long), 'zh-TW', 'long Chinese ending with one katakana word');
+  assert.equal(detectContentLanguage('品味系統需要審美判斷。アート'), 'zh-TW');
 });
 
 test('ticket 06: real Japanese stays Japanese, also with many Han characters or a long paragraph', () => {
@@ -449,28 +448,28 @@ test('ticket 06: real Japanese stays Japanese, also with many Han characters or 
     '新幹線で大阪まで行く', '日本語です Plan', '東京ラメン A B', 'ラメン'
   ];
   for (const text of samples) {
-    assert.equal(detectAimContentLanguage(text), 'ja', text);
-    assert.equal(chooseAimContentLanguage('zh-TW', text), 'ja', text);
+    assert.equal(detectContentLanguage(text), 'ja', text);
+    assert.equal(chooseContentLanguage('zh-TW', text), 'ja', text);
   }
   const paragraph = '日本の経済は長い間、低成長とデフレに悩まされてきました。しかし最近では、賃金の上昇や企業の投資拡大により、少しずつ明るい兆しが見え始めています。専門家は、今後の金融政策の動向が景気の回復に大きな影響を与えると指摘しています。一方で、物価の上昇が家計に与える負担も無視できません。政府は支援策を検討しており、国民の生活を守るための対応が求められています。さらに、地方の中小企業では人手不足が深刻になっており、働き方の見直しや新しい技術の導入が急がれています。';
   assert.ok(paragraph.length >= 200);
-  assert.equal(chooseAimContentLanguage('zh-TW', paragraph), 'ja');
+  assert.equal(chooseContentLanguage('zh-TW', paragraph), 'ja');
 });
 
 test('ticket 06: links, images, URLs and code are not counted; a lone Japanese link still is', () => {
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。`こんにちはさようなら` 是範例'), 'zh-TW', 'inline code');
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nこんにちは さようなら ラーメン\n```\n以上是範例'), 'zh-TW', 'fenced code');
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n~~~\nこんにちは さようなら ラーメン\n~~~\n以上是範例'), 'zh-TW', 'tilde fence');
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。![ラーメンの写真](https://x.jp/a.png)'), 'zh-TW', 'image');
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統。https://example.com/the-best-guide-for-the-trip'), 'zh-TW', 'bare URL: its Latin words are not counted');
-  assert.equal(chooseAimContentLanguage('zh-TW', 'アート https://x.jp品味系統需要審美判斷系統的說明與更多的中文內容'), 'zh-TW', 'bare URL: Chinese right after it is kept');
-  assert.equal(chooseAimContentLanguage('zh-TW', '[東京ラーメンガイド](https://x.jp)'), 'ja', 'only a Japanese link: no letters left, the original text decides');
-  assert.equal(detectAimContentLanguage('[東京ラーメンガイド](https://x.jp)'), 'ja');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統的五個盲點。`こんにちはさようなら` 是範例'), 'zh-TW', 'inline code');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nこんにちは さようなら ラーメン\n```\n以上是範例'), 'zh-TW', 'fenced code');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統的五個盲點。\n~~~\nこんにちは さようなら ラーメン\n~~~\n以上是範例'), 'zh-TW', 'tilde fence');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統的五個盲點。![ラーメンの写真](https://x.jp/a.png)'), 'zh-TW', 'image');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統。https://example.com/the-best-guide-for-the-trip'), 'zh-TW', 'bare URL: its Latin words are not counted');
+  assert.equal(chooseContentLanguage('zh-TW', 'アート https://x.jp品味系統需要審美判斷系統的說明與更多的中文內容'), 'zh-TW', 'bare URL: Chinese right after it is kept');
+  assert.equal(chooseContentLanguage('zh-TW', '[東京ラーメンガイド](https://x.jp)'), 'ja', 'only a Japanese link: no letters left, the original text decides');
+  assert.equal(detectContentLanguage('[東京ラーメンガイド](https://x.jp)'), 'ja');
   // An unclosed fence does not swallow the rest of the text.
-  assert.equal(chooseAimContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nconst a = 1;\n這是後面的中文內容，很長很長很長'), 'zh-TW', 'unclosed fence, Chinese after it');
-  assert.equal(chooseAimContentLanguage('zh-TW', '```\nconst a = 1;\n東京ラーメンの旅に行きます。日本語を勉強しています'), 'ja', 'unclosed fence, Japanese after it');
+  assert.equal(chooseContentLanguage('zh-TW', '品味系統的五個盲點。\n```\nconst a = 1;\n這是後面的中文內容，很長很長很長'), 'zh-TW', 'unclosed fence, Chinese after it');
+  assert.equal(chooseContentLanguage('zh-TW', '```\nconst a = 1;\n東京ラーメンの旅に行きます。日本語を勉強しています'), 'ja', 'unclosed fence, Japanese after it');
   // Wiki links keep their text.
-  assert.equal(chooseAimContentLanguage('zh-TW', '[[東京ラーメンガイド]]'), 'ja');
+  assert.equal(chooseContentLanguage('zh-TW', '[[東京ラーメンガイド]]'), 'ja');
 });
 
 const JA_PARAGRAPH_07 = '日本の経済は長い間、低成長とデフレに悩まされてきました。しかし最近では、賃金の上昇や企業の投資拡大により、少しずつ明るい兆しが見え始めています。専門家は、今後の金融政策の動向が景気の回復に大きな影響を与えると指摘しています。一方で、物価の上昇が家計に与える負担も無視できません。政府は支援策を検討しており、国民の生活を守るための対応が求められています。さらに、地方の中小企業では人手不足が深刻になっており、働き方の見直しや新しい技術の導入が急がれています。';
@@ -485,9 +484,9 @@ test('ticket 07: an English instruction decides over a pasted Chinese article', 
   assert.equal(chatLanguage07('zh-TW', 'Make a mind map from this article:\n\n' + '品味系統需要審美判斷，也需要取捨的判斷系統。'.repeat(10)), 'en');
 });
 
-test('ticket 07: no blank line means the whole message, same as chooseAimContentLanguage', () => {
+test('ticket 07: no blank line means the whole message, same as chooseContentLanguage', () => {
   for (const message of ['幫我整理這張圖的重點', '東京ラーメンの旅に行きます', 'line one\nline two 中文']) {
-    assert.equal(chatLanguage07('zh-TW', message), chooseAimContentLanguage('zh-TW', message), message);
+    assert.equal(chatLanguage07('zh-TW', message), chooseContentLanguage('zh-TW', message), message);
   }
 });
 
@@ -583,10 +582,10 @@ test('card output language follows the map title when the card title is Latin (d
   // Unchanged behaviour.
   assert.equal(cardOutputLanguage({ title: 'The Roman Empire' }, 'en', 'La vie en rose'), 'same-as-input');
   assert.equal(cardOutputLanguage({ title: 'Ancient Egypt' }, 'en', 'How to plan the trip'), 'en');
-  assert.equal(cardOutputLanguage({ title: 'Ancient Egypt' }, 'en', 'Plan a trip'), chooseAimContentLanguage('en', 'Plan a trip'));
+  assert.equal(cardOutputLanguage({ title: 'Ancient Egypt' }, 'en', 'Plan a trip'), chooseContentLanguage('en', 'Plan a trip'));
   for (const title of ['Untitled mind map', '未命名心智圖']) assert.equal(cardOutputLanguage({ title }, 'en', 'sharpen'), 'same-as-input', title);
   assert.equal(cardOutputLanguage(undefined, 'en', 'sharpen'), 'same-as-input');
-  assert.equal(cardOutputLanguage(null, 'zh-TW', 'sharpen'), chooseAimContentLanguage('zh-TW', 'sharpen'));
+  assert.equal(cardOutputLanguage(null, 'zh-TW', 'sharpen'), chooseContentLanguage('zh-TW', 'sharpen'));
   // Map chat still follows what is typed.
   assert.equal(outputLanguageForMap({ title: 'pstack 技能解析' }, 'zh-TW', ...mapChatLanguageSources('Please explain the plan')), 'en');
   // Dialog default.

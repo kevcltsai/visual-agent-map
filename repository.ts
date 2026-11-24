@@ -1,7 +1,7 @@
 import { escapeRegExp } from "./core/escape-regexp";
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isPlaceholder } from "./core/note-placeholder";
-import { resolveAimContentLanguage } from "./core/content-language";
+import { resolveMapOutputLanguage } from "./core/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import {
   changeTopicStyles,
@@ -886,7 +886,7 @@ function replaceSection(content: string, heading: NoteSection, value: string): s
 }
 
 // Blockquoted, escaped source text cannot impersonate managed sections or markers.
-export function originMarkdown(value: string): string {
+function originMarkdown(value: string): string {
   return value
     .split(/\r?\n/)
     .map(line => `> ${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`)
@@ -3093,7 +3093,7 @@ export class Repository {
     }
     // Notes owned by an AIM map write their placeholder text in the map's content language.
     const textLanguage = owner?.map.aim
-      ? noteLanguageOf(resolveAimContentLanguage(owner.map, language))
+      ? noteLanguageOf(resolveMapOutputLanguage(owner.map, language))
       : (noteContentLanguage(fm) ?? language);
     let body = ensurePreview(
       decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")),
@@ -3156,42 +3156,21 @@ export class Repository {
     }
   }
 
-  async createMap(
-    title: string,
-    nodes: MapNode[] = [],
-    onRootCreated?: (folder: TFolder) => void,
-    aim?: MapDocument["aim"],
-    outputLanguage?: ContentLanguage
-  ): Promise<string> {
-    const container = aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
+  async createMap(title: string, nodes: MapNode[] = []): Promise<string> {
+    const container = this.settings.mindMapsFolder;
     await this.folder(container);
-    const preferredRoot = normalizePath(`${container}/${safeName(title)}`);
-    const preferredFolder = this.app.vault.getAbstractFileByPath(preferredRoot);
-    // A failed first Map.md write can leave only the just-created empty topic folder.
-    // For an identity-bearing AIM create, reuse that empty folder on retry;
-    // any non-empty existing folder remains untouched and receives the usual suffix.
-    const recoverEmptyAimFolder =
-      !!aim?.creationId && preferredFolder instanceof TFolder && preferredFolder.children.length === 0;
-    const root = recoverEmptyAimFolder ? preferredRoot : this.uniqueFolder(container, title);
-    const folder =
-      recoverEmptyAimFolder && preferredFolder instanceof TFolder
-        ? preferredFolder
-        : await this.app.vault.createFolder(root);
-    onRootCreated?.(folder);
-    if (!aim?.creationId) await this.ensureTopicFolders(root);
+    const root = this.uniqueFolder(container, title);
+    await this.app.vault.createFolder(root);
+    await this.ensureTopicFolders(root);
     const path = `${root}/Map.md`;
     const map: MapDocument = {
       version: 1,
       id: crypto.randomUUID(),
       title,
       nodes,
-      viewport: { x: 40, y: 40, zoom: 1 },
-      ...(aim ? { aim } : {}),
-      ...(outputLanguage ? { outputLanguage } : {})
+      viewport: { x: 40, y: 40, zoom: 1 }
     };
     await this.app.vault.create(path, serializeMap(map, this.noteLanguage));
-    // Persist the request identity before adding subfolders so a partial setup can be found and resumed.
-    if (aim?.creationId) await this.ensureTopicFolders(root);
     return path;
   }
 

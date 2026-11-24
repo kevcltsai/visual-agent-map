@@ -153,9 +153,9 @@ test('collect snapshots: style combinations per step (safety net before the prom
 test('collect snapshots: topics whose language is read from the text (D-2026-10-94)', async () => {
   // The existing snapshots name an explicit language id; these two start from the topic text. An English topic with function
   // words is detected as en (the en path); a French topic keeps the follow-input row, whose clause quotes the topic.
-  const { chooseAimContentLanguage } = loadModule('core/content-language.ts');
+  const { chooseContentLanguage } = loadModule('core/content-language.ts');
   const english = 'How to plan a trip to Taipei', french = 'Histoire de la Révolution française';
-  const englishLanguage = chooseAimContentLanguage('zh-TW', english), frenchLanguage = chooseAimContentLanguage('zh-TW', french);
+  const englishLanguage = chooseContentLanguage('zh-TW', english), frenchLanguage = chooseContentLanguage('zh-TW', french);
   assert.equal(englishLanguage, 'en');
   assert.equal(frenchLanguage, 'same-as-input');
   await recordContext('service.task-topic-english.detected-en', 'AiTaskService instructions: general task, English topic detected as en (D-2026-10-94)', englishLanguage, { ...base, title: english, outputLanguage: englishLanguage });

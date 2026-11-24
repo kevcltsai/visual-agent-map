@@ -14,7 +14,7 @@ import {
 } from "./topic-colors";
 import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult } from "./topic-links";
 import { changeTopicMarkers, readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
-import { createHash } from "node:crypto";
+import { rebaseLegacyAimNotePaths } from "./core/legacy-aim-paths";
 import {
   contentLocale,
   isNoteLanguage,
@@ -34,7 +34,7 @@ import {
   type UiLanguage
 } from "./i18n";
 import type { CanvasItem } from "./experiences/visual-map/canvas-items";
-import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord, type TopicRelationKind } from "./map-model";
+import { MapDocument, MapNode, serializeMap, parseMap, type TopicRelationKind } from "./map-model";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
 import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
@@ -382,12 +382,7 @@ function splitOpenItems(value: string): { text: string; marker: string } {
     : { text: value, marker: "" };
 }
 const NOTE_CSS_CLASS = "visual-agent-map-node";
-/**
- * Point every reference to a moved note at its new path: node paths and the AIM records that must name the same note
- * (results, drafts, pending commits, input snapshots, reuse sources). An attempt whose input snapshot changed gets
- * the matching snapshot hash, and so do its drafts. Changing only node paths leaves an AIM map unreadable.
- * Returns whether anything changed.
- */
+/** Point node paths and retained legacy AIM references at moved notes. Returns whether anything changed. */
 export function rebaseMapNotePaths(map: MapDocument, rebase: (path: string) => string): boolean {
   let changed = false;
   const move = (path: string): string => {
@@ -395,42 +390,8 @@ export function rebaseMapNotePaths(map: MapDocument, rebase: (path: string) => s
     if (next !== path) changed = true;
     return next;
   };
-  const moveReuse = (record: AimReuseRecord | undefined): void => {
-    if (record) record.sourceNotePath = move(record.sourceNotePath);
-  };
   for (const node of map.nodes) node.path = move(node.path);
-  const aim = map.aim;
-  if (!aim) return changed;
-  const hashSnapshot = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-  for (const branch of aim.branches) {
-    const snapshotBefore = JSON.stringify(branch.inputSnapshot);
-    for (const result of branch.inputSnapshot.upstreamResults) result.notePath = move(result.notePath);
-    for (const item of branch.researchPlan ?? []) if (item.source) item.source.notePath = move(item.source.notePath);
-    for (const result of branch.results) {
-      result.notePath = move(result.notePath);
-      moveReuse(result.reuse);
-    }
-    if (JSON.stringify(branch.inputSnapshot) === snapshotBefore) continue;
-    const hash = hashSnapshot({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
-    for (const run of aim.runs) {
-      if (run.branchId !== branch.id) continue;
-      for (const attempt of run.attempts) {
-        attempt.inputSnapshotHash = hash;
-        for (const draft of aim.resultDrafts ?? [])
-          if (draft.runId === run.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
-      }
-    }
-  }
-  for (const run of aim.runs)
-    for (const attempt of run.attempts)
-      if (attempt.retainedReports) attempt.retainedReports.notePath = move(attempt.retainedReports.notePath);
-  for (const draft of aim.resultDrafts ?? []) {
-    draft.notePath = move(draft.notePath);
-    moveReuse(draft.reuse);
-  }
-  if (aim.rootDraft) aim.rootDraft.notePath = move(aim.rootDraft.notePath);
-  if (aim.questionDraft) aim.questionDraft.notePath = move(aim.questionDraft.notePath);
-  for (const pending of aim.pendingCommits) pending.notePath = move(pending.notePath);
+  if (map.aim) rebaseLegacyAimNotePaths(map.aim, move);
   return changed;
 }
 /** A rebase function that moves exactly one note path. */

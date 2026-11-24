@@ -2,15 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, root, load } = require('../support.cjs');
-test('Coffee Tables room switches conversation and insights by pane width', () => {
-  const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  const responsive = styles.slice(styles.indexOf('@container (max-width: 899px)'));
-  assert.match(responsive, /\.ct-room-columns\s*\{\s*flex-direction:\s*column/);
-  assert.match(responsive, /\.ct-pane-tabs\s*\{[^}]*display:\s*flex/);
-  assert.match(responsive, /\.ct-room-columns\[data-pane="chat"\].*\.ct-insight-panel/);
-  assert.doesNotMatch(styles.match(/@media\s*\(max-width:\s*900px\)\s*\{([^}]*(?:\}[^}]*)?)\}/s)?.[1] ?? '', /\.ct-room-columns/);
-});
-test('product ribbon pins both entrances below other actions and cleans up on unload', () => {
+test('product ribbon pins the map entrance below other actions and cleans up on unload', () => {
   let observer;
   class Observer {
     constructor(callback) { this.callback = callback; observer = this; }
@@ -35,25 +27,16 @@ test('product ribbon pins both entrances below other actions and cleans up on un
     get nextSibling() { return parent.children[parent.children.indexOf(this) + 1] || null; },
     get nextElementSibling() { return this.nextSibling; }
   });
-  const before = make('before'), coffee = make('coffee'), other = make('other'), map = make('map');
-  parent.children = [before, coffee, other, map];
+  const before = make('before'), other = make('other'), map = make('map');
+  parent.children = [before, map, other];
   const { groupRibbonIcons } = load('ui/ribbon-group.ts', {}, { MutationObserver: Observer });
-  const stop = groupRibbonIcons(map, coffee);
-  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
-  assert.ok(map.classList.values.has('vam-ribbon-group-start'));
-  assert.ok(coffee.classList.values.has('vam-ribbon-group-end'));
-  parent.insertBefore(coffee, before); observer.moved(coffee);
-  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
-  parent.insertBefore(map, null); observer.moved(map);
-  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map', 'coffee']);
-  parent.children = parent.children.filter(x => x !== coffee); coffee.parentElement = null;
-  observer.moved(other);
+  const stop = groupRibbonIcons(map);
+  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map']);
   assert.ok(map.classList.values.has('vam-ribbon-group-start'));
   assert.ok(map.classList.values.has('vam-ribbon-group-end'));
-  parent.insertBefore(coffee, before); observer.moved(coffee);
-  assert.equal(map.nextElementSibling, coffee);
+  parent.insertBefore(map, before); observer.moved(map);
+  assert.deepEqual(parent.children.map(x => x.name), ['before', 'other', 'map']);
   stop();
   assert.equal(observer.connected, false);
   assert.equal(map.classList.values.size, 0);
-  assert.equal(coffee.classList.values.size, 0);
 });

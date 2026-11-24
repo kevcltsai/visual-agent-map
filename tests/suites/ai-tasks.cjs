@@ -70,7 +70,6 @@ integrationTest('Claude Haiku is accepted by the AI task service and runs as the
   assert.equal(call[1], 'haiku'); assert.equal(call[2], 'medium');
   assert.equal(result.summary, 'Haiku result');
   assert.equal(plugin.modelLabel('claude:haiku'), 'Claude · Haiku');
-  assert.equal(plugin.coffeeReasoningEfforts('claude:haiku').join(), 'low,medium,high');
 });
 integrationTest('AI response fallback keeps the language captured when the task started', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });

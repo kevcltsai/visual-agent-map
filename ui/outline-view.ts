@@ -1,10 +1,9 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
 import { readTopicLinks } from "../topic-links";
 import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
-import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 /** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". Traditional Chinese folds to Simplified so 图 finds 圖 and vice versa. */
@@ -20,10 +19,6 @@ export class OutlineView extends ItemView {
   private toggleEls = new Map<string, HTMLElement>();
   private query = "";
   private activePath = "";
-  private coffee: CoffeeNavigationSnapshot | null = null;
-  private coffeeActive = false;
-  private locateCoffee: ((item: string) => boolean) | null = null;
-  private fillCoffee: (() => void) | null = null;
   constructor(
     leaf: WorkspaceLeaf,
     private openNote: (path: string) => Promise<void>
@@ -76,38 +71,13 @@ export class OutlineView extends ItemView {
       else row.removeAttribute("aria-current");
     }
   }
-  setCoffeeOutline(
-    snapshot: CoffeeNavigationSnapshot | null,
-    active: boolean,
-    locate: ((item: string) => boolean) | null,
-    fill: (() => void) | null = null
-  ): void {
-    const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search"),
-      restoreFocus = !!search && search === document.activeElement;
-    const selection = restoreFocus ? ([search.selectionStart, search.selectionEnd] as const) : null;
-    this.coffee = snapshot;
-    this.coffeeActive = active;
-    this.locateCoffee = locate;
-    this.fillCoffee = fill;
-    this.render();
-    if (restoreFocus) {
-      const updated = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
-      updated?.focus();
-      if (updated && selection && selection[0] !== null && selection[1] !== null)
-        updated.setSelectionRange(selection[0], selection[1]);
-    }
-  }
   private render(): void {
     this.contentEl.empty();
     this.contentEl.addClass("vam-outline");
     const heading = this.contentEl.createDiv("vam-outline-heading");
     heading.createEl("strong", {
-      text: this.coffeeActive ? (this.coffee?.topic ?? "Coffee Tables") : (this.map?.title ?? t("ui.topic_outline"))
+      text: this.map?.title ?? t("ui.topic_outline")
     });
-    if (this.coffeeActive) {
-      this.renderCoffee();
-      return;
-    }
     if (!this.map) {
       this.contentEl.createDiv({
         cls: "vam-outline-empty",
@@ -156,47 +126,6 @@ export class OutlineView extends ItemView {
       if (found) return found;
     }
     return null;
-  }
-  private renderCoffee(): void {
-    this.contentEl.createEl("h4", { text: t("ui.coffee_segments") });
-    const snapshot = this.coffee;
-    if (!snapshot?.segments.length) {
-      this.contentEl.createDiv({ cls: "vam-outline-empty", text: t("ui.coffee_segments_empty") });
-      return;
-    }
-    if (
-      !snapshot.readOnly &&
-      snapshot.segments.some(item => !item.summary && item.text.trim() && item.status !== "generating")
-    ) {
-      const fill = this.contentEl.createEl("button", { text: t("ui.coffee_fill_summaries") });
-      fill.addEventListener("click", () => this.fillCoffee?.());
-    }
-    const tree = this.contentEl.createDiv("vam-outline-tree");
-    snapshot.segments.forEach((item, index) => {
-      const button = tree.createEl("button", { cls: "vam-coffee-segment" });
-      const kind = t(
-        item.kind === "question"
-          ? "ui.coffee_segment_question"
-          : item.kind === "continuation"
-            ? "ui.coffee_segment_continuation"
-            : item.kind === "legacy"
-              ? "ui.coffee_segment_legacy"
-              : "ui.coffee_segment_initial"
-      );
-      button.createEl("strong", {
-        text: t("ui.coffee_outline_segment", index + 1, kind)
-      });
-      button.createSpan({
-        text:
-          item.status === "generating"
-            ? t("ui.coffee_segment_generating")
-            : (item.summary ?? t("ui.coffee_segment_no_summary"))
-      });
-      if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
-      button.addEventListener("click", () => {
-        if (!this.locateCoffee?.(item.id)) new Notice(t("ui.coffee_segment_no_content"));
-      });
-    });
   }
   private renderTree(): void {
     this.contentEl.querySelector(".vam-outline-tree")?.remove();

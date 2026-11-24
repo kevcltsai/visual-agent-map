@@ -24,7 +24,6 @@ export const nodeTestFiles = [
   "tests/steps-*.cjs",
   "tests/codex-parallel-runtime.cjs",
   "tests/prompt-monitor-timing.cjs",
-  "tests/coffee-customization-storage.cjs",
 ];
 export const parts = [
   ...Array.from({ length: shards }, (_, i) => ({ name: `run.cjs shard ${i + 1}/${shards}`, args: ["tests/run.cjs", "--layer=unit", `--shard=${i + 1}/${shards}`] })),

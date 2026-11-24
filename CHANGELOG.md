@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Coffee Tables (talking an unfinished idea through with AI guests) is gone, which makes the plugin file about 0.43 MB smaller (4.27 MB to 3.84 MB). Its ribbon button, the "Open Coffee Tables" command and the Coffee Tables side outline no longer exist; a hotkey you set for that command stops working.
+- Nothing in your vault is deleted or changed. Conversations you already had stay in your workspace's `Coffee Tables` folder as ordinary Markdown notes you can still open, read and move. The hidden `Coffee Tables/.sessions` folder (used only to continue a conversation) is left in place and is no longer read; you can delete it yourself. Custom guest styles saved in the plugin settings are dropped from the settings file the next time settings are saved.
+- Maps, map chat, data sources and sharing never depended on Coffee Tables and are unchanged.
+
 ### Fixes
 
 - The stylesheet no longer uses `:has` or `all`, which the Obsidian plugin review flagged; pictures, the book page, the goal bar icons, the usage filter, the picture-book loading shimmer and the empty proofread box look the same.

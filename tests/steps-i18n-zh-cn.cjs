@@ -37,7 +37,7 @@ test('zh-CN glossary terms are applied', () => {
     assert.ok(!all.includes(bad), bad);
   }
   // 模板 is not required any more: its only use was ui.block_folder_template, removed with the folder rename (note-style-recipe P2a, structures are "段落结构").
-  for (const term of ['心智图', '议题', '子议题', '父议题', '大纲', '洞见', '嘉宾', '观察者', '收敛', '文件夹', '设置', '搜索', '用户', '加载', '导入', '窗口', '消息', '保存', '粘贴', '插件', '网络', '菜单', '笔记', '撤销', '核心']) {
+  for (const term of ['心智图', '议题', '子议题', '父议题', '大纲', '洞见', '文件夹', '设置', '搜索', '用户', '加载', '导入', '窗口', '消息', '保存', '粘贴', '插件', '网络', '菜单', '笔记', '撤销', '核心']) {
     assert.ok(all.includes(term), term);
   }
 });

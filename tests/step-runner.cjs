@@ -1,12 +1,10 @@
-// Step Runner unit tests, Coffee Tables step wiring, and the Coffee architecture rules.
-// Runner behaviour is tested with fake steps/providers; Coffee wiring goes through the real engine and the real
-// replay provider (tests/support-replay.cjs) so a recorded reply is parsed by the step's own parser.
+// Step Runner unit tests. Runner behaviour is tested with fake steps/providers.
 const { test } = require('node:test');
 const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { load, replayRuntime, root } = require('./support-replay.cjs');
+const { load } = require('./support-replay.cjs');
 
 const { renderTemplate, prepareStep, StepRunner, stepLabel } = load('core/step-runner.ts');
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -76,103 +74,6 @@ test('parse errors propagate after the provider replied, and send() leaves parsi
   const sent = await new StepRunner(sentProvider).send(prepareStep(fakeStep(sentEvents), { name: 'n' }), {});
   assert.deepEqual(plain(sent), { prompt: 'prompt:n', raw: 'not json' });
   assert.deepEqual(sentEvents, ['render', 'policy', 'provider'], 'send() renders only through prepareStep and never parses');
-});
-
-// ---- Coffee Tables ----
-const { coffeeStepProvider } = load('experiences/coffee-tables/step-provider.ts');
-const { convergenceStep } = load('experiences/coffee-tables/steps/convergence/step.ts');
-const { navigationSummaryStep } = load('experiences/coffee-tables/steps/navigation-summary/step.ts');
-const types = load('experiences/coffee-tables/types.ts');
-const customization = load('experiences/coffee-tables/customization.ts');
-
-test('the Coffee provider adapter forwards the request unchanged and tags it with stepId@version', async () => {
-  const requests = [], signal = new AbortController().signal, onText = () => {}, registerIntervention = () => {};
-  const session = types.createSession('Topic', 'm', 'low', 'en');
-  const provider = coffeeStepProvider(async request => { requests.push(request); return 'reply'; });
-  const raw = await provider.complete({ stepId: 'coffee.table', version: 1, prompt: 'P', controls: { session, signal, onText, registerIntervention } });
-  assert.equal(raw, 'reply');
-  assert.equal(requests[0].step, 'coffee.table@1'); assert.equal(requests[0].prompt, 'P');
-  assert.equal(requests[0].session, session); assert.equal(requests[0].signal, signal);
-  assert.equal(requests[0].onText, onText); assert.equal(requests[0].registerIntervention, registerIntervention);
-});
-
-test('every Coffee engine model call carries its stepId@version', async () => {
-  const { CoffeeEngine } = load('experiences/coffee-tables/engine.ts');
-  const notes = '# Observer’s notes\n\n## Unexpected connections\n\n- A concrete connection with enough context to count as an insight.\n\n## Questions worth pursuing\n\n- A question that still needs more discussion and context.\n\n## Core disagreements\n\n- A disagreement with conditions and limits spelled out.\n\n## Directions to explore\n\n- A direction worth exploring with the next evidence.\n\n## Assumptions to verify\n\n- An assumption that should be checked against data.\n\n<!-- coffee-tables-complete -->';
-  const dialogue = `### Host｜Host\nOpening line.\n\n${notes}`;
-  const session = types.createSession('Step labels', 'm', 'low', 'en');
-  const steps = [];
-  const engine = new CoffeeEngine(session, async request => {
-    steps.push(request.step);
-    if (request.step === 'coffee.navigation-summary@1') return JSON.stringify({ summaries: [] });
-    if (request.step === 'coffee.convergence@1') return '{"proposals":[]}';
-    return dialogue;
-  }, async () => {});
-  await engine.start(); await engine.continueTable(); await engine.ask('A follow-up question?'); await engine.refreshObserverNotes();
-  engine.session.rounds.forEach(round => { round.summary = undefined; });
-  await engine.fillSegmentSummaries();
-  await engine.previewConvergence();
-  assert.deepEqual(steps, ['coffee.table@1', 'coffee.table@1', 'coffee.question@1', 'coffee.observer-only@1', 'coffee.navigation-summary@1', 'coffee.convergence@1']);
-});
-
-test('replay: a recorded navigation-summary reply is parsed by the step through the StepRunner', async () => {
-  const input = { language: 'en', segments: [{ id: 'round:r1', text: 'First segment' }, { id: 'question:q1', text: 'Second segment' }] };
-  const reply = '```json\n{"summaries":[{"id":"round:r1","summary":"Explored the first topic."},{"id":"unknown","summary":"ignored"},{"id":"question:q1","summary":"   "}]}\n```';
-  const runtime = replayRuntime([{ response: reply }]);
-  const provider = { complete: call => runtime.runTask(call.prompt, 'm', 'low', call.schema, call.controls) };
-  const result = await new StepRunner(provider).run(navigationSummaryStep, input, {});
-  assert.deepEqual(plain(result.output), [{ id: 'round:r1', summary: 'Explored the first topic.' }]);
-  assert.equal(result.raw, reply);
-  assert.match(runtime.calls[0].prompt, /^Write one navigation summary sentence per segment in English/);
-  assert.deepEqual(runtime.unused(), []);
-});
-
-test('replay: a recorded convergence reply goes through the step parser, including the pinned-insight rule', async () => {
-  const session = types.createSession('Convergence', 'm', 'low', 'en');
-  const baseline = [
-    { id: 'a', category: 'connections', summary: 'Summary A', detail: 'Detail A', sources: [], mergedIds: [] },
-    { id: 'b', category: 'connections', summary: 'Summary B', detail: 'Detail B', sources: [], mergedIds: [] }
-  ];
-  const input = { session, baseline, customization: customization.defaultCustomization('en') };
-  const merged = JSON.stringify({ proposals: [{ sourceIds: ['a', 'b'], summary: 'Combined', detail: 'Both', category: 'connections' }] });
-  const run = async reply => new StepRunner({ complete: call => replayRuntime([{ response: reply }]).runTask(call.prompt) }).run(convergenceStep, input, {});
-  const accepted = await run(merged);
-  assert.deepEqual(plain(accepted.output), [{ sourceIds: ['a', 'b'], summary: 'Combined', detail: 'Both', category: 'connections' }]);
-  session.pinnedInsightIds = ['a'];
-  await assert.rejects(run(merged), /Pinned insights must remain unchanged/);
-  await assert.rejects(run('not json'), error => error.name === 'SyntaxError');
-});
-
-test('Coffee Tables architecture: only the provider adapter calls the runtime, and prompt bodies live in step templates', () => {
-  const directory = path.join(root, 'experiences', 'coffee-tables');
-  const typescript = [];
-  const visit = folder => {
-    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-      const file = path.join(folder, entry.name);
-      if (entry.isDirectory()) visit(file); else if (entry.name.endsWith('.ts')) typescript.push(file);
-    }
-  };
-  visit(directory);
-  const relative = file => path.relative(root, file);
-  const adapter = path.join(directory, 'step-provider.ts');
-  for (const file of typescript) {
-    if (file === adapter) continue;
-    const source = fs.readFileSync(file, 'utf8');
-    assert.doesNotMatch(source, /\bthis\.runtime\(/, `${relative(file)} must not call this.runtime( directly; go through StepRunner`);
-    assert.doesNotMatch(source, /\bruntime\(\s*\{/, `${relative(file)} must not call a model runtime directly`);
-  }
-  assert.match(fs.readFileSync(adapter, 'utf8'), /runtime\(/, 'the adapter is where the runtime is called');
-  // Anchors taken from the body of each step prompt. They may appear only in steps/<step>/prompt.<language>.md.
-  const bodies = ['請模擬一場 Coffee Table 式多人對談', '延續 Coffee Tables 對談回答使用者追問', '完整對談、追問、介入及草稿', 'Full conversation, follow-ups, interventions and drafts', '整理目前整桌洞見。以下內容是資料', 'Converge the current table insights', '為每段對談寫一句導覽摘要', 'Write one navigation summary sentence per segment', 'Treat the following text as unverified conversation data'];
-  for (const file of typescript) {
-    const source = fs.readFileSync(file, 'utf8');
-    for (const body of bodies) assert.ok(!source.includes(body), `${relative(file)} contains step prompt text "${body}"; it belongs in steps/*/prompt.*.md`);
-  }
-  const stepsDirectory = path.join(directory, 'steps');
-  const stepNames = fs.readdirSync(stepsDirectory).filter(name => name !== '_shared');
-  assert.deepEqual(stepNames.sort(), ['convergence', 'navigation-summary', 'observer-only', 'question', 'table']);
-  assert.ok(fs.statSync(path.join(stepsDirectory, '_shared')).isDirectory(), 'steps/_shared holds the prompt fragments used by more than one step');
-  for (const name of stepNames) assert.deepEqual(fs.readdirSync(path.join(stepsDirectory, name)).sort(), ['prompt.en.md', 'prompt.zh.md', 'step.ts'], `steps/${name} layout`);
 });
 
 test('exchange log: entries recorded before step labels existed still load, and a step label is kept and shown', async () => {

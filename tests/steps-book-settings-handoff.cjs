@@ -5,59 +5,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const S = require('./support.cjs');
-const { reframingModalFixture, coffeeFind, until, plain } = S;
+const { until, plain } = S;
 const { BookPipelineRuns } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BOOK_SETTING_FIELDS } = S.load('core/book-pipeline/model.ts');
 const { cleanBookSettingsInput, BOOK_SETTING_INPUT_MAX } = S.load('core/book-pipeline/settings.ts');
-
-const LABELS = ['Reader', 'Learning goal', 'Angle to explore', 'Tone', 'Words per chapter', 'Writing style'];
-const find = (modal, label) => coffeeFind(modal.contentEl, e => e.attrs['aria-label'] === label);
-async function create(fill) {
-  const fx = await reframingModalFixture();
-  const { modal } = fx;
-  coffeeFind(modal.contentEl, e => e.attrs['aria-label'] === 'Research question').value = 'What decides access?';
-  fill?.(modal);
-  coffeeFind(modal.contentEl, e => e.text === 'Create research map').onclick();
-  await until(() => fx.opened.length === 1);
-  const map = await fx.repo.readMap(fx.opened[0]);
-  const rootPath = map.nodes[0].path;
-  return { ...fx, rootPath, raw: fx.contents.get(rootPath), note: await fx.repo.readNote(rootPath) };
-}
-
-test('six empty fields: the root topic gets no book-* key', async () => {
-  const r = await create();
-  assert.doesNotMatch(r.raw, /^book-/m);
-  assert.equal(r.note.bookSettings, undefined);
-});
-
-test('the dialog has six labelled fields in tab order, with a hint for empty ones', async () => {
-  const fx = await reframingModalFixture();
-  const inputs = fx.modal.contentEl.querySelectorAll('textarea').filter(e => LABELS.includes(e.attrs['aria-label']));
-  assert.deepEqual(inputs.map(e => e.attrs['aria-label']), LABELS);
-  for (const input of inputs) { assert.equal(input.attrs.maxlength, String(BOOK_SETTING_INPUT_MAX)); assert.match(input.attrs.placeholder, /chief editor/); }
-  const all = fx.modal.contentEl.querySelectorAll('textarea').map(e => e.attrs['aria-label']);
-  assert.ok(all.indexOf('Research context') < all.indexOf('Reader'));
-});
-
-test('only the filled fields are written', async () => {
-  const r = await create(m => { find(m, 'Reader').value = 'Grade 5 kids'; find(m, 'Tone').value = 'warm'; });
-  assert.deepEqual(plain(r.note.bookSettings), { reader: 'Grade 5 kids', tone: 'warm' });
-  assert.match(r.raw, /^book-reader: "Grade 5 kids"$/m);
-  assert.doesNotMatch(r.raw, /^book-(goal|angle|length|style):/m);
-});
-
-test('newlines, ---, ## and markup become one quoted line; frontmatter and the note stay intact', async () => {
-  const evil = 'line one\n---\n## Heading\n<img src=x onerror=alert(1)>\r\nend';
-  const r = await create(m => { find(m, 'Reader').value = evil; find(m, 'Writing style').value = 'x'.repeat(500); });
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(r.raw)[1];
-  const reader = fm.split(/\r?\n/).filter(l => l.startsWith('book-reader:'));
-  assert.equal(reader.length, 1);
-  assert.equal(fm.split(/\r?\n/).filter(l => l === '---').length, 0);
-  assert.equal(r.note.bookSettings.reader, 'line one --- ## Heading <img src=x onerror=alert(1)> end');
-  assert.equal(r.note.bookSettings.style.length, BOOK_SETTING_INPUT_MAX);
-  assert.equal(r.note.title.length > 0, true);
-  assert.match(r.note.detail, /Candidate/);
-});
 
 test('cleanBookSettingsInput drops empty, non-string and over-long input', () => {
   assert.deepEqual(plain(cleanBookSettingsInput(undefined)), {});
@@ -69,14 +20,6 @@ test('cleanBookSettingsInput drops empty, non-string and over-long input', () =>
 test('cleanBookSettingsInput removes control characters (NUL, escape, tab)', () => {
   assert.deepEqual(plain(cleanBookSettingsInput({ reader: 'a\u0000b\u001bc\u007fd\te' })), { reader: 'a b c d e' });
   assert.deepEqual(plain(cleanBookSettingsInput({ goal: '\u0000\u0001' })), {});
-});
-
-test('typing at the limit shows a notice', async () => {
-  const fx = await reframingModalFixture();
-  const input = find(fx.modal, 'Reader');
-  input.value = 'a'.repeat(BOOK_SETTING_INPUT_MAX); input.input();
-  const status = coffeeFind(fx.modal.contentEl, e => /at most 200/.test(e.text));
-  assert.ok(status);
 });
 
 test('the global plan does not overwrite a role the owner already set', async () => {

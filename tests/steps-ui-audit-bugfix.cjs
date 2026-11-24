@@ -101,30 +101,6 @@ test('A3: changing a summary range in selection mode writes the new range; a ref
   assert.ok(h.notices.length > noticesBefore, 'a reason is shown');
 });
 
-// Every `@container (max-width: 899px) { ... }` block of the stylesheet (the stacked Coffee Table room is styled in one of them).
-const fs = require('node:fs');
-const path = require('node:path');
-const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-const stackedBlocks = () => {
-  const out = [];
-  for (let at = css.indexOf('@container (max-width: 899px) {'); at >= 0; at = css.indexOf('@container (max-width: 899px) {', at + 1)) {
-    let depth = 0;
-    for (let i = css.indexOf('{', at); i < css.length; i++) {
-      if (css[i] === '{') depth++;
-      if (css[i] === '}' && --depth === 0) { out.push(css.slice(at, i + 1)); break; }
-    }
-  }
-  return out;
-};
-
-test('S4: in the stacked Coffee Table layout the chat panel may shrink below its content (min-height 0), so the chat scrolls', () => {
-  const rules = stackedBlocks().map(block => block.match(/^\s*\.ct-chat-panel\s*\{([^}]*)\}/m)).filter(Boolean);
-  assert.ok(rules.length, 'the stacked layout styles .ct-chat-panel');
-  assert.ok(rules.some(rule => /min-height:\s*0\b/.test(rule[1])));
-  // The scroller inside still scrolls and the room still clips; nothing else is needed for the chat to be the one that scrolls.
-  assert.match(css, /\.ct-chat-scroll\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/);
-});
-
 // Obsidian's layer scale (app.css): the built-in image viewer (lightbox) sits at 50, the same level as modals.
 const OBSIDIAN_LAYERS = { 'layer-cover': 5, 'layer-sidedock': 10, 'layer-status-bar': 15, 'layer-popover': 30, 'layer-slides': 45, 'layer-modal': 50, 'layer-notice': 60, 'layer-menu': 65, 'layer-tooltip': 70 };
 const LIGHTBOX_Z = 50;
@@ -193,31 +169,6 @@ test('A2: a malformed agent-map block throws a readable translated error, not a 
   // The message comes from the dictionary of the interface language (map-model has its own language state in this bundle).
   const zhTW = Object.values(load('i18n/zh-TW.ts')).find(value => value && typeof value === 'object' && 'ui.map_data_block_invalid' in value);
   assert.equal(zhTW['ui.map_data_block_invalid'], '這張心智圖的資料區塊格式不正確，無法開啟。請修正 agent-map 區塊的內容。');
-});
-
-// A4: the "same topic" banner row is hidden with is-hidden, but `.ct-topic-focus { display: flex }` used to win over it.
-test('A4: .ct-topic-focus.is-hidden hides the row, and the view toggles it only by the topic filter', () => {
-  const fs = require('node:fs'), path = require('node:path');
-  const styles = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-  assert.match(styles, /\.ct-topic-focus\.is-hidden\s*\{\s*display:\s*none\s*;?\s*\}/);
-  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/coffee-tables/view.ts'), 'utf8');
-  assert.match(view, /createDiv\("ct-topic-focus is-hidden"\)/);
-  assert.match(view, /topicFocusRow\.toggleClass\("is-hidden", !this\.focusedTopic\)/);
-});
-
-// A5: an unreadable table row says it cannot be read (not "Interrupted") and explains why; it stays disabled.
-test('A5: the unreadable table row has its own badge text and reason line, and the row stays disabled', () => {
-  const fs = require('node:fs'), path = require('node:path');
-  const list = load('experiences/coffee-tables/list.ts');
-  const base = { id: 'x', path: 'a.md', topic: 'T', createdAt: '', updatedAt: '', model: '' };
-  assert.equal(list.tableStatusKey({ ...base, status: 'error', unreadable: true }), 'coffee.unreadable');
-  assert.equal(list.tableStatusKey({ ...base, status: 'error' }), 'coffee.interrupted', 'a readable interrupted table keeps its label');
-  assert.equal(list.tableStatusKey({ ...base, status: 'completed' }), 'coffee.complete');
-  const zh = Object.values(load('i18n/zh-TW.ts')).find(value => value && typeof value === 'object' && 'coffee.unreadable' in value);
-  assert.equal(zh['coffee.unreadable'], '讀不到');
-  assert.equal(zh['coffee.unreadable_reason'], '檔案內容無法讀取，請檢查或手動移除這個檔案。');
-  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/coffee-tables/view.ts'), 'utf8');
-  assert.match(view, /if \(item\.unreadable\) \{[^}]*ct-list-unreadable[^}]*button\.disabled = true;[^}]*coffee\.unreadable_reason/s);
 });
 
 // UI audit bugfix-2 (add-topic-esc-keeps-card, vm-empty-esc-creates-topic): a new topic is created before it is named;

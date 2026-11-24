@@ -1,4 +1,4 @@
-// Plugin lifecycle regressions: Coffee Tables follows a workspace reconnect; unload cancels pending external reconciliation.
+// Plugin lifecycle regressions: unload cancels pending external reconciliation.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
@@ -12,53 +12,6 @@ function newPlugin() {
   plugin.logs = { appendLog() {} };
   return plugin;
 }
-
-test('reconnecting to another workspace rebuilds Coffee Tables storage and manager and re-points open views', async () => {
-  const plugin = newPlugin();
-  plugin.settings.workspaceFolder = 'Old Workspace';
-  plugin.buildCoffee();
-  const oldManager = plugin.coffeeManager;
-  assert.equal(plugin.coffeeStorage.folder, 'Old Workspace/Coffee Tables');
-  let stopped = 0;
-  const gate = S.deferred();
-  let duringStop;
-  oldManager.stop = async () => {
-    stopped++;
-    duringStop = { manager: plugin.coffeeManager, folder: plugin.coffeeStorage.folder };
-    await gate.promise;
-  };
-  const rebound = [];
-  plugin.coffeeViews = () => [{ rebindStorage: () => rebound.push(plugin.coffeeStorage.folder) }];
-  plugin.settings.workspaceFolder = 'New Workspace';
-  const rebuilding = plugin.rebuildCoffee();
-  await delay(10);
-  assert.ok(duringStop, 'the old manager is being stopped');
-  assert.ok(duringStop.manager && duringStop.manager !== oldManager, 'while the old manager stops, coffeeManager is the new one, never null');
-  assert.equal(duringStop.folder, 'New Workspace/Coffee Tables');
-  assert.deepEqual(rebound, ['New Workspace/Coffee Tables'], 'views are re-pointed before the old stop finishes');
-  gate.resolve();
-  await rebuilding;
-  assert.equal(stopped, 1, 'the old manager was stopped (in-flight work awaited) before replacement');
-  assert.notEqual(plugin.coffeeManager, oldManager);
-  assert.equal(plugin.coffeeStorage.folder, 'New Workspace/Coffee Tables');
-  assert.deepEqual(rebound, ['New Workspace/Coffee Tables'], 'open views re-read the new storage');
-});
-
-test('a manager still flushing after a reconnect saves through its own storage, not the new folder', async () => {
-  const plugin = newPlugin();
-  plugin.settings.workspaceFolder = 'Old Workspace';
-  plugin.buildCoffee();
-  const oldStorage = plugin.coffeeStorage;
-  const saved = [];
-  oldStorage.save = async () => { saved.push('old'); };
-  const oldManager = plugin.coffeeManager;
-  plugin.settings.workspaceFolder = 'New Workspace';
-  plugin.coffeeViews = () => [];
-  await plugin.rebuildCoffee();
-  plugin.coffeeStorage.save = async () => { saved.push('new'); };
-  await oldManager.saveSession({ id: 's' });
-  assert.deepEqual(saved, ['old']);
-});
 
 test('unload clears the pending external reconciliation so no repo work runs after dispose', async () => {
   const plugin = newPlugin();
@@ -91,31 +44,6 @@ test('one external delete batch scans the maps once, however many notes were del
   assert.equal(checked[0].length, 50);
   assert.equal(reconciled, 0, 'no node deleted, nothing reconciled');
   plugin.onunload();
-});
-
-test('Reconnect existing workspace (offerWorkspaceReconnect) rebuilds Coffee Tables for the chosen folder', async () => {
-  const modals = [];
-  const obsidian = { ...S.obsidian, Modal: class { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} } };
-  const { default: ReconnectPlugin } = S.load('main.ts', { obsidian });
-  const plugin = new ReconnectPlugin();
-  plugin.app = { vault: {}, fileManager: {} };
-  plugin.logs = { appendLog() {} };
-  plugin.settings.workspaceFolder = 'Old Workspace';
-  plugin.buildCoffee();
-  const oldManager = plugin.coffeeManager;
-  const rebound = [];
-  plugin.coffeeViews = () => [{ rebindStorage: () => rebound.push(plugin.coffeeStorage.folder) }];
-  plugin.views = () => [];
-  plugin.saveSettings = async () => {};
-  plugin.mutate = work => work();
-  plugin.repo = { rebuildDerivedData: async () => {} };
-  await plugin.offerWorkspaceReconnect(['New Workspace']);
-  assert.equal(modals.length, 1);
-  await modals[0].choices[0].action();
-  assert.equal(plugin.settings.workspaceFolder, 'New Workspace');
-  assert.equal(plugin.coffeeStorage.folder, 'New Workspace/Coffee Tables');
-  assert.notEqual(plugin.coffeeManager, oldManager);
-  assert.deepEqual(rebound, ['New Workspace/Coffee Tables']);
 });
 
 test('W2c plugin: prewarmClaude for a synthesis resolves auto to medium like the run itself; other modes and explicit levels are unchanged', () => {

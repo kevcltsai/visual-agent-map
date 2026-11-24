@@ -445,11 +445,11 @@ test('M1 flushChatRender while the tab is hidden still draws again once it is sh
 
 test('M2 a hidden tab keeps the outline and the tab title in step with its map', async () => {
   const w = makeWorld({ focusNewTab: false }); const { view } = await w.hiddenTab();
-  w.plugin.outlineSourceView = undefined; w.plugin.outlineMap = null;
+  w.plugin.outlineSourceView = undefined; let outlined = null; const syncOutline = w.plugin.syncOutline; w.plugin.syncOutline = (map, ...rest) => { outlined = map; return syncOutline?.call(w.plugin, map, ...rest); };
   const layouts = w.counts.layouts;
   view.map = { id: 'id-new', title: 'Renamed', nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   view.render(); await w.flush();
-  assert.equal(w.plugin.outlineMap, view.map, 'the outline shows this tab\'s map');
+  assert.equal(outlined, view.map, 'the outline shows this tab\'s map');
   assert.equal(view.headerTitle, 'Renamed'); assert.ok(w.counts.layouts > layouts, 'the tab title was asked to refresh');
 });
 

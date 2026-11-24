@@ -50,14 +50,13 @@ test('language change saves before applying and refreshes all views without muta
     { refreshFromPlugin: async () => { calls.push(['view-a', plugin.settings.language]); throw new Error('test view error'); } },
     { refreshFromPlugin: async () => calls.push(['view-b', plugin.settings.language]) }
   ];
-  plugin.coffeeViews = () => [{ refreshForLanguageChange: async () => calls.push(['coffee-a', plugin.settings.language]) }, { refreshForLanguageChange: async () => calls.push(['coffee-b', plugin.settings.language]) }];
   plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
   plugin.recordFailure = (...args) => calls.push(['diagnostic', ...args]);
   plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.settings.language, plugin.languageSwitchPending]) };
   const tab = new VisualAgentMapSettingTab({}, plugin);
   await tab.setControlValue('language', 'zh-TW');
   assert.equal(plugin.settings.language, 'zh-TW');
-  assert.deepEqual(calls.filter(([kind]) => ['save', 'commands', 'view-a', 'view-b', 'coffee-a', 'coffee-b'].includes(kind)), [['save', 'zh-TW', 'en'], ['commands', 'zh-TW'], ['view-a', 'zh-TW'], ['view-b', 'zh-TW'], ['coffee-a', 'zh-TW'], ['coffee-b', 'zh-TW']]);
+  assert.deepEqual(calls.filter(([kind]) => ['save', 'commands', 'view-a', 'view-b'].includes(kind)), [['save', 'zh-TW', 'en'], ['commands', 'zh-TW'], ['view-a', 'zh-TW'], ['view-b', 'zh-TW']]);
   assert.equal(plugin.settings, sharedSettings);
   assert.equal(plugin.repo.settings.language, 'zh-TW', 'repository keeps the shared settings object updated');
   assert.equal(calls.filter(([kind]) => kind === 'diagnostic').length, 1);
@@ -75,13 +74,12 @@ test('changeLanguage("zh-CN") saves first, then refreshes commands and views wit
   plugin.saveData = async settings => { calls.push(['save', settings.language, plugin.settings.language]); };
   plugin.repo = { settings: plugin.settings, syncManagedDetailHeadings: async () => { throw new Error('language switch must not rewrite Markdown'); } };
   plugin.views = () => [{ refreshFromPlugin: async () => calls.push(['view', plugin.settings.language]) }];
-  plugin.coffeeViews = () => [{ refreshForLanguageChange: async () => calls.push(['coffee', plugin.settings.language]) }];
   plugin.refreshLocalizedEntrypoints = () => calls.push(['commands', plugin.settings.language]);
   plugin.recordFailure = (...args) => calls.push(['diagnostic', ...args]);
   plugin.settingTab = { update() {}, refreshAfterLanguageChange: () => calls.push(['settings', plugin.settings.language]) };
   assert.equal(await plugin.changeLanguage('zh-CN'), true);
   assert.equal(plugin.settings.language, 'zh-CN');
-  assert.deepEqual(calls.filter(([kind]) => kind !== 'settings'), [['save', 'zh-CN', 'en'], ['commands', 'zh-CN'], ['view', 'zh-CN'], ['coffee', 'zh-CN']]);
+  assert.deepEqual(calls.filter(([kind]) => kind !== 'settings'), [['save', 'zh-CN', 'en'], ['commands', 'zh-CN'], ['view', 'zh-CN']]);
   assert.equal(calls.filter(([kind]) => kind === 'diagnostic').length, 0);
   assert.equal(plugin.languageSwitchPending, false);
   assert.equal(await plugin.changeLanguage('zh-CN'), false, 'selecting the current language is a no-op');
@@ -152,7 +150,7 @@ test('C4: every command keeps its id, takes its name from a ui.command_* key wit
   const ids = [], keys = new Map();
   for (const match of source.matchAll(/addLocalizedCommand\(\s*("[^"]+"),\s*"([^"]+)"/g)) { ids.push(match[1].replace(/"/g, '')); keys.set(ids.at(-1), match[2]); }
   for (const match of source.matchAll(/id: "([^"]+)",\s*name: t\("([^"]+)"\)/g)) { ids.push(match[1]); keys.set(match[1], match[2]); }
-  assert.deepEqual(ids.slice().sort(), ['add-summary-bracket', 'add-text-node', 'book-note-add', 'book-note-apply', 'book-note-undo', 'book-pipeline', 'fix-math-formulas', 'import-outline', 'import-outline-exchange', 'markdown-selection-ai', 'normalize-note-filenames', 'open-coffee-tables', 'open-debug-log', 'open-map', 'open-note-styles-folder', 'open-prompt-monitor', 'open-topic-outline', 'organize-workspace-folders', 'preview-full-prompt', 'rebuild-references', 'reconnect-workspace', 'repair-note-presentation', 'repair-workspace', 'share-map', 'toggle-map-chat'].sort(), 'the 25 command ids (the 21 old ones unchanged, plus the picture-book command and its three note commands; the AIM create command left with AIM, ticket 07), so hotkeys keep working');
+  assert.deepEqual(ids.slice().sort(), ['add-summary-bracket', 'add-text-node', 'book-note-add', 'book-note-apply', 'book-note-undo', 'book-pipeline', 'fix-math-formulas', 'import-outline', 'import-outline-exchange', 'markdown-selection-ai', 'normalize-note-filenames', 'open-debug-log', 'open-map', 'open-note-styles-folder', 'open-prompt-monitor', 'open-topic-outline', 'organize-workspace-folders', 'preview-full-prompt', 'rebuild-references', 'reconnect-workspace', 'repair-note-presentation', 'repair-workspace', 'share-map', 'toggle-map-chat'].sort(), 'the 24 command ids (the 21 old ones less open-coffee-tables, plus the picture-book command and its three note commands; the AIM create command left with AIM, ticket 07), so hotkeys keep working');
   const category = { en: ['Maintenance: ', 'Diagnostics: '], 'zh-TW': ['維護：', '診斷：'], 'zh-CN': ['维护：', '诊断：'] };
   const maintenance = ['rebuild-references', 'normalize-note-filenames', 'repair-note-presentation', 'fix-math-formulas', 'organize-workspace-folders', 'repair-workspace', 'reconnect-workspace'];
   const diagnostics = ['open-prompt-monitor', 'open-debug-log'];
@@ -200,9 +198,7 @@ test('all user-facing translations use stable semantic keys', () => {
   const keys = extract(english);
   for (const [id, source] of dictionaryFiles) assert.deepEqual([...extract(source)].sort(), [...keys].sort(), `${id} must define exactly the same semantic keys as en`);
   const tsFiles = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? tsFiles(`${dir}/${entry.name}`) : entry.name.endsWith('.ts') ? [`${dir}/${entry.name}`] : []);
-  // Coffee Tables prompt, transcript and Markdown-format modules hold conversation content, not interface text.
-  const coffeeContent = /^experiences\/coffee-tables\/(prompts|engine|convergence|storage|insights|types|topics|samples|outline|segments)\.ts$/;
-  const sourceFiles = ['main.ts', 'map-model.ts', ...runtimeMessageFiles.filter(file => !file.startsWith('ui/') && file !== 'main.ts'), ...tsFiles('ui'), ...tsFiles('experiences').filter(file => !coffeeContent.test(file))];
+  const sourceFiles = ['main.ts', 'map-model.ts', ...runtimeMessageFiles.filter(file => !file.startsWith('ui/') && file !== 'main.ts'), ...tsFiles('ui'), ...tsFiles('experiences')];
   const missing = [];
   let checked = 0;
   for (const file of sourceFiles) {
@@ -213,12 +209,7 @@ test('all user-facing translations use stable semantic keys', () => {
     }
   }
   assert.deepEqual(missing, []);
-  assert.ok(checked > 600, `expected the scan to reach Coffee Tables keys, saw ${checked}`);
-  const coffeeSources = tsFiles('experiences/coffee-tables').filter(file => !coffeeContent.test(file));
-  for (const file of coffeeSources) {
-    const source = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.doesNotMatch(source, /\btr\(\s*["`]|this\.zh\b|\bmessage\(\s*["`]/, `${file} must use i18n keys instead of inline bilingual pairs`);
-  }
+  assert.ok(checked > 600, `expected the scan to reach the experience keys, saw ${checked}`);
   const dictionaryValues = source => new Map([...source.matchAll(/^  "((?:[^"\\]|\\.)+)": "((?:[^"\\]|\\.)*)",?$/gm)].map(match => [match[1], match[2]]));
   const englishValues = dictionaryValues(english);
   const placeholders = value => [...value.matchAll(/\{\d+\}/g)].map(match => match[0]).sort();
@@ -277,13 +268,9 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-CN', 'en', 'region'), 'Simplified Chinese (Mainland China)');
   assert.equal(name('zh-CN', 'en', 'usage'), 'Simplified Chinese (Mainland China usage)');
   assert.equal(name('en', 'en', 'plain'), 'English');
-  // The language fragments (core and Coffee Tables) take the name from the registry ({{language}}) instead of spelling it out.
+  // The language fragments (core) take the name from the registry ({{language}}) instead of spelling it out.
   const parameterised = ['core/steps/reframe/language.zh.md'];
-  for (const step of ['table', 'question', 'observer-only', 'navigation-summary']) for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/${step}/prompt.${lang}.md`);
-  for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/_shared/builtin-style.${lang}.md`);
   for (const file of parameterised) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes('{{language}}'), file);
-  const spelled = ['experiences/coffee-tables/steps/table/prompt.zh.md', 'experiences/coffee-tables/steps/_shared/builtin-style.zh.md'];
-  for (const file of spelled) assert.ok(!/繁體中文|Traditional Chinese/.test(fs.readFileSync(path.join(root, file), 'utf8')), file);
 });
 test('inLanguage selects the fragment by instruction language', () => {
   const { inLanguage } = load('core/steps/_shared/fragments.ts');

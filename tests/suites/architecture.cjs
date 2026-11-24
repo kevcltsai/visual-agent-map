@@ -5,7 +5,6 @@ const { test, root, load, plain } = require('../support.cjs');
 test('product architecture keeps shell, core, and experiences separated', () => {
   const shell = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.doesNotMatch(shell, /class VisualAgentMapView/);
-  assert.doesNotMatch(shell, /class CoffeeTablesView/);
   assert.doesNotMatch(shell, /class AiTaskService/);
 
   const coreFiles = fs.readdirSync(path.join(root, 'core')).filter(name => name.endsWith('.ts'));
@@ -19,18 +18,6 @@ test('product architecture keeps shell, core, and experiences separated', () => 
     const source = fs.readFileSync(path.join(root, 'ai', sharedAi), 'utf8');
     assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `ai/${sharedAi} must stay experience-independent`);
     assert.doesNotMatch(source, /experiences\//, `ai/${sharedAi} must not import an experience`);
-  }
-
-  const visualFiles = fs.readdirSync(path.join(root, 'experiences', 'visual-map')).filter(name => name.endsWith('.ts'));
-  for (const name of visualFiles) {
-    const source = fs.readFileSync(path.join(root, 'experiences', 'visual-map', name), 'utf8');
-    assert.doesNotMatch(source, /experiences\/coffee-tables|\.\.\/coffee-tables/, `visual-map/${name} must not import Coffee Tables`);
-  }
-
-  const coffeeFiles = fs.readdirSync(path.join(root, 'experiences', 'coffee-tables')).filter(name => name.endsWith('.ts'));
-  for (const name of coffeeFiles) {
-    const source = fs.readFileSync(path.join(root, 'experiences', 'coffee-tables', name), 'utf8');
-    assert.doesNotMatch(source, /experiences\/visual-map|\.\.\/visual-map/, `coffee-tables/${name} must not import Visual Map`);
   }
 });
 test('thinking artifacts route through shared core without view coupling', async () => {

@@ -8,12 +8,12 @@ const path = require('node:path');
 const { load } = require('./support.cjs');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-const dictionary = file => Object.values(load(file)).find(value => value && typeof value === 'object' && 'coffee.unreadable' in value);
+const dictionary = file => Object.values(load(file)).find(value => value && typeof value === 'object' && 'ui.usage_filter_total' in value);
 const LANGUAGES = ['i18n/en.ts', 'i18n/zh-TW.ts', 'i18n/zh-CN.ts'];
 const NEW_KEYS = [
   'ui.context_ai_inserted_after', 'ui.context_ai_accept_unavailable', 'ui.editor_sections_none', 'ui.note_style_part_unknown_0',
   'ui.usage_filter_total', 'ui.ai_status_preparing', 'ui.ai_status_sent', 'ui.ai_status_received', 'ui.ai_status_parsed',
-  'ui.ai_status_completed', 'ui.ai_status_failed', 'coffee.delete_style_confirm_title', 'coffee.delete_style_confirm_body'
+  'ui.ai_status_completed', 'ui.ai_status_failed'
 ];
 
 // style-editor-empty-raw-english / style-summary-raw-refs / usage / debug log / confirm: every new key exists in all three languages.
@@ -69,14 +69,4 @@ test('P5 style editor: removing every section gives a translated reason and an e
   const source = read('ui/modals/note-style-editor-modal.ts');
   assert.match(source, /if \(!rows\.length\) return say\(t\("ui\.editor_sections_none"\)\);/);
   assert.match(source, /if \(this\.sectionsEdited\(\) && this\.cleanRows\(\)\.length === 0\) \{\s*host\.empty\(\);/);
-});
-
-// ct-style-delete-no-confirm: deleting a saved chat style asks first, and the removal runs only after the confirm.
-test('P5 chat style delete: a confirm dialog runs before the style is removed', () => {
-  const source = read('experiences/coffee-tables/view.ts');
-  const handler = source.slice(source.indexOf('this.button(styleActions, this.t("coffee.delete_style")'), source.indexOf('this.button(styleActions, this.t("coffee.default_for_new_tables")'));
-  const confirmAt = handler.indexOf('new CoffeeStyleDeleteModal(');
-  const removeAt = handler.indexOf('this.changeCoffeeStyles(');
-  assert.ok(confirmAt > 0 && removeAt > confirmAt, 'the confirm comes before the removal');
-  assert.match(handler, /if \(!\(await new CoffeeStyleDeleteModal\(this\.app, items\[index\]\.name, this\.plugin\.settings\.language\)\.confirm\(\)\)\)\s*return;/);
 });

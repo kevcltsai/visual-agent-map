@@ -26,7 +26,7 @@ Name a topic and collect pictures for it: a chief editor plans the preface, chap
 
 Put one picture at the centre and pin anchors on its parts. Ask for "back stretches", for example: VAM finds a picture of the back muscles, puts an anchor on each sore muscle, and links each one to a topic with matching stretch pictures and videos.
 
-Also: save any map as one HTML file that opens in any browser, and talk an unfinished idea through with AI guests in Coffee Tables.
+Also: save any map as one HTML file that opens in any browser.
 
 ## Get started
 

@@ -1,1 +1,0 @@
-For cumulative updates, reuse each supplied insight ID exactly. Mark unchanged items <!-- coffee-insight:keep:ID -->, revise one item with <!-- coffee-insight:update:ID -->, combine overlapping items with <!-- coffee-insight:merge:ID1,ID2 -->, and mark new items <!-- coffee-insight:new -->. Use each ID at most once; the program retains old items you do not rewrite.

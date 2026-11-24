@@ -437,7 +437,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   // A real language switch of this bundle (like languageView below), so the view's fixed words follow `language`.
   if (language !== 'en') {
     const switcher = new LanguagePlugin(); switcher.settings = { ...DEFAULT_SETTINGS, language: 'en' }; switcher.saveData = async () => {}; switcher.repo = { settings: switcher.settings };
-    switcher.views = () => []; switcher.coffeeViews = () => []; switcher.refreshLocalizedEntrypoints = () => {}; switcher.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+    switcher.views = () => []; switcher.refreshLocalizedEntrypoints = () => {}; switcher.settingTab = { update() {}, refreshAfterLanguageChange() {} };
     await switcher.changeLanguage(language);
   }
   ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
@@ -5509,7 +5509,7 @@ async function languageView(language) {
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
   plugin.saveData = async () => {};
   plugin.repo = { settings: plugin.settings };
-  plugin.views = () => []; plugin.coffeeViews = () => []; plugin.refreshLocalizedEntrypoints = () => {}; plugin.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+  plugin.views = () => []; plugin.refreshLocalizedEntrypoints = () => {}; plugin.settingTab = { update() {}, refreshAfterLanguageChange() {} };
   await plugin.changeLanguage(language);
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.app = {};

@@ -1176,12 +1176,13 @@ const outlineFixture = () => {
   const mapView = (plugin, title) => { const view = Object.create(VisualAgentMapView.prototype); Object.assign(view, { plugin, map: titled(title), notes: new Map() }); return view; };
   const plugin = Object.create(Plugin.prototype), state = { views: [], active: null };
   const leaf = { setViewState: async () => {} };
-  Object.assign(plugin, { outlineTitles: new Map(), outlineSourceView: null, coffeeOutlineActive: false, coffeeOutlineSource: null, logs: { appendLog() {} },
+  Object.assign(plugin, { outlineSourceView: null, logs: { appendLog() {} },
     app: { workspace: { getLeavesOfType: type => type === 'visual-agent-map' ? state.views.map(view => ({ view })) : [], getActiveViewOfType: () => state.active, getLeftLeaf: () => leaf, revealLeaf: async () => {} } } });
   plugin.views = () => state.views;
+  const outlined = { map: null }, syncOutline = plugin.syncOutline; plugin.syncOutline = function (map, notes, source) { if (!source || !this.outlineSourceView || this.outlineSourceView === source) outlined.map = map; return syncOutline.call(this, map, notes, source); };
   const a = mapView(plugin, 'Map A'), b = mapView(plugin, 'Map B');
   state.views = [a, b]; state.active = b;
-  return { plugin, a, b, state, title: () => plugin.outlineMap?.title ?? null };
+  return { plugin, a, b, state, outlined, title: () => outlined.map?.title ?? null };
 };
 integrationTest('topic outline follows the active mind map: the header button and the command show the active map, not the first tab', async () => {
   const { plugin, a, b, title } = outlineFixture();
@@ -1197,15 +1198,15 @@ integrationTest('topic outline: a background map tab re-rendering does not overw
   b.map = { ...b.map, title: 'Map B edited' }; b.syncOutline(); assert.equal(title(), 'Map B edited', 'the source still updates');
 });
 integrationTest('topic outline: switching to another map tab re-syncs the outline, and closing the source falls back', () => {
-  const { plugin, a, b, state, title } = outlineFixture();
-  plugin.styleNodeLeaf = () => {}; plugin.syncCoffeeOutline = () => {};
+  const { plugin, a, b, state, outlined, title } = outlineFixture();
+  plugin.styleNodeLeaf = () => {};
   plugin.useOutlineSource(a); assert.equal(title(), 'Map A');
   state.active = b; plugin.onActiveLeafChange({ view: b });
   assert.equal(title(), 'Map B', 'active-leaf-change to a map view makes it the source');
   state.views = [a]; plugin.releaseOutline(b);
   assert.equal(title(), 'Map A', 'closing the source falls back to the remaining map');
   state.views = []; plugin.releaseOutline(a);
-  assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
+  assert.equal(outlined.map, null, 'no map left: the outline empties');
 });
 integrationTest('card tools: AI explore, Details, Collapse, This card and Select subtopics are icon-only buttons with no More menu (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');

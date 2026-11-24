@@ -1,1 +1,0 @@
-更新整桌洞見時，沿用提供的識別碼。輸出未變項目用 <!-- coffee-insight:keep:ID -->；修正單項用 <!-- coffee-insight:update:ID -->；合併重疊項目用 <!-- coffee-insight:merge:ID1,ID2 -->；新項目用 <!-- coffee-insight:new -->。每個 ID 僅用一次。沒有重新輸出的舊項目會由程式保留。

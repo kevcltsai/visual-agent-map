@@ -29,8 +29,6 @@ const suites = [
   'relevance-grade.cjs',
   'goal-topic-suggest.cjs',
   'shell-entrances.cjs',
-  'coffee-tables-core.cjs',
-  'coffee-tables-session.cjs',
   'reframing.cjs',
   'legacy-aim-map.cjs',
   'workspace-folders.cjs',

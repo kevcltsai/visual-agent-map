@@ -6,10 +6,6 @@ import { markPictureParagraphs } from "./experiences/markdown-context/picture-pa
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
-import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-tables/view";
-import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
-import { CoffeeManager } from "./experiences/coffee-tables/engine";
-import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
@@ -199,7 +195,6 @@ import {
   type GoalRecommendRun
 } from "./core/goal-recommend-service";
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
-import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
@@ -326,17 +321,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
           )
         }
       : {}),
-    coffeeStyles: Array.isArray(saved?.coffeeStyles)
-      ? saved.coffeeStyles.filter(
-          (item: unknown): item is { id: string; name: string; prompt: string } =>
-            !!item &&
-            typeof item === "object" &&
-            typeof (item as { id?: unknown }).id === "string" &&
-            typeof (item as { name?: unknown }).name === "string" &&
-            typeof (item as { prompt?: unknown }).prompt === "string"
-        )
-      : [],
-    defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined,
     language: initialUiLanguage(saved?.language, appLocale),
     workspaceFolder: savedWorkspace,
     topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder,
@@ -1191,20 +1175,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     () => this.loadCodexModels(),
     () => this.claudeDiagnostic().installed
   );
-  coffeeManager: CoffeeManager | null = null;
-  coffeeStorage: CoffeeStorage | null = null;
-  private coffeeOutlineActive = false;
-  private coffeeOutlineSource: CoffeeTablesView | null = null;
   private outlineSourceView: VisualAgentMapView | null = null;
-  private outlineMap: MapDocument | null = null;
-  private outlineTitles = new Map<string, string>();
-  private outlineMarkers = new Map<string, TopicMarker[]>();
-  private outlineLinks = new Map<string, string[]>();
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
   private ribbonIcon: HTMLElement | null = null;
-  private coffeeRibbonIcon: HTMLElement | null = null;
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
@@ -1311,40 +1286,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.outlineSourceView = source;
     }
     const titles = new Map([...notes].map(([id, note]) => [id, note.title]));
-    this.outlineMap = map;
-    this.outlineTitles = titles;
     const markers = new Map<string, TopicMarker[]>();
     for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
-    this.outlineMarkers = markers;
     const links = new Map<string, string[]>();
     for (const [id, note] of notes) if (note.links?.length) links.set(id, note.links);
-    this.outlineLinks = links;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-      if (leaf.view instanceof OutlineView) {
-        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, markers, links);
-      }
+      if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles, markers, links);
   }
   /** Marks the active outline row without rebuilding the outline. */
   setOutlineActive(path: string): void {
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) leaf.view.setActive(path);
-  }
-  syncCoffeeOutline(view?: CoffeeTablesView): void {
-    this.coffeeOutlineSource = view ?? null;
-    this.coffeeOutlineActive = !!view;
-    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-      if (leaf.view instanceof OutlineView) {
-        leaf.view.setCoffeeOutline(
-          this.coffeeOutlineSource?.outlineSnapshot() ?? null,
-          this.coffeeOutlineActive,
-          id => this.coffeeOutlineSource?.locateSegment(id) ?? false,
-          () => {
-            void this.coffeeOutlineSource?.confirmFillSummaries();
-          }
-        );
-        if (!this.coffeeOutlineActive)
-          leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineMarkers, this.outlineLinks);
-      }
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */
   releaseOutline(view: VisualAgentMapView): void {
@@ -1358,22 +1310,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   private useOutlineSource(view: VisualAgentMapView): void {
     this.outlineSourceView = view;
     view.syncOutline();
-  }
-  isCoffeeOutlineSource(view: CoffeeTablesView): boolean {
-    return this.coffeeOutlineSource === view;
-  }
-  refreshCoffeeOutline(view: CoffeeTablesView): void {
-    if (this.coffeeOutlineSource !== view) return;
-    for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-      if (leaf.view instanceof OutlineView)
-        leaf.view.setCoffeeOutline(
-          view.outlineSnapshot(),
-          true,
-          id => view.locateSegment(id),
-          () => {
-            void view.confirmFillSummaries();
-          }
-        );
   }
   /** Opens the share dialog for a map view (the active one by default), or says why this map cannot be shared. */
   private sharePreparing = false;
@@ -1408,13 +1344,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     }).open();
   }
   async activateOutline(source?: VisualAgentMapView): Promise<void> {
-    const activeCoffeeView = this.app.workspace.getActiveViewOfType(CoffeeTablesView);
-    if (activeCoffeeView) this.syncCoffeeOutline(activeCoffeeView);
     let leaf: WorkspaceLeaf | null = this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE)[0] ?? null;
     if (!leaf) leaf = this.app.workspace.getLeftLeaf(true);
     if (!leaf) throw new Error(t("ui.could_not_open_the_left_sidebar"));
     await leaf.setViewState({ type: OUTLINE_VIEW_TYPE, active: true });
-    this.syncCoffeeOutline(this.coffeeOutlineSource ?? undefined);
     const mapView =
       source ?? this.app.workspace.getActiveViewOfType(VisualAgentMapView) ?? this.outlineSourceView ?? this.views()[0];
     if (mapView) this.useOutlineSource(mapView);
@@ -1423,11 +1356,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   onActiveLeafChange(leaf: WorkspaceLeaf | null): void {
     this.styleNodeLeaf(leaf);
     if (leaf?.view instanceof OutlineView) return;
-    if (leaf?.view instanceof CoffeeTablesView) {
-      this.syncCoffeeOutline(leaf.view);
-      return;
-    }
-    this.syncCoffeeOutline();
     if (leaf?.view instanceof VisualAgentMapView) {
       this.useOutlineSource(leaf.view);
       return;
@@ -1569,14 +1497,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         })
       )
     );
-    this.registerView(COFFEE_TABLES_VIEW_TYPE, leaf => new CoffeeTablesView(leaf, this));
-    this.buildCoffee();
-    const openCoffee = (): void => {
-      void this.activateCoffeeTables().catch((error: unknown) => new Notice(String(error)));
-    };
-    const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
-    this.coffeeRibbonIcon = coffeeRibbonIcon;
-    this.addLocalizedCommand("open-coffee-tables", "ui.command_open_coffee_tables", openCoffee);
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(
       OUTLINE_VIEW_TYPE,
@@ -1600,7 +1520,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       void this.activateView().catch(error => new Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
-    this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
+    this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon)));
     // Opens or closes the map's AI chat and leaves the keyboard in its message field. No default hotkey: the user picks one in
     // Obsidian's hotkey settings, so it can never collide with a built-in one.
     this.localizedCommands.push({
@@ -2169,39 +2089,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const view of this.views()) await view.refreshFromPlugin();
     noticeInWindowOf(t("ui.vam_data_has_been_refreshed"), anchor);
   }
-  /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
-  private buildCoffee(): void {
-    const storage = new CoffeeStorage(
-      this.app.vault,
-      this.settings.workspaceFolder,
-      (file, path) => this.app.fileManager.renameFile(file, path),
-      file => this.app.fileManager.trashFile(file),
-      message => this.logs.appendLog("warn", message)
-    );
-    this.coffeeStorage = storage;
-    // Bound to its own storage so a manager that is still stopping never flushes into a newer workspace folder.
-    this.coffeeManager = new CoffeeManager(
-      request => this.runCoffeeRequest(request),
-      (session, summariesOnly) => storage.save(session, summariesOnly)
-    );
-  }
-  /**
-   * After the workspace folder changes: build the new storage and manager first (coffeeManager is never null), re-point
-   * open views, then let the old manager finish and flush into the old folder through its own storage.
-   */
-  private async rebuildCoffee(): Promise<void> {
-    const previous = this.coffeeManager;
-    this.buildCoffee();
-    for (const view of this.coffeeViews()) view.rebindStorage();
-    try {
-      await previous?.stop();
-    } catch (error) {
-      this.logs.appendLog(
-        "warn",
-        `Coffee Tables did not stop cleanly: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
   private connectWorkspace(root: string): void {
     this.settings.workspaceFolder = root;
     this.settings.topicsFolder = `${root}/Topics`;
@@ -2228,7 +2115,6 @@ export default class VisualAgentMapPlugin extends Plugin {
           this.mutate(async () => {
             this.connectWorkspace(root);
             await this.saveSettings();
-            await this.rebuildCoffee();
             await this.repo.rebuildDerivedData();
             for (const view of this.views()) await view.refreshFromPlugin();
             noticeInWindowOf(t("ui.reconnected_workspace_0", root), anchor);
@@ -2299,22 +2185,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       models.push(...CLAUDE_MODEL_CHOICES.map(choice => choice.id));
     return [...new Set(models)];
   }
-  async refreshCoffeeModels(): Promise<string[]> {
-    const states = await Promise.all([this.refreshModelDiscovery("codex"), this.refreshModelDiscovery("claude")]);
-    for (const state of states)
-      if (state.status === "error")
-        this.logs.appendLog("warn", `${state.provider} model discovery failed: ${state.error ?? "unknown error"}`);
-    return this.availableModels();
-  }
   /** Which runtime serves `model`, without starting it. */
   private runtimeIdFor(model: string): AiRuntimeId {
     return this.aiRuntime.runtimeFor(model).capabilities.id;
-  }
-  coffeeReasoningEfforts(model: string): string[] {
-    const fixed = this.aiRuntime.runtimeFor(model).capabilities.fixedReasoningEfforts;
-    // A copy: the list belongs to the runtime's shared capabilities.
-    if (fixed) return [...fixed];
-    return this.modelDiscovery.state("codex").reasoningEfforts?.[model] ?? [];
   }
   modelLabel(model: string): string {
     return (
@@ -2484,8 +2357,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookNotes.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
-    void this.coffeeManager?.stop();
-    this.coffeeManager = null;
     // A pending external-delete reconcile must not touch the disposed repo after unload.
     if (this.externalReconcileTimer !== null) window.clearTimeout(this.externalReconcileTimer);
     this.externalReconcileTimer = null;
@@ -2748,13 +2619,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       } catch (error) {
         failures.push(error);
       }
-      try {
-        const views = this.coffeeViews();
-        const results = await Promise.allSettled(views.map(view => view.refreshForLanguageChange()));
-        for (const result of results) if (result.status === "rejected") failures.push(result.reason);
-      } catch (error) {
-        failures.push(error);
-      }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
       new Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
@@ -2770,16 +2634,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
-    this.coffeeRibbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     this.markdownSelectionAi?.refreshLanguage();
     for (const { command, key } of this.localizedCommands)
       command.name = `${this.manifest?.name ?? "Visual Agent Map"}: ${translate(this.settings.language, key)}`;
-  }
-  coffeeViews(): CoffeeTablesView[] {
-    return this.app.workspace
-      .getLeavesOfType(COFFEE_TABLES_VIEW_TYPE)
-      .map(leaf => leaf.view)
-      .filter((view): view is CoffeeTablesView => view instanceof CoffeeTablesView);
   }
   async aiReadyForModel(model: string): Promise<boolean> {
     const runtime = this.aiRuntime.runtimeFor(model);
@@ -2944,47 +2801,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.detailsLeaf = null;
     this.detailsPath = null;
   }
-  async activateCoffeeTables(): Promise<void> {
-    await this.ready;
-    let leaf = this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE)[0];
-    if (!leaf) {
-      leaf = this.app.workspace.getLeaf("tab");
-      await leaf.setViewState({ type: COFFEE_TABLES_VIEW_TYPE, active: true });
-    }
-    await this.app.workspace.revealLeaf(leaf);
-    if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
-  }
-  async runCoffeeRequest(request: CoffeeRequest): Promise<string> {
-    if (!(this.app.vault.adapter instanceof FileSystemAdapter) || !this.manifest.dir)
-      throw new Error("Coffee Tables requires the desktop runtime");
-    const { session, signal, prompt } = request;
-    const effort = effectiveReasoningLevel(
-      { title: session.topic, summary: "", detail: "", rules: "", task: "", ancestors: "" },
-      normalizeReasoningLevel(session.reasoning)
-    );
-    return this.aiCalls.runCall(
-      { prompt, step: request.step },
-      {
-        model: session.model,
-        effort,
-        topic: `Coffee Tables · ${session.topic}`,
-        taskName: "coffee",
-        signal,
-        localCodex: true,
-        milestones: false,
-        stopped: () => new Error("Coffee Tables request cancelled"),
-        task: {
-          textOnly: true,
-          searchBudget: 0,
-          timeoutMs: 15 * 60 * 1000,
-          timeoutMessage: t("ui.coffee_generation_timed_out"),
-          onText: (text: string): void => request.onText?.(text),
-          onSteer: (handler: (text: string) => Promise<void>): void => request.registerIntervention?.(handler)
-        }
-      },
-      raw => raw
-    );
-  }
   private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
     if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));
     // Use the already loaded pixels first. Cross-origin images can taint the canvas.
@@ -3117,14 +2933,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         return raw;
       }
     );
-  }
-  async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
-    try {
-      if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
-      await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
-    } catch (error) {
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
   }
   async openResearchMap(path: string): Promise<void> {
     await this.activateView(path);

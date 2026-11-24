@@ -278,28 +278,6 @@ test('A3 after unload neither a Claude nor a Codex model starts or releases anyt
   assert.deepEqual([out.released, out.claude, out.prewarm.length], [0, 0, 0]);
 });
 
-// ---- A4: the effort menu ----
-
-test('A4 Claude efforts are a fresh array every time; changing one changes nothing else', () => {
-  const { plugin } = fixture();
-  const first = plugin.coffeeReasoningEfforts(CLAUDE);
-  assert.deepEqual(list(first), ['low', 'medium', 'high']);
-  first.push('x');
-  const second = plugin.coffeeReasoningEfforts(CLAUDE);
-  assert.deepEqual(list(second), ['low', 'medium', 'high']);
-  assert.notEqual(second, first);
-  assert.deepEqual(list(plugin.coffeeReasoningEfforts('claude:haiku')), ['low', 'medium', 'high']);
-});
-
-test('A4 Codex efforts come from model discovery, and an unknown model has none', () => {
-  const { plugin } = fixture();
-  plugin.modelDiscovery = { state: provider => { assert.equal(provider, 'codex'); return { reasoningEfforts: { 'gpt-test': ['low', 'xhigh'] } }; } };
-  assert.deepEqual(list(plugin.coffeeReasoningEfforts('gpt-test')), ['low', 'xhigh']);
-  assert.deepEqual(list(plugin.coffeeReasoningEfforts('gpt-unknown')), []);
-  plugin.modelDiscovery = { state: () => ({}) };
-  assert.deepEqual(list(plugin.coffeeReasoningEfforts('gpt-test')), []);
-});
-
 // ---- A5: Fix connection (real plugin) ----
 
 test('A5 repairConnection checks the chosen service and quietly refreshes the other one', () => {

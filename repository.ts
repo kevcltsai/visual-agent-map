@@ -34,7 +34,6 @@ import {
 } from "./i18n";
 import type { CanvasItem } from "./experiences/visual-map/canvas-items";
 import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord, type TopicRelationKind } from "./map-model";
-import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
 import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
@@ -206,10 +205,8 @@ export interface Settings {
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */
   noteStyleFiles?: Record<string, string>;
-  coffeeStyles?: CoffeeStyle[];
   /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
   promptPresets?: PromptPreset[];
-  defaultCoffeeStyleId?: string;
   language: UiLanguage;
   workspaceFolder: string;
   /** Legacy container (pre-0.19): maps here stay openable; new maps go to mindMapsFolder / aimFolder. */
@@ -329,7 +326,6 @@ export function defaultProofModel(authorModel: string): string {
 const BOOK_PROOF_MODEL = defaultProofModel(BOOK_WRITE_MODEL);
 export const DEFAULT_SETTINGS: Settings = {
   detailTemplates: [],
-  coffeeStyles: [],
   promptPresets: [],
   language: "en",
   workspaceFolder: "Agent Workspace",

@@ -153,7 +153,7 @@ test('zh-CN prompt snapshots: exactly 106 lines carry a research.* text that dif
   assert.equal(lines.length, 106);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 104 output-language sentences and 97 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 104 output-language sentences and 92 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -170,5 +170,6 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 104 out
   // no detail structure, so no clause). The same two snapshots then lose their sentence again (the AI decides or keeps the
   // sections, so no six-standard-headings sentence): 103 - 2 = 101; the followed one keeps its clause. The zh-CN snapshot
   // service.synthesize-standard (topic chat P1b) adds 1 sentence and 1 clause: 102 and 95. The zh-CN snapshot service.argument-evidence (argument map P4) adds 1 and 1: 103 and 96. The zh-CN snapshot service.argument-evidence-context (V1 boost P3) adds 1 and 1: 104 and 97.
-  assert.deepEqual(total, { rules: 104, clauses: 97 });
+  // Coffee Tables removal: its five zh-CN prompt snapshots carried five clauses and no sentence: 104 and 92.
+  assert.deepEqual(total, { rules: 104, clauses: 92 });
 });

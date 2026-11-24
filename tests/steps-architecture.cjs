@@ -163,15 +163,6 @@ for (const configuration of configurations) {
   });
 }
 
-test('Coffee shared fragments: every language pair exists and each fragment is used by a step', () => {
-  const directory = path.join(root, 'experiences', 'coffee-tables', 'steps', '_shared');
-  const names = fs.readdirSync(directory);
-  const pairs = names.filter(name => /\.(zh|en)\.md$/.test(name)).map(name => name.replace(/\.(zh|en)\.md$/, ''));
-  for (const base of new Set(pairs)) for (const language of ['zh', 'en']) assert.ok(names.includes(`${base}.${language}.md`), `${base}.${language}.md is missing`);
-  const fragments = fs.readFileSync(path.join(directory, 'fragments.ts'), 'utf8');
-  for (const name of names.filter(item => item.endsWith('.md'))) assert.ok(fragments.includes(`./${name}`), `${name} is not imported by fragments.ts`);
-});
-
 // ---- AiCalls call-site boundary and i18n guards (S2 integration guards: every model call goes through AiCalls, and no prompt text is left in i18n.ts) ----
 function sourceFiles(directory) {
   const from = path.relative(root, directory).split(path.sep).join('/');
@@ -243,8 +234,7 @@ const ACTIVE_TASKS_SET = /\bactiveTasks\s*\.\s*set\(/g;
 const PROVIDER_FOR_MODEL_ALLOWED = [
   { file: 'ai/providers/provider.ts', count: 2, reason: 'definition and providerModelId' },
   { file: 'core/ai-runtime-service.ts', count: 2, reason: 'import and aiRuntimeForModel' },
-  { file: 'core/steps/goal-recommend/step.ts', count: 2, reason: 'import and the one prompt branch (tools and output wording follow the provider; changing it changes the prompt input)' },
-  { file: 'experiences/coffee-tables/view.ts', count: 2, reason: 'UI leftover, waits for C1' }
+  { file: 'core/steps/goal-recommend/step.ts', count: 2, reason: 'import and the one prompt branch (tools and output wording follow the provider; changing it changes the prompt input)' }
 ];
 const CLAUDE_PREFIX_ALLOWED = [{ file: 'ai/providers/provider.ts', count: 1, reason: 'the one place that knows the claude: model prefix' }];
 const ENTRY_END_ALLOWED = [
@@ -258,10 +248,9 @@ const EXCHANGE_WRITE_ALLOWED = [
 const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'core/ai-calls.ts', count: 1, reason: 'the per-call registration' },
   { file: 'experiences/visual-map/expansion-batch.ts', count: 1, reason: 'batch Stop key (parent path), a whole-job key' },
-  { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons (registerTask goes through the ports() call and is outside this pattern)' },
-  { file: 'experiences/coffee-tables/handoff-modal.ts', count: 1, reason: 'reframe-modal key, a whole-job Stop key around one registered AiCalls call' }
+  { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons (registerTask goes through the ports() call and is outside this pattern)' }
 ];
-const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/coffee-tables/handoff-modal.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];
+const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];
 
 // Every runtime.runTask call outside ai/runtime/ is a provider adapter (or the runtime behind one), pinned by
 // file, enclosing function and count so a new direct call anywhere fails this test.
@@ -346,26 +335,6 @@ test('pin helpers reject every way around the boundary', () => {
   assert.notDeepEqual(sendOnceViolations('no anchors here'), []);
   // positive case: the real repo has no violations
   assert.deepEqual(pinViolations(siteCounts(real, PROVIDER_FOR_MODEL), PROVIDER_FOR_MODEL_ALLOWED), []);
-});
-
-test('runCoffeeRequest, which takes a raw prompt, is only wired into the Coffee Tables step provider', () => {
-  const uses = sourceFiles(root).flatMap(file => {
-    const relative = path.relative(root, file).split(path.sep).join('/');
-    return [...fs.readFileSync(file, 'utf8').matchAll(/runCoffeeRequest\(/g)].map(() => relative);
-  });
-  // The definition, the plugin's own Coffee view factory and the view's engine wiring.
-  assert.deepEqual(uses.sort(), ['experiences/coffee-tables/view.ts', 'main.ts', 'main.ts']);
-});
-
-test('runCoffeeRequest is a thin wiring over AiCalls.runCall', () => {
-  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const start = main.indexOf('async runCoffeeRequest(');
-  const end = main.indexOf('private async markdownContextImage', start);
-  assert.ok(start >= 0 && end > start);
-  const body = main.slice(start, end);
-  for (const forbidden of ['providerForModel(', '.runTask(', 'new AbortController', 'activeTasks', 'exchanges', 'randomUUID'])
-    assert.equal(body.split(forbidden).length - 1, 0, `${forbidden} must not appear in runCoffeeRequest`);
-  assert.equal(body.split('this.aiCalls.runCall(').length - 1, 1);
 });
 
 test('i18n.ts holds no prompt.* keys', () => {

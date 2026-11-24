@@ -89,8 +89,6 @@ Map AI chat: tested live with Claude only; Codex was not tested live in the chat
 
 Share files: web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
-Coffee Tables stores what it needs to continue a conversation in the hidden `Coffee Tables/.sessions` folder. Obsidian Sync skips hidden folders, so on other devices you can read synced conversations but not continue them; continue them on the device where they started.
-
 ## Contributing checks
 
 - `npm run verify` runs the same checks as CI (lint, format, tests, committed artifacts).
@@ -189,8 +187,6 @@ AI 從網路找到的圖片不一定能自由使用，請查看各自的來源�
 地圖 AI 對話：只用 Claude 做過實機測試，Codex 未在對話中實機測試。已插入的圖與無法載入的圖看起來一樣，找圖的結果列即使之後找不到圖也會寫「已開始」。對話依回覆套用的變更無法復原。對話在英文與簡體中文畫面、彈出視窗、Windows 與 Linux 未檢查。
 
 分享檔：網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
-
-Coffee Tables 把接續對談所需的資料存在隱藏資料夾 `Coffee Tables/.sessions`。Obsidian Sync 不同步隱藏資料夾，因此在其他裝置上可以閱讀同步過去的對談，但無法接著聊；請回到開始對談的裝置繼續。
 
 ## 貢獻檢查
 

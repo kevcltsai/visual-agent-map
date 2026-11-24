@@ -62,13 +62,6 @@ test('Codex reasoning metadata survives loading and error refresh states', async
   await loading;
   assert.deepEqual(plain(discovery.state('codex').reasoningEfforts), { model: ['high'] });
 });
-test('Coffee Tables preserves a requested reasoning choice while model discovery is pending', () => {
-  const { reasoningChoiceState } = load('experiences/coffee-tables/view.ts', { obsidian });
-  assert.deepEqual(plain(reasoningChoiceState('high', [], 'loading')), { values: ['auto', 'high'], selected: 'high' });
-  assert.deepEqual(plain(reasoningChoiceState('high', [], 'error')), { values: ['auto', 'high'], selected: 'high' });
-  assert.deepEqual(plain(reasoningChoiceState('high', ['low'], 'ready')), { values: ['auto', 'low'], selected: 'auto' });
-  assert.deepEqual(plain(reasoningChoiceState('high', ['high'], 'ready')), { values: ['auto', 'high'], selected: 'high' });
-});
 test('automatic reasoning respects manual choices and local tasks avoid research', () => {
   const { effectiveReasoningLevel, researchGuidance } = load('ai/task-policy.ts');
   const task = { title: 'Topic', summary: '', rules: '', detail: '', task: 'Organize', ancestors: '', mode: 'task', researchMode: 'local' };

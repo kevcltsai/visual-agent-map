@@ -206,38 +206,9 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
   }
 });
 
-test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => {
-  // One bundle, so the Coffee modules and setUiLanguage share the same interface-language state (Coffee names the table language from it).
-  const coffeeModules = loadSource(`export * as i18n from './i18n'; export * as prompts from './experiences/coffee-tables/prompts'; export * as types from './experiences/coffee-tables/types'; export * as engine from './experiences/coffee-tables/engine'; export * as customization from './experiences/coffee-tables/customization'; export { convergenceStep } from './experiences/coffee-tables/steps/convergence/step';`);
-  const prompts = coffeeModules.prompts, types = coffeeModules.types;
-  const customization = coffeeModules.customization;
-  const { convergenceStep } = coffeeModules;
-  for (const [language, tag] of LANGUAGES) {
-    coffeeModules.i18n.setUiLanguage(language);
-    const noteLanguage = coffeeModules.i18n.noteLanguageOf(language); // a session stores the note language; the table speaks the interface language
-    const topic = language === 'en' ? 'Should lunches allow parent top-ups' : '營養午餐是否開放家長加價';
-    const session = types.createSession(topic, 'test-model', 'high', noteLanguage);
-    session.id = 'session-fixed'; session.createdAt = '2026-01-01T00:00:00.000Z'; session.updatedAt = session.createdAt;
-    record(`coffee.table-opening.${tag}`, 'coffee-tables/prompts.ts tablePrompt (opening, default guests)', language, prompts.tablePrompt(topic, noteLanguage));
-    record(`coffee.table-continue.${tag}`, 'coffee-tables/prompts.ts tablePrompt (draft + prior context + invited guest)', language, prompts.tablePrompt(topic, noteLanguage, session.guests, 'Unfinished draft text', 'Prior discussion text', [{ id: 'g1', name: 'Guest Name', category: 'experts', description: 'Guest background' }]));
-    record(`coffee.opening-preview.${tag}`, 'coffee-tables/prompts.ts openingPromptPreview', language, prompts.openingPromptPreview(topic, noteLanguage, session.guests));
-    session.status = 'completed';
-    session.rounds = [{ id: 'round-1', createdAt: session.createdAt, status: 'completed', markdown: '### Host|Host\nOpening line one.\n\n### Expert|Expert\nSecond speaker line.', notes: '' }];
-    session.interventions = [{ id: 'iv-1', roundId: 'round-1', afterTurn: 1, text: 'User intervention text', createdAt: session.createdAt }];
-    record(`coffee.question.${tag}`, 'coffee-tables/prompts.ts questionPrompt', language, prompts.questionPrompt(session, 'Follow-up question text', 'Earlier answer draft'));
-    record(`coffee.observer-only.${tag}`, 'coffee-tables/prompts.ts observerOnlyPrompt', language, prompts.observerOnlyPrompt(session));
-    session.questions = [{ id: 'question-1', question: 'Follow-up question text', answer: 'Answer text for the follow-up.', status: 'complete', createdAt: '2026-01-01T00:00:01.000Z' }];
-    const navigation = [];
-    const navigationEngine = new coffeeModules.engine.CoffeeEngine(JSON.parse(JSON.stringify(session)), async request => { navigation.push(request.prompt); return ''; }, async () => {});
-    await navigationEngine.fillSegmentSummaries();
-    assert.equal(navigation.length, 1, 'navigation summary prompt reached the provider once');
-    record(`coffee.navigation-summary.${tag}`, 'coffee-tables/engine.ts fillSegmentSummaries (navigation summary request)', language, navigation[0]);
-    session.questions = [];
-    const baseline = [{ id: 'insight-1', category: 'connections', summary: 'Insight summary one', detail: 'Insight detail one', sources: ['source quote'], question: '', proposedSolution: '', limitations: '' }, { id: 'insight-2', category: 'questions', summary: 'Insight summary two', detail: 'Insight detail two', sources: [], question: '', proposedSolution: '', limitations: '' }];
-    session.pinnedInsightIds = ['insight-2'];
-    record(`coffee.convergence.${tag}`, 'coffee-tables/convergence.ts convergencePrompt', language, convergenceStep.render({ session, baseline, customization: customization.defaultCustomization(noteLanguage) }));
-  }
-  coffeeModules.i18n.setUiLanguage('en');
+test('collect snapshots: Reframe, Markdown context', async () => {
+  const { i18n } = loadSource(`export * as i18n from './i18n';`);
+  i18n.setUiLanguage('en');
   const { buildReframePrompt } = support.load('core/reframing-service.ts', { obsidian: support.obsidian });
   for (const [language, tag] of LANGUAGES) record(`reframe.${tag}`, 'core/reframing-service.ts buildReframePrompt', language, buildReframePrompt({ language, question: 'Direction question', context: 'Direction context', source: 'Source thinking text' }));
   // Share translation prompts are written in English for every target; the target and source languages are named inside.
@@ -257,7 +228,7 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   const { buildMapChatContext } = support.load('core/map-chat-context.ts', { obsidian: support.obsidian });
   const chatOutline = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', parentId: 'n1', depth: 1, kind: 'hypothesis', strength: 'medium' }];
   const chatContext = buildMapChatContext({ mapTitle: 'Map title', mapFolder: 'Maps', outline: chatOutline, selected: [{ id: 'n2', title: 'Child topic', summary: 'Child summary', detail: 'Child detail text', path: 'Maps/Notes/Child topic.md' }], references: [{ id: 'n1', title: 'Root topic', summary: 'Root summary', detail: 'Root detail text', path: 'Maps/Notes/Root topic.md' }], relations: [{ kind: 'supports', from: 'n2', to: 'n1', description: 'Relation note' }], snippets: [{ path: 'Notes/Draft.md', text: 'Snippet text', pathGuessed: true }], files: [{ path: 'Notes/File.md', content: 'File body text' }], activeFile: { path: 'Notes/Active.md', content: 'Active body text' }, history: [{ role: 'user', text: 'Earlier question' }, { role: 'assistant', text: 'Earlier answer' }] });
-  // The steer template is English for every UI language (like Coffee Tables' steering lines).
+  // The steer template is English for every UI language (a fixed English line).
   const { renderMapChatSteer } = support.load('core/steps/map-chat/step.ts', { obsidian: support.obsidian });
   record('map-chat-steer.en', 'core/steps/map-chat/step.ts renderMapChatSteer', 'en', renderMapChatSteer('Also rename the child topic'));
   // The neutral steer of research, expansion and topic chat: no output field is named, the format is the original request's.

@@ -136,62 +136,10 @@ async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a'
   const mapPath = `Agent Workspace/Topics/${id}/Map.md`; await repo.ensureTopicFolders(`Agent Workspace/Topics/${id}`);
   return repo.createNote(title, model, mapDoc, mapPath, 'workspace');
 }
-// Coffee Tables uses one plain-text generation, then one request per follow-up.
-const coffeeTypes = load('experiences/coffee-tables/types.ts');
-const coffee = load('experiences/coffee-tables/engine.ts');
-const coffeePrompts = load('experiences/coffee-tables/prompts.ts');
-const coffeeInsights = load('experiences/coffee-tables/insights.ts');
-const coffeeGuestInvitations = load('experiences/coffee-tables/guest-invitations.ts');
-const coffeeCustomization = load('experiences/coffee-tables/customization.ts');
-const coffeeConvergence = load('experiences/coffee-tables/convergence.ts');
-const coffeeSession = () => coffeeTypes.createSession('學生免費的營養午餐是否應該開放讓家長加價', 'test-model', 'high', 'zh-TW');
-const coffeeTableList = load('experiences/coffee-tables/list.ts');
-const coffeeTopics = load('experiences/coffee-tables/topics.ts');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setImmediate(r)); } throw new Error('condition not reached'); };
-function coffeeElement(tag, options = {}) {
-  return { tag, cls: options.cls ?? '', querySelectorAll(selector) { const result = []; const visit = node => { for (const child of node.children) { if (selector.startsWith('.') ? child.cls.split(' ').includes(selector.slice(1)) : child.tag === selector) result.push(child); visit(child); } }; visit(this); return result; }, text: options.text ?? '', value: options.value ?? '', children: [], disabled: false, attrs: options.attr ?? {}, get options() { return this.children.filter(child => child.tag === 'option' || child.value !== undefined); },
-    createDiv(value) { const element = coffeeElement('div', typeof value === 'string' ? { cls: value } : value); this.children.push(element); return element; },
-    createEl(name, value) { const element = coffeeElement(name, value); this.children.push(element); return element; }, createSpan(value) { const element = coffeeElement('span', value); this.children.push(element); return element; }, addClass() {}, toggleClass() {}, removeClass() {}, setText(value) { this.text = value; }, empty() { this.children = []; }, focus() {}, remove() { this.removed = true; },
-    add(option) { this.children.push(option); }, replaceChildren(...children) { this.children = children; },
-    classList: { add() {}, toggle() {} }, dataset: {},
-    setAttribute(name, value) { this.attrs[name] = value; },
-    addEventListener(name, handler) { this[name] = handler; }, get childElementCount() { return this.children.length; } };
-}
-const coffeeFind = (root, predicate) => predicate(root) ? root : root.children.map(child => coffeeFind(child, predicate)).find(Boolean);
-function withCoffeeModelDiscovery(plugin, models) {
-  const states = {
-    codex: { provider: 'codex', status: 'ready', models: models.filter(model => !model.startsWith('claude:')) },
-    claude: { provider: 'claude', status: 'ready', models: models.filter(model => model.startsWith('claude:')) }
-  };
-  const listeners = new Set();
-  plugin.availableModels = () => [...new Set([...states.codex.models, ...states.claude.models])];
-  plugin.modelLabel = plugin.modelLabel ?? (model => model);
-  plugin.modelDiscoveryState = provider => ({ ...states[provider], models: [...states[provider].models] });
-  plugin.subscribeModelDiscovery = listener => { listeners.add(listener); return () => listeners.delete(listener); };
-  plugin.refreshModelDiscovery = async provider => { const state = plugin.modelDiscoveryState(provider); for (const listener of listeners) listener(state); return state; };
-  plugin.refreshCoffeeModels = plugin.refreshCoffeeModels ?? (async () => plugin.availableModels());
-  plugin.coffeeReasoningEfforts = plugin.coffeeReasoningEfforts ?? (model => model.startsWith('claude:') ? ['low', 'medium', 'high'] : []);
-  return plugin;
-}
-async function reframingModalFixture(insightId) {
-  const data=fixture('en'); const {app,contents,repo}=data;
-  const {CoffeeStorage}=load('experiences/coffee-tables/storage.ts',{obsidian});
-  const session=coffeeSession(); session.status='completed'; session.language='en'; session.rounds=[{id:'round-handoff',createdAt:session.createdAt,status:'completed',markdown:'### Host|Host\nUnique discussion line.',notes:''}]; session.transcriptMarkdown=session.rounds[0].markdown;
-  session.observerNotes=['# Observer’s notes\n\n## Unexpected connections\n- Candidate analogy <!-- coffee-insight:v1:id=idea --> <!-- source: Unique discussion line. -->\n  - Context: Important limits'];
-  const store=new CoffeeStorage(app.vault,'Agent Workspace'); await store.save(session); const path=store.sessionPath(session.id), displayed=await store.inspectReadOnly(path);
-  const {default:Plugin}=load('main.ts',{obsidian});const plugin=new Plugin(); plugin.app=app;plugin.repo=repo;plugin.coffeeStorage=store;plugin.settings.language='en';withCoffeeModelDiscovery(plugin,['test-model']); plugin.confirmAiUsage=async (_m,run)=>{await run();return true;}; plugin.register=()=>{};
-  const opened=[];plugin.activateView=async p=>{opened.push(p);};plugin.openResearchMap=async p=>{opened.push(p);};plugin.mutate=async work=>work();
-  const {receiveVisualMapHandoff}=load('experiences/visual-map/handoff.ts',{obsidian});
-  plugin.core.experiences.register('visual-map',(artifact,beforeWrite)=>receiveVisualMapHandoff(artifact,{repo,defaultModel:()=>plugin.settings.cliModel,currentModel:()=>({model:plugin.settings.cliModel,reasoning:plugin.settings.cliReasoning}),exists:p=>!!app.vault.getAbstractFileByPath(p),mutate:work=>plugin.mutate(work),navigate:p=>plugin.activateView(p),beforeWrite}));
-  const modals=[];class Modal {constructor(){this.titleEl=coffeeElement('title');this.contentEl=coffeeElement('content');}open(){modals.push(this);this.onOpen?.();}close(){this.didClose=true;this.onClose?.();}}
-  const dom=require('./support-dom.cjs'), notices=[], Notice=dom.makeNotice(notices);
-  const handoff=load('experiences/coffee-tables/handoff-modal.ts',{obsidian:{...obsidian,Modal,Notice}},{createFragment:dom.createFragment});
-  const modal=await handoff.openCoffeeResearchHandoff(plugin,store,displayed,path,insightId);
-  return {...data,plugin,store,session:displayed,path,modal,opened,handoff,notices,Notice,displayed,insightId,modals};
-}
 /** Ids of every registered language, read from the registry so a new language needs no test edit. */
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture };
+module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, deferred, until };

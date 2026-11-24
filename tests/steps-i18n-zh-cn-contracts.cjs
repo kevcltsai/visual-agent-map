@@ -99,39 +99,18 @@ test('B2: the Detail prompt under zh-CN names the note language for headings and
   assert.ok(!tw.includes('逐字照上列'));
 });
 
-test('B2: the Coffee observer format adds the verbatim-heading clause only for zh-CN', () => {
-  const shared = loadSource("export * as ui from './i18n'; export * as prompts from './experiences/coffee-tables/prompt-parts'; export * as language from './experiences/coffee-tables/language';", { obsidian });
-  const { prompts, language, ui } = shared;
-  const i18n = ui;
-  i18n.setUiLanguage('zh-CN');
-  try {
-    assert.match(prompts.observerTitles('zh-TW'), /^# 觀察者整理\n## 意外連結[\s\S]*\n固定標題必須逐字照上列寫出（繁體中文，不要轉成简体中文）/);
-    assert.equal(language.coffeeContentLocale('zh-TW'), 'zh-CN');
-    i18n.setUiLanguage('zh-TW');
-    assert.equal(prompts.observerTitles('zh-TW'), prompts.OBSERVER_TITLES.zh);
-    i18n.setUiLanguage('en');
-    assert.equal(prompts.observerTitles('en'), prompts.OBSERVER_TITLES.en);
-  } finally { i18n.setUiLanguage('en'); }
-});
-
-test('B1 and B5: the selection-AI and Coffee Tables commands and ribbon refresh with the language', () => {
+test('B1: the selection-AI command and the map ribbon refresh with the language', () => {
   const { default: Plugin } = load('main.ts', { obsidian });
-  const plugin = new Plugin(), attributes = {}, coffeeAttributes = {};
-  const selection = { name: '' }, coffee = { name: '' };
+  const plugin = new Plugin(), attributes = {};
+  const selection = { name: '' };
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
-  plugin.coffeeRibbonIcon = { setAttribute: (key, value) => { coffeeAttributes[key] = value; } };
   plugin.manifest = { name: 'Visual Agent Map' };
-  plugin.localizedCommands = [{ command: selection, key: 'ui.command_selection_ai' }, { command: coffee, key: 'ui.command_open_coffee_tables' }];
+  plugin.localizedCommands = [{ command: selection, key: 'ui.command_selection_ai' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'zh-CN' };
   plugin.refreshLocalizedEntrypoints();
   assert.equal(selection.name, 'Visual Agent Map: ' + i18n.translate('zh-CN', 'ui.command_selection_ai'));
-  assert.equal(coffee.name, 'Visual Agent Map: 打开 Coffee Tables');
-  assert.equal(coffeeAttributes['aria-label'], '打开 Coffee Tables');
-  plugin.settings.language = 'en'; plugin.refreshLocalizedEntrypoints();
-  assert.equal(coffeeAttributes['aria-label'], 'Open Coffee Tables');
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.ok(/id: "markdown-selection-ai"[\s\S]{0,200}key: "ui\.command_selection_ai"/.test(source), 'the selection command is registered as localized');
-  assert.ok(!/Open \$\{COFFEE_TABLES_NAME\}/.test(source));
 });
 
 test('B5: the model discovery summary reads the dictionaries, including the error text', () => {
@@ -143,43 +122,8 @@ test('B5: the model discovery summary reads the dictionaries, including the erro
   try {
     assert.equal(modelDiscoverySummary({ ...codex, status: 'error', error: 'boom' }, claude), 'Codex：错误 · boom · Claude CLI 候选模型：找不到');
   } finally { i18n.setUiLanguage('en'); }
-  for (const file of ['ui/settings-tab.ts', 'experiences/coffee-tables/view.ts', 'experiences/coffee-tables/handoff-modal.ts'])
+  for (const file of ['ui/settings-tab.ts'])
     assert.ok(!/CLI candidates/.test(fs.readFileSync(path.join(root, file), 'utf8')), `${file}: no inline status text`);
-});
-
-test('B3: Coffee roster placeholders follow the interface language while real guests keep their stored role', () => {
-  const { rosterFor, ui: i18n } = loadSource("export * as ui from './i18n'; export { rosterFor } from './experiences/coffee-tables/view';", { obsidian });
-  const session = { id: 's', language: 'zh-TW', guests: { hostCount: 1, counts: { experts: 1, 'cross-domain': 0, generalist: 0, affected: 0 }, guests: [], background: '', customPrompt: '' } };
-  i18n.setUiLanguage('zh-CN');
-  try {
-    const roster = rosterFor(session, '- **林岑｜主持人**：擅長追問。');
-    const placeholder = roster.find(person => person.role !== '主持人' && person.bio !== '擅長追問。');
-    assert.equal(placeholder.role, '即将登场');
-    assert.ok(placeholder.name.includes('主题专家') || placeholder.name.includes('观察'), placeholder.name);
-    assert.equal(roster[0].role, '主持人');
-    i18n.setUiLanguage('zh-TW');
-    assert.equal(rosterFor(session, '').find(person => person.role === '即將登場').role, '即將登場');
-  } finally { i18n.setUiLanguage('en'); }
-});
-
-test('B3b: Simplified, Traditional and English roles of real guests count toward the roster (no duplicate placeholders)', () => {
-  const { rosterFor, ui: i18n } = loadSource("export * as ui from './i18n'; export { rosterFor } from './experiences/coffee-tables/view';", { obsidian });
-  const session = language => ({ id: 's', language, guests: { hostCount: 1, counts: { experts: 1, 'cross-domain': 1, generalist: 1, affected: 1 }, guests: [], background: '', customPrompt: '' } });
-  const placeholders = (roster, joining) => roster.filter(person => person.role === joining);
-  try {
-    i18n.setUiLanguage('zh-CN');
-    const cn = ['主持人', '中立观察者', '主题专家', '跨领域专家', '好奇的通才', '受影响者'].map((role, index) => `- **林${index}｜${role}**：简介${index}。`).join('\n');
-    const roster = rosterFor(session('zh-CN'), cn);
-    assert.equal(roster.length, 6);
-    assert.equal(placeholders(roster, '即将登场').length, 0);
-    assert.equal(rosterFor(session('zh-CN'), '').length, 6);
-    i18n.setUiLanguage('zh-TW');
-    const tw = ['主持人', '觀察者', '主題專家', '跨領域專家', '好奇的通才', '受影響者'].map((role, index) => `- **林${index}｜${role}**：簡介${index}。`).join('\n');
-    assert.equal(placeholders(rosterFor(session('zh-TW'), tw), '即將登場').length, 0);
-    i18n.setUiLanguage('en');
-    const en = ['Host', 'Observer', 'Topic expert', 'Cross-domain expert', 'Curious generalist', 'Affected perspective'].map((role, index) => `- **Lin ${index}｜${role}**: Bio ${index}.`).join('\n');
-    assert.equal(placeholders(rosterFor(session('en'), en), 'Joining').length, 0);
-  } finally { i18n.setUiLanguage('en'); }
 });
 
 // The dialogs read the name from runStyle's label; steps-run-style.cjs slice 9 checks it in the interface language.
@@ -229,45 +173,9 @@ test('N1 counterexamples: zh-TW, en, custom template, body text, wrong level, ne
     assert.equal(normalize(text, 'zh-CN', standardZh), text);
 });
 
-// N1b (D-2026-10-69): Simplified observer headings are mapped instead of dropped.
-const coffeeInsights = load('experiences/coffee-tables/insights.ts');
-const coffeeEngine = load('experiences/coffee-tables/engine.ts');
-const SIMPLIFIED_NOTES = ['# 观察者整理', '', '## 意外链接', '- 连结甲。', '', '## 值得继续想的问题', '- 问题乙。', '', '## 核心分歧', '- 分歧丙。', '', '## 探索方向', '- 方向丁。', '', '## 值得查证的假设', '- 假设戊。'].join('\n');
-
 test('N1 counterexamples: adaptive format under zh-CN is not rewritten', () => {
   const simplified = '### 核心结论\n\n内容';
   const run = context => resultUtils.normalizeOutputScriptHeadings(simplified, 'zh-CN', undefined, context);
   assert.equal(run({ detailFormat: 'adaptive' }), simplified);
   assert.equal(run({}), '### 核心結論\n\n内容');
-});
-
-test('N1b: Simplified observer headings parse into the right categories and are not dropped', () => {
-  const parsed = coffeeInsights.baselineFromVersions([SIMPLIFIED_NOTES], 'zh-TW');
-  assert.deepEqual([...parsed.map(item => item.category)], ['connections', 'questions', 'disagreements', 'directions', 'assumptions']);
-  assert.deepEqual([...parsed.map(item => item.summary)], ['连结甲。', '问题乙。', '分歧丙。', '方向丁。', '假设戊。']);
-  const solutions = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 疑问与可能解方\n- 解方己。'], 'zh-TW');
-  assert.deepEqual([...solutions.map(item => item.category)], ['solutions']);
-});
-
-test('N1b: a Simplified observer reply is split as complete notes (no incomplete-format path)', () => {
-  const { dialogue, notes } = coffeeEngine.splitObserverNotes(`### 来宾｜甲\n\n发言。\n\n${SIMPLIFIED_NOTES}`);
-  assert.equal(dialogue, '### 来宾｜甲\n\n发言。');
-  assert.ok(notes.startsWith('# 觀察者整理'));
-  for (const heading of ['## 意外連結', '## 值得繼續想的問題', '## 核心分歧', '## 探索方向', '## 值得查證的假設']) assert.ok(notes.includes(heading), heading);
-});
-
-test('N1b counterexamples: Traditional and English unchanged; near matches and body lines are not matched', () => {
-  const traditional = '# 觀察者整理\n\n## 意外連結\n- 甲。\n\n## 核心分歧\n- 乙。';
-  assert.equal(coffeeEngine.splitObserverNotes(`### 來賓｜甲\n\n話。\n\n${traditional}`).notes, traditional);
-  const english = '# Observer’s notes\n\n## Unexpected connections\n- A.';
-  assert.equal(coffeeEngine.splitObserverNotes(`### Guest｜A\n\nHi.\n\n${english}`).notes, english);
-  assert.deepEqual([...coffeeInsights.baselineFromVersions([traditional], 'zh-TW').map(item => item.category)], ['connections', 'disagreements']);
-  // Near match (extra words) and wrong level: not mapped, the section is not recognised as a category.
-  const near = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 意外链接总览\n- 甲。\n\n### 意外链接\n- 乙。'], 'zh-TW');
-  assert.ok(near.every(item => item.category === 'questions'));
-  // Body lines containing the words stay as they are.
-  const body = coffeeInsights.baselineFromVersions(['# 观察者整理\n\n## 意外链接\n- 提到意外链接与核心分歧。'], 'zh-TW');
-  assert.equal(body.length, 1);
-  assert.equal(body[0].summary, '提到意外链接与核心分歧。');
-  assert.equal(coffeeEngine.splitObserverNotes('对话里说 ## 意外链接 很有趣\n\n- 意外链接').notes, '');
 });

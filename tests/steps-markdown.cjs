@@ -71,7 +71,7 @@ test('nothing in the plugin reads the five removed context_ai prompt keys', () =
 
 test('the markdown call site in main.ts goes through AiCalls only', () => {
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const start = main.indexOf('private async runMarkdownContextAi'), end = main.indexOf('async openCoffeeHandoff', start);
+  const start = main.indexOf('private async runMarkdownContextAi'), end = main.indexOf('async openResearchMap', start);
   assert.ok(end > start, 'the end anchor follows the start anchor');
   const body = main.slice(start, end);
   assert.ok(start >= 0 && /this\.aiCalls\.run\(\s*prepared,/.test(body));

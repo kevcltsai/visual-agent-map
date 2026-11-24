@@ -27,7 +27,8 @@ const elementsIn = (root: Element): Element[] => {
 
 /** Replaces every Facebook or Instagram video link or image under `root` with a click-to-play card; returns how many. */
 export function upgradeSocialVideoLinks(root: Element, labels: SocialVideoLabels): number {
-  const doc = root.ownerDocument;
+  // Typed as just the factory (like the share viewer's dom.ts): the unit test DOM has no Obsidian `createEl`.
+  const doc: Pick<Document, "createElement"> = root.ownerDocument;
   let made = 0;
   for (const element of elementsIn(root)) {
     const name = element.localName.toLowerCase();

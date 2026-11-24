@@ -8,7 +8,7 @@ import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
 import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
-import { assertOwnerIdle, waitOwnerIdle } from "./owner-idle.mjs";
+import { assertOwnerIdle, ownerBusyReasons, waitOwnerIdle } from "./owner-idle.mjs";
 import { connectCdp } from "./obsidian-cdp.mjs";
 import { sourceFingerprint } from "./candidate-id.mjs";
 import { recordDevEvent, timedSync } from "./dev-metrics.mjs";
@@ -267,6 +267,97 @@ export function sessionVault(name) {
   return vault;
 }
 
+// Only the exact owning checkout can operate on an isolated session.
+export function assertSessionOwner(vault) {
+  if (isOwnerVault(vault) || !existsSync(vault) || !lstatSync(vault).isDirectory() || lstatSync(vault).isSymbolicLink()) throw new Error("Refusing an unowned session vault.");
+  const path = join(vault, marker);
+  if (!existsSync(path) || !lstatSync(path).isFile() || lstatSync(path).isSymbolicLink()) throw new Error("Refusing an unowned session vault.");
+  const record = json(path);
+  if (record.kind !== "vam-disposable-test-vault" || record.owner !== realpathSync(root)) throw new Error("Refusing a session vault owned by another checkout.");
+  return record;
+}
+export function withSessionLock(vault, work) {
+  const lock = vault + ".lock";
+  mkdirSync(lock); // interrupted operation: inspect stale lock instead of racing another writer
+  const release = () => rmSync(lock, { recursive: true });
+  let result;
+  try { result = work(); } catch (error) { release(); throw error; }
+  if (result && typeof result.then === "function") return result.finally(release);
+  release();
+  return result;
+}
+function assertSessionIdle(vault) {
+  const reasons = ownerBusyReasons(vault);
+  if (reasons.length) throw new Error("Session reload refused: possible pending work or unknown state; finish work or stop the session. " + reasons.join("; "));
+}
+// Missing/unknown runtime state is not permission to unload. Deliberately
+// conservative, especially for books, chat, Coffee sessions and queued writes.
+export function sessionDisableExpression(vault, runtimeVersion) {
+  return "(async()=>{" +
+    "if(app.vault.adapter.basePath!==" + JSON.stringify(vault) + ")return {status:'wrong-vault'};" +
+    "const id='visual-agent-map',p=app.plugins.plugins[id];" +
+    "if(require('electron').ipcRenderer.sendSync('version')!==" + JSON.stringify(runtimeVersion) + ")return {status:'runtime-mismatch'};" +
+    "if(!app.plugins.enabledPlugins.has(id)||!p||!p.repo||p.unloaded!==false)return {status:'unknown'};" +
+    "const queue=p.queue;if(!queue||typeof queue.then!=='function'||!p.ready||typeof p.ready.then!=='function')return {status:'unknown'};" +
+    "const settled=await Promise.race([Promise.all([queue,p.ready]).then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),0))]);" +
+    "const empty=x=>x!=null&&typeof x.size==='number'&&x.size===0;" +
+    "if(!settled||p.queue!==queue||p.writing!==0||p.pendingRenames!==null||p.externalReconcileTimer!==null||p.languageSwitchPending!==false||document.querySelector('.modal-container')||" +
+    "![p.running,p.activeTasks,p.chartJobs,p.quickExpandPending,p.expansionBatches,p.pendingSuggestions,p.pendingResearchOptions,p.externalReconcilePaths,p.bookPipelineRuns?.drives,p.bookPipelineRuns?.gateWaiting,p.bookPipelineRuns?.notesJobs,p.argumentRuns?.drives,p.bookNotesApply?.jobs,p.coffeeManager?.engines,p.coffeeManager?.deletingIds].every(empty))return {status:'busy'};" +
+    "await app.plugins.disablePlugin(id);return {status:!app.plugins.plugins[id]?'disabled':'unknown'};})()";
+}
+function sessionEnableExpression(vault, enable) {
+  return "(async()=>{if(app.vault.adapter.basePath!==" + JSON.stringify(vault) + ")return false;const id='visual-agent-map';" +
+    (enable ? "await app.plugins.enablePlugin(id);return !!app.plugins.plugins[id]&&app.plugins.enabledPlugins.has(id);" : "if(app.plugins.plugins[id])await app.plugins.disablePlugin(id);return !app.plugins.plugins[id];") + "})()";
+}
+export async function reloadSessionVault({ vault, source, artifact = root, connect = connectCdp, idle = assertSessionIdle, checkCandidate = () => {} }) {
+  const previous = assertSessionOwner(vault);
+  idle(vault);
+  const runtime = source.obsidianRuntime;
+  if (!runtime?.version || JSON.stringify(previous.source?.obsidianRuntime) !== JSON.stringify(runtime)) throw new Error("Session runtime changed or is unknown; stop and restart instead.");
+  const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
+  if (!lstatSync(plugin).isDirectory() || lstatSync(plugin).isSymbolicLink()) throw new Error("Invalid installed plugin directory.");
+  for (const name of assets) if (!lstatSync(join(plugin, name)).isFile() || lstatSync(join(plugin, name)).isSymbolicLink()) throw new Error("Invalid installed artifact.");
+  verifyTestVault(vault, plugin);
+  const recordPath = join(vault, marker);
+  const staging = mkdtempSync(join(plugin, ".vam-reload-"));
+  const realVault = realpathSync(vault);
+  let cdp, disabled = false, keepBackup = false;
+  try {
+    for (const name of assets) copyFileSync(join(plugin, name), join(staging, name + ".previous"));
+    copyFileSync(recordPath, join(staging, marker + ".previous"));
+    cdp = await connect(vault);
+    idle(vault);
+    checkCandidate();
+    const result = await cdp.evaluate(sessionDisableExpression(realVault, runtime.version));
+    if (result?.status !== "disabled") throw new Error("Session reload refused: " + (result?.status || "unknown") + "; finish work or stop/restart.");
+    disabled = true;
+    checkCandidate();
+    const record = updateCurrentTestVault({ vault, artifact, source });
+    if (await cdp.evaluate(sessionEnableExpression(realVault, true)) !== true) throw new Error("New plugin instance not loaded.");
+    verifyTestVault(vault, artifact);
+    checkCandidate();
+    return record;
+  } catch (error) {
+    if (disabled) {
+      let restored = false;
+      try { await cdp.evaluate(sessionEnableExpression(realVault, false)); } catch { /* restore disk, never claim runtime PASS */ }
+      try {
+        restorePreviousInstall({ staging, plugin, replaced: assets, recordPath });
+        verifyTestVault(vault, plugin);
+        restored = true;
+      } catch { keepBackup = true; }
+      if (restored) {
+        try { await cdp.evaluate(sessionEnableExpression(realVault, true)); } catch { /* restart required */ }
+      }
+      throw new Error("Session reload failed: " + error.message + ". " + (restored ? "Previous files restored; runtime requires stop/restart and verification." : "Rollback incomplete; retained backup at " + staging));
+    }
+    throw error;
+  } finally {
+    if (cdp) cdp.close();
+    if (!keepBackup) rmSync(staging, { recursive: true, force: true });
+  }
+}
+
 // Session preparation has three distinct policies. Only an exact, landed, clean CI
 // candidate can bypass build; preview is explicitly unverified and never a runtime PASS.
 export function prepareSessionCandidate({
@@ -305,17 +396,22 @@ export function prepareSessionCandidate({
   }
   if (fingerprint() !== before) throw new Error("Source changed during session preparation; rerun the harness before E2E.");
   if (JSON.stringify(artifactHashes()) !== JSON.stringify(built)) throw new Error("Build artifacts changed during session preparation.");
-  return { fingerprint: before, verification };
+  return { fingerprint: before, verification, artifacts: built };
 }
 
 function sessionMain(args) {
-  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`--session cannot be combined with: ${arg}`);
+  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full", "--reload"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`--session cannot be combined with: ${arg}`);
   if (args.filter(arg => arg.startsWith("--session=")).length !== 1) throw new Error("Exactly one session name is required.");
-  if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg.startsWith("--profile=")))) throw new Error("Conflicting session options.");
+  if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg === "--reload" || arg.startsWith("--profile=")))) throw new Error("Conflicting session options.");
   const mode = args.includes("--preview") ? "preview" : args.includes("--full") ? "full" : "affected";
   const vault = sessionVault(args.find(arg => arg.startsWith("--session=")).slice("--session=".length));
+  return withSessionLock(vault, () => sessionMainLocked(args, vault, mode));
+}
+
+function sessionMainLocked(args, vault, mode) {
   const appProfile = join(vault, ".vam-app");
   if (args.includes("--stop")) {
+    assertSessionOwner(vault);
     // SIGTERM lets Obsidian save its workspace. Only the instance using this session's own profile is stopped.
     spawnSync("pkill", ["-TERM", "-f", "--", instancePattern(appProfile)]);
     for (let wait = 0; wait < 40 && instanceRunning(appProfile); wait++) spawnSync("sleep", ["0.25"]);
@@ -324,20 +420,26 @@ function sessionMain(args) {
     return;
   }
   if (process.platform !== "darwin") throw new Error("Automatic Obsidian preparation/launch currently supports macOS only; automated tests are cross-platform.");
-  // Refreshing files under a running instance would leave it on the old build; stopping it is the session's call.
-  if (instanceRunning(appProfile)) throw new Error(`Obsidian is running on ${vault}. Finish or stop its work, run with --stop, then rerun.`);
+  const running = instanceRunning(appProfile), reload = args.includes("--reload");
+  if (running && !reload) throw new Error("Obsidian is running on " + vault + ". Finish or stop its work; use --stop or explicitly --reload.");
+  if (reload && !running) throw new Error("No running session to reload; run ordinary session preparation.");
   const exists = existsSync(vault);
   if (exists && args.some(arg => arg.startsWith("--profile="))) throw new Error(`${vault} exists and is updated in place; --profile applies only when it is first created.`);
-  if (exists && (lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker)))) throw new Error("Refusing an unowned session vault.");
-  if (exists) {
-    const previous = json(join(vault, marker));
-    if (previous.kind !== "vam-disposable-test-vault" || previous.owner !== realpathSync(root)) throw new Error("Refusing a session vault owned by another checkout.");
-  }
-  const { fingerprint, verification } = prepareSessionCandidate({ mode });
-  if (instanceRunning(appProfile)) throw new Error("Session Obsidian started during preparation; refusing to replace loaded files.");
+  if (exists) assertSessionOwner(vault);
+  if (reload) { assertSessionOwner(vault); assertSessionIdle(vault); }
+  const { fingerprint, verification, artifacts } = prepareSessionCandidate({ mode });
+  if (instanceRunning(appProfile) !== running) throw new Error("Session Obsidian changed state during preparation; refusing to replace loaded files.");
   const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" }).trim();
   const runtime = installedObsidianRuntime();
   const source = { branch: git("branch", "--show-current"), commit: git("rev-parse", "HEAD"), status: git("status", "--short"), diffHash: gitDiffHash(root, ["diff", "HEAD", "--binary"]), fingerprint, verification, obsidianRuntime: { version: runtime.version, hash: runtime.hash } };
+  const checkCandidate = () => {
+    assertSourceUnchanged(fingerprint);
+    if (JSON.stringify(buildHashes(root)) !== JSON.stringify(artifacts)) throw new Error("Build artifacts changed before installation.");
+  };
+  checkCandidate();
+  if (reload) return reloadSessionVault({ vault, source, checkCandidate }).then(record => {
+    process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
+  });
   const record = timedSync("install", () => exists
     ? updateCurrentTestVault({ vault, source })
     : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source }));
@@ -389,11 +491,12 @@ function assertObsidianClosed() {
 // The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
 
-export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--profile=...] | --which-installed | --help]
+export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--reload] [--profile=...] | --which-installed | --help]
   (no option)        build + unit + integration tests only
   --session=<name>   isolated vault /private/tmp/vam-e2e-<name>, background Obsidian driven over CDP (see scripts/obsidian-cdp.mjs, scripts/run-scenario.mjs)
   --preview          session only: build and install for inspection; verification NOT RUN, not acceptance
   --full             session only: force build + full unit and integration tests
+  --reload           session only: explicitly refresh a running owned idle session; refuses uncertain state
   default session    reuse exact clean landed CI artifacts + local vault test, otherwise build + affected tests (full fallback)
   seed a picture-book map into a session vault: node scripts/book-fixture.mjs --session=<name>`;
 export const isHelp = args => args.includes("--help") || args.includes("-h");

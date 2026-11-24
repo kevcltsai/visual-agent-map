@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
 import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readViewerCache, saveViewerCache } from '../scripts/viewer-cache.mjs';
@@ -837,4 +837,45 @@ test('viewer cache uses actual local graph and config, detects added resolution 
   assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), false);
   writeFileSync(join(folder, 'node_modules/esbuild/index.js'), 'changed tool');
   assert.notEqual(key(), initial);
+});
+
+test('session operations have exclusive locks and cannot stop a foreign owned vault', async t => {
+  const { vault } = environment(t);
+  const record = prepareTestVault({ vault });
+  assert.equal(assertSessionOwner(vault).owner, record.owner);
+  await withSessionLock(vault, async () => {
+    assert.throws(() => withSessionLock(vault, () => {}), /EEXIST/);
+  });
+  assert.equal(existsSync(vault + '.lock'), false);
+  await assert.rejects(withSessionLock(vault, async () => { throw new Error('failure'); }), /failure/);
+  assert.equal(existsSync(vault + '.lock'), false);
+  const marker = join(vault, '.vam-test-environment.json');
+  writeFileSync(marker, JSON.stringify({ ...record, owner: '/other' }));
+  assert.throws(() => assertSessionOwner(vault), /another checkout/);
+});
+test('hot reload refuses busy/unknown instances, restores files and record on failed load', async t => {
+  const { folder, vault } = environment(t);
+  const runtime = { version: '1.14.0', hash: 'h' };
+  const old = { fingerprint: 'old', obsidianRuntime: runtime };
+  const next = { fingerprint: 'new', obsidianRuntime: runtime };
+  prepareTestVault({ vault, source: old });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  const bytes = readFileSync(join(plugin, 'main.js'));
+  const artifact = join(folder, 'build');
+  mkdirSync(artifact);
+  for (const name of ['main.js', 'manifest.json', 'styles.css']) copyFileSync(join(root, name), join(artifact, name));
+  writeFileSync(join(artifact, 'main.js'), 'new build');
+  const connection = results => async () => ({ evaluate: async () => results.shift(), close() {} });
+  const run = options => reloadSessionVault({ vault, source: next, artifact, idle() {}, ...options });
+  await assert.rejects(run({ connect: connection([{ status: 'busy' }]) }), /busy/);
+  assert.deepEqual(readFileSync(join(plugin, 'main.js')), bytes);
+  await assert.rejects(run({ connect: connection([{ status: 'disabled' }, false, true, true]) }), /Previous files restored/);
+  assert.deepEqual(readFileSync(join(plugin, 'main.js')), bytes);
+  assert.deepEqual(verifyTestVault(vault).source, old);
+  const installed = await run({ connect: connection([{ status: 'disabled' }, true]) });
+  assert.deepEqual(installed.source, next);
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'new build');
+  assert.match(sessionDisableExpression('/test', runtime.version), /p\.activeTasks/);
+  assert.match(sessionDisableExpression('/test', runtime.version), /wrong-vault/);
+  assert.throws(() => main(['--session=a', '--stop', '--reload']), /Conflicting session options/);
 });

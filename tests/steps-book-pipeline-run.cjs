@@ -5784,9 +5784,9 @@ test('P1 chapter reasons: English map language says "Picture 2" / "Pictures 2, 3
 // ---- AI-drawn Mermaid for diagram-kind slots that found no picture (plan 2026-11-23-book-ai-diagrams, P2) ----
 const { diagramHash: dHash, diagramHashesOf: dHashes } = S.load('core/book-pipeline/image-slots.ts');
 const GOOD_CHART = 'flowchart LR\n  A[開場] --> B[土壤] --> C[小結]';
-async function diagRig({ kinds = ['圖表'], draw, ports = {}, manual, limitExtra, holder = {} }) {
+async function diagRig({ kinds = ['圖表'], draw, ports = {}, manual, limitExtra, holder = {}, base = DRAFT }) {
   const slots = kinds.map((kind, i) => ({ index: i + 1, kind, explains: `說明${i + 1}`, anchor: 'end' }));
-  const MARKED = `${DRAFT}\n\n${slots.map(s => `〔圖位 ${s.index}：${s.explains}〕`).join('\n\n')}\n`;
+  const MARKED = `${base}\n\n${slots.map(s => `〔圖位 ${s.index}：${s.explains}〕`).join('\n\n')}\n`;
   const calls = [];
   const r = await rig({
     titles: ['T0', 'T1'],
@@ -5794,7 +5794,7 @@ async function diagRig({ kinds = ['圖表'], draw, ports = {}, manual, limitExtr
       card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: request.card.title === 'T0' ? slots : [] }),
       author: async input => {
         await input.admission.reserve();
-        const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: input.nodeId === holder.r.nodes[0].id ? MARKED : DRAFT }, { authorize: input.authorize, finalize: input.finalize });
+        const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: input.nodeId === holder.r.nodes[0].id ? MARKED : base }, { authorize: input.authorize, finalize: input.finalize });
         return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
       }
     },
@@ -5924,4 +5924,86 @@ test('diagram slots: a card edited between the re-read and the write is refused 
   });
   assert.equal(outcomes[0], 'discarded', 'the stale write is refused');
   assert.match((await r.note(0)).detail, /擁有者新增一句。/, 'the owner text is kept');
+});
+
+// ---- structured figures in the same call (plan svg-figures, P2) ----
+const NUMBERED = `${DRAFT}\n\n轉盤停在 10 時估計約 25%；停在 65 時約 45%。`;
+const GOOD_FIGURE = { type: 'bar', unit: '%', stacked: false, groups: [{ label: '轉盤 10', values: [{ value: '25' }] }, { label: '轉盤 65', values: [{ value: '45' }] }] };
+const FIGURE_BODY = '{"type":"bar","unit":"%","stacked":false,"groups":[{"label":"轉盤 10","values":[{"value":"25"}]},{"label":"轉盤 65","values":[{"value":"45"}]}]}';
+const figDraft = (slot, figure, title = '轉盤與估計') => ({ slot, title, figure });
+
+test('figure slots: a figure lands as a vam-figure fence with the caption, a diagram record with its hash, in the one call; a hand edit reads as edited', async () => {
+  const { r, calls } = await diagRig({ base: NUMBERED, draw: request => [figDraft(1, GOOD_FIGURE)] });
+  assert.equal(calls.length, 1, 'still one call');
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.includes('```vam-figure\n' + FIGURE_BODY + '\n```\n示意圖｜轉盤與估計（依本章內文整理，非史料原圖）'), detail);
+  assert.doesNotMatch(detail, /〔圖位|```mermaid/);
+  const hash = dHash(FIGURE_BODY);
+  assert.match(detail, new RegExp(`"index":1,"state":"diagram","hash":"${hash}"`));
+  const { describeSlots, latestSlotsRecord } = S.load('core/book-pipeline/image-slots.ts');
+  const plan = [{ index: 1, kind: '圖表', explains: '說明1', anchor: 'end' }];
+  assert.equal(describeSlots(plan, latestSlotsRecord(detail), [], dHashes(detail))[0].state, 'diagram');
+  const edited = detail.replace('"25"', '"26"');
+  assert.equal(describeSlots(plan, latestSlotsRecord(edited), [], dHashes(edited))[0].state, 'edited');
+  assert.equal((await r.state()).phase, 'done');
+});
+
+test('figure slots: a figure and a chart in one reply; a bad figure (unknown type, number not in the text, unsafe text, null chart) is dropped alone and counted by code', async () => {
+  const text = (n, v) => ({ ...GOOD_FIGURE, groups: [{ label: n, values: [{ value: v }] }] });
+  const { r } = await diagRig({
+    base: NUMBERED,
+    kinds: ['圖表', '流程', '時間軸', '比較', '示意'],
+    draw: () => [figDraft(1, GOOD_FIGURE), draft(2, GOOD_CHART), figDraft(3, { type: 'pie' }), figDraft(4, text('轉盤 10', '26')), figDraft(5, text('a<b', '25'))]
+  });
+  const detail = (await r.note(0)).detail;
+  assert.equal(detail.split('```vam-figure').length - 1, 1);
+  assert.equal(detail.split('```mermaid').length - 1, 1);
+  for (const i of [3, 4, 5]) assert.match(detail, new RegExp(`"index":${i},"state":"missing"`));
+  const log = r.stat.logs.find(l => l.includes('diagram_asked'));
+  for (const code of ['figure_type', 'number_not_in_text', 'unsafe_text']) assert.match(log, new RegExp(`diagram_rej_${code}`));
+  assert.doesNotMatch(log, /轉盤|25/);
+});
+
+test('figure slots: a chapter without numbers keeps the slot not_found and the text unchanged', async () => {
+  const { r } = await diagRig({ draw: () => [figDraft(1, GOOD_FIGURE)] });
+  const detail = (await r.note(0)).detail;
+  assert.doesNotMatch(detail, /vam-figure/);
+  assert.match(detail, /"index":1,"state":"missing","reasonCode":"not_found"/);
+  assert.match(r.stat.logs.find(l => l.includes('diagram_asked')), /diagram_rej_number_not_in_text/);
+});
+
+test('figure slots: stop during the call, or a card edited before the write, writes no figure', async () => {
+  const entered = defer();
+  const { r, running } = await diagRig({
+    base: NUMBERED,
+    manual: true,
+    draw: (request, run) => new Promise((resolve, reject) => { run.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }); entered.resolve(); })
+  });
+  await entered.promise;
+  await r.runs.stop(r.mapPath);
+  await running.catch(() => undefined);
+  await settle();
+  assert.doesNotMatch((await r.note(0)).detail, /vam-figure/);
+  let edited = false;
+  const outcomes = [];
+  const holder = {};
+  const second = await diagRig({
+    base: NUMBERED,
+    draw: () => [figDraft(1, GOOD_FIGURE)],
+    holder,
+    ports: {
+      updateNoteGuarded: async (path, patch, options) => {
+        if (!edited && /```vam-figure/.test(patch.detail ?? '')) {
+          edited = true;
+          const note = await holder.r.repo.readNote(path);
+          await holder.r.repo.updateNoteGuarded(path, { detail: `${note.detail}\n\n擁有者新增一句。` });
+        }
+        const out = await holder.r.repo.updateNoteGuarded(path, patch, options);
+        if (/```vam-figure/.test(patch.detail ?? '')) outcomes.push(out);
+        return out;
+      }
+    }
+  });
+  assert.equal(outcomes[0], 'discarded');
+  assert.match((await second.r.note(0)).detail, /擁有者新增一句。/);
 });

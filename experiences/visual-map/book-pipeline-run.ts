@@ -244,6 +244,7 @@ import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import {
   checkDiagram,
+  checkFigureDraft,
   type DiagramDraft,
   type DrawDiagramsRequest
 } from "../../core/steps/book-pipeline/draw-diagrams";
@@ -5595,6 +5596,26 @@ export class BookPipelineRuns {
           for (const draft of drafts) {
             const slot = want.find(item => item.index === draft.slot);
             if (!slot) continue;
+            if (draft.mermaid === undefined) {
+              const figure = checkFigureDraft(draft, text);
+              let figureCode: string | undefined = figure.ok ? undefined : figure.code;
+              const figureTitle = diagramTitle(draft.title, slot.explains, language);
+              if (
+                figure.ok &&
+                this.exitCheck(
+                  ["```vam-figure", figure.body, "```", "", diagramCaption(figureTitle, language)].join("\n"),
+                  new Set()
+                )
+              )
+                figureCode = "unsafe";
+              if (figureCode || !figure.ok) {
+                diagramStats.rejected[figureCode ?? "unsafe"] =
+                  (diagramStats.rejected[figureCode ?? "unsafe"] ?? 0) + 1;
+                continue;
+              }
+              drawnDiagrams.set(slot.index, { title: figureTitle, mermaid: figure.body, fence: "vam-figure" });
+              continue;
+            }
             const checked = checkDiagram(draft, text);
             let code: string | undefined = checked.ok ? undefined : checked.code;
             let title = "";

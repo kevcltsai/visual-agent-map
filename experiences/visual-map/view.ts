@@ -295,6 +295,7 @@ import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchD
 import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
+import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
 import { checkMergePreservation, withSourceSupplement, type MergeCheckResult } from "../../core/steps/task/merge-check";
 import {
   expansionTask,
@@ -1592,6 +1593,10 @@ export class VisualAgentMapView extends ItemView {
   private anchorLinks = new Map<string, AnchorLine>();
   /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
   private hoverAnchor: string | null = null;
+  /** Anchors clicked to hide their topics (`imageId NUL anchorId`). View state only: never saved, cleared when another map opens. */
+  private hiddenAnchors = new Set<string>();
+  /** Set when an anchor drag ends, so the click that follows the release does not toggle the anchor. */
+  private anchorClickSuppressed = false;
   /** The topic card under the pointer or keyboard focus: its anchor lines are emphasised like a selected topic's. View state only. */
   private hoverTopic: string | null = null;
   /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
@@ -3568,6 +3573,7 @@ export class VisualAgentMapView extends ItemView {
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
+    if (this.path !== path) this.hiddenAnchors.clear();
     this.path = path;
     this.map = map;
     this.selection.exitMultiSelect("openMap");
@@ -7449,17 +7455,28 @@ export class VisualAgentMapView extends ItemView {
     for (const anchor of image.anchors) {
       if (!isImage2dAnchor(anchor)) continue;
       const links = (image.relations ?? []).filter(r => r.from === anchor.id || r.to === anchor.id).length;
+      const ref = `${image.id}\u0000${anchor.id}`;
+      const topicsHidden = links > 0 && !!this.hiddenAnchors?.has(ref);
       const dot = el.createEl("button", {
-        cls: links ? "vam-anchor is-linked" : "vam-anchor",
+        cls: links ? (topicsHidden ? "vam-anchor is-linked is-topics-hidden" : "vam-anchor is-linked") : "vam-anchor",
         attr: { type: "button" }
       });
+      // A linked anchor is a toggle: a click hides or shows the topics it links to.
+      if (links) dot.setAttr("aria-pressed", topicsHidden ? "true" : "false");
       dot.dataset.anchorId = anchor.id;
       this.anchorDots.set(`${image.id}\u0000${anchor.id}`, dot);
       dot.tabIndex = 0;
       // Only numbers reach the style: the position is clamped 0-1 by the data layer.
       dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
       dot.style.top = `${Math.round(anchor.at.y * 1e6) / 1e4}%`;
-      const state = links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
+      const hiddenCount = topicsHidden
+        ? anchorHiddenTopicIds(this.map?.canvasItems ?? [], this.map?.nodes ?? [], new Set([ref])).size
+        : 0;
+      const state = topicsHidden
+        ? t("ui.anchor_topics_hidden", hiddenCount)
+        : links
+          ? t("ui.anchor_links", links)
+          : t("ui.anchor_unlinked");
       // The note is untrusted: only setAttr / text reach the page.
       dot.setAttr(
         "aria-label",
@@ -7470,13 +7487,23 @@ export class VisualAgentMapView extends ItemView {
       tip.setAttr("id", tip.id);
       tip.setAttr("role", "tooltip");
       if (anchor.note) tip.createSpan({ text: anchor.note, cls: "vam-anchor-tip-note" });
-      tip.createSpan({ text: state, cls: "vam-anchor-tip-links" });
+      // The tooltip says what a click does; the label does not (aria-pressed already says it is a toggle).
+      tip.createSpan({
+        text: links && !topicsHidden ? `${state}${t("ui.anchor_click_to_hide")}` : state,
+        cls: "vam-anchor-tip-links"
+      });
       dot.setAttr("aria-describedby", tip.id);
       // A click on an anchor never selects or drags the image.
       dot.addEventListener("pointerdown", event => event.stopPropagation());
-      dot.addEventListener("click", event => event.stopPropagation());
+      dot.addEventListener("click", event => {
+        event.stopPropagation();
+        if (this.anchorClickSuppressed) {
+          this.anchorClickSuppressed = false;
+          return;
+        }
+        if (links) this.toggleAnchorTopics(image.id, anchor.id);
+      });
       // Pointing at or focusing an anchor highlights the lines that leave it, like selecting a topic does for its own.
-      const ref = `${image.id}\u0000${anchor.id}`;
       const mark = (on: boolean): void => {
         if (on) this.hoverAnchor = ref;
         else if (this.hoverAnchor === ref) this.hoverAnchor = null;
@@ -7600,6 +7627,8 @@ export class VisualAgentMapView extends ItemView {
         const write =
           active && dot.isConnected !== false && this.canEditCanvasItems() && (at.x !== origin.x || at.y !== origin.y);
         settle();
+        // A drag is no click: the click event that follows this release must not hide or show the anchor's topics.
+        if (active) this.anchorClickSuppressed = true;
         if (!write) {
           if (active) paint(origin);
           return;
@@ -8102,6 +8131,36 @@ export class VisualAgentMapView extends ItemView {
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
+    if (!this.hiddenAnchors?.size) return;
+    const hidden = anchorHiddenTopicIds(
+      this.map?.canvasItems ?? [],
+      this.map?.nodes ?? [],
+      this.hiddenAnchors,
+      image.id
+    );
+    if (!hidden.size) return;
+    const all = bar.createEl("button", {
+      cls: "vam-annotated-showall",
+      text: t("ui.anchor_show_all", hidden.size),
+      attr: { type: "button" }
+    });
+    all.addEventListener("pointerdown", event => event.stopPropagation());
+    all.addEventListener("click", event => {
+      event.stopPropagation();
+      for (const anchor of image.anchors) this.hiddenAnchors.delete(`${image.id}\u0000${anchor.id}`);
+      this.render();
+    });
+  }
+  /** Hides the topics one anchor links to (with their branches), or shows them again; a view state, nothing is written. */
+  private toggleAnchorTopics(imageId: string, anchorId: string): void {
+    if (!anchorTopicIds(this.map?.canvasItems ?? [], imageId, anchorId).length) return;
+    const ref = `${imageId}\u0000${anchorId}`;
+    const hide = !this.hiddenAnchors.has(ref);
+    if (hide) this.hiddenAnchors.add(ref);
+    else this.hiddenAnchors.delete(ref);
+    this.focusAnchorRef = ref;
+    this.render();
+    this.announcer?.setText(t(hide ? "ui.anchor_hid_topics" : "ui.anchor_showed_topics"));
   }
   /** The right-click / Shift+F10 / Menu-key menu of one anchor: edit it, or delete only it (with its relations, one undo step). */
   private openAnchorMenu(event: MouseEvent, imageId: string, anchorId: string, dot: HTMLElement): void {
@@ -10696,9 +10755,18 @@ export class VisualAgentMapView extends ItemView {
       this.refreshCutMarks();
     }
     if (!this.map || !event.clipboardData || this.notesLoading()) return;
-    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (!inClipboardScope(event.target, this.contentEl) && !(kind === "paste" && this.ownsUnfocusedPaste(event.target)))
+      return;
     if (kind === "paste") this.pasteFromClipboard(event);
     else this.copyToClipboard(event, kind);
+  }
+  /**
+   * A paste with no element focused (target is body: the map was just opened, or its window was switched back to
+   * without a click) belongs to this map when it is the active view; nothing else could take it.
+   */
+  private ownsUnfocusedPaste(target: EventTarget | null): boolean {
+    const body = this.contentEl.ownerDocument?.body;
+    return !!body && target === body && this.app.workspace?.getActiveViewOfType?.(VisualAgentMapView) === this;
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {
@@ -13226,7 +13294,14 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
     const shown = visibleNodes(this.map.nodes);
-    const nodes = superseded.size ? shown.filter(node => !superseded.has(node.id)) : shown;
+    // Topics hidden by a clicked anchor (and their branches) are left out; the other cards keep their places.
+    const byAnchor = this.hiddenAnchors?.size
+      ? anchorHiddenTopicIds(this.map.canvasItems ?? [], this.map.nodes, this.hiddenAnchors)
+      : null;
+    const nodes =
+      superseded.size || byAnchor?.size
+        ? shown.filter(node => !superseded.has(node.id) && !byAnchor?.has(node.id))
+        : shown;
     // A view only: these copies carry display positions and must never be written back to the map.
     if (!this.relevanceSortOn()) return nodes;
     // Ring members and their branches keep the coordinates they have; the sort never folds them into the column.

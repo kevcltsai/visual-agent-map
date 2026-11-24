@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -173,6 +173,21 @@ test('a same-repo worktree behind origin/main, edited, or a different repo is re
   assert.equal(sameRepoCleanMain(ahead.main, ahead.wt), false);
   const untracked = repoWithWorktree(sub(folder, 'f'), { untracked: true });
   assert.equal(sameRepoCleanMain(untracked.main, untracked.wt), false);
+});
+
+test('--update-current refuses a candidate that does not contain origin/main, after fetching origin', t => {
+  const { folder } = environment(t);
+  const behind = repoWithWorktree(sub(folder, 'b'), { behind: true });
+  assert.throws(() => assertContainsOriginMain(behind.wt), /does not contain origin\/main.*git fetch origin && git rebase origin\/main/s);
+  const ahead = repoWithWorktree(sub(folder, 'a'), { ahead: true });
+  assert.doesNotThrow(() => assertContainsOriginMain(ahead.wt));
+  const same = repoWithWorktree(sub(folder, 's'));
+  assert.doesNotThrow(() => assertContainsOriginMain(same.main));
+  // origin moves on without a local fetch: the check must fetch, not trust the stale origin/main ref.
+  const stale = repoWithWorktree(sub(folder, 'f')), other = join(folder, 'f', 'other');
+  execFileSync('git', ['clone', '-q', join(folder, 'f', 'origin.git'), other]);
+  writeFileSync(join(other, 'a.txt'), 'new'); execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'new'], { cwd: other }); execFileSync('git', ['push', '-q', 'origin', 'main'], { cwd: other });
+  assert.throws(() => assertContainsOriginMain(stale.wt), /does not contain origin\/main/);
 });
 
 test('the refusal names the branch the owning checkout is on', t => {
@@ -598,4 +613,11 @@ test('a running Obsidian is made to load the new build: the plugin is disabled a
   assert.equal((await reloadRunningPlugin('/v', connect(off))).enabled, false);
   assert.deepEqual(off.calls, [], 'a plugin the owner switched off is left off');
   assert.doesNotMatch(reloadPluginExpression, /AndSave|focus|activate/);
+});
+
+// 2026-11-24: the test Obsidian was running with its last window closed; the install succeeded but --update-current exited 1.
+test('a running Obsidian with no window open is not a failed install: the new files load when a window opens', async () => {
+  const noWindow = async () => { throw new Error('No Obsidian main window on DevTools port 60274.'); };
+  assert.deepEqual(await reloadRunningPlugin('/v', noWindow), { enabled: true, window: false });
+  await assert.rejects(reloadRunningPlugin('/v', async () => { throw new Error('Obsidian for /v is not answering on DevTools port 1; it may have quit.'); }), /not answering/);
 });

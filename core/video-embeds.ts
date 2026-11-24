@@ -173,3 +173,27 @@ export function keepOpenedVideoEmbeds(detail: string, openedUrls: readonly strin
   flush();
   return out.join("");
 }
+
+/** Whether a video can be played: true, false (private, deleted or embedding off), or null when that cannot be told (offline, timeout). */
+export type VideoPlayableCheck = (id: string, signal?: AbortSignal) => Promise<boolean | null>;
+
+/**
+ * `detail` without the YouTube embeds that `check` says are unplayable. Only ids that are new (not in `existingDetail`, which is the
+ * user's own choice) are asked, all at once; null (cannot tell) or a thrown error keeps the embed, so no content is lost to a network error.
+ */
+export async function dropUnplayableVideos(
+  detail: string,
+  existingDetail: string | undefined,
+  check: VideoPlayableCheck | undefined,
+  signal?: AbortSignal
+): Promise<string> {
+  if (!check) return detail;
+  const existing = embeddedIds(existingDetail ?? "");
+  const ids = [...embeddedIds(detail)].filter(id => !existing.has(id));
+  if (!ids.length) return detail;
+  const verdicts = await Promise.all(ids.map(id => check(id, signal).catch(() => null)));
+  const bad = new Set(ids.filter((_, i) => verdicts[i] === false));
+  if (!bad.size) return detail;
+  const good = ids.filter(id => !bad.has(id)).map(id => `https://www.youtube.com/watch?v=${id}`);
+  return keepOpenedVideoEmbeds(detail, good, existingDetail);
+}

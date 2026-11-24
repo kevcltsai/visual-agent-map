@@ -1138,6 +1138,22 @@ export default class VisualAgentMapPlugin extends Plugin {
         arrayBuffer: response.arrayBuffer
       };
     },
+    // YouTube oEmbed: only the video address goes to youtube.com. 401/403/404 = private, embedding off or deleted; anything else cannot be told.
+    videoPlayable: async (id: string, signal?: AbortSignal): Promise<boolean | null> => {
+      if (signal?.aborted) return null;
+      try {
+        const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+        const response = await Promise.race([
+          requestUrl({ url, method: "GET", throw: false }),
+          new Promise<null>(resolve => window.setTimeout(() => resolve(null), 5000))
+        ]);
+        if (!response) return null;
+        if (response.status === 401 || response.status === 403 || response.status === 404) return false;
+        return response.status === 200 ? true : null;
+      } catch {
+        return null;
+      }
+    },
     mermaidParses: async (code: string): Promise<boolean> => {
       // The same mermaid Obsidian renders with; a missing or failing parser refuses the diagram rather than trusting it.
       try {

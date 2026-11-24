@@ -359,7 +359,7 @@ test('anchors: 2D anchors are buttons at their percentages in DOM order after th
   const tip = find(list[0], i => i.hasClass('vam-anchor-tip'));
   assert.equal(list[0].attrs['aria-describedby'], tip.attrs.id);
   assert.equal(tip.attrs.role, 'tooltip');
-  assert.deepEqual(findAll(tip, i => i.tag === 'span' && i.text).map(i => i.text), ['cow back', 'Linked to 1 topic(s)']);
+  assert.deepEqual(findAll(tip, i => i.tag === 'span' && i.text).map(i => i.text), ['cow back', 'Linked to 1 topic(s) · click to hide them']);
   assert.deepEqual(findAll(find(list[1], i => i.hasClass('vam-anchor-tip')), i => i.text).map(i => i.text), ['Not linked to any topic']);
   assert.equal(findAll(h.view.stageEl, i => i.hasClass('vam-anchor')).length, 2, 'exported scene never sees them: they live only in the item element');
 });
@@ -1357,4 +1357,43 @@ test('anchor drag: the written position is rounded to 0.001', async () => {
   h.dot().fire('pointerup', {});
   await h.settle();
   assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 0.754, y: 0.752 });
+});
+
+test('a linked anchor is a toggle: a click hides its topic, a second click (or Show all) brings it back; nothing is saved', async () => {
+  const h = await harness(rootId => [annotated({ anchors: [anchor('a1'), anchor('a2')], relations: [{ kind: 'related', from: 'a1', to: rootId }] })]);
+  const rootId = h.view.map.nodes[0].id;
+  const before = h.fileText();
+  const dot = id => find(h.imageEl(), i => i.hasClass('vam-anchor') && i.dataset?.anchorId === id);
+  const showAll = () => find(bar(h.imageEl()), i => i.hasClass('vam-annotated-showall'));
+  const drawn = () => [...h.view.canvasNodes().map(n => n.id)];
+  h.view.render();
+  assert.equal(dot('a1').attrs['aria-pressed'], 'false');
+  assert.equal(dot('a2').attrs['aria-pressed'], undefined, 'an unlinked anchor is no toggle');
+  assert.deepEqual(drawn(), [rootId]);
+  assert.equal(showAll(), undefined);
+  dot('a2').click();
+  assert.deepEqual(drawn(), [rootId], 'an unlinked anchor hides nothing');
+  dot('a1').click();
+  assert.deepEqual(drawn(), []);
+  assert.ok(dot('a1').hasClass('is-topics-hidden'));
+  assert.equal(dot('a1').attrs['aria-pressed'], 'true');
+  assert.equal(showAll().text, 'Show all (1 hidden)');
+  dot('a1').click();
+  assert.deepEqual(drawn(), [rootId]);
+  assert.ok(!dot('a1').hasClass('is-topics-hidden'));
+  dot('a1').click();
+  showAll().click();
+  assert.deepEqual(drawn(), [rootId]);
+  assert.equal(showAll(), undefined);
+  await h.settle();
+  assert.equal(h.fileText(), before, 'hiding is a view state: Map.md is unchanged');
+});
+
+test('the click that ends an anchor drag does not toggle the anchor', async () => {
+  const h = await harness(rootId => [annotated({ anchors: [anchor('a1')], relations: [{ kind: 'related', from: 'a1', to: rootId }] })]);
+  h.view.render();
+  h.view.anchorClickSuppressed = true;
+  find(h.imageEl(), i => i.hasClass('vam-anchor')).click();
+  assert.equal(h.view.canvasNodes().length, 1);
+  assert.equal(h.view.anchorClickSuppressed, false);
 });

@@ -13,6 +13,7 @@ import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
+import { markdownProtectedRanges, normalizeNewlines } from "./share-code";
 import { applyNodeLinks } from "./share-node-links";
 import { replaceMediaWithLinks } from "./share-media";
 import { mathFromLatex, MATHML_NS, MATH_NOTE_CLASS, MATH_SOURCE_CLASS } from "./share-math";
@@ -578,7 +579,11 @@ export class ShareExporter {
     const drop = this.dropped.get(topicId) ?? new Set<number>();
     const problems: EmbeddedFigure[] = [];
     let next = firstIndex;
-    for (const match of detail.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
+    const plain = normalizeNewlines(detail);
+    const hidden = markdownProtectedRanges(plain);
+    for (const match of plain.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
+      const at = match.index ?? 0;
+      if (hidden.some(range => at >= range.start && at < range.end)) continue;
       const target = match[1].split(/\\?\|/)[0].trim();
       if (found.has(target)) continue;
       const hash = target.indexOf("#");

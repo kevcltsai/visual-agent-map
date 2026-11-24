@@ -7,7 +7,7 @@
  */
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
-import { markdownCodeRanges, normalizeNewlines } from "./share-code";
+import { commentRanges, markdownCodeRanges, normalizeNewlines } from "./share-code";
 import { markAttachment, markNodeLink, stripNodeLinkMarks, VIDEO_MARK } from "./share-node-links";
 
 export interface ShareCleanContext {
@@ -131,7 +131,8 @@ function embedBox(title: string, content: string, ctx: ShareCleanContext, out: S
   return `\n\n> [!vam-embed] ${label}\n${quoted.join("\n")}\n\n`;
 }
 
-function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
+/** `hidden`: the text is inside a `%%`/`<!--` comment, which the renderer hides: embeds there are not expanded, read or registered. */
+function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult, hidden = false): string {
   const attach = (ref: string): string => {
     const decoded = decodeRef(ref.trim());
     const name = ctx.assets.nameFor(decoded);
@@ -156,6 +157,7 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       label: string | undefined,
       href: string | undefined
     ) => {
+      if ((embed !== undefined || src !== undefined) && hidden) return all;
       if (embed !== undefined) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
@@ -189,6 +191,12 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;
+        }
+        const ext = /\.([a-z0-9]{1,5})$/i.exec(raw.split(/[?#]/)[0]);
+        if (ext && !IMAGE_EXT.test(`.${ext[1]}`)) {
+          const file = escapeMd(stripNodeLinkMarks(decodeRef(raw).split("/").pop() ?? raw));
+          const card = ctx.attachmentOf?.(decodeRef(raw));
+          return card ? markAttachment(card, file) : file;
         }
         return `![${alt ?? ""}](${SHARE_ASSET_SCHEME}${attach(raw)})`;
       }
@@ -226,12 +234,22 @@ export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCle
   const out: ShareCleanResult = { markdown: "", attachments: [], webImages: [] };
   // The marks of share-node-links.ts never come from the author: strip them before anything is marked.
   const text = removeLocalReferenceDefinitions(stripNodeLinkMarks(normalizeNewlines(md)));
+  const code = markdownCodeRanges(text);
+  const comments = commentRanges(text, code);
+  const parts = [
+    ...code
+      .filter(range => !comments.some(comment => range.start >= comment.start && range.start < comment.end))
+      .map(range => ({ ...range, comment: false })),
+    ...comments.map(range => ({ ...range, comment: true }))
+  ].sort((a, b) => a.start - b.start);
   let result = "";
   let from = 0;
-  for (const range of markdownCodeRanges(text)) {
+  for (const range of parts) {
     result +=
       cleanSegment(dropWritebackBackupLines(text.slice(from, range.start)), ctx, out) +
-      text.slice(range.start, range.end);
+      (range.comment
+        ? cleanSegment(text.slice(range.start, range.end), ctx, out, true)
+        : text.slice(range.start, range.end));
     from = range.end;
   }
   out.markdown = result + cleanSegment(dropWritebackBackupLines(text.slice(from)), ctx, out);

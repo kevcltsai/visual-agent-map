@@ -36,6 +36,7 @@ function webSource(raw: string): { href: string; host: string } | null {
   try {
     const url = new URL(text);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    url.protocol = "https:";
     return { href: url.href, host: url.hostname.replace(/^www\./i, "") };
   } catch {
     return null;

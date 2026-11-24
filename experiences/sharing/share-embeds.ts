@@ -3,7 +3,7 @@
  * One level only: a note embed inside embedded content becomes a plain `[[link]]` (the cleaner then turns it into its
  * title), so embeds never nest or loop. Images and other file embeds inside the content stay as they are.
  */
-import { markdownCodeRanges, normalizeNewlines } from "./share-code";
+import { markdownCodeRanges, normalizeNewlines, stripComments } from "./share-code";
 
 const FRONTMATTER = /^---[ \t]*\n[\s\S]*?\n(?:---|\.\.\.)[ \t]*(?:\n|$)/;
 const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
@@ -82,7 +82,7 @@ export function flattenNoteEmbeds(md: string): string {
 
 /** The Markdown an embed shows, or undefined when the heading or block is not in the note (or nothing is left). */
 export function extractEmbedContent(noteText: string, subpath: string): string | undefined {
-  const text = stripFrontmatter(noteText);
+  const text = stripComments(stripFrontmatter(noteText));
   const lines = text.split("\n");
   const prose = proseLineFlags(text);
   const sub = subpath.trim();

@@ -945,7 +945,7 @@ const mediaOf = html => {
 
 test('share media: iframe, video, audio, embed and object with a web source become a link card with the host', () => {
   assert.equal(mediaOf('<iframe src="https://evil.example/x"></iframe>'), '<a class="vam-media-link" href="https://evil.example/x">Embedded: evil.example</a>');
-  assert.equal(mediaOf('<video src="http://www.cdn.example/v.mp4" controls></video>'), '<a class="vam-media-link" href="http://www.cdn.example/v.mp4">Video: cdn.example</a>');
+  assert.equal(mediaOf('<video src="http://www.cdn.example/v.mp4" controls></video>'), '<a class="vam-media-link" href="https://www.cdn.example/v.mp4">Video: cdn.example</a>');
   assert.equal(mediaOf('<video><source src="https://cdn.example/v.webm" type="video/webm"></video>'), '<a class="vam-media-link" href="https://cdn.example/v.webm">Video: cdn.example</a>');
   assert.equal(mediaOf('<audio src="https://cdn.example/a.mp3"></audio>'), '<a class="vam-media-link" href="https://cdn.example/a.mp3">Audio: cdn.example</a>');
   assert.equal(mediaOf('<embed src="//cdn.example/e.swf"><object data="https://cdn.example/o"></object>'), '<a class="vam-media-link" href="https://cdn.example/e.swf">Embedded: cdn.example</a><a class="vam-media-link" href="https://cdn.example/o">Embedded: cdn.example</a>');
@@ -1035,4 +1035,35 @@ test('share math: MathML carries no link, so the local-reference count and the l
   const math = shareMath.mathFromLatex('x', false, mathDeps(HOSTILE_MML));
   const html = outer(math);
   assert.ok(!/href|src=|http|file:|app:/i.test(html), html);
+});
+
+// ---- R2: commented embeds stay hidden, markdown file embeds become cards ----
+const readsOf = () => { const reads = []; return { reads, ctx: extra => ({ titleOf: () => undefined, assets: clean.createAssetRegistry(), embedOf: t => { reads.push(t); return 'body'; }, attachmentOf: ref => reads.push(`att:${ref}`) && 'file-1', ...extra }) }; };
+
+test('sharing R2: an embed inside %% or <!-- --> is left untouched: no expansion, no read, no asset or attachment', () => {
+  const { reads, ctx } = readsOf();
+  for (const md of ['%% ![[Draft]] %%', 'see <!-- ![[D2]] --> now', 'a\n%%\nx ![[Draft]]\n![[pic.png]] ![[f.pdf]] ![](a.png)\n%%\nb', '<!--\n![[D2]]\n-->']) {
+    const out = clean.cleanShareMarkdown(md, ctx());
+    assert.equal(out.markdown, md);
+    assert.ok(!out.markdown.includes('vam-embed') && !out.attachments.length);
+  }
+  assert.deepEqual(reads, []);
+  const open = clean.cleanShareMarkdown('x ![[Draft]]', ctx()).markdown;
+  assert.ok(open.includes('[!vam-embed]'), 'outside a comment it still expands');
+  assert.equal(clean.cleanShareMarkdown('`%%` ![[Draft]] `%%`', ctx()).markdown.includes('[!vam-embed]'), true, '%% in code opens no comment');
+});
+
+test('sharing R2: embedded content drops comments (outside code) before it is quoted', () => {
+  assert.equal(embeds.extractEmbedContent('Public %%private remark%% tail', ''), 'Public  tail');
+  assert.equal(embeds.extractEmbedContent('A\n%%\n![[Draft]]\nsecret\n%%\nB', ''), 'A\n\nB');
+  assert.equal(embeds.extractEmbedContent('x <!-- secret --> y', ''), 'x  y');
+  assert.equal(embeds.extractEmbedContent('`%% keep %%` and ```a %% b```', ''), '`%% keep %%` and ```a %% b```');
+  assert.equal(embeds.extractEmbedContent('```\n%% keep %%\n```', ''), '```\n%% keep %%\n```');
+});
+
+test('sharing R2: ![](doc.pdf) is an attachment card, not an image asset', () => {
+  const out = clean.cleanShareMarkdown('![](Docs/doc.pdf) ![x](p.png)', attachCtx());
+  assert.ok(out.markdown.includes('file-1') && !out.markdown.includes('vam-asset:image-1](') , out.markdown);
+  assert.ok(!/!\[\]\(vam-asset:/.test(out.markdown) && /\(vam-asset:image-1\)/.test(out.markdown), out.markdown);
+  assert.equal(clean.cleanShareMarkdown('![](doc.pdf)', { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown, 'doc.pdf');
 });

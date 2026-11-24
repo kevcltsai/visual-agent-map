@@ -727,3 +727,10 @@ test('share translate P6b: MathML and the source fallback are atoms; a translate
   const out = html.serialize(tree);
   assert.ok(out.includes('<math><msup><mi>x</mi><mn>2</mn></msup></math>') && out.includes('<math display="block"><mfrac><mn>1</mn><mn>3</mn></mfrac></math>') && out.includes('a_1'), out);
 });
+
+test('share translate segments: attachment cards and media links are atoms (names and hosts never translated)', () => {
+  const root = html.parse('<p>See <a class="vam-attachment-card" href="#vam-attachment-file-1">report.pdf</a> and <a class="vam-media-link" href="https://cdn.example/v">Video: cdn.example</a> or <span class="vam-media-text">Video</span> <a class="vam-video-link" href="https://youtu.be/x">▶ Cat</a> now.</p>');
+  const texts = segments.extractSegments(root).units.map(unit => unit.text);
+  assert.ok(texts.every(text => !/report\.pdf|cdn\.example|Cat/.test(text.replace(/⟦\d+\/⟧/g, ''))), texts.join('|'));
+  assert.equal(texts.length, 1);
+});

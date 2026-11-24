@@ -124,3 +124,49 @@ export function markdownCodeRanges(markdown: string): CodeRange[] {
 }
 
 export const normalizeNewlines = (text: string): string => text.replace(/\r\n?/g, "\n");
+
+/** Ranges of Obsidian comments (`%%…%%`, `<!--…-->`, possibly multi-line) outside code; an unclosed one runs to the end. Needs `\n` line endings. */
+export function commentRanges(markdown: string, code: CodeRange[] = markdownCodeRanges(markdown)): CodeRange[] {
+  const ranges: CodeRange[] = [];
+  const open = /%%|<!--/g;
+  let at = 0;
+  while (at < markdown.length) {
+    open.lastIndex = at;
+    const found = open.exec(markdown);
+    if (!found) break;
+    if (inside(code, found.index)) {
+      at = found.index + 1;
+      continue;
+    }
+    const closer = found[0] === "%%" ? "%%" : "-->";
+    const close = markdown.indexOf(closer, found.index + found[0].length);
+    const end = close < 0 ? markdown.length : close + closer.length;
+    ranges.push({ start: found.index, end });
+    at = end;
+  }
+  return ranges;
+}
+
+/** Code and comment ranges together, sorted and merged: text the cleaner and exporter must leave exactly as written. */
+export function markdownProtectedRanges(markdown: string): CodeRange[] {
+  const code = markdownCodeRanges(markdown);
+  const all = [...code, ...commentRanges(markdown, code)].sort((a, b) => a.start - b.start);
+  const merged: CodeRange[] = [];
+  for (const range of all) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  return merged;
+}
+
+/** Removes comments (outside code) the way Obsidian's embeds do not show them. */
+export function stripComments(markdown: string): string {
+  let result = "";
+  let from = 0;
+  for (const range of commentRanges(markdown)) {
+    result += markdown.slice(from, range.start);
+    from = range.end;
+  }
+  return result + markdown.slice(from);
+}

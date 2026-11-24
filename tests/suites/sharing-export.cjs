@@ -1132,3 +1132,19 @@ test('share export P6b: formulas are read before the sanitizer and filled as Mat
   assert.ok(/mjx-math\[data-latex\]/.test(source) && /classList\.contains\("math-block"\)/.test(source), 'LaTeX from data-latex; display from math-block');
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.ok(/"share\.math_source_note":/.test(fs.readFileSync(path.join(repoRoot, `i18n/${lang}.ts`), 'utf8')), lang);
 });
+
+test('sharing export R2: embeds inside %% and <!-- --> comments are never read', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const files = { 'Folder/Draft.md': { path: 'Folder/Draft.md', extension: 'md', text: 'Public %%private remark%% tail' } };
+  const reads = [];
+  const app = { vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; } }, metadataCache: { getFirstLinkpathDest: (ref) => files[`Folder/${ref}.md`] ?? null } };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const exporter = new module.ShareExporter(app, { map, notes: new Map(), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const embeds = await exporter.readEmbeds('%% ![[Draft]] %%\n\nx <!-- ![[Draft]] --> y\r\n%%\r\n![[Draft]]\r\n%%', 'Folder/A.md', 'a', 0);
+  assert.equal(embeds.size, 0);
+  assert.deepEqual(reads, []);
+  const shown = await exporter.readEmbeds('![[Draft]]', 'Folder/A.md', 'a', 0);
+  assert.equal(shown.get('Draft'), 'Public  tail');
+});

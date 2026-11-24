@@ -1,5 +1,6 @@
 import type { TopicColor } from "../../topic-colors";
 import type { TopicMarker } from "../../topic-markers";
+import type { ShareNodeKind, ShareRelationKind } from "./share-format";
 
 /**
  * Interface text of the share viewer. The exporter fills it in its own interface language and it travels inside the file
@@ -77,6 +78,17 @@ export interface ShareViewerUi {
   colorLabel: string;
   /** The name of each topic colour, so colour is never the only cue. */
   colorNames: Record<TopicColor, string>;
+  /** Accessible-name part of a topic that has a type; `{0}` is the type name (share-complete). */
+  kindLabel: string;
+  /** The name of each topic type, shown on the card and in the side panel. */
+  kindNames: Record<ShareNodeKind, string>;
+  /** The name of each relation kind, shown on the line and in the side panel's list. */
+  relationNames: Record<ShareRelationKind, string>;
+  /** Heading of the side panel's relation list. */
+  relationsHeading: string;
+  /** Accessible name of a frame around cards, and `{0}` the frame's own name. */
+  frameLabel: string;
+  frameNamed: string;
 }
 
 /**
@@ -158,5 +170,24 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
     question: "Question"
   },
   colorLabel: "Color: {0}",
-  colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" }
+  colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" },
+  kindLabel: "Type: {0}",
+  kindNames: {
+    action: "Action",
+    atomic: "Atomic knowledge",
+    hypothesis: "Hypothesis",
+    evidence: "Evidence",
+    conclusion: "Conclusion"
+  },
+  relationNames: {
+    supports: "Supports",
+    contradicts: "Contradicts",
+    verifies: "Verifies",
+    derives_from: "Derives from",
+    related: "Related",
+    prerequisite: "Prerequisite"
+  },
+  relationsHeading: "Relations",
+  frameLabel: "Frame",
+  frameNamed: "Frame: {0}"
 };

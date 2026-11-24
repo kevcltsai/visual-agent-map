@@ -77,7 +77,13 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       question: "質問"
     },
     colorLabel: "色：{0}",
-    colorNames: { red: "赤", orange: "オレンジ", yellow: "黄", green: "緑", blue: "青", purple: "紫" }
+    colorNames: { red: "赤", orange: "オレンジ", yellow: "黄", green: "緑", blue: "青", purple: "紫" },
+    kindLabel: "タイプ：{0}",
+    kindNames: { action: "アクション", atomic: "原子知識", hypothesis: "仮説", evidence: "証拠", conclusion: "結論" },
+    relationNames: { supports: "支持する", contradicts: "反論する", verifies: "検証する", derives_from: "導出元", related: "関連", prerequisite: "前提知識" },
+    relationsHeading: "関係",
+    frameLabel: "枠",
+    frameNamed: "枠：{0}"
   },
   ko: {
     lang: "ko",
@@ -148,7 +154,13 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       question: "질문"
     },
     colorLabel: "색상: {0}",
-    colorNames: { red: "빨강", orange: "주황", yellow: "노랑", green: "초록", blue: "파랑", purple: "보라" }
+    colorNames: { red: "빨강", orange: "주황", yellow: "노랑", green: "초록", blue: "파랑", purple: "보라" },
+    kindLabel: "유형: {0}",
+    kindNames: { action: "행동", atomic: "원자 지식", hypothesis: "가설", evidence: "증거", conclusion: "결론" },
+    relationNames: { supports: "뒷받침", contradicts: "반박", verifies: "검증", derives_from: "도출 근거", related: "관련", prerequisite: "선행 지식" },
+    relationsHeading: "관계",
+    frameLabel: "프레임",
+    frameNamed: "프레임: {0}"
   },
   es: {
     lang: "es",
@@ -219,6 +231,12 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       question: "Pregunta"
     },
     colorLabel: "Color: {0}",
-    colorNames: { red: "Rojo", orange: "Naranja", yellow: "Amarillo", green: "Verde", blue: "Azul", purple: "Morado" }
+    colorNames: { red: "Rojo", orange: "Naranja", yellow: "Amarillo", green: "Verde", blue: "Azul", purple: "Morado" },
+    kindLabel: "Tipo: {0}",
+    kindNames: { action: "Acción", atomic: "Conocimiento atómico", hypothesis: "Hipótesis", evidence: "Evidencia", conclusion: "Conclusión" },
+    relationNames: { supports: "Apoya", contradicts: "Contradice", verifies: "Verifica", derives_from: "Deriva de", related: "Relacionado", prerequisite: "Requisito previo" },
+    relationsHeading: "Relaciones",
+    frameLabel: "Marco",
+    frameNamed: "Marco: {0}"
   }
 };

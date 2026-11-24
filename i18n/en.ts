@@ -2765,6 +2765,10 @@ export const en = {
   "share.viewer_color_green": "Green",
   "share.viewer_color_blue": "Blue",
   "share.viewer_color_purple": "Purple",
+  "share.viewer_kind_0": "Type: {0}",
+  "share.viewer_relations": "Relations",
+  "share.viewer_frame": "Frame",
+  "share.viewer_frame_named_0": "Frame: {0}",
   // Share dialog
   "share.title": "Share this map",
   "share.intro":

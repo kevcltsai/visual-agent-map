@@ -118,6 +118,18 @@ function uiFrom(raw: unknown): ShareViewerUi {
       const value = (colors as Record<string, unknown>)[id];
       if (typeof value === "string" && value.trim()) ui.colorNames[id] = value;
     }
+  const nameMap = (field: string, fallback: Record<string, string>): Record<string, string> => {
+    const out = { ...fallback };
+    const given = raw && typeof raw === "object" ? (raw as Record<string, unknown>)[field] : undefined;
+    if (given && typeof given === "object")
+      for (const id of Object.keys(fallback)) {
+        const value = (given as Record<string, unknown>)[id];
+        if (typeof value === "string" && value.trim()) out[id] = value;
+      }
+    return out;
+  };
+  ui.kindNames = nameMap("kindNames", SHARE_VIEWER_UI_DEFAULT.kindNames);
+  ui.relationNames = nameMap("relationNames", SHARE_VIEWER_UI_DEFAULT.relationNames);
   return ui;
 }
 

@@ -2584,6 +2584,10 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_color_green": "綠色",
   "share.viewer_color_blue": "藍色",
   "share.viewer_color_purple": "紫色",
+  "share.viewer_kind_0": "類型：{0}",
+  "share.viewer_relations": "關係",
+  "share.viewer_frame": "範圍框",
+  "share.viewer_frame_named_0": "範圍框：{0}",
   // Share dialog
   "share.title": "分享這張心智圖",
   "share.intro": "產生一個 HTML 檔，任何瀏覽器都能開啟，離線也可以。存放位置由你決定，不會上傳任何東西。",

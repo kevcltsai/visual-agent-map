@@ -2584,6 +2584,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_color_green": "绿色",
   "share.viewer_color_blue": "蓝色",
   "share.viewer_color_purple": "紫色",
+  "share.viewer_kind_0": "类型：{0}",
+  "share.viewer_relations": "关系",
+  "share.viewer_frame": "范围框",
+  "share.viewer_frame_named_0": "范围框：{0}",
   // Share dialog
   "share.title": "分享这张地图",
   "share.intro": "生成一个 HTML 文件，任何浏览器都能打开，离线也可以。存放位置由你决定，不会上传任何内容。",

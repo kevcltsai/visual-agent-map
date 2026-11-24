@@ -2,6 +2,8 @@
 // numbers are checked again, pictures must be `data:image/` entries of `assets`, and text is kept as plain strings.
 // No DOM and no imports of plugin modules, so a unit test can load it directly.
 
+import { plainLine, readRelationKind, type ViewerRelationKind } from "./relation-data";
+
 const IMAGE_PREFIX = "data:image/";
 const COORDINATE_LIMIT = 1e6;
 const IMAGE_LIMIT = 200;
@@ -38,6 +40,9 @@ export interface ViewerImageLink {
   anchor: string;
   topic: string;
   ring: boolean;
+  /** Undefined for a file without relation kinds (or a kind the viewer does not know): the line is drawn plain, as before. */
+  kind: ViewerRelationKind | undefined;
+  description: string;
 }
 export interface ViewerImage {
   id: string;
@@ -50,6 +55,8 @@ export interface ViewerImage {
   note: string;
   anchors: ViewerAnchor[];
   links: ViewerImageLink[];
+  /** A picture with no anchors, no relations and no note: drawn as a plain picture, without the annotation bar. */
+  free: boolean;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -129,9 +136,24 @@ export function readImages(
       if (!anchor || !topicIds.has(link.topic) || seenLinks.has(key)) continue;
       seenLinks.add(key);
       anchor.linked = true;
-      links.push({ anchor: link.anchor, topic: link.topic, ring: link.ring === true });
+      links.push({
+        anchor: link.anchor,
+        topic: link.topic,
+        ring: link.ring === true,
+        kind: readRelationKind(link.kind),
+        description: plainLine(link.description)
+      });
     }
-    out.push({ id: item.id, ...box, src: assetSource(assets, item.asset), note: plainNote(item.note), anchors, links });
+    const note = plainNote(item.note);
+    out.push({
+      id: item.id,
+      ...box,
+      src: assetSource(assets, item.asset),
+      note,
+      anchors,
+      links,
+      free: !anchors.length && !links.length && !note
+    });
   }
   return out;
 }

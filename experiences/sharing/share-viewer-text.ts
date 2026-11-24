@@ -83,7 +83,26 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
       green: text("share.viewer_color_green"),
       blue: text("share.viewer_color_blue"),
       purple: text("share.viewer_color_purple")
-    }
+    },
+    kindLabel: text("share.viewer_kind_0"),
+    kindNames: {
+      action: text("ui.topic_kind_action"),
+      atomic: text("ui.topic_kind_atomic"),
+      hypothesis: text("ui.topic_kind_hypothesis"),
+      evidence: text("ui.topic_kind_evidence"),
+      conclusion: text("ui.topic_kind_conclusion")
+    },
+    relationNames: {
+      supports: text("ui.relation_name_supports"),
+      contradicts: text("ui.relation_name_contradicts"),
+      verifies: text("ui.relation_name_verifies"),
+      derives_from: text("ui.relation_name_derives_from"),
+      related: text("ui.relation_name_related"),
+      prerequisite: text("ui.relation_name_prerequisite")
+    },
+    relationsHeading: text("share.viewer_relations"),
+    frameLabel: text("share.viewer_frame"),
+    frameNamed: text("share.viewer_frame_named_0")
   };
 }
 

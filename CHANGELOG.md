@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.35.1] - 2026-11-25
+
+### Fixes
+
+- The plugin file is smaller (about 4.3 MB instead of 6.5 MB), so Obsidian Sync Standard plans can sync it again.
+
 ## [0.35.0] - 2026-11-25
 
 ### Make a picture book

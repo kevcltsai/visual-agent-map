@@ -6,7 +6,7 @@
 
 Start with a question, a topic or a picture. VAM's AI lays it out as a visual map, researches it with you, and keeps everything as editable Markdown in your vault.
 
-[**Get started**](#get-started) · [See the 0.35.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.35.0) · [Installation guide](INSTALL.md)
+[**Get started**](#get-started) · [See the 0.35.1 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.35.1) · [Installation guide](INSTALL.md)
 
 ## Mind map: from one question to topics
 

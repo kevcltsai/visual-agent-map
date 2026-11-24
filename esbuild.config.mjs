@@ -13,6 +13,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: production ? false : "inline",
   treeShaking: true,
+  ...(production ? { minify: true, keepNames: true } : {}),
   loader: { ".md": "text" },
   outfile: "main.js"
 });

@@ -6,7 +6,7 @@
 
 從一個問題、一個議題或一張圖片開始。VAM 的 AI 把它排成視覺化地圖、陪你研究，所有內容都是 Vault 裡可編輯的 Markdown。
 
-[**開始使用**](#開始使用) · [查看 0.35.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.35.0) · [安裝指南](INSTALL.md)
+[**開始使用**](#開始使用) · [查看 0.35.1 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.35.1) · [安裝指南](INSTALL.md)
 
 ## 心智圖：從一個問題拆成議題
 

@@ -2,41 +2,42 @@
 
 [English](README.md) · **繁體中文**
 
-### 在 Obsidian，用視覺化 AI 地圖探索問題
+### 在 Obsidian 研究一個問題、做一本圖文書，或從一張圖片展開
 
-**從一個問題出發，看見各個部分，再追你想探索的線索。** 建立視覺化研究地圖，或到 Coffee Tables 聊出新角度。想留下的內容都是 Vault 裡可編輯的 Markdown。
+從一個問題、一個議題或一張圖片開始。VAM 的 AI 把它排成視覺化地圖、陪你研究，所有內容都是 Vault 裡可編輯的 Markdown。
 
 [**開始使用**](#開始使用) · [查看 0.34.0 正式版](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.34.0) · [安裝指南](INSTALL.md)
 
-![Obsidian 中的 Visual Agent Map 研究地圖範例，顯示相連的議題卡片](assets/screenshots/map-overview.png)
+## 心智圖：從一個問題拆成議題
 
-## 兩種探索方式
+![Obsidian 中的 Visual Agent Map 心智圖，一個問題拆成相連的議題卡片](assets/screenshots/map-overview.png)
 
-- **視覺化地圖。** 把問題拆成議題，用 AI 深入任何一個分支，或用「假設研究」（Beta）檢查一個說法：它會找證據，證據不足就不下結論。可以草擬多層大綱、在單一議題的對話窗裡研究、展開或綜合，可以為每種議題類型選擇筆記風格（段落結構、寫作口吻、格式規則與更新方式，例如教科書，一般議題也可選「AI 建議」；也能用 Markdown 自己寫）、合併相關議題，也能在背景同時研究多個議題、為地圖指定自己的資料來源，並在圖片上放錨點連到議題。手動繪圖不需要 AI。
-  - **對地圖說話。** 在地圖旁開啟 AI 對話，用一般的話說出需求：一句話建出整張地圖、新增／移動／改名議題、研究或展開某個分支、找圖、在選取的標註圖上放錨點，或修改你指定的筆記。大量變更會先列成計畫，每個動作都有結果列。
-  - **快速或標準。** 快速只用模型自身的知識、不上網；標準會上網搜尋，並可配圖。每次研究或展開時選擇。
-- **Coffee Tables。** 把未成形的想法帶來，與模擬的 AI 來賓對談，再回看觀察者整理的洞見。
+輸入一個問題，VAM 會把它拆成地圖上的議題。任何分支都能研究（快速只用模型自身的知識，標準會上網搜尋）、再往下展開，或直接告訴地圖對話要改什麼。不用 AI 也能手動畫地圖。
 
-地圖完成後，可以存成一個 HTML 檔，在任何瀏覽器開啟（也能離線；連到網路的圖片需要連線才顯示），或傳給別人，還能加上 AI 翻譯版本。
+## 圖文書：從一個議題做成一本書
+
+![圖文書心智圖：序、章、節，旁邊開著一章圖文內容](assets/screenshots/picture-book.png)
+
+說出一個議題並收集圖片：總編輯先規劃序、各章與各節，你確認企劃後才開始寫。接著作者逐章寫出圖文並茂的內容、配上圖表，再由另一個 AI 模型校對，讓整本書能從頭讀到尾，而不是零散的筆記。任何階段都能停下，也能放棄這本書、保留地圖。
+
+## 從一張圖片展開
+
+![背部肌肉圖片，每塊肌肉上有錨點，連到各自的伸展議題](assets/screenshots/image-anchors.png)
+
+把一張圖片放在中心，在各部位釘上錨點。例如說「背部伸展」：VAM 會找一張背部肌肉圖，在每塊酸痛的肌肉上放錨點，再各自連到有伸展圖片與影片的議題。
+
+還有：任何地圖都能存成一個 HTML 檔，用任何瀏覽器開啟；也能在 Coffee Tables 與 AI 來賓聊未成形的想法。
 
 ## 開始使用
 
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要桌面版 Obsidian **1.13.7+**。
-2. 首次使用時 VAM 會開啟一張空白心智圖：用一句話開始，或直接加議題。使用 AI 功能前，安裝並登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。
+2. 使用 AI 功能前，安裝並登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。
 
-介面提供英文、繁體中文與簡體中文。AI 回答會跟著你書寫的語言，包括日文、韓文、西班牙文等其他語言。
-
-詳細設定、問題排除與已知限制，請見 [INSTALL.md](INSTALL.md)。
-
-## 貢獻檢查
-
-- `npm run verify` 與 CI 執行同一組檢查（lint、格式、測試、已提交產物）。
-- 執行 `git config core.hooksPath .githooks`，每次 push 前會自動跑。
-- 不要用 `--no-verify` 跳過。
+介面提供英文、繁體中文與簡體中文；AI 回答會跟著你書寫的語言。詳細設定、問題排除與已知限制，請見 [INSTALL.md](INSTALL.md)。
 
 ## 隱私
 
-VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容傳送至 OpenAI 或 Anthropic，可能使用帳號額度或產生費用。地圖 AI 對話會送出地圖大綱、你其他地圖的標題、你選取或加入參考的議題、你選取的標註圖（圖片本身）、地圖旁開著的筆記（整篇，以可移除的標籤顯示）、你拖入的筆記或文字，以及最近幾則訊息；它可以修改這些筆記，也能在 vault 中新增筆記。研究、展開與收斂也會讀取地圖資料來源裡的項目。保存地圖 AI 對話預設關閉；開啟後對話會存在你的 vault。VAM 會執行你安裝的 Codex 或 Claude Code 程式；使用標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。圖文書找圖後仍有空著的圖位時，VAM 會自己向 Wikimedia Commons（commons.wikimedia.org）搜尋，只送出該圖位的一行簡短搜尋文字。分享檔會存在你的 vault 或你選的位置，VAM 不會上傳；要不要發佈由你決定。分享檔裡連到網路的圖片，會由讀者的瀏覽器向原網站載入。
+VAM 不含遙測，也不儲存 API key。AI 功能會執行你安裝的 Codex 或 Claude Code 程式，把相關筆記、地圖內容與你選的圖片傳送至 OpenAI 或 Anthropic（可能使用帳號額度或產生費用），並在標準模式與找圖時上網搜尋。圖文書也可能直接向 Wikimedia Commons 搜尋圖片。分享檔不會被上傳。完整說明：[資料與權限](INSTALL.md#資料與權限)。
 
 ## 致謝與授權
 

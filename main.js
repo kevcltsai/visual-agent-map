@@ -106978,6 +106978,155 @@ function fitWithin(width, height, max = SHARE_IMAGE_MAX_EDGE) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
+// core/video-embeds.ts
+var YOUTUBE_HOSTS = /* @__PURE__ */ new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+var VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+var EMBED2 = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
+function youtubeVideoId(rawUrl) {
+  var _a2;
+  let url;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  const host = url.hostname.toLowerCase();
+  if (!YOUTUBE_HOSTS.has(host)) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  let id;
+  if (host === "youtu.be") id = parts[0];
+  else if (parts[0] === "watch") id = url.searchParams.get("v");
+  else if (["embed", "shorts", "live", "v"].includes((_a2 = parts[0]) != null ? _a2 : "")) id = parts[1];
+  return id && VIDEO_ID.test(id) ? id : null;
+}
+var looksLikeYoutube = (rawUrl) => {
+  try {
+    const host = new URL(rawUrl.trim()).hostname.toLowerCase();
+    return YOUTUBE_HOSTS.has(host) || host.split(".").some((label) => label.startsWith("youtube") || label === "youtu");
+  } catch (e) {
+    return false;
+  }
+};
+var HTML_EMBED = /<(iframe|embed|object)\b[^>]*>(?:\s*<\/\1\s*>)?/gi;
+var HTML_SOURCE = /\b(?:src|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+var DEFINITION2 = /^( {0,3}\[([^\]\n]+)\]:[ \t]*)(?:<([^>\n]*)>|(\S+))((?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?[ \t]*)$/;
+var IMAGE_REFERENCE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![([])/g;
+var REMOVED2 = "\0";
+var labelKey = (label) => label.trim().replace(/\s+/g, " ").toLowerCase();
+var htmlSource = (tag) => {
+  var _a2, _b2, _c;
+  const m = HTML_SOURCE.exec(tag);
+  const raw = ((_c = (_b2 = (_a2 = m == null ? void 0 : m[1]) != null ? _a2 : m == null ? void 0 : m[2]) != null ? _b2 : m == null ? void 0 : m[3]) != null ? _c : "").trim();
+  return raw.startsWith("//") ? `https:${raw}` : raw;
+};
+function embeddedIds(text11) {
+  var _a2, _b2, _c, _d;
+  const ids2 = /* @__PURE__ */ new Set();
+  const add = (url) => {
+    const id = youtubeVideoId(url);
+    if (id) ids2.add(id);
+  };
+  for (const m of text11.matchAll(EMBED2)) add((_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
+  for (const m of text11.matchAll(HTML_EMBED)) add(htmlSource(m[0]));
+  for (const line3 of text11.split(/\r?\n/)) {
+    const d = DEFINITION2.exec(line3);
+    if (d) add((_d = (_c = d[3]) != null ? _c : d[4]) != null ? _d : "");
+  }
+  return ids2;
+}
+function filterText(text11, opened) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
+  let out = text11.replace(HTML_EMBED, (whole) => {
+    const url = htmlSource(whole);
+    if (!looksLikeYoutube(url)) return whole;
+    const id = youtubeVideoId(url);
+    return id && opened.has(id) ? `![](${watch(id)})` : REMOVED2;
+  });
+  out = out.replace(EMBED2, (whole, alt, angled, bare3) => {
+    var _a3;
+    const url = (_a3 = angled != null ? angled : bare3) != null ? _a3 : "";
+    if (!looksLikeYoutube(url)) return whole;
+    const id = youtubeVideoId(url);
+    return id && opened.has(id) ? `![${alt}](${watch(id)})` : REMOVED2;
+  });
+  const imageLabels = /* @__PURE__ */ new Set();
+  for (const m of out.matchAll(IMAGE_REFERENCE)) imageLabels.add(labelKey(m[2] ? m[2] : (_b2 = (_a2 = m[1]) != null ? _a2 : m[3]) != null ? _b2 : ""));
+  const dropped = /* @__PURE__ */ new Set();
+  const lines = out.split(/(\r?\n)/);
+  for (let i = 0; i < lines.length; i += 2) {
+    const d = DEFINITION2.exec((_c = lines[i]) != null ? _c : "");
+    if (!d || !imageLabels.has(labelKey((_d = d[2]) != null ? _d : ""))) continue;
+    const url = (_f = (_e = d[3]) != null ? _e : d[4]) != null ? _f : "";
+    if (!looksLikeYoutube(url)) continue;
+    const id = youtubeVideoId(url);
+    if (id && opened.has(id)) lines[i] = `${d[1]}${watch(id)}${(_g = d[5]) != null ? _g : ""}`;
+    else {
+      lines[i] = REMOVED2;
+      dropped.add(labelKey((_h = d[2]) != null ? _h : ""));
+    }
+  }
+  out = lines.join("");
+  if (dropped.size)
+    out = out.replace(
+      IMAGE_REFERENCE,
+      (whole, alt, ref, short) => {
+        var _a3;
+        return dropped.has(labelKey(ref ? ref : (_a3 = alt != null ? alt : short) != null ? _a3 : "")) ? REMOVED2 : whole;
+      }
+    );
+  return out;
+}
+function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
+  var _a2, _b2, _c;
+  const opened = embeddedIds(existingDetail);
+  for (const url of openedUrls) {
+    const id = youtubeVideoId(url);
+    if (id) opened.add(id);
+  }
+  const lines = detail.split(/(\r?\n)/);
+  let fence2 = null;
+  const out = [];
+  let pending2 = [];
+  const flush = () => {
+    var _a3, _b3;
+    if (!pending2.length) return;
+    const filtered = filterText(pending2.join(""), opened);
+    if (!filtered.includes(REMOVED2)) out.push(filtered);
+    else {
+      const parts = filtered.split(/(\r?\n)/);
+      for (let i = 0; i < parts.length; i += 2) {
+        const line3 = (_a3 = parts[i]) != null ? _a3 : "";
+        const eol2 = (_b3 = parts[i + 1]) != null ? _b3 : "";
+        if (!line3.includes(REMOVED2)) {
+          out.push(line3, eol2);
+          continue;
+        }
+        const rest = line3.split(REMOVED2).join("");
+        if (!rest.trim() || /^\s*(?:[-*+]|\d+[.)])\s*$/.test(rest)) continue;
+        out.push(rest.replace(/[ \t]+$/, ""), eol2);
+      }
+    }
+    pending2 = [];
+  };
+  for (let i = 0; i < lines.length; i += 2) {
+    const line3 = (_a2 = lines[i]) != null ? _a2 : "";
+    const eol2 = (_b2 = lines[i + 1]) != null ? _b2 : "";
+    const mark2 = (_c = /^ {0,3}(`{3,}|~{3,})/.exec(line3)) == null ? void 0 : _c[1];
+    if (fence2) {
+      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
+      out.push(line3, eol2);
+    } else if (mark2) {
+      flush();
+      fence2 = mark2;
+      out.push(line3, eol2);
+    } else pending2.push(line3, eol2);
+  }
+  flush();
+  return out.join("");
+}
+
 // experiences/sharing/share-code.ts
 var FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 var VOID_TAGS = /* @__PURE__ */ new Set([
@@ -107164,6 +107313,7 @@ function cleanSegment(text11, ctx, out) {
       }
       if (src !== void 0) {
         const raw2 = src.trim().replace(/^<|>$/g, "").replace(/\s+"[^"]*"$/, "");
+        if (youtubeVideoId(raw2)) return `[\u25B6 ${alt || escapeMd(raw2)}](${raw2})`;
         if (isWeb(raw2)) {
           out.webImages.push({ url: raw2, alt: alt != null ? alt : "" });
           return `![${alt != null ? alt : ""}](${raw2})`;
@@ -113724,155 +113874,6 @@ function taskResponseShape(context, language2) {
     };
   }
   return { schema: responseSchema };
-}
-
-// core/video-embeds.ts
-var YOUTUBE_HOSTS = /* @__PURE__ */ new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
-var VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-var EMBED2 = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
-function youtubeVideoId(rawUrl) {
-  var _a2;
-  let url;
-  try {
-    url = new URL(rawUrl.trim());
-  } catch (e) {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const host = url.hostname.toLowerCase();
-  if (!YOUTUBE_HOSTS.has(host)) return null;
-  const parts = url.pathname.split("/").filter(Boolean);
-  let id;
-  if (host === "youtu.be") id = parts[0];
-  else if (parts[0] === "watch") id = url.searchParams.get("v");
-  else if (["embed", "shorts", "live", "v"].includes((_a2 = parts[0]) != null ? _a2 : "")) id = parts[1];
-  return id && VIDEO_ID.test(id) ? id : null;
-}
-var looksLikeYoutube = (rawUrl) => {
-  try {
-    const host = new URL(rawUrl.trim()).hostname.toLowerCase();
-    return YOUTUBE_HOSTS.has(host) || host.split(".").some((label) => label.startsWith("youtube") || label === "youtu");
-  } catch (e) {
-    return false;
-  }
-};
-var HTML_EMBED = /<(iframe|embed|object)\b[^>]*>(?:\s*<\/\1\s*>)?/gi;
-var HTML_SOURCE = /\b(?:src|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
-var DEFINITION2 = /^( {0,3}\[([^\]\n]+)\]:[ \t]*)(?:<([^>\n]*)>|(\S+))((?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?[ \t]*)$/;
-var IMAGE_REFERENCE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![([])/g;
-var REMOVED2 = "\0";
-var labelKey = (label) => label.trim().replace(/\s+/g, " ").toLowerCase();
-var htmlSource = (tag) => {
-  var _a2, _b2, _c;
-  const m = HTML_SOURCE.exec(tag);
-  const raw = ((_c = (_b2 = (_a2 = m == null ? void 0 : m[1]) != null ? _a2 : m == null ? void 0 : m[2]) != null ? _b2 : m == null ? void 0 : m[3]) != null ? _c : "").trim();
-  return raw.startsWith("//") ? `https:${raw}` : raw;
-};
-function embeddedIds(text11) {
-  var _a2, _b2, _c, _d;
-  const ids2 = /* @__PURE__ */ new Set();
-  const add = (url) => {
-    const id = youtubeVideoId(url);
-    if (id) ids2.add(id);
-  };
-  for (const m of text11.matchAll(EMBED2)) add((_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
-  for (const m of text11.matchAll(HTML_EMBED)) add(htmlSource(m[0]));
-  for (const line3 of text11.split(/\r?\n/)) {
-    const d = DEFINITION2.exec(line3);
-    if (d) add((_d = (_c = d[3]) != null ? _c : d[4]) != null ? _d : "");
-  }
-  return ids2;
-}
-function filterText(text11, opened) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h;
-  const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
-  let out = text11.replace(HTML_EMBED, (whole) => {
-    const url = htmlSource(whole);
-    if (!looksLikeYoutube(url)) return whole;
-    const id = youtubeVideoId(url);
-    return id && opened.has(id) ? `![](${watch(id)})` : REMOVED2;
-  });
-  out = out.replace(EMBED2, (whole, alt, angled, bare3) => {
-    var _a3;
-    const url = (_a3 = angled != null ? angled : bare3) != null ? _a3 : "";
-    if (!looksLikeYoutube(url)) return whole;
-    const id = youtubeVideoId(url);
-    return id && opened.has(id) ? `![${alt}](${watch(id)})` : REMOVED2;
-  });
-  const imageLabels = /* @__PURE__ */ new Set();
-  for (const m of out.matchAll(IMAGE_REFERENCE)) imageLabels.add(labelKey(m[2] ? m[2] : (_b2 = (_a2 = m[1]) != null ? _a2 : m[3]) != null ? _b2 : ""));
-  const dropped = /* @__PURE__ */ new Set();
-  const lines = out.split(/(\r?\n)/);
-  for (let i = 0; i < lines.length; i += 2) {
-    const d = DEFINITION2.exec((_c = lines[i]) != null ? _c : "");
-    if (!d || !imageLabels.has(labelKey((_d = d[2]) != null ? _d : ""))) continue;
-    const url = (_f = (_e = d[3]) != null ? _e : d[4]) != null ? _f : "";
-    if (!looksLikeYoutube(url)) continue;
-    const id = youtubeVideoId(url);
-    if (id && opened.has(id)) lines[i] = `${d[1]}${watch(id)}${(_g = d[5]) != null ? _g : ""}`;
-    else {
-      lines[i] = REMOVED2;
-      dropped.add(labelKey((_h = d[2]) != null ? _h : ""));
-    }
-  }
-  out = lines.join("");
-  if (dropped.size)
-    out = out.replace(
-      IMAGE_REFERENCE,
-      (whole, alt, ref, short) => {
-        var _a3;
-        return dropped.has(labelKey(ref ? ref : (_a3 = alt != null ? alt : short) != null ? _a3 : "")) ? REMOVED2 : whole;
-      }
-    );
-  return out;
-}
-function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
-  var _a2, _b2, _c;
-  const opened = embeddedIds(existingDetail);
-  for (const url of openedUrls) {
-    const id = youtubeVideoId(url);
-    if (id) opened.add(id);
-  }
-  const lines = detail.split(/(\r?\n)/);
-  let fence2 = null;
-  const out = [];
-  let pending2 = [];
-  const flush = () => {
-    var _a3, _b3;
-    if (!pending2.length) return;
-    const filtered = filterText(pending2.join(""), opened);
-    if (!filtered.includes(REMOVED2)) out.push(filtered);
-    else {
-      const parts = filtered.split(/(\r?\n)/);
-      for (let i = 0; i < parts.length; i += 2) {
-        const line3 = (_a3 = parts[i]) != null ? _a3 : "";
-        const eol2 = (_b3 = parts[i + 1]) != null ? _b3 : "";
-        if (!line3.includes(REMOVED2)) {
-          out.push(line3, eol2);
-          continue;
-        }
-        const rest = line3.split(REMOVED2).join("");
-        if (!rest.trim() || /^\s*(?:[-*+]|\d+[.)])\s*$/.test(rest)) continue;
-        out.push(rest.replace(/[ \t]+$/, ""), eol2);
-      }
-    }
-    pending2 = [];
-  };
-  for (let i = 0; i < lines.length; i += 2) {
-    const line3 = (_a2 = lines[i]) != null ? _a2 : "";
-    const eol2 = (_b2 = lines[i + 1]) != null ? _b2 : "";
-    const mark2 = (_c = /^ {0,3}(`{3,}|~{3,})/.exec(line3)) == null ? void 0 : _c[1];
-    if (fence2) {
-      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
-      out.push(line3, eol2);
-    } else if (mark2) {
-      flush();
-      fence2 = mark2;
-      out.push(line3, eol2);
-    } else pending2.push(line3, eol2);
-  }
-  flush();
-  return out.join("");
 }
 
 // core/steps/task/parse.ts

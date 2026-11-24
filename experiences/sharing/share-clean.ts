@@ -6,6 +6,7 @@
  * does not hide shows as plain text the author sees too.
  */
 import { NOTE_LANGUAGES, translate } from "../../i18n";
+import { youtubeVideoId } from "../../core/video-embeds";
 import { markdownCodeRanges, normalizeNewlines } from "./share-code";
 
 export interface ShareCleanContext {
@@ -145,6 +146,8 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
           .trim()
           .replace(/^<|>$/g, "")
           .replace(/\s+"[^"]*"$/, "");
+        // A YouTube embed renders as an iframe, which the shared page does not keep: share it as a plain link instead.
+        if (youtubeVideoId(raw)) return `[▶ ${alt || escapeMd(raw)}](${raw})`;
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;

@@ -138,6 +138,16 @@ test('sharing: vault attachments are listed for embedding, web images keep their
   assert.equal(clean.replaceAssetImages('a ![x](vam-asset:image-1) b', '[image omitted]'), 'a [image omitted] b');
 });
 
+test('sharing: a YouTube embed is shared as a plain link, not an image or iframe', () => {
+  const ctx = { titleOf: () => undefined, assets: clean.createAssetRegistry() };
+  const result = clean.cleanShareMarkdown('Stretch ![Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and ![](https://youtu.be/dQw4w9WgXcQ)', ctx);
+  assert.equal(
+    result.markdown,
+    'Stretch [▶ Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and [▶ https://youtu.be/dQw4w9WgXcQ](https://youtu.be/dQw4w9WgXcQ)'
+  );
+  assert.deepEqual(plain(result.webImages), [], 'a video is never fetched as a web image');
+});
+
 test('sharing: code is left untouched', () => {
   const ctx = { titleOf: () => undefined, assets: clean.createAssetRegistry() };
   const md = 'Use `[[x]]` here\n```js\nconst a = [[1]];\n```\nand [[Real]]';

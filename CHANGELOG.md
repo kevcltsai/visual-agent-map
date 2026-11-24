@@ -13,6 +13,10 @@ Say "I want a picture book about how bees make honey": a chief editor plans the 
 
 Ask the map chat for "back stretches": it puts a picture of the back muscles on the map, pins an anchor on each muscle and links each one to stretch pictures and videos.
 
+### Share the whole map
+
+A map saved as one HTML file now keeps what you built: topic types and shapes, relation lines, frames and pictures on the map, embedded notes, attachments, math, and videos that play with a click.
+
 ### Changed
 
 - Hypothesis research is hidden for now. Hypothesis maps you already made still open.

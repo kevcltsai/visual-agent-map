@@ -176,12 +176,12 @@ export type VideoPlayableCheck = (id: string, signal?: AbortSignal) => Promise<b
  */
 export async function dropUnplayableVideos(
   detail: string,
-  existingDetail: string,
+  existingDetail: string | undefined,
   check: VideoPlayableCheck | undefined,
   signal?: AbortSignal
 ): Promise<string> {
   if (!check) return detail;
-  const existing = embeddedIds(existingDetail);
+  const existing = embeddedIds(existingDetail ?? "");
   const ids = [...embeddedIds(detail)].filter(id => !existing.has(id));
   if (!ids.length) return detail;
   const verdicts = await Promise.all(ids.map(id => check(id, signal).catch(() => null)));

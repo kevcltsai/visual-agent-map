@@ -108021,7 +108021,7 @@ function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
 }
 async function dropUnplayableVideos(detail, existingDetail, check, signal) {
   if (!check) return detail;
-  const existing = embeddedIds(existingDetail);
+  const existing = embeddedIds(existingDetail != null ? existingDetail : "");
   const ids2 = [...embeddedIds(detail)].filter((id) => !existing.has(id));
   if (!ids2.length) return detail;
   const verdicts = await Promise.all(ids2.map((id) => check(id, signal).catch(() => null)));

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { recordDevEvent } from "./dev-metrics.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const shards = Math.max(1, Number(process.env.VAM_TEST_SHARDS) || 3);
@@ -103,6 +104,9 @@ export async function runParts(list, layer = "integration", shard = parseShard()
 async function main() {
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:integration");
-  process.exitCode = (await runParts(shardParts(parts, parseShard(), { reverse: true }))).length ? 1 : 0; // not process.exit: it can cut off piped output
+  const started = performance.now();
+  const failed = await runParts(shardParts(parts, parseShard(), { reverse: true }));
+  recordDevEvent("test-integration", performance.now() - started, failed.length ? "error" : "ok");
+  process.exitCode = failed.length ? 1 : 0; // not process.exit: it can cut off piped output
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

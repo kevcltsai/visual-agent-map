@@ -5,7 +5,8 @@ const os = require('node:os');
 const vm = require('node:vm');
 const path = require('node:path');
 const { test: nodeTest } = require('node:test');
-const layer = process.argv.find(value => value.startsWith('--layer='))?.split('=')[1];
+const directSuite = process.argv[1] && path.dirname(path.resolve(process.argv[1])) === path.join(__dirname, 'suites');
+const layer = process.argv.find(value => value.startsWith('--layer='))?.split('=')[1] || (directSuite ? process.env.VAM_ISOLATED_TEST_LAYER : undefined);
 if (layer && !['unit', 'integration'].includes(layer)) throw new Error('Unknown test layer');
 // A test that never settles fails after this long instead of hanging the run; VAM_TEST_TIMEOUT_MS overrides it (the timeout test uses a tiny value), and options a test passes itself win.
 const testTimeout = Number(process.env.VAM_TEST_TIMEOUT_MS) || 60000;

@@ -5,7 +5,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node scripts/build-viewer.mjs && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build": "node scripts/build-product.mjs",
+    "build:resolve-generated": "node scripts/resolve-generated-conflicts.mjs",
+    "dev:evidence": "node scripts/dev-metrics.mjs --evidence",
     "check:artifacts": "node scripts/check-artifacts.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:vault": "npm run test:ui:prepare",

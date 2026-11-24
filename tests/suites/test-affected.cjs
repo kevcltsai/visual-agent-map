@@ -134,7 +134,16 @@ test('test-affected: a changed suite runs every suite, because the suites of a s
   const all = ['tests/suites/map-model.cjs', 'tests/suites/spawner.cjs', 'tests/suites/other.cjs', 'tests/steps-x.cjs'];
   const result = selectTests({ changed: ['tests/suites/other.cjs'], deps, testFiles: all });
   assert.deepEqual(result.files, ['tests/suites/map-model.cjs', 'tests/suites/other.cjs', 'tests/suites/spawner.cjs']);
+  const isolated = selectTests({ changed: ['tests/suites/other.cjs'], deps, testFiles: all, isolatedSuites: true });
+  assert.deepEqual(isolated.files, ['tests/suites/other.cjs', 'tests/suites/spawner.cjs']);
   assert.deepEqual(selectTests({ changed: ['tests/steps-x.cjs'], deps, testFiles: all }).files, ['tests/steps-x.cjs', 'tests/suites/other.cjs', 'tests/suites/spawner.cjs']); // other.cjs: not in the table
+});
+test('isolated targeted runner executes only the requested suite in a separate node:test process', () => {
+  const env = { ...process.env, CI: 'false', VAM_CI_SHARD: '', VAM_ISOLATED_SUITES: '1', VAM_AFFECTED_TESTS: 'tests/suites/check-workflows.cjs' };
+  const run = spawnSync(process.execPath, ['tests/run.cjs', '--layer=unit'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr + run.stdout);
+  assert.match(run.stdout, /check-workflows/);
+  assert.doesNotMatch(run.stdout, /test-affected: a source change/);
 });
 test('test-affected: a rename lists both paths, and a table older or newer than HEAD adds every file that differs from its commit', async () => {
   const { changedFiles, plan, buildDeps } = await affected();

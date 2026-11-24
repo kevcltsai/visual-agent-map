@@ -8,6 +8,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { candidateEvidence } from "./candidate-id.mjs";
+import { recordDevEvent, telemetryFile } from "./dev-metrics.mjs";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 export const DEPS_VERSION = 1;
@@ -247,7 +249,7 @@ const full = reason => ({ mode: "full", files: [], reasons: [reason] });
  * shaIsAncestor: whether the table's commit is an ancestor of the base (the caller asks git).
  * Returns { mode: "full" | "none" | "files", files, reasons }; any throw is the caller's to turn into "full".
  */
-export function selectTests({ changed, deps, testFiles, shaIsAncestor = true }) {
+export function selectTests({ changed, deps, testFiles, shaIsAncestor = true, isolatedSuites = false }) {
   const files = [...new Set(changed)].filter(file => file !== "test-deps.json");
   if (!files.length) return full("no changed files");
   const infra = files.find(fullSuiteReason);
@@ -268,7 +270,7 @@ export function selectTests({ changed, deps, testFiles, shaIsAncestor = true }) 
     if (!readers.length && !isTest) return full(`${file} is not in the dependency table`);
     if (isTest && current.has(file)) pick(file, `${file} changed`);
     // Suites of one run.cjs shard share a process and the support.cjs module state, so a changed suite can pollute or be polluted by any other suite.
-    if (isTest && current.has(file) && file.startsWith("tests/suites/")) for (const test of testFiles) if (test.startsWith("tests/suites/")) pick(test, `${file} changed and suites share a process`);
+    if (!isolatedSuites && isTest && current.has(file) && file.startsWith("tests/suites/")) for (const test of testFiles) if (test.startsWith("tests/suites/")) pick(test, `${file} changed and suites share a process`);
     for (const [test] of readers) pick(test, `uses ${file}`);
   }
   for (const [test, entry] of Object.entries(deps.tests)) if (entry.always) pick(test, `always runs: ${entry.always}`);
@@ -297,15 +299,27 @@ export function isAncestor(root, ancestor, descendant) {
 }
 
 /** The whole decision for a working tree; never throws: an error is a full-suite answer. */
-export function plan(root = defaultRoot, base = "origin/main") {
+export function plan(root = defaultRoot, base = "origin/main", { isolatedSuites = false } = {}) {
   try {
     let deps = null;
     try { deps = parseDeps(readFileSync(depsPath(root), "utf8")); } catch { /* absent or unreadable: selectTests answers full */ }
     const changed = changedFiles(root, base, deps?.sha ?? null);
-    return selectTests({ changed, deps, testFiles: listTestFiles(root), shaIsAncestor: deps ? isAncestor(root, deps.sha, base) : false });
+    return selectTests({ changed, deps, testFiles: listTestFiles(root), shaIsAncestor: deps ? isAncestor(root, deps.sha, base) : false, isolatedSuites });
   } catch (error) {
     return full(`test-affected failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
   }
+}
+
+// A small local plan may use one process per suite. Do not pay process startup cost
+// for large selections, or change the full/CI shared-process regression gate.
+export const MAX_ISOLATED_SUITES = 8;
+export function localPlan(root = defaultRoot, base = "origin/main", env = process.env) {
+  if (env.CI !== "true" && !env.VAM_CI_SHARD) {
+    const isolated = plan(root, base, { isolatedSuites: true });
+    const count = isolated.files.filter(file => file.startsWith("tests/suites/")).length;
+    if (isolated.mode === "files" && count > 0 && count <= MAX_ISOLATED_SUITES) return { ...isolated, isolatedSuites: true };
+  }
+  return plan(root, base);
 }
 
 // ---------- writing the table ----------
@@ -333,7 +347,7 @@ export function writeDeps(root, recordDir, sha) {
 
 function report(result, json) {
   if (json) return process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  process.stdout.write(`test-affected: ${result.mode}${result.mode === "files" ? ` (${result.files.length} test files)` : ""}\n`);
+  process.stdout.write(`test-affected: ${result.mode}${result.mode === "files" ? ` (${result.files.length} test files${result.isolatedSuites ? ", isolated suites" : ""})` : ""}\n`);
   for (const reason of result.reasons) process.stdout.write(`  ${reason}\n`);
 }
 
@@ -367,17 +381,32 @@ async function main(argv) {
   // A fresh worktree has no ignored test-deps.json. Fetch the same CI table the harness used to fetch,
   // before selecting tests; read-only plan mode, CI cache and explicit test tables are not changed.
   if (argv.includes("--run")) fetchDepsTable(root);
-  const result = plan(root, args[0] || "origin/main");
+  const result = localPlan(root, args[0] || "origin/main");
   report(result, argv.includes("--json"));
   if (!argv.includes("--run")) return;
   if (result.mode === "none") return;
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:affected", { blocking: true }); // spawnSync below: see enterHeavy
   const env = { ...process.env };
+  // A full fallback must not inherit an earlier selective run's filter.
+  delete env.VAM_AFFECTED_TESTS;
+  delete env.VAM_ISOLATED_SUITES;
+  delete env.VAM_ISOLATED_TEST_LAYER;
   if (result.mode === "files") env.VAM_AFFECTED_TESTS = result.files.join(",");
-  for (const script of ["test:unit", "test:integration"]) {
-    const run = spawnSync("npm", ["run", script], { cwd: root, stdio: "inherit", env });
-    if (run.status !== 0) { process.exitCode = run.status ?? 1; return; }
+  if (result.isolatedSuites) env.VAM_ISOLATED_SUITES = "1";
+  const before = telemetryFile() ? candidateEvidence(root) : null;
+  const started = performance.now();
+  let outcome = "error";
+  try {
+    for (const script of ["test:unit", "test:integration"]) {
+      const run = spawnSync("npm", ["run", script], { cwd: root, stdio: "inherit", env });
+      if (run.status !== 0) { process.exitCode = run.status ?? 1; return; }
+    }
+    outcome = "ok";
+  } finally {
+    const after = before ? candidateEvidence(root) : null;
+    const identity = before && after?.fingerprint === before.fingerprint ? before : {};
+    recordDevEvent("affected-verification", performance.now() - started, outcome, { ...identity, mode: result.mode, isolatedSuites: !!result.isolatedSuites });
   }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main(process.argv.slice(2));

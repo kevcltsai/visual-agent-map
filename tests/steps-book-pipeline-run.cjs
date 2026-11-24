@@ -5961,7 +5961,10 @@ test('figure slots: a figure and a chart in one reply; a bad figure (unknown typ
   for (const i of [3, 4, 5]) assert.match(detail, new RegExp(`"index":${i},"state":"missing"`));
   const log = r.stat.logs.find(l => l.includes('diagram_asked'));
   for (const code of ['figure_type', 'number_not_in_text', 'unsafe_text']) assert.match(log, new RegExp(`diagram_rej_${code}`));
-  assert.doesNotMatch(log, /轉盤|25/);
+  // The generated card UUID can contain "25"; it is an opaque identifier, not rejected figure content.
+  const cardId = / card=[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?= )/i;
+  assert.match(log, cardId);
+  assert.doesNotMatch(log.replace(cardId, ' card=<uuid>'), /轉盤|25|a<b/);
 });
 
 test('figure slots: a number that only an old vam-figure fence holds does not count as text; the draft is rejected and nothing is written', async () => {

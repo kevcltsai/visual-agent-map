@@ -10,6 +10,9 @@ export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
 import { assertOwnerIdle, waitOwnerIdle } from "./owner-idle.mjs";
 import { connectCdp } from "./obsidian-cdp.mjs";
+import { sourceFingerprint } from "./candidate-id.mjs";
+import { recordDevEvent, timedSync } from "./dev-metrics.mjs";
+export { sourceFingerprint };
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
 // The owner's vault must survive reboots (macOS clears /private/tmp), so it lives beside the main checkout, never under the temp session prefix.
@@ -280,13 +283,6 @@ function sessionMain(args) {
   process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`, `Test Obsidian stays in the background for its whole life; to watch it, create ${join(appProfile, "allow-focus")} (delete it to hide again)`] }, null, 2)}\n`);
 }
 
-export function sourceFingerprint(directory = root) {
-  const git = (...args) => execFileSync("git", args, { cwd: directory, encoding: "utf8" });
-  const generated = new Set(["main.js", "experiences/sharing/viewer-bundle.generated.ts"]);
-  const files = [...new Set(git("ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0").filter(name => name && !generated.has(name)))].sort();
-  return hash(JSON.stringify({ commit: git("rev-parse", "HEAD").trim(), branch: git("branch", "--show-current").trim(), files: files.map(name => [name, existsSync(join(directory, name)) ? hash(readFileSync(join(directory, name))) : null]) }));
-}
-
 export function assertSourceUnchanged(expected, directory = root) {
   if (sourceFingerprint(directory) !== expected) throw new Error("Source changed during verification; rerun the harness before E2E.");
 }
@@ -364,7 +360,11 @@ export function main(args = process.argv.slice(2)) {
     // check after those expected outputs exist, then protect them through verification.
     const fingerprint = sourceFingerprint();
     const green = greenInstallRun();
-    if (green) process.stdout.write(`Owner vault verification: reusing full CI run ${green.id} for ${green.sha} (clean commit, matching artifacts).\n`);
+    if (green) {
+      process.stdout.write(`Owner vault verification: reusing full CI run ${green.id} for ${green.sha} (clean commit, matching artifacts); checking the local vault harness.\n`);
+      timedSync("local-vault-test", () => run(process.execPath, ["--test", "tests/test-vault.mjs"]));
+      recordDevEvent("ci-reuse-install", 0, "ok", { commit: green.sha, runId: green.id });
+    }
     else {
       // Every doubt (missing/stale table, unknown file) is answered with the full suite.
       run("npm", ["run", "test:affected"]);
@@ -374,10 +374,10 @@ export function main(args = process.argv.slice(2)) {
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
     const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint: sourceFingerprint() };
     const runtime = installedObsidianRuntime();
-    source.verification = green ? { kind: "ci-full", ...green } : { kind: "local-affected" };
+    source.verification = green ? { kind: "ci-full", ...green, localVaultTest: true } : { kind: "local-affected" };
     source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
-    const record = updateCurrentTestVault({ source, ownerIdleConfirmed });
+    const record = timedSync("install", () => updateCurrentTestVault({ source, ownerIdleConfirmed }));
     const appProfile = join(canonicalVault, ".vam-app");
     if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, installedObsidianRuntime());
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
@@ -454,7 +454,7 @@ export async function runHarnessCli(argv, {
   execute = main
 } = {}) {
   const waitOutsideLock = argv.length === 2 && argv.includes("--update-current") && argv.includes("--wait-idle");
-  if (waitOutsideLock) wait();
+  if (waitOutsideLock) timedSync("owner-idle-wait", wait);
   // --help and read-only/session paths must not wait for the heavy lock.
   if (!isHelp(argv) && !argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enter(`npm test ${argv.join(" ")}`.trim(), { blocking: true });
   await execute(waitOutsideLock ? argv.filter(arg => arg !== "--wait-idle") : argv);

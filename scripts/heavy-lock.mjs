@@ -21,6 +21,7 @@ import { basename, join, relative, sep } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
+import { recordDevEvent } from "./dev-metrics.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const LOCK_NAME = "heavy-test.lock";
@@ -348,7 +349,14 @@ export async function enterHeavy(label, { env = process.env, dir = lockDir(env),
   process.on("exit", finish);
   if (ci) { env.VAM_HEAVY_LOCK_HELD = token; return; }
   if (env.VAM_HEAVY_LOCK_DIR && dir !== lockDir({})) out(`鎖位置改為 ${dir}（不與預設位置的鎖互斥）`);
-  held = await acquire({ dir, label, ...options });
+  const waiting = performance.now();
+  try {
+    held = await acquire({ dir, label, ...options });
+    recordDevEvent("heavy-lock-wait", performance.now() - waiting, "ok");
+  } catch (error) {
+    recordDevEvent("heavy-lock-wait", performance.now() - waiting, "error");
+    throw error;
+  }
   env.VAM_HEAVY_LOCK_HELD = held.token;
   if (blocking) for (const [signal, listener] of listeners) process.off(signal, listener);
 }

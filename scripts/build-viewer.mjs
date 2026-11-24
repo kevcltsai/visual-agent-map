@@ -38,5 +38,8 @@ export const SHARE_VIEWER_JS = ${JSON.stringify(js)};
 export const SHARE_VIEWER_CSS = ${JSON.stringify(css)};
 `;
 const options = (await resolveConfig(output)) ?? {};
-writeFileSync(output, await format(source, { ...options, parser: "typescript" }));
+const generated = await format(source, { ...options, parser: "typescript" });
+let previous;
+try { previous = readFileSync(output, "utf8"); } catch { /* first build */ }
+if (previous !== generated) writeFileSync(output, generated);
 process.stdout.write(`share viewer: ${js.length} bytes of JavaScript, ${css.length} bytes of CSS\n`);

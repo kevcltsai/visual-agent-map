@@ -3,6 +3,7 @@
 // scripts/check-test-wiring.mjs reads `nodeTestFiles` and `parts`, so a test file under tests/ must be listed here (or be run by run.cjs, or by test-integration.mjs).
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { recordDevEvent } from "./dev-metrics.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const shards = Math.max(1, Number(process.env.VAM_TEST_SHARDS) || 4);
@@ -47,7 +48,9 @@ async function main() {
   await enterHeavy("npm run test:unit");
   // Imported here so that importing this file (the wiring check does) does not load the runner.
   const { runParts, shardParts, parseShard } = await import("./test-integration.mjs");
+  const started = performance.now();
   const failed = await runParts(shardParts(runnable(parts), parseShard(), { splitNodeTest: true }), "unit");
+  recordDevEvent("test-unit", performance.now() - started, failed.length ? "error" : "ok");
   if (failed.length) {
     process.stdout.write(`\ntest:unit FAILED in: ${failed.join(", ")}\n`);
     process.exitCode = 1; // not process.exit(1): on a pipe it can cut off the part output still being written

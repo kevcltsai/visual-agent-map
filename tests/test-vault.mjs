@@ -7,6 +7,9 @@ import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
 import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { fetchDepsTable } from '../scripts/test-affected.mjs';
+import { typecheckArgs } from '../scripts/build-product.mjs';
+import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
+import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -597,6 +600,38 @@ test('dependency download does not touch CI cache or an explicitly selected tabl
   assert.equal(fetchDepsTable(folder, lookup, { VAM_TEST_DEPS_FILE: '/custom/table.json' }), false);
   assert.equal(called, false);
   assert.equal(existsSync(join(folder, 'test-deps.json')), false);
+});
+
+test('build uses the native incremental compiler only locally and clean builds retain full checking', () => {
+  assert.ok(typecheckArgs(root, {}).includes('--incremental'));
+  for (const env of [{ CI: 'true' }, { VAM_CLEAN_BUILD: '1' }]) {
+    const args = typecheckArgs(root, env);
+    assert.ok(args.includes('-noEmit') && args.includes('-skipLibCheck'));
+    assert.ok(!args.includes('--incremental'));
+  }
+});
+
+test('generated conflict recovery refuses source conflicts and unrelated unstaged work', () => {
+  const files = ['main.js', 'experiences/sharing/viewer-bundle.generated.ts'];
+  assert.deepEqual(generatedConflictPlan(files, files, []), files);
+  assert.throws(() => generatedConflictPlan([], [], []), /source conflict/);
+  assert.throws(() => generatedConflictPlan(['main.ts', ...files], files, []), /source conflict/);
+  assert.throws(() => generatedConflictPlan(files, ['main.ts'], []), /unstaged/);
+  assert.throws(() => generatedConflictPlan(files, files, ['new.ts']), /unstaged/);
+});
+
+test('development telemetry stores only allowlisted fields and evidence matches the exact candidate', t => {
+  const { folder } = environment(t);
+  const file = join(folder, 'dev-events.jsonl');
+  const opts = { env: { VAM_DEV_TELEMETRY_FILE: file } };
+  const identity = { commit: 'a'.repeat(40), fingerprint: 'b'.repeat(64) };
+  assert.equal(recordDevEvent('affected-verification', 125, 'ok', { ...identity, mode: 'files', prompt: 'SECRET' }, opts), true);
+  assert.equal(recordDevEvent('affected-verification', 200, 'error', identity, opts), true);
+  assert.equal(recordDevEvent('unrecognized', 1, 'ok', {}, opts), false);
+  assert.equal(recordDevEvent('test-unit', 1, 'ok', {}, { env: { ...opts.env, CI: 'true' } }), false);
+  assert.doesNotMatch(readFileSync(file, 'utf8'), /SECRET|prompt/);
+  assert.equal(matchingEvidence(file, identity).length, 1);
+  assert.deepEqual(matchingEvidence(file, { ...identity, fingerprint: 'c'.repeat(64) }), []);
 });
 
 test('fetchDepsTable fetches the latest green full main run once and fails soft', t => {

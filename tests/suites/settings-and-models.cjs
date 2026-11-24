@@ -96,7 +96,8 @@ test('explicit source context survives long existing Markdown', () => {
   assert.ok(prepared.context.detail.length < context.detail.length);
 });
 test('general tasks retain existing Detail while decompose uses lightweight context', () => {
-  const { buildPreparedTaskContext, extractJsonObject } = load('main.ts', { obsidian });
+  const { buildPreparedTaskContext } = load('ai/context-builder.ts');
+  const { extractJsonObject } = load('core/ai-task-service.ts', { obsidian });
   const input = { title: 'Topic', summary: 'Existing summary', detail: 'Existing Detail', rules: '', task: 'Research the topic', ancestors: '', mode: 'task' };
   assert.equal(buildPreparedTaskContext(input, 'gpt-5.6-luna').context.detail, 'Existing Detail');
   assert.equal(buildPreparedTaskContext({ ...input, mode: 'decompose' }, 'gpt-5.6-luna').context.detail, '');

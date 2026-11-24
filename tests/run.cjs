@@ -81,4 +81,16 @@ if (process.env.VAM_AFFECTED_TESTS) {
   const affected = new Set(process.env.VAM_AFFECTED_TESTS.split(','));
   selected = selected.filter(suite => affected.has(`tests/suites/${suite}`));
 }
-for (const suite of selected) require(path.join(directory, suite));
+if (process.env.VAM_ISOLATED_SUITES === '1' && process.env.VAM_AFFECTED_TESTS && process.env.CI !== 'true' && !process.env.VAM_CI_SHARD && selected.length) {
+  // Node's test runner starts a fresh process per file. Keep concurrency bounded by
+  // the existing shards, and pass the layer only to these suite files.
+  const { spawnSync } = require('node:child_process');
+  const env = { ...process.env, VAM_ISOLATED_TEST_LAYER: process.argv.find(value => value.startsWith('--layer='))?.split('=')[1] || '' };
+  delete env.VAM_ISOLATED_SUITES;
+  delete env.VAM_AFFECTED_TESTS;
+  const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...selected.map(suite => path.join(directory, suite))], { env, stdio: 'inherit' });
+  if (result.error) throw result.error;
+  process.exitCode = result.status ?? 1;
+} else {
+  for (const suite of selected) require(path.join(directory, suite));
+}

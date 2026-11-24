@@ -1,13 +1,15 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
-import { fetchDepsTable } from '../scripts/test-affected.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, ensureSessionProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
+import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readViewerCache, saveViewerCache } from '../scripts/viewer-cache.mjs';
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
 import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
@@ -556,14 +558,19 @@ test('owner install reuses full CI only for the exact clean landed commit with m
   const { folder } = environment(t);
   const { main: checkout } = repoWithWorktree(folder);
   const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  for (const name of ['main.js', 'manifest.json', 'styles.css']) writeFileSync(join(checkout, name), 'committed ' + name);
-  git('add', 'main.js', 'manifest.json', 'styles.css'); git('commit', '-qm', 'artifacts'); git('push', '-q', 'origin', 'main'); git('fetch', '-q', 'origin');
+  const viewer = 'experiences/sharing/viewer-bundle.generated.ts';
+  mkdirSync(join(checkout, 'experiences/sharing'), { recursive: true });
+  for (const name of ['main.js', 'manifest.json', 'styles.css', viewer]) writeFileSync(join(checkout, name), 'committed ' + name);
+  git('add', 'main.js', 'manifest.json', 'styles.css', viewer); git('commit', '-qm', 'artifacts'); git('push', '-q', 'origin', 'main'); git('fetch', '-q', 'origin');
   const sha = git('rev-parse', 'HEAD');
   const lookup = (dir, candidate) => { assert.equal(dir, checkout); assert.equal(candidate, sha); return '12345'; };
   assert.deepEqual(greenInstallRun(checkout, lookup), { sha, id: '12345' });
+  git('update-index', '--assume-unchanged', 'a.txt');
+  assert.equal(greenInstallRun(checkout, () => { throw new Error('must not look up hidden source'); }), null);
+  git('update-index', '--no-assume-unchanged', 'a.txt');
   assert.equal(greenInstallRun(checkout, () => { throw new Error('no full green CI'); }), null);
   assert.equal(greenInstallRun(checkout, () => 'not a run id'), null);
-  for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', 'new.ts']) {
+  for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', viewer, 'new.ts']) {
     const path = join(checkout, name);
     const original = existsSync(path) ? readFileSync(path) : null;
     writeFileSync(path, 'dirty');
@@ -640,10 +647,10 @@ test('fetchDepsTable fetches the latest green full main run once and fails soft'
   const fake = (command, args) => {
     calls.push([command, ...args]);
     if (args[1] === 'list') return 'noise\n111\n222\n';
-    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), '{"fetched":true}');
+    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), JSON.stringify({ version: 1, sha: 'a'.repeat(40), paths: [], tests: {} }));
   };
   assert.equal(fetchDepsTable(folder, fake, {}), true);
-  assert.equal(readFileSync(join(folder, 'test-deps.json'), 'utf8'), '{"fetched":true}');
+  assert.equal(JSON.parse(readFileSync(join(folder, 'test-deps.json'), 'utf8')).sha, 'a'.repeat(40));
   assert.deepEqual(calls[1].slice(0, 5), ['gh', 'run', 'download', '111', '-n']);
   assert.equal(fetchDepsTable(folder, () => { throw new Error('must not run'); }, {}), false); // table already present
   rmSync(join(folder, 'test-deps.json'));
@@ -706,4 +713,237 @@ test('a running Obsidian with no window open is not a failed install: the new fi
   const noWindow = async () => { throw new Error('No Obsidian main window on DevTools port 60274.'); };
   assert.deepEqual(await reloadRunningPlugin('/v', noWindow), { enabled: true, window: false });
   await assert.rejects(reloadRunningPlugin('/v', async () => { throw new Error('Obsidian for /v is not answering on DevTools port 1; it may have quit.'); }), /not answering/);
+});
+
+test('session preparation selects exactly one verification policy, preserves full fallback and never labels preview as verified', () => {
+  const simulate = (mode, green, env = {}, fail = null) => {
+    const calls = [];
+    const options = {
+      mode, env, lookup: () => { calls.push('lookup'); return green; },
+      execute: (_command, args) => { const name = args.join(' '); calls.push(name); if (name === fail) throw new Error('verification failed'); },
+      fingerprint: () => 'same-source', artifactHashes: () => ({ 'main.js': 'same', viewer: 'same' })
+    };
+    return { calls, options, result: () => prepareSessionCandidate(options) };
+  };
+  const green = { sha: 'a'.repeat(40), id: '123' };
+  for (const [mode, proof, env, expected, calls] of [
+    ['affected', green, {}, 'ci-full', ['lookup', '--test tests/test-vault.mjs']],
+    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'run test:affected']],
+    ['affected', green, { VAM_CLEAN_BUILD: '1' }, 'local-affected', ['run build', 'run test:affected']],
+    ['affected', green, { CI: 'true' }, 'local-affected', ['run build', 'run test:affected']],
+    ['preview', green, {}, 'preview-unverified', ['run build']],
+    ['full', green, {}, 'local-full', ['run build', 'run test:unit', 'run test:integration']]
+  ]) {
+    const s = simulate(mode, proof, env);
+    assert.equal(s.result().verification.kind, expected);
+    assert.deepEqual(s.calls, calls);
+  }
+  const failed = simulate('affected', null, {}, 'run test:affected');
+  assert.throws(failed.result, /verification failed/);
+  const localFailure = simulate('affected', green, {}, '--test tests/test-vault.mjs');
+  assert.throws(localFailure.result, /verification failed/);
+  const changed = simulate('preview', null);
+  let reads = 0;
+  changed.options.fingerprint = () => String(reads++);
+  assert.throws(changed.result, /Source changed/);
+  const changedArtifact = simulate('affected', green);
+  reads = 0;
+  changedArtifact.options.artifactHashes = () => ({ viewer: String(reads++) });
+  assert.throws(changedArtifact.result, /artifacts changed/);
+  assert.throws(() => main(['--session=a', '--preview', '--full']), /Conflicting session options/);
+  assert.throws(() => main(['--session=a', '--stop', '--preview']), /Conflicting session options/);
+  assert.throws(() => main(['--update-current', '--preview']), /Unknown argument/);
+});
+
+test('same session bytes skip asset replacement but update preview verification record', t => {
+  const { vault } = environment(t);
+  const previous = { fingerprint: 'same', verification: { kind: 'preview-unverified' } };
+  prepareTestVault({ vault, source: previous });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  const file = join(plugin, 'main.js');
+  const before = readFileSync(file), inode = statSync(file).ino;
+  const current = { fingerprint: 'same', verification: { kind: 'local-full' } };
+  assert.deepEqual(updateCurrentTestVault({ vault, source: current }).source, current);
+  assert.deepEqual(readFileSync(file), before);
+  assert.equal(statSync(file).ino, inode, 'same bytes were not replaced');
+  assert.deepEqual(verifyTestVault(vault).source, current);
+  writeFileSync(file, 'tampered');
+  updateCurrentTestVault({ vault, source: current });
+  assert.deepEqual(readFileSync(file), before, 'tamper forces normal repair');
+});
+test('session full does not inherit selective test or CI shard settings', () => {
+  const env = { VAM_AFFECTED_TESTS: 'other', VAM_CI_SHARD: '1/4', VAM_ISOLATED_SUITES: '1' };
+  const calls = [];
+  prepareSessionCandidate({ mode: 'full', env, fingerprint: () => 'x', artifactHashes: () => ({ x: 'y' }), execute: (_command, args, childEnv) => calls.push({ args, env: childEnv }) });
+  for (const call of calls.slice(1)) for (const key of Object.keys(env)) assert.equal(call.env[key], undefined);
+});
+
+test('expensive affected plans refresh stale dependency tables without accepting unrelated or older proof', t => {
+  const { folder } = environment(t);
+  const { main: checkout } = repoWithWorktree(folder, { behind: true });
+  const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const base = git('rev-parse', 'origin/main'), old = git('rev-parse', 'HEAD^');
+  const data = sha => JSON.stringify({ version: 1, sha, paths: [], tests: {} });
+  const path = join(checkout, 'test-deps.json');
+  writeFileSync(path, data(old));
+  let calls = 0;
+  const mock = sha => (_command, args) => {
+    calls++;
+    if (args[1] === 'list') return '111\n';
+    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), data(sha));
+  };
+  const full = { mode: 'full', files: [] };
+  assert.equal(refreshDepsTable(checkout, 'origin/main', { mode: 'files', files: ['a'] }, mock(base), {}, 1000), false);
+  assert.equal(calls, 0);
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock('f'.repeat(40)), {}, 1000), false);
+  assert.equal(readFileSync(path, 'utf8'), data(old));
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(base), {}, 1001), false, 'cooldown');
+  assert.equal(calls, 2);
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(base), {}, 601001), true);
+  assert.equal(readFileSync(path, 'utf8'), data(base));
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(old), {}, 1202000), false);
+  assert.equal(readFileSync(path, 'utf8'), data(base));
+});
+
+test('viewer cache uses actual local graph and config, detects added resolution paths and output tampering', t => {
+  const { folder } = environment(t);
+  const output = 'experiences/sharing/viewer-bundle.generated.ts';
+  const fixed = ['scripts/build-viewer.mjs', 'scripts/viewer-css.mjs', 'scripts/viewer-cache.mjs', 'styles.css',
+    'experiences/sharing/viewer/viewer.css', 'package.json', 'package-lock.json', 'tsconfig.json', '.prettierrc.json',
+    'experiences/sharing/viewer/index.ts', 'core/used.ts', 'core/other.ts', output,
+    'node_modules/esbuild/index.js', 'node_modules/@esbuild/platform/bin', 'node_modules/prettier/index.js'];
+  for (const path of fixed) {
+    mkdirSync(dirname(join(folder, path)), { recursive: true });
+    writeFileSync(join(folder, path), path.endsWith('.json') ? '{}' : path);
+  }
+  const entry = 'experiences/sharing/viewer/index.ts', used = 'core/used.ts';
+  const inputs = viewerInputs({ inputs: { [entry]: { imports: [{ path: used, original: '../../../core/used' }] }, [used]: { imports: [] } } });
+  assert.deepEqual(inputs, [used, entry]);
+  assert.equal(viewerInputs({ inputs: { [entry]: { imports: [{ path: 'node_modules/pkg/index.js', original: 'pkg' }] } } }), null);
+  assert.equal(viewerCacheEnabled({ CI: 'true' }), false);
+  assert.equal(viewerCacheEnabled({ VAM_CLEAN_BUILD: '1' }), false);
+  const key = () => viewerCacheKey(folder, inputs, {}, {});
+  const initial = key();
+  assert.match(initial, /^[0-9a-f]{64}$/);
+  saveViewerCache(folder, inputs, null, output);
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), false);
+  saveViewerCache(folder, inputs, initial, output);
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), true);
+  writeFileSync(join(folder, 'core/other.ts'), 'unrelated content');
+  assert.equal(key(), initial);
+  writeFileSync(join(folder, used), 'changed dependency');
+  assert.notEqual(key(), initial);
+  writeFileSync(join(folder, used), used);
+  writeFileSync(join(folder, 'core/used.js'), 'new resolver candidate');
+  assert.notEqual(key(), initial);
+  rmSync(join(folder, 'core/used.js'));
+  assert.equal(key(), initial);
+  writeFileSync(join(folder, output), 'tampered output');
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), false);
+  writeFileSync(join(folder, 'node_modules/esbuild/index.js'), 'changed tool');
+  assert.notEqual(key(), initial);
+});
+
+test('session operations have exclusive locks and cannot stop a foreign owned vault', async t => {
+  const { vault } = environment(t);
+  const record = prepareTestVault({ vault });
+  assert.equal(assertSessionOwner(vault).owner, record.owner);
+  await withSessionLock(vault, async () => {
+    assert.throws(() => withSessionLock(vault, () => {}), /EEXIST/);
+  });
+  assert.equal(existsSync(vault + '.lock'), false);
+  await assert.rejects(withSessionLock(vault, async () => { throw new Error('failure'); }), /failure/);
+  assert.equal(existsSync(vault + '.lock'), false);
+  const marker = join(vault, '.vam-test-environment.json');
+  writeFileSync(marker, JSON.stringify({ ...record, owner: '/other' }));
+  assert.throws(() => assertSessionOwner(vault), /another checkout/);
+});
+test('hot reload refuses busy/unknown instances, restores files and record on failed load', async t => {
+  const { folder, vault } = environment(t);
+  const runtime = { version: '1.14.0', hash: 'h' };
+  const old = { fingerprint: 'old', obsidianRuntime: runtime };
+  const next = { fingerprint: 'new', obsidianRuntime: runtime };
+  prepareTestVault({ vault, source: old });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  const bytes = readFileSync(join(plugin, 'main.js'));
+  const artifact = join(folder, 'build');
+  mkdirSync(artifact);
+  for (const name of ['main.js', 'manifest.json', 'styles.css']) copyFileSync(join(root, name), join(artifact, name));
+  writeFileSync(join(artifact, 'main.js'), 'new build');
+  const connection = results => async () => ({ evaluate: async () => results.shift(), close() {} });
+  const run = options => reloadSessionVault({ vault, source: next, artifact, idle() {}, ...options });
+  await assert.rejects(run({ connect: connection([{ status: 'busy' }]) }), /busy/);
+  assert.deepEqual(readFileSync(join(plugin, 'main.js')), bytes);
+  await assert.rejects(run({ connect: connection([{ status: 'disabled' }, false, true, true]) }), /Previous files restored/);
+  assert.deepEqual(readFileSync(join(plugin, 'main.js')), bytes);
+  assert.deepEqual(verifyTestVault(vault).source, old);
+  const installed = await run({ connect: connection([{ status: 'disabled' }, true]) });
+  assert.deepEqual(installed.source, next);
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'new build');
+  assert.match(sessionDisableExpression('/test', runtime.version), /p\.activeTasks/);
+  assert.match(sessionDisableExpression('/test', runtime.version), /wrong-vault/);
+  assert.throws(() => main(['--session=a', '--stop', '--reload']), /Conflicting session options/);
+});
+
+test('an explicit owned session can reload after completed work without the owner quiet-time wait', t => {
+  const vault = busyVault(t, { ...one([start(1, 4), end(1, 'done', 3)]), exchanges: [{ startedAt: ago(4), completedAt: ago(3) }] });
+  assert.ok(ownerBusyReasons(vault, { now: NOW }).length > 0);
+  assert.deepEqual(ownerBusyReasons(vault, { now: NOW, requireQuietWindow: false }), []);
+  const active = busyVault(t, one([start(1, 3)]));
+  assert.match(ownerBusyReasons(active, { now: NOW, requireQuietWindow: false }).join('\n'), /還沒結束/);
+});
+test('session runtime profile reuses matching bytes, refuses running mismatch and repairs only stopped runtime', t => {
+  const { folder, vault } = environment(t);
+  prepareTestVault({ vault });
+  const path = join(folder, 'runtime.asar');
+  const bytes = Buffer.from('runtime bytes');
+  writeFileSync(path, bytes);
+  const runtime = { version: '1.14.0', path, hash: createHash('sha256').update(bytes).digest('hex') };
+  const profile = ensureSessionProfile(vault, runtime);
+  assert.equal(ensureSessionProfile(vault, runtime, { running: true }), profile);
+  const asar = join(profile, 'obsidian-1.14.0.asar');
+  writeFileSync(asar, 'tampered');
+  assert.throws(() => ensureSessionProfile(vault, runtime, { running: true }), /archive changed/);
+  assert.equal(readFileSync(asar, 'utf8'), 'tampered');
+  ensureSessionProfile(vault, runtime);
+  assert.deepEqual(readFileSync(asar), bytes);
+});
+
+test('session reload CDP guard really executes: only an idle correct instance is unloaded', async () => {
+  const id = 'visual-agent-map', empty = () => new Map();
+  const setup = () => {
+    const plugin = {
+      repo: {}, unloaded: false, queue: Promise.resolve(), ready: Promise.resolve(), writing: 0,
+      pendingRenames: null, externalReconcileTimer: null, languageSwitchPending: false,
+      running: empty(), activeTasks: empty(), chartJobs: empty(), quickExpandPending: empty(),
+      expansionBatches: empty(), pendingSuggestions: empty(), pendingResearchOptions: empty(), externalReconcilePaths: empty(),
+      bookPipelineRuns: { drives: empty(), gateWaiting: empty(), notesJobs: empty() },
+      argumentRuns: { drives: empty() }, bookNotesApply: { jobs: empty() },
+      coffeeManager: { engines: empty(), deletingIds: empty() }
+    };
+    const calls = [], plugins = { enabledPlugins: new Set([id]), plugins: { [id]: plugin } };
+    plugins.disablePlugin = async key => { calls.push(key); delete plugins.plugins[key]; };
+    const context = { app: { vault: { adapter: { basePath: '/test' } }, plugins }, document: { querySelector: () => null },
+      require: () => ({ ipcRenderer: { sendSync: () => '1.14.0' } }), setTimeout };
+    return { plugin, calls, context };
+  };
+  const execute = state => vm.runInNewContext(sessionDisableExpression('/test', '1.14.0'), state.context);
+  const idle = setup();
+  assert.equal((await execute(idle)).status, 'disabled');
+  assert.deepEqual(idle.calls, [id]);
+  for (const alter of [
+    s => s.plugin.activeTasks.set('ai', {}),
+    s => s.plugin.bookPipelineRuns.drives.set('book', {}),
+    s => s.plugin.writing = 1,
+    s => s.plugin.queue = new Promise(() => {}),
+    s => delete s.plugin.chartJobs,
+    s => s.context.document.querySelector = () => ({}),
+    s => s.context.app.vault.adapter.basePath = '/other',
+    s => s.context.require = () => ({ ipcRenderer: { sendSync: () => '1.13.0' } })
+  ]) {
+    const state = setup();
+    alter(state);
+    assert.notEqual((await execute(state)).status, 'disabled');
+    assert.deepEqual(state.calls, []);
+  }
 });

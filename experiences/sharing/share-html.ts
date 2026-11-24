@@ -8,7 +8,7 @@ import { SHARE_VIEWER_CSS, SHARE_VIEWER_JS } from "./viewer-bundle.generated";
  * frames only of YouTube's no-cookie player (after a click), no forms or connections, and no `eval`. The inline script and style are the file's own.
  */
 const CONTENT_SECURITY_POLICY =
-  "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com";
+  "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com https://www.facebook.com https://www.instagram.com";
 
 const escapeText = (text: string): string =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

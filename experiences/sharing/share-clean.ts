@@ -6,6 +6,7 @@
  * does not hide shows as plain text the author sees too.
  */
 import { NOTE_LANGUAGES, translate } from "../../i18n";
+import { socialVideoOf } from "../../core/social-video";
 import { youtubeVideoId } from "../../core/video-embeds";
 import { classifyShareTarget, commentRanges, markdownCodeRanges, normalizeNewlines } from "./share-code";
 export { classifyShareTarget } from "./share-code";
@@ -199,8 +200,8 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
           .trim()
           .replace(/\s+"[^"]*"$/, "")
           .replace(/^<|>$/g, "");
-        // A YouTube embed renders as an iframe, which the shared page does not keep: share it as a plain link instead.
-        if (youtubeVideoId(raw)) return `[${VIDEO_MARK}▶ ${alt || escapeMd(raw)}](${raw})`;
+        // A YouTube, Facebook or Instagram video in image syntax is no image: share it as a video link the viewer turns into a card.
+        if (youtubeVideoId(raw) || socialVideoOf(raw)) return `[${VIDEO_MARK}▶ ${alt || escapeMd(raw)}](${raw})`;
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;

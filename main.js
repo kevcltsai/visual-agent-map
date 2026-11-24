@@ -107501,6 +107501,12 @@ function applyNodeLinks(root, knownIds, createLink, knownAttachments = /* @__PUR
 // experiences/sharing/share-clean.ts
 var SHARE_ASSET_SCHEME = "vam-asset:";
 var IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+function classifyShareTarget(path) {
+  const clean3 = path.split(/[?#]/)[0].trim();
+  if (IMAGE_EXT.test(clean3)) return "image";
+  const ext = /\.([a-z0-9]{1,5})$/i.exec(clean3);
+  return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
+}
 var isWeb = (value) => /^https?:\/\//i.test(value);
 function createAssetRegistry() {
   const byRef = /* @__PURE__ */ new Map();
@@ -107584,11 +107590,12 @@ function cleanSegment(text11, ctx, out, hidden = false) {
       if (embed !== void 0) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
-        if (IMAGE_EXT.test(pathPart)) {
+        const kind = classifyShareTarget(pathPart);
+        if (kind === "image") {
           const altText = alias && !/^\d+(x\d+)?$/.test(alias) ? escapeMd(alias) : "";
           return `![${altText}](${SHARE_ASSET_SCHEME}${attach(pathPart)})`;
         }
-        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart)) {
+        if (kind === "attachment") {
           const file = escapeMd(stripNodeLinkMarks((_a2 = pathPart.split("/").pop()) != null ? _a2 : pathPart));
           const card = (_b2 = ctx.attachmentOf) == null ? void 0 : _b2.call(ctx, decodeRef(pathPart));
           return card ? markAttachment(card, file) : file;
@@ -107605,14 +107612,15 @@ function cleanSegment(text11, ctx, out, hidden = false) {
         return nodeId && text12 ? markNodeLink(nodeId, text12) : text12;
       }
       if (src !== void 0) {
-        const raw2 = src.trim().replace(/^<|>$/g, "").replace(/\s+"[^"]*"$/, "");
+        const raw2 = src.trim().replace(/\s+"[^"]*"$/, "").replace(/^<|>$/g, "");
         if (youtubeVideoId(raw2)) return `[${VIDEO_MARK}\u25B6 ${alt || escapeMd(raw2)}](${raw2})`;
         if (isWeb(raw2)) {
           out.webImages.push({ url: raw2, alt: alt != null ? alt : "" });
           return `![${alt != null ? alt : ""}](${raw2})`;
         }
-        const ext = /\.([a-z0-9]{1,5})$/i.exec(raw2.split(/[?#]/)[0]);
-        if (ext && !IMAGE_EXT.test(`.${ext[1]}`)) {
+        const kind = classifyShareTarget(decodeRef(raw2));
+        if (kind === "note") return escapeMd(titleFor(decodeRef(raw2)));
+        if (kind === "attachment") {
           const file = escapeMd(stripNodeLinkMarks((_e = decodeRef(raw2).split("/").pop()) != null ? _e : raw2));
           const card = (_f = ctx.attachmentOf) == null ? void 0 : _f.call(ctx, decodeRef(raw2));
           return card ? markAttachment(card, file) : file;
@@ -110766,6 +110774,7 @@ ${fence2}`, host, "", child);
     const internal = (_a2 = this.config.internalFolders) != null ? _a2 : [];
     let found = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
     if (found && internal.some((folder) => (found == null ? void 0 : found.path) === folder || (found == null ? void 0 : found.path.startsWith(`${folder}/`)))) found = null;
+    if (found && found.extension.toLowerCase() === "md") found = null;
     const key5 = found ? found.path : `?${ref}`;
     const existing = this.fileNames.get(key5);
     if (existing) return existing;

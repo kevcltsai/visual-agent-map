@@ -1067,3 +1067,23 @@ test('sharing R2: ![](doc.pdf) is an attachment card, not an image asset', () =>
   assert.ok(!/!\[\]\(vam-asset:/.test(out.markdown) && /\(vam-asset:image-1\)/.test(out.markdown), out.markdown);
   assert.equal(clean.cleanShareMarkdown('![](doc.pdf)', { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown, 'doc.pdf');
 });
+
+test('sharing R3: one target rule for both embed syntaxes; a note is never an attachment', () => {
+  const sharing = load('experiences/sharing/share-clean.ts');
+  assert.equal(sharing.classifyShareTarget('Other.md'), 'note');
+  assert.equal(sharing.classifyShareTarget('Other'), 'note');
+  assert.equal(sharing.classifyShareTarget('Docs/x.MD'), 'note');
+  assert.equal(sharing.classifyShareTarget('a.png'), 'image');
+  assert.equal(sharing.classifyShareTarget('a.pdf?x=1'), 'attachment');
+  const calls = [];
+  const ctx = { titleOf: () => undefined, assets: sharing.createAssetRegistry(), attachmentOf: ref => { calls.push(ref); return 'file-1'; } };
+  for (const md of ['![](Other.md)', '![x](Notes/Other.md "t")', '![[Other.md]]', '![](<my note.md> "t")']) {
+    const out = sharing.cleanShareMarkdown(md, ctx);
+    assert.equal(out.markdown.includes('vam-asset:'), false, md);
+    assert.equal(out.attachments.length, 0, md);
+  }
+  assert.deepEqual(calls, [], 'no note reaches attachmentOf');
+  const pdf = sharing.cleanShareMarkdown('![](<my doc.pdf> "t")', ctx);
+  assert.equal(pdf.markdown.includes('vam-asset:'), false, 'angle brackets and a title still give an attachment');
+  assert.deepEqual(calls, ['my doc.pdf']);
+});

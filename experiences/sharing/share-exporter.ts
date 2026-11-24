@@ -851,6 +851,8 @@ export class ShareExporter {
     const internal = this.config.internalFolders ?? [];
     let found: TFile | null = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
     if (found && internal.some(folder => found?.path === folder || found?.path.startsWith(`${folder}/`))) found = null;
+    // A note is never shipped as raw bytes, whatever syntax pointed at it.
+    if (found && found.extension.toLowerCase() === "md") found = null;
     const key = found ? found.path : `?${ref}`;
     const existing = this.fileNames.get(key);
     if (existing) return existing;

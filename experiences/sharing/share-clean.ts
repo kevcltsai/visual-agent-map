@@ -53,6 +53,16 @@ export interface AssetRegistry {
 
 export const SHARE_ASSET_SCHEME = "vam-asset:";
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+/**
+ * What an embed target is, from its path alone. One rule for `![[…]]` and `![](…)` (Diagnostic Reset, share-export-complete):
+ * a note (`.md` or no extension) is never shipped as a file, an image becomes an asset, anything else is an attachment.
+ */
+export function classifyShareTarget(path: string): "note" | "image" | "attachment" {
+  const clean = path.split(/[?#]/)[0].trim();
+  if (IMAGE_EXT.test(clean)) return "image";
+  const ext = /\.([a-z0-9]{1,5})$/i.exec(clean);
+  return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
+}
 const isWeb = (value: string): boolean => /^https?:\/\//i.test(value);
 
 export function createAssetRegistry(): AssetRegistry {
@@ -161,11 +171,12 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       if (embed !== undefined) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
-        if (IMAGE_EXT.test(pathPart)) {
+        const kind = classifyShareTarget(pathPart);
+        if (kind === "image") {
           const altText = alias && !/^\d+(x\d+)?$/.test(alias) ? escapeMd(alias) : "";
           return `![${altText}](${SHARE_ASSET_SCHEME}${attach(pathPart)})`;
         }
-        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart)) {
+        if (kind === "attachment") {
           const file = escapeMd(stripNodeLinkMarks(pathPart.split("/").pop() ?? pathPart));
           const card = ctx.attachmentOf?.(decodeRef(pathPart));
           return card ? markAttachment(card, file) : file;
@@ -184,16 +195,18 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       if (src !== undefined) {
         const raw = src
           .trim()
-          .replace(/^<|>$/g, "")
-          .replace(/\s+"[^"]*"$/, "");
+          .replace(/\s+"[^"]*"$/, "")
+          .replace(/^<|>$/g, "");
         // A YouTube embed renders as an iframe, which the shared page does not keep: share it as a plain link instead.
         if (youtubeVideoId(raw)) return `[${VIDEO_MARK}▶ ${alt || escapeMd(raw)}](${raw})`;
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;
         }
-        const ext = /\.([a-z0-9]{1,5})$/i.exec(raw.split(/[?#]/)[0]);
-        if (ext && !IMAGE_EXT.test(`.${ext[1]}`)) {
+        const kind = classifyShareTarget(decodeRef(raw));
+        // A note in image syntax is never read as bytes: it shows as its title, like an unresolved note embed.
+        if (kind === "note") return escapeMd(titleFor(decodeRef(raw)));
+        if (kind === "attachment") {
           const file = escapeMd(stripNodeLinkMarks(decodeRef(raw).split("/").pop() ?? raw));
           const card = ctx.attachmentOf?.(decodeRef(raw));
           return card ? markAttachment(card, file) : file;

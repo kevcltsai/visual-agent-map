@@ -3077,13 +3077,13 @@ const exampleButtons = chat => {
   const input = chat.inputEl; input.setSelectionRange = (a, b) => { input.selectionStart = a; input.selectionEnd = b; };
   return findAll(chat.examplesEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-example'));
 };
-test('Book entry 12: the opening screen shows two examples under the field (owner 2026-11-23), the picture one first and marked new, then the book one; a click fills the field and selects the blank', () => {
+test('Book entry 12: the opening screen shows two examples under the field (owner 2026-11-23), the picture one first, then the book one, both marked new (owner 2026-11-24); a click fills the field and selects the blank', () => {
   const f = heroFixture(); const c = f.panel; const buttons = exampleButtons(c);
   assert.equal(buttons.length, 2, 'two examples');
   assert.equal(c.examplesEl.parent, c.heroActionsEl, 'in the mind map tab panel, below the composer'); assert.equal(c.examplesEl.attrs.role, 'group'); assert.equal(c.examplesEl.attrs['aria-label'], 'Examples');
   assert.ok(hasClass(buttons[0], 'is-new')); assert.match(visibleText(buttons[0]), /Start from a picture.*New/);
   assert.equal(find(buttons[0], i => i.text === '🖼').attrs['aria-hidden'], 'true', 'the picture icon is not read out');
-  assert.equal(hasClass(buttons[1], 'is-new'), false, 'the book one is no longer marked new'); assert.doesNotMatch(visibleText(buttons[1]), /New/);
+  assert.ok(hasClass(buttons[1], 'is-new'), 'the book one is marked new too'); assert.match(visibleText(buttons[1]), /picture book.*New/i);
   assert.equal(find(buttons[1], i => i.text === '📖').attrs['aria-hidden'], 'true', 'the book icon is not read out');
   assert.equal(c.heroActionsEl.hidden, false);
   buttons[1].click();

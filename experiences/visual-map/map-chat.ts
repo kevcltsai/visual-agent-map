@@ -550,7 +550,7 @@ let panelSequence = 0;
 
 type HeroTab = "map" | "research";
 const HERO_TABS: readonly HeroTab[] = ["map", "research"];
-/** The opening screen's examples (owner 2026-11-23: two): the picture one first, marked new, then the book one; `slot` is the blank the field selects. */
+/** The opening screen's examples (owner 2026-11-23: two): the picture one first, then the book one, both marked new (owner 2026-11-24); `slot` is the blank the field selects. */
 const MAP_CHAT_EXAMPLES = [
   {
     book: false,
@@ -562,7 +562,7 @@ const MAP_CHAT_EXAMPLES = [
   },
   {
     book: true,
-    isNew: false,
+    isNew: true,
     icon: "📖",
     label: "ui.map_chat_example_book",
     prompt: "ui.map_chat_example_book_prompt",

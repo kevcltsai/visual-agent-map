@@ -2593,6 +2593,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_frame_named_0": "范围框：{0}",
   "share.viewer_video_play": "点击播放 YouTube 视频",
   "share.viewer_video_note": "播放时才会连到 YouTube（不记录 cookie 的版本）",
+  "share.viewer_video_note_local": "直接从文件打开时，会在新标签页用 YouTube 播放",
   "share.viewer_video_open": "在 YouTube 打开",
   "share.media_video_0": "视频：{0}",
   "share.media_audio_0": "音频：{0}",

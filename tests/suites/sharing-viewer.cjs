@@ -104,8 +104,9 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
   for (const lang of LANGUAGES) {
     const shell = html.renderShareShell(text.shareViewerUiFor(lang));
     const urls = [...shell.matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
-    // P6: the only other address is YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only after a click).
-    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/'].sort());
+    // P6: the only other addresses are YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only
+    // after a click) and the watch page a click opens in a new tab when the file is opened from disk.
+    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/', 'https://www.youtube.com/watch'].sort());
     assert.doesNotMatch(shell, /<script[^>]*\ssrc=/i);
     assert.doesNotMatch(shell, /<link\b/i);
     assert.doesNotMatch(shell, /@import/i);
@@ -2372,4 +2373,22 @@ test('sharing video: the file policy allows only the no-cookie player frame, and
   assert.equal(text.shareViewerUiFor('zh-TW').videoNote, '播放時才會連到 YouTube（不記錄 cookie 的版本）');
   assert.equal(text.shareViewerUiFor('zh-TW').videoOpen, '在 YouTube 開啟');
   assert.equal(text.shareViewerUiFor('zh-TW').videoPlay, '按一下播放 YouTube 影片');
+});
+
+test('sharing video: opened from a local file (file://), play opens YouTube in a new tab instead of an embed that YouTube refuses (error 153)', () => {
+  const video = load('experiences/sharing/viewer/video.ts');
+  const ui = text.shareViewerUiFor('en');
+  const { doc, root } = videoFixture([['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'vam-video-link']]);
+  doc.location = { protocol: 'file:' };
+  video.upgradeVideoLinks(root, doc, ui);
+  const card = root.kids[0];
+  const play = card.kids[0].kids[0];
+  assert.equal(play.localName, 'a', 'a real link, so a click never builds an embed');
+  assert.equal(play.getAttribute('href'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(play.getAttribute('target'), '_blank');
+  assert.equal(play.getAttribute('rel'), 'noopener noreferrer');
+  assert.equal(play.handlers.click, undefined);
+  assert.equal(card.all().filter(node => node.localName === 'iframe').length, 0);
+  assert.equal(card.kids[1].text, ui.videoNoteLocal, 'the note says it plays on YouTube in a new tab');
+  for (const lang of ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es']) assert.ok(text.shareViewerUiFor(lang).videoNoteLocal.length > 3, lang);
 });

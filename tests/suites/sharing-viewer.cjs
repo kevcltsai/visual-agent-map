@@ -82,7 +82,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -194,7 +194,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     const ui = text.shareViewerUiFor(lang);
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -322,7 +322,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     const ui = dictionaries.SHARE_VIEWER_UI_EXTRA[code];
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -1457,7 +1457,11 @@ test('sharing viewer images: image-data keeps only what a viewer may draw (asset
   assert.equal(image.src, undefined, 'a web address is not a picture');
   assert.equal(image.note, '<img src=x onerror=1> two', 'the note stays a plain string');
   assert.deepEqual(image.anchors.map(a => [a.id, a.x, a.y, a.linked]), [['a1', 0.25, 0.75, true], ['a2', 1, 0, true]]);
-  assert.deepEqual(image.links, [{ anchor: 'a1', topic: 't1', ring: true }, { anchor: 'a2', topic: 't2', ring: false }]);
+  assert.deepEqual(image.links, [{ anchor: 'a1', topic: 't1', ring: true, description: '' }, { anchor: 'a2', topic: 't2', ring: false, description: '' }]);
+  assert.equal(image.free, false, 'an image the file does not mark free is annotated, whatever it holds');
+  assert.equal(read([{ ...base, free: true }])[0].free, true);
+  for (const free of [1, 'true', {}, null]) assert.equal(read([{ ...base, free }])[0].free, false, `free must be exactly true: ${JSON.stringify(free)}`);
+  assert.equal(read([{ ...base, asset: 'web' }])[0].free, false, 'an old picture with no anchors, links or note stays annotated');
 });
 
 test('sharing viewer images: only the picture, bar and anchor rules of the map are taken from .vam-view; the viewer stylesheet lets a press pan', async () => {
@@ -2090,4 +2094,122 @@ test('sharing viewer fold R2-F3: opening a file whose expanded covered cards ove
     assert.ok(report.settled.hits.length > 0, 'the saved places overlap, so there is something an arrangement would move');
     assert.equal(places(report.settled), places(report.first), 'no card moved when the covers loaded');
   });
+});
+
+// share-complete P2: types, frames and free pictures in the viewer.
+test('sharing viewer shapes: the copied shape drawing, padding and table equal the map\'s topic-kind-shape.ts for every type', () => {
+  const copy = load('experiences/sharing/viewer/topic-shapes.ts');
+  // A tiny element that records what the two drawings do (the map's version binds to Obsidian's createSvg / addClass).
+  const make = tag => { const el = { tag, attrs: {}, children: [] }; el.setAttribute = (k, v) => { el.attrs[k] = v; }; el.addClass = c => { el.attrs.class = c; }; el.appendChild = child => { el.children.push(child); return child; }; return el; };
+  const strip = el => ({ tag: el.tag, attrs: el.attrs, children: el.children.map(strip) });
+  const doc = { createElementNS: (_ns, tag) => make(tag) };
+  const original = load('experiences/visual-map/topic-kind-shape.ts', {}, { createSvg: tag => make(tag) });
+  {
+    const kinds = Object.keys(original.TOPIC_KIND_SHAPES);
+    assert.deepEqual(plain(Object.fromEntries(kinds.map(kind => [kind, original.TOPIC_KIND_SHAPES[kind].shape]))), plain(copy.TOPIC_KIND_SHAPES), 'kind -> shape table');
+    assert.deepEqual(plain(copy.VIEWER_KINDS), kinds.filter(kind => kind !== 'topic'));
+    for (const kind of kinds) {
+      const shape = original.TOPIC_KIND_SHAPES[kind].shape;
+      const cardA = make('div'), cardB = make('div');
+      const drawn = original.renderShapeBackground(cardA, kind);
+      if (shape === 'rounded') { assert.equal(copy.readViewerShape(shape), undefined, 'rounded is never a viewer shape'); assert.ok(!drawn); continue; }
+      const mine = copy.renderShapeBackground(doc, cardB, shape);
+      assert.deepEqual(plain(strip(cardB)), plain(strip(cardA)), `${kind} drawing`);
+      assert.equal(Boolean(mine), Boolean(drawn), kind);
+      for (const width of [120, 280, 400]) for (const height of [0, 30, 90, 200]) assert.deepEqual(plain(copy.shapeInsets(shape, { width, height })), plain(original.shapeInsets(kind, { width, height })), `${kind} ${width}x${height}`);
+    }
+  }
+});
+
+test('sharing viewer shapes: only whitelisted words are read; relation and frame readers keep ids that exist and plain text', () => {
+  const copy = load('experiences/sharing/viewer/topic-shapes.ts');
+  for (const bad of ['topic', 'Atomic', '<b>', 'evil" onclick="x', '', 5, null, {}, ['atomic']]) assert.equal(copy.readViewerKind(bad), undefined, String(bad));
+  for (const bad of ['rounded', 'circle', 'RECT', '', 5, null, ['rect']]) assert.equal(copy.readViewerShape(bad), undefined, String(bad));
+  const data = load('experiences/sharing/viewer/relation-data.ts');
+  const ids = new Set(['a', 'b']);
+  assert.deepEqual(plain(data.readFrames([{ id: 'f', members: ['a', 'gone', 5, 'a'], label: ' <b>x</b>\n y ' }, { id: 'g', members: ['gone'] }, { id: 'f', members: ['b'] }, { members: ['a'] }, 'x'], ids)), [{ id: 'f', members: ['a'], label: '<b>x</b> y' }]);
+  assert.deepEqual(plain(data.readFrames({}, ids)), []);
+});
+
+test('sharing viewer: the new interface text for types, relations and frames exists in all six languages', () => {
+  const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
+  assert.equal(everyUi.length, 6);
+  const kinds = ['action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+  const relations = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
+  for (const ui of everyUi) {
+    assert.match(ui.kindLabel, /\{0\}/, `${ui.lang}.kindLabel`);
+    assert.match(ui.frameNamed, /\{0\}/, `${ui.lang}.frameNamed`);
+    for (const key of ['frameLabel', 'relationsHeading']) assert.ok(String(ui[key]).trim(), `${ui.lang}.${key}`);
+    for (const id of kinds) assert.ok(ui.kindNames[id]?.trim(), `${ui.lang}.kind.${id}`);
+    for (const id of relations) assert.ok(ui.relationNames[id]?.trim(), `${ui.lang}.relation.${id}`);
+  }
+});
+
+test('sharing viewer types, frames and free pictures: whitelisted kinds draw the map\'s shape, forged ones draw nothing, frames wrap drawn members, a free picture has no bar (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-kinds-'));
+  try {
+    const data = payload();
+    const ids = data.nodes.slice(0, 6).map(n => n.id);
+    data.nodes[0].kind = 'hypothesis'; data.nodes[0].shape = 'diamond';
+    data.nodes[1].kind = 'conclusion';
+    data.nodes[2].kind = 'evil" onclick="document.title=1'; data.nodes[2].shape = 'circle';
+    data.nodes[3].kind = 'topic'; data.nodes[3].shape = 'rounded';
+    data.nodes[4].shape = 'rect';
+    data.nodes[5].kind = ['atomic'];
+    data.assets = { ...data.assets, pic: pngDataUri(4, 3, [9, 8, 7]) };
+    data.images = [
+      { id: 'freeok', x: 900, y: 0, w: 120, h: 90, asset: 'pic', free: true, anchors: [] },
+      { id: 'freegone', x: 900, y: 200, w: 120, h: 90, free: true, anchors: [] },
+      { id: 'oldplain', x: 900, y: 400, w: 120, h: 90, asset: 'pic', anchors: [] }
+    ];
+    data.boundaries = [
+      { id: 'f1', members: [ids[0], ids[1], 'not-in-file', 'freeok'], label: '<img src=x onerror="document.title=1">' },
+      { id: 'f2', members: ['not-in-file'], label: 'ghost' },
+      { id: 'f3', members: [ids[4]] }
+    ];
+    const out = path.join(directory, 'kinds.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = id => document.querySelector('[data-node-id="' + id + '"]');
+        const rect = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+        const frame = id => document.querySelector('[data-frame-id="' + id + '"]');
+        const f1 = frame('f1');
+        const members = ${JSON.stringify([ids[0], ids[1]])}.map(id => rect(card(id)));
+        return {
+          cards: ${JSON.stringify(ids)}.map(id => { const c = card(id); return { kind: c.dataset.shareKind ?? null, shape: c.dataset.shareShape ?? null, svg: c.querySelectorAll('svg.vam-kind-shape').length, polygons: c.querySelectorAll('svg.vam-kind-shape polygon').length, label: c.getAttribute('aria-label'), kindText: c.querySelector('.vam-card-kind')?.textContent ?? null, padding: c.style.padding }; }),
+          frames: [...document.querySelectorAll('.vam-share-frame')].map(f => f.dataset.frameId),
+          frameLabel: f1 && f1.querySelector('.vam-share-frame-label')?.textContent,
+          frameChildren: f1 ? f1.querySelectorAll('*').length : -1,
+          frameAria: f1 && f1.getAttribute('aria-label'),
+          frameRole: f1 && f1.getAttribute('role'),
+          frameContains: f1 ? members.every(m => { const r = rect(f1); return r.l <= m.l && r.t <= m.t && r.r >= m.r && r.b >= m.b; }) : false,
+          frameBehind: !!document.querySelector('.vam-share-frames') && !!(document.querySelector('.vam-share-frames').compareDocumentPosition(card(${JSON.stringify(ids[0])})) & Node.DOCUMENT_POSITION_FOLLOWING),
+          pics: ['freeok', 'freegone', 'oldplain'].map(id => { const e = document.querySelector('[data-item-id="' + id + '"]'); return { annotated: e.classList.contains('is-annotated'), bar: !!e.querySelector('.vam-annotated-bar'), missing: e.classList.contains('is-missing'), name: e.querySelector('.vam-canvas-image-name')?.textContent ?? null, img: !!e.querySelector('img') }; }),
+          title: document.title, injected: document.querySelectorAll('img[src="x"]').length
+        };
+      })()`);
+    });
+    const [hyp, con, forged, plainTopic, rectOnly, listKind] = report.cards;
+    assert.equal(hyp.kind, 'hypothesis'); assert.equal(hyp.shape, 'diamond'); assert.equal(hyp.svg, 1); assert.equal(hyp.polygons, 1);
+    assert.match(hyp.label, /Type: Hypothesis/); assert.equal(hyp.kindText, 'Hypothesis');
+    assert.ok(hyp.padding, 'the text is fitted inside the shape');
+    assert.equal(con.kind, 'conclusion'); assert.equal(con.shape, 'hexagon', 'a kind without a shape takes the map\'s shape for it'); assert.equal(con.svg, 1);
+    for (const card of [forged, plainTopic, listKind]) { assert.equal(card.kind, null); assert.equal(card.shape, null); assert.equal(card.svg, 0); assert.equal(card.kindText, null); assert.ok(!/Type:/.test(card.label ?? ''), 'no type text'); }
+    assert.equal(rectOnly.shape, 'rect'); assert.equal(rectOnly.kind, null); assert.equal(rectOnly.svg, 0, 'a rectangle is the card\'s own frame');
+    assert.deepEqual(report.frames, ['f1', 'f3'], 'a frame with no member in the file is not drawn');
+    assert.equal(report.frameLabel, '<img src=x onerror="document.title=1">', 'a frame name stays text');
+    assert.equal(report.frameChildren, 1); assert.equal(report.frameRole, 'group'); assert.match(report.frameAria, /^Frame: /);
+    assert.equal(report.frameContains, true, 'the frame is drawn outside its members');
+    assert.equal(report.frameBehind, true);
+    assert.deepEqual(plain(report.pics[0]), { annotated: false, bar: false, missing: false, name: null, img: true });
+    assert.equal(report.pics[1].annotated, false); assert.equal(report.pics[1].bar, false); assert.equal(report.pics[1].missing, true); assert.equal(report.pics[1].name, '[image not included]');
+    assert.equal(report.pics[2].annotated, true, 'an old file\'s picture with no anchors stays annotated'); assert.equal(report.pics[2].bar, true);
+    assert.notEqual(report.title, '1'); assert.equal(report.injected, 0);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
 });

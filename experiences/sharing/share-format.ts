@@ -197,6 +197,8 @@ export interface ShareImagePayload {
   h: number;
   asset?: string;
   note?: string;
+  /** Optional (share-complete): `true` for a free picture (a plain image of the map, not an annotated one); the viewer draws it without the annotation bar. */
+  free?: true;
   anchors: ShareAnchorPayload[];
   /** anchor -> topic relations (either direction in the map). `kind` and `description` are optional (share-complete), plain text only; the viewer checks `kind` again. */
   links?: Array<{ anchor: string; topic: string; ring?: true; kind?: ShareRelationKind; description?: string }>;
@@ -422,7 +424,7 @@ function shareImages(
     const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h] as number[];
     if (!(w > 0 && h > 0)) continue;
     seen.add(raw.id);
-    const image: ShareImagePayload = { id: raw.id, x, y, w, h, anchors: [] };
+    const image: ShareImagePayload = { id: raw.id, x, y, w, h, anchors: [], ...(raw.kind === "image" ? { free: true as const } : {}) };
     const asset = assetNames[raw.id];
     if (asset && assets[asset]) image.asset = asset;
     const note = typeof raw.note === "string" ? optionalText(plain(raw.note)) : undefined;

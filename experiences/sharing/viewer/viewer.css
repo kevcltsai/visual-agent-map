@@ -27,6 +27,7 @@
   --color-green: #08b94e;
   --color-blue: #086ddd;
   --color-purple: #7852ee;
+  --color-cyan: #00bfbc;
   --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);
   --radius-s: 4px;
@@ -64,6 +65,7 @@
     --color-green: #44cf6e;
     --color-blue: #027aff;
     --color-purple: #a882ff;
+    --color-cyan: #53dfdd;
     --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
     --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);
   }
@@ -211,3 +213,27 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-anchor-line { fill: none; stroke: var(--interactive-accent); stroke-width: 2.25px; pointer-events: none; }
 /* No picture in the file (images off, structure only, unreadable): a grey placeholder, not the accent frame the map draws around a picture it has. */
 .vam-view .vam-canvas-image.is-annotated.is-missing { background: var(--background-secondary); border-color: var(--background-modifier-border-hover); box-shadow: none; }
+/* Topic types and shapes (share-complete P2): the map's rules from styles.css (V1.6), keyed on the viewer's own whitelisted attributes data-share-kind and data-share-shape. */
+.vam-node[data-share-kind="atomic"] { --vam-kind-hue: var(--color-cyan); }
+.vam-node[data-share-kind="hypothesis"] { --vam-kind-hue: var(--color-purple); }
+.vam-node[data-share-kind="evidence"] { --vam-kind-hue: var(--color-green); }
+.vam-node[data-share-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
+.vam-node[data-share-kind="action"] { --vam-kind-hue: var(--color-orange); }
+.vam-node[data-share-kind] { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--text-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
+.vam-node[data-share-kind][data-relevance="side"] { --vam-kind-dash: 6 4; }
+.vam-node[data-share-kind].is-selected { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
+.vam-node[data-share-kind="action"] { border-radius: 3px; border-color: var(--vam-kind-line); background: var(--vam-kind-fill); }
+.vam-node[data-share-shape="rect"]:not([data-share-kind]) { border-radius: 3px; }
+.vam-node[data-share-shape="ellipse"], .vam-node[data-share-shape="diamond"], .vam-node[data-share-shape="folded"], .vam-node[data-share-shape="hexagon"] { isolation: isolate; padding: 28px 40px; border-color: transparent; background: transparent; box-shadow: none; }
+.vam-node[data-share-shape="ellipse"].is-selected, .vam-node[data-share-shape="diamond"].is-selected, .vam-node[data-share-shape="folded"].is-selected, .vam-node[data-share-shape="hexagon"].is-selected { outline: 0; border-color: transparent; }
+.vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
+.vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill, var(--vam-card-bg)); stroke: var(--vam-kind-line, var(--text-muted)); stroke-width: var(--vam-kind-width, 2px); stroke-dasharray: var(--vam-kind-dash, none); stroke-linejoin: round; }
+.vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line, var(--text-muted)); stroke-width: var(--vam-kind-width, 2px); stroke-linejoin: round; }
+.vam-node[data-share-kind="atomic"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.vam-node[data-share-kind="hypothesis"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.vam-node[data-share-kind="hypothesis"] .vam-card-summary, .vam-node[data-share-kind="atomic"] .vam-card-summary { -webkit-line-clamp: 2; }
+.vam-card-kind { display: block; font-size: var(--font-ui-smaller); line-height: 1.3; color: var(--text-muted); }
+/* Frames (map boundaries): a dashed outline round their members, behind the cards. */
+.vam-share-frames { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.vam-share-frame { position: absolute; box-sizing: border-box; border: 2px dashed var(--interactive-accent); border-radius: 12px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
+.vam-share-frame-label { position: absolute; left: 10px; top: -12px; max-width: calc(100% - 20px); padding: 1px 10px; border-radius: 999px; border: 1px solid var(--interactive-accent); background: var(--background-primary); color: var(--text-accent); font-size: var(--font-ui-smaller); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

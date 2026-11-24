@@ -55,7 +55,7 @@ export interface ViewerImage {
   note: string;
   anchors: ViewerAnchor[];
   links: ViewerImageLink[];
-  /** A picture with no anchors, no relations and no note: drawn as a plain picture, without the annotation bar. */
+  /** The file marks it a free picture (`free: true`): drawn as a plain picture, without the annotation bar. An old annotated image never is. */
   free: boolean;
 }
 
@@ -152,7 +152,7 @@ export function readImages(
       note,
       anchors,
       links,
-      free: !anchors.length && !links.length && !note
+      free: item.free === true
     });
   }
   return out;

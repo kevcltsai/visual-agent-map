@@ -772,7 +772,7 @@ test('sharing complete: boundaries keep members present in the file; a frame wit
   assert.deepEqual(plain(payload.boundaries), [{ id: 'bd1', members: [a, b], label: '<b>Group</b> x' }, { id: 'bd3', members: [a] }, { id: 'bd4', members: ['img1'] }]);
   const json = format.serializeShareJson(payload);
   assert.ok(!json.includes('Secret/vault') && !json.includes('"path"'), 'a free picture never carries its vault path');
-  assert.deepEqual(plain(payload.images), [{ id: 'img1', x: 1, y: 2, w: 30, h: 40, anchors: [] }], 'a free picture without an attached file is listed without an asset');
+  assert.deepEqual(plain(payload.images), [{ id: 'img1', x: 1, y: 2, w: 30, h: 40, anchors: [], free: true }], 'a free picture without an attached file is listed without an asset');
 });
 
 test('sharing complete: image links carry a whitelisted kind and plain description; an unknown kind is left out of the link only', () => {

@@ -936,14 +936,14 @@ test('share exporter complete: type and shape come from the note; an argument-ma
   const [na, nb] = plain(result.payload.nodes);
   assert.deepEqual([na.kind, na.shape, nb.kind, nb.shape], ['hypothesis', 'diamond', 'evidence', 'folded']);
   const free = plain(result.payload.images)[0];
-  assert.deepEqual(Object.keys(free).sort(), ['anchors', 'asset', 'h', 'id', 'w', 'x', 'y']);
+  assert.deepEqual(Object.keys(free).sort(), ['anchors', 'asset', 'free', 'h', 'id', 'w', 'x', 'y']);
   assert.deepEqual(free.anchors, []);
   assert.ok(result.payload.assets[free.asset]);
   assert.equal(harness.serialised(result).includes('Pics/other.png'), false);
   assert.deepEqual(plain(result.payload.boundaries), [{ id: 'bd', members: ['a', 'b', 'free1'], label: 'Frame' }]);
   // Images off: the picture is still listed (the viewer draws a text placeholder), with no asset.
   result = harness.exporter.assemble({ includeDetail: true, includeImages: false });
-  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 3, y: 4, w: 50, h: 60, anchors: [] }]);
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 3, y: 4, w: 50, h: 60, anchors: [], free: true }]);
   // An argument map draws every managed card as a plain rectangle, whatever its type.
   const fixture = require('../fixtures/argument-map-ui.cjs');
   const one = fixture.states.facet_matched;
@@ -963,7 +963,7 @@ test('share exporter complete: a map without new data keeps its payload, and a v
   const harness = matchMapHarness({ files: [], canvasItems: [{ id: 'free1', kind: 'image', path: 'Gone/x.png', x: 0, y: 0, w: 5, h: 5 }] });
   await harness.prepare();
   const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
-  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 0, y: 0, w: 5, h: 5, anchors: [] }], 'nothing silently disappears');
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 0, y: 0, w: 5, h: 5, anchors: [], free: true }], 'nothing silently disappears');
   assert.equal(result.leakCategories.length, 0);
   assert.equal(harness.serialised(result).includes('Gone/x.png'), false);
 });

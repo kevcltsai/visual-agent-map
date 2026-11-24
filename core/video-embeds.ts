@@ -30,6 +30,13 @@ export function youtubeVideoId(rawUrl: string): string | null {
   return id && VIDEO_ID.test(id) ? id : null;
 }
 
+/** The plain YouTube video urls written in `text` (what a user pasted), in order; trailing punctuation is not part of a url. */
+export function videoUrlsInText(text: string): string[] {
+  return (text.match(/https?:\/\/[^\s<>"'()[\]]+/gi) ?? [])
+    .map(url => url.replace(/[.,;:!?，。；：！？、]+$/u, ""))
+    .filter(url => youtubeVideoId(url) !== null);
+}
+
 /** A host that is YouTube or dresses up as it (`youtube.com.evil.example`, `youtube-nocookie.com`): such an embed is never kept as it is. */
 const looksLikeYoutube = (rawUrl: string): boolean => {
   try {

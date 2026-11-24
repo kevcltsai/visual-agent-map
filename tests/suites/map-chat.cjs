@@ -3077,13 +3077,13 @@ const exampleButtons = chat => {
   const input = chat.inputEl; input.setSelectionRange = (a, b) => { input.selectionStart = a; input.selectionEnd = b; };
   return findAll(chat.examplesEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-example'));
 };
-test('Book entry 12: the opening screen shows two examples under the field (owner 2026-11-23), the picture one first and marked new, then the book one; a click fills the field and selects the blank', () => {
+test('Book entry 12: the opening screen shows two examples under the field (owner 2026-11-23), the picture one first, then the book one, both marked new (owner 2026-11-24); a click fills the field and selects the blank', () => {
   const f = heroFixture(); const c = f.panel; const buttons = exampleButtons(c);
   assert.equal(buttons.length, 2, 'two examples');
   assert.equal(c.examplesEl.parent, c.heroActionsEl, 'in the mind map tab panel, below the composer'); assert.equal(c.examplesEl.attrs.role, 'group'); assert.equal(c.examplesEl.attrs['aria-label'], 'Examples');
   assert.ok(hasClass(buttons[0], 'is-new')); assert.match(visibleText(buttons[0]), /Start from a picture.*New/);
   assert.equal(find(buttons[0], i => i.text === '🖼').attrs['aria-hidden'], 'true', 'the picture icon is not read out');
-  assert.equal(hasClass(buttons[1], 'is-new'), false, 'the book one is no longer marked new'); assert.doesNotMatch(visibleText(buttons[1]), /New/);
+  assert.ok(hasClass(buttons[1], 'is-new'), 'the book one is marked new too'); assert.match(visibleText(buttons[1]), /picture book.*New/i);
   assert.equal(find(buttons[1], i => i.text === '📖').attrs['aria-hidden'], 'true', 'the book icon is not read out');
   assert.equal(c.heroActionsEl.hidden, false);
   buttons[1].click();
@@ -3095,12 +3095,12 @@ test('Book entry 12: the opening screen shows two examples under the field (owne
   assert.equal(f.calls.send, 0, 'the picture example does not send either');
   c.researchTabEl.click(); assert.equal(c.heroActionsEl.hidden, true, 'the research tab has its own suggestions');
 });
-test('Book entry 12: the examples are in Traditional Chinese: the picture one with the new tag and the owner\'s sentence, the book one with the 「主題」 blank', () => {
+test('Book entry 12: the examples are in Traditional Chinese: both with the new tag, the picture one with the owner\'s sentence, the book one with the 「主題」 blank', () => {
   const f = heroFixture(); f.setLanguage('zh-TW'); f.panel.relabel(); const c = f.panel; const buttons = exampleButtons(c);
   assert.match(visibleText(buttons[0]), /從一張圖展開.*新/); buttons[0].click();
   assert.equal(c.inputEl.value, '我想做一個「背部伸展」的圖片心智圖，幫我找一個背部肌肉的圖片當作根議題, 在各部位酸痛肌肉部位上面設置錨點. 每個對應的酸痛肌肉部位, 幫我找相關的伸展動作, 包含影片, 跟圖片');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '背部伸展');
-  assert.doesNotMatch(visibleText(buttons[1]), /新/); buttons[1].click();
+  assert.match(visibleText(buttons[1]), /做一本圖文書新/); buttons[1].click();
   assert.equal(c.inputEl.value, '我想做一本關於「主題」的圖文書，先幫我建大綱');
   assert.equal(c.inputEl.value.slice(c.inputEl.selectionStart, c.inputEl.selectionEnd), '主題');
   f.setLanguage('en');

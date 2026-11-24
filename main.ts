@@ -167,7 +167,6 @@ import { groupRibbonIcons } from "./ui/ribbon-group";
 import { CodexAppServerRuntime, type CodexWebSearchEvent } from "./ai/runtime/codex-app-server";
 import { ClaudeCodeCliRuntime } from "./ai/runtime/claude-code-cli";
 import { CLAUDE_MODEL_CHOICES } from "./ai/providers/provider";
-import { ThinkingCore } from "./core/thinking-core";
 import { prepareStep, type PreparedStep } from "./core/step-runner";
 import type { ImageCandidate } from "./core/image-candidates";
 import { imageSearchStep } from "./core/steps/image-search/step";
@@ -185,7 +184,6 @@ import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
 import { mermaidSyntaxCheck } from "./ai/mermaid-safety";
 import { localizedResponseSchema } from "./core/steps/task/schemas";
-import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
 import { StructureReviewService, providerStructureReviewRunner } from "./core/structure-review-service";
 import { MapChatService, providerMapChatRunner } from "./core/map-chat-service";
@@ -194,7 +192,6 @@ import {
   providerGoalRecommendRunner,
   type GoalRecommendRun
 } from "./core/goal-recommend-service";
-import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
@@ -1151,12 +1148,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
   };
   readonly aiTasks = new AiTaskService(this.aiTaskOptions);
-  readonly core = new ThinkingCore(
-    this.aiRuntime,
-    this.aiTasks,
-    this.aiCalls,
-    new ReframingService(providerReframeRunner(this.aiCalls))
-  );
   readonly outlineGeneration = new OutlineGenerationService(providerOutlineRunner(this.aiCalls));
   readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
   readonly mapChat = new MapChatService(providerMapChatRunner(this.aiCalls));
@@ -1484,19 +1475,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     });
     this.ready = initialize;
-    this.register(
-      this.core.experiences.register("visual-map", (artifact, beforeWrite) =>
-        receiveVisualMapHandoff(artifact, {
-          repo: this.repo,
-          defaultModel: () => this.settings.cliModel,
-          currentModel: () => this.currentModelChoice(),
-          exists: path => !!this.app.vault.getAbstractFileByPath(path),
-          mutate: work => this.mutate(work),
-          navigate: path => this.activateView(path),
-          beforeWrite
-        })
-      )
-    );
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(
       OUTLINE_VIEW_TYPE,

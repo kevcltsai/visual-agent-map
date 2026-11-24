@@ -3,7 +3,7 @@ import type { ReasoningLevel } from "../../ai/types";
 import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
 import { isFollowInputLanguage, supportedLanguageLabel, t } from "../../i18n";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
-import { detectAimContentLanguage } from "../../core/content-language";
+import { detectContentLanguage } from "../../core/content-language";
 import { mapContentLanguage } from "../visual-map/map-text-language";
 import {
   BuildController,
@@ -103,7 +103,7 @@ export function originalLanguage(source: ShareSource, uiLanguage: ShareLanguage)
   if (!isFollowInputLanguage(language)) return language;
   const hasLetter = (text: unknown): text is string => typeof text === "string" && /\p{L}/u.test(text);
   const named = (text: string): ShareOriginalLanguage => {
-    const detected = detectAimContentLanguage(text);
+    const detected = detectContentLanguage(text);
     return detected === undefined || isFollowInputLanguage(detected) ? SHARE_UNKNOWN_LANGUAGE : detected;
   };
   const own = [source.map.title, source.goal].find(hasLetter);

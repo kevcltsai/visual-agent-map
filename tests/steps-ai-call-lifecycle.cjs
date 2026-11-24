@@ -1,5 +1,5 @@
 // Characterization of one AI call's lifecycle (exchange log events, runtime arguments, activeTasks key, stop handling)
-// for the outline, map-chat and reframe runners. These tests pin today's behaviour; the AiCalls refactor must keep them green.
+// for the outline and map-chat runners. These tests pin today's behaviour; the AiCalls refactor must keep them green.
 // Only `makeRunner` knows how a runner is built, so a later packet changes that one helper.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,13 +11,11 @@ const { aiCallsFor } = require('./support-ai-calls.cjs');
 const bundle = loadSource(`
 export { providerOutlineRunner } from "./core/outline-generation-service";
 export { providerMapChatRunner } from "./core/map-chat-service";
-export { providerReframeRunner } from "./core/reframing-service";
 export { prepareStep } from "./core/step-runner";
 export { AiCalls } from "./core/ai-calls";
 export { aiRuntimeForModel } from "./core/ai-runtime-service";
 export { outlineGenerateStep } from "./core/steps/outline-generate/step";
 export { mapChatStep, MAP_CHAT_SCHEMA } from "./core/steps/map-chat/step";
-export { reframeStep, REFRAME_SCHEMA } from "./core/steps/reframe/step";
 // An Error of the bundle's own realm: product code tests instanceof Error, which a host-realm Error would fail.
 export const makeError = (message: string): Error => new Error(message);
 `, { obsidian: S.obsidian });
@@ -34,11 +32,7 @@ function makeRunner(kind, options, active) {
     const runner = bundle.providerMapChatRunner(aiCallsFor(bundle, options, active));
     return (request, signal, onJson) => runner(request, signal, prepare(bundle.mapChatStep, request), onJson);
   }
-  const runner = bundle.providerReframeRunner(aiCallsFor(bundle, options, active));
-  return (request, signal) => {
-    const prepared = prepare(bundle.reframeStep, request);
-    return runner(request, prepared.prompt, bundle.REFRAME_SCHEMA, signal, prepared);
-  };
+  throw new Error(`Unknown runner: ${kind}`);
 }
 
 const outline = [
@@ -58,12 +52,6 @@ const KINDS = {
     name: 'map-chat', topic: 'Map chat · What is missing?', step: 'map-chat@31', stopped: 'Map chat stopped',
     schema: () => bundle.MAP_CHAT_SCHEMA, stream: true
   },
-  reframe: {
-    request: (extra = {}) => ({ targetCore: 'understand', source: 'Candidate insight', question: 'Explore this', context: '', language: 'en', model: 'gpt-6-luna', reasoning: 'low', ...extra }),
-    good: JSON.stringify({ question: 'What distinguishes these?', context: 'Open tensions remain.', rationale: 'Test it.' }), bad: '{"question":"q"}',
-    name: 'reframe', topic: 'Reframing · Explore this', step: 'reframe@1', stopped: 'Reframing stopped',
-    schema: () => bundle.REFRAME_SCHEMA, stream: false
-  }
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

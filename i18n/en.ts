@@ -2201,8 +2201,6 @@ export const en = {
   "error.batch_remove_rollback_failed": "Batch removal failed and could not be fully undone",
   "error.copy_rollback_restore_failed": "Undoing the copy failed and could not be fully restored",
   "error.batch_copy_rollback_failed": "Batch copy failed and could not be fully undone",
-  "error.reframing_stopped": "Reframing stopped.",
-  "error.reframing_over_budget": "Source exceeds the reframing budget; choose one insight or create manually.",
   "note.copy_suffix": "copy",
   "note.source_topic_label": "Source topic: ",
   "error.outline_generate_empty_topic": "Enter a research topic before generating an outline.",

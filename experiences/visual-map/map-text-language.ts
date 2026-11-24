@@ -1,6 +1,6 @@
 import type { MapDocument } from "../../map-model";
 import { isUiLanguage, translate, uiLocale, type ContentLanguage, type UiLanguage } from "../../i18n";
-import { detectAimContentLanguage, resolveMapOutputLanguage } from "../../core/content-language";
+import { detectContentLanguage, resolveMapOutputLanguage } from "../../core/content-language";
 
 /**
  * "Map text language": the registry language (an interface language with a dictionary) that fixed text VAM makes up for
@@ -36,7 +36,7 @@ export function resolveMapTextLanguage(
  * decisive signal (digits, emoji, empty). Output-only scripts and the follow-the-input row read English, like {@link mapTextLanguage}.
  */
 export function textLanguageOf(text: string, fallback: UiLanguage): UiLanguage {
-  const detected = detectAimContentLanguage(text);
+  const detected = detectContentLanguage(text);
   return detected === undefined ? fallback : mapTextLanguage(detected);
 }
 

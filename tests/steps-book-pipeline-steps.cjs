@@ -575,7 +575,8 @@ test('exchange log: success, parse error and provider error keep titles, chapter
     noContent(proofDown.log, spy, 'proof provider error');
     // control: a call that does not set the flag does log its text, so the assertions above can fail
     const plainCall = harness({ answer: 'SECRET-REPLY' });
-    await plainCall.planCalls.runCall({ prompt: `${TITLE} prompt` }, { model: 'gpt-6-luna', effort: 'low', topic: 't', taskName: 'x', signal: signal(), localCodex: true }, raw => raw);
+    const plainStep = runMod.prepareStep({ id: 'test.plain', version: 1, render: () => `${TITLE} prompt`, parse: raw => raw }, {});
+    await plainCall.planCalls.run(plainStep, { model: 'gpt-6-luna', effort: 'low', topic: 't', taskName: 'x', signal: signal(), localCodex: true }, raw => raw);
     assert.ok(JSON.stringify(plainCall.log.getEntries()).includes(TITLE));
   } finally {
     spy.restore();

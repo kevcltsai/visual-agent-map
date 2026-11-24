@@ -21,7 +21,7 @@ import { hanScriptVotes } from "../i18n/han-fold";
 import { LATIN_TEXT_DETECTION } from "../i18n/languages";
 
 /**
- * What {@link detectAimContentLanguage} can name: an output-only language (including the follow-the-input row), a Han
+ * What {@link detectContentLanguage} can name: an output-only language (including the follow-the-input row), a Han
  * script (Traditional or Simplified), or plain English.
  */
 export type DetectedLanguage = OutputOnlyId | "zh-TW" | "zh-CN" | typeof LATIN_TEXT_DETECTION.language;
@@ -104,10 +104,10 @@ function englishByFunctionWords(text: string): boolean {
 
 /**
  * Character-only language detection for one piece of user text. Undefined means no letters at all. Han text with no
- * decisive characters reads as Traditional here; {@link chooseAimContentLanguage} lets the interface language decide
+ * decisive characters reads as Traditional here; {@link chooseContentLanguage} lets the interface language decide
  * that case instead.
  */
-export function detectAimContentLanguage(text: string): DetectedLanguage | undefined {
+export function detectContentLanguage(text: string): DetectedLanguage | undefined {
   const signal = signalOf(text);
   if (signal === UNDECIDED_HAN) return "zh-TW";
   return signal;
@@ -121,7 +121,7 @@ export function detectAimContentLanguage(text: string): DetectedLanguage | undef
  * source gives the interface language. A default name ("New topic 5", "Untitled mind map") counts as no text. No AI call. A manual choice and a map's remembered language rank above this and
  * are applied by the callers.
  */
-export function chooseAimContentLanguage(uiLanguage: UiLanguage, ...sources: (string | undefined)[]): ContentLanguage {
+export function chooseContentLanguage(uiLanguage: UiLanguage, ...sources: (string | undefined)[]): ContentLanguage {
   for (const source of sources) {
     // A default name ("New topic 5", "Untitled mind map") was not written by the user: it says nothing about their language.
     if (isPlaceholderText(source ?? "")) continue;
@@ -137,9 +137,9 @@ export function chooseAimContentLanguage(uiLanguage: UiLanguage, ...sources: (st
 const isPlaceholderText = (text: string): boolean =>
   isPlaceholderTopicTitle(text) || isPlaceholderMapTitle(text, PLACEHOLDER_MAP_NAMES);
 
-/** The language to write in for a piece of selected text; same rule as {@link chooseAimContentLanguage}. */
+/** The language to write in for a piece of selected text; same rule as {@link chooseContentLanguage}. */
 export function selectionOutputLanguage(uiLanguage: UiLanguage, selected: string): ContentLanguage {
-  return chooseAimContentLanguage(uiLanguage, selected);
+  return chooseContentLanguage(uiLanguage, selected);
 }
 
 /** The standard Detail heading keys: a note carrying one of them in a language's spelling was written in that language. */
@@ -211,7 +211,7 @@ function cardLanguageFromTitles(
   cardTitle: string,
   mapTitle: string | undefined
 ): ContentLanguage {
-  const chosen = chooseAimContentLanguage(uiLanguage, cardTitle);
+  const chosen = chooseContentLanguage(uiLanguage, cardTitle);
   if (chosen !== LATIN_TEXT_DETECTION.language && chosen !== FOLLOW_INPUT_ID) return chosen;
   if (!mapTitle || isPlaceholderText(mapTitle)) return chosen;
   const signal = signalOf(mapTitle);
@@ -247,7 +247,7 @@ export function rememberedOutputLanguage(
  *    interface keeps Chinese);
  * 3. otherwise derived from the map title, then the interface language.
  */
-export function resolveAimContentLanguage(
+export function resolveMapOutputLanguage(
   map: Pick<MapDocument, "title" | "aim" | "outputLanguage"> | undefined | null,
   uiLanguage: UiLanguage
 ): ContentLanguage {
@@ -255,7 +255,7 @@ export function resolveAimContentLanguage(
   if (remembered !== undefined) return remembered;
   const stored = map?.aim?.contentLanguage;
   if (isNoteLanguage(stored)) {
-    const detected = detectAimContentLanguage(map?.title ?? "");
+    const detected = detectContentLanguage(map?.title ?? "");
     if (
       detected !== undefined &&
       isOutputOnlyLanguage(detected) &&
@@ -265,7 +265,7 @@ export function resolveAimContentLanguage(
       return detected;
     return contentLocale(stored, uiLanguage);
   }
-  return chooseAimContentLanguage(uiLanguage, map?.title);
+  return chooseContentLanguage(uiLanguage, map?.title);
 }
 
 /**
@@ -277,14 +277,14 @@ export function outputLanguageForMap(
   uiLanguage: UiLanguage,
   ...sources: (string | undefined)[]
 ): ContentLanguage {
-  return rememberedOutputLanguage(map) ?? chooseAimContentLanguage(uiLanguage, ...sources);
+  return rememberedOutputLanguage(map) ?? chooseContentLanguage(uiLanguage, ...sources);
 }
 
 /**
  * The text sources the map chat reads the output language from (0.28 ticket 07, decision
  * 2026-10-30-map-chat-instruction-language#1). The instruction is the first paragraph: the text before the first blank
  * line (a line with only whitespace; `\n` and `\r\n` both count) outside a code fence, when more text follows it. Returns
- * `[instruction, whole message]`, so {@link chooseAimContentLanguage} takes the first source with letters: what the user
+ * `[instruction, whole message]`, so {@link chooseContentLanguage} takes the first source with letters: what the user
  * typed decides. When the instruction has no letters of its own once code, links and URLs are removed (symbols, emoji,
  * a code block, a lone URL), or the message has no such blank line, the result is `[whole message]`.
  */
@@ -300,9 +300,3 @@ export function mapChatLanguageSources(message: string): string[] {
   }
   return [message];
 }
-
-/**
- * The language a map's AI output and map-level text follow, as a `ContentLanguage`: the single function other code
- * (default names, labels) calls to learn what the map is written in. Same rule as {@link resolveAimContentLanguage}.
- */
-export const resolveMapOutputLanguage = resolveAimContentLanguage;

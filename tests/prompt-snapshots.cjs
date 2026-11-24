@@ -153,9 +153,9 @@ test('collect snapshots: style combinations per step (safety net before the prom
 test('collect snapshots: topics whose language is read from the text (D-2026-10-94)', async () => {
   // The existing snapshots name an explicit language id; these two start from the topic text. An English topic with function
   // words is detected as en (the en path); a French topic keeps the follow-input row, whose clause quotes the topic.
-  const { chooseAimContentLanguage } = loadModule('core/content-language.ts');
+  const { chooseContentLanguage } = loadModule('core/content-language.ts');
   const english = 'How to plan a trip to Taipei', french = 'Histoire de la Révolution française';
-  const englishLanguage = chooseAimContentLanguage('zh-TW', english), frenchLanguage = chooseAimContentLanguage('zh-TW', french);
+  const englishLanguage = chooseContentLanguage('zh-TW', english), frenchLanguage = chooseContentLanguage('zh-TW', french);
   assert.equal(englishLanguage, 'en');
   assert.equal(frenchLanguage, 'same-as-input');
   await recordContext('service.task-topic-english.detected-en', 'AiTaskService instructions: general task, English topic detected as en (D-2026-10-94)', englishLanguage, { ...base, title: english, outputLanguage: englishLanguage });
@@ -206,11 +206,9 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
   }
 });
 
-test('collect snapshots: Reframe, Markdown context', async () => {
+test('collect snapshots: Markdown context and shared services', async () => {
   const { i18n } = loadSource(`export * as i18n from './i18n';`);
   i18n.setUiLanguage('en');
-  const { buildReframePrompt } = support.load('core/reframing-service.ts', { obsidian: support.obsidian });
-  for (const [language, tag] of LANGUAGES) record(`reframe.${tag}`, 'core/reframing-service.ts buildReframePrompt', language, buildReframePrompt({ language, question: 'Direction question', context: 'Direction context', source: 'Source thinking text' }));
   // Share translation prompts are written in English for every target; the target and source languages are named inside.
   const { buildShareTranslatePrompt, buildShareTranslateLabelsPrompt, SHARE_TRANSLATE_SCHEMA } = support.load('experiences/sharing/share-translate-service.ts', { obsidian: support.obsidian });
   const shareItems = [{ id: '1', text: 'Heat changes \u27e61/\u27e7 and \u27e62\u27e7starches\u27e6/2\u27e7.' }, { id: '2', text: 'Roast' }];

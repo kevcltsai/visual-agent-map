@@ -347,14 +347,12 @@ const { loadSource } = require('./support-replay.cjs');
 const S = require('./support.cjs');
 const shared = loadSource(`
 export { providerOutlineRunner } from "./core/outline-generation-service";
-export { providerReframeRunner } from "./core/reframing-service";
 export { prepareStep } from "./core/step-runner";
 export { AiCalls } from "./core/ai-calls";
 export { aiRuntimeForModel } from "./core/ai-runtime-service";
 export { outlineGenerateStep } from "./core/steps/outline-generate/step";
 export { providerGoalRecommendRunner, buildGoalRecommendPrompt } from "./core/goal-recommend-service";
 export { goalRecommendStep } from "./core/steps/goal-recommend/step";
-export { reframeStep, REFRAME_SCHEMA } from "./core/steps/reframe/step";
 `, { obsidian: S.obsidian });
 
 function sharedCalls(reply, { report, records }) {
@@ -385,17 +383,6 @@ test('a goal-recommend call is recorded under its map path, and the path never r
   same([records[0].action, records[0].mapPath, records[0].inputTokens], ['other', 'SECRET/PATH/map.vam', 30]);
   assert.equal(shared.buildGoalRecommendPrompt(request).includes('SECRET/PATH'), false);
   assert.equal(prepared.prompt.includes('SECRET/PATH'), false);
-});
-
-test('a reframe call is recorded exactly once', async () => {
-  const records = [];
-  const reply = JSON.stringify({ question: 'What distinguishes these?', context: 'Open tensions remain.', rationale: 'Test it.' });
-  const calls = sharedCalls(reply, { report: { usage: { inputTokens: 40, outputTokens: 6 } }, records });
-  const request = { targetCore: 'understand', source: 'Candidate', question: 'Explore this', context: '', language: 'en', model: 'claude:sonnet', reasoning: 'low' };
-  const prepared = shared.prepareStep(shared.reframeStep, request);
-  await shared.providerReframeRunner(calls)(request, prepared.prompt, shared.REFRAME_SCHEMA, new AbortController().signal, prepared);
-  assert.equal(records.length, 1);
-  same([records[0].action, records[0].inputTokens, records[0].outputTokens], ['other', 40, 6]);
 });
 
 test('an AiTaskService task goes through AiCalls and is still recorded exactly once', async () => {

@@ -127,7 +127,7 @@ test('the literal scan finds long natural-language literals, skips error message
     'export const short = "Short label";',
     'export const prompt = "Summarize the following notes and return only a JSON object with a title field";',
     'export const chinese = "請整理以下內容並以繁體中文回答，保留所有條件與限制。";',
-    'export const identifier = "experiences/coffee-tables/steps/convergence/prompt.en.md.something-long-without-spaces";',
+    'export const identifier = "core/steps/outline-generate/prompt.en.md.something-long-without-spaces";',
     'export function fail() { throw new Error("This is a long error message that explains what went wrong clearly"); }',
     'export const wrapped = new RangeError(`A long template error message that spans ${1} several words in a row`);'
   ].join('\n'));

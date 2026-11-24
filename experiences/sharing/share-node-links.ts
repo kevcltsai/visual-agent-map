@@ -12,18 +12,21 @@ export const NODE_LINK_MID = "\uE001";
 export const NODE_LINK_END = "\uE002";
 /** Starts a mark for a file attachment (a card, not a link to a note): `ATTACHMENT_START label MID name END`. */
 export const ATTACHMENT_START = "\uE003";
+/** Starts the text of a YouTube link the cleaner wrote (`[VIDEO ▶ title](url)`): the viewer may turn it into a click-to-play card. Author-written links never carry it. */
+export const VIDEO_MARK = "\uE004";
+export const VIDEO_LINK_CLASS = "vam-video-link";
 export const ATTACHMENT_CLASS = "vam-attachment-card";
 export const ATTACHMENT_HREF_PREFIX = "#vam-attachment-";
 export const NODE_LINK_CLASS = "vam-node-link";
 export const NODE_LINK_HREF_PREFIX = "#vam-node-";
 
-const MARKS = /[\uE000-\uE003]/g;
-const HAS_MARK = /[\uE000-\uE003]/;
-const MARKED = /([\uE000\uE003])([^\uE000-\uE003]*)\uE001([^\uE000-\uE003]*)\uE002/g;
+const MARKS = /[\uE000-\uE004]/g;
+const HAS_MARK = /[\uE000-\uE004]/;
+const MARKED = /([\uE000\uE003])([^\uE000-\uE004]*)\uE001([^\uE000-\uE004]*)\uE002/g;
 /** The ids a link may carry; anything else stays plain text (the viewer looks the id up in the file, so this is about the attribute value only). */
 const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
-/** Text with the four marks removed: what every author input and every title goes through before a mark is added. */
+/** Text with the five marks removed: what every author input and every title goes through before a mark is added. */
 export const stripNodeLinkMarks = (text: string): string => text.replace(MARKS, "");
 
 /** `text` wrapped in a mark for node `id`; the text unchanged when the id cannot be a link target. */
@@ -37,6 +40,9 @@ export function markAttachment(name: string, label: string): string {
   const plain = stripNodeLinkMarks(label);
   return SAFE_ID.test(name) ? `${ATTACHMENT_START}${plain}${NODE_LINK_MID}${name}${NODE_LINK_END}` : plain;
 }
+
+const textOf = (node: Node): string =>
+  node.nodeType === 3 ? (node.nodeValue ?? "") : Array.from(node.childNodes).map(textOf).join("");
 
 /**
  * Turns the marks in the text of `root` into links to the nodes in `knownIds` and, for attachment marks, cards for the
@@ -53,13 +59,25 @@ export function applyNodeLinks(
   const doc = root.ownerDocument;
   let made = 0;
   const texts: Text[] = [];
+  const links: Element[] = [];
   const walk = (parent: Node): void => {
     for (const child of Array.from(parent.childNodes)) {
       if (child.nodeType === 3) texts.push(child as Text);
-      else if (child.nodeType === 1) walk(child);
+      else if (child.nodeType === 1) {
+        if ((child as Element).localName.toLowerCase() === "a") links.push(child as Element);
+        walk(child);
+      }
     }
   };
   walk(root);
+  // Only the cleaner's own YouTube links carry the video mark; a class an author wrote by hand never survives.
+  for (const link of links) {
+    const kept = (link.getAttribute("class") ?? "").split(/\s+/).filter(name => name && name !== VIDEO_LINK_CLASS);
+    if (kept.length) link.setAttribute("class", kept.join(" "));
+    else link.removeAttribute("class");
+    if (!textOf(link).includes(VIDEO_MARK)) continue;
+    if (/^https:\/\//i.test(link.getAttribute("href") ?? "")) link.setAttribute("class", VIDEO_LINK_CLASS);
+  }
   for (const node of texts) {
     const value = node.nodeValue ?? "";
     if (!HAS_MARK.test(value)) continue;

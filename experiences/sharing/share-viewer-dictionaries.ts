@@ -92,7 +92,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     },
     relationsHeading: "関係",
     frameLabel: "枠",
-    frameNamed: "枠：{0}"
+    frameNamed: "枠：{0}",
+    videoPlay: "クリックして YouTube 動画を再生",
+    videoNote: "再生したときだけ YouTube に接続します（Cookie を記録しない版）",
+    videoOpen: "YouTube で開く"
   },
   ko: {
     lang: "ko",
@@ -178,7 +181,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     },
     relationsHeading: "관계",
     frameLabel: "프레임",
-    frameNamed: "프레임: {0}"
+    frameNamed: "프레임: {0}",
+    videoPlay: "클릭하여 YouTube 동영상 재생",
+    videoNote: "재생할 때만 YouTube에 연결됩니다(쿠키를 기록하지 않는 버전)",
+    videoOpen: "YouTube에서 열기"
   },
   es: {
     lang: "es",
@@ -270,6 +276,9 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     },
     relationsHeading: "Relaciones",
     frameLabel: "Marco",
-    frameNamed: "Marco: {0}"
+    frameNamed: "Marco: {0}",
+    videoPlay: "Haz clic para reproducir el vídeo de YouTube",
+    videoNote: "El vídeo solo se conecta a YouTube al reproducirlo (versión sin cookies)",
+    videoOpen: "Abrir en YouTube"
   }
 };

@@ -2591,6 +2591,12 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_relations": "關係",
   "share.viewer_frame": "範圍框",
   "share.viewer_frame_named_0": "範圍框：{0}",
+  "share.viewer_video_play": "按一下播放 YouTube 影片",
+  "share.viewer_video_note": "播放時才會連到 YouTube（不記錄 cookie 的版本）",
+  "share.viewer_video_open": "在 YouTube 開啟",
+  "share.media_video_0": "影片：{0}",
+  "share.media_audio_0": "音訊：{0}",
+  "share.media_embed_0": "嵌入內容：{0}",
   // Share dialog
   "share.title": "分享這張心智圖",
   "share.intro": "產生一個 HTML 檔，任何瀏覽器都能開啟，離線也可以。存放位置由你決定，不會上傳任何東西。",

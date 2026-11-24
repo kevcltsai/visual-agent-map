@@ -93,6 +93,10 @@ export interface ShareViewerUi {
   /** Accessible name of a frame around cards, and `{0}` the frame's own name. */
   frameLabel: string;
   frameNamed: string;
+  /** Click-to-play YouTube card: the play button label, the note under it, and the link that opens the video on YouTube. */
+  videoPlay: string;
+  videoNote: string;
+  videoOpen: string;
 }
 
 /**
@@ -195,5 +199,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   },
   relationsHeading: "Relations",
   frameLabel: "Frame",
-  frameNamed: "Frame: {0}"
+  frameNamed: "Frame: {0}",
+  videoPlay: "Click to play the YouTube video",
+  videoNote: "The video only connects to YouTube when you play it (the no-cookie version)",
+  videoOpen: "Open on YouTube"
 };

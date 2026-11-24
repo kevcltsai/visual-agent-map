@@ -188,6 +188,15 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .vam-attachment-name { overflow-wrap: anywhere; }
 .vam-sample-detail .vam-attachment-missing { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.vam-sample-detail .vam-video-card { margin: 8px 0; }
+.vam-sample-detail .vam-video-stage { border-radius: 8px; background: #111; color: #eee; aspect-ratio: 16 / 9; max-width: 100%; display: grid; place-items: center; text-align: center; overflow: hidden; }
+.vam-sample-detail .vam-video-play { display: grid; gap: 6px; justify-items: center; background: none; border: 0; color: inherit; font: inherit; font-size: 0.85em; cursor: pointer; padding: 10px; width: 100%; height: 100%; align-content: center; }
+.vam-sample-detail .vam-video-icon { width: 46px; height: 32px; border-radius: 8px; background: #e33; display: grid; place-items: center; }
+.vam-sample-detail .vam-video-icon::after { content: ""; border-left: 13px solid #fff; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 3px; }
+.vam-sample-detail .vam-video-frame { width: 100%; height: 100%; border: 0; }
+.vam-sample-detail .vam-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }
+.vam-sample-detail .vam-video-card > a { display: inline-block; margin-top: 2px; font-size: var(--font-ui-smaller); }
+.vam-sample-detail .vam-media-text { color: var(--text-muted); }
 .vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
 /* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */
 .vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }

@@ -788,7 +788,7 @@ export function startViewer(doc: Document): void {
       if (!rect) continue;
       frameRects.push(rect);
       const el = make("div", "vam-share-frame");
-      el.dataset.frameId = frame.id;
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(frame.id)) el.dataset.frameId = frame.id;
       el.setAttribute("role", "group");
       el.setAttribute("aria-label", frame.label ? fill(ui.frameNamed, frame.label) : ui.frameLabel);
       el.style.left = `${Math.round(rect.x)}px`;

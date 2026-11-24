@@ -14,6 +14,7 @@ import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
 import { applyNodeLinks } from "./share-node-links";
+import { replaceMediaWithLinks } from "./share-media";
 import {
   assertCurrent,
   assetNamesInHtml,
@@ -737,6 +738,19 @@ export class ShareExporter {
         caption.textContent = note("share.mermaid_undrawn_note");
         pre.after(caption);
       }
+    // Video, audio and frames are never carried: each becomes a link card (or visible text) before the sanitizer sees it.
+    replaceMediaWithLinks(
+      host,
+      {
+        label: (kind, name) =>
+          translate(
+            this.config.language,
+            kind === "video" ? "share.media_video_0" : kind === "audio" ? "share.media_audio_0" : "share.media_embed_0",
+            name
+          ).replace(/[:：]\s*$/, "")
+      },
+      tag => createEl(tag)
+    );
     const clean = createDiv();
     clean.append(sanitizeHTMLToDom(host.innerHTML));
     unwrapLocalLinks(clean, () => createSpan());
@@ -964,7 +978,7 @@ export class ShareExporter {
         title: plainWikilinks(note.title),
         summary: plainWikilinks(note.summary),
         status: note.status,
-        ...(note.topicKind ? { kind: note.topicKind } : {}),
+        ...(note.topicKind && !argumentIds.has(node.id) ? { kind: note.topicKind } : {}),
         shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,
         ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),

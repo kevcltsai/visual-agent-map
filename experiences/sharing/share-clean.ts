@@ -8,7 +8,7 @@
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
 import { markdownCodeRanges, normalizeNewlines } from "./share-code";
-import { markAttachment, markNodeLink, stripNodeLinkMarks } from "./share-node-links";
+import { markAttachment, markNodeLink, stripNodeLinkMarks, VIDEO_MARK } from "./share-node-links";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
@@ -185,7 +185,7 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
           .replace(/^<|>$/g, "")
           .replace(/\s+"[^"]*"$/, "");
         // A YouTube embed renders as an iframe, which the shared page does not keep: share it as a plain link instead.
-        if (youtubeVideoId(raw)) return `[▶ ${alt || escapeMd(raw)}](${raw})`;
+        if (youtubeVideoId(raw)) return `[${VIDEO_MARK}▶ ${alt || escapeMd(raw)}](${raw})`;
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;

@@ -104,7 +104,10 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     },
     relationsHeading: text("share.viewer_relations"),
     frameLabel: text("share.viewer_frame"),
-    frameNamed: text("share.viewer_frame_named_0")
+    frameNamed: text("share.viewer_frame_named_0"),
+    videoPlay: text("share.viewer_video_play"),
+    videoNote: text("share.viewer_video_note"),
+    videoOpen: text("share.viewer_video_open")
   };
 }
 

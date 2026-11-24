@@ -82,7 +82,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -104,7 +104,8 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
   for (const lang of LANGUAGES) {
     const shell = html.renderShareShell(text.shareViewerUiFor(lang));
     const urls = [...shell.matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
-    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE].sort());
+    // P6: the only other address is YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only after a click).
+    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/'].sort());
     assert.doesNotMatch(shell, /<script[^>]*\ssrc=/i);
     assert.doesNotMatch(shell, /<link\b/i);
     assert.doesNotMatch(shell, /@import/i);
@@ -119,7 +120,7 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
 });
 
 test('sharing viewer: the viewer program has no eval and writes titles and summaries with textContent only', () => {
-  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts', 'cover-dom.ts', 'image-data.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
+  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts', 'cover-dom.ts', 'image-data.ts', 'video.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
   const js = bundle.SHARE_VIEWER_JS;
   for (const source of [...sources, js]) {
     assert.doesNotMatch(source, /\beval\s*\(/);
@@ -2167,7 +2168,8 @@ test('sharing viewer types, frames and free pictures: whitelisted kinds draw the
     data.boundaries = [
       { id: 'f1', members: [ids[0], ids[1], 'not-in-file', 'freeok'], label: '<img src=x onerror="document.title=1">' },
       { id: 'f2', members: ['not-in-file'], label: 'ghost' },
-      { id: 'f3', members: [ids[4]] }
+      { id: 'f3', members: [ids[4]] },
+      { id: 'f4" onmouseover="x', members: [ids[3]] }
     ];
     const out = path.join(directory, 'kinds.html');
     fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
@@ -2200,7 +2202,7 @@ test('sharing viewer types, frames and free pictures: whitelisted kinds draw the
     assert.equal(con.kind, 'conclusion'); assert.equal(con.shape, 'hexagon', 'a kind without a shape takes the map\'s shape for it'); assert.equal(con.svg, 1);
     for (const card of [forged, plainTopic, listKind]) { assert.equal(card.kind, null); assert.equal(card.shape, null); assert.equal(card.svg, 0); assert.equal(card.kindText, null); assert.ok(!/Type:/.test(card.label ?? ''), 'no type text'); }
     assert.equal(rectOnly.shape, 'rect'); assert.equal(rectOnly.kind, null); assert.equal(rectOnly.svg, 0, 'a rectangle is the card\'s own frame');
-    assert.deepEqual(report.frames, ['f1', 'f3'], 'a frame with no member in the file is not drawn');
+    assert.deepEqual(report.frames, ['f1', 'f3', null], 'a frame with no member in the file is not drawn; an id outside the safe charset is drawn without a frame id');
     assert.equal(report.frameLabel, '<img src=x onerror="document.title=1">', 'a frame name stays text');
     assert.equal(report.frameChildren, 1); assert.equal(report.frameRole, 'group'); assert.match(report.frameAria, /^Frame: /);
     assert.equal(report.frameContains, true, 'the frame is drawn outside its members');
@@ -2294,4 +2296,80 @@ test('sharing viewer attachments: a card offers an opaque download only for a we
   assert.equal(viewerDetail.formatFileSize(5 * 1024 * 1024), '5.0 MB');
   for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) { const u = text.shareViewerUiFor(lang); assert.match(u.attachmentDownload, /\{0\}/, lang); assert.ok(u.attachmentNotIncluded, lang); }
   assert.equal(text.shareViewerUiFor('zh-TW').attachmentNotIncluded, '未附上');
+});
+
+// ---- share-complete P6: click-to-play video ----
+class VNode {
+  constructor(tag) { this.localName = tag; this.attrs = {}; this.kids = []; this.parent = null; this.handlers = {}; this.className = ''; this.text = ''; }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  removeAttribute(k) { delete this.attrs[k]; }
+  append(...nodes) { for (const node of nodes) { node.parent = this; this.kids.push(node); } }
+  replaceChildren(...nodes) { this.kids = []; this.append(...nodes); }
+  replaceWith(node) { const at = this.parent.kids.indexOf(this); this.parent.kids[at] = node; node.parent = this.parent; this.parent = null; }
+  addEventListener(type, fn) { this.handlers[type] = fn; }
+  set textContent(value) { this.text = value; this.kids = []; }
+  get textContent() { return this.text; }
+  all() { return this.kids.flatMap(kid => [kid, ...kid.all()]); }
+}
+const videoFixture = hrefs => {
+  const doc = { createElement: tag => new VNode(tag) };
+  const root = new VNode('div');
+  const links = hrefs.map(([href, cls]) => { const a = new VNode('a'); a.setAttribute('href', href); if (cls) a.setAttribute('class', cls); a.text = '▶ Cat video'; return a; });
+  root.append(...links);
+  root.querySelectorAll = selector => { assert.equal(selector, 'a.vam-video-link'); return root.kids.filter(kid => kid.localName === 'a' && (kid.attrs.class ?? '').split(' ').includes('vam-video-link')); };
+  return { doc, root, links };
+};
+
+test('sharing video: only a marked link to a real YouTube video becomes a card; a look-alike host or an author link stays a link', () => {
+  const video = load('experiences/sharing/viewer/video.ts');
+  const ui = text.shareViewerUiFor('en');
+  const { doc, root, links } = videoFixture([['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'vam-video-link'], ['https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ', 'vam-video-link'], ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', ''], ['https://youtu.be/short', 'vam-video-link'], ['https://youtu.be/dQw4w9WgXcQ"onload=1', 'vam-video-link']]);
+  video.upgradeVideoLinks(root, doc, ui);
+  assert.deepEqual(root.kids.map(kid => kid.localName), ['div', 'a', 'a', 'a', 'a'], 'one card, the other four are untouched');
+  assert.equal(links[1].getAttribute('class'), 'vam-video-link', 'a fake host keeps its link');
+  const card = root.kids[0];
+  assert.equal(card.className, 'vam-video-card');
+  assert.equal(card.all().filter(node => node.localName === 'iframe').length, 0, 'no iframe before the click');
+  assert.equal(card.all().filter(node => node.localName === 'iframe' || node.attrs.src).length, 0, 'nothing that could load');
+  const open = card.kids[2];
+  assert.equal(open, links[0]);
+  assert.equal(open.text, ui.videoOpen, 'the original link stays as the fallback');
+  assert.equal(open.getAttribute('href'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(card.kids[1].text, ui.videoNote);
+  const button = card.kids[0].kids[0];
+  assert.equal(button.localName, 'button'); assert.equal(button.getAttribute('type') ?? button.type, 'button');
+  button.handlers.click();
+  const frames = card.all().filter(node => node.localName === 'iframe');
+  assert.equal(frames.length, 1);
+  assert.deepEqual(plain(frames[0].attrs), {
+    src: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1',
+    allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin',
+    sandbox: 'allow-scripts allow-same-origin allow-presentation allow-popups', title: 'Cat video'
+  });
+});
+
+test('sharing video: the player is never in the file; the viewer drops an iframe that arrives in a note and rebuilds the detail (and so the player) for each card', () => {
+  const detail = read('experiences/sharing/viewer/detail.ts');
+  assert.match(detail, /"script, iframe, frame, object, embed, applet, link, meta, base"/);
+  assert.ok(detail.indexOf('upgradeVideoLinks(root, doc, ui)') > detail.indexOf('root.querySelectorAll("script, iframe'), 'the strip runs before the viewer builds its own player');
+  const main = read('experiences/sharing/viewer/main.ts');
+  assert.match(main, /inspector\.replaceChildren\(\);/);
+  assert.match(main, /const detail = make\("div", "vam-sample-detail"\);/, 'each selection builds a new detail');
+  assert.ok(/if \(\/\^\[A-Za-z0-9_-\]\{1,100\}\$\/\.test\(frame\.id\)\) el\.dataset\.frameId = frame\.id;/.test(main), 'frame ids are written only when safe');
+  assert.ok(!bundle.SHARE_VIEWER_JS.includes('youtube-nocookie.com') || bundle.SHARE_VIEWER_JS.includes('vam-video-card'), 'the bundle carries the player builder');
+  for (const forbidden of [/url\(/, /<\/script/i, /<!--/]) { assert.doesNotMatch(bundle.SHARE_VIEWER_JS, forbidden); assert.doesNotMatch(bundle.SHARE_VIEWER_CSS, forbidden); }
+});
+
+test('sharing video: the file policy allows only the no-cookie player frame, and every language has the card text', () => {
+  const shell = html.renderShareShell(text.shareViewerUiFor('en'));
+  assert.ok(shell.includes(`content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com"`), 'exact policy');
+  assert.equal((shell.match(/frame-src/g) ?? []).length, 1);
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) {
+    const ui = Object.values(text.shareViewerUiExtras([lang]).uiByLanguage)[0];
+    for (const key of ['videoPlay', 'videoNote', 'videoOpen']) assert.ok(typeof ui[key] === 'string' && ui[key].length > 3, `${lang}.${key}`);
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').videoNote, '播放時才會連到 YouTube（不記錄 cookie 的版本）');
+  assert.equal(text.shareViewerUiFor('zh-TW').videoOpen, '在 YouTube 開啟');
+  assert.equal(text.shareViewerUiFor('zh-TW').videoPlay, '按一下播放 YouTube 影片');
 });

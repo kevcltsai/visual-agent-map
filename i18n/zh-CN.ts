@@ -2591,6 +2591,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_relations": "关系",
   "share.viewer_frame": "范围框",
   "share.viewer_frame_named_0": "范围框：{0}",
+  "share.viewer_video_play": "点击播放 YouTube 视频",
+  "share.viewer_video_note": "播放时才会连到 YouTube（不记录 cookie 的版本）",
+  "share.viewer_video_open": "在 YouTube 打开",
+  "share.media_video_0": "视频：{0}",
+  "share.media_audio_0": "音频：{0}",
+  "share.media_embed_0": "嵌入内容：{0}",
   // Share dialog
   "share.title": "分享这张地图",
   "share.intro": "生成一个 HTML 文件，任何浏览器都能打开，离线也可以。存放位置由你决定，不会上传任何内容。",

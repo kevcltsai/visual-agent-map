@@ -1,7 +1,9 @@
 // Sharing P1 (Worker C): the Obsidian-side export pieces that can run without Obsidian: DOM scrub, build lifecycle,
 // size advice, save fallback, and the share dialog's stale/cancel behaviour against a test-double exporter.
 const assert = require('node:assert/strict');
-const { test, load, obsidian, plain } = require('../support.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { test, load, obsidian, plain, root: repoRoot } = require('../support.cjs');
 
 const dom = load('experiences/sharing/share-dom.ts');
 const build = load('experiences/sharing/share-build.ts');
@@ -956,16 +958,19 @@ test('share exporter complete: type and shape come from the note; an argument-ma
   assert.ok(managed.has('a') && managed.has('b'), 'the fixture manages both cards');
   await argument.prepare();
   const [aa, ab] = plain(argument.exporter.assemble({ includeDetail: true, includeImages: true }).payload.nodes);
-  assert.deepEqual([aa.kind, aa.shape, ab.kind, ab.shape], ['hypothesis', 'rect', 'hypothesis', 'rect']);
+  assert.deepEqual([aa.kind, aa.shape, ab.kind, ab.shape], [undefined, 'rect', undefined, 'rect'], 'a managed argument card is a plain rectangle and carries no type');
+  assert.equal('kind' in aa || 'kind' in ab, false, 'the key is not written at all');
 });
 
-test('share exporter complete: a map without new data keeps its payload, and a vault with a missing free picture still lists it', async () => {
+test('share exporter complete: a map without new data adds no new field to the payload, and a vault with a missing free picture still lists it', async () => {
   const harness = matchMapHarness({ files: [], canvasItems: [{ id: 'free1', kind: 'image', path: 'Gone/x.png', x: 0, y: 0, w: 5, h: 5 }] });
   await harness.prepare();
   const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
   assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 0, y: 0, w: 5, h: 5, anchors: [], free: true }], 'nothing silently disappears');
   assert.equal(result.leakCategories.length, 0);
   assert.equal(harness.serialised(result).includes('Gone/x.png'), false);
+  for (const key of ['attachments', 'relations', 'boundaries']) assert.equal(key in result.payload, false, `no ${key} for a map without them`);
+  for (const node of result.payload.nodes) for (const key of ['kind', 'markers', 'color', 'style', 'links', 'relevance']) assert.equal(key in node, false, `a plain card has no ${key}`);
 });
 
 // ---- P4: inline note embeds ----
@@ -1073,4 +1078,47 @@ test('share exporter embeds: embedded images resolve from the embedded note own 
   const after = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 2);
   assert.equal([...after.values()][0].trim(), 'Kept');
   assert.equal(node.id, 'a');
+});
+
+// ---- review R1 fixes ----
+test('share exporter links: nodeIds keys are the path without .md, the file name and the title; a name two cards share has no link', () => {
+  const { exporter } = p5Exporter({});
+  const node = (id, path) => ({ id, path, parentId: null, x: 0, y: 0, collapsed: false });
+  exporter.source.map.nodes = [node('water', 'Folder/Water.md'), node('other', 'Other/Water.md'), node('salt', 'Folder/Sub/Salt.md')];
+  exporter.source.notes = new Map([['water', { title: 'Water in food' }], ['other', { title: 'Elsewhere' }], ['salt', { title: 'Salt' }], ['ghost', { title: 'No card' }]]);
+  const ids = plain(Object.fromEntries(exporter.nodeIds()));
+  assert.deepEqual(ids, { 'Folder/Water': 'water', 'Water in food': 'water', 'Other/Water': 'other', Elsewhere: 'other', 'Folder/Sub/Salt': 'salt', Salt: 'salt' });
+  assert.equal('Water' in ids, false, 'the name two cards share goes to no card');
+  assert.equal(exporter.nodeIds().get('Salt'), 'salt');
+  exporter.source.notes.delete('salt');
+  assert.equal(exporter.nodeIds().has('Folder/Sub/Salt'), false, 'a card without a note has no key');
+});
+
+test('share exporter links: a marked link survives the scrub into the final html as a node link, and the exporter applies links after the scrub', () => {
+  const supportHtml = require('../support-html-dom.cjs');
+  const links = load('experiences/sharing/share-node-links.ts');
+  const dom = load('experiences/sharing/share-dom.ts');
+  const root = supportHtml.parse(`<p>See ${links.markNodeLink('water', 'Water')} and <span onclick="x()" data-x="1">${links.markNodeLink('gone', 'Gone')}</span></p>`);
+  dom.scrubShareTree(root);
+  assert.ok(root.childNodes[0].innerHTML.includes(links.NODE_LINK_START), 'the scrub leaves the mark text alone');
+  links.applyNodeLinks(root, new Set(['water']), () => new supportHtml.El('a', root.ownerDocument));
+  const out = supportHtml.serialize(root);
+  assert.ok(out.includes('<a class="vam-node-link" href="#vam-node-water">Water</a>') || out.includes('<a href="#vam-node-water" class="vam-node-link">Water</a>'), out);
+  assert.ok(!/[\uE000-\uE004]/.test(out) && out.includes('Gone'), 'an unknown id ends as text');
+  const source = fs.readFileSync(path.join(repoRoot, 'experiences/sharing/share-exporter.ts'), 'utf8');
+  const body = source.slice(source.indexOf('private finish('));
+  assert.ok(body.indexOf('replaceMediaWithLinks(') < body.indexOf('sanitizeHTMLToDom(') && body.indexOf('scrubShareTree(clean)') < body.indexOf('applyNodeLinks('), 'media links first, then sanitize and scrub, then the node links');
+});
+
+test('share exporter embeds: a picture dropped in the image check is also left out of the embedded note on the first build', async () => {
+  const files = { 'Notes/Sub/Emb.md': { ...mk('Notes/Sub/Emb.md', 5, 'md'), text: '![[../img/x.png]]\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n\nKept\n' }, 'Notes/img/x.png': mk('Notes/img/x.png', 5) };
+  const { exporter } = p5Exporter(files, { detail: '![[Notes/Sub/Emb]]' });
+  let seen = null;
+  exporter.renderOne = async (md, titles, ids, embeds) => { seen = [...embeds.values()][0]; return { html: seen, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: [], mermaidUndrawn: 0, mermaidBlocked: 0 }; };
+  exporter.dropFigures(new Map([['a', new Set([0])]]));
+  await exporter.ensureRendered(ticket(), () => {});
+  assert.ok(seen !== null && !seen.includes('x.png') && seen.includes('Kept'), `first build: ${seen}`);
+  exporter.dropFigures(new Map());
+  await exporter.ensureRendered(ticket(), () => {});
+  assert.ok(seen.includes('x.png'), 'cleared: the picture is back');
 });

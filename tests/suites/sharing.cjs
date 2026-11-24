@@ -143,7 +143,7 @@ test('sharing: a YouTube embed is shared as a plain link, not an image or iframe
   const result = clean.cleanShareMarkdown('Stretch ![Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and ![](https://youtu.be/dQw4w9WgXcQ)', ctx);
   assert.equal(
     result.markdown,
-    'Stretch [▶ Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and [▶ https://youtu.be/dQw4w9WgXcQ](https://youtu.be/dQw4w9WgXcQ)'
+    'Stretch [\uE004▶ Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and [\uE004▶ https://youtu.be/dQw4w9WgXcQ](https://youtu.be/dQw4w9WgXcQ)'
   );
   assert.deepEqual(plain(result.webImages), [], 'a video is never fetched as a web image');
 });
@@ -930,4 +930,54 @@ test('sharing embeds: embedded file references are anchored to the embedded note
   assert.ok(!out.includes('Agent/s.png') && !out.includes('![[gone.png]]') && !out.includes('![[../img'), out);
   assert.ok(out.includes('![w](https://e.example/p.png)') && out.includes('![[Note]]'));
   assert.ok(out.endsWith('```\n![[a.pdf]]\n```'), 'code is left alone');
+});
+
+// ---- share-complete P6: video and other media ----
+const media = load('experiences/sharing/share-media.ts');
+const videoCore = load('core/video-embeds.ts');
+const viewerVideo = load('experiences/sharing/viewer/video.ts');
+const mediaLabels = { label: (kind, host) => `${{ video: 'Video', audio: 'Audio', embed: 'Embedded' }[kind]}${host ? `: ${host}` : ''}` };
+const mediaOf = html => {
+  const root = supportHtml.parse(html);
+  media.replaceMediaWithLinks(root, mediaLabels, tag => new supportHtml.El(tag, root.ownerDocument));
+  return supportHtml.serialize(root);
+};
+
+test('share media: iframe, video, audio, embed and object with a web source become a link card with the host', () => {
+  assert.equal(mediaOf('<iframe src="https://evil.example/x"></iframe>'), '<a class="vam-media-link" href="https://evil.example/x">Embedded: evil.example</a>');
+  assert.equal(mediaOf('<video src="http://www.cdn.example/v.mp4" controls></video>'), '<a class="vam-media-link" href="http://www.cdn.example/v.mp4">Video: cdn.example</a>');
+  assert.equal(mediaOf('<video><source src="https://cdn.example/v.webm" type="video/webm"></video>'), '<a class="vam-media-link" href="https://cdn.example/v.webm">Video: cdn.example</a>');
+  assert.equal(mediaOf('<audio src="https://cdn.example/a.mp3"></audio>'), '<a class="vam-media-link" href="https://cdn.example/a.mp3">Audio: cdn.example</a>');
+  assert.equal(mediaOf('<embed src="//cdn.example/e.swf"><object data="https://cdn.example/o"></object>'), '<a class="vam-media-link" href="https://cdn.example/e.swf">Embedded: cdn.example</a><a class="vam-media-link" href="https://cdn.example/o">Embedded: cdn.example</a>');
+});
+
+test('share media: a source that is not a web address is visible text with no link and no address', () => {
+  for (const src of ['javascript:alert(1)', 'file:///Users/me/secret.mp4', 'data:text/html;base64,AAAA', 'app://abc/v.mp4', 'obsidian://open?vault=V', ' java\nscript:x']) {
+    const out = mediaOf(`<p>before</p><iframe src="${src}"></iframe><video src="${src}"></video>`);
+    assert.ok(!/<a |href|<iframe|<video|src=/.test(out), out);
+    assert.ok(/Embedded/.test(out) && /Video/.test(out), `visible, not silent: ${out}`);
+    assert.ok(!/secret|Users|alert/.test(out), `no address leaks: ${out}`);
+  }
+  assert.equal(mediaOf('<video></video>'), '<span class="vam-media-text">Video</span>', 'a media element with no source is a label too');
+  assert.equal(mediaOf('<p>plain <a href="https://example.org">link</a></p>'), '<p>plain <a href="https://example.org">link</a></p>', 'other content is untouched');
+});
+
+test('share media: the video mark makes only the cleaner\'s own https link a video link; an author class never survives', () => {
+  const marked = `<p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">${nodeLinks.VIDEO_MARK}▶ Cat</a> <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">plain</a> <a class="vam-video-link x" href="https://youtu.be/dQw4w9WgXcQ">forged</a> <a href="javascript:x">${nodeLinks.VIDEO_MARK}bad</a></p>`;
+  const out = applyLinks(marked, []);
+  assert.ok(out.includes('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="vam-video-link">▶ Cat</a>'), out);
+  assert.ok(out.includes('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">plain</a>'), 'an author link stays plain');
+  assert.ok(out.includes('<a class="x" href="https://youtu.be/dQw4w9WgXcQ">forged</a>'), 'a hand-written video class is removed');
+  assert.ok(out.includes('<a href="javascript:x">bad</a>') && !/[\uE000-\uE004]/.test(out), 'the mark is gone everywhere, a non-https link gets no class');
+  assert.equal(nodeLinks.stripNodeLinkMarks(`a${nodeLinks.VIDEO_MARK}b`), 'ab');
+  assert.ok(!clean.cleanShareMarkdown(`x${nodeLinks.VIDEO_MARK}y`, { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown.includes(nodeLinks.VIDEO_MARK), 'typed marks are stripped from the author text');
+});
+
+test('share viewer video: the viewer id parser agrees with the plugin parser on every address', () => {
+  const urls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'http://youtube.com/watch?v=dQw4w9WgXcQ&t=5', 'https://m.youtube.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ?si=x', 'https://www.youtube.com/shorts/dQw4w9WgXcQ', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://www.youtube.com/live/dQw4w9WgXcQ', 'https://www.youtube.com/v/dQw4w9WgXcQ',
+    'https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ', 'https://evil.com/youtube.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'https://youtu.be.evil.example/dQw4w9WgXcQ', 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=short', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ"onload=1', 'https://www.youtube.com/watch', 'https://youtu.be/', 'javascript:alert(1)', 'ftp://youtu.be/dQw4w9WgXcQ', 'not a url', '', ' https://youtu.be/dQw4w9WgXcQ '];
+  for (const url of urls) assert.equal(viewerVideo.viewerYoutubeId(url), videoCore.youtubeVideoId(url), url);
+  assert.equal(viewerVideo.viewerYoutubeId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  assert.equal(viewerVideo.viewerYoutubeId('https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ'), null);
 });

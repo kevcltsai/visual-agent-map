@@ -10696,9 +10696,18 @@ export class VisualAgentMapView extends ItemView {
       this.refreshCutMarks();
     }
     if (!this.map || !event.clipboardData || this.notesLoading()) return;
-    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (!inClipboardScope(event.target, this.contentEl) && !(kind === "paste" && this.ownsUnfocusedPaste(event.target)))
+      return;
     if (kind === "paste") this.pasteFromClipboard(event);
     else this.copyToClipboard(event, kind);
+  }
+  /**
+   * A paste with no element focused (target is body: the map was just opened, or its window was switched back to
+   * without a click) belongs to this map when it is the active view; nothing else could take it.
+   */
+  private ownsUnfocusedPaste(target: EventTarget | null): boolean {
+    const body = this.contentEl.ownerDocument?.body;
+    return !!body && target === body && this.app.workspace?.getActiveViewOfType?.(VisualAgentMapView) === this;
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {

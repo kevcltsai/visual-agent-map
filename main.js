@@ -89644,9 +89644,19 @@ ${t("ui.book_role_running_suffix")}` : first);
       this.refreshCutMarks();
     }
     if (!this.map || !event.clipboardData || this.notesLoading()) return;
-    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (!inClipboardScope(event.target, this.contentEl) && !(kind === "paste" && this.ownsUnfocusedPaste(event.target)))
+      return;
     if (kind === "paste") this.pasteFromClipboard(event);
     else this.copyToClipboard(event, kind);
+  }
+  /**
+   * A paste with no element focused (target is body: the map was just opened, or its window was switched back to
+   * without a click) belongs to this map when it is the active view; nothing else could take it.
+   */
+  ownsUnfocusedPaste(target) {
+    var _a2, _b2, _c;
+    const body = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.body;
+    return !!body && target === body && ((_c = (_b2 = this.app.workspace) == null ? void 0 : _b2.getActiveViewOfType) == null ? void 0 : _c.call(_b2, _VisualAgentMapView)) === this;
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   clipboardReadOnly() {

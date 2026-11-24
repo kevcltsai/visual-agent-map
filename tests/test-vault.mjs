@@ -614,3 +614,10 @@ test('a running Obsidian is made to load the new build: the plugin is disabled a
   assert.deepEqual(off.calls, [], 'a plugin the owner switched off is left off');
   assert.doesNotMatch(reloadPluginExpression, /AndSave|focus|activate/);
 });
+
+// 2026-11-24: the test Obsidian was running with its last window closed; the install succeeded but --update-current exited 1.
+test('a running Obsidian with no window open is not a failed install: the new files load when a window opens', async () => {
+  const noWindow = async () => { throw new Error('No Obsidian main window on DevTools port 60274.'); };
+  assert.deepEqual(await reloadRunningPlugin('/v', noWindow), { enabled: true, window: false });
+  await assert.rejects(reloadRunningPlugin('/v', async () => { throw new Error('Obsidian for /v is not answering on DevTools port 1; it may have quit.'); }), /not answering/);
+});

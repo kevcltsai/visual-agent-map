@@ -208,7 +208,10 @@ function installedObsidianRuntime() {
 // startup and is the same across builds, so it proves nothing). A plugin the owner switched off is left off. No window is focused.
 export const reloadPluginExpression = `(async()=>{const id="visual-agent-map";if(!app.plugins.enabledPlugins.has(id))return {enabled:false};const before=app.plugins.plugins[id];await app.plugins.disablePlugin(id);await app.plugins.enablePlugin(id);const after=app.plugins.plugins[id];return {enabled:true,reloaded:!!after&&after!==before}})()`;
 export async function reloadRunningPlugin(vault, connect = connectCdp) {
-  const cdp = await connect(vault);
+  let cdp;
+  // macOS keeps Obsidian running after its last window closes; the installed files load when a window opens, so that is not a failure.
+  try { cdp = await connect(vault); }
+  catch (error) { if (/No Obsidian main window/.test(error.message)) return { enabled: true, window: false }; throw error; }
   let result;
   try { result = await cdp.evaluate(reloadPluginExpression); } finally { cdp.close(); }
   if (result?.enabled === false) return result;
@@ -376,7 +379,7 @@ export function main(args = process.argv.slice(2)) {
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
     if (!instanceRunning(appProfile)) return launchObsidian(appProfile);
     return reloadRunningPlugin(canonicalVault).then(result => {
-      process.stdout.write(result.enabled === false ? "The plugin is switched off in the running Obsidian; left off (the new files load when it is switched on).\n" : "Reloaded the plugin in the running Obsidian.\n");
+      process.stdout.write(result.enabled === false ? "The plugin is switched off in the running Obsidian; left off (the new files load when it is switched on).\n" : result.window === false ? "The running Obsidian has no window open; the new files load when a window opens.\n" : "Reloaded the plugin in the running Obsidian.\n");
     });
   }
   const lock = `${canonicalVault}.lock`;

@@ -2099,7 +2099,7 @@ export const en = {
   "ui.preset_name_magazine_old": "Magazine column",
   "ui.outline_topic_placeholder": "{research topic}",
   "ui.preset_copy_suffix": " copy",
-  // coffee:begin (keep every coffee.* key in this one contiguous block)
+  // Picture-book settings (existing translation keys retained).
   "coffee.book_settings": "Whole-book settings",
   "coffee.book_settings_hint": "Fill in only for a picture book; may stay empty",
   "coffee.book_reader": "Reader",
@@ -2110,7 +2110,6 @@ export const en = {
   "coffee.book_style": "Writing style",
   "coffee.book_setting_empty": "Empty → the chief editor decides",
   "coffee.book_setting_limit": '"{0}" holds at most {1} characters; the rest is not accepted.',
-  // coffee:end
   "log.exchange_full_prompt": "Full prompt:",
   "log.exchange_legacy_prompt_missing": "(older record without the full prompt)",
   "log.exchange_request": "Request sent to AI:",

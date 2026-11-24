@@ -1977,7 +1977,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.preset_name_magazine_old": "雜誌專欄",
   "ui.outline_topic_placeholder": "{填入研究主題}",
   "ui.preset_copy_suffix": " 副本",
-  // coffee:begin (keep every coffee.* key in this one contiguous block)
+  // Picture-book settings (existing translation keys retained).
   "coffee.book_settings": "全書設定",
   "coffee.book_settings_hint": "要做圖文書才填，可留空",
   "coffee.book_reader": "讀者",
@@ -1988,7 +1988,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "coffee.book_style": "寫作風格",
   "coffee.book_setting_empty": "留空 → 由總編輯決定",
   "coffee.book_setting_limit": "「{0}」最多 {1} 字，超過的部分不會輸入。",
-  // coffee:end
   "log.exchange_full_prompt": "完整 Prompt：",
   "log.exchange_legacy_prompt_missing": "（舊紀錄未保存完整 prompt）",
   "log.exchange_request": "送往 AI 的請求：",

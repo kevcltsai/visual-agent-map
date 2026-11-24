@@ -108212,6 +108212,16 @@ function applyNodeLinks(root2, knownIds, createLink, knownAttachments = /* @__PU
     }
   };
   walk2(root2);
+  const clearAttributes = (element) => {
+    var _a3;
+    for (const name2 of element.getAttributeNames()) {
+      const value = (_a3 = element.getAttribute(name2)) != null ? _a3 : "";
+      if (HAS_MARK.test(value))
+        element.setAttribute(name2, stripNodeLinkMarks(value.replace(MARKED2, (_all, _start, label2) => label2)));
+    }
+    for (const child of Array.from(element.children)) clearAttributes(child);
+  };
+  clearAttributes(root2);
   for (const link of links) {
     const kept = ((_a2 = link.getAttribute("class")) != null ? _a2 : "").split(/\s+/).filter((name2) => name2 && name2 !== VIDEO_LINK_CLASS);
     if (kept.length) link.setAttribute("class", kept.join(" "));
@@ -108312,19 +108322,24 @@ var WRITEBACK_BACKUP_LINE = (() => {
 function dropWritebackBackupLines(text12) {
   return text12.split("\n").filter((line4) => !WRITEBACK_BACKUP_LINE.test(line4)).join("\n");
 }
-function embedBox(title, content, ctx, out) {
+function embedBox(title, content, ctx, out, indent2 = "") {
   const inner = cleanShareMarkdown(content, { ...ctx, embedOf: void 0 });
   for (const item of inner.attachments)
     if (!out.attachments.some((known) => known.name === item.name)) out.attachments.push(item);
   out.webImages.push(...inner.webImages);
   const label2 = escapeMd(ctx.embedTitle ? ctx.embedTitle(title) : title).replace(/\s+/g, " ");
-  const quoted2 = inner.markdown.trim().split("\n").map((line4) => line4 ? `> ${line4}` : ">");
+  const quoted2 = inner.markdown.trim().split("\n").map((line4) => `${indent2}${line4 ? `> ${line4}` : ">"}`);
   return `
 
-> [!vam-embed] ${label2}
+${indent2}> [!vam-embed] ${label2}
 ${quoted2.join("\n")}
 
-`;
+${indent2}`;
+}
+function listIndentAt(text12, at) {
+  const line4 = text12.slice(text12.lastIndexOf("\n", at - 1) + 1, at);
+  const item = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+/.exec(line4);
+  return item ? " ".repeat(item[0].replace(/\t/g, "    ").length) : "";
 }
 function cleanSegment(text12, ctx, out, hidden = false) {
   const attach = (ref) => {
@@ -108342,7 +108357,7 @@ function cleanSegment(text12, ctx, out, hidden = false) {
   const pattern = /!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
   return text12.replace(
     pattern,
-    (all, embed, link, alt, src, label2, href) => {
+    (all, embed, link, alt, src, label2, href, at) => {
       var _a2, _b2, _c, _d, _e, _f;
       if ((embed !== void 0 || src !== void 0) && hidden) return all;
       if (embed !== void 0) {
@@ -108359,7 +108374,7 @@ function cleanSegment(text12, ctx, out, hidden = false) {
           return card ? markAttachment(card, file) : file;
         }
         const content = (_c = ctx.embedOf) == null ? void 0 : _c.call(ctx, target);
-        if (content == null ? void 0 : content.trim()) return embedBox(titleFor(target), content, ctx, out);
+        if (content == null ? void 0 : content.trim()) return embedBox(titleFor(target), content, ctx, out, listIndentAt(text12, at));
         return escapeMd(titleFor(target));
       }
       if (link !== void 0) {
@@ -111314,7 +111329,7 @@ ${detail}`;
    * folder are left out, so the cleaner shows their title only.
    */
   async readEmbeds(detail, fromPath, topicId, firstIndex) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const found = /* @__PURE__ */ new Map();
     const isInternal = (path) => this.isInternalFile(path);
     const drop = (_a2 = this.dropped.get(topicId)) != null ? _a2 : /* @__PURE__ */ new Set();
@@ -111333,7 +111348,11 @@ ${detail}`;
       const file = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
       if (!file || file.extension !== "md" || file.path === fromPath) continue;
       if (isInternal(file.path)) continue;
-      let content = extractEmbedContent(await this.app.vault.cachedRead(file), hash < 0 ? "" : target.slice(hash + 1));
+      const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
+      const card = this.source.map.nodes.find((node) => node.path === file.path);
+      if (!card && mapFolder && file.path.startsWith(`${mapFolder}/`)) continue;
+      const text12 = card ? (_d = (_c = this.source.notes.get(card.id)) == null ? void 0 : _c.detail) != null ? _d : "" : await this.app.vault.cachedRead(file);
+      let content = extractEmbedContent(text12, hash < 0 ? "" : target.slice(hash + 1));
       if (!content) continue;
       const figures = figuresOf(content);
       for (const figure of figures)

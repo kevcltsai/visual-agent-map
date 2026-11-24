@@ -594,7 +594,13 @@ export class ShareExporter {
       const file: TFile | null = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
       if (!file || file.extension !== "md" || file.path === fromPath) continue;
       if (isInternal(file.path)) continue;
-      let content = extractEmbedContent(await this.app.vault.cachedRead(file), hash < 0 ? "" : target.slice(hash + 1));
+      // A card's own note gives only what the card shows (its detail, never Prompt, Rules or the summary block); any
+      // other VAM note in the map's folder (unassigned, archived) shows its title only.
+      const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
+      const card = this.source.map.nodes.find(node => node.path === file.path);
+      if (!card && mapFolder && file.path.startsWith(`${mapFolder}/`)) continue;
+      const text = card ? (this.source.notes.get(card.id)?.detail ?? "") : await this.app.vault.cachedRead(file);
+      let content = extractEmbedContent(text, hash < 0 ? "" : target.slice(hash + 1));
       if (!content) continue;
       // The embedded note's pictures are checked and dropped like the card's own (numbered after them), then every file
       // reference is anchored to the embedded note's own folder (internal folders and missing files become plain text).

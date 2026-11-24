@@ -37,7 +37,7 @@ The interface is in English, Traditional Chinese and Simplified Chinese; AI answ
 
 ## Privacy
 
-VAM has no telemetry and stores no API keys. AI features run the Codex or Claude Code program you installed, which sends the relevant notes, map content and selected pictures to OpenAI or Anthropic (your plan's allowance or charges apply) and searches the web in Standard mode and picture search. Picture books may also search Wikimedia Commons directly, and research checks YouTube videos with YouTube's oEmbed service. Share files are never uploaded. Full details: [Data and permissions](INSTALL.md#data-and-permissions).
+VAM has no telemetry and stores no API keys. AI features start the Codex or Claude Code program you installed as a separate program on your computer, which sends the relevant notes, map content and selected pictures to OpenAI or Anthropic (your plan's allowance or charges apply) and searches the web in Standard mode and picture search. Picture books may also search Wikimedia Commons directly, and research checks YouTube videos with YouTube's oEmbed service. A map's data source can also be a folder outside the vault that you add: VAM only reads it, and keeps the list of those folders in one file on this device, outside the vault. Share files are never uploaded. Full details: [Data and permissions](INSTALL.md#data-and-permissions).
 
 ## Credits and license
 

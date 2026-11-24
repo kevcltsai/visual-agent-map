@@ -89,6 +89,7 @@ try {
   assert.ok(existsSync(environmentPath), `Managed test-vault record not found at ${environmentPath}`);
   const environment = JSON.parse(readFileSync(environmentPath, "utf8"));
   assert.equal(environment.kind, "vam-disposable-test-vault", "refusing a vault not owned by the plugin test harness");
+  assert.notEqual(environment.source?.verification?.kind, "preview-unverified", "Preview vault is not runtime acceptance evidence; prepare a verified session first.");
   assert.equal(environment.profile, "onboarding", "runtime smoke requires a clean onboarding profile");
   assert.equal(environment.owner, resolve(new URL("..", import.meta.url).pathname), "vault belongs to another checkout");
   check("Source fingerprint matches prepared build", sourceFingerprint() === environment.source.fingerprint, environment.source.fingerprint);

@@ -250,8 +250,44 @@ export function sessionVault(name) {
   return vault;
 }
 
+// Session preparation has three distinct policies. Only an exact, landed, clean CI
+// candidate can bypass build; preview is explicitly unverified and never a runtime PASS.
+export function prepareSessionCandidate({
+  mode = "affected", execute = run, lookup = greenInstallRun, fingerprint = sourceFingerprint,
+  artifactHashes = () => ({ ...hashes(root), viewer: hash(readFileSync(join(root, "experiences/sharing/viewer-bundle.generated.ts"))) }),
+  env = process.env
+} = {}) {
+  if (!["affected", "full", "preview"].includes(mode)) throw new Error("Unknown session verification mode.");
+  const before = fingerprint();
+  const green = mode === "affected" && env.CI !== "true" && env.VAM_CLEAN_BUILD !== "1" ? lookup() : null;
+  if (!green) execute("npm", ["run", "build"]);
+  const built = artifactHashes();
+  let verification;
+  if (green) {
+    process.stdout.write(`Session vault: reusing committed artifacts from full CI run ${green.id} for ${green.sha}; checking the local vault harness.\n`);
+    execute(process.execPath, ["--test", "tests/test-vault.mjs"]);
+    verification = { kind: "ci-full", ...green, localVaultTest: true, buildReused: true };
+  } else if (mode === "preview") {
+    verification = { kind: "preview-unverified" };
+    process.stdout.write("PREVIEW ONLY: backend verification NOT RUN; not acceptance evidence.\n");
+  } else if (mode === "full") {
+    execute("npm", ["run", "test:unit"]);
+    execute("npm", ["run", "test:integration"]);
+    verification = { kind: "local-full" };
+  } else {
+    execute("npm", ["run", "test:affected"]);
+    verification = { kind: "local-affected" };
+  }
+  if (fingerprint() !== before) throw new Error("Source changed during session preparation; rerun the harness before E2E.");
+  if (JSON.stringify(artifactHashes()) !== JSON.stringify(built)) throw new Error("Build artifacts changed during session preparation.");
+  return { fingerprint: before, verification };
+}
+
 function sessionMain(args) {
-  for (const arg of args) if (!/^--session=/.test(arg) && arg !== "--stop" && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`--session cannot be combined with: ${arg}`);
+  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`--session cannot be combined with: ${arg}`);
+  if (args.filter(arg => arg.startsWith("--session=")).length !== 1) throw new Error("Exactly one session name is required.");
+  if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg.startsWith("--profile=")))) throw new Error("Conflicting session options.");
+  const mode = args.includes("--preview") ? "preview" : args.includes("--full") ? "full" : "affected";
   const vault = sessionVault(args.find(arg => arg.startsWith("--session=")).slice("--session=".length));
   const appProfile = join(vault, ".vam-app");
   if (args.includes("--stop")) {
@@ -267,23 +303,23 @@ function sessionMain(args) {
   if (instanceRunning(appProfile)) throw new Error(`Obsidian is running on ${vault}. Finish or stop its work, run with --stop, then rerun.`);
   const exists = existsSync(vault);
   if (exists && args.some(arg => arg.startsWith("--profile="))) throw new Error(`${vault} exists and is updated in place; --profile applies only when it is first created.`);
-  const fingerprint = sourceFingerprint();
-  run("npm", ["run", "build"]);
-  const builtHashes = hashes(root);
-  run("npm", ["run", "test:unit"]);
-  run("npm", ["run", "test:integration"]);
-  assertSourceUnchanged(fingerprint);
-  if (JSON.stringify(hashes(root)) !== JSON.stringify(builtHashes)) throw new Error("Build artifacts changed during tests.");
+  if (exists && (lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker)))) throw new Error("Refusing an unowned session vault.");
+  if (exists) {
+    const previous = json(join(vault, marker));
+    if (previous.kind !== "vam-disposable-test-vault" || previous.owner !== realpathSync(root)) throw new Error("Refusing a session vault owned by another checkout.");
+  }
+  const { fingerprint, verification } = prepareSessionCandidate({ mode });
+  if (instanceRunning(appProfile)) throw new Error("Session Obsidian started during preparation; refusing to replace loaded files.");
   const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" }).trim();
   const runtime = installedObsidianRuntime();
-  const source = { branch: git("branch", "--show-current"), commit: git("rev-parse", "HEAD"), status: git("status", "--short"), diffHash: gitDiffHash(root, ["diff", "HEAD", "--binary"]), fingerprint, obsidianRuntime: { version: runtime.version, hash: runtime.hash } };
-  const record = exists
+  const source = { branch: git("branch", "--show-current"), commit: git("rev-parse", "HEAD"), status: git("status", "--short"), diffHash: gitDiffHash(root, ["diff", "HEAD", "--binary"]), fingerprint, verification, obsidianRuntime: { version: runtime.version, hash: runtime.hash } };
+  const record = timedSync("install", () => exists
     ? updateCurrentTestVault({ vault, source })
-    : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source });
+    : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source }));
   if (!existsSync(join(appProfile, "obsidian.json"))) prepareObsidianProfile(vault, runtime, { cli: false });
   launchObsidian(appProfile);
   const cdp = `node scripts/obsidian-cdp.mjs --vault=${vault}`;
-  process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`, `Test Obsidian stays in the background for its whole life; to watch it, create ${join(appProfile, "allow-focus")} (delete it to hide again)`] }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING", next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`, `Test Obsidian stays in the background for its whole life; to watch it, create ${join(appProfile, "allow-focus")} (delete it to hide again)`] }, null, 2)}\n`);
 }
 
 export function assertSourceUnchanged(expected, directory = root) {
@@ -327,9 +363,12 @@ function assertObsidianClosed() {
 // The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
 
-export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop] [--profile=...] | --which-installed | --help]
+export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--profile=...] | --which-installed | --help]
   (no option)        build + unit + integration tests only
   --session=<name>   isolated vault /private/tmp/vam-e2e-<name>, background Obsidian driven over CDP (see scripts/obsidian-cdp.mjs, scripts/run-scenario.mjs)
+  --preview          session only: build and install for inspection; verification NOT RUN, not acceptance
+  --full             session only: force build + full unit and integration tests
+  default session    reuse exact clean landed CI artifacts + local vault test, otherwise build + affected tests (full fallback)
   seed a picture-book map into a session vault: node scripts/book-fixture.mjs --session=<name>`;
 export const isHelp = args => args.includes("--help") || args.includes("-h");
 

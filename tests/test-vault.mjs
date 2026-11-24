@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { fetchDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
@@ -706,4 +706,44 @@ test('a running Obsidian with no window open is not a failed install: the new fi
   const noWindow = async () => { throw new Error('No Obsidian main window on DevTools port 60274.'); };
   assert.deepEqual(await reloadRunningPlugin('/v', noWindow), { enabled: true, window: false });
   await assert.rejects(reloadRunningPlugin('/v', async () => { throw new Error('Obsidian for /v is not answering on DevTools port 1; it may have quit.'); }), /not answering/);
+});
+
+test('session preparation selects exactly one verification policy, preserves full fallback and never labels preview as verified', () => {
+  const simulate = (mode, green, env = {}, fail = null) => {
+    const calls = [];
+    const options = {
+      mode, env, lookup: () => { calls.push('lookup'); return green; },
+      execute: (_command, args) => { const name = args.join(' '); calls.push(name); if (name === fail) throw new Error('verification failed'); },
+      fingerprint: () => 'same-source', artifactHashes: () => ({ 'main.js': 'same', viewer: 'same' })
+    };
+    return { calls, options, result: () => prepareSessionCandidate(options) };
+  };
+  const green = { sha: 'a'.repeat(40), id: '123' };
+  for (const [mode, proof, env, expected, calls] of [
+    ['affected', green, {}, 'ci-full', ['lookup', '--test tests/test-vault.mjs']],
+    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'run test:affected']],
+    ['affected', green, { VAM_CLEAN_BUILD: '1' }, 'local-affected', ['run build', 'run test:affected']],
+    ['affected', green, { CI: 'true' }, 'local-affected', ['run build', 'run test:affected']],
+    ['preview', green, {}, 'preview-unverified', ['run build']],
+    ['full', green, {}, 'local-full', ['run build', 'run test:unit', 'run test:integration']]
+  ]) {
+    const s = simulate(mode, proof, env);
+    assert.equal(s.result().verification.kind, expected);
+    assert.deepEqual(s.calls, calls);
+  }
+  const failed = simulate('affected', null, {}, 'run test:affected');
+  assert.throws(failed.result, /verification failed/);
+  const localFailure = simulate('affected', green, {}, '--test tests/test-vault.mjs');
+  assert.throws(localFailure.result, /verification failed/);
+  const changed = simulate('preview', null);
+  let reads = 0;
+  changed.options.fingerprint = () => String(reads++);
+  assert.throws(changed.result, /Source changed/);
+  const changedArtifact = simulate('affected', green);
+  reads = 0;
+  changedArtifact.options.artifactHashes = () => ({ viewer: String(reads++) });
+  assert.throws(changedArtifact.result, /artifacts changed/);
+  assert.throws(() => main(['--session=a', '--preview', '--full']), /Conflicting session options/);
+  assert.throws(() => main(['--session=a', '--stop', '--preview']), /Conflicting session options/);
+  assert.throws(() => main(['--update-current', '--preview']), /Unknown argument/);
 });

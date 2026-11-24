@@ -1,14 +1,10 @@
+import { errorMessage } from "../../core/error-message";
 import type { MapDocument } from "../../map-model";
 import type { ImageCandidate } from "../../core/image-candidates";
 import { imageKey } from "../../core/image-keys";
 import { t, type TranslationKey } from "../../i18n";
 import { acceptImage, safeImageName } from "./image-input";
 import type { MapChatImages, MapChatPanel } from "./map-chat";
-
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
-}
 
 /** What the picture searches of one reply share: the cards already searched, the usage notices answered, and the blocks. */
 export interface ChatImageBatch {

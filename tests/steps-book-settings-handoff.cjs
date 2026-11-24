@@ -91,12 +91,17 @@ test('role defaults before the plan: root and first level intro, deeper body, ex
   await runs.stop?.(mapPath);
 });
 
-test('i18n: all three languages carry the new keys, no placeholder drift', () => {
-  const keys = ['book_settings', 'book_settings_hint', 'book_reader', 'book_goal', 'book_angle', 'book_tone', 'book_length', 'book_style', 'book_setting_empty', 'book_setting_limit'];
+test('i18n: all three languages carry the picture-book field labels and empty-field hint', () => {
+  const keys = [...BOOK_SETTING_FIELDS.map(field => `ui.book_setting_${field}`), 'ui.book_setting_empty'];
+  const { translate } = S.load('i18n.ts');
   for (const lang of ['zh-TW', 'zh-CN', 'en']) {
     const text = fs.readFileSync(path.join(S.root, `i18n/${lang}.ts`), 'utf8');
-    for (const k of keys) assert.match(text, new RegExp(`"coffee\\.${k}":\\s*["']`), `${lang} ${k}`);
-    assert.match(text, /"coffee\.book_setting_limit":\s*["'].*\{0\}.*\{1\}/);
+    for (const key of keys) {
+      assert.ok(text.includes(`"${key}":`), `${lang} ${key}`);
+      assert.notEqual(translate(lang, key), key, `${lang} ${key} resolves`);
+      assert.ok(translate(lang, key).trim(), `${lang} ${key} is nonempty`);
+    }
+    assert.ok(!text.includes('"coffee.book_'), `${lang}: retired namespace`);
   }
-  assert.ok(BOOK_SETTING_FIELDS.length === 6);
+  assert.equal(BOOK_SETTING_FIELDS.length, 6);
 });

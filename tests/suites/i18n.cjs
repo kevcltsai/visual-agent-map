@@ -5,6 +5,7 @@ const { test, root, load, plain, obsidian, DEFAULT_SETTINGS, languageIds } = req
 test('UI language switch translates stable semantic keys and placeholders', () => {
   const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');assert.equal(translate('zh-TW','ui.expand_0'),'展開 {0}');assert.equal(translate('zh-TW','ui.interface_language'),'介面語言');
   assert.equal(translate('zh-TW','missing.runtime.key'), 'missing.runtime.key');
+  assert.equal(translate('zh-TW', 'ui.reconnect_existing_workspace'), '找回既有工作區');
 });
 // UX B5 (owner request 2026-11): this replaces "first install defaults to English regardless of Obsidian language".
 test('first install follows the Obsidian language when VAM has an interface in it, English otherwise, while a saved VAM choice wins', () => {
@@ -296,7 +297,7 @@ test('check:i18n fails on bad placeholder and extra-key fixtures and passes on a
     const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-i18n-')); fixtures.push(fixture);
     fs.mkdirSync(path.join(fixture, 'i18n'));
     fs.copyFileSync(path.join(root, 'i18n', 'languages.ts'), path.join(fixture, 'i18n', 'languages.ts'));
-    const write = (name, name2, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${name2} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
+    const write = (name, name2, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${name2} = {\n  "detail.a": "Hello **{0}**",\n${entries}};\n`);
     write('en.ts', 'en', '  "ui.b": "Count {0} of {1}",\n');
     // One dictionary per non-English registry language, so a new language needs no edit here.
     for (const { id } of LANGUAGES) if (id !== 'en') write(`${id}.ts`, exportName(id), chinese);
@@ -376,7 +377,7 @@ test('checkZhTwMapTerms flags 節點/地圖/Workspace in zh-TW ui.* strings only
   assert.match(mapProblem[0].reason, /地圖.*心智圖/);
   assert.match(zh({ 'ui.n': '新增節點' })[0].reason, /節點/);
   assert.deepEqual(zh({ 'ui.aim_x': '地圖' }), [], 'ui.aim_* is exempt');
-  assert.deepEqual(zh({ 'detail.x': '節點', 'coffee.y': '地圖' }), [], 'non-ui. keys are exempt');
+  assert.deepEqual(zh({ 'detail.x': '節點', 'detail.y': '地圖' }), [], 'non-ui. keys are exempt');
   assert.deepEqual(zh({ 'ui.y': '放在 Agent Workspace/ 下' }), [], 'Agent Workspace/ is allowed');
   const workspace = zh({ 'ui.z': '開啟 Workspace' });
   assert.equal(workspace.length, 1, 'bare Workspace is reported');

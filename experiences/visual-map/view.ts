@@ -1,3 +1,4 @@
+import { errorMessage } from "../../core/error-message";
 import {
   cardOutputLanguage,
   defaultOutputLanguage,
@@ -698,10 +699,6 @@ const INTERACTIVE_SELECTOR = [
 /** True when a key event came from a text control, where the field owns the key (undo, Backspace, typing). */
 function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
-}
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
 }
 
 /** A copy of `node` without any AIM field: what an old AIM map shares. */

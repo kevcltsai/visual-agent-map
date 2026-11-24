@@ -11,6 +11,7 @@
  * request they are taken out of the Detail the model sees ({@link splitFullText}) and after the reply the program puts them
  * back ({@link attachFullText}), so the model never reads the fetched text and cannot rewrite a block under the VAM label.
  */
+import { escapeRegExp } from "./escape-regexp";
 import { translateNote, type ContentLanguage, type TranslationKey } from "../i18n";
 import type { FetchResponse } from "./argument-map/source-proof";
 import type { TaskContext } from "../ai/types";
@@ -129,7 +130,6 @@ export async function fetchFullTexts(
 }
 
 const LANGUAGES: ContentLanguage[] = ["zh-TW", "zh-CN", "en"];
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const alternatives = (key: TranslationKey): string =>
   LANGUAGES.map(language => escapeRegExp(translateNote(language, key, "\u0000")).replace("\u0000", "[^\\n]*")).join(
     "|"

@@ -303,7 +303,7 @@ import {
 import type { ProofreadRequest, ProofreadRun } from "../../core/steps/book-pipeline/proofread";
 import { BOOK_CHECKS, researchVoiceSentences } from "../../core/book-pipeline/prose-checks";
 import type { StepDefinition } from "../../core/step-runner";
-import { untilAborted } from "./argument-run";
+import { untilAborted } from "../../core/abort";
 import {
   avoidSourcesInstruction,
   cardResultSnapshot,

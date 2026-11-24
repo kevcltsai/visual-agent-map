@@ -1324,16 +1324,6 @@ integrationTest('UI wording: short research (subtopic research), not shallow res
   assert.equal(translate('zh-TW', 'ui.review_synthesis_draft'), '檢閱整合草稿'); assert.equal(translate('zh-TW', 'ui.review_the_synthesis_draft'), '請檢閱整合草稿。');
   assert.equal(translate('zh-TW', 'ui.shallow_research_counts', 1, 3), '簡短研究：完成 1／3'); assert.equal(translate('en', 'ui.shallow_research_counts', 1, 3), 'Short research: 1 of 3 done');
 });
-integrationTest('map UI terms in zh-TW say 議題 and 心智圖, not 節點 or 地圖, and keep 工作區 consistent', () => {
-  const { translate } = load('i18n.ts');
-  const source = require('../support.cjs').i18nSource('zh-TW');
-  const zh = source;
-  const mapUi = [...zh.matchAll(/^  "(ui\.[^"]+)": "((?:[^"\\]|\\.)*)"/gm)].filter(([, key]) => !/aim_/.test(key));
-  const drift = mapUi.filter(([, , text]) => /節點|地圖/.test(text)).map(([, key]) => key);
-  assert.deepEqual(drift, [], 'no map UI string uses 節點 or 地圖');
-  assert.equal(mapUi.filter(([, , text]) => /Workspace/.test(text.replace('Agent Workspace/', ''))).length, 0, 'prose says 工作區, not Workspace');
-  assert.equal(translate('zh-TW', 'ui.reconnect_existing_workspace'), '找回既有工作區');
-});
 test('applyCollapseLevel: collapse all, expand all and expand to level N set the collapsed flag on branches only', () => {
   const nodes = () => [node('root'), node('a', 'root'), node('b', 'root'), node('a1', 'a'), node('a2', 'a'), node('a11', 'a1')];
   const flags = list => Object.fromEntries(list.map(item => [item.id, item.collapsed]));

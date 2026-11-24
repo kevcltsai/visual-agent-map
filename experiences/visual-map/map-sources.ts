@@ -1,3 +1,4 @@
+import { abortError as aborted } from "../../core/abort";
 import { TFile, TFolder, parseYaml, type App } from "obsidian";
 import {
   dedupeReferenceGroups,
@@ -96,8 +97,6 @@ export interface MapSourceDeps {
   /** Folders outside the vault (device-local list) and the scope they are checked against on every read. */
   external?: { sources: readonly ExternalSource[]; scope: ExternalScope };
 }
-
-const aborted = (): Error => Object.assign(new Error("Aborted"), { name: "AbortError" });
 
 function markdownFiles(folder: TFolder): TFile[] {
   const found: TFile[] = [];

@@ -1,3 +1,4 @@
+import { escapeRegExp } from "../../escape-regexp";
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguage, inLanguageNaming } from "../_shared/fragments";
@@ -77,10 +78,7 @@ export class OutlineGenerateError extends Error {
 /** The topic placeholders a preset may contain (Traditional Chinese and English); the English one is case-insensitive. */
 export const OUTLINE_TOPIC_PLACEHOLDERS: readonly string[] = ["{填入研究主題}", "{research topic}"];
 export const OUTLINE_GENERATE_TOKEN_BUDGET = 32_000;
-const PLACEHOLDER_PATTERN = new RegExp(
-  OUTLINE_TOPIC_PLACEHOLDERS.map(item => item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
-  "gi"
-);
+const PLACEHOLDER_PATTERN = new RegExp(OUTLINE_TOPIC_PLACEHOLDERS.map(escapeRegExp).join("|"), "gi");
 
 /**
  * Put the topic into the preset. Every placeholder is replaced by the topic as a JSON string, so the model sees it

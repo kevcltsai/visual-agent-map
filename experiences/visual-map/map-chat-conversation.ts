@@ -1,3 +1,4 @@
+import { errorMessage } from "../../core/error-message";
 import { runAttempts } from "../../core/attempt-runner";
 import {
   isResumeKeyword,
@@ -35,11 +36,6 @@ import { bookPlanDiff, bookStructureCard, bookThreadDiff } from "./book-plan-dif
 import type { TransactionEntry } from "./map-transaction";
 import type { MapChatTurnRecord, TurnEndFields } from "./map-chat-turn-record";
 import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
-
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
-}
 
 /** The part of the chat window the plan flow uses. */
 export type ChatPlanPanel = Pick<

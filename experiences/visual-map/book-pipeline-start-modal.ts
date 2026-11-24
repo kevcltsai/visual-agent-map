@@ -213,12 +213,12 @@ export interface BookStartInput {
 }
 
 const FIELD_LABEL: Record<BookSettingField, TranslationKey> = {
-  reader: "coffee.book_reader",
-  goal: "coffee.book_goal",
-  angle: "coffee.book_angle",
-  tone: "coffee.book_tone",
-  length: "coffee.book_length",
-  style: "coffee.book_style"
+  reader: "ui.book_setting_reader",
+  goal: "ui.book_setting_goal",
+  angle: "ui.book_setting_angle",
+  tone: "ui.book_setting_tone",
+  length: "ui.book_setting_length",
+  style: "ui.book_setting_style"
 };
 
 export interface BookSettingsFields {
@@ -276,7 +276,7 @@ export function renderBookSettingsFields(
         rows: "2",
         maxlength: String(BOOK_SETTING_INPUT_MAX),
         "aria-label": label,
-        placeholder: t("coffee.book_setting_empty")
+        placeholder: t("ui.book_setting_empty")
       }
     });
     wrap.createSpan({ cls: "vam-book-start-shimmer", attr: { "aria-hidden": "true" } });

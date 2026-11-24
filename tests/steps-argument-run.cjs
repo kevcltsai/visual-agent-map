@@ -3,7 +3,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { ArgumentRuns, ArgumentRunError, MAX_RESEARCH_CONCURRENCY: MAX, WORST_CASE_AI_CALLS, assumptionScope, untilAborted } = S.load('experiences/visual-map/argument-run.ts');
+const { ArgumentRuns, ArgumentRunError, MAX_RESEARCH_CONCURRENCY: MAX, WORST_CASE_AI_CALLS, assumptionScope } = S.load('experiences/visual-map/argument-run.ts');
+const { untilAborted } = S.load('core/abort.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
 const machine = S.load('core/argument-map/machine.ts');

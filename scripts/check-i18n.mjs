@@ -2,11 +2,10 @@
 //   - key set equal to en (missing and extra keys)
 //   - placeholder multisets equal: {0}, {1}, ... and {{name}}
 //   - Markdown/structure token counts equal: **, `, [[, ]], ](, line-start #, > and "- ", HTML tags, newlines
-//   - coffee.* keys contiguous between the coffee:begin / coffee:end markers of each dictionary file
 //   - zh-TW ui.* strings (except ui.aim_*) say 議題/心智圖/工作區: no 節點, 地圖 or bare Workspace (Agent Workspace/ is fine)
 // Usage: node scripts/check-i18n.mjs [--root <dir>]   (<dir> holds i18n/languages.ts; default: the repository root)
 import { buildSync } from "esbuild";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -56,7 +55,7 @@ export function checkDictionaries(dictionaries) {
   return problems;
 }
 
-/** zh-TW map UI wording: same rule as the "map UI terms in zh-TW" test in tests/suites/visual-map-view.cjs. */
+/** Canonical zh-TW map UI wording rule. */
 export function checkZhTwMapTerms(dictionaries) {
   const problems = [];
   for (const [key, value] of Object.entries(dictionaries["zh-TW"] ?? {})) {
@@ -65,23 +64,6 @@ export function checkZhTwMapTerms(dictionaries) {
     if (value.includes("地圖")) problems.push({ language: "zh-TW", key, reason: "uses 地圖; write 心智圖" });
     if (value.replace("Agent Workspace/", "").includes("Workspace")) problems.push({ language: "zh-TW", key, reason: "uses Workspace; write 工作區" });
   }
-  return problems;
-}
-
-/** Each dictionary file keeps all coffee.* keys in one block between the coffee:begin and coffee:end markers. */
-export function checkCoffeeBlock(language, source) {
-  const problems = [];
-  const lines = source.split("\n");
-  const begin = lines.findIndex(line => line.includes("coffee:begin"));
-  const end = lines.findIndex(line => line.includes("coffee:end"));
-  if (begin < 0 || end < begin) return [{ language, key: "coffee.*", reason: "coffee:begin / coffee:end markers are missing" }];
-  lines.forEach((line, index) => {
-    const inCoffee = /^\s*"coffee\./.test(line);
-    const inside = index > begin && index < end;
-    if (inCoffee !== inside && (inCoffee || /^\s*"[^"]+":/.test(line))) {
-      problems.push({ language, key: (line.match(/"([^"]+)"/) ?? [])[1] ?? `line ${index + 1}`, reason: inCoffee ? "coffee.* key outside the coffee block" : "non-coffee key inside the coffee block" });
-    }
-  });
   return problems;
 }
 
@@ -103,7 +85,6 @@ function loadFromRoot(root) {
       continue;
     }
     dictionaries[id] = Object.values(bundle(file)).find(value => value && typeof value === "object");
-    problems.push(...checkCoffeeBlock(id, readFileSync(file, "utf8")));
   }
   return { dictionaries, problems };
 }

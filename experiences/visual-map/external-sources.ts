@@ -1,3 +1,5 @@
+import { escapeRegExp } from "../../core/escape-regexp";
+import { abortError as aborted } from "../../core/abort";
 import {
   constants,
   chmodSync,
@@ -225,7 +227,6 @@ export class ExternalSourceError extends Error {
   }
 }
 
-const aborted = (): Error => Object.assign(new Error("Aborted"), { name: "AbortError" });
 const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith(".md");
 
 interface ExternalFile {
@@ -283,8 +284,6 @@ export async function listExternalSource(
   await visit(check.real, "", 0);
   return { real: check.real, files };
 }
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Replaces every spelling of the source's root (as typed, real, and with the other slash) in file text. */
 export function scrubExternalPaths(text: string, roots: readonly string[]): string {

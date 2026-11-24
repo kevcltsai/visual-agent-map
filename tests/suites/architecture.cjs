@@ -42,3 +42,15 @@ test('thinking artifacts route through shared core without view coupling', async
   assert.equal(router.canHandoff('visual-map'), false);
   await assert.rejects(() => router.handoff({ target: 'visual-map', artifact }), /not available/);
 });
+
+test('shared error message preserves the raw message across realms and stringifies other thrown values', () => {
+  const { errorMessage } = load('core/error-message.ts');
+  assert.equal(errorMessage(new Error('failed')), 'failed');
+  assert.equal(errorMessage({ message: 'cross-realm' }), 'cross-realm');
+  assert.equal(errorMessage({ message: '' }), '');
+  assert.equal(errorMessage('raw failure'), 'raw failure');
+  assert.equal(errorMessage(42), '42');
+  assert.equal(errorMessage(null), 'null');
+  assert.equal(errorMessage(undefined), 'undefined');
+  assert.equal(errorMessage({ message: 42 }), '[object Object]');
+});

@@ -1,3 +1,4 @@
+import { errorMessage } from "../../core/error-message";
 import type VisualAgentMapPlugin from "../../main";
 import { t, type ContentLanguage, type UiLanguage } from "../../i18n";
 import type { History, MapDocument } from "../../map-model";
@@ -27,11 +28,6 @@ interface Action {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   label?: string;
-}
-/** Message of any thrown value, without relying on instanceof Error (errors may cross realms). */
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
 }
 /** History entries of grading runs that are currently undone (shared by every view of the map; redo takes it out). */
 const undoneGradings = new WeakSet<object>();

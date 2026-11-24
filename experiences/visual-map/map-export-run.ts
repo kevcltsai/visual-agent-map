@@ -3,6 +3,7 @@
  * No Obsidian import: the vault, notices, the PNG encoder and the view's lifecycle are reached through ports, so the
  * run is loaded and tested without a view.
  */
+import { errorMessage } from "../../core/error-message";
 import { effectiveSummaryRange, isAnnotatedImage } from "./canvas-items";
 import type { AnnotatedImageItem, BoundaryItem, ImageItem, SummaryItem } from "./canvas-items";
 import { sniffImage } from "./image-input";
@@ -62,10 +63,6 @@ export interface MapExportPorts extends ExportSceneSource {
   notice(text: string): void;
 }
 
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
-}
 const boxOf = (card: HTMLElement): { x: number; y: number; width: number; height: number } => ({
   x: card.offsetLeft,
   y: card.offsetTop,

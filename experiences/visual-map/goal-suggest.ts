@@ -1,3 +1,4 @@
+import { errorMessage } from "../../core/error-message";
 import type VisualAgentMapPlugin from "../../main";
 import { t } from "../../i18n";
 import type { History, MapDocument, MapNode } from "../../map-model";
@@ -13,11 +14,6 @@ interface Action {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   label?: string;
-}
-/** Message of any thrown value, without relying on instanceof Error (errors may cross realms). */
-function errorMessage(error: unknown): string {
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === "string" ? message : String(error);
 }
 let goalSuggestSeq = 0;
 /**

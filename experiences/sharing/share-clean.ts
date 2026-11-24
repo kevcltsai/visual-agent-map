@@ -7,7 +7,8 @@
  */
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
-import { commentRanges, markdownCodeRanges, normalizeNewlines } from "./share-code";
+import { classifyShareTarget, commentRanges, markdownCodeRanges, normalizeNewlines } from "./share-code";
+export { classifyShareTarget } from "./share-code";
 import { markAttachment, markNodeLink, stripNodeLinkMarks, VIDEO_MARK } from "./share-node-links";
 
 export interface ShareCleanContext {
@@ -52,17 +53,6 @@ export interface AssetRegistry {
 }
 
 export const SHARE_ASSET_SCHEME = "vam-asset:";
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
-/**
- * What an embed target is, from its path alone. One rule for `![[…]]` and `![](…)` (Diagnostic Reset, share-export-complete):
- * a note (`.md` or no extension) is never shipped as a file, an image becomes an asset, anything else is an attachment.
- */
-export function classifyShareTarget(path: string): "note" | "image" | "attachment" {
-  const clean = path.split(/[?#]/)[0].trim();
-  if (IMAGE_EXT.test(clean)) return "image";
-  const ext = /\.([a-z0-9]{1,5})$/i.exec(clean);
-  return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
-}
 const isWeb = (value: string): boolean => /^https?:\/\//i.test(value);
 
 export function createAssetRegistry(): AssetRegistry {

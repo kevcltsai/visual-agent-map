@@ -3,7 +3,7 @@
  * One level only: a note embed inside embedded content becomes a plain `[[link]]` (the cleaner then turns it into its
  * title), so embeds never nest or loop. Images and other file embeds inside the content stay as they are.
  */
-import { markdownCodeRanges, normalizeNewlines, stripComments } from "./share-code";
+import { classifyShareTarget, markdownCodeRanges, normalizeNewlines, stripComments } from "./share-code";
 
 const FRONTMATTER = /^---[ \t]*\n[\s\S]*?\n(?:---|\.\.\.)[ \t]*(?:\n|$)/;
 const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
@@ -76,7 +76,7 @@ export function flattenNoteEmbeds(md: string): string {
   return md.replace(/!\[\[([^\]\n]+)\]\]/g, (all: string, inner: string, at: number) => {
     if (ranges.some(range => at >= range.start && at < range.end)) return all;
     const path = inner.split("|")[0].split("#")[0].trim();
-    return /\.[a-z0-9]{1,5}$/i.test(path) && !/\.md$/i.test(path) ? all : `[[${inner}]]`;
+    return classifyShareTarget(path) === "note" ? `[[${inner}]]` : all;
   });
 }
 
@@ -132,13 +132,13 @@ export function anchorEmbeddedFiles(content: string, resolve: (ref: string) => s
         ref = decode(
           (src ?? "")
             .trim()
-            .replace(/^<|>$/g, "")
             .replace(/\s+"[^"]*"$/, "")
+            .replace(/^<|>$/g, "")
         );
         label = (alt ?? "").trim();
         if (WEB_OR_DATA.test(ref) || ref.startsWith("//")) return all;
       }
-      if (!ref || !/\.[a-z0-9]{1,5}$/i.test(ref) || /\.md$/i.test(ref)) return all;
+      if (!ref || classifyShareTarget(ref) === "note") return all;
       const path = resolve(ref);
       if (!path || /[\]|\n]/.test(path)) return plainLabel(ref.split("/").pop() ?? ref);
       const shown = label.replace(/[[\]|\n]/g, " ").trim();

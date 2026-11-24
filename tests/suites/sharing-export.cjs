@@ -1148,3 +1148,48 @@ test('sharing export R2: embeds inside %% and <!-- --> comments are never read',
   const shown = await exporter.readEmbeds('![[Draft]]', 'Folder/A.md', 'a', 0);
   assert.equal(shown.get('Draft'), 'Public  tail');
 });
+
+test('share exporter acceptance fix: the shared map\'s own folder is content even inside a VAM folder; other VAM folders stay out', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const clean = load('experiences/sharing/share-clean.ts');
+  const list = [
+    { path: 'Agent/Topics/M/Notes/Src.md', extension: 'md', name: 'Src.md', text: 'Map body', stat: { size: 8 } },
+    { path: 'Agent/Topics/Other/Notes/X.md', extension: 'md', name: 'X.md', text: 'OTHER-MAP-SECRET', stat: { size: 16 } },
+    { path: 'Agent/Topics/M/Attachments/s.pdf', extension: 'pdf', name: 's.pdf', stat: { size: 3 } },
+    { path: 'Agent/Records/r.pdf', extension: 'pdf', name: 'r.pdf', stat: { size: 3 } },
+    { path: 'Agent/Topics/M/Attachments/board.canvas', extension: 'canvas', name: 'board.canvas', stat: { size: 3 } }
+  ];
+  const byKey = { Src: list[0], X: list[1], 's.pdf': list[2], 'r.pdf': list[3], 'board.canvas': list[4] };
+  const reads = [];
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; }, readBinary: async () => new TextEncoder().encode('ABC').buffer, getFileByPath: path => list.find(file => file.path === path) ?? null },
+    metadataCache: { getFirstLinkpathDest: ref => byKey[ref] ?? null }
+  };
+  const node = { id: 'a', path: 'Agent/Topics/M/Notes/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const detail = '![[Src]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]';
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Agent/Topics/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  let markdown = '';
+  exporter.renderOne = async (md, titles, ids, embeds) => {
+    markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, attachmentOf: ref => exporter.registerFile(ref, node.path), assets: exporter.registry }).markdown;
+    return { html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: [], mermaidUndrawn: 0, mermaidBlocked: 0 };
+  };
+  await exporter.ensureRendered({ generation: 0, signal: new AbortController().signal, isCurrent: () => true }, () => {});
+  assert.deepEqual([...new Set(reads)], ['Agent/Topics/M/Notes/Src.md'], 'only the shared map\'s own note is read');
+  assert.ok(markdown.includes('> Map body'), markdown);
+  assert.equal(markdown.includes('OTHER-MAP-SECRET'), false);
+  const files = [...exporter.files.values()];
+  assert.deepEqual(files.map(file => [file.file, file.size > 0]), [['s.pdf', true], ['r.pdf', false], ['board.canvas', true]], 'map attachments are found, a VAM record is not, a canvas is an attachment');
+});
+
+test('share viewer acceptance fix: buttons with click handlers are built after the note is imported into the page', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(repoRoot, 'experiences/sharing/viewer/detail.ts'), 'utf8');
+  const body = source.slice(source.indexOf('export function fillDetailRoot'));
+  const imported = body.indexOf('doc.importNode(child, true)');
+  assert.ok(imported > 0);
+  assert.ok(body.indexOf('upgradeVideoLinks(target, doc, ui)') > imported, 'video cards are built on the live page');
+  assert.ok(body.indexOf('target.querySelectorAll("a.vam-attachment-card")') > imported, 'attachment cards are built on the live page');
+  assert.equal(body.slice(0, imported).includes('upgradeVideoLinks('), false);
+});

@@ -13,7 +13,7 @@ import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
-import { markdownProtectedRanges, normalizeNewlines } from "./share-code";
+import { classifyShareTarget, markdownProtectedRanges, normalizeNewlines } from "./share-code";
 import { applyNodeLinks } from "./share-node-links";
 import { replaceMediaWithLinks } from "./share-media";
 import { mathFromLatex, MATHML_NS, MATH_NOTE_CLASS, MATH_SOURCE_CLASS } from "./share-math";
@@ -573,9 +573,7 @@ export class ShareExporter {
     firstIndex: number
   ): Promise<Map<string, string>> {
     const found = new Map<string, string>();
-    const internal = this.config.internalFolders ?? [];
-    const isInternal = (path: string): boolean =>
-      internal.some(folder => path === folder || path.startsWith(`${folder}/`));
+    const isInternal = (path: string): boolean => this.isInternalFile(path);
     const drop = this.dropped.get(topicId) ?? new Set<number>();
     const problems: EmbeddedFigure[] = [];
     let next = firstIndex;
@@ -588,7 +586,7 @@ export class ShareExporter {
       if (found.has(target)) continue;
       const hash = target.indexOf("#");
       const linkPath = (hash < 0 ? target : target.slice(0, hash)).trim();
-      if (!linkPath || (/\.[a-z0-9]{1,5}$/i.test(linkPath) && !/\.md$/i.test(linkPath))) continue;
+      if (!linkPath || classifyShareTarget(linkPath) !== "note") continue;
       const file: TFile | null = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
       if (!file || file.extension !== "md" || file.path === fromPath) continue;
       if (isInternal(file.path)) continue;
@@ -847,10 +845,19 @@ export class ShareExporter {
   }
 
   /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
+  /**
+   * True for a file in one of VAM's own folders, except the folder of the map being shared: that map's notes and
+   * attachments are its content. Files elsewhere in VAM's folders (other maps, records) stay out of the share.
+   */
+  private isInternalFile(path: string): boolean {
+    const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
+    if (mapFolder && path.startsWith(`${mapFolder}/`)) return false;
+    return (this.config.internalFolders ?? []).some(folder => path === folder || path.startsWith(`${folder}/`));
+  }
+
   private registerFile(ref: string, fromPath: string): string {
-    const internal = this.config.internalFolders ?? [];
     let found: TFile | null = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
-    if (found && internal.some(folder => found?.path === folder || found?.path.startsWith(`${folder}/`))) found = null;
+    if (found && this.isInternalFile(found.path)) found = null;
     // A note is never shipped as raw bytes, whatever syntax pointed at it.
     if (found && found.extension.toLowerCase() === "md") found = null;
     const key = found ? found.path : `?${ref}`;

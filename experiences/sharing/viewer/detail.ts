@@ -228,8 +228,6 @@ export function fillDetailRoot(
       (anchor ?? image).after(sourceLine(doc, src, ui));
     } else if (!/^data:image\//i.test(src)) image.replaceWith(omitted());
   }
-  for (const card of Array.from(root.querySelectorAll("a.vam-attachment-card")))
-    card.replaceWith(attachmentCard(doc, card, assets, ui));
   for (const link of Array.from(root.querySelectorAll("a"))) {
     const href = link.getAttribute("href") ?? "";
     if (/^(https?:|mailto:)/i.test(href)) {
@@ -237,7 +235,6 @@ export function fillDetailRoot(
       link.setAttribute("rel", "noopener noreferrer");
     } else if (!href.startsWith("#")) link.removeAttribute("href");
   }
-  upgradeVideoLinks(root, doc, ui);
   cleanViewerMath(root);
   for (const table of Array.from(root.querySelectorAll("table"))) {
     if (table.parentElement?.classList.contains("vam-table-scroll")) continue;
@@ -247,6 +244,10 @@ export function fillDetailRoot(
     wrap.append(table);
   }
   target.append(...Array.from(root.childNodes).map(child => doc.importNode(child, true)));
+  // Controls with click handlers are built on the live page: importNode copies nodes, never their listeners.
+  for (const card of Array.from(target.querySelectorAll("a.vam-attachment-card")))
+    card.replaceWith(attachmentCard(doc, card, assets, ui));
+  upgradeVideoLinks(target, doc, ui);
 }
 
 /**

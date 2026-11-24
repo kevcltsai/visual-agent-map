@@ -170,3 +170,15 @@ export function stripComments(markdown: string): string {
   }
   return result + markdown.slice(from);
 }
+
+const SHARE_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+/**
+ * What an embed target is, from its path alone. One rule for `![[…]]` and `![](…)` (Diagnostic Reset, share-export-complete):
+ * a note (`.md` or no extension) is never shipped as a file, an image becomes an asset, anything else is an attachment.
+ */
+export function classifyShareTarget(path: string): "note" | "image" | "attachment" {
+  const clean = path.split(/[?#]/)[0].trim();
+  if (SHARE_IMAGE_EXT.test(clean)) return "image";
+  const ext = /\.([a-z0-9]{1,10})$/i.exec(clean);
+  return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
+}

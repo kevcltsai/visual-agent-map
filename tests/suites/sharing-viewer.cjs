@@ -2352,7 +2352,7 @@ test('sharing video: only a marked link to a real YouTube video becomes a card; 
 test('sharing video: the player is never in the file; the viewer drops an iframe that arrives in a note and rebuilds the detail (and so the player) for each card', () => {
   const detail = read('experiences/sharing/viewer/detail.ts');
   assert.match(detail, /"script, iframe, frame, object, embed, applet, link, meta, base"/);
-  assert.ok(detail.indexOf('upgradeVideoLinks(root, doc, ui)') > detail.indexOf('root.querySelectorAll("script, iframe'), 'the strip runs before the viewer builds its own player');
+  assert.ok(detail.indexOf('upgradeVideoLinks(target, doc, ui)') > detail.indexOf('root.querySelectorAll("script, iframe'), 'the strip runs before the viewer builds its own player');
   const main = read('experiences/sharing/viewer/main.ts');
   assert.match(main, /inspector\.replaceChildren\(\);/);
   assert.match(main, /const detail = make\("div", "vam-sample-detail"\);/, 'each selection builds a new detail');

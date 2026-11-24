@@ -1087,3 +1087,13 @@ test('sharing R3: one target rule for both embed syntaxes; a note is never an at
   assert.equal(pdf.markdown.includes('vam-asset:'), false, 'angle brackets and a title still give an attachment');
   assert.deepEqual(calls, ['my doc.pdf']);
 });
+
+test('sharing acceptance fix: long extensions such as .canvas are attachments, not notes', () => {
+  const sharing = load('experiences/sharing/share-clean.ts');
+  assert.equal(sharing.classifyShareTarget('board.canvas'), 'attachment');
+  assert.equal(sharing.classifyShareTarget('deck.keynote'), 'attachment');
+  const embeds = load('experiences/sharing/share-embeds.ts');
+  const anchored = embeds.anchorEmbeddedFiles('![](<my doc.pdf> "t") ![[board.canvas]]', ref => `Here/${ref}`);
+  assert.ok(anchored.includes('![[Here/my doc.pdf]]'), anchored);
+  assert.ok(anchored.includes('![[Here/board.canvas]]'), anchored);
+});

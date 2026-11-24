@@ -73676,6 +73676,159 @@ async function runAttempts(options) {
   }
 }
 
+// core/video-embeds.ts
+var YOUTUBE_HOSTS = /* @__PURE__ */ new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+var VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+var EMBED2 = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
+function youtubeVideoId(rawUrl) {
+  var _a2;
+  let url;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  const host = url.hostname.toLowerCase();
+  if (!YOUTUBE_HOSTS.has(host)) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  let id;
+  if (host === "youtu.be") id = parts[0];
+  else if (parts[0] === "watch") id = url.searchParams.get("v");
+  else if (["embed", "shorts", "live", "v"].includes((_a2 = parts[0]) != null ? _a2 : "")) id = parts[1];
+  return id && VIDEO_ID.test(id) ? id : null;
+}
+function videoUrlsInText(text12) {
+  var _a2;
+  return ((_a2 = text12.match(/https?:\/\/[^\s<>"'()[\]]+/gi)) != null ? _a2 : []).map((url) => url.replace(/[.,;:!?，。；：！？、]+$/u, "")).filter((url) => youtubeVideoId(url) !== null);
+}
+var looksLikeYoutube = (rawUrl) => {
+  try {
+    const host = new URL(rawUrl.trim()).hostname.toLowerCase();
+    return YOUTUBE_HOSTS.has(host) || host.split(".").some((label2) => label2.startsWith("youtube") || label2 === "youtu");
+  } catch (e) {
+    return false;
+  }
+};
+var HTML_EMBED = /<(iframe|embed|object)\b[^>]*>(?:\s*<\/\1\s*>)?/gi;
+var HTML_SOURCE = /\b(?:src|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+var DEFINITION2 = /^( {0,3}\[([^\]\n]+)\]:[ \t]*)(?:<([^>\n]*)>|(\S+))((?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?[ \t]*)$/;
+var IMAGE_REFERENCE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![([])/g;
+var REMOVED2 = "\0";
+var labelKey = (label2) => label2.trim().replace(/\s+/g, " ").toLowerCase();
+var htmlSource = (tag) => {
+  var _a2, _b2, _c;
+  const m = HTML_SOURCE.exec(tag);
+  const raw = ((_c = (_b2 = (_a2 = m == null ? void 0 : m[1]) != null ? _a2 : m == null ? void 0 : m[2]) != null ? _b2 : m == null ? void 0 : m[3]) != null ? _c : "").trim();
+  return raw.startsWith("//") ? `https:${raw}` : raw;
+};
+function embeddedIds(text12) {
+  var _a2, _b2, _c, _d;
+  const ids2 = /* @__PURE__ */ new Set();
+  const add = (url) => {
+    const id = youtubeVideoId(url);
+    if (id) ids2.add(id);
+  };
+  for (const m of text12.matchAll(EMBED2)) add((_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
+  for (const m of text12.matchAll(HTML_EMBED)) add(htmlSource(m[0]));
+  for (const line4 of text12.split(/\r?\n/)) {
+    const d = DEFINITION2.exec(line4);
+    if (d) add((_d = (_c = d[3]) != null ? _c : d[4]) != null ? _d : "");
+  }
+  return ids2;
+}
+function filterText(text12, opened) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
+  let out = text12.replace(HTML_EMBED, (whole) => {
+    const url = htmlSource(whole);
+    if (!looksLikeYoutube(url)) return whole;
+    const id = youtubeVideoId(url);
+    return id && opened.has(id) ? `![](${watch(id)})` : REMOVED2;
+  });
+  out = out.replace(EMBED2, (whole, alt, angled, bare3) => {
+    var _a3;
+    const url = (_a3 = angled != null ? angled : bare3) != null ? _a3 : "";
+    if (!looksLikeYoutube(url)) return whole;
+    const id = youtubeVideoId(url);
+    return id && opened.has(id) ? `![${alt}](${watch(id)})` : REMOVED2;
+  });
+  const imageLabels = /* @__PURE__ */ new Set();
+  for (const m of out.matchAll(IMAGE_REFERENCE)) imageLabels.add(labelKey(m[2] ? m[2] : (_b2 = (_a2 = m[1]) != null ? _a2 : m[3]) != null ? _b2 : ""));
+  const dropped = /* @__PURE__ */ new Set();
+  const lines = out.split(/(\r?\n)/);
+  for (let i = 0; i < lines.length; i += 2) {
+    const d = DEFINITION2.exec((_c = lines[i]) != null ? _c : "");
+    if (!d || !imageLabels.has(labelKey((_d = d[2]) != null ? _d : ""))) continue;
+    const url = (_f = (_e = d[3]) != null ? _e : d[4]) != null ? _f : "";
+    if (!looksLikeYoutube(url)) continue;
+    const id = youtubeVideoId(url);
+    if (id && opened.has(id)) lines[i] = `${d[1]}${watch(id)}${(_g = d[5]) != null ? _g : ""}`;
+    else {
+      lines[i] = REMOVED2;
+      dropped.add(labelKey((_h = d[2]) != null ? _h : ""));
+    }
+  }
+  out = lines.join("");
+  if (dropped.size)
+    out = out.replace(
+      IMAGE_REFERENCE,
+      (whole, alt, ref, short) => {
+        var _a3;
+        return dropped.has(labelKey(ref ? ref : (_a3 = alt != null ? alt : short) != null ? _a3 : "")) ? REMOVED2 : whole;
+      }
+    );
+  return out;
+}
+function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
+  var _a2, _b2, _c;
+  const opened = embeddedIds(existingDetail);
+  for (const url of openedUrls) {
+    const id = youtubeVideoId(url);
+    if (id) opened.add(id);
+  }
+  const lines = detail.split(/(\r?\n)/);
+  let fence2 = null;
+  const out = [];
+  let pending2 = [];
+  const flush = () => {
+    var _a3, _b3;
+    if (!pending2.length) return;
+    const filtered = filterText(pending2.join(""), opened);
+    if (!filtered.includes(REMOVED2)) out.push(filtered);
+    else {
+      const parts = filtered.split(/(\r?\n)/);
+      for (let i = 0; i < parts.length; i += 2) {
+        const line4 = (_a3 = parts[i]) != null ? _a3 : "";
+        const eol2 = (_b3 = parts[i + 1]) != null ? _b3 : "";
+        if (!line4.includes(REMOVED2)) {
+          out.push(line4, eol2);
+          continue;
+        }
+        const rest = line4.split(REMOVED2).join("");
+        if (!rest.trim() || /^\s*(?:[-*+]|\d+[.)])\s*$/.test(rest)) continue;
+        out.push(rest.replace(/[ \t]+$/, ""), eol2);
+      }
+    }
+    pending2 = [];
+  };
+  for (let i = 0; i < lines.length; i += 2) {
+    const line4 = (_a2 = lines[i]) != null ? _a2 : "";
+    const eol2 = (_b2 = lines[i + 1]) != null ? _b2 : "";
+    const mark2 = (_c = /^ {0,3}(`{3,}|~{3,})/.exec(line4)) == null ? void 0 : _c[1];
+    if (fence2) {
+      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
+      out.push(line4, eol2);
+    } else if (mark2) {
+      flush();
+      fence2 = mark2;
+      out.push(line4, eol2);
+    } else pending2.push(line4, eol2);
+  }
+  flush();
+  return out.join("");
+}
+
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
 var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
@@ -73905,6 +74058,17 @@ function chatResearchMode(action, mapAiMode) {
   if (action.mode) return action.mode;
   if (action.needsWeb === true || action.images === true) return "standard";
   return mapAiMode || "quick";
+}
+function keepPastedVideoUrls(actions, userWords) {
+  const pasted = new Set(videoUrlsInText(userWords).map((url) => youtubeVideoId(url)));
+  return actions.map((action) => {
+    if (action.kind !== "run_map_action" || !action.direction) return action;
+    const urls = videoUrlsInText(action.direction).filter((url) => !pasted.has(youtubeVideoId(url)));
+    if (!urls.length) return action;
+    let direction = action.direction;
+    for (const url of urls) direction = direction.split(url).join("");
+    return { ...action, direction };
+  });
 }
 function chatResearchRequest(action, mapAiMode, optionsOf) {
   const mode = chatResearchMode(action, mapAiMode);
@@ -74836,7 +75000,14 @@ var MapChatConversation = class {
               }
             });
             if (!alive()) return;
-            const result = outcome.droppedOnRetry && !outcome.actions.length ? { ...outcome, reply: t("ui.map_chat_reply_format_rejected") } : { ...outcome, actions: resolveSelectionTargets(outcome.actions) };
+            const userWords = [
+              autoOrigin ? "" : origin.text,
+              ...chat.transcript().filter((item) => item.role === "user" && !item.auto).flatMap((item) => {
+                var _a4;
+                return [item.text, ...((_a4 = item.steers) != null ? _a4 : []).map((steer) => steer.text)];
+              })
+            ].join("\n");
+            const result = outcome.droppedOnRetry && !outcome.actions.length ? { ...outcome, reply: t("ui.map_chat_reply_format_rejected") } : { ...outcome, actions: keepPastedVideoUrls(resolveSelectionTargets(outcome.actions), userWords) };
             for (const id of (_c2 = (_b3 = request.context.research) == null ? void 0 : _b3.sent) != null ? _c2 : []) this.ports.researchSent().add(id);
             await steerState.steers.close();
             if (!alive()) return;
@@ -107874,155 +108045,6 @@ function fitWithin(width, height, max = SHARE_IMAGE_MAX_EDGE) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-// core/video-embeds.ts
-var YOUTUBE_HOSTS = /* @__PURE__ */ new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
-var VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-var EMBED2 = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
-function youtubeVideoId(rawUrl) {
-  var _a2;
-  let url;
-  try {
-    url = new URL(rawUrl.trim());
-  } catch (e) {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const host = url.hostname.toLowerCase();
-  if (!YOUTUBE_HOSTS.has(host)) return null;
-  const parts = url.pathname.split("/").filter(Boolean);
-  let id;
-  if (host === "youtu.be") id = parts[0];
-  else if (parts[0] === "watch") id = url.searchParams.get("v");
-  else if (["embed", "shorts", "live", "v"].includes((_a2 = parts[0]) != null ? _a2 : "")) id = parts[1];
-  return id && VIDEO_ID.test(id) ? id : null;
-}
-var looksLikeYoutube = (rawUrl) => {
-  try {
-    const host = new URL(rawUrl.trim()).hostname.toLowerCase();
-    return YOUTUBE_HOSTS.has(host) || host.split(".").some((label2) => label2.startsWith("youtube") || label2 === "youtu");
-  } catch (e) {
-    return false;
-  }
-};
-var HTML_EMBED = /<(iframe|embed|object)\b[^>]*>(?:\s*<\/\1\s*>)?/gi;
-var HTML_SOURCE = /\b(?:src|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
-var DEFINITION2 = /^( {0,3}\[([^\]\n]+)\]:[ \t]*)(?:<([^>\n]*)>|(\S+))((?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?[ \t]*)$/;
-var IMAGE_REFERENCE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![([])/g;
-var REMOVED2 = "\0";
-var labelKey = (label2) => label2.trim().replace(/\s+/g, " ").toLowerCase();
-var htmlSource = (tag) => {
-  var _a2, _b2, _c;
-  const m = HTML_SOURCE.exec(tag);
-  const raw = ((_c = (_b2 = (_a2 = m == null ? void 0 : m[1]) != null ? _a2 : m == null ? void 0 : m[2]) != null ? _b2 : m == null ? void 0 : m[3]) != null ? _c : "").trim();
-  return raw.startsWith("//") ? `https:${raw}` : raw;
-};
-function embeddedIds(text12) {
-  var _a2, _b2, _c, _d;
-  const ids2 = /* @__PURE__ */ new Set();
-  const add = (url) => {
-    const id = youtubeVideoId(url);
-    if (id) ids2.add(id);
-  };
-  for (const m of text12.matchAll(EMBED2)) add((_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
-  for (const m of text12.matchAll(HTML_EMBED)) add(htmlSource(m[0]));
-  for (const line4 of text12.split(/\r?\n/)) {
-    const d = DEFINITION2.exec(line4);
-    if (d) add((_d = (_c = d[3]) != null ? _c : d[4]) != null ? _d : "");
-  }
-  return ids2;
-}
-function filterText(text12, opened) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h;
-  const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
-  let out = text12.replace(HTML_EMBED, (whole) => {
-    const url = htmlSource(whole);
-    if (!looksLikeYoutube(url)) return whole;
-    const id = youtubeVideoId(url);
-    return id && opened.has(id) ? `![](${watch(id)})` : REMOVED2;
-  });
-  out = out.replace(EMBED2, (whole, alt, angled, bare3) => {
-    var _a3;
-    const url = (_a3 = angled != null ? angled : bare3) != null ? _a3 : "";
-    if (!looksLikeYoutube(url)) return whole;
-    const id = youtubeVideoId(url);
-    return id && opened.has(id) ? `![${alt}](${watch(id)})` : REMOVED2;
-  });
-  const imageLabels = /* @__PURE__ */ new Set();
-  for (const m of out.matchAll(IMAGE_REFERENCE)) imageLabels.add(labelKey(m[2] ? m[2] : (_b2 = (_a2 = m[1]) != null ? _a2 : m[3]) != null ? _b2 : ""));
-  const dropped = /* @__PURE__ */ new Set();
-  const lines = out.split(/(\r?\n)/);
-  for (let i = 0; i < lines.length; i += 2) {
-    const d = DEFINITION2.exec((_c = lines[i]) != null ? _c : "");
-    if (!d || !imageLabels.has(labelKey((_d = d[2]) != null ? _d : ""))) continue;
-    const url = (_f = (_e = d[3]) != null ? _e : d[4]) != null ? _f : "";
-    if (!looksLikeYoutube(url)) continue;
-    const id = youtubeVideoId(url);
-    if (id && opened.has(id)) lines[i] = `${d[1]}${watch(id)}${(_g = d[5]) != null ? _g : ""}`;
-    else {
-      lines[i] = REMOVED2;
-      dropped.add(labelKey((_h = d[2]) != null ? _h : ""));
-    }
-  }
-  out = lines.join("");
-  if (dropped.size)
-    out = out.replace(
-      IMAGE_REFERENCE,
-      (whole, alt, ref, short) => {
-        var _a3;
-        return dropped.has(labelKey(ref ? ref : (_a3 = alt != null ? alt : short) != null ? _a3 : "")) ? REMOVED2 : whole;
-      }
-    );
-  return out;
-}
-function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
-  var _a2, _b2, _c;
-  const opened = embeddedIds(existingDetail);
-  for (const url of openedUrls) {
-    const id = youtubeVideoId(url);
-    if (id) opened.add(id);
-  }
-  const lines = detail.split(/(\r?\n)/);
-  let fence2 = null;
-  const out = [];
-  let pending2 = [];
-  const flush = () => {
-    var _a3, _b3;
-    if (!pending2.length) return;
-    const filtered = filterText(pending2.join(""), opened);
-    if (!filtered.includes(REMOVED2)) out.push(filtered);
-    else {
-      const parts = filtered.split(/(\r?\n)/);
-      for (let i = 0; i < parts.length; i += 2) {
-        const line4 = (_a3 = parts[i]) != null ? _a3 : "";
-        const eol2 = (_b3 = parts[i + 1]) != null ? _b3 : "";
-        if (!line4.includes(REMOVED2)) {
-          out.push(line4, eol2);
-          continue;
-        }
-        const rest = line4.split(REMOVED2).join("");
-        if (!rest.trim() || /^\s*(?:[-*+]|\d+[.)])\s*$/.test(rest)) continue;
-        out.push(rest.replace(/[ \t]+$/, ""), eol2);
-      }
-    }
-    pending2 = [];
-  };
-  for (let i = 0; i < lines.length; i += 2) {
-    const line4 = (_a2 = lines[i]) != null ? _a2 : "";
-    const eol2 = (_b2 = lines[i + 1]) != null ? _b2 : "";
-    const mark2 = (_c = /^ {0,3}(`{3,}|~{3,})/.exec(line4)) == null ? void 0 : _c[1];
-    if (fence2) {
-      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
-      out.push(line4, eol2);
-    } else if (mark2) {
-      flush();
-      fence2 = mark2;
-      out.push(line4, eol2);
-    } else pending2.push(line4, eol2);
-  }
-  flush();
-  return out.join("");
-}
-
 // experiences/sharing/share-code.ts
 var FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 var VOID_TAGS = /* @__PURE__ */ new Set([
@@ -116006,7 +116028,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     if (input2.timeoutMs !== void 0 && (!Number.isInteger(input2.timeoutMs) || input2.timeoutMs < 18e4 || input2.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
@@ -116165,7 +116187,13 @@ var AiTaskService = class {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
         };
-      const videoFilter = ((_h = context.mode) != null ? _h : "task") === "task" && role === void 0 && !input2.countRepair ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] } : null;
+      const videoFilter = ((_h = context.mode) != null ? _h : "task") === "task" && role === void 0 && !input2.countRepair ? {
+        opened: [
+          ...countsWeb ? openedUrlsFromEvents(webEvents) : [],
+          ...videoUrlsInText(`${input2.task}
+${(_i = input2.userTexts) != null ? _i : ""}`)
+        ]
+      } : null;
       if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input2.detail);
       if (readerFacingDetail(input2)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
@@ -116178,7 +116206,7 @@ var AiTaskService = class {
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
       const aiDecides = input2.aiSections === "decide";
-      if (aiDecides && ((_i = input2.mode) != null ? _i : "task") === "task" && !input2.countRepair && !((_j = input2.detail) == null ? void 0 : _j.trim())) {
+      if (aiDecides && ((_j = input2.mode) != null ? _j : "task") === "task" && !input2.countRepair && !((_k = input2.detail) == null ? void 0 : _k.trim())) {
         const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage2));
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;

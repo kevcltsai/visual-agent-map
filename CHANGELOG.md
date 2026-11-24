@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.35.0] - 2026-11-24
+## [0.35.0] - 2026-11-25
 
 ### Make a picture book
 
@@ -19,17 +19,19 @@ Ask the map chat for "back stretches": it puts a picture of the back muscles on 
 
 A map saved as one HTML file now keeps what you built: topic types and shapes, relation lines, frames and pictures on the map, embedded notes, attachments, math, and videos that play with a click.
 
+### Play Facebook and Instagram videos
+
+Paste a Facebook or Instagram video link into a note: it plays right inside the note, on map cards and in shared pages.
+
 ### Changed
 
 - Hypothesis research is hidden for now. Hypothesis maps you already made still open.
 - Map chat can carry out a long plan by itself, and picks up an interrupted plan when you type "continue".
 - A map's data sources can also be folders outside the vault, and expand, synthesis and both chats now use them.
-- Facebook and Instagram videos play right inside notes, map cards and shared pages.
 
 ### Fixes
 
-- When sharing is blocked to protect private text, the dialog names the topic and the text to fix; shared files keep YouTube videos as links; plus many picture-book and map chat fixes.
-- Cmd+V pastes onto the map again when nothing is focused; research that rewrites a note keeps its videos and pictures; a shared file opened from disk plays YouTube in a new tab.
+- A blocked share now names the topic and text to fix; Cmd+V with nothing focused pastes onto the map again; research that rewrites a note keeps its videos and pictures; plus many sharing, picture-book and map chat fixes.
 
 ## [0.34.0] - 2026-11-11
 

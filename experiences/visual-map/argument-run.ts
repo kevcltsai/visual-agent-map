@@ -10,6 +10,7 @@
  * goes back to pending, it is retried once, and a second consecutive failure pauses the run with 'error' (resumable). Only an
  * answer that arrived can become a miss (no_answer, not_found, a refused source).
  */
+import { untilAborted } from "../../core/abort";
 import type { TranslationKey } from "../../i18n";
 import { intakeAiMarkdown } from "../../ai/markdown-intake";
 import {
@@ -281,25 +282,6 @@ function linked(a: AbortSignal, b: AbortSignal): AbortSignal {
   a.addEventListener("abort", abort, { once: true });
   b.addEventListener("abort", abort, { once: true });
   return controller.signal;
-}
-/** The call's result, or a rejection the moment `signal` aborts: a provider that ignores abort must not hang Stop. */
-export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
-  if (signal.aborted) return Promise.reject(new Error("aborted"));
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => reject(new Error("aborted"));
-    signal.addEventListener("abort", onAbort, { once: true });
-    const settle = (): void => signal.removeEventListener("abort", onAbort);
-    work.then(
-      value => {
-        settle();
-        resolve(value);
-      },
-      (error: unknown) => {
-        settle();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    );
-  });
 }
 /** The item a research action works on (a need or a situation datum). */
 const researchItem = (action: ArgumentAction): string =>

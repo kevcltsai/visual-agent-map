@@ -1,3 +1,4 @@
+import { abortError as aborted } from "../../core/abort";
 import {
   constants,
   chmodSync,
@@ -225,7 +226,6 @@ export class ExternalSourceError extends Error {
   }
 }
 
-const aborted = (): Error => Object.assign(new Error("Aborted"), { name: "AbortError" });
 const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith(".md");
 
 interface ExternalFile {

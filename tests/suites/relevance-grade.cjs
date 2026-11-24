@@ -60,7 +60,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
     prewarmClaudeStep: (...args) => control.prewarms.push(args), releaseWarmClaude: () => { control.releases++; },
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.confirmGate) await control.confirmGate; if (control.decline) return false; await run(); return true; }
   });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } }, { get activeDocument() { return ctx.activeDocument; }, setInterval: fn => { control.intervals.push(fn); return control.intervals.length; }, clearInterval: () => {}, createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } }, { get activeDocument() { return ctx.activeDocument; }, setInterval: fn => { control.intervals.push(fn); return control.intervals.length; }, clearInterval: () => {}, createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
   const gradeModule = load('core/goal-recommend-service.ts');
   const { GoalRecommendService } = gradeModule;
   plugin.goalRecommend = new GoalRecommendService(async (request, signal, prepared, onJson) => {
@@ -384,7 +384,7 @@ integrationTest('relevance: only one run per map; a second Enter, or a second vi
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
   await h.enter('Goal'); await until(() => h.control.calls.length);
   await h.view.submitRelevanceGoal('Another');
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, setTooltip() {} } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, setTooltip() {} } });
   const other = new VisualAgentMapView({ app: h.app }, h.plugin); Object.assign(other, { path: MAP, map: h.view.map, render() {} });
   await other.submitRelevanceGoal('Third');
   assert.equal(h.control.calls.length, 1); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal');
@@ -1504,7 +1504,7 @@ const PANEL_MAP_PATH = 'Agent Workspace/Topics/m/Map.md';
 
 function goalEditFixture(language = 'en') {
   const notices = [], prewarms = [], counts = { releases: 0 };
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
   const docListeners = { pointerdown: [], pointerup: [], pointercancel: [] };
   const doc = { activeElement: null, addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); }, removeEventListener(name, fn) { docListeners[name] = (docListeners[name] ?? []).filter(f => f !== fn); } };
   const plugin = { settings: { ...DEFAULT_SETTINGS, language }, relevanceGrades: new Map(), releaseOutline() {}, prewarmClaudeStep: (...args) => prewarms.push(args), releaseWarmClaude: () => { counts.releases++; } };

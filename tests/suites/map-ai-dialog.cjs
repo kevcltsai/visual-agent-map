@@ -77,7 +77,7 @@ test('outline library: delete asks twice (armed for five seconds) and New preset
 // ---- tone pickers -----------------------------------------------------------------------------------------------
 integrationTest('map actions (counterexample 9, Q15/Q17, C5; was: the map default note style and map default tone pickers): a regular map and an AIM map list neither "Note style for this map" nor "Voice for this map", and the old map values stay byte for byte', async () => {
   const menus = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } }, Notice: class {} } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } }, Notice: class {} } });
   const plugin = { settings: { language: 'en', detailTemplates: [], promptPresets: [] } };
   for (const aim of [false, true]) {
     const view = new VisualAgentMapView({ app: {} }, plugin);
@@ -315,7 +315,7 @@ async function synthesisHarness({ language = 'en' } = {}) {
       return entry.directions ? DIRECTIONS : DRAFT;
     } });
   const Notice = dom.makeNotice(notices);
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {}, Notice } }, { createFragment: dom.createFragment });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {}, Notice } }, { createFragment: dom.createFragment });
   view = new VisualAgentMapView({ app }, plugin);
   view.path = mapPath; view.map = doc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.ancestorContext = async () => ''; view.focusNode = () => {};
   view.enqueue = work => work();

@@ -269,7 +269,7 @@ integrationTest('replacing AI synthesis preserves 預覽', async () => {
 });
 integrationTest('text undo uses field patches and preserves AI details arriving in between', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Original', 'a');
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {};
   await view.noteChange(n, { title: 'Edited' }); await repo.updateNote(n.path, { detail: 'New AI answer' }); await view.travel(false);
@@ -286,7 +286,7 @@ integrationTest('map topic sources retain every selected summary and working fin
   const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'a'), second = await topicNote(repo, 'Recipe B', 'a');
   await repo.updateNote(first.path, { summary: 'Use more onion', newFindings: '### 暫存結論\n\nOnion adds sweetness.' });
   await repo.updateNote(second.path, { summary: 'Toast the buns' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
   const group = await view.topicReferenceGroup([first, second]);
   assert.deepEqual(group.documents.map(document => document.path), [first.path, second.path]);
   assert.match(group.documents[0].content, /Use more onion/);
@@ -296,7 +296,7 @@ integrationTest('map topic sources retain every selected summary and working fin
 integrationTest('legacy integrated source links resolve from short Obsidian links', async () => {
   const { repo, app } = fixture(), source = await topicNote(repo, 'Recipe A', 'a'), root = await topicNote(repo, 'Integrated Burger', 'a');
   await repo.updateNote(root.path, { detail: '### 整合來源（保存內容）\n\n- [[Recipe A]]' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo });
   assert.deepEqual(plain(view.referenceSourcePaths(await repo.readNote(root.path), root.path)), [source.path]);
 });
 integrationTest('creating an integrated topic runs AI with full sources and keeps clickable source paths', async () => {
@@ -307,7 +307,7 @@ integrationTest('creating an integrated topic runs AI with full sources and keep
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, askModel: async context => {
     assert.equal(context.mode, 'synthesize'); const allSources = context.referenceGroups.flatMap(group => group.documents).map(document => document.content).join('\n'); assert.match(allSources, /Saved onion note/); assert.match(allSources, /Caramelize slowly/); assert.match(allSources, /Saved bun note/);
     return { summary: 'Integrated answer', detail: 'Integrated detail', suggestions: [] };
@@ -326,7 +326,7 @@ integrationTest('failed multi-select integration creates no empty root or note',
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, askModel: async () => { throw new Error('provider unavailable'); } };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {};
   await assert.rejects(() => view.createIntegratedNode('Should not exist', [first, second], 'Combine', ''), /provider unavailable/);
@@ -338,7 +338,7 @@ integrationTest('saved integration is not offered for retry when derived-data re
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async paths => { if (!paths) throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
   await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
@@ -354,7 +354,7 @@ integrationTest('topic notes hide properties without removing existing css class
 integrationTest('deleted map restore refuses an occupied path without changing its contents', async () => {
   const { repo, app } = fixture(), path = await repo.createMap('Restoration conflict', []);
   const existing = await app.vault.read(repo.file(path));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo });
   view.deletedMap = { path, content: 'previous map contents', map: await repo.readMap(path), deleted: true };
   await assert.rejects(() => view.restoreDeletedMap());
@@ -363,7 +363,7 @@ integrationTest('deleted map restore refuses an occupied path without changing i
 });
 integrationTest('map structural undo restores deleted branch; redo removes it again', async () => {
   const { repo, app } = fixture(); const file = await repo.createMap('Undo', tree());
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
   await view.mapChange(m => { m.nodes = core.removeNodes(m.nodes, 'a', true); }); assert.equal((await repo.readMap(file)).nodes.length, 1);
   await view.travel(false); assert.equal((await repo.readMap(file)).nodes.length, 4);
@@ -371,14 +371,14 @@ integrationTest('map structural undo restores deleted branch; redo removes it ag
 });
 integrationTest('layout-only map changes and AI note results do not rebuild derived data', async () => {
   const { repo, app } = fixture(), file = await repo.createMap('Layout', tree()); let rebuilds = 0;
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => { rebuilds++; } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => { rebuilds++; } });
   view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
   await view.mapChange(map => { map.nodes[0].x = 120; map.viewport.zoom = 1.2; }); assert.equal(rebuilds, 0);
   await view.mapChange(map => { map.nodes[0].parentId = 'd'; }); assert.equal(rebuilds, 1);
 });
 integrationTest('full auto layout can be undone without changing parent links', async () => {
   const { repo, app } = fixture(), file = await repo.createMap('Arrange', tree());
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => assert.fail('layout should not rebuild ownership') });
   view.path = file; view.map = await repo.readMap(file); view.render = () => {}; view.hydrate = async () => {};
   const before = plain(view.map.nodes);
@@ -481,7 +481,7 @@ integrationTest('English notes follow the summary under the Preview heading', as
 });
 integrationTest('undo and redo of a summary change restore the preview text, preview-initialized and preview-auto-hash', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo preview');
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
   view.map = map([n]);
@@ -507,7 +507,7 @@ integrationTest('counterexample: undo of a card summary change on a note with an
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo usernotes');
   await repo.updateNote(n.path, { summary: '舊摘要' });
   contents.set(n.path, contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '').replace('## 詳細內容', '## User Notes\n\n![[image 2.png]]\n\n## 詳細內容'));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
   view.map = map([n]);
@@ -523,7 +523,7 @@ integrationTest('counterexample: undo of a card summary change on a note with an
 integrationTest('counterexample: undo of a card summary change keeps a preview the user edited afterwards, while summary is restored (packet 1-fix M2)', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo user edit');
   await repo.updateNote(n.path, { summary: '第一次' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
   view.map = map([n]);
@@ -540,7 +540,7 @@ integrationTest('counterexample: undo of a card summary change keeps a preview t
 integrationTest('counterexample: undo of a card summary change keeps a User Notes section added afterwards inside the preview (packet 1-fix2 R2-M1)', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo new usernotes');
   await repo.updateNote(n.path, { summary: '第一次' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
   view.map = map([n]);
@@ -563,7 +563,7 @@ integrationTest('AI history refuses to undo over a later edit and retains the un
   const before = await repo.readNote(node.path);
   await repo.updateNote(node.path, { summary: 'AI answer', detail: 'AI detail', status: 'completed' });
   const after = await repo.readNote(node.path);
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo }); view.map = map([node]); view.render = () => {}; view.hydrate = async () => {};
   view.recordNoteWrite(node.path, before, after, ['summary', 'detail', 'status'], 'Research');
   await repo.updateNote(node.path, { detail: 'Manual follow-up' });
@@ -612,7 +612,7 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
   const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
   let pending=Promise.resolve();
   const plugin={abortChartJobs:()=>{},addChartsAfterWrite:()=>{},repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
-  const {VisualAgentMapView}=load('main.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.selection.toggleMultiSelect();view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
+  const {VisualAgentMapView}=load('experiences/visual-map/view.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.selection.toggleMultiSelect();view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.createIntegratedNode('Combined',[first,second],'Combine','');
   const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.selection.state.multiSelectMode,false);
   const origin={x:root.x,y:root.y}; const events=new Map(),card={style:{},setPointerCapture(){},addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)}};
@@ -832,7 +832,7 @@ const mergeHarness = async ({ details = ['Alpha detail', '', 'Gamma detail'], pa
   await repo.saveMap(path, mapDoc);
   let pending=Promise.resolve();
   const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),mutate(work){pending=pending.then(work);return pending},running:new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {},quickExpandPending:new Set(),activeTasks:new Map(),expansionBatches:new Map(),currentModelChoice(){return {model:this.settings.cliModel,reasoning:'auto'}}};
-  const {VisualAgentMapView}=load('main.ts',{obsidian:shim},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){},...globals}); const view=new VisualAgentMapView({app},plugin);
+  const {VisualAgentMapView}=load('experiences/visual-map/view.ts',{obsidian:shim},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){},...globals}); const view=new VisualAgentMapView({app},plugin);
   view.path=path;view.map=mapDoc;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.hydrate();
   const fm = file => { const text = contents.get(file) ?? ''; const get = key => text.match(new RegExp('^' + key + ': (.*)$', 'm'))?.[1]?.trim(); return { state: get('topic-state'), mapId: get('agent-map-id'), status: get('status') }; };

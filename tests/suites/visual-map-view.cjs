@@ -8,7 +8,7 @@ const heSuggests = [];
 class HeInputSuggest { constructor(app, input) { this.app = app; this.inputEl = input; this.closed = 0; heSuggests.push(this); } close() { this.closed++; } open() {} setValue(v) { this.inputEl.value = v; } getValue() { return this.inputEl.value; } }
 const heObsidian = { ...obsidian, AbstractInputSuggest: HeInputSuggest };
 integrationTest('node plus adds a child without opening a duplicate right-click menu', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const events = new Map(), buttons = [];
   const element = tag => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
@@ -74,7 +74,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   assert.equal(events.has('div:contextmenu'), false);
 });
 integrationTest('map cards keep the generic map actions; no card exposes an AIM action', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const makeElement = (tag, buttons) => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = makeElement('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
     createEl(name, options) { const child = makeElement(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
@@ -103,7 +103,7 @@ integrationTest('map cards keep the generic map actions; no card exposes an AIM 
   assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;\s*this\.renderSelectTool\(tools\);/);
 });
 integrationTest('a topic waiting in a research batch shows a scheduled frame and status, and has no aria-label tooltip', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const element = tag => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
     createEl(name, options) { const child = element(name); child.text = options?.text; child.cls = options?.cls; this.children.push(child); return child; },
@@ -129,7 +129,7 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   assert.equal(card.dataset.status, 'idea'); assert.equal(all(card, item => item.cls === 'vam-status vam-status-queued').length, 0);
 });
 integrationTest('outline reveal expands collapsed ancestors, centers and selects the topic, and reports unknown paths', async () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const root = node('root'), child = node('child'), leaf = node('leaf');
   child.parentId = root.id; leaf.parentId = child.id; root.collapsed = true; child.collapsed = true;
   const doc = map([root, child, leaf]); doc.viewport = { x: 0, y: 0, zoom: 1 }; leaf.x = 1000; leaf.y = 400;
@@ -197,7 +197,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   const rect = {left:0,top:0,right:100,width:800,height:600};
   const element = () => ({style:{setProperty(){}},addEventListener(){},createEl(tag, options){created.push([tag,options.text]);return element()},createDiv(){return element()},getBoundingClientRect(){return rect},remove(){}});
   const workspace = element(); const contentEl = {querySelector(){return workspace}};
-  const {VisualAgentMapView} = load('main.ts', {obsidian:{...obsidian,MarkdownRenderer:{render(app, markdown, el, path){rendered={markdown,path};return Promise.resolve()}}}});
+  const {VisualAgentMapView} = load('experiences/visual-map/view.ts', {obsidian:{...obsidian,MarkdownRenderer:{render(app, markdown, el, path){rendered={markdown,path};return Promise.resolve()}}}});
   const view = new VisualAgentMapView({app:{}},{settings:{...DEFAULT_SETTINGS}}); view.contentEl=contentEl;view.map=map([node('a')]);
   const markdown='Text first\n\n![Image](https://example.com/a.png)\n\nText after\n\n|A|B|\n|---|---|\n|1|2|';
   view.showHoverCard({...element(),dataset:{nodeId:'a'},querySelector(){return null}},{title:'Topic',preview:markdown});
@@ -279,7 +279,7 @@ test('multi research modal: no per-topic depth radios (the mode is one switch wi
   assert.equal(m5.length, 0); assert.equal(cancelled.closed, 1);
 });
 test('card shows a Format not met badge with the issues as tooltip', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const element = tag => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
     createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); return child; },
@@ -316,7 +316,7 @@ integrationTest('draft review renders the draft, edits on demand and keeps the d
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { this.closed = true; this.onClose?.(); } }
   class Component { load() { this.loaded = true; } unload() { this.loaded = false; } addChild(child) { return child; } removeChild() {} }
   const MarkdownRenderer = { render: async (_app, markdown, el) => { el.rendered = markdown; } };
-  const { DraftReviewModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {} } });
+  const { DraftReviewModal } = load('experiences/visual-map/modals.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {} } });
   const saved = []; let failNext = true;
   const modal = new DraftReviewModal({}, 'New summary', '## Result\n\n- **one**', { intro: 'Confirming replaces the summary and details of “Parent”.', currentSummary: 'Old summary', confirmLabel: 'Confirm update to parent topic' }, async (summary, detail) => {
     if (failNext) { failNext = false; throw new Error('The topic changed'); }
@@ -364,7 +364,7 @@ integrationTest('draft review asks once more before discarding the AI draft', as
   const find = (root, predicate) => predicate(root) ? root : root.children.map(child => find(child, predicate)).find(Boolean);
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { this.closed = true; this.onClose?.(); } }
   class Component { load() {} unload() {} addChild(child) { return child; } removeChild() {} }
-  const { DraftReviewModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
+  const { DraftReviewModal } = load('experiences/visual-map/modals.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
   let discarded = 0;
   const modal = new DraftReviewModal({}, 'S', 'D', { intro: 'Intro', confirmLabel: 'Confirm update to parent topic' }, () => {}, () => { discarded++; });
   modal.onOpen();
@@ -391,7 +391,7 @@ integrationTest('proposal list groups children, links parent and child checks an
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const find = (root, predicate) => all(root, predicate)[0];
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { this.closed = true; } }
-  const { ChildProposalModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {} } });
+  const { ChildProposalModal } = load('experiences/visual-map/modals.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {} } });
   let submitted;
   const modal = new ChildProposalModal({}, [
     { title: 'Heat', task: 'T1', contribution: '', parentTitle: '' },
@@ -432,7 +432,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   const { element, find, button, tick } = dom;
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl.children.push(this.contentEl); } close() { this.closed = true; this.onClose?.(); } }
   class Component { load() {} unload() {} addChild(child) { return child; } removeChild() {} }
-  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
+  const { NextStepModal } = load('experiences/visual-map/modals.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
   const plugin = { settings: { language: 'en', cliModel: 'gpt-test', codexUsageNoticeSeen: true }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, activeTasks: new Map() };
   const sources = { mapSources: async () => [] };
   const open = (names, title, calls) => {
@@ -469,7 +469,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); } close() { this.closed = true; this.onClose?.(); } }
   class Component { load() {} unload() {} addChild(child) { return child; } removeChild() {} }
   const MarkdownRenderer = { render: async () => { throw new Error('render failed'); } };
-  const { ChildProposalModal, DraftReviewModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {} } });
+  const { ChildProposalModal, DraftReviewModal } = load('experiences/visual-map/modals.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {} } });
   const proposals = new ChildProposalModal({}, [
     { title: 'Heat', task: '', contribution: '', parentTitle: '' },
     { title: 'Heat', task: '', contribution: '', parentTitle: '' },
@@ -503,7 +503,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   });
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const find = (root, predicate) => all(root, predicate)[0];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: heObsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: heObsidian });
   // Every card on a map has coordinates; moving under another parent lays the branch out from them.
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0;
@@ -559,7 +559,7 @@ integrationTest('expansion suggestions panel uses the shared list, treats the to
   });
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const find = (root, predicate) => all(root, predicate)[0];
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const node = { id: 'p', path: 'P.md', parentId: null };
   const suggestions = [{ title: 'Heat', task: '', contribution: '', parentTitle: 'Parent' }, { title: 'Pan', task: '', contribution: '', parentTitle: 'Heat' }];
   const pendingSuggestions = new Map([['P.md', suggestions]]);
@@ -756,7 +756,7 @@ const selectionDom = () => {
   return make;
 };
 const selectionView = (load, extra = {}, shim = obsidian) => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian: shim });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: shim });
   const root = node('root'), a = node('a', 'root'), b = node('b', 'root'), c = node('c', 'a');
   root.x = 0; a.x = 400; a.y = 0; b.x = 400; b.y = 200; c.x = 800;
   const doc = map([root, a, b, c]);
@@ -1537,7 +1537,7 @@ integrationTest('card layout never depends on hover, focus or selection: state r
   assert.deepEqual(offenders, [], 'a hover/focus/selection rule changes card layout');
 });
 integrationTest('AIM canvas treats superseded interim results as hidden (behaviour + source wiring)', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const q = node('Q'), r = node('R', 'Q'), s1 = node('S1', 'R'), s2 = node('S2', 'R'), c = node('C', 'R');
   q.aimKind = 'question'; r.aimKind = 'research'; s1.aimKind = s2.aimKind = 'synthesis'; c.aimKind = 'conclusion';
   s1.y = 10; s2.y = 20; c.y = 30;
@@ -1749,7 +1749,7 @@ test('ai-mode helpers: modes map to note values and task options; the knowledge-
   assert.equal(translate('en', 'research.knowledge_gap_marker'), 'Model knowledge is insufficient');
 });
 integrationTest('Re-run with Standard on the card: only for an idle Quick topic whose Detail carries the marker, on an ordinary map; named for screen readers', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const makeElement = (tag, buttons) => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = makeElement('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
     createEl(name, options) { const child = makeElement(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
@@ -1793,7 +1793,7 @@ function heFixture(options = {}) {
   const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
-  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
+  const { VisualAgentMapView } = options.shared ?? load('experiences/visual-map/view.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
@@ -3961,7 +3961,7 @@ integrationTest('topic-links: a refused write leaves no undo step; the link menu
   assert.equal((await view.changeTopicLinks(view.map.nodes[0], { add: 'https://a.example/' })).ok, true); assert.equal(pushed.length, 1);
   // The menu: the app blurs focus after the click; a deferred focus puts it back on the first item.
   const timers = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian }, { setTimeout: run => { timers.push(run); return timers.length; }, clearTimeout() {} });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }, { setTimeout: run => { timers.push(run); return timers.length; }, clearTimeout() {} });
   const menuView = Object.create(VisualAgentMapView.prototype);
   const doc = { activeElement: null, addEventListener() {}, removeEventListener() {} };
   const focusable = () => ({ attrs: {}, listeners: {}, setAttr(n, v) { this.attrs[n] = v; }, addEventListener(n, fn) { this.listeners[n] = fn; }, focus() { doc.activeElement = this; }, remove() {}, contains(x) { return x === this || (this.kids ?? []).includes(x); }, getBoundingClientRect: () => ({ left: 0, top: 0, bottom: 0 }), style: {}, createEl() { const el = focusable(); (this.kids ??= []).push(el); return el; }, createDiv() { return focusable(); } });
@@ -4021,7 +4021,7 @@ integrationTest('topic-links: the outline marks a row with an aria-hidden arrow 
   assert.ok(!/@media/.test(fresh.join('\n')));
 });
 integrationTest('N2: an old view state carrying sample opens no map by itself, is not written back, and a file beside it still opens', async () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const opened = [];
   const view = Object.create(VisualAgentMapView.prototype);
   Object.assign(view, { path: '', map: null, openMap: async file => { opened.push(file); } });
@@ -4033,7 +4033,7 @@ integrationTest('N2: an old view state carrying sample opens no map by itself, i
   assert.deepEqual(opened, ['X/Map.md']);
 });
 integrationTest('N2: onOpen after a stale sample state opens the ordinary map, or renders the empty state when there is none', async () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   for (const files of [[{ path: 'AIM/Q/Map.md' }, { path: 'Agent Workspace/Mind Maps/A/Map.md' }], []]) {
     const opened = [];
     const plugin = { ready: Promise.resolve(), repo: { workspaceExists: () => true, mapFiles: async () => files, readMap: async file => (file === 'AIM/Q/Map.md' ? { aim: {} } : {}) } };
@@ -4058,7 +4058,7 @@ test('N5: the empty state offers "Create a new mind map" and no "View sample" (s
 integrationTest('N6: the map switcher lists exactly the topics and no "Sample:" entry', async () => {
   const opened = [];
   class FuzzySuggestModal { constructor(app) { this.app = app; } setPlaceholder() {} setInstructions() {} open() { opened.push(this); } close() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, FuzzySuggestModal } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, FuzzySuggestModal } });
   const items = [{ title: 'Alpha', mapPath: 'A/Map.md', topicCount: 1, modified: 2, folder: 'W' }, { title: 'Beta', mapPath: 'B/Map.md', topicCount: 3, modified: 1, folder: 'W' }];
   const view = Object.create(VisualAgentMapView.prototype);
   Object.assign(view, { app: {}, path: 'A/Map.md', plugin: { repo: { mapSwitcherItems: async () => items } }, enqueue: work => work(), restoreMapFocusSoon() {} });
@@ -4856,7 +4856,7 @@ test('drop zone: the panel does not close when focus or a press moves to a dragg
 
 // The view: button label, ⚠, aria, write path, duplicate no-op, repaint and visibility.
 function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {}) {
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
   const tree = msTree();
   const state = { stored: [...stored], writes: [], notices: [] };
   const plugin = { settings: { ...DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), relevanceGrades: new Map(), mutate: async work => work(),

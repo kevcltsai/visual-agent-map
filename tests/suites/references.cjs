@@ -58,7 +58,7 @@ test('source footnotes: numbered by first use, one definition per source, placed
   assert.equal(api.resolveSummaryReferences('結論 [S1]。重點[S2] [S9] end', groups), '結論。重點 end');
   assert.equal(api.resolveSummaryReferences('See [[x.md]] [S1]', groups), 'See External source: /Volumes/Refs/x.md');
   // canonicalDetail keeps definitions inside the evidence section.
-  const { canonicalDetail } = load('main.ts', { obsidian });
+  const { canonicalDetail } = load('ai/result-utils.ts', { obsidian });
   const evidence = canonicalDetail(out, 'zh-TW').split('### 來源')[1].split('### 更新紀錄')[0];
   assert.ok(evidence.includes('[^1]:') && evidence.includes('[^2]:') && evidence.includes('[^3]:'));
   assert.ok(canonicalDetail(api.resolveDetailReferences('### Core conclusions\n\nA[S1]', groups), 'en').includes('### Sources\n\n[^1]: [[Maps/A/one.md|one]]'));
@@ -86,7 +86,7 @@ test('source footnotes survive reruns: numbers stay consistent, kept references 
     assert.equal(api.resolveSummaryReferences(text, groups), text);
 });
 test('canonicalDetail gathers source footnote definitions into the evidence section', () => {
-  const { canonicalDetail } = load('main.ts', { obsidian });
+  const { canonicalDetail } = load('ai/result-utils.ts', { obsidian });
   const out = canonicalDetail('### Core conclusions\n\nA[^1]\n\n### Update log\n\n- today\n[^1]: [[a.md|a]]', 'en');
   assert.ok(out.includes('### Sources\n\n[^1]: [[a.md|a]]\n\n### Update log'));
   assert.ok(out.includes('### Update log\n\n- today'));
@@ -97,7 +97,7 @@ test('canonicalDetail gathers source footnote definitions into the evidence sect
 });
 test('source footnotes leave code, links and the writer\'s own footnotes untouched', () => {
   const api = load('ai/reference-materials.ts', { obsidian });
-  const { canonicalDetail } = load('main.ts', { obsidian });
+  const { canonicalDetail } = load('ai/result-utils.ts', { obsidian });
   const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: '' }] }];
   const code = 'Match `/[^a-z]+/` here[S1].\n\n```js\nconst re = /[^0-9]/;\n[^x]: code line\n```\n\nSee [^foo](https://x.y) and ![^img](a.png).';
   const out = api.resolveDetailReferences(code, groups);

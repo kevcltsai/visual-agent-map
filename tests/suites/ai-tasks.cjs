@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { attachTopicRuns, startResearch } = require('../support.cjs');
 const { test, integrationTest, load, core, map, plain, obsidian, DEFAULT_SETTINGS, fixture, topicNote } = require('../support.cjs');
 test('AI result formatting always produces the canonical knowledge structure', async () => {
-  const { canonicalDetail } = load('main.ts', { obsidian });
+  const { canonicalDetail } = load('ai/result-utils.ts', { obsidian });
   const result = canonicalDetail('New analysis');
   for (const heading of ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄']) assert.match(result, new RegExp(`### ${heading}`));
   assert.equal((result.match(/New analysis/g) || []).length, 1);
@@ -16,7 +16,7 @@ test('AI result formatting always produces the canonical knowledge structure', a
   assert.doesNotMatch(bilingual, /To be added/);
 });
 test('AI visual references render as image cards', () => {
-  const { visualReferencesMarkdown } = load('main.ts', { obsidian });
+  const { visualReferencesMarkdown } = load('ai/result-utils.ts', { obsidian });
   const markdown = visualReferencesMarkdown([{ title: 'Navy + Beige', imageUrl: 'https://example.com/outfit.jpg', sourceUrl: 'https://example.com/page', description: '乾淨休閒穿搭', palette: ['navy', 'white', 'beige'], formula: '深色外套 + 白色內搭 + 淺色褲' }]);
   assert.match(markdown, /!\[Navy \+ Beige\]\(https:\/\/example.com\/outfit.jpg\)/);
   assert.match(markdown, /來源：https:\/\/example.com\/page/);
@@ -84,7 +84,7 @@ integrationTest('AI response fallback keeps the language captured when the task 
   assert.equal(result.visualReferences[0].title, 'Visual reference');
 });
 test('hover helpers extract image and table from user notes markdown', () => {
-  const { firstMarkdownImage, firstMarkdownTable, markdownImages } = load('main.ts', { obsidian });
+  const { firstMarkdownImage, firstMarkdownTable, markdownImages } = load('ui/preview-utils.ts', { obsidian });
   const markdown = '我的筆記\n\n![配色](https://example.com/style.jpg)\n![髮型](https://example.com/hair.jpg)\n![鞋子](https://example.com/shoes.jpg)\n![外套](https://example.com/jacket.jpg)\n![忽略](https://example.com/ignored.jpg)\n\n| 面向 | 判斷 |\n| --- | --- |\n| 顏色 | navy / beige |\n| 鞋子 | white sneakers |';
   const image = firstMarkdownImage(markdown);
   assert.equal(image.alt, '配色');
@@ -116,7 +116,7 @@ integrationTest('the "no conclusion yet" placeholder in a task prompt follows th
     assert.equal(isPlaceholder((await repo.readNote(n.path)).summary), true);
     const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [root, n], viewport: { x: 0, y: 0, zoom: 1 } };
     await app.vault.create(mapPath, core.serializeMap(mapDoc));
-    const { VisualAgentMapView } = load('main.ts', { obsidian }); let view, seen;
+    const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view, seen;
     const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'zh-TW' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
       askModel: async context => { seen = context; const error = new Error('stop'); error.name = 'AbortError'; throw error; }, mutate: async work => work(), views: () => [view] };
     view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
@@ -131,7 +131,7 @@ integrationTest('counterexample: an ordinary research run starts its progress en
   await repo.updateNote(n.path, { prompt: 'Research this' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view, askedModel; const begun = [];
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view, askedModel; const begun = [];
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     researchProgress: { begin: (...args) => begun.push(args), newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end() {}, get: () => undefined },
     askModel: async (_context, model) => { askedModel = model; const error = new Error('stop'); error.name = 'AbortError'; throw error; }, mutate: async work => work(), views: () => [view] };
@@ -147,7 +147,7 @@ integrationTest('a successful AI task immediately updates summary and MD detail'
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view;
   let acceptedLaunch = false, acceptedSignal;
   let finishAi;
   const plugin = {
@@ -190,7 +190,7 @@ integrationTest('a successful AI task immediately updates summary and MD detail'
 integrationTest('cancelling a node task keeps its earlier Markdown and status', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Cancel');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view;
   const plugin = {
     repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (_context, _model, _reasoning, signal, _exchange, accepted) => { accepted?.(); return new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })); },
@@ -207,7 +207,7 @@ integrationTest('cancelling a node task keeps its earlier Markdown and status', 
 integrationTest('prelaunch AI failures release task ownership and preserve startup errors', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Startup cleanup');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Keep this' });
-  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view;
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [view] };
   view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => { throw new Error('hydrate failed'); };
   await assert.rejects(view.runAgent(n), /hydrate failed/);
@@ -239,7 +239,7 @@ integrationTest('cancelling child synthesis restores the topic status and does n
     askModel: (_context, _model, _reasoning, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true })),
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => { reported = error.message; return error.message; }
   };
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
   const pending = view.integrateChildren(parent, { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [], signal: controller.signal });
   await new Promise(resolve => setImmediate(resolve)); controller.abort(); await pending;
@@ -256,7 +256,7 @@ integrationTest('provider failure keeps its original AI log stage during node er
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: async (_context, _model, _reasoning, _signal, onExchange) => { onExchange(entry.id); throw new Error('provider timeout'); },
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => error.message };
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
   const originalError = console.error; console.error = () => {};
   try { await startResearch(plugin, n, { map: view.map }); await new Promise(resolve => setTimeout(resolve, 20)); }
@@ -272,7 +272,7 @@ integrationTest('shallow research with reply suggestions never touches the pendi
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS, aiExchangeLoggingEnabled: true }, exchanges: { completed: () => { exchangeStatus = 'completed'; }, getEntries: () => [{ id: 'exchange-1', status: exchangeStatus }], failed: () => { exchangeStatus = 'failed'; } }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: pending,
     askModel: async (_context, _model, _reasoning, _signal, onExchange) => { onExchange('exchange-1'); return { summary: 'Researched', detail: 'Result body', suggestions: [{ title: 'Proposal', task: 'Investigate', contribution: '' }], visualReferences: [] }; },
     mutate: async work => work(), views: () => [view], recordFailure: (_context, error) => { reported = error.message; return reported; } };
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
   await startResearch(plugin, n, { map: view.map }); await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal((await repo.readNote(n.path)).status, 'completed');
@@ -282,7 +282,7 @@ integrationTest('shallow research with reply suggestions never touches the pendi
 integrationTest('a completed but stale answer cannot overwrite an edited note', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Stale');
   await repo.updateNote(n.path, { prompt: 'Research', detail: 'Original' });
-  let finish; const { VisualAgentMapView } = load('main.ts', { obsidian }); let view;
+  let finish; const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian }); let view;
   const plugin = {
     repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
     askModel: (_context, _model, _reasoning, _signal, _exchange, accepted) => { accepted?.(); return new Promise(resolve => { finish = resolve; }); }, mutate: async work => work(), views: () => [view]
@@ -301,7 +301,7 @@ integrationTest('new child topics follow the resolved reasoning without activati
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, attachTopicRuns({ repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} }));
   view.path = mapPath; view.map = mapDoc; view.render = () => {};
   await view.addNode(parent, 'Child');
@@ -955,7 +955,7 @@ integrationTest('research write-back: a <sup> line with an angle-bracket link is
     let view;
     const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
       askModel: async () => ({ summary: 'Researched', detail: reply, suggestions: [], visualReferences: [] }), mutate: async work => work(), views: () => [view] };
-    const { VisualAgentMapView } = load('main.ts', { obsidian });
+    const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
     // The update way comes from the note style; the run's own style is kept with only that changed.
     const { NoteStyleStore } = load('ai/note-style-store.ts', { obsidian });
     const store = new NoteStyleStore({ settings: () => plugin.settings, port: {}, save: async () => {} });
@@ -989,7 +989,7 @@ integrationTest('research write-back: old Detail has A and the rewrite has A (tw
     const { NoteStyleStore } = load('ai/note-style-store.ts', { obsidian });
     const store = new NoteStyleStore({ settings: () => plugin.settings, port: {}, save: async () => {} });
     plugin.noteStyles = { runStyle: input => ({ ...store.runStyle(input), updateMode }) };
-    const { VisualAgentMapView } = load('main.ts', { obsidian });
+    const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
     view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
     await startResearch(plugin, n, { map: view.map, request: { task: 'Research it' } }); await new Promise(resolve => setTimeout(resolve, 20));
     const detail = (await repo.readNote(n.path)).detail;

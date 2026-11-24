@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { fetchDepsTable } from '../scripts/test-affected.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -574,6 +575,30 @@ test('owner install reuses full CI only for the exact clean landed commit with m
   assert.equal(greenInstallRun(checkout, () => '12345'), null);
 });
 
+test('owner idle wait happens before the heavy lock and rechecks without waiting inside it', async () => {
+  const events = [];
+  const wait = () => events.push('wait');
+  const enter = async () => events.push('lock');
+  const execute = async args => events.push(args);
+  await runHarnessCli(['--update-current', '--wait-idle'], { wait, enter, execute });
+  assert.deepEqual(events, ['wait', 'lock', ['--update-current']]);
+  events.length = 0;
+  await assert.rejects(runHarnessCli(['--update-current', '--wait-idle'], { wait: () => { throw new Error('busy timeout'); }, enter, execute }), /busy timeout/);
+  assert.deepEqual(events, []);
+  await runHarnessCli(['--update-current', '--owner-idle-confirmed', '--wait-idle'], { wait, enter, execute });
+  assert.deepEqual(events, ['lock', ['--update-current', '--owner-idle-confirmed', '--wait-idle']]);
+});
+
+test('dependency download does not touch CI cache or an explicitly selected table', t => {
+  const { folder } = environment(t);
+  let called = false;
+  const lookup = () => { called = true; return ''; };
+  assert.equal(fetchDepsTable(folder, lookup, { CI: 'true' }), false);
+  assert.equal(fetchDepsTable(folder, lookup, { VAM_TEST_DEPS_FILE: '/custom/table.json' }), false);
+  assert.equal(called, false);
+  assert.equal(existsSync(join(folder, 'test-deps.json')), false);
+});
+
 test('fetchDepsTable fetches the latest green full main run once and fails soft', t => {
   const { folder } = environment(t);
   const calls = [];
@@ -582,14 +607,14 @@ test('fetchDepsTable fetches the latest green full main run once and fails soft'
     if (args[1] === 'list') return 'noise\n111\n222\n';
     writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), '{"fetched":true}');
   };
-  assert.equal(fetchDepsTable(folder, fake), true);
+  assert.equal(fetchDepsTable(folder, fake, {}), true);
   assert.equal(readFileSync(join(folder, 'test-deps.json'), 'utf8'), '{"fetched":true}');
   assert.deepEqual(calls[1].slice(0, 5), ['gh', 'run', 'download', '111', '-n']);
-  assert.equal(fetchDepsTable(folder, () => { throw new Error('must not run'); }), false); // table already present
+  assert.equal(fetchDepsTable(folder, () => { throw new Error('must not run'); }, {}), false); // table already present
   rmSync(join(folder, 'test-deps.json'));
-  assert.equal(fetchDepsTable(folder, () => { throw new Error('gh missing'); }), false);
+  assert.equal(fetchDepsTable(folder, () => { throw new Error('gh missing'); }, {}), false);
   assert.equal(existsSync(join(folder, 'test-deps.json')), false);
-  assert.equal(fetchDepsTable(folder, () => ''), false); // no green full run
+  assert.equal(fetchDepsTable(folder, () => '', {}), false); // no green full run
 });
 
 test('a refresh that fails part-way puts back the replaced artifacts and the ownership record', t => {

@@ -4,7 +4,8 @@
 //   node scripts/test-affected.mjs --write-deps <dir>  merges the records tests/build.cjs wrote into <dir> (VAM_TEST_DEPS_DIR) with a static scan into test-deps.json
 // Every doubt is answered with the full suite: a missing or stale table, an unknown changed file, or any error here.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -336,6 +337,23 @@ function report(result, json) {
   for (const reason of result.reasons) process.stdout.write(`  ${reason}\n`);
 }
 
+/** Best effort: fetch the dependency table test:affected needs from the latest green full CI run on main. Any failure leaves it missing, which means the full suite. */
+export function fetchDepsTable(directory = defaultRoot, exec = execFileSync, env = process.env) {
+  if (env.CI === "true" || env.VAM_TEST_DEPS_FILE) return false;
+  const table = join(directory, "test-deps.json");
+  if (existsSync(table)) return false;
+  let scratch;
+  try {
+    const rows = exec("gh", ["run", "list", "--workflow", "ci.yml", "--branch", "main", "--limit", "20", "--json", "databaseId,displayTitle,conclusion", "--jq", '.[] | select(.conclusion == "success") | select(.displayTitle | startswith("CI full")) | .databaseId'], { cwd: directory, timeout: 20_000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const id = rows.split("\n").map(line => line.trim()).find(line => /^\d+$/.test(line));
+    if (!id) return false;
+    scratch = mkdtempSync(join(tmpdir(), "vam-deps-"));
+    exec("gh", ["run", "download", id, "-n", "test-deps", "-D", scratch], { cwd: directory, timeout: 20_000, stdio: "ignore" });
+    copyFileSync(join(scratch, "test-deps.json"), table);
+    return true;
+  } catch { return false; } finally { if (scratch) rmSync(scratch, { recursive: true, force: true }); }
+}
+
 async function main(argv) {
   const args = argv.filter(arg => !arg.startsWith("--"));
   const root = defaultRoot;
@@ -346,6 +364,9 @@ async function main(argv) {
     process.stdout.write(`test-deps.json: ${Object.keys(deps.tests).length} test files at ${sha.slice(0, 9)}, ${always.length} always run\n`);
     return;
   }
+  // A fresh worktree has no ignored test-deps.json. Fetch the same CI table the harness used to fetch,
+  // before selecting tests; read-only plan mode, CI cache and explicit test tables are not changed.
+  if (argv.includes("--run")) fetchDepsTable(root);
   const result = plan(root, args[0] || "origin/main");
   report(result, argv.includes("--json"));
   if (!argv.includes("--run")) return;

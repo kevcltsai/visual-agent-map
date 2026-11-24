@@ -291,22 +291,6 @@ export function assertSourceUnchanged(expected, directory = root) {
   if (sourceFingerprint(directory) !== expected) throw new Error("Source changed during verification; rerun the harness before E2E.");
 }
 
-/** Best effort: fetch the dependency table test:affected needs from the latest green full CI run on main. Any failure leaves it missing, which means the full suite. */
-export function fetchDepsTable(directory = root, exec = execFileSync) {
-  const table = join(directory, "test-deps.json");
-  if (existsSync(table)) return false;
-  let scratch;
-  try {
-    const rows = exec("gh", ["run", "list", "--workflow", "ci.yml", "--branch", "main", "--limit", "20", "--json", "databaseId,displayTitle,conclusion", "--jq", '.[] | select(.conclusion == "success") | select(.displayTitle | startswith("CI full")) | .databaseId'], { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    const id = rows.split("\n").map(line => line.trim()).find(line => /^\d+$/.test(line));
-    if (!id) return false;
-    scratch = mkdtempSync(join(tmpdir(), "vam-deps-"));
-    exec("gh", ["run", "download", id, "-n", "test-deps", "-D", scratch], { cwd: directory, stdio: "ignore" });
-    copyFileSync(join(scratch, "test-deps.json"), table);
-    return true;
-  } catch { return false; } finally { if (scratch) rmSync(scratch, { recursive: true, force: true }); }
-}
-
 // Only reuse full CI for a clean, already-landed candidate whose locally built install artifacts
 // are byte-identical to the commit. The existing full-CI lookup rejects affected runs and fails closed.
 // Any local edit (including generated output), missing proof or lookup failure retains targeted verification.
@@ -382,7 +366,6 @@ export function main(args = process.argv.slice(2)) {
     const green = greenInstallRun();
     if (green) process.stdout.write(`Owner vault verification: reusing full CI run ${green.id} for ${green.sha} (clean commit, matching artifacts).\n`);
     else {
-      fetchDepsTable();
       // Every doubt (missing/stale table, unknown file) is answered with the full suite.
       run("npm", ["run", "test:affected"]);
     }
@@ -461,10 +444,22 @@ export function whichInstalled(vault = canonicalVault, checkout = root) {
   return lines.join("\n");
 }
 
+// Waiting for the owner does no heavy work and must not occupy the machine-wide test lock.
+// Once the lock is acquired, main() still fetches origin and checks the owner before build
+// and updateCurrentTestVault checks again before replacing files. If the owner became busy
+// in the queue, refuse instead of waiting while holding the lock.
+export async function runHarnessCli(argv, {
+  wait = () => waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) }),
+  enter = enterHeavy,
+  execute = main
+} = {}) {
+  const waitOutsideLock = argv.length === 2 && argv.includes("--update-current") && argv.includes("--wait-idle");
+  if (waitOutsideLock) wait();
+  // --help and read-only/session paths must not wait for the heavy lock.
+  if (!isHelp(argv) && !argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enter(`npm test ${argv.join(" ")}`.trim(), { blocking: true });
+  await execute(waitOutsideLock ? argv.filter(arg => arg !== "--wait-idle") : argv);
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  // --help, --smoke, --session= and --which-installed are the paths that build nothing; every other form builds and runs the test layers.
-  // --help must not wait for the heavy lock: it used to queue behind other test runs and never print.
-  if (!isHelp(argv) && !argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
-  await main();
+  await runHarnessCli(process.argv.slice(2));
 }

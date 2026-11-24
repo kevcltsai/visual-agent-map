@@ -3557,5 +3557,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_role_running_suffix": "圖文書正在執行，要等下次載入才生效。",
   "ui.book_role_failed": "無法更改章節角色。",
   "ui.book_deleted_chapter_hint_0": "這裡提到已不在心智圖上的章：{0}",
-  "ui.book_deleted_chapter_hint_keep": "要的話改掉這段文字；不改也會照目前的章來寫。"
+  "ui.book_deleted_chapter_hint_keep": "要的話改掉這段文字；不改也會照目前的章來寫。",
+  "ui.book_figure_unreadable": "示意圖資料無法顯示"
 };

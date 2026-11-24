@@ -326,3 +326,23 @@ test('runDrawDiagrams: one tool-free call at low effort with the caller admissio
   assert.equal(prepared.step.schema.properties.diagrams.maxItems, 1);
   assert.deepEqual(plain(out), [{ slot: 2, title: 'T', mermaid: 'pie\n  title T\n  "a" : 3' }]);
 });
+
+test('draw-diagrams figures: parse keeps a figure item (null chart ok), drops one with both or a non-object figure; checkFigureDraft checks title and figure; fence and hash', () => {
+  const request = { chapter: 'x', slots: [{ index: 1, kind: 'a', explains: 'b' }, { index: 2, kind: 'a', explains: 'b' }, { index: 3, kind: 'a', explains: 'b' }, { index: 4, kind: 'a', explains: 'b' }], language: 'zh-TW', model: 'm', reasoning: 'low' };
+  const figure = { type: 'bar', stacked: false, groups: [{ label: '甲', values: [{ value: '25' }] }] };
+  const out = plain(draw.drawDiagramsStep.parse(JSON.stringify({ diagrams: [{ slot: 1, title: 'T', mermaid: null, figure }, { slot: 2, title: 'T', mermaid: LIFE, figure }, { slot: 3, title: 'T', figure: 'x' }, { slot: 4, title: 'T', figure: [] }] }), request));
+  assert.deepEqual(out, [{ slot: 1, title: 'T', figure }]);
+  const props = draw.drawDiagramsStep.schema.properties.diagrams.items;
+  assert.deepEqual(plain(props.required), ['slot', 'title']);
+  assert.deepEqual(plain(props.properties.figure.properties.type.enum), ['bar', 'scale', 'graph', 'board']);
+  const text = '甲 25 %。';
+  assert.equal(draw.checkFigureDraft({ title: '甲 25', figure }, text).ok, true);
+  assert.equal(draw.checkFigureDraft({ title: '甲 26', figure }, text).code, 'number_not_in_text');
+  assert.equal(draw.checkFigureDraft({ title: 'a<b', figure }, text).code, 'unsafe_text');
+  assert.equal(draw.checkFigureDraft({ title: 'T', figure: { type: 'x' } }, text).code, 'figure_type');
+  const body = '{"type":"bar"}';
+  const filled = slots.fillSlotMarkers('a\n\n〔圖位 1：s〕\n', [slot(1, 's')], new Map([[1, { diagram: { title: 'T', mermaid: body, fence: 'vam-figure' } }]]), 'zh-TW');
+  assert.match(filled.text, /```vam-figure\n\{"type":"bar"\}\n```\n示意圖｜T/);
+  assert.deepEqual(plain(filled.diagrams), [{ index: 1, mermaid: body }]);
+  assert.deepEqual(plain(slots.diagramHashesOf(filled.text)), [slots.diagramHash(body)]);
+});

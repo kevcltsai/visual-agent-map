@@ -2,6 +2,7 @@ import { createBookStructurePort } from "./experiences/visual-map/book-structure
 import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
+import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-tables/view";
 import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
@@ -1428,6 +1429,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     registerInternalMarkerPresentation(this);
     for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
+    registerBookFigures(this);
     registerBookPlanView(
       this,
       () => this.settings.language,

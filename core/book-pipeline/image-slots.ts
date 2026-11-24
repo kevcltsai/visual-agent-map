@@ -269,7 +269,10 @@ export interface SlotFigure {
 /** A Mermaid diagram the program drew for a slot that found no picture; `title` is final (see {@link diagramTitle}), `mermaid` a chart body that passed `checkDiagram`. */
 export interface SlotDiagram {
   title: string;
+  /** The fence body: a chart body, or with `fence` the canonical JSON of a figure (figure-spec.ts). */
   mermaid: string;
+  /** Present for a structured figure: its code fence is ```vam-figure instead of ```mermaid. */
+  fence?: "vam-figure";
 }
 export type SlotOutcome =
   { figure: SlotFigure } | { diagram: SlotDiagram } | { reasonCode: SlotReasonCode; reasonText?: string };
@@ -549,7 +552,7 @@ export function fillSlotMarkers(
     if (diagram) {
       if (out.length && !isBlank(out[out.length - 1])) out.push("");
       const written = [
-        "```mermaid",
+        `\`\`\`${diagram.fence ?? "mermaid"}`,
         ...diagram.mermaid.split("\n"),
         "```",
         diagramCaption(diagram.title, language)
@@ -657,7 +660,7 @@ export function shortHash(url: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
-/** {@link diagramHash} of every ```mermaid block in a text, in order (what `describeSlots` compares a recorded diagram with). */
+/** {@link diagramHash} of every ```mermaid and ```vam-figure block in a text, in order (what `describeSlots` compares a recorded diagram with). */
 export function diagramHashesOf(text: string): string[] {
   const out: string[] = [];
   let open: { fence: string; body: string[] } | undefined;
@@ -670,7 +673,7 @@ export function diagramHashesOf(text: string): string[] {
       } else open.body.push(trimmed);
       continue;
     }
-    const m = /^\s*(`{3,}|~{3,})\s*mermaid\b/.exec(trimmed);
+    const m = /^\s*(`{3,}|~{3,})\s*(?:mermaid|vam-figure)\b/.exec(trimmed);
     if (m) open = { fence: m[1], body: [] };
   }
   return out;

@@ -431,7 +431,9 @@ export function hidePipelineLog(detail: string, known: ReadonlySet<string>, back
   const ownLine = stamp
     ? shapes.map(
         ([head, tail]) =>
-          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}${pathShape}${escapeRegExp(tail)}$`)
+          new RegExp(
+            `^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}${pathShape}${escapeRegExp(tail)}$`
+          )
       )
     : [];
   return hideUpdateLog(dropRecordCopies(detail), line => known.has(line) || ownLine.some(re => re.test(line)));
@@ -444,7 +446,8 @@ function replacedLineTest(): (line: string) => boolean {
     translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
   ).filter(parts => parts.length === 2);
   const res = shapes.map(
-    ([head, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}.+${escapeRegExp(tail)}$`)
+    ([head, tail]) =>
+      new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}.+${escapeRegExp(tail)}$`)
   );
   return line => res.some(re => re.test(line));
 }

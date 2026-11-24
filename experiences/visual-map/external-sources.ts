@@ -285,7 +285,6 @@ export async function listExternalSource(
   return { real: check.real, files };
 }
 
-
 /** Replaces every spelling of the source's root (as typed, real, and with the other slash) in file text. */
 export function scrubExternalPaths(text: string, roots: readonly string[]): string {
   const spellings = new Set<string>();

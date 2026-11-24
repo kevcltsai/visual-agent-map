@@ -89,13 +89,14 @@ export function pathEnd(d: string): { tip: Point; ux: number; uy: number } | nul
   const numbers = (d.match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi) ?? []).map(Number);
   if (numbers.length !== 8 || !numbers.every(Number.isFinite)) return null;
   const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = numbers;
-  for (const [fx, fy] of [
-    [cx2, cy2],
-    [cx1, cy1],
-    [x1, y1]
+  // Objects, not pairs: the bundle may not contain a double opening bracket (the leak gate reads it as a wikilink).
+  for (const from of [
+    { x: cx2, y: cy2 },
+    { x: cx1, y: cy1 },
+    { x: x1, y: y1 }
   ]) {
-    const length = Math.hypot(x2 - fx, y2 - fy);
-    if (length > 1e-6) return { tip: { x: x2, y: y2 }, ux: (x2 - fx) / length, uy: (y2 - fy) / length };
+    const length = Math.hypot(x2 - from.x, y2 - from.y);
+    if (length > 1e-6) return { tip: { x: x2, y: y2 }, ux: (x2 - from.x) / length, uy: (y2 - from.y) / length };
   }
   return null;
 }

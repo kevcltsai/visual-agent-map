@@ -11,6 +11,7 @@ import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
+import { applyNodeLinks } from "./share-node-links";
 import {
   assertCurrent,
   assetNamesInHtml,
@@ -401,6 +402,24 @@ export class ShareExporter {
     return this.container;
   }
 
+  /** Link target (path without .md, file name, or title) -> card id; a name two cards share is left out, so a link never goes to the wrong card. */
+  private nodeIds(): Map<string, string> {
+    const found = new Map<string, string | null>();
+    const add = (key: string, id: string): void => {
+      found.set(key, found.has(key) && found.get(key) !== id ? null : id);
+    };
+    for (const node of this.source.map.nodes) {
+      const title = this.source.notes.get(node.id)?.title;
+      if (!title) continue;
+      add(node.path.replace(/\.md$/i, ""), node.id);
+      add(node.path.split("/").pop()?.replace(/\.md$/i, "") ?? node.path, node.id);
+      add(title, node.id);
+    }
+    const out = new Map<string, string>();
+    for (const [key, id] of found) if (id) out.set(key, id);
+    return out;
+  }
+
   private titles(): Map<string, string> {
     const titles = new Map<string, string>();
     for (const node of this.source.map.nodes) {
@@ -433,10 +452,11 @@ export class ShareExporter {
     const total = this.source.map.nodes.filter(node => this.renderSource(node.id)).length;
     let done = total - nodes.length;
     const titles = this.titles();
+    const nodeIds = this.nodeIds();
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
-      const result = await this.renderOne(this.renderSource(node.id), titles, ticket);
+      const result = await this.renderOne(this.renderSource(node.id), titles, nodeIds, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
@@ -446,8 +466,17 @@ export class ShareExporter {
     onProgress({ phase: "render", done: total, total });
   }
 
-  private async renderOne(detail: string, titles: Map<string, string>, ticket: BuildTicket): Promise<RenderedNote> {
-    const cleaned = cleanShareMarkdown(detail, { titleOf: target => titles.get(target), assets: this.registry });
+  private async renderOne(
+    detail: string,
+    titles: Map<string, string>,
+    nodeIds: Map<string, string>,
+    ticket: BuildTicket
+  ): Promise<RenderedNote> {
+    const cleaned = cleanShareMarkdown(detail, {
+      titleOf: target => titles.get(target),
+      nodeIdOf: target => nodeIds.get(target),
+      assets: this.registry
+    });
     const host = this.host().createDiv();
     const child = new Component();
     this.component.addChild(child);
@@ -584,6 +613,11 @@ export class ShareExporter {
     clean.append(sanitizeHTMLToDom(host.innerHTML));
     unwrapLocalLinks(clean, () => createSpan());
     scrubShareTree(clean);
+    applyNodeLinks(
+      clean,
+      new Set(this.source.map.nodes.filter(node => this.source.notes.has(node.id)).map(node => node.id)),
+      () => createEl("a")
+    );
     const slots = Array.from(clean.querySelectorAll(".vam-mermaid-slot"));
     slots.forEach((slot, index) => {
       const diagram = diagrams[index];
@@ -649,7 +683,12 @@ export class ShareExporter {
     }
     for (const item of this.source.map.canvasItems ?? []) {
       const raw = item as unknown as Record<string, unknown>;
-      if ((raw.kind === "annotated-image" || raw.kind === "image") && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+      if (
+        (raw.kind === "annotated-image" || raw.kind === "image") &&
+        typeof raw.id === "string" &&
+        typeof raw.path === "string" &&
+        raw.path
+      )
         this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
     }
   }

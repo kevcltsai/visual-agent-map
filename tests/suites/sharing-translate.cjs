@@ -701,3 +701,13 @@ test('share translate compact: when the sanitizer changes the rebuilt text the n
   assert.equal(ok.result.fallbackNodes, 0);
   assert.ok(Array.isArray(ok.entry.detailSegments));
 });
+
+test('share translate compact: an in-map note link survives the rebuild with only href and class', () => {
+  const original = '<p>Salt the water, then see <a class="vam-node-link" href="#vam-node-water">Water in food</a> for more.</p>';
+  const extraction = segments.extractSegments(html.parse(original));
+  const entry = { title: 'x', summary: 'y', detailSegments: extraction.units.map(unit => `T:${unit.text}`), detailCheck: compact.detailCheckOf(extraction) };
+  const out = shown(original, entry);
+  assert.match(out, /<a class="vam-node-link" href="#vam-node-water">[^<]*Water in food[^<]*<\/a>/);
+  assert.ok(out.includes('T:Salt the water'), 'the text around the link is translated');
+  assert.equal((out.match(/<a /g) ?? []).length, 1);
+});

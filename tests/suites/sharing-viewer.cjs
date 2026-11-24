@@ -2213,3 +2213,59 @@ test('sharing viewer types, frames and free pictures: whitelisted kinds draw the
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
+
+test('sharing viewer relations: lines, arrows and names for known kinds only; folded ends draw nothing; the panel lists them as text; note links go only to cards in the file (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-rel-'));
+  try {
+    const data = payload();
+    data.nodes.find(node => node.id === 'heat').collapsed = true;
+    data.nodes.find(node => node.id === 'root').detailHtml = '<p><a class="vam-node-link" href="#vam-node-ghost">G</a> <a class="vam-node-link" href="#vam-node-water">W</a></p>';
+    data.relations = [
+      { kind: 'supports', from: 'water', to: 'salt', description: '<img src=x onerror="window.__pwned=1">hostile' },
+      { kind: 'contradicts', from: 'salt', to: 'water' },
+      { kind: 'derives_from', from: 'water', to: 'root' },
+      { kind: 'related', from: 'salt', to: 'root' },
+      { kind: 'evil" onload="window.__pwned=1', from: 'water', to: 'salt' },
+      { kind: 'supports', from: 'maillard', to: 'salt' },
+      { kind: 'supports', from: 'water', to: 'nowhere' }
+    ];
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'rel.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(500);
+      const lines = await evaluate(`(() => ({ paths: [...document.querySelectorAll('.vam-edges path.vam-relation')].map(e => e.getAttribute('class')), polygons: document.querySelectorAll('.vam-edges polygon').length, gaps: document.querySelectorAll('.vam-edges .vam-relation-gap').length, labels: [...document.querySelectorAll('.vam-edges text.vam-relation-label')].map(e => e.textContent), evil: !!document.querySelector('[class*="evil"]'), pwned: !!window.__pwned }))()`);
+      await evaluate(`document.querySelector('[data-node-id="water"]').click()`);
+      await wait(200);
+      const panel = await evaluate(`(() => ({ rows: [...document.querySelectorAll('.vam-relation-item')].map(e => e.textContent), imgs: document.querySelectorAll('.vam-relations img').length, pwned: !!window.__pwned }))()`);
+      await evaluate(`document.querySelector('[data-node-id="root"]').click()`);
+      await wait(200);
+      await evaluate(`document.querySelector('a.vam-node-link[href="#vam-node-ghost"]').click()`);
+      const afterGhost = await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`);
+      await evaluate(`document.querySelector('a.vam-node-link[href="#vam-node-water"]').click()`);
+      await wait(200);
+      return { lines, panel, afterGhost, afterWater: await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`), hash: await evaluate('location.hash') };
+    });
+    assert.deepEqual(report.lines.paths.sort(), ['vam-relation vam-relation-contradicts', 'vam-relation vam-relation-derives_from', 'vam-relation vam-relation-related', 'vam-relation vam-relation-supports'], 'forged kind, folded end and unknown end draw nothing');
+    assert.equal(report.lines.polygons, 4, 'supports 1, contradicts head and bar 2, derives 1, related 0');
+    assert.equal(report.lines.gaps, 1);
+    assert.deepEqual(report.lines.labels.sort(), ['Contradicts', 'Derives from', 'Related', 'Supports']);
+    assert.equal(report.lines.evil, false);
+    assert.equal(report.lines.pwned, false);
+    assert.equal(report.panel.rows.length, 3, 'water: supports out, contradicts in, derives_from out');
+    assert.ok(report.panel.rows.some(row => row.includes('hostile') && row.includes('<img')), 'the description is shown as text');
+    assert.equal(report.panel.imgs, 0);
+    assert.equal(report.panel.pwned, false);
+    assert.equal(report.afterGhost, 'root', 'a link to an id that is not in the file does nothing');
+    assert.equal(report.afterWater, 'water');
+    assert.equal(report.hash, '', 'the link never changes the address');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});

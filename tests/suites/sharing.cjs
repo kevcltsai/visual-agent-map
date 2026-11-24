@@ -788,3 +788,45 @@ test('sharing complete: image links carry a whitelisted kind and plain descripti
   const links = format.buildSharePayload(map, notesById, options()).images[0].links;
   assert.deepEqual(plain(links), [{ anchor: 'p1', topic: a, kind: 'supports', description: 'why' }, { anchor: 'p1', topic: b, description: '</script>' }]);
 });
+
+// ---- share-complete P3: links between the notes of one map ----
+const nodeLinks = load('experiences/sharing/share-node-links.ts');
+const supportHtml = require('../support-html-dom.cjs');
+const applyLinks = (html, ids) => {
+  const root = supportHtml.parse(html);
+  nodeLinks.applyNodeLinks(root, new Set(ids), () => new supportHtml.El('a', root.ownerDocument));
+  return supportHtml.serialize(root);
+};
+const markdownOf = (md, nodeIdOf) => clean.cleanShareMarkdown(md, { titleOf: target => (target === 'Water' ? 'Water in food' : undefined), nodeIdOf, assets: clean.createAssetRegistry() }).markdown;
+
+test('share node links: a wikilink to a map card is marked, a non-map wikilink stays plain text', () => {
+  const idOf = target => (target === 'Water' ? 'water' : undefined);
+  const md = markdownOf('See [[Water]], [[Water|the wet one]] and [[Elsewhere]] and [[#Heading]].', idOf);
+  const html = applyLinks(`<p>${md}</p>`, ['water']);
+  assert.match(html, /<a class="vam-node-link" href="#vam-node-water">Water in food<\/a>/);
+  assert.match(html, /<a class="vam-node-link" href="#vam-node-water">the wet one<\/a>/);
+  assert.ok(html.includes('and Elsewhere and Heading.'), 'no link for a target that is not a card');
+  assert.ok(!/[-]/.test(html), 'no mark character is left');
+  assert.equal((html.match(/<a /g) ?? []).length, 2);
+});
+
+test('share node links: private-use characters typed by the author cannot forge a link', () => {
+  const md = markdownOf('Clickwater and [[Water]]', target => (target === 'Water' ? 'water' : undefined));
+  assert.ok(!/Click/.test(md), 'the forged marks are gone from the markdown');
+  const html = applyLinks(`<p>${md}</p>`, ['water']);
+  assert.equal((html.match(/<a /g) ?? []).length, 1, 'only the real wikilink became a link');
+  assert.ok(html.includes('Clickwater'), 'the forged text stays plain');
+  // A mark that reaches the html anyway (a renderer that split it, an id not in the file, an unsafe id) ends as text.
+  assert.ok(!/<a /.test(applyLinks('<p>xghost</p>', ['water'])));
+  assert.equal(applyLinks('<p>x"onmouseover=1</p>', ['"onmouseover=1']), '<p>x</p>');
+  assert.equal(nodeLinks.markNodeLink('a b', 'T'), 'T', 'an id outside the safe charset is not marked');
+  assert.equal(applyLinks('<p><a href="https://example.org">xwater</a></p>', ['water']), '<p><a href="https://example.org">x</a></p>', 'no link inside a link');
+});
+
+test('share node links: the generated link carries only href and class', () => {
+  const root = supportHtml.parse('<p>Twater</p>');
+  nodeLinks.applyNodeLinks(root, new Set(['water']), () => new supportHtml.El('a', root.ownerDocument));
+  const link = root.childNodes[0].childNodes[0];
+  assert.equal(link.localName, 'a');
+  assert.deepEqual([...link.attrs.keys()].sort(), ['class', 'href']);
+});

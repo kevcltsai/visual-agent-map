@@ -8,10 +8,13 @@
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
 import { markdownCodeRanges, normalizeNewlines } from "./share-code";
+import { markNodeLink, stripNodeLinkMarks } from "./share-node-links";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
   titleOf(target: string): string | undefined;
+  /** The id of the map card a link target points at, if it is one; the link then becomes an in-map link (share-node-links.ts). */
+  nodeIdOf?(target: string): string | undefined;
   /** Shared across the notes of one export so the same file gets the same asset name. */
   assets: AssetRegistry;
 }
@@ -139,7 +142,10 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       }
       if (link !== undefined) {
         const { target, alias } = splitWikilink(link);
-        return escapeMd(alias ?? titleFor(target));
+        const text = escapeMd(stripNodeLinkMarks(alias ?? titleFor(target)));
+        const pathPart = target.split("#")[0].trim();
+        const nodeId = pathPart ? ctx.nodeIdOf?.(pathPart) : undefined;
+        return nodeId && text ? markNodeLink(nodeId, text) : text;
       }
       if (src !== undefined) {
         const raw = src
@@ -186,7 +192,8 @@ function removeLocalReferenceDefinitions(text: string): string {
  */
 export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCleanResult {
   const out: ShareCleanResult = { markdown: "", attachments: [], webImages: [] };
-  const text = removeLocalReferenceDefinitions(normalizeNewlines(md));
+  // The marks of share-node-links.ts never come from the author: strip them before anything is marked.
+  const text = removeLocalReferenceDefinitions(stripNodeLinkMarks(normalizeNewlines(md)));
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text)) {

@@ -237,3 +237,23 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-share-frames { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .vam-share-frame { position: absolute; box-sizing: border-box; border: 2px dashed var(--interactive-accent); border-radius: 12px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
 .vam-share-frame-label { position: absolute; left: 10px; top: -12px; max-width: calc(100% - 20px); padding: 1px 10px; border-radius: 999px; border: 1px solid var(--interactive-accent); background: var(--background-primary); color: var(--text-accent); font-size: var(--font-ui-smaller); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Semantic lines and the relations list (share-complete P3): the map's rules from styles.css, same names. */
+.vam-relation { fill: none; stroke: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke-width: var(--vam-relation-width, 1.75px); pointer-events: none; }
+.vam-relation-supports { stroke-dasharray: none; }
+.vam-relation-contradicts { stroke-dasharray: 8 4; }
+.vam-relation-verifies { stroke-dasharray: 1 5; stroke-linecap: round; }
+.vam-relation-derives_from { --vam-relation-width: 4.5px; }
+.vam-relation-related { --vam-relation-width: 1.25px; }
+.vam-relation-prerequisite { stroke-dasharray: 10 4 2 4; }
+.vam-relation-gap { fill: none; stroke: var(--background-primary); stroke-width: 1.5px; pointer-events: none; }
+.vam-relation-arrow { fill: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke: none; }
+.vam-relation-arrow-bar { fill: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke: none; }
+.vam-relation-label { fill: var(--text-muted); font-weight: 500; stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+[data-relation-labels="hidden"] .vam-relation-label { display: none; }
+.vam-relations { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
+.vam-relations strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }
+.vam-relation-item { display: flex; flex-direction: column; gap: 2px; }
+.vam-relation-item button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }
+.vam-relation-item > span { overflow-wrap: anywhere; font-size: var(--font-ui-small); }
+.vam-relation-description { color: var(--text-muted); padding: 0 8px; }
+a.vam-node-link { cursor: pointer; }

@@ -2593,6 +2593,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_frame_named_0": "範圍框：{0}",
   "share.viewer_video_play": "按一下播放 YouTube 影片",
   "share.viewer_video_note": "播放時才會連到 YouTube（不記錄 cookie 的版本）",
+  "share.viewer_video_note_local": "從檔案直接打開時，會在新分頁用 YouTube 播放",
   "share.viewer_video_open": "在 YouTube 開啟",
   "share.media_video_0": "影片：{0}",
   "share.media_audio_0": "音訊：{0}",

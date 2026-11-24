@@ -2774,6 +2774,7 @@ export const en = {
   "share.viewer_frame_named_0": "Frame: {0}",
   "share.viewer_video_play": "Click to play the YouTube video",
   "share.viewer_video_note": "The video only connects to YouTube when you play it (the no-cookie version)",
+  "share.viewer_video_note_local": "Opened from a file, the video plays on YouTube in a new tab",
   "share.viewer_video_open": "Open on YouTube",
   "share.media_video_0": "Video: {0}",
   "share.media_audio_0": "Audio: {0}",

@@ -107,6 +107,7 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     frameNamed: text("share.viewer_frame_named_0"),
     videoPlay: text("share.viewer_video_play"),
     videoNote: text("share.viewer_video_note"),
+    videoNoteLocal: text("share.viewer_video_note_local"),
     videoOpen: text("share.viewer_video_open")
   };
 }

@@ -59,8 +59,17 @@ export function upgradeVideoLinks(root: ParentNode, doc: Document, ui: ShareView
         .slice(0, 200) || ui.videoPlay;
     const card = createViewerElement(doc, "div", "vam-video-card");
     const stage = createViewerElement(doc, "div", "vam-video-stage");
-    const button = createViewerElement(doc, "button", "vam-video-play");
-    button.type = "button";
+    // Opened from a file on disk, the page has no address to send, and YouTube refuses an embed without one (error 153):
+    // there the play control opens the video on YouTube in a new tab. From a web address it plays in the card.
+    const local = doc.location?.protocol === "file:";
+    const button = createViewerElement(doc, local ? "a" : "button", "vam-video-play");
+    if (local) {
+      const watch = new UrlParser("https://www.youtube.com/watch");
+      watch.searchParams.set("v", id);
+      button.setAttribute("href", watch.href);
+      button.setAttribute("target", "_blank");
+      button.setAttribute("rel", "noopener noreferrer");
+    } else (button as HTMLButtonElement).type = "button";
     button.setAttribute("aria-label", `${ui.videoPlay}: ${title}`);
     const icon = createViewerElement(doc, "span", "vam-video-icon");
     icon.setAttribute("aria-hidden", "true");
@@ -68,9 +77,9 @@ export function upgradeVideoLinks(root: ParentNode, doc: Document, ui: ShareView
     caption.textContent = ui.videoPlay;
     button.append(icon, caption);
     stage.append(button);
-    button.addEventListener("click", () => stage.replaceChildren(videoPlayer(doc, id, title)));
+    if (!local) button.addEventListener("click", () => stage.replaceChildren(videoPlayer(doc, id, title)));
     const note = createViewerElement(doc, "small", "vam-video-note");
-    note.textContent = ui.videoNote;
+    note.textContent = local ? ui.videoNoteLocal : ui.videoNote;
     link.textContent = ui.videoOpen;
     link.removeAttribute("class");
     link.setAttribute("title", title);

@@ -8132,7 +8132,12 @@ export class VisualAgentMapView extends ItemView {
     bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
     if (!this.hiddenAnchors?.size) return;
-    const hidden = anchorHiddenTopicIds(this.map?.canvasItems ?? [], this.map?.nodes ?? [], this.hiddenAnchors, image.id);
+    const hidden = anchorHiddenTopicIds(
+      this.map?.canvasItems ?? [],
+      this.map?.nodes ?? [],
+      this.hiddenAnchors,
+      image.id
+    );
     if (!hidden.size) return;
     const all = bar.createEl("button", {
       cls: "vam-annotated-showall",

@@ -2624,6 +2624,8 @@ integrationTest('reference update reads each affected note once, and skips non-V
 test('social video cards: a Facebook or Instagram video link or image in rendered Markdown becomes a click-to-play card; other links stay', () => {
   const { parse, serialize, El } = require('../support-html-dom.cjs');
   const cards = load('experiences/markdown-context/social-video-cards.ts');
+  const saved = ['addEventListener', 'replaceChildren', 'textContent'].map(key => [key, Object.getOwnPropertyDescriptor(El.prototype, key)]);
+  try {
   El.prototype.addEventListener = function (type, fn) { (this.handlers ??= {})[type] = fn; };
   El.prototype.replaceChildren = function (...nodes) { for (const kid of [...this.childNodes]) this.removeChild(kid); this.append(...nodes); };
   Object.defineProperty(El.prototype, 'textContent', { configurable: true, get() { return this.childNodes.map(kid => kid.nodeType === 3 ? kid.nodeValue : kid.textContent ?? '').join(''); }, set(value) { for (const kid of [...this.childNodes]) this.removeChild(kid); this.appendChild(this.ownerDocument.createTextNode(value)); } });
@@ -2654,5 +2656,7 @@ test('social video cards: a Facebook or Instagram video link or image in rendere
   assert.equal(frame.getAttribute('referrerpolicy'), 'strict-origin-when-cross-origin');
   fb.childNodes[0].childNodes[0].handlers.click();
   assert.equal(fb.childNodes[0].childNodes[0].getAttribute('src'), 'https://www.facebook.com/plugins/video.php?href=https%3A%2F%2Fwww.facebook.com%2Ffacebook%2Fvideos%2F1128464476453508%2F&show_text=false');
-  delete El.prototype.addEventListener; delete El.prototype.replaceChildren; delete El.prototype.textContent;
+  } finally {
+    for (const [key, descriptor] of saved) { if (descriptor) Object.defineProperty(El.prototype, key, descriptor); else delete El.prototype[key]; }
+  }
 });

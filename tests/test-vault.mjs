@@ -8,6 +8,7 @@ import vm from 'node:vm';
 import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
+import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readViewerCache, saveViewerCache } from '../scripts/viewer-cache.mjs';
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
 import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
@@ -797,4 +798,43 @@ test('expensive affected plans refresh stale dependency tables without accepting
   assert.equal(readFileSync(path, 'utf8'), data(base));
   assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(old), {}, 1202000), false);
   assert.equal(readFileSync(path, 'utf8'), data(base));
+});
+
+test('viewer cache uses actual local graph and config, detects added resolution paths and output tampering', t => {
+  const { folder } = environment(t);
+  const output = 'experiences/sharing/viewer-bundle.generated.ts';
+  const fixed = ['scripts/build-viewer.mjs', 'scripts/viewer-css.mjs', 'scripts/viewer-cache.mjs', 'styles.css',
+    'experiences/sharing/viewer/viewer.css', 'package.json', 'package-lock.json', 'tsconfig.json', '.prettierrc.json',
+    'experiences/sharing/viewer/index.ts', 'core/used.ts', 'core/other.ts', output,
+    'node_modules/esbuild/index.js', 'node_modules/@esbuild/platform/bin', 'node_modules/prettier/index.js'];
+  for (const path of fixed) {
+    mkdirSync(dirname(join(folder, path)), { recursive: true });
+    writeFileSync(join(folder, path), path.endsWith('.json') ? '{}' : path);
+  }
+  const entry = 'experiences/sharing/viewer/index.ts', used = 'core/used.ts';
+  const inputs = viewerInputs({ inputs: { [entry]: { imports: [{ path: used, original: '../../../core/used' }] }, [used]: { imports: [] } } });
+  assert.deepEqual(inputs, [used, entry]);
+  assert.equal(viewerInputs({ inputs: { [entry]: { imports: [{ path: 'node_modules/pkg/index.js', original: 'pkg' }] } } }), null);
+  assert.equal(viewerCacheEnabled({ CI: 'true' }), false);
+  assert.equal(viewerCacheEnabled({ VAM_CLEAN_BUILD: '1' }), false);
+  const key = () => viewerCacheKey(folder, inputs, {}, {});
+  const initial = key();
+  assert.match(initial, /^[0-9a-f]{64}$/);
+  saveViewerCache(folder, inputs, null, output);
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), false);
+  saveViewerCache(folder, inputs, initial, output);
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), true);
+  writeFileSync(join(folder, 'core/other.ts'), 'unrelated content');
+  assert.equal(key(), initial);
+  writeFileSync(join(folder, used), 'changed dependency');
+  assert.notEqual(key(), initial);
+  writeFileSync(join(folder, used), used);
+  writeFileSync(join(folder, 'core/used.js'), 'new resolver candidate');
+  assert.notEqual(key(), initial);
+  rmSync(join(folder, 'core/used.js'));
+  assert.equal(key(), initial);
+  writeFileSync(join(folder, output), 'tampered output');
+  assert.equal(viewerCacheHit(folder, readViewerCache(folder), initial), false);
+  writeFileSync(join(folder, 'node_modules/esbuild/index.js'), 'changed tool');
+  assert.notEqual(key(), initial);
 });

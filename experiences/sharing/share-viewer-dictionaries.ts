@@ -38,6 +38,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     noContent: "このトピックには共有ファイル内のノートがありません。",
     imageOmitted: "[画像は含まれていません]",
     imageSource: "出典: {0}",
+    attachmentDownload: "ダウンロード（{0}）",
+    attachmentNotIncluded: "含まれていません",
     resizePanel: "サイドパネルの幅を変更",
     outline: "アウトライン",
     untitledMap: "無題のマップ",
@@ -80,7 +82,14 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     colorNames: { red: "赤", orange: "オレンジ", yellow: "黄", green: "緑", blue: "青", purple: "紫" },
     kindLabel: "タイプ：{0}",
     kindNames: { action: "アクション", atomic: "原子知識", hypothesis: "仮説", evidence: "証拠", conclusion: "結論" },
-    relationNames: { supports: "支持する", contradicts: "反論する", verifies: "検証する", derives_from: "導出元", related: "関連", prerequisite: "前提知識" },
+    relationNames: {
+      supports: "支持する",
+      contradicts: "反論する",
+      verifies: "検証する",
+      derives_from: "導出元",
+      related: "関連",
+      prerequisite: "前提知識"
+    },
     relationsHeading: "関係",
     frameLabel: "枠",
     frameNamed: "枠：{0}"
@@ -115,6 +124,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     noContent: "이 주제에는 공유 파일에 노트가 없습니다.",
     imageOmitted: "[이미지가 포함되지 않음]",
     imageSource: "출처: {0}",
+    attachmentDownload: "다운로드({0})",
+    attachmentNotIncluded: "포함되지 않음",
     resizePanel: "사이드 패널 크기 조절",
     outline: "개요",
     untitledMap: "제목 없는 맵",
@@ -157,7 +168,14 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     colorNames: { red: "빨강", orange: "주황", yellow: "노랑", green: "초록", blue: "파랑", purple: "보라" },
     kindLabel: "유형: {0}",
     kindNames: { action: "행동", atomic: "원자 지식", hypothesis: "가설", evidence: "증거", conclusion: "결론" },
-    relationNames: { supports: "뒷받침", contradicts: "반박", verifies: "검증", derives_from: "도출 근거", related: "관련", prerequisite: "선행 지식" },
+    relationNames: {
+      supports: "뒷받침",
+      contradicts: "반박",
+      verifies: "검증",
+      derives_from: "도출 근거",
+      related: "관련",
+      prerequisite: "선행 지식"
+    },
     relationsHeading: "관계",
     frameLabel: "프레임",
     frameNamed: "프레임: {0}"
@@ -192,6 +210,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     noContent: "Este tema no tiene notas en el archivo compartido.",
     imageOmitted: "[imagen no incluida]",
     imageSource: "Fuente: {0}",
+    attachmentDownload: "Descargar ({0})",
+    attachmentNotIncluded: "No incluido",
     resizePanel: "Cambiar el tamaño del panel lateral",
     outline: "Esquema",
     untitledMap: "Mapa sin título",
@@ -233,8 +253,21 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     colorLabel: "Color: {0}",
     colorNames: { red: "Rojo", orange: "Naranja", yellow: "Amarillo", green: "Verde", blue: "Azul", purple: "Morado" },
     kindLabel: "Tipo: {0}",
-    kindNames: { action: "Acción", atomic: "Conocimiento atómico", hypothesis: "Hipótesis", evidence: "Evidencia", conclusion: "Conclusión" },
-    relationNames: { supports: "Apoya", contradicts: "Contradice", verifies: "Verifica", derives_from: "Deriva de", related: "Relacionado", prerequisite: "Requisito previo" },
+    kindNames: {
+      action: "Acción",
+      atomic: "Conocimiento atómico",
+      hypothesis: "Hipótesis",
+      evidence: "Evidencia",
+      conclusion: "Conclusión"
+    },
+    relationNames: {
+      supports: "Apoya",
+      contradicts: "Contradice",
+      verifies: "Verifica",
+      derives_from: "Deriva de",
+      related: "Relacionado",
+      prerequisite: "Requisito previo"
+    },
     relationsHeading: "Relaciones",
     frameLabel: "Marco",
     frameNamed: "Marco: {0}"

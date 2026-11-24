@@ -1010,3 +1010,67 @@ test('share exporter embeds: embedded notes are read from the vault (whole, head
   assert.ok(markdown.includes('Nope') || markdown.includes('Src'), 'the missing heading keeps its title');
   assert.ok(markdown.includes('Data.csv') && markdown.includes('Hidden'));
 });
+
+// ---- P5: file attachments, and embedded content keeps to its own note ----
+const p5Exporter = (files, extra = {}) => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const binaryReads = [];
+  const byPath = Object.fromEntries(Object.values(files).map(file => [file.path, file]));
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => file.text, readBinary: async file => { binaryReads.push(file.path); return new TextEncoder().encode('ABC').buffer; }, getFileByPath: path => byPath[path] ?? null },
+    metadataCache: { getFirstLinkpathDest: (ref, from) => byPath[ref] ?? files[ref] ?? byPath[`${ref}.md`] ?? null }
+  };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail: extra.detail ?? 'x' }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  return { exporter, binaryReads, node };
+};
+const ticket = () => ({ generation: 0, signal: new AbortController().signal, isCurrent: () => true });
+const mk = (path, size, extension = path.split('.').pop()) => ({ path, name: path.split('/').pop(), basename: path.split('/').pop().replace(/\.[^.]*$/, ''), extension, stat: { size }, text: '' });
+
+test('share exporter attachments: cards carry the file name only; a file over 10 MB, missing or internal is listed without bytes; images off gives no bytes; the bytes are an opaque data URI', async () => {
+  const files = { 'Docs/Private/report.pdf': mk('Docs/Private/report.pdf', 3), 'Docs/big.zip': mk('Docs/big.zip', 10 * 1024 * 1024 + 1), 'Agent/secret.pdf': mk('Agent/secret.pdf', 3), 'Docs/page.html': mk('Docs/page.html', 3) };
+  const { exporter, binaryReads } = p5Exporter(files);
+  const names = ['Docs/Private/report.pdf', 'Docs/big.zip', 'Agent/secret.pdf', 'gone/missing.pdf', 'Docs/page.html', 'Docs/Private/report.pdf'].map(ref => exporter.registerFile(ref, 'Folder/A.md'));
+  assert.deepEqual(plain(names), ['file-1', 'file-2', 'file-3', 'file-4', 'file-5', 'file-1'], 'the same file keeps its name');
+  exporter.rendered.set('a', { html: '', diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: names, mermaidUndrawn: 0, mermaidBlocked: 0 });
+  await exporter.readFiles(ticket());
+  assert.deepEqual(plain(binaryReads), ['Docs/Private/report.pdf', 'Docs/page.html'], 'no read for a big, internal or missing file');
+  const on = exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
+  assert.deepEqual(plain(on.attachments.map(item => [item.name, item.file, item.size, item.asset ?? null])), [['file-1', 'report.pdf', 3, 'file-1'], ['file-2', 'big.zip', 10485761, null], ['file-3', 'secret.pdf', 0, null], ['file-4', 'missing.pdf', 0, null], ['file-5', 'page.html', 3, 'file-5']]);
+  assert.equal(on.assets['file-1'], 'data:application/octet-stream;base64,QUJD');
+  assert.equal(on.assets['file-5'], 'data:application/octet-stream;base64,QUJD', 'an .html file is still opaque bytes');
+  assert.equal(JSON.stringify(on).includes('Docs/Private') || JSON.stringify(on).includes('Agent/'), false, 'no vault path in the payload');
+  const off = exporter.buildPayload({ includeDetail: true, includeImages: false }).payload;
+  assert.equal(off.attachments.length, 5);
+  assert.equal(off.attachments.some(item => item.asset), false);
+  assert.deepEqual(plain(Object.keys(off.assets)), []);
+  assert.equal('attachments' in exporter.buildPayload({ includeDetail: false, includeImages: false }).payload, false);
+  const plainMap = p5Exporter({}).exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
+  assert.equal('attachments' in plainMap, false, 'a map without files has no new field');
+  assert.equal(on.nodes.length, 1);
+});
+
+test('share exporter embeds: embedded images resolve from the embedded note own folder, internal-folder pictures never enter, and a picture dropped in the check cannot return through the embed', async () => {
+  const SOURCE = 'Intro\n\n![[../img/x.png]]\n\n![[../Agent/s.png]]\n\n![alt](../img/y.png)\n\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n';
+  const files = { 'Notes/Sub/Emb.md': { ...mk('Notes/Sub/Emb.md', 5, 'md'), text: SOURCE }, 'Notes/img/x.png': mk('Notes/img/x.png', 5), 'Notes/img/y.png': mk('Notes/img/y.png', 5), 'Agent/s.png': mk('Agent/s.png', 5) };
+  files['Notes/Agent/s.png'] = files['Agent/s.png'];
+  const { exporter, node } = p5Exporter(files, { detail: '![[Notes/Sub/Emb]]' });
+  const read = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 0);
+  const text = [...read.values()][0];
+  assert.ok(text.includes('![[Notes/img/x.png]]'), text);
+  assert.ok(text.includes('![[Notes/img/y.png|alt]]'), text);
+  assert.ok(!text.includes('Agent/s.png') && !text.includes('../'), text);
+  assert.equal(exporter.embeddedFigureProblems().length, 0, 'a picture without its own source line is not a licence problem');
+  // A picture line followed by a source line: checked, numbered after the card own pictures, and dropped on request.
+  files['Notes/Sub/Emb.md'].text = '![[../img/x.png]]\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n\nKept\n';
+  const before = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 2);
+  assert.ok([...before.values()][0].includes('x.png'));
+  assert.deepEqual(plain(exporter.embeddedFigureProblems().map(item => [item.id, item.index, item.problem])), [['a', 2, 'nc']]);
+  exporter.dropFigures(new Map([['a', new Set([2])]]));
+  const after = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 2);
+  assert.equal([...after.values()][0].trim(), 'Kept');
+  assert.equal(node.id, 'a');
+});

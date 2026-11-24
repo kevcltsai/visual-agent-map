@@ -44,6 +44,10 @@ export interface ShareViewerUi {
   imageOmitted: string;
   /** `{0}` is the web address the image came from (shown as a link under the image). */
   imageSource: string;
+  /** `{0}` is the file size (for example `412 KB`): the label of an attached file's download button. */
+  attachmentDownload: string;
+  /** Shown on a file card whose file is not in the shared file (too big, images off, or not found). */
+  attachmentNotIncluded: string;
   resizePanel: string;
   /** Label of the outline (the topic tree on the left) and of its toggle button. */
   outline: string;
@@ -131,6 +135,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   noContent: "This topic has no notes in the shared file.",
   imageOmitted: "[image not included]",
   imageSource: "Source: {0}",
+  attachmentDownload: "Download ({0})",
+  attachmentNotIncluded: "Not included",
   resizePanel: "Resize the side panel",
   outline: "Outline",
   untitledMap: "Untitled map",

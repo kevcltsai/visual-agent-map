@@ -92,3 +92,57 @@ export function extractEmbedContent(noteText: string, subpath: string): string |
   else picked = headingSection(lines, prose, sub.split("#").pop() ?? sub);
   return picked ? flattenNoteEmbeds(picked) : undefined;
 }
+
+const WEB_OR_DATA = /^(?:[a-z][a-z0-9+.-]*:)/i;
+const plainLabel = (text: string): string => text.replace(/[\\`*_{}[\]<>#|!()~=$%^&-]/g, "\\$&");
+
+/**
+ * Makes every file reference of embedded content (the Markdown of another note) point at its vault path, resolved from the
+ * embedded note's own folder: the cleaner and the exporter resolve references from the note that embeds, which would be the
+ * wrong folder. `resolve(ref)` gives the vault path, or null for a file that is missing, internal or outside the vault;
+ * such a reference (and anything unresolvable) becomes its plain file name, so it can never be found from the other folder.
+ * Notes (`.md` or no extension) and web or data addresses stay as written. Code is left alone.
+ */
+export function anchorEmbeddedFiles(content: string, resolve: (ref: string) => string | null): string {
+  const ranges = markdownCodeRanges(content);
+  const decode = (value: string): string => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  return content.replace(
+    /!\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)/g,
+    (all: string, wiki: string | undefined, alt: string | undefined, src: string | undefined, at: number) => {
+      if (ranges.some(range => at >= range.start && at < range.end)) return all;
+      let ref: string;
+      let label: string;
+      if (wiki !== undefined) {
+        const bar = wiki.search(/\\?\|/);
+        ref = (bar < 0 ? wiki : wiki.slice(0, bar)).split("#")[0].trim();
+        label =
+          bar < 0
+            ? ""
+            : wiki
+                .slice(bar)
+                .replace(/^\\?\|/, "")
+                .trim();
+      } else {
+        ref = decode(
+          (src ?? "")
+            .trim()
+            .replace(/^<|>$/g, "")
+            .replace(/\s+"[^"]*"$/, "")
+        );
+        label = (alt ?? "").trim();
+        if (WEB_OR_DATA.test(ref) || ref.startsWith("//")) return all;
+      }
+      if (!ref || !/\.[a-z0-9]{1,5}$/i.test(ref) || /\.md$/i.test(ref)) return all;
+      const path = resolve(ref);
+      if (!path || /[\]|\n]/.test(path)) return plainLabel(ref.split("/").pop() ?? ref);
+      const shown = label.replace(/[[\]|\n]/g, " ").trim();
+      return `![[${path}${shown ? `|${shown}` : ""}]]`;
+    }
+  );
+}

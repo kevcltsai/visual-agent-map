@@ -2269,3 +2269,29 @@ test('sharing viewer relations: lines, arrows and names for known kinds only; fo
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
+
+// ---- share-complete P5: file cards ----
+test('sharing viewer attachments: a card offers an opaque download only for a well-formed octet-stream entry; everything else says not included', () => {
+  const made = [];
+  const makeEl = tag => ({ tag, attrs: {}, children: [], className: '', textContent: '', listeners: {}, setAttribute(k, v) { this.attrs[k] = v; }, append(...c) { this.children.push(...c); }, addEventListener(type, fn) { this.listeners[type] = fn; }, click() { made.push({ href: this.href, download: this.download }); } });
+  const blobs = []; const revoked = []; const timers = [];
+  const doc = { createElement: makeEl, defaultView: { atob: value => Buffer.from(value, 'base64').toString('binary'), Blob: class { constructor(parts, init) { blobs.push({ parts, type: init.type }); } }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: url => revoked.push(url) }, setTimeout: fn => timers.push(fn) } };
+  const ui = { attachmentDownload: 'Download ({0})', attachmentNotIncluded: 'Not included' };
+  const link = (name, text) => ({ textContent: text, getAttribute: () => `#vam-attachment-${name}` });
+  const texts = card => card.children.map(child => child.textContent);
+  const ok = viewerDetail.attachmentCard(doc, link('file-1', 'page.html'), { 'file-1': 'data:application/octet-stream;base64,QUJD' }, ui);
+  assert.deepEqual(texts(ok), ['HTML', 'page.html', 'Download (3 B)']);
+  ok.children[2].listeners.click();
+  assert.equal(blobs[0].type, 'application/octet-stream', '.html is still an opaque Blob');
+  assert.deepEqual(made, [{ href: 'blob:x', download: 'page.html' }]);
+  assert.equal(revoked.length, 0); timers.forEach(fn => fn()); assert.deepEqual(revoked, ['blob:x'], 'the URL is revoked after the click');
+  const notIncluded = ['data:text/html;base64,QUJD', 'data:image/svg+xml;base64,QUJD', 'data:application/octet-stream;base64,@@@', 'data:application/octet-stream;base64,QUJ', 5, undefined];
+  for (const data of notIncluded) assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('file-1', 'a.svg'), { 'file-1': data }, ui)), ['SVG', 'a.svg', 'Not included']);
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('nope', 'a.pdf'), { 'file-1': 'data:application/octet-stream;base64,QUJD' }, ui)).slice(2), ['Not included'], 'an unknown name');
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('__proto__', 'a.pdf'), {}, ui)).slice(2), ['Not included']);
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('file-1', 'Private/Dir/archive.tar.gz'), {}, ui)).slice(0, 2), ['GZ', 'archive.tar.gz'], 'a path in the text shows its file name only');
+  assert.equal(viewerDetail.formatFileSize(412 * 1024), '412 KB');
+  assert.equal(viewerDetail.formatFileSize(5 * 1024 * 1024), '5.0 MB');
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) { const u = text.shareViewerUiFor(lang); assert.match(u.attachmentDownload, /\{0\}/, lang); assert.ok(u.attachmentNotIncluded, lang); }
+  assert.equal(text.shareViewerUiFor('zh-TW').attachmentNotIncluded, '未附上');
+});

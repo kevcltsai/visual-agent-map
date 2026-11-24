@@ -8,7 +8,7 @@
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
 import { markdownCodeRanges, normalizeNewlines } from "./share-code";
-import { markNodeLink, stripNodeLinkMarks } from "./share-node-links";
+import { markAttachment, markNodeLink, stripNodeLinkMarks } from "./share-node-links";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
@@ -21,6 +21,11 @@ export interface ShareCleanContext {
    * middle of a line is cut out of it into its own block.
    */
   embedOf?(target: string): string | undefined;
+  /**
+   * A file that is not a note or a picture (pdf, canvas, audio, office file…): the name its card carries (share-node-links.ts),
+   * or undefined when the export cannot offer files (the embed then stays the file name as text).
+   */
+  attachmentOf?(ref: string): string | undefined;
   /** The callout title of an embed box for a note title (default: the title alone). */
   embedTitle?(title: string): string;
   /** Shared across the notes of one export so the same file gets the same asset name. */
@@ -158,8 +163,11 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
           const altText = alias && !/^\d+(x\d+)?$/.test(alias) ? escapeMd(alias) : "";
           return `![${altText}](${SHARE_ASSET_SCHEME}${attach(pathPart)})`;
         }
-        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart))
-          return escapeMd(pathPart.split("/").pop() ?? pathPart);
+        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart)) {
+          const file = escapeMd(stripNodeLinkMarks(pathPart.split("/").pop() ?? pathPart));
+          const card = ctx.attachmentOf?.(decodeRef(pathPart));
+          return card ? markAttachment(card, file) : file;
+        }
         const content = ctx.embedOf?.(target);
         if (content?.trim()) return embedBox(titleFor(target), content, ctx, out);
         return escapeMd(titleFor(target));

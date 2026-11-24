@@ -876,3 +876,58 @@ test('sharing embeds: the embed box title and content survive a script or iframe
   assert.match(out.markdown, /> <script>alert\(1\)<\/script>/);
   assert.match(out.markdown, /\[!vam-embed\]/);
 });
+
+// ---- share-complete P5: file attachment cards ----
+const attachCtx = extra => ({ titleOf: () => undefined, assets: clean.createAssetRegistry(), attachmentOf: ref => (ref.endsWith('.pdf') ? 'file-1' : undefined), ...extra });
+
+test('sharing attachments: a file embed becomes a mark that carries the name; without the hook it stays the escaped file name', () => {
+  const md = clean.cleanShareMarkdown('See ![[Docs/Sub/report.pdf]] here', attachCtx()).markdown;
+  assert.ok(md.startsWith('See ') && md.includes('file-1'), md);
+  assert.ok(!md.includes('Docs/') && !md.includes('Sub'), 'only the base name is in the text');
+  assert.equal(clean.cleanShareMarkdown('See ![[Docs/report.pdf]]', { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown, 'See report.pdf');
+  assert.equal(clean.cleanShareMarkdown('![[a.mp4]]', attachCtx()).markdown, 'a.mp4', 'a file the hook refuses stays text');
+});
+
+test('sharing attachments: the card carries only href and class; an unknown name, a mark inside a link or typed by the author gives plain text', () => {
+  const applyCards = (html, names) => {
+    const root = supportHtml.parse(html);
+    nodeLinks.applyNodeLinks(root, new Set(), () => new supportHtml.El('a', root.ownerDocument), new Set(names));
+    return supportHtml.serialize(root);
+  };
+  const mark = nodeLinks.markAttachment('file-1', 'r.pdf');
+  const html = applyCards(`<p>${mark}</p>`, ['file-1']);
+  assert.equal(html, '<p><a class="vam-attachment-card" href="#vam-attachment-file-1">r.pdf</a></p>');
+  assert.equal(applyCards(`<p>${mark}</p>`, ['file-2']), '<p>r.pdf</p>', 'a name the file does not have is text');
+  assert.equal(applyCards(`<p><a href="https://e.example">${mark}</a></p>`, ['file-1']), '<p><a href="https://e.example">r.pdf</a></p>');
+  assert.equal(nodeLinks.markAttachment('a"b', 'x'), 'x', 'an unsafe name is not marked');
+  // The author types the marks: cleaning strips them, so no card is forged.
+  const typed = clean.cleanShareMarkdown('evil.exefile-1 and ![[x.pdf]]', attachCtx()).markdown;
+  assert.equal((typed.match(//g) ?? []).length, 1, 'only the real embed keeps its mark');
+});
+
+test('sharing attachments: payload lists the file name only; bytes only with notes and images on; wrong prefix or no entry gives no asset; old maps are unchanged', () => {
+  const { notesById } = cleanedNotes();
+  const OCT = 'data:application/octet-stream;base64,QUJD';
+  const files = [{ name: 'file-1', file: 'Private/Folder/report.pdf', size: 3 }, { name: 'file-2', file: 'x.html', size: 5 }, { name: 'bad name', file: 'z', size: 1 }];
+  const withData = format.buildSharePayload(fixtureMap(), notesById, options({ attachments: files, assets: { 'file-1': OCT, 'file-2': 'data:text/html;base64,QUJD' } }));
+  assert.deepEqual(plain(withData.attachments), [{ name: 'file-1', file: 'report.pdf', size: 3, asset: 'file-1' }, { name: 'file-2', file: 'x.html', size: 5 }]);
+  assert.ok(!JSON.stringify(withData).includes('Private/Folder'), 'no vault path in the file');
+  const noImages = format.buildSharePayload(fixtureMap(), notesById, options({ includeImages: false, attachments: files, assets: { 'file-1': OCT } }));
+  assert.ok(noImages.attachments.every(item => !('asset' in item)));
+  assert.equal(noImages.assets['file-1'], undefined);
+  const noDetail = format.buildSharePayload(fixtureMap(), notesById, options({ includeDetail: false, attachments: files }));
+  assert.equal('attachments' in noDetail, false);
+  const old = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.equal('attachments' in old, false);
+  assert.equal(format.serializeShareJson(old), format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options({ attachments: [] }))));
+  assert.equal(format.SHARE_ATTACHMENT_MAX_BYTES, 10 * 1024 * 1024);
+});
+
+test('sharing embeds: embedded file references are anchored to the embedded note own folder; internal or missing files become plain text', () => {
+  const resolve = ref => ({ '../img/x.png': 'Notes/img/x.png', 'a.pdf': 'Notes/Sub/a.pdf', 'Agent/s.png': null })[ref] ?? null;
+  const out = embeds.anchorEmbeddedFiles('![[../img/x.png|cap]] ![](../img/x.png) ![[a.pdf]] ![[Agent/s.png]] ![](Agent/s.png) ![w](https://e.example/p.png) ![[Note]] ![[gone.png]]\n```\n![[a.pdf]]\n```', resolve);
+  assert.ok(out.startsWith('![[Notes/img/x.png|cap]] ![[Notes/img/x.png]] ![[Notes/Sub/a.pdf]] '), out);
+  assert.ok(!out.includes('Agent/s.png') && !out.includes('![[gone.png]]') && !out.includes('![[../img'), out);
+  assert.ok(out.includes('![w](https://e.example/p.png)') && out.includes('![[Note]]'));
+  assert.ok(out.endsWith('```\n![[a.pdf]]\n```'), 'code is left alone');
+});

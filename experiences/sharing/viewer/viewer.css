@@ -183,6 +183,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .callout[data-callout="vam-embed"] .callout-title { font-weight: 400; font-size: 0.85em; color: var(--text-muted); }
 .vam-sample-detail .callout[data-callout="vam-embed"] .callout-icon { display: none; }
 .vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-sample-detail .vam-attachment { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); max-width: 100%; }
+.vam-sample-detail .vam-attachment-type { font-size: 0.7em; font-weight: 600; padding: 1px 5px; border-radius: 3px; background: var(--background-modifier-border); color: var(--text-muted); }
+.vam-sample-detail .vam-attachment-name { overflow-wrap: anywhere; }
+.vam-sample-detail .vam-attachment-missing { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
 /* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */

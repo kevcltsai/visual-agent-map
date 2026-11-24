@@ -2723,6 +2723,8 @@ export const en = {
   "share.viewer_no_content": "This topic has no notes in the shared file.",
   "share.viewer_image_omitted": "[image not included]",
   "share.viewer_image_source_0": "Source: {0}",
+  "share.viewer_attachment_download_0": "Download ({0})",
+  "share.viewer_attachment_not_included": "Not included",
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_outline": "Outline",
   "share.viewer_untitled": "Untitled map",

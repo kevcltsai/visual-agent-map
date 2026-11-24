@@ -2542,6 +2542,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_no_content": "这个议题在分享文件中没有笔记内容。",
   "share.viewer_image_omitted": "[图片未包含]",
   "share.viewer_image_source_0": "来源：{0}",
+  "share.viewer_attachment_download_0": "下载（{0}）",
+  "share.viewer_attachment_not_included": "未附上",
   "share.viewer_resize_panel": "调整侧栏宽度",
   "share.viewer_outline": "大纲",
   "share.viewer_untitled": "未命名的地图",

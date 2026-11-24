@@ -10,16 +10,20 @@
 export const NODE_LINK_START = "\uE000";
 export const NODE_LINK_MID = "\uE001";
 export const NODE_LINK_END = "\uE002";
+/** Starts a mark for a file attachment (a card, not a link to a note): `ATTACHMENT_START label MID name END`. */
+export const ATTACHMENT_START = "\uE003";
+export const ATTACHMENT_CLASS = "vam-attachment-card";
+export const ATTACHMENT_HREF_PREFIX = "#vam-attachment-";
 export const NODE_LINK_CLASS = "vam-node-link";
 export const NODE_LINK_HREF_PREFIX = "#vam-node-";
 
-const MARKS = /[\uE000-\uE002]/g;
-const HAS_MARK = /[\uE000-\uE002]/;
-const MARKED = /\uE000([^\uE000-\uE002]*)\uE001([^\uE000-\uE002]*)\uE002/g;
+const MARKS = /[\uE000-\uE003]/g;
+const HAS_MARK = /[\uE000-\uE003]/;
+const MARKED = /([\uE000\uE003])([^\uE000-\uE003]*)\uE001([^\uE000-\uE003]*)\uE002/g;
 /** The ids a link may carry; anything else stays plain text (the viewer looks the id up in the file, so this is about the attribute value only). */
 const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
-/** Text with the three marks removed: what every author input and every title goes through before a mark is added. */
+/** Text with the four marks removed: what every author input and every title goes through before a mark is added. */
 export const stripNodeLinkMarks = (text: string): string => text.replace(MARKS, "");
 
 /** `text` wrapped in a mark for node `id`; the text unchanged when the id cannot be a link target. */
@@ -28,12 +32,24 @@ export function markNodeLink(id: string, text: string): string {
   return SAFE_ID.test(id) ? `${NODE_LINK_START}${plain}${NODE_LINK_MID}${id}${NODE_LINK_END}` : plain;
 }
 
+/** `label` (a file's basename) wrapped in a mark for attachment `name`; the label alone when the name cannot be an attribute value. */
+export function markAttachment(name: string, label: string): string {
+  const plain = stripNodeLinkMarks(label);
+  return SAFE_ID.test(name) ? `${ATTACHMENT_START}${plain}${NODE_LINK_MID}${name}${NODE_LINK_END}` : plain;
+}
+
 /**
- * Turns the marks in the text of `root` into links to the nodes in `knownIds`. A mark for an unknown id, a mark inside
+ * Turns the marks in the text of `root` into links to the nodes in `knownIds` and, for attachment marks, cards for the
+ * names in `knownAttachments` (`<a class="vam-attachment-card" href="#vam-attachment-<name>">`, text = the file's basename). A mark for an unknown id, a mark inside
  * another link or code, and a mark that got split by the renderer all end as the plain text; no mark character survives.
  * Returns how many links were made.
  */
-export function applyNodeLinks(root: Element, knownIds: ReadonlySet<string>, createLink: () => Element): number {
+export function applyNodeLinks(
+  root: Element,
+  knownIds: ReadonlySet<string>,
+  createLink: () => Element,
+  knownAttachments: ReadonlySet<string> = new Set()
+): number {
   const doc = root.ownerDocument;
   let made = 0;
   const texts: Text[] = [];
@@ -59,8 +75,17 @@ export function applyNodeLinks(root: Element, knownIds: ReadonlySet<string>, cre
     for (const match of value.matchAll(MARKED)) {
       const at = match.index ?? 0;
       if (at > last) parts.push(doc.createTextNode(stripNodeLinkMarks(value.slice(last, at))));
-      const [, label, id] = match;
-      if (!inside && label && knownIds.has(id) && SAFE_ID.test(id)) {
+      const [, start, label, id] = match;
+      if (start === ATTACHMENT_START) {
+        if (!inside && label && knownAttachments.has(id) && SAFE_ID.test(id)) {
+          const card = createLink();
+          card.setAttribute("class", ATTACHMENT_CLASS);
+          card.setAttribute("href", `${ATTACHMENT_HREF_PREFIX}${id}`);
+          card.appendChild(doc.createTextNode(label));
+          parts.push(card);
+          made++;
+        } else parts.push(doc.createTextNode(label));
+      } else if (!inside && label && knownIds.has(id) && SAFE_ID.test(id)) {
         const link = createLink();
         link.setAttribute("class", NODE_LINK_CLASS);
         link.setAttribute("href", `${NODE_LINK_HREF_PREFIX}${id}`);

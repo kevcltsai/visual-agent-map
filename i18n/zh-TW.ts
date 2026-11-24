@@ -2542,6 +2542,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_no_content": "這個議題在分享檔中沒有筆記內容。",
   "share.viewer_image_omitted": "[圖片未包含]",
   "share.viewer_image_source_0": "來源：{0}",
+  "share.viewer_attachment_download_0": "下載（{0}）",
+  "share.viewer_attachment_not_included": "未附上",
   "share.viewer_resize_panel": "調整側欄寬度",
   "share.viewer_outline": "大綱",
   "share.viewer_untitled": "未命名的心智圖",

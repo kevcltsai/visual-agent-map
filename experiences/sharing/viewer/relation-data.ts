@@ -66,7 +66,9 @@ export function readFrames(raw: unknown, presentIds: ReadonlySet<string>): Viewe
     if (!isRecord(item) || typeof item.id !== "string" || !item.id || seen.has(item.id)) continue;
     if (!Array.isArray(item.members)) continue;
     const members = [
-      ...new Set(item.members.slice(0, MEMBER_LIMIT).filter((id): id is string => typeof id === "string" && presentIds.has(id)))
+      ...new Set(
+        item.members.slice(0, MEMBER_LIMIT).filter((id): id is string => typeof id === "string" && presentIds.has(id))
+      )
     ];
     if (!members.length) continue;
     seen.add(item.id);
@@ -115,7 +117,10 @@ export function arrowPolygons(d: string, barred: boolean): string[] {
   const { tip, ux, uy } = end;
   const nx = -uy,
     ny = ux;
-  const at = (back: number, side: number): Point => ({ x: tip.x - ux * back + nx * side, y: tip.y - uy * back + ny * side });
+  const at = (back: number, side: number): Point => ({
+    x: tip.x - ux * back + nx * side,
+    y: tip.y - uy * back + ny * side
+  });
   const head = points([at(0, 0), at(ARROW_LENGTH, ARROW_HALF_WIDTH), at(ARROW_LENGTH, -ARROW_HALF_WIDTH)]);
   if (!barred) return [head];
   const back = BAR_BACK;

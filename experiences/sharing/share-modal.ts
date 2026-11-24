@@ -50,6 +50,15 @@ export interface ShareExporterLike {
   ): ShareBuildResult;
   dispose(): void;
   /** Leaves the chosen pictures (topic id -> picture indexes) out of the file; the notes are never changed. */
+  /** Licence problems of the pictures inside embedded notes, known after ensureRendered; their indexes continue the card's own. */
+  embeddedFigureProblems?(): {
+    id: string;
+    index: number;
+    alt: string;
+    host: string;
+    problem: FigureProblem;
+    note: string;
+  }[];
   dropFigures?(choice: ReadonlyMap<string, ReadonlySet<number>>): void;
   /** Translation only: what the service translates, a diagram drawer, and the strings every translated language is scanned for. */
   translationSource?(
@@ -806,7 +815,15 @@ export class ShareModal extends Modal {
     problem: FigureProblem;
   }[] {
     if (!this.includeDetail || !this.includeImages) return [];
-    return this.options.source.map.nodes.flatMap(node => {
+    const embedded = (this.exporter.embeddedFigureProblems?.() ?? []).map(item => ({
+      topic: this.options.source.notes.get(item.id)?.title ?? "",
+      id: item.id,
+      index: item.index,
+      alt: item.alt || item.note,
+      host: item.host,
+      problem: item.problem
+    }));
+    const own = this.options.source.map.nodes.flatMap(node => {
       const note = this.options.source.notes.get(node.id);
       return figuresOf(note?.detail ?? "").flatMap(figure =>
         figure.problem
@@ -823,6 +840,7 @@ export class ShareModal extends Modal {
           : []
       );
     });
+    return [...own, ...embedded];
   }
 
   private renderImageCheck(): void {

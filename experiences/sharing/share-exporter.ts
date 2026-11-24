@@ -12,7 +12,7 @@ import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
-import { extractEmbedContent } from "./share-embeds";
+import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
 import { applyNodeLinks } from "./share-node-links";
 import {
   assertCurrent,
@@ -41,6 +41,8 @@ import {
 import {
   buildSharePayload,
   fitWithin,
+  SHARE_ATTACHMENT_DATA_PREFIX,
+  SHARE_ATTACHMENT_MAX_BYTES,
   SHARE_IMAGE_MAX_EDGE,
   type ShareLanguage,
   type ShareOriginalLanguage,
@@ -62,7 +64,7 @@ import { TOPIC_KIND_SHAPES, shapeKindFor } from "../visual-map/topic-kind-shape"
 import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
-import { withoutFigures } from "./share-image-check";
+import { figuresOf, withoutFigures, type FigureProblem } from "./share-image-check";
 import { topLevelSvgs } from "./share-translate-segments";
 
 /** Everything the exporter reads from the open map. A snapshot: later edits to the map do not change an export in progress. */
@@ -108,6 +110,31 @@ export interface ShareBuildResult {
   mermaidBlocked: number;
 }
 
+const payloadNodeIds = (nodes: readonly { id: string }[]): string[] => nodes.map(node => node.id);
+
+/** The file cards (`#vam-attachment-<name>`) in a note's final html. */
+function fileNamesInHtml(html: string): string[] {
+  return [...new Set([...html.matchAll(/href="#vam-attachment-([A-Za-z0-9_-]+)"/g)].map(match => match[1]))];
+}
+
+/** Base64 of the bytes, in slices so a big file does not overflow the call stack. */
+function bytesToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let at = 0; at < bytes.length; at += 0x8000) binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  return btoa(binary);
+}
+
+/** A licence problem of a picture inside an embedded note: `index` continues the card's own picture numbers (see readEmbeds). */
+export interface EmbeddedFigure {
+  id: string;
+  index: number;
+  alt: string;
+  host: string;
+  problem: FigureProblem;
+  note: string;
+}
+
 interface RenderedNote {
   html: string;
   /** Diagrams in the final html: the place among its top-level `<svg>` elements and the source the renderer showed. */
@@ -117,6 +144,8 @@ interface RenderedNote {
   /** Links in the renderer's output (before sanitizing) that lead outside the page; above 0 blocks a file with notes. */
   localRefs: number;
   attachments: string[];
+  /** Names of the file cards (not pictures) the final html carries. */
+  files: string[];
   mermaidUndrawn: number;
   mermaidBlocked: number;
 }
@@ -356,6 +385,13 @@ export class ShareExporter {
   private readonly images = new Map<string, string | null>();
   private readonly registry = createAssetRegistry();
   private readonly ownerPath = new Map<string, string>();
+  /** File name (`file-N`) -> the vault file a card stands for (null: not found or not shareable) and its size. Names are shared across the notes of one export. */
+  private readonly files = new Map<string, { path: string | null; file: string; size: number }>();
+  private readonly fileNames = new Map<string, string>();
+  /** topic id -> the licence problems of the pictures its embedded notes show (numbered after the card's own pictures). */
+  private readonly embeddedFigures = new Map<string, EmbeddedFigure[]>();
+  /** File name -> `data:application/octet-stream;base64,…`, or null when it is too big or could not be read. */
+  private readonly fileData = new Map<string, string | null>();
   /** topic id -> asset name of its cover picture; annotated image id -> asset name of its picture (set by ensureImages). */
   private readonly coverNames = new Map<string, string>();
   private readonly imageNames = new Map<string, string>();
@@ -375,6 +411,26 @@ export class ShareExporter {
     this.component.load();
   }
 
+  /** The pictures of embedded notes with a licence problem, known once the notes have been read (the dialog adds them to its check). */
+  embeddedFigureProblems(): EmbeddedFigure[] {
+    return [...this.embeddedFigures.values()].flat();
+  }
+
+  /** The vault file a reference points at, written as the author's link or as a path relative to `fromPath`'s folder. */
+  private locateFile(ref: string, fromPath: string): TFile | null {
+    const folder = fromPath.split("/").slice(0, -1).join("/");
+    const relative = resolveRelative(folder, ref);
+    const candidates = [
+      this.app.metadataCache.getFirstLinkpathDest(ref, fromPath)?.path,
+      relative ? normalizePath(relative) : undefined
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getFileByPath(path) : null;
+      if (file) return file;
+    }
+    return null;
+  }
+
   /** Leaves the chosen pictures (topic id -> picture indexes, see share-image-check) out of the file; the topics whose choice changed render again. */
   dropFigures(choice: ReadonlyMap<string, ReadonlySet<number>>): void {
     const same = (a: ReadonlySet<number> | undefined, b: ReadonlySet<number> | undefined): boolean =>
@@ -392,6 +448,9 @@ export class ShareExporter {
     this.container = null;
     this.rendered.clear();
     this.images.clear();
+    this.files.clear();
+    this.fileNames.clear();
+    this.fileData.clear();
   }
 
   private host(): HTMLElement {
@@ -459,9 +518,10 @@ export class ShareExporter {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
       const detail = this.renderSource(node.id);
-      const embeds = await this.readEmbeds(detail, node.path);
+      const own = this.source.notes.get(node.id)?.detail ?? "";
+      const embeds = await this.readEmbeds(detail, node.path, node.id, figuresOf(own).length);
       assertCurrent(ticket);
-      const result = await this.renderOne(detail, titles, nodeIds, embeds, ticket);
+      const result = await this.renderOne(detail, titles, nodeIds, embeds, node.path, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
@@ -476,9 +536,19 @@ export class ShareExporter {
    * Markdown notes of the vault count; the note itself (a cycle), a missing note, heading or block, and a vault-internal
    * folder are left out, so the cleaner shows their title only.
    */
-  private async readEmbeds(detail: string, fromPath: string): Promise<Map<string, string>> {
+  private async readEmbeds(
+    detail: string,
+    fromPath: string,
+    topicId: string,
+    firstIndex: number
+  ): Promise<Map<string, string>> {
     const found = new Map<string, string>();
     const internal = this.config.internalFolders ?? [];
+    const isInternal = (path: string): boolean =>
+      internal.some(folder => path === folder || path.startsWith(`${folder}/`));
+    const drop = this.dropped.get(topicId) ?? new Set<number>();
+    const problems: EmbeddedFigure[] = [];
+    let next = firstIndex;
     for (const match of detail.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
       const target = match[1].split(/\\?\|/)[0].trim();
       if (found.has(target)) continue;
@@ -487,13 +557,34 @@ export class ShareExporter {
       if (!linkPath || (/\.[a-z0-9]{1,5}$/i.test(linkPath) && !/\.md$/i.test(linkPath))) continue;
       const file: TFile | null = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
       if (!file || file.extension !== "md" || file.path === fromPath) continue;
-      if (internal.some(folder => file.path === folder || file.path.startsWith(`${folder}/`))) continue;
-      const content = extractEmbedContent(
-        await this.app.vault.cachedRead(file),
-        hash < 0 ? "" : target.slice(hash + 1)
+      if (isInternal(file.path)) continue;
+      let content = extractEmbedContent(await this.app.vault.cachedRead(file), hash < 0 ? "" : target.slice(hash + 1));
+      if (!content) continue;
+      // The embedded note's pictures are checked and dropped like the card's own (numbered after them), then every file
+      // reference is anchored to the embedded note's own folder (internal folders and missing files become plain text).
+      const figures = figuresOf(content);
+      for (const figure of figures)
+        if (figure.problem)
+          problems.push({
+            id: topicId,
+            index: next + figure.index,
+            alt: figure.alt,
+            host: figure.host,
+            problem: figure.problem,
+            note: file.basename
+          });
+      content = withoutFigures(
+        content,
+        new Set(figures.filter(item => drop.has(next + item.index)).map(item => item.index))
       );
-      if (content) found.set(target, content);
+      content = anchorEmbeddedFiles(content, ref => {
+        const found = this.locateFile(ref, file.path);
+        return found && !isInternal(found.path) ? found.path : null;
+      });
+      next += figures.length;
+      found.set(target, content);
     }
+    this.embeddedFigures.set(topicId, problems);
     return found;
   }
 
@@ -502,12 +593,14 @@ export class ShareExporter {
     titles: Map<string, string>,
     nodeIds: Map<string, string>,
     embeds: ReadonlyMap<string, string>,
+    fromPath: string,
     ticket: BuildTicket
   ): Promise<RenderedNote> {
     const cleaned = cleanShareMarkdown(detail, {
       titleOf: target => titles.get(target),
       nodeIdOf: target => nodeIds.get(target),
       embedOf: target => embeds.get(target),
+      attachmentOf: ref => this.registerFile(ref, fromPath),
       embedTitle: title => translate(this.config.language, "share.embed_title_0", title),
       assets: this.registry
     });
@@ -528,6 +621,7 @@ export class ShareExporter {
         diagrams: finished.diagrams,
         diagramsUnsourced: finished.unsourced,
         localRefs: finished.localRefs,
+        files: fileNamesInHtml(finished.html),
         // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
         attachments: cleaned.attachments.map(item => item.name).filter(name => used.has(name)),
         mermaidUndrawn: finished.undrawn,
@@ -650,7 +744,8 @@ export class ShareExporter {
     applyNodeLinks(
       clean,
       new Set(this.source.map.nodes.filter(node => this.source.notes.has(node.id)).map(node => node.id)),
-      () => createEl("a")
+      () => createEl("a"),
+      new Set(this.files.keys())
     );
     const slots = Array.from(clean.querySelectorAll(".vam-mermaid-slot"));
     slots.forEach((slot, index) => {
@@ -663,6 +758,45 @@ export class ShareExporter {
     const placed = placeDiagrams(finalSvgs, diagrams, diagramSources);
     const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
     return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
+  }
+
+  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
+  private registerFile(ref: string, fromPath: string): string {
+    const internal = this.config.internalFolders ?? [];
+    let found: TFile | null = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
+    if (found && internal.some(folder => found?.path === folder || found?.path.startsWith(`${folder}/`))) found = null;
+    const key = found ? found.path : `?${ref}`;
+    const existing = this.fileNames.get(key);
+    if (existing) return existing;
+    const name = `file-${this.fileNames.size + 1}`;
+    this.fileNames.set(key, name);
+    this.files.set(name, {
+      path: found?.path ?? null,
+      file: (found?.name ?? ref.split(/[\\/]/).pop() ?? ref).trim(),
+      size: found?.stat.size ?? 0
+    });
+    return name;
+  }
+
+  /** Reads the bytes of the files the notes show, once each; a file over the size limit or unreadable stays null. */
+  private async readFiles(ticket: BuildTicket): Promise<void> {
+    const names = new Set([...this.rendered.values()].flatMap(note => note.files));
+    for (const name of names) {
+      if (this.fileData.has(name)) continue;
+      const entry = this.files.get(name);
+      const file = entry?.path ? this.app.vault.getFileByPath(entry.path) : null;
+      let data: string | null = null;
+      if (file && entry && entry.size > 0 && entry.size <= SHARE_ATTACHMENT_MAX_BYTES) {
+        try {
+          data = SHARE_ATTACHMENT_DATA_PREFIX + bytesToBase64(await this.app.vault.readBinary(file));
+        } catch {
+          data = null;
+        }
+      }
+      assertCurrent(ticket);
+      if (this.disposed) return;
+      this.fileData.set(name, data);
+    }
   }
 
   /** The vault file a registered image name points at, or null when it cannot be found or is not a known image type. */
@@ -755,6 +889,7 @@ export class ShareExporter {
       done++;
     }
     onProgress({ phase: "images", done: names.length, total: names.length });
+    await this.readFiles(ticket);
   }
 
   forbiddenStrings(): ForbiddenString[] {
@@ -852,6 +987,19 @@ export class ShareExporter {
     const assets: Record<string, string> = {};
     if (options.includeDetail && options.includeImages)
       for (const [name, data] of this.images) if (data) assets[name] = data;
+    // The files the shown notes carry as cards; their bytes travel only with notes and images on, and only when they were read (size limit).
+    const fileNames = options.includeDetail
+      ? [...new Set(payloadNodeIds(this.source.map.nodes).flatMap(id => this.rendered.get(id)?.files ?? []))]
+      : [];
+    const attachments = fileNames.flatMap(name => {
+      const entry = this.files.get(name);
+      return entry ? [{ name, file: entry.file, size: entry.size }] : [];
+    });
+    if (options.includeDetail && options.includeImages)
+      for (const { name } of attachments) {
+        const data = this.fileData.get(name);
+        if (data) assets[name] = data;
+      }
     const covers: NonNullable<ShareOptions["covers"]> = Object.fromEntries(
       [...this.coverNames].map(([id, asset]) => [id, { asset, ...this.source.coverLooks?.get(id) }])
     );
@@ -863,6 +1011,7 @@ export class ShareExporter {
       exportedAt: (this.config.now?.() ?? new Date()).toISOString(),
       goal: this.source.goal,
       assets,
+      attachments,
       covers,
       imageAssets: Object.fromEntries(this.imageNames),
       ...(this.source.ringHeights?.size ? { ringHeights: Object.fromEntries(this.source.ringHeights) } : {}),
@@ -917,7 +1066,7 @@ export class ShareExporter {
     const counts = {
       topics: payload.nodes.length,
       notesWithContent: scoped.notesWithContent,
-      images: Object.keys(payload.assets).length
+      images: Object.values(payload.assets).filter(data => data.startsWith("data:image/")).length
     };
     const shared = {
       payload,

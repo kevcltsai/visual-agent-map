@@ -90,6 +90,10 @@ export interface ShareMapTranslation {
 /** Size thresholds (bytes) for the preview warning and the "leave the images out" suggestion. */
 export const SHARE_SIZE_WARN_BYTES = 10 * 1024 * 1024;
 export const SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES = 20 * 1024 * 1024;
+/** A file attachment (pdf, office file…) larger than this is listed in the file but its bytes are not embedded. */
+export const SHARE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** The only data-URI prefix an attachment's bytes may carry: the viewer offers it as an opaque download, never opens it. */
+export const SHARE_ATTACHMENT_DATA_PREFIX = "data:application/octet-stream;base64,";
 /** Longest edge (px) of an embedded image. */
 export const SHARE_IMAGE_MAX_EDGE = 1600;
 /** OQ-1 (owner decision): shares include the full note content unless the exporter turns it off. */
@@ -219,6 +223,14 @@ export interface ShareBoundaryPayload {
   label?: string;
 }
 
+/** Optional (share-complete): a file a note embeds. `name` is the key of `assets` (when the bytes travel) and of the card; `file` is the file name only, never a path. */
+export interface ShareAttachmentPayload {
+  name: string;
+  file: string;
+  size: number;
+  asset?: string;
+}
+
 export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
@@ -241,6 +253,8 @@ export interface SharePayload {
   relations?: ShareRelationPayload[];
   /** Optional (share-complete): frames around cards; absent when the map has none. `version` stays 1. */
   boundaries?: ShareBoundaryPayload[];
+  /** Optional (share-complete): files the notes embed; absent when there are none. `version` stays 1. */
+  attachments?: ShareAttachmentPayload[];
   assets: Record<string, string>;
   /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
   contentLanguage?: string;
@@ -285,6 +299,8 @@ export interface ShareOptions {
   goal?: string;
   /** name -> data URL, embedded only when includeImages is true. */
   assets?: Record<string, string>;
+  /** Files the notes embed (name, file name, byte size); `assets[name]` holds the bytes when they travel. Kept only with includeDetail. */
+  attachments?: readonly { name: string; file: string; size: number }[];
   /** topic id -> cover picture asset name and look. Used only when includeDetail and includeImages; an asset not in `assets` is ignored. */
   covers?: Readonly<
     Record<
@@ -419,12 +435,26 @@ function shareImages(
   const seen = new Set<string>();
   for (const item of map.canvasItems ?? []) {
     const raw = item as unknown as Record<string, unknown>;
-    if ((raw.kind !== "annotated-image" && raw.kind !== "image") || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (
+      (raw.kind !== "annotated-image" && raw.kind !== "image") ||
+      typeof raw.id !== "string" ||
+      !raw.id ||
+      seen.has(raw.id)
+    )
+      continue;
     if (![raw.x, raw.y, raw.w, raw.h].every(finiteNumber)) continue;
     const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h] as number[];
     if (!(w > 0 && h > 0)) continue;
     seen.add(raw.id);
-    const image: ShareImagePayload = { id: raw.id, x, y, w, h, anchors: [], ...(raw.kind === "image" ? { free: true as const } : {}) };
+    const image: ShareImagePayload = {
+      id: raw.id,
+      x,
+      y,
+      w,
+      h,
+      anchors: [],
+      ...(raw.kind === "image" ? { free: true as const } : {})
+    };
     const asset = assetNames[raw.id];
     if (asset && assets[asset]) image.asset = asset;
     const note = typeof raw.note === "string" ? optionalText(plain(raw.note)) : undefined;
@@ -482,6 +512,33 @@ function shareRelations(
     if (from === to || !nodeIds.has(from) || !nodeIds.has(to)) continue;
     const text = limitedText(description, plain);
     out.push({ kind, from, to, ...(text ? { description: text } : {}) });
+  }
+  return out;
+}
+
+const ATTACHMENT_NAME = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** The file list: a safe name, the file name without any folder, a non-negative size; `asset` only when the bytes really are in `assets` with the opaque prefix. */
+function shareAttachments(
+  raw: ShareOptions["attachments"],
+  assets: Record<string, string>,
+  includeDetail: boolean,
+  plain: (text: string) => string
+): ShareAttachmentPayload[] {
+  if (!includeDetail || !raw) return [];
+  const out: ShareAttachmentPayload[] = [];
+  for (const item of raw) {
+    if (!ATTACHMENT_NAME.test(item.name) || out.some(each => each.name === item.name)) continue;
+    const file = plain(item.file.split(/[\\/]/).pop() ?? "").slice(0, 200);
+    if (!file) continue;
+    const size = Number.isFinite(item.size) && item.size > 0 ? Math.floor(item.size) : 0;
+    const data = assets[item.name];
+    out.push({
+      name: item.name,
+      file,
+      size,
+      ...(typeof data === "string" && data.startsWith(SHARE_ATTACHMENT_DATA_PREFIX) ? { asset: item.name } : {})
+    });
   }
   return out;
 }
@@ -591,6 +648,7 @@ export function buildSharePayload(
     new Set([...nodeIds, ...images.map(image => image.id), ...textNodes.map(text => text.id)]),
     plain
   );
+  const attachments = shareAttachments(options.attachments, withImages ? assets : {}, options.includeDetail, plain);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -607,6 +665,7 @@ export function buildSharePayload(
     ...(images.length ? { images } : {}),
     ...(relations.length ? { relations } : {}),
     ...(boundaries.length ? { boundaries } : {}),
+    ...(attachments.length ? { attachments } : {}),
     assets
   };
 }

@@ -21,7 +21,9 @@ export const TOPIC_KIND_SHAPES: Record<ViewerKind | "topic", string> = {
 export const readViewerKind = (value: unknown): ViewerKind | undefined =>
   typeof value === "string" && (VIEWER_KINDS as readonly string[]).includes(value) ? (value as ViewerKind) : undefined;
 export const readViewerShape = (value: unknown): ViewerShape | undefined =>
-  typeof value === "string" && (VIEWER_SHAPES as readonly string[]).includes(value) ? (value as ViewerShape) : undefined;
+  typeof value === "string" && (VIEWER_SHAPES as readonly string[]).includes(value)
+    ? (value as ViewerShape)
+    : undefined;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const EDGE = 0;

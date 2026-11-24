@@ -37,6 +37,8 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     noContent: text("share.viewer_no_content"),
     imageOmitted: text("share.viewer_image_omitted"),
     imageSource: text("share.viewer_image_source_0"),
+    attachmentDownload: text("share.viewer_attachment_download_0"),
+    attachmentNotIncluded: text("share.viewer_attachment_not_included"),
     resizePanel: text("share.viewer_resize_panel"),
     outline: text("share.viewer_outline"),
     untitledMap: text("share.viewer_untitled"),

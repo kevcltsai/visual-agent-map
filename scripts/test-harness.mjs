@@ -147,7 +147,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   if (!isOwnerVault(vault, owner)) ensureNativeMenusOff(vault);
   // Identical verified files need no copy. Still validate settings/fixtures and update
   // the source record atomically when preview/verification or runtime identity changed.
-  if (JSON.stringify(hashes(artifact)) === JSON.stringify(record.hashes)) {
+  if ([recordPath, ...assets.map(name => join(plugin, name))].every(path => existsSync(path) && lstatSync(path).isFile() && !lstatSync(path).isSymbolicLink()) && JSON.stringify(hashes(artifact)) === JSON.stringify(record.hashes)) {
     let verified;
     try { verified = verifyTestVault(vault, artifact, owner); } catch { /* repair via normal staging */ }
     if (verified) {
@@ -480,7 +480,7 @@ function sessionMainLocked(args, vault, mode) {
   if (reload) {
     ensureSessionProfile(vault, runtime, { running: true });
     return reloadSessionVault({ vault, source, checkCandidate }).then(record => {
-    process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
+      process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
     });
   }
   const record = timedSync("install", () => exists

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -565,6 +565,9 @@ test('owner install reuses full CI only for the exact clean landed commit with m
   const sha = git('rev-parse', 'HEAD');
   const lookup = (dir, candidate) => { assert.equal(dir, checkout); assert.equal(candidate, sha); return '12345'; };
   assert.deepEqual(greenInstallRun(checkout, lookup), { sha, id: '12345' });
+  git('update-index', '--assume-unchanged', 'a.txt');
+  assert.equal(greenInstallRun(checkout, () => { throw new Error('must not look up hidden source'); }), null);
+  git('update-index', '--no-assume-unchanged', 'a.txt');
   assert.equal(greenInstallRun(checkout, () => { throw new Error('no full green CI'); }), null);
   assert.equal(greenInstallRun(checkout, () => 'not a run id'), null);
   for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', viewer, 'new.ts']) {
@@ -758,10 +761,11 @@ test('same session bytes skip asset replacement but update preview verification 
   prepareTestVault({ vault, source: previous });
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
   const file = join(plugin, 'main.js');
-  const before = readFileSync(file);
+  const before = readFileSync(file), inode = statSync(file).ino;
   const current = { fingerprint: 'same', verification: { kind: 'local-full' } };
   assert.deepEqual(updateCurrentTestVault({ vault, source: current }).source, current);
   assert.deepEqual(readFileSync(file), before);
+  assert.equal(statSync(file).ino, inode, 'same bytes were not replaced');
   assert.deepEqual(verifyTestVault(vault).source, current);
   writeFileSync(file, 'tampered');
   updateCurrentTestVault({ vault, source: current });
@@ -903,4 +907,43 @@ test('session runtime profile reuses matching bytes, refuses running mismatch an
   assert.equal(readFileSync(asar, 'utf8'), 'tampered');
   ensureSessionProfile(vault, runtime);
   assert.deepEqual(readFileSync(asar), bytes);
+});
+
+test('session reload CDP guard really executes: only an idle correct instance is unloaded', async () => {
+  const id = 'visual-agent-map', empty = () => new Map();
+  const setup = () => {
+    const plugin = {
+      repo: {}, unloaded: false, queue: Promise.resolve(), ready: Promise.resolve(), writing: 0,
+      pendingRenames: null, externalReconcileTimer: null, languageSwitchPending: false,
+      running: empty(), activeTasks: empty(), chartJobs: empty(), quickExpandPending: empty(),
+      expansionBatches: empty(), pendingSuggestions: empty(), pendingResearchOptions: empty(), externalReconcilePaths: empty(),
+      bookPipelineRuns: { drives: empty(), gateWaiting: empty(), notesJobs: empty() },
+      argumentRuns: { drives: empty() }, bookNotesApply: { jobs: empty() },
+      coffeeManager: { engines: empty(), deletingIds: empty() }
+    };
+    const calls = [], plugins = { enabledPlugins: new Set([id]), plugins: { [id]: plugin } };
+    plugins.disablePlugin = async key => { calls.push(key); delete plugins.plugins[key]; };
+    const context = { app: { vault: { adapter: { basePath: '/test' } }, plugins }, document: { querySelector: () => null },
+      require: () => ({ ipcRenderer: { sendSync: () => '1.14.0' } }), setTimeout };
+    return { plugin, calls, context };
+  };
+  const execute = state => vm.runInNewContext(sessionDisableExpression('/test', '1.14.0'), state.context);
+  const idle = setup();
+  assert.equal((await execute(idle)).status, 'disabled');
+  assert.deepEqual(idle.calls, [id]);
+  for (const alter of [
+    s => s.plugin.activeTasks.set('ai', {}),
+    s => s.plugin.bookPipelineRuns.drives.set('book', {}),
+    s => s.plugin.writing = 1,
+    s => s.plugin.queue = new Promise(() => {}),
+    s => delete s.plugin.chartJobs,
+    s => s.context.document.querySelector = () => ({}),
+    s => s.context.app.vault.adapter.basePath = '/other',
+    s => s.context.require = () => ({ ipcRenderer: { sendSync: () => '1.13.0' } })
+  ]) {
+    const state = setup();
+    alter(state);
+    assert.notEqual((await execute(state)).status, 'disabled');
+    assert.deepEqual(state.calls, []);
+  }
 });

@@ -999,7 +999,7 @@ test('share exporter embeds: embedded notes are read from the vault (whole, head
   const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
   const detail = '![[Src]]\n\n![[Src#H]]\n\n![[Src#^b1]]\n\n![[Src#Nope]]\n\n![[A]]\n\n![[Data.csv]]\n\n![[Agent/Hidden]]';
   const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
-  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Maps/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
   let markdown = '';
   exporter.renderOne = async (md, titles, ids, embeds) => {
     markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, assets: exporter.registry }).markdown;
@@ -1141,7 +1141,7 @@ test('sharing export R2: embeds inside %% and <!-- --> comments are never read',
   const app = { vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; } }, metadataCache: { getFirstLinkpathDest: (ref) => files[`Folder/${ref}.md`] ?? null } };
   const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
   const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
-  const exporter = new module.ShareExporter(app, { map, notes: new Map(), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const exporter = new module.ShareExporter(app, { map, notes: new Map(), mapPath: 'Maps/M/Map.md' }, { vamVersion: '1', language: 'en' });
   const embeds = await exporter.readEmbeds('%% ![[Draft]] %%\n\nx <!-- ![[Draft]] --> y\r\n%%\r\n![[Draft]]\r\n%%', 'Folder/A.md', 'a', 0);
   assert.equal(embeds.size, 0);
   assert.deepEqual(reads, []);
@@ -1154,7 +1154,8 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
   const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
   const clean = load('experiences/sharing/share-clean.ts');
   const list = [
-    { path: 'Agent/Topics/M/Notes/Src.md', extension: 'md', name: 'Src.md', text: 'Map body', stat: { size: 8 } },
+    { path: 'Agent/Topics/M/Notes/Src.md', extension: 'md', name: 'Src.md', text: '## Prompt\n\nINTERNAL-PROMPT-TEXT\n\n## Detail\n\nMap body', stat: { size: 8 } },
+    { path: 'Agent/Topics/M/Unassigned/Loose.md', extension: 'md', name: 'Loose.md', text: 'UNASSIGNED-NOTE-TEXT', stat: { size: 8 } },
     { path: 'Agent/Topics/Other/Notes/X.md', extension: 'md', name: 'X.md', text: 'OTHER-MAP-SECRET', stat: { size: 16 } },
     { path: 'Agent/Topics/M/Attachments/s.pdf', extension: 'pdf', name: 's.pdf', stat: { size: 3 } },
     { path: 'Agent/Records/r.pdf', extension: 'pdf', name: 'r.pdf', stat: { size: 3 } },
@@ -1163,25 +1164,28 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
     { path: 'Agent/Topics/M/Chats/topics/t1.jsonl', extension: 'jsonl', name: 't1.jsonl', stat: { size: 30 } },
     { path: 'Agent/Topics/M/Chats/records/Talk.md', extension: 'md', name: 'Talk.md', text: 'CHAT-RECORD-SECRET', stat: { size: 18 } }
   ];
-  const byKey = { Src: list[0], X: list[1], 's.pdf': list[2], 'r.pdf': list[3], 'board.canvas': list[4], 'c1.jsonl': list[5], 't1.jsonl': list[6], Talk: list[7] };
+  const byKey = { Loose: list[1], Src: list[0], X: list[2], 's.pdf': list[3], 'r.pdf': list[4], 'board.canvas': list[5], 'c1.jsonl': list[6], 't1.jsonl': list[7], Talk: list[8] };
   const reads = [];
   const app = {
     vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; }, readBinary: async () => new TextEncoder().encode('ABC').buffer, getFileByPath: path => list.find(file => file.path === path) ?? null },
     metadataCache: { getFirstLinkpathDest: ref => byKey[ref] ?? null }
   };
   const node = { id: 'a', path: 'Agent/Topics/M/Notes/A.md', parentId: null, x: 0, y: 0, collapsed: false };
-  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
-  const detail = '![[Src]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
-  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const srcCard = { id: 's', path: 'Agent/Topics/M/Notes/Src.md', parentId: 'a', x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node, srcCard] };
+  const detail = '![[Src]]\n\n![[Loose]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }], ['s', { title: 'Src', summary: 'S', status: 'idea', model: '', detail: 'Map body' }]]);
   const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Agent/Topics/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
   let markdown = '';
   exporter.renderOne = async (md, titles, ids, embeds) => {
-    markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, attachmentOf: ref => exporter.registerFile(ref, node.path), assets: exporter.registry }).markdown;
+    markdown += clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, attachmentOf: ref => exporter.registerFile(ref, node.path), assets: exporter.registry }).markdown;
     return { html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: [], mermaidUndrawn: 0, mermaidBlocked: 0 };
   };
   await exporter.ensureRendered({ generation: 0, signal: new AbortController().signal, isCurrent: () => true }, () => {});
-  assert.deepEqual([...new Set(reads)], ['Agent/Topics/M/Notes/Src.md'], 'only the shared map\'s own note is read');
+  assert.deepEqual([...new Set(reads)], [], 'a card note comes from the card detail; nothing in the map folder is read raw');
   assert.ok(markdown.includes('> Map body'), markdown);
+  assert.equal(markdown.includes('INTERNAL-PROMPT-TEXT'), false, 'an embedded card never shows its Prompt section');
+  assert.equal(markdown.includes('UNASSIGNED-NOTE-TEXT'), false, 'a non-card VAM note in the map folder shows its title only');
   assert.equal(markdown.includes('OTHER-MAP-SECRET'), false);
   assert.equal(markdown.includes('CHAT-RECORD-SECRET'), false, 'a chat record note in the map folder is not embedded');
   const files = [...exporter.files.values()];

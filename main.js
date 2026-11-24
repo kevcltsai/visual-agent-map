@@ -111314,7 +111314,7 @@ ${detail}`;
    * folder are left out, so the cleaner shows their title only.
    */
   async readEmbeds(detail, fromPath, topicId, firstIndex) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const found = /* @__PURE__ */ new Map();
     const isInternal = (path) => this.isInternalFile(path);
     const drop = (_a2 = this.dropped.get(topicId)) != null ? _a2 : /* @__PURE__ */ new Set();
@@ -111333,7 +111333,11 @@ ${detail}`;
       const file = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
       if (!file || file.extension !== "md" || file.path === fromPath) continue;
       if (isInternal(file.path)) continue;
-      let content = extractEmbedContent(await this.app.vault.cachedRead(file), hash < 0 ? "" : target.slice(hash + 1));
+      const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
+      const card = this.source.map.nodes.find((node) => node.path === file.path);
+      if (!card && mapFolder && file.path.startsWith(`${mapFolder}/`)) continue;
+      const text12 = card ? (_d = (_c = this.source.notes.get(card.id)) == null ? void 0 : _c.detail) != null ? _d : "" : await this.app.vault.cachedRead(file);
+      let content = extractEmbedContent(text12, hash < 0 ? "" : target.slice(hash + 1));
       if (!content) continue;
       const figures = figuresOf(content);
       for (const figure of figures)

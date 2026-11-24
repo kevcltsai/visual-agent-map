@@ -1099,3 +1099,28 @@ test('sharing acceptance fix: long extensions such as .canvas are attachments, n
   assert.ok(anchored.includes('![[Here/my doc.pdf]]'), anchored);
   assert.ok(anchored.includes('![[Here/board.canvas]]'), anchored);
 });
+
+// ---- share-export leftovers ----
+test('leftover 03: a wikilink inside an author-written HTML attribute leaves no invisible mark and no link', () => {
+  const md = markdownOf('<span title="see [[Water]] here">x</span>', target => (target === 'Water' ? 'water' : undefined));
+  const html = applyLinks(md, ['water']);
+  assert.equal(/[-]/.test(html), false, 'no private-use character anywhere in the output');
+  assert.ok(html.includes('title="see Water in food here"'), html);
+  assert.equal(html.includes('vam-node-link'), false, 'an attribute never becomes a link');
+});
+
+test('leftover 01: an inline embed inside a list item stays in that list item', () => {
+  const out = clean.cleanShareMarkdown('- before ![[Other]] after\n- next', { titleOf: () => undefined, embedOf: t => (t === 'Other' ? 'Embedded body' : undefined), assets: clean.createAssetRegistry() }).markdown;
+  const lines = out.split('\n');
+  const first = lines.findIndex(line => line.startsWith('- before'));
+  const next = lines.findIndex(line => line.startsWith('- next'));
+  assert.ok(first >= 0 && next > first, out);
+  for (const line of lines.slice(first + 1, next)) assert.ok(line === '' || /^ {2,}/.test(line), `continuation line is indented under the item: ${JSON.stringify(line)}`);
+  assert.ok(lines.slice(first + 1, next).some(line => /^ {2,}> Embedded body$/.test(line)), out);
+  assert.ok(lines.slice(first + 1, next).some(line => /^ {2,}after$/.test(line)), out);
+});
+
+test('leftover 01: an inline embed in a plain paragraph keeps its old block shape', () => {
+  const out = clean.cleanShareMarkdown('before ![[Other]] after', { titleOf: () => undefined, embedOf: t => (t === 'Other' ? 'Body' : undefined), assets: clean.createAssetRegistry() }).markdown;
+  assert.ok(out.includes('\n\n> [!vam-embed] Other\n> Body\n\n'), out);
+});

@@ -118,7 +118,11 @@ export function dropWritebackBackupLines(text: string): string {
 }
 
 /** `> [!vam-embed] title` and the cleaned content quoted under it, as its own block. One level: the content is cleaned without embeds. */
-function embedBox(title: string, content: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
+/**
+ * `indent` is the continuation indent of the list item the embed sits in ("" outside a list): the box and the text after it
+ * stay inside that item instead of ending the list.
+ */
+function embedBox(title: string, content: string, ctx: ShareCleanContext, out: ShareCleanResult, indent = ""): string {
   const inner = cleanShareMarkdown(content, { ...ctx, embedOf: undefined });
   for (const item of inner.attachments)
     if (!out.attachments.some(known => known.name === item.name)) out.attachments.push(item);
@@ -127,8 +131,15 @@ function embedBox(title: string, content: string, ctx: ShareCleanContext, out: S
   const quoted = inner.markdown
     .trim()
     .split("\n")
-    .map(line => (line ? `> ${line}` : ">"));
-  return `\n\n> [!vam-embed] ${label}\n${quoted.join("\n")}\n\n`;
+    .map(line => `${indent}${line ? `> ${line}` : ">"}`);
+  return `\n\n${indent}> [!vam-embed] ${label}\n${quoted.join("\n")}\n\n${indent}`;
+}
+
+/** The continuation indent of the list item that `at` sits on (`- `, `1. `, nested), or "" when the line is not a list item. */
+function listIndentAt(text: string, at: number): string {
+  const line = text.slice(text.lastIndexOf("\n", at - 1) + 1, at);
+  const item = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+/.exec(line);
+  return item ? " ".repeat(item[0].replace(/\t/g, "    ").length) : "";
 }
 
 /** `hidden`: the text is inside a `%%`/`<!--` comment, which the renderer hides: embeds there are not expanded, read or registered. */
@@ -155,7 +166,8 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       alt: string | undefined,
       src: string | undefined,
       label: string | undefined,
-      href: string | undefined
+      href: string | undefined,
+      at: number
     ) => {
       if ((embed !== undefined || src !== undefined) && hidden) return all;
       if (embed !== undefined) {
@@ -172,7 +184,7 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
           return card ? markAttachment(card, file) : file;
         }
         const content = ctx.embedOf?.(target);
-        if (content?.trim()) return embedBox(titleFor(target), content, ctx, out);
+        if (content?.trim()) return embedBox(titleFor(target), content, ctx, out, listIndentAt(text, at));
         return escapeMd(titleFor(target));
       }
       if (link !== undefined) {

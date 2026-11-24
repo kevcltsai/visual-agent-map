@@ -1173,7 +1173,7 @@ test('share exporter acceptance fix: the shared map\'s own folder is content eve
   const node = { id: 'a', path: 'Agent/Topics/M/Notes/A.md', parentId: null, x: 0, y: 0, collapsed: false };
   const srcCard = { id: 's', path: 'Agent/Topics/M/Notes/Src.md', parentId: 'a', x: 0, y: 0, collapsed: false };
   const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node, srcCard] };
-  const detail = '![[Src]]\n\n![[Loose]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
+  const detail = '![[Src]]\n\n![[Src#Prompt]]\n\n![[Src#prompt]]\n\n![[Loose]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
   const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }], ['s', { title: 'Src', summary: 'S', status: 'idea', model: '', detail: 'Map body' }]]);
   const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Agent/Topics/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
   let markdown = '';

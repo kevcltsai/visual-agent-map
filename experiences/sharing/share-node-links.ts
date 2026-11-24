@@ -70,6 +70,16 @@ export function applyNodeLinks(
     }
   };
   walk(root);
+  // A mark inside an attribute an author wrote (`<span title="[[Note]]">`) never becomes a link: its label stays as plain text.
+  const clearAttributes = (element: Element): void => {
+    for (const name of element.getAttributeNames()) {
+      const value = element.getAttribute(name) ?? "";
+      if (HAS_MARK.test(value))
+        element.setAttribute(name, stripNodeLinkMarks(value.replace(MARKED, (_all, _start, label: string) => label)));
+    }
+    for (const child of Array.from(element.children)) clearAttributes(child);
+  };
+  clearAttributes(root);
   // Only the cleaner's own YouTube links carry the video mark; a class an author wrote by hand never survives.
   for (const link of links) {
     const kept = (link.getAttribute("class") ?? "").split(/\s+/).filter(name => name && name !== VIDEO_LINK_CLASS);

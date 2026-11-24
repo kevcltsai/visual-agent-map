@@ -2530,6 +2530,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.copy_technical_details": "复制技术细节",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的地图・只读",
+  "share.embed_title_0": "嵌入：{0}",
   "share.viewer_made_with": "由 VAM 制作",
   "share.viewer_install": "安装 VAM",
   "share.viewer_goal_0": "目标：{0}",

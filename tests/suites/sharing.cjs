@@ -830,3 +830,49 @@ test('share node links: the generated link carries only href and class', () => {
   assert.equal(link.localName, 'a');
   assert.deepEqual([...link.attrs.keys()].sort(), ['class', 'href']);
 });
+
+// ---- P4: inline note embeds ----
+const embeds = load('experiences/sharing/share-embeds.ts');
+const NOTE = '---\ntitle: Source\n---\nIntro line\n\n# Top\nTop text\n## Part A\nA text ![[Other]] and ![[pic.png]]\n### Deep\nDeep text\n## Part B\nB text\n\nA block para ^blk1\n\n- item one ^li1\n  - child\n- item two\n';
+const embedCtx = (map, extra = {}) => ({ titleOf: t => ({ Source: 'Source Title', Other: 'Other Title' })[t], assets: clean.createAssetRegistry(), embedOf: t => map[t], ...extra });
+
+test('sharing embeds: whole note without frontmatter, heading section to the next same-or-higher heading, block paragraph and list item', () => {
+  const whole = embeds.extractEmbedContent(NOTE, '');
+  assert.ok(whole.startsWith('Intro line') && !whole.includes('title: Source'));
+  assert.equal(embeds.extractEmbedContent(NOTE, 'Part A'), '## Part A\nA text [[Other]] and ![[pic.png]]\n### Deep\nDeep text');
+  assert.equal(embeds.extractEmbedContent(NOTE, 'part   b'), '## Part B\nB text\n\nA block para ^blk1\n\n- item one ^li1\n  - child\n- item two', 'case and spacing are ignored; the section runs to the end');
+  assert.equal(embeds.extractEmbedContent(NOTE, '^blk1'), 'A block para');
+  assert.equal(embeds.extractEmbedContent(NOTE, '^li1'), '- item one\n  - child');
+  assert.equal(embeds.extractEmbedContent(NOTE, 'Missing'), undefined);
+  assert.equal(embeds.extractEmbedContent(NOTE, '^nope'), undefined);
+  assert.equal(embeds.extractEmbedContent('```\n# Not heading\n```\n# Real\nx', 'Not heading'), undefined, 'a # line in a code fence is not a heading');
+  assert.equal(embeds.extractEmbedContent('---\na: 1\n---\n', ''), undefined, 'an empty note shows nothing');
+  assert.equal(embeds.extractEmbedContent('Line one\r\n\r\nPara ^b\r\n', '^b'), 'Para', 'CRLF');
+});
+
+test('sharing embeds: the cleaner puts the content in a vam-embed callout; nested note embeds become titles, images stay', () => {
+  const content = embeds.extractEmbedContent(NOTE, 'Part A');
+  const out = clean.cleanShareMarkdown('Before\n\n![[Source#Part A]]\n\nAfter', embedCtx({ 'Source#Part A': content }, { embedTitle: t => `Embedded: ${t}` }));
+  assert.equal(out.markdown, 'Before\n\n\n\n> [!vam-embed] Embedded: Source Title\n> ## Part A\n> A text Other Title and ![](vam-asset:image-1)\n> ### Deep\n> Deep text\n\n\n\nAfter');
+  assert.deepEqual(plain(out.attachments), [{ ref: 'pic.png', name: 'image-1' }]);
+});
+
+test('sharing embeds: no content (self, cycle, not found) keeps the title only; an embed in the middle of a line is cut into its own block', () => {
+  assert.equal(clean.cleanShareMarkdown('See ![[Source]] now', embedCtx({})).markdown, 'See Source Title now');
+  const mid = clean.cleanShareMarkdown('See ![[Source]] now', embedCtx({ Source: 'Body' })).markdown;
+  assert.match(mid, /^See \n\n> \[!vam-embed\] Source Title\n> Body\n\n now$/);
+});
+
+test('sharing embeds: embedded content gets the same cleaning (private links, local reference definitions, writeback lines, marks), and the embed does not recurse', () => {
+  const body = 'Link [[private/Path/Secret]] and [x](Private/Folder/y.md)\n\n[ref]: Private/z.md\n\n![[Other]]';
+  const out = clean.cleanShareMarkdown('![[Source]]', embedCtx({ Source: embeds.extractEmbedContent(body, '') }, { embedOf: t => ({ Source: embeds.extractEmbedContent(body, ''), Other: 'LOOP' })[t] }));
+  assert.ok(!out.markdown.includes('private/Path') && !out.markdown.includes('Private/') && !out.markdown.includes('LOOP'), out.markdown);
+  assert.match(out.markdown, /> Link Secret and x/);
+  assert.match(out.markdown, /> Other Title/);
+});
+
+test('sharing embeds: the embed box title and content survive a script or iframe in the embedded text only as text that the scrub later drops (leak scan has nothing to find)', () => {
+  const out = clean.cleanShareMarkdown('![[Source]]', embedCtx({ Source: '<script>alert(1)</script>\n\n<iframe src="https://evil.example"></iframe>' }));
+  assert.match(out.markdown, /> <script>alert\(1\)<\/script>/);
+  assert.match(out.markdown, /\[!vam-embed\]/);
+});

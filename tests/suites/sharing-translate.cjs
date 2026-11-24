@@ -711,3 +711,8 @@ test('share translate compact: an in-map note link survives the rebuild with onl
   assert.ok(out.includes('T:Salt the water'), 'the text around the link is translated');
   assert.equal((out.match(/<a /g) ?? []).length, 1);
 });
+
+test('share translate segments: the embed box title and its text are units like any callout', () => {
+  const units = segments.extractSegments(html.parse('<div class="callout" data-callout="vam-embed"><div class="callout-title"><div class="callout-title-inner">Embedded: Source</div></div><div class="callout-content"><p>Embedded body text</p></div></div>')).units.map(unit => unit.text);
+  assert.ok(units.includes('Embedded: Source') && units.includes('Embedded body text'));
+});

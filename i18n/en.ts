@@ -2711,6 +2711,7 @@ export const en = {
   "ui.copy_technical_details": "Copy technical details",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map · read-only",
+  "share.embed_title_0": "Embedded: {0}",
   "share.viewer_made_with": "Made with VAM",
   "share.viewer_install": "Install VAM",
   "share.viewer_goal_0": "Goal: {0}",

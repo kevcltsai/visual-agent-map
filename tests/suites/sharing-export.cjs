@@ -967,3 +967,46 @@ test('share exporter complete: a map without new data keeps its payload, and a v
   assert.equal(result.leakCategories.length, 0);
   assert.equal(harness.serialised(result).includes('Gone/x.png'), false);
 });
+
+// ---- P4: inline note embeds ----
+test('share dom: a vam-embed callout keeps its type and its content; a work record or plan block inside the embedded content is dropped, the rest kept', () => {
+  const record = el('div', { class: 'callout', 'data-callout': 'vam-book' }, [el('p', {}, [], 'record')]);
+  const inner = el('div', { class: 'callout-content' }, [el('p', {}, [], 'embedded text'), record]);
+  const box = el('div', { class: 'callout', 'data-callout': 'vam-embed' }, [el('div', { class: 'callout-title' }, [el('div', { class: 'callout-title-inner' }, [], 'Embedded: T')]), inner]);
+  const root = el('div', {}, [box]);
+  assert.equal(dom.dropHiddenContent(root), 1);
+  dom.scrubShareTree(root, { allowStyle: true });
+  assert.equal(root.children[0].getAttribute('data-callout'), 'vam-embed');
+  assert.deepEqual(plain(tags(root).filter(name => name === 'p')), ['p']);
+});
+
+test('share exporter embeds: embedded notes are read from the vault (whole, heading, block), only Markdown notes of the vault, never the note itself, and render through the cleaner', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const clean = load('experiences/sharing/share-clean.ts');
+  const files = { 'Folder/Src.md': { path: 'Folder/Src.md', extension: 'md', text: '---\nk: v\n---\nWhole body\n\n## H\nHeading body\n\nBlock text ^b1\n' }, 'Folder/Data.csv': { path: 'Folder/Data.csv', extension: 'csv', text: 'a,b' }, 'Agent/Hidden.md': { path: 'Agent/Hidden.md', extension: 'md', text: 'internal' } };
+  const reads = [];
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; } },
+    metadataCache: { getFirstLinkpathDest: (ref, from) => files[`Folder/${ref}.md`] ?? files[ref] ?? files[`${ref}.md`] ?? null }
+  };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const detail = '![[Src]]\n\n![[Src#H]]\n\n![[Src#^b1]]\n\n![[Src#Nope]]\n\n![[A]]\n\n![[Data.csv]]\n\n![[Agent/Hidden]]';
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  let markdown = '';
+  exporter.renderOne = async (md, titles, ids, embeds) => {
+    markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, assets: exporter.registry }).markdown;
+    return { html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], mermaidUndrawn: 0, mermaidBlocked: 0 };
+  };
+  await exporter.ensureRendered({ generation: 0, signal: new AbortController().signal, isCurrent: () => true }, () => {});
+  assert.deepEqual([...new Set(reads)], ['Folder/Src.md'], 'only the one vault note is read (once per target as written)');
+  assert.ok(markdown.includes('> [!vam-embed] Embedded: Src\n> Whole body'), markdown);
+  assert.ok(!markdown.includes('k: v'), 'frontmatter is not shown');
+  assert.ok(markdown.includes('> ## H\n> Heading body'));
+  assert.ok(markdown.includes('> [!vam-embed] Embedded: Src\n> Block text\n'));
+  assert.equal((markdown.match(/\[!vam-embed\]/g) ?? []).length, 3, 'a missing heading, the note itself, a non-Markdown file and an internal folder give no box');
+  assert.ok(markdown.includes('Nope') || markdown.includes('Src'), 'the missing heading keeps its title');
+  assert.ok(markdown.includes('Data.csv') && markdown.includes('Hidden'));
+});

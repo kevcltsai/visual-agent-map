@@ -2530,6 +2530,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.copy_technical_details": "複製技術細節",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的心智圖・唯讀",
+  "share.embed_title_0": "嵌入：{0}",
   "share.viewer_made_with": "由 VAM 製作",
   "share.viewer_install": "安裝 VAM",
   "share.viewer_goal_0": "目標：{0}",

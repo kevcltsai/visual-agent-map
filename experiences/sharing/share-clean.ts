@@ -15,6 +15,14 @@ export interface ShareCleanContext {
   titleOf(target: string): string | undefined;
   /** The id of the map card a link target points at, if it is one; the link then becomes an in-map link (share-node-links.ts). */
   nodeIdOf?(target: string): string | undefined;
+  /**
+   * The Markdown a note embed (`![[note]]`, `note#Heading`, `note#^block`; the target as written) shows, if it can be shown
+   * (share-embeds.ts, read by the exporter beforehand). Absent or undefined: the embed becomes its title. An embed in the
+   * middle of a line is cut out of it into its own block.
+   */
+  embedOf?(target: string): string | undefined;
+  /** The callout title of an embed box for a note title (default: the title alone). */
+  embedTitle?(title: string): string;
   /** Shared across the notes of one export so the same file gets the same asset name. */
   assets: AssetRegistry;
 }
@@ -104,6 +112,20 @@ export function dropWritebackBackupLines(text: string): string {
     .join("\n");
 }
 
+/** `> [!vam-embed] title` and the cleaned content quoted under it, as its own block. One level: the content is cleaned without embeds. */
+function embedBox(title: string, content: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
+  const inner = cleanShareMarkdown(content, { ...ctx, embedOf: undefined });
+  for (const item of inner.attachments)
+    if (!out.attachments.some(known => known.name === item.name)) out.attachments.push(item);
+  out.webImages.push(...inner.webImages);
+  const label = escapeMd(ctx.embedTitle ? ctx.embedTitle(title) : title).replace(/\s+/g, " ");
+  const quoted = inner.markdown
+    .trim()
+    .split("\n")
+    .map(line => (line ? `> ${line}` : ">"));
+  return `\n\n> [!vam-embed] ${label}\n${quoted.join("\n")}\n\n`;
+}
+
 function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
   const attach = (ref: string): string => {
     const decoded = decodeRef(ref.trim());
@@ -138,6 +160,8 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
         }
         if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart))
           return escapeMd(pathPart.split("/").pop() ?? pathPart);
+        const content = ctx.embedOf?.(target);
+        if (content?.trim()) return embedBox(titleFor(target), content, ctx, out);
         return escapeMd(titleFor(target));
       }
       if (link !== undefined) {

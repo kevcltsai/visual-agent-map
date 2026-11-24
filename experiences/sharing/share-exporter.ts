@@ -5,12 +5,14 @@ import {
   MarkdownRenderer,
   normalizePath,
   sanitizeHTMLToDom,
-  type App
+  type App,
+  type TFile
 } from "obsidian";
 import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
+import { extractEmbedContent } from "./share-embeds";
 import { applyNodeLinks } from "./share-node-links";
 import {
   assertCurrent,
@@ -456,7 +458,10 @@ export class ShareExporter {
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
-      const result = await this.renderOne(this.renderSource(node.id), titles, nodeIds, ticket);
+      const detail = this.renderSource(node.id);
+      const embeds = await this.readEmbeds(detail, node.path);
+      assertCurrent(ticket);
+      const result = await this.renderOne(detail, titles, nodeIds, embeds, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
@@ -466,15 +471,44 @@ export class ShareExporter {
     onProgress({ phase: "render", done: total, total });
   }
 
+  /**
+   * The text each `![[note]]`, `![[note#Heading]]` or `![[note#^block]]` of a note shows, by the target as written. Only
+   * Markdown notes of the vault count; the note itself (a cycle), a missing note, heading or block, and a vault-internal
+   * folder are left out, so the cleaner shows their title only.
+   */
+  private async readEmbeds(detail: string, fromPath: string): Promise<Map<string, string>> {
+    const found = new Map<string, string>();
+    const internal = this.config.internalFolders ?? [];
+    for (const match of detail.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
+      const target = match[1].split(/\\?\|/)[0].trim();
+      if (found.has(target)) continue;
+      const hash = target.indexOf("#");
+      const linkPath = (hash < 0 ? target : target.slice(0, hash)).trim();
+      if (!linkPath || (/\.[a-z0-9]{1,5}$/i.test(linkPath) && !/\.md$/i.test(linkPath))) continue;
+      const file: TFile | null = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
+      if (!file || file.extension !== "md" || file.path === fromPath) continue;
+      if (internal.some(folder => file.path === folder || file.path.startsWith(`${folder}/`))) continue;
+      const content = extractEmbedContent(
+        await this.app.vault.cachedRead(file),
+        hash < 0 ? "" : target.slice(hash + 1)
+      );
+      if (content) found.set(target, content);
+    }
+    return found;
+  }
+
   private async renderOne(
     detail: string,
     titles: Map<string, string>,
     nodeIds: Map<string, string>,
+    embeds: ReadonlyMap<string, string>,
     ticket: BuildTicket
   ): Promise<RenderedNote> {
     const cleaned = cleanShareMarkdown(detail, {
       titleOf: target => titles.get(target),
       nodeIdOf: target => nodeIds.get(target),
+      embedOf: target => embeds.get(target),
+      embedTitle: title => translate(this.config.language, "share.embed_title_0", title),
       assets: this.registry
     });
     const host = this.host().createDiv();

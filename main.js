@@ -2472,6 +2472,7 @@ var en = {
   "ui.copy_technical_details": "Copy technical details",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
+  "share.embed_title_0": "Embedded: {0}",
   "share.viewer_made_with": "Made with VAM",
   "share.viewer_install": "Install VAM",
   "share.viewer_goal_0": "Goal: {0}",
@@ -5895,6 +5896,7 @@ var zhCN = {
   "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
+  "share.embed_title_0": "\u5D4C\u5165\uFF1A{0}",
   "share.viewer_made_with": "\u7531 VAM \u5236\u4F5C",
   "share.viewer_install": "\u5B89\u88C5 VAM",
   "share.viewer_goal_0": "\u76EE\u6807\uFF1A{0}",
@@ -9318,6 +9320,7 @@ var zhTW = {
   "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
+  "share.embed_title_0": "\u5D4C\u5165\uFF1A{0}",
   "share.viewer_made_with": "\u7531 VAM \u88FD\u4F5C",
   "share.viewer_install": "\u5B89\u88DD VAM",
   "share.viewer_goal_0": "\u76EE\u6A19\uFF1A{0}",
@@ -107412,6 +107415,20 @@ var WRITEBACK_BACKUP_LINE = (() => {
 function dropWritebackBackupLines(text11) {
   return text11.split("\n").filter((line3) => !WRITEBACK_BACKUP_LINE.test(line3)).join("\n");
 }
+function embedBox(title, content, ctx, out) {
+  const inner = cleanShareMarkdown(content, { ...ctx, embedOf: void 0 });
+  for (const item of inner.attachments)
+    if (!out.attachments.some((known) => known.name === item.name)) out.attachments.push(item);
+  out.webImages.push(...inner.webImages);
+  const label = escapeMd(ctx.embedTitle ? ctx.embedTitle(title) : title).replace(/\s+/g, " ");
+  const quoted2 = inner.markdown.trim().split("\n").map((line3) => line3 ? `> ${line3}` : ">");
+  return `
+
+> [!vam-embed] ${label}
+${quoted2.join("\n")}
+
+`;
+}
 function cleanSegment(text11, ctx, out) {
   const attach = (ref) => {
     const decoded3 = decodeRef(ref.trim());
@@ -107429,7 +107446,7 @@ function cleanSegment(text11, ctx, out) {
   return text11.replace(
     pattern,
     (all, embed, link, alt, src, label, href) => {
-      var _a2, _b2;
+      var _a2, _b2, _c;
       if (embed !== void 0) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
@@ -107439,13 +107456,15 @@ function cleanSegment(text11, ctx, out) {
         }
         if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart))
           return escapeMd((_a2 = pathPart.split("/").pop()) != null ? _a2 : pathPart);
+        const content = (_b2 = ctx.embedOf) == null ? void 0 : _b2.call(ctx, target);
+        if (content == null ? void 0 : content.trim()) return embedBox(titleFor(target), content, ctx, out);
         return escapeMd(titleFor(target));
       }
       if (link !== void 0) {
         const { target, alias } = splitWikilink(link);
         const text12 = escapeMd(stripNodeLinkMarks(alias != null ? alias : titleFor(target)));
         const pathPart = target.split("#")[0].trim();
-        const nodeId = pathPart ? (_b2 = ctx.nodeIdOf) == null ? void 0 : _b2.call(ctx, pathPart) : void 0;
+        const nodeId = pathPart ? (_c = ctx.nodeIdOf) == null ? void 0 : _c.call(ctx, pathPart) : void 0;
         return nodeId && text12 ? markNodeLink(nodeId, text12) : text12;
       }
       if (src !== void 0) {
@@ -108638,6 +108657,90 @@ function attachTranslations(payload, options) {
 // experiences/sharing/share-exporter.ts
 var import_obsidian47 = require("obsidian");
 
+// experiences/sharing/share-embeds.ts
+var FRONTMATTER2 = /^---[ \t]*\n[\s\S]*?\n(?:---|\.\.\.)[ \t]*(?:\n|$)/;
+var HEADING6 = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+var BLOCK_ID = /(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*$/;
+var sameHeading = (a, b) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+function stripFrontmatter(text11) {
+  return normalizeNewlines(text11).replace(FRONTMATTER2, "");
+}
+function proseLineFlags(text11) {
+  const ranges = markdownCodeRanges(text11);
+  const flags = [];
+  let at = 0;
+  for (const line3 of text11.split("\n")) {
+    flags.push(!ranges.some((range) => at >= range.start && at < range.end));
+    at += line3.length + 1;
+  }
+  return flags;
+}
+function headingSection(lines, prose, name2) {
+  let start = -1;
+  let level = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const match = prose[i] ? HEADING6.exec(lines[i]) : null;
+    if (!match) continue;
+    if (start < 0) {
+      if (sameHeading(match[2], name2)) {
+        start = i;
+        level = match[1].length;
+      }
+    } else if (match[1].length <= level) {
+      return lines.slice(start, i).join("\n").trim();
+    }
+  }
+  return start < 0 ? void 0 : lines.slice(start).join("\n").trim();
+}
+var indentOf2 = (line3) => {
+  var _a2, _b2;
+  return (_b2 = (_a2 = /^[ \t]*/.exec(line3)) == null ? void 0 : _a2[0].replace(/\t/g, "    ").length) != null ? _b2 : 0;
+};
+var isListItem = (line3) => /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/.test(line3);
+function blockById(lines, id) {
+  const at = lines.findIndex((line3) => {
+    var _a2;
+    return ((_a2 = BLOCK_ID.exec(line3)) == null ? void 0 : _a2[1]) === id;
+  });
+  if (at < 0) return void 0;
+  const marker3 = (line3) => line3.replace(BLOCK_ID, "").trimEnd();
+  if (isListItem(lines[at])) {
+    const base = indentOf2(lines[at]);
+    let end = at + 1;
+    while (end < lines.length && lines[end].trim() && indentOf2(lines[end]) > base) end++;
+    return [marker3(lines[at]), ...lines.slice(at + 1, end)].join("\n").trim();
+  }
+  const own2 = marker3(lines[at]).trim() === "";
+  let last = own2 ? at - 1 : at;
+  while (own2 && last >= 0 && !lines[last].trim()) last--;
+  if (last < 0) return void 0;
+  let first = last;
+  while (first > 0 && lines[first - 1].trim()) first--;
+  const block2 = lines.slice(first, last + 1);
+  if (!own2) block2[block2.length - 1] = marker3(lines[at]);
+  return block2.join("\n").trim();
+}
+function flattenNoteEmbeds(md) {
+  const ranges = markdownCodeRanges(md);
+  return md.replace(/!\[\[([^\]\n]+)\]\]/g, (all, inner, at) => {
+    if (ranges.some((range) => at >= range.start && at < range.end)) return all;
+    const path = inner.split("|")[0].split("#")[0].trim();
+    return /\.[a-z0-9]{1,5}$/i.test(path) && !/\.md$/i.test(path) ? all : `[[${inner}]]`;
+  });
+}
+function extractEmbedContent(noteText, subpath) {
+  var _a2;
+  const text11 = stripFrontmatter(noteText);
+  const lines = text11.split("\n");
+  const prose = proseLineFlags(text11);
+  const sub = subpath.trim();
+  let picked;
+  if (!sub) picked = text11.trim();
+  else if (sub.startsWith("^")) picked = blockById(lines, sub.slice(1));
+  else picked = headingSection(lines, prose, (_a2 = sub.split("#").pop()) != null ? _a2 : sub);
+  return picked ? flattenNoteEmbeds(picked) : void 0;
+}
+
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
   ja: {
@@ -109429,6 +109532,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .callout-icon { display: inline-flex; flex: none; }
 .vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }
 .vam-sample-detail .callout-content p:first-child { margin-top: 4px; }
+.vam-sample-detail .callout[data-callout="vam-embed"] { padding: 6px 10px; border-radius: 0 var(--radius-m) var(--radius-m) 0; background: var(--background-secondary); border-left: 3px solid var(--interactive-accent); }
+.vam-sample-detail .callout[data-callout="vam-embed"] .callout-title { font-weight: 400; font-size: 0.85em; color: var(--text-muted); }
+.vam-sample-detail .callout[data-callout="vam-embed"] .callout-icon { display: none; }
 .vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
@@ -109931,7 +110037,10 @@ ${detail}`;
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total: total2 });
-      const result = await this.renderOne(this.renderSource(node.id), titles, nodeIds, ticket);
+      const detail = this.renderSource(node.id);
+      const embeds = await this.readEmbeds(detail, node.path);
+      assertCurrent(ticket);
+      const result = await this.renderOne(detail, titles, nodeIds, embeds, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
@@ -109940,10 +110049,38 @@ ${detail}`;
     }
     onProgress({ phase: "render", done: total2, total: total2 });
   }
-  async renderOne(detail, titles, nodeIds, ticket) {
+  /**
+   * The text each `![[note]]`, `![[note#Heading]]` or `![[note#^block]]` of a note shows, by the target as written. Only
+   * Markdown notes of the vault count; the note itself (a cycle), a missing note, heading or block, and a vault-internal
+   * folder are left out, so the cleaner shows their title only.
+   */
+  async readEmbeds(detail, fromPath) {
+    var _a2;
+    const found = /* @__PURE__ */ new Map();
+    const internal = (_a2 = this.config.internalFolders) != null ? _a2 : [];
+    for (const match of detail.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
+      const target = match[1].split(/\\?\|/)[0].trim();
+      if (found.has(target)) continue;
+      const hash = target.indexOf("#");
+      const linkPath = (hash < 0 ? target : target.slice(0, hash)).trim();
+      if (!linkPath || /\.[a-z0-9]{1,5}$/i.test(linkPath) && !/\.md$/i.test(linkPath)) continue;
+      const file = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
+      if (!file || file.extension !== "md" || file.path === fromPath) continue;
+      if (internal.some((folder) => file.path === folder || file.path.startsWith(`${folder}/`))) continue;
+      const content = extractEmbedContent(
+        await this.app.vault.cachedRead(file),
+        hash < 0 ? "" : target.slice(hash + 1)
+      );
+      if (content) found.set(target, content);
+    }
+    return found;
+  }
+  async renderOne(detail, titles, nodeIds, embeds, ticket) {
     const cleaned = cleanShareMarkdown(detail, {
       titleOf: (target) => titles.get(target),
       nodeIdOf: (target) => nodeIds.get(target),
+      embedOf: (target) => embeds.get(target),
+      embedTitle: (title) => translate(this.config.language, "share.embed_title_0", title),
       assets: this.registry
     });
     const host = this.host().createDiv();

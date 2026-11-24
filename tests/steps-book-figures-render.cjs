@@ -27,14 +27,14 @@ test('builder: whitelisted tags only, svg namespace, attributes from the tree, t
     { tag: 'text', attrs: { x: 1, class: 'fig-text' }, text: '<img onerror=x>', children: [] },
     { tag: 'script', attrs: {}, children: [{ tag: 'rect', attrs: {}, children: [] }] },
     { tag: 'foreignObject', attrs: {}, children: [] },
-    { tag: 'rect', attrs: { x: 1, width: NaN, onclick: 'x()', href: 'javascript:1', style: 'a:b', 'xlink:href': 'u', class: 'fig-bar-0', fill: 'url(http://e)' }, children: [] }] };
-  const svg = reg.buildFigureElement(tree, doc);
+    { tag: 'rect', attrs: { x: 1, width: NaN, onclick: 'x()', href: 'javascript:1', style: 'a:b', 'xlink:href': 'u', class: 'fig-bar-0', fill: 'url(http://e)', 'data-x': 'a', foo: 'b' }, children: [] }] };
+  const svg = reg.buildFigureElement(tree, doc, 7);
   assert.equal(svg.ns, 'http://www.w3.org/2000/svg');
   const tags = all(svg).map(e => e.tag);
   assert.deepEqual([...tags], ['svg', 'text', 'rect']);
   assert.equal(svg.children[0].textContent, '<img onerror=x>');
   assert.deepEqual({ ...svg.children[1].attrs }, { x: '1', class: 'fig-bar-0' });
-  assert.equal(reg.buildFigureElement({ tag: 'script', attrs: {}, children: [] }, doc), undefined);
+  assert.equal(reg.buildFigureElement({ tag: 'script', attrs: {}, children: [] }, doc, 7), undefined);
 });
 
 test('render: a good figure becomes one svg with the figure class on the host; every layout tree passes through the whitelist untouched', () => {
@@ -56,4 +56,31 @@ test('render: a broken or unknown source shows the source as text plus one line,
     assert.equal(h.children[0].textContent, source);
     assert.ok(h.children[1].textContent.length > 0);
   }
+});
+
+test('builder: marker id and marker-end share a per-figure suffix; an unknown attribute name is dropped', () => {
+  const tree = { tag: 'svg', attrs: { viewBox: '0 0 1 1', bogus: '1' }, children: [
+    { tag: 'marker', attrs: { id: 'vam-ah' }, children: [] },
+    { tag: 'line', attrs: { 'marker-end': 'url(#vam-ah)' }, children: [] }] };
+  const svg = reg.buildFigureElement(tree, doc, 3);
+  assert.equal(svg.attrs.bogus, undefined);
+  assert.equal(svg.children[0].attrs.id, 'vam-ah-3');
+  assert.equal(svg.children[1].attrs['marker-end'], 'url(#vam-ah-3)');
+});
+
+test('render: the line after the block becomes the svg title; no section info or no caption gives none', () => {
+  const titleOf = h => all(h.children[0]).find(e => e.tag === 'title');
+  const ctx = (text, lineEnd) => ({ getSectionInfo: () => ({ text, lineStart: 0, lineEnd }) });
+  let h = host();
+  reg.renderFigure(GOOD, h, ctx('```vam-figure\nx\n```\n圖 1 營收\n', 2));
+  assert.equal(titleOf(h).textContent, '圖 1 營收');
+  assert.equal(h.children[0].attrs.role, 'img');
+  h = host(); reg.renderFigure(GOOD, h, ctx('```vam-figure\nx\n```\n', 2));
+  assert.equal(titleOf(h), undefined);
+  h = host(); reg.renderFigure(GOOD, h, { getSectionInfo: () => null });
+  assert.equal(titleOf(h), undefined);
+  h = host(); reg.renderFigure(GOOD, h, { getSectionInfo: () => { throw new Error('x'); } });
+  assert.equal(titleOf(h), undefined);
+  h = host(); reg.renderFigure(GOOD, h);
+  assert.equal(titleOf(h), undefined);
 });

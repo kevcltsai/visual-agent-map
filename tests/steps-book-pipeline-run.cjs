@@ -5964,6 +5964,15 @@ test('figure slots: a figure and a chart in one reply; a bad figure (unknown typ
   assert.doesNotMatch(log, /轉盤|25/);
 });
 
+test('figure slots: a number that only an old vam-figure fence holds does not count as text; the draft is rejected and nothing is written', async () => {
+  const old = '```vam-figure\n{"type":"bar","unit":"%","stacked":false,"groups":[{"label":"舊","values":[{"value":"99"}]}]}\n```';
+  const { r } = await diagRig({ base: `${DRAFT}\n\n${old}`, draw: () => [figDraft(1, { ...GOOD_FIGURE, groups: [{ label: '新', values: [{ value: '99' }] }] })] });
+  const detail = (await r.note(0)).detail;
+  assert.equal(detail.split('```vam-figure').length - 1, 1, 'only the old fence');
+  assert.doesNotMatch(detail, /"label":"新"/);
+  assert.match(r.stat.logs.find(l => l.includes('diagram_asked')), /diagram_rej_number_not_in_text/);
+});
+
 test('figure slots: a chapter without numbers keeps the slot not_found and the text unchanged', async () => {
   const { r } = await diagRig({ draw: () => [figDraft(1, GOOD_FIGURE)] });
   const detail = (await r.note(0)).detail;

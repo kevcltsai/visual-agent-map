@@ -3,6 +3,12 @@ The chapter (JSON string): {{chapter}}
 The positions (JSON array; "slot" is the position number, "kind" the kind of picture wanted, "shows" what it must show or explain): {{slots}}
 Draw at most one diagram for each position and never more diagrams than positions. Every word and number in a diagram must come from the chapter text; add no fact, cause or step the text does not state. Decline a position (leave it out of "diagrams") when the text cannot support the diagram, when the chapter already has a table or a mermaid diagram that shows the same content, or when the position needs a real photo, painting or map. Declining is a correct answer; forcing a diagram is worse than none.
 Choose between a chart and a figure by the content: boxes joined by arrows or stages go to a Mermaid chart; the figure types below go to a figure. Give each position either "mermaid" or "figure", never both.
+Choose the figure type by this rule, and prefer a figure to a chart whenever the text states the numbers:
+- The position compares quantities and the text gives the numbers (for example two years of revenue, two shares of a total): bar.
+- The numbers are values or a range on one axis (a confidence interval, a value an estimate approaches, thresholds): scale.
+- Nodes and links where the position of a node carries no meaning: graph.
+- A grid or rows of cells: board.
+When the text gives such numbers, a bar or a scale is the expected answer, not a chart and not a decline.
 Choose the chart type by the shape of the content. If none of these shapes fits, decline.
 - Stages ordered by time, temperature or degree (for example larva, pupa, adult): timeline, one time point per stage; stage names and numbers copied from the text.
 - A classification, composition, or "A splits into B and C": mindmap.
@@ -26,6 +32,11 @@ Figures: "figure" is an object whose "type" is one of the following; give only t
 - scale: a number line with points and ranges (for example a range of estimates, a value at a point). Fields: "unit" (optional), "min", "max" (the ends of the line, both written in the text), "marks":[{"label","at"} or {"label","from","to"}] at most 6, every position between min and max.
 - graph: things and the links between them (at most 8 nodes, 12 edges). Fields: "directed", "layout" ("circle" or "row"), "nodes":[{"id" (a short name only used to join edges),"label"}], "edges":[{"from","to","label" (optional)}]. Use it only when the picture is the links; refuse it when where each node sits would carry meaning (a map, a timeline, a hierarchy).
 - board: a grid of at most 10 rows and 10 columns, with some cells marked. Fields: "rows", "cols", "shade" ("checker" or "none"), "cells":[{"row","col","label" (optional),"cut" (optional, true for a removed cell)}] (rows and columns count from 1), "pairs":[{"a":[row,col],"b":[row,col],"label" (optional)}] (two neighbouring cells are drawn as one box, two far apart as an arc). The rows and columns must be numbers the text states; a single row of labelled cells is the exception (then "cols" is the number of labelled cells).
+Examples of the 4 types (generic, only to show the shape):
+{"type":"bar","unit":"%","stacked":false,"groups":[{"label":"A","values":[{"value":"12.5"}]},{"label":"B","values":[{"value":"30"}]}]}
+{"type":"scale","unit":"kg","min":"0","max":"10","marks":[{"label":"range","from":"2","to":"6"},{"label":"mean","at":"4"}]}
+{"type":"graph","directed":true,"layout":"circle","nodes":[{"id":"a","label":"X"},{"id":"b","label":"Y"}],"edges":[{"from":"a","to":"b"}]}
+{"type":"board","rows":2,"cols":3,"shade":"checker","cells":[{"row":1,"col":2,"label":"K"}],"pairs":[]}
 Rules for figures: write every number as a string copied exactly as it is written in the chapter text ("69.0", not "69"; "25", not the number 25; put a sign such as % in "unit", not in the value). Never give coordinates, sizes or colours: the program places everything. Every label is plain text of at most about 12 characters, with no markup, link or bracket. Decline the position when the text does not state the numbers the figure needs, or when drawing it would mean inventing positions or values.
 Return ONLY JSON: {"diagrams":[{"slot":1,"title":"...","mermaid":"..."}]} or, for a figure, {"diagrams":[{"slot":1,"title":"...","figure":{"type":"bar",...}}]}. Use each position's number as "slot"; return {"diagrams":[]} when you decline all of them.
 {{languageInstruction}}

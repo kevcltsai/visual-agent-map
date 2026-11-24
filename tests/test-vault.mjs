@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
 import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
-import { fetchDepsTable } from '../scripts/test-affected.mjs';
+import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
 import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
@@ -642,10 +642,10 @@ test('fetchDepsTable fetches the latest green full main run once and fails soft'
   const fake = (command, args) => {
     calls.push([command, ...args]);
     if (args[1] === 'list') return 'noise\n111\n222\n';
-    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), '{"fetched":true}');
+    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), JSON.stringify({ version: 1, sha: 'a'.repeat(40), paths: [], tests: {} }));
   };
   assert.equal(fetchDepsTable(folder, fake, {}), true);
-  assert.equal(readFileSync(join(folder, 'test-deps.json'), 'utf8'), '{"fetched":true}');
+  assert.equal(JSON.parse(readFileSync(join(folder, 'test-deps.json'), 'utf8')).sha, 'a'.repeat(40));
   assert.deepEqual(calls[1].slice(0, 5), ['gh', 'run', 'download', '111', '-n']);
   assert.equal(fetchDepsTable(folder, () => { throw new Error('must not run'); }, {}), false); // table already present
   rmSync(join(folder, 'test-deps.json'));
@@ -770,4 +770,31 @@ test('session full does not inherit selective test or CI shard settings', () => 
   const calls = [];
   prepareSessionCandidate({ mode: 'full', env, fingerprint: () => 'x', artifactHashes: () => ({ x: 'y' }), execute: (_command, args, childEnv) => calls.push({ args, env: childEnv }) });
   for (const call of calls.slice(1)) for (const key of Object.keys(env)) assert.equal(call.env[key], undefined);
+});
+
+test('expensive affected plans refresh stale dependency tables without accepting unrelated or older proof', t => {
+  const { folder } = environment(t);
+  const { main: checkout } = repoWithWorktree(folder, { behind: true });
+  const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const base = git('rev-parse', 'origin/main'), old = git('rev-parse', 'HEAD^');
+  const data = sha => JSON.stringify({ version: 1, sha, paths: [], tests: {} });
+  const path = join(checkout, 'test-deps.json');
+  writeFileSync(path, data(old));
+  let calls = 0;
+  const mock = sha => (_command, args) => {
+    calls++;
+    if (args[1] === 'list') return '111\n';
+    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), data(sha));
+  };
+  const full = { mode: 'full', files: [] };
+  assert.equal(refreshDepsTable(checkout, 'origin/main', { mode: 'files', files: ['a'] }, mock(base), {}, 1000), false);
+  assert.equal(calls, 0);
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock('f'.repeat(40)), {}, 1000), false);
+  assert.equal(readFileSync(path, 'utf8'), data(old));
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(base), {}, 1001), false, 'cooldown');
+  assert.equal(calls, 2);
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(base), {}, 601001), true);
+  assert.equal(readFileSync(path, 'utf8'), data(base));
+  assert.equal(refreshDepsTable(checkout, 'origin/main', full, mock(old), {}, 1202000), false);
+  assert.equal(readFileSync(path, 'utf8'), data(base));
 });

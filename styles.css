@@ -2386,3 +2386,27 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 
 .vam-book-applied-notice { position: fixed; right: 16px; bottom: 16px; z-index: var(--layer-notice); max-width: 360px; padding: 8px 12px; border-radius: var(--radius-m); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-map-chat-diff-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+
+/* Book figures (```vam-figure): drawn by the plugin from structured data; colours come only from Obsidian's variables. */
+.vam-figure { max-width: 480px; margin: 0.5em auto; }
+.vam-figure .vam-figure-svg { display: block; width: 100%; height: auto; }
+.vam-figure .fig-text, .vam-figure .fig-text-sm, .vam-figure .fig-text-acc, .vam-figure .fig-text-inv { font-size: 13px; fill: var(--text-normal); }
+.vam-figure .fig-text-sm { font-size: 11px; fill: var(--text-muted); }
+.vam-figure .fig-text-acc { fill: var(--interactive-accent); font-weight: 600; }
+.vam-figure .fig-text-inv { font-size: 11px; fill: var(--background-primary); }
+.vam-figure .fig-axis, .vam-figure .fig-guide { stroke: var(--text-muted); stroke-width: 1; fill: none; }
+.vam-figure .fig-guide { stroke-dasharray: 3 3; }
+.vam-figure .fig-bar-0 { fill: var(--interactive-accent); }
+.vam-figure .fig-bar-1 { fill: var(--color-orange); }
+.vam-figure .fig-bar-2 { fill: var(--text-muted); }
+.vam-figure .fig-interval { fill: var(--interactive-accent); opacity: 0.55; }
+.vam-figure .fig-point { fill: var(--interactive-accent); }
+.vam-figure .fig-node { fill: var(--background-secondary); stroke: var(--interactive-accent); stroke-width: 1.5; }
+.vam-figure .fig-edge { stroke: var(--text-muted); stroke-width: 1.5; fill: none; }
+.vam-figure .fig-arrow-head { fill: var(--text-muted); }
+.vam-figure .fig-sq-a { fill: var(--background-secondary); stroke: var(--text-muted); stroke-width: 0.5; }
+.vam-figure .fig-sq-b { fill: var(--background-modifier-border); stroke: var(--text-muted); stroke-width: 0.5; }
+.vam-figure .fig-cut { fill: none; stroke: var(--text-muted); stroke-width: 0.5; stroke-dasharray: 3 3; }
+.vam-figure .fig-box { fill: var(--interactive-accent); fill-opacity: 0.25; stroke: var(--interactive-accent); stroke-width: 1.5; }
+.vam-figure .fig-arc { stroke: var(--interactive-accent); stroke-width: 1.5; fill: none; }
+.vam-figure .vam-figure-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }

@@ -3797,7 +3797,8 @@ export const en = {
   "ui.book_role_failed": "Could not change the chapter role.",
   "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}",
   "ui.book_deleted_chapter_hint_keep":
-    "Change this text if you like; if you leave it, the book follows the chapters the map has now."
+    "Change this text if you like; if you leave it, the book follows the chapters the map has now.",
+  "ui.book_figure_unreadable": "The figure data cannot be shown."
 } as const;
 
 export type TranslationKey = keyof typeof en;

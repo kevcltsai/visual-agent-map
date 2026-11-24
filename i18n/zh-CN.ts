@@ -3542,5 +3542,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_role_running_suffix": "图文书正在执行，要等下次载入才生效。",
   "ui.book_role_failed": "无法更改章节角色。",
   "ui.book_deleted_chapter_hint_0": "这里提到已不在心智图上的章：{0}",
-  "ui.book_deleted_chapter_hint_keep": "要的话改掉这段文字；不改也会照目前的章来写。"
+  "ui.book_deleted_chapter_hint_keep": "要的话改掉这段文字；不改也会照目前的章来写。",
+  "ui.book_figure_unreadable": "示意图数据无法显示"
 };

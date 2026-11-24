@@ -90,12 +90,12 @@ export interface AiCallExchange {
   fail(message: string): void;
 }
 
-/** A call without a PreparedStep. */
-export interface AiCallRequest {
+/** Internal transport request produced only by StepRunner. */
+interface AiCallRequest {
   prompt: string;
   schema?: unknown;
-  /** `stepId@version` for the exchange log; the entry has no step field when absent. */
-  step?: string;
+  /** `stepId@version` from the prepared step. */
+  step: string;
 }
 
 /** The prompt text a runtime request carries (Codex: the text inputs; Claude's request has none). */
@@ -155,7 +155,7 @@ export class AiCalls {
     const provider: StepProvider<null> = {
       complete: async call => {
         result = {
-          value: await this.runCall(
+          value: await this.#runCall(
             {
               prompt: call.prompt,
               ...(call.schema === undefined ? {} : { schema: call.schema }),
@@ -173,8 +173,8 @@ export class AiCalls {
     return result.value;
   }
 
-  /** A raw call without a PreparedStep (Coffee Tables). Same registration, runtime routing and logging as `run`. */
-  async runCall<Result>(
+  /** Registers and sends the transport request assembled by StepRunner. Not a public model-call entry point. */
+  async #runCall<Result>(
     call: AiCallRequest,
     options: AiCallOptions,
     finish: (raw: string, exchange: AiCallExchange) => Result | Promise<Result>
@@ -237,7 +237,7 @@ export class AiCalls {
         mode,
         model: options.model,
         effort: options.effort,
-        ...(call.step ? { step: call.step } : {})
+        step: call.step
       });
       if (started) options.onBegin?.(id);
       const runtime = this.options.runtimeFor(options.model);

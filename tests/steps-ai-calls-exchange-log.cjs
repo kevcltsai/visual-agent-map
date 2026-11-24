@@ -1,7 +1,7 @@
 // core/ai-calls.ts: the model call over the Claude and Codex runtimes and the AI exchange log. Ported from the former
 // runtimeStepProvider tests; the assertions are the same except where AiCalls differs by design (D-2026-10-334 D2):
 // the runtime signal is AiCalls' own controller, `onBegin` replaces `onExchange`, `entryEnd: 'caller'` replaces
-// `finish: 'caller'`, and the call goes through `runCall` / `run` instead of `provider.complete`.
+// `finish: 'caller'`, and the call goes through `run` instead of `provider.complete`.
 const { test } = require('node:test');
 const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const assert = require('node:assert/strict');
@@ -29,10 +29,10 @@ function fixture({ reply = 'raw reply', fail, logging = true, onRun } = {}) {
   const calls = callsOver(runtime, locals, () => (logging ? log : null));
   return { runs, log, locals, calls };
 }
-const request = (extra = {}) => ({ prompt: 'the prompt', schema: { type: 'object' }, step: 'test.step@4', ...extra });
+const request = () => prepareStep({ id: 'test.step', version: 4, schema: { type: 'object' }, render: () => 'the prompt', parse: value => value }, {});
 const options = (extra = {}) => ({ model: 'gpt-6-luna', effort: 'low', topic: 'Test · topic', taskName: 'test', signal: new AbortController().signal, localCodex: false, ...extra });
 const raw = value => value;
-const run = (calls, extra, extraRequest) => calls.runCall(request(extraRequest), options(extra), raw);
+const run = (calls, extra) => calls.run(request(), options(extra), raw);
 
 // old :24
 test('a Codex model runs through the Codex runtime with the step schema, and the exchange records the step label', async () => {

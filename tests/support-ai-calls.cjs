@@ -16,6 +16,7 @@ function loadWithAiCalls(entry, overrides = {}, globals = {}) {
   const contents = [
     `export * from ${JSON.stringify('./' + entry.replace(/\.ts$/, ''))};`,
     'export { AiCalls } from "./core/ai-calls";',
+    'export { prepareStep } from "./core/step-runner";',
     'export { aiRuntimeForModel, claudeCodeAiRuntime, codexAppServerAiRuntime } from "./core/ai-runtime-service";',
     'export { CLAUDE_CAPABILITIES, CODEX_CAPABILITIES } from "./core/ai-runtime";',
     'export const makeError = (message: string): Error => new Error(message);'

@@ -1,3 +1,4 @@
+import { escapeRegExp } from "../../core/escape-regexp";
 import { abortError as aborted } from "../../core/abort";
 import {
   constants,
@@ -284,7 +285,6 @@ export async function listExternalSource(
   return { real: check.real, files };
 }
 
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Replaces every spelling of the source's root (as typed, real, and with the other slash) in file text. */
 export function scrubExternalPaths(text: string, roots: readonly string[]): string {

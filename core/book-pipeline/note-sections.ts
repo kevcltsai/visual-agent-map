@@ -4,6 +4,7 @@
  * Older cards keep their `### 研究備註` section (a `[!note]-` callout) and `## 校對結果` section; they are read as before and turned into
  * the hidden callouts the first time the pipeline writes them. Nothing else in the text is touched.
  */
+import { escapeRegExp } from "../escape-regexp";
 import {
   isNewSourcesHeading,
   isOpenQuestionsHeading,
@@ -420,18 +421,17 @@ export function hidePipelineLog(detail: string, known: ReadonlySet<string>, back
   const shapes = NOTE_LANGUAGES.map(locale =>
     translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
   ).filter(parts => parts.length === 2);
-  const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Only the exact line the write-back made for this write. The write-back takes its own backup of the card (same folder, same note name,
   // a newer time stamp, so a different path from the pipeline's `backupPath`): the path must be that folder + `<note name> <date> <time>[ (n)].md`.
   // A log line the author wrote (any other text or any other folder) stays visible.
   const stamp = /^(.*\/)?(.+) \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/.exec(backupPath ?? "");
   const pathShape = stamp
-    ? `${escape(stamp[1] ?? "")}${escape(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md`
+    ? `${escapeRegExp(stamp[1] ?? "")}${escapeRegExp(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md`
     : "";
   const ownLine = stamp
     ? shapes.map(
         ([head, tail]) =>
-          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}${pathShape}${escape(tail)}$`)
+          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}${pathShape}${escapeRegExp(tail)}$`)
       )
     : [];
   return hideUpdateLog(dropRecordCopies(detail), line => known.has(line) || ownLine.some(re => re.test(line)));
@@ -440,12 +440,11 @@ export function hidePipelineLog(detail: string, known: ReadonlySet<string>, back
 /** Whether a log line (plain text) is the write-back's "rewritten, old version backed up at <path>" line, in any note language. */
 function replacedLineTest(): (line: string) => boolean {
   const marker = "\u0000";
-  const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const shapes = NOTE_LANGUAGES.map(locale =>
     translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
   ).filter(parts => parts.length === 2);
   const res = shapes.map(
-    ([head, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}.+${escape(tail)}$`)
+    ([head, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escapeRegExp(head)}.+${escapeRegExp(tail)}$`)
   );
   return line => res.some(re => re.test(line));
 }

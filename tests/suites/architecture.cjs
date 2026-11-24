@@ -54,3 +54,12 @@ test('shared error message preserves the raw message across realms and stringifi
   assert.equal(errorMessage(undefined), 'undefined');
   assert.equal(errorMessage({ message: 42 }), '[object Object]');
 });
+
+test('escapeRegExp treats every metacharacter as literal text', () => {
+  const { escapeRegExp } = load('core/escape-regexp.ts');
+  for (const input of ['a.b', 'a+b?', '[x](y){z}', '^x$|y', 'a\\\\b', '資料/檔案.md', '']) {
+    const pattern = new RegExp('^' + escapeRegExp(input) + '$');
+    assert.ok(pattern.test(input), input);
+    assert.ok(!pattern.test(input + 'x'), input);
+  }
+});

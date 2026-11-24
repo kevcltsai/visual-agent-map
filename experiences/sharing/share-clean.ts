@@ -5,6 +5,7 @@
  * `%%` and `<!-- -->` comments are NOT removed here: the renderer hides them (live-checked, D-2026-10-110), and what it
  * does not hide shows as plain text the author sees too.
  */
+import { escapeRegExp } from "../../core/escape-regexp";
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { socialVideoOf } from "../../core/social-video";
 import { youtubeVideoId } from "../../core/video-embeds";
@@ -94,7 +95,6 @@ function splitWikilink(inner: string): { target: string; alias: string | undefin
   return { target, alias: alias || undefined };
 }
 
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
  * The write-back's own "rewritten, old version backed up at <vault path>" log line, exactly as it writes it (any note
  * language, in a quote or callout, as a list item or not): `<date>` U+3000 `<text><folder>/<note> <date> <HHmmss>[ (n)].md<text>`.

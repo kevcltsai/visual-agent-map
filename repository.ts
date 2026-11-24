@@ -1,3 +1,4 @@
+import { escapeRegExp } from "./core/escape-regexp";
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isPlaceholder } from "./core/note-placeholder";
 import { resolveAimContentLanguage } from "./core/content-language";
@@ -1447,8 +1448,7 @@ export class Repository {
     const names = new Set(["Topics", "Mind Maps", "AIM"]);
     for (const folder of managedMapContainers(this.settings))
       names.add(folder.startsWith(workspace) ? folder.slice(workspace.length) : (folder.split("/").at(-1) ?? folder));
-    const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const containerPattern = new RegExp(`^(.*)/(?:${[...names].map(escape).join("|")})/[^/]+/Map\\.md$`);
+    const containerPattern = new RegExp(`^(.*)/(?:${[...names].map(escapeRegExp).join("|")})/[^/]+/Map\\.md$`);
     for (const file of this.app.vault.getMarkdownFiles()) {
       const match = file.path.match(containerPattern);
       if (!match?.[1]) continue;

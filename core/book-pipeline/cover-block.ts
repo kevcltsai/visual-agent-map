@@ -17,6 +17,7 @@
  * program's own intact block into the key and the credit line. Pure: no I/O.
  */
 
+import { escapeRegExp } from "../escape-regexp";
 import { imageKey } from "./image-dedupe";
 import { fencedLines } from "./note-sections";
 import { safeHref } from "./proof";
@@ -323,10 +324,9 @@ export function removeCoverCredit(detail: string, href: string, language: string
     "\uE000",
     "\uE001"
   ).split(/[\uE000\uE001]/);
-  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // The credit's link has its parentheses encoded (as sourceOf writes it); the record keeps the page address as it is.
   const link = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-  const shape = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(link)}\\).*${escape(after)}\\r?$`);
+  const shape = new RegExp(`^- ${escapeRegExp(before)}.*${escapeRegExp(middle)}.*\\]\\(${escapeRegExp(link)}\\).*${escapeRegExp(after)}\\r?$`);
   return detail
     .split("\n")
     .filter(line => !shape.test(line))

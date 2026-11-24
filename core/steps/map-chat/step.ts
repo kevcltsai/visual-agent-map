@@ -1,3 +1,4 @@
+import { escapeRegExp } from "../../escape-regexp";
 import { normalizeProgress, type MapChatProgress } from "../../map-chat-progress";
 import { estimateMapChatTokens } from "../../map-chat-tokens";
 import { IGNORE_EXTRA_FIELDS } from "../../../ai/runtime/output-schema";
@@ -499,7 +500,7 @@ export function linkSources(summary: string, paths: readonly string[] | undefine
   for (const path of paths) {
     if (!/\.md$/i.test(path)) continue;
     const target = path.replace(/\.md$/i, "");
-    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escaped = escapeRegExp(path);
     const pattern = new RegExp("`?" + escaped + "`?", "g");
     out = out
       .split(/(\[\[[^\]]*\]\])/)

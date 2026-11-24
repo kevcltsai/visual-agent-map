@@ -128,6 +128,8 @@
 .vam-view .vam-annotated-pill-icon svg { width: 12px; height: 12px; }
 .vam-view .vam-annotated-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-view .vam-annotated-count { flex: none; color: var(--text-muted); }
+.vam-view button.vam-annotated-showall { flex: none; height: auto; padding: 0 6px; font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--interactive-accent); background: transparent; border: 1px solid var(--interactive-accent); border-radius: 4px; box-shadow: none; cursor: pointer; }
+.vam-view button.vam-annotated-showall:hover { background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); }
 .vam-menu-subtitle { display: block; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-annotated-note-hint { margin: 8px 0 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-annotated-note-input { width: 100%; }
@@ -2151,6 +2153,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-anchor-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; display: none; flex-direction: column; gap: 2px; width: max-content; max-width: 240px; padding: 4px 8px; transform: translateX(-50%); font-size: var(--font-ui-smaller); line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 4px; box-shadow: var(--shadow-s); pointer-events: none; }
 .vam-view .vam-anchor:hover .vam-anchor-tip, .vam-view .vam-anchor:focus-visible .vam-anchor-tip { display: flex; }
 .vam-view .vam-anchor.is-draggable { cursor: grab; touch-action: none; }
+/* An anchor clicked to hide its topics: a hollow dashed muted ring with a slash; a click shows them again. */
+.vam-view .vam-anchor.is-linked.is-topics-hidden { border: 2px dashed var(--text-muted); background: var(--background-primary); box-shadow: none; }
+.vam-view .vam-anchor.is-linked.is-topics-hidden::after { content: ""; position: absolute; left: 50%; top: -3px; width: 2px; height: 16px; margin-left: -1px; background: var(--text-muted); transform: rotate(45deg); pointer-events: none; }
 .vam-view .vam-anchor.is-draggable.is-dragging { cursor: grabbing; }
 .vam-view .is-placing .vam-anchor.is-draggable { cursor: crosshair; }
 .vam-view .vam-anchor.is-dragging .vam-anchor-tip { display: none; }

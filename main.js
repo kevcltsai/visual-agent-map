@@ -74018,17 +74018,136 @@ function keepOpenedVideoEmbeds(detail, openedUrls, existingDetail = "") {
   flush();
   return out.join("");
 }
-async function dropUnplayableVideos(detail, existingDetail, check, signal) {
+async function dropUnplayableVideos(detail, existingDetail, check, signal, alsoCheck = /* @__PURE__ */ new Set()) {
   if (!check) return detail;
   const existing = embeddedIds(existingDetail != null ? existingDetail : "");
-  const ids2 = [...embeddedIds(detail)].filter((id) => !existing.has(id));
+  const all = [...embeddedIds(detail)];
+  const ids2 = all.filter((id) => !existing.has(id) || alsoCheck.has(id));
   if (!ids2.length) return detail;
   const verdicts = await Promise.all(ids2.map((id) => check(id, signal).catch(() => null)));
   const bad2 = new Set(ids2.filter((_, i) => verdicts[i] === false));
   if (!bad2.size) return detail;
-  const good = ids2.filter((id) => !bad2.has(id)).map((id) => `https://www.youtube.com/watch?v=${id}`);
-  return keepOpenedVideoEmbeds(detail, good, existingDetail);
+  const good = all.filter((id) => !bad2.has(id)).map((id) => `https://www.youtube.com/watch?v=${id}`);
+  return keepOpenedVideoEmbeds(detail, good);
 }
+var UPDATE_LOG_HEADING2 = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
+var MD_LINK2 = /(?<!!)\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/;
+var HTML_LINK = /<a\b[^>]*>[\s\S]*?<\/a\s*>/i;
+var watchUrl = (id) => `https://www.youtube.com/watch?v=${id}`;
+function fenceSegments(text12) {
+  var _a2, _b2, _c, _d;
+  const lines = text12.split(/(\r?\n)/);
+  const out = [];
+  let fence2 = null;
+  const push = (isFence, piece) => {
+    const last = out[out.length - 1];
+    if (last && last[0] === isFence) last[1] += piece;
+    else out.push([isFence, piece]);
+  };
+  for (let i = 0; i < lines.length; i += 2) {
+    const piece = ((_a2 = lines[i]) != null ? _a2 : "") + ((_b2 = lines[i + 1]) != null ? _b2 : "");
+    const mark2 = (_d = /^ {0,3}(`{3,}|~{3,})/.exec((_c = lines[i]) != null ? _c : "")) == null ? void 0 : _d[1];
+    if (fence2) {
+      push(true, piece);
+      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
+    } else if (mark2) {
+      fence2 = mark2;
+      push(true, piece);
+    } else push(false, piece);
+  }
+  return out;
+}
+function mediaOf(text12) {
+  var _a2, _b2, _c, _d;
+  const videos = /* @__PURE__ */ new Map();
+  const images = [];
+  for (const [isFence, piece] of fenceSegments(text12)) {
+    if (isFence) continue;
+    for (const m of piece.matchAll(EMBED2)) {
+      const url = (_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "";
+      const id = youtubeVideoId(url);
+      if (id) {
+        if (!videos.has(id)) videos.set(id, (_c = m[1]) != null ? _c : "");
+      } else if (url && !looksLikeYoutube(url)) images.push({ alt: (_d = m[1]) != null ? _d : "", url });
+    }
+    for (const id of embeddedIds(piece)) if (!videos.has(id)) videos.set(id, "");
+  }
+  return { videos, images };
+}
+function restoreDroppedMedia(detail, existingDetail) {
+  var _a2, _b2, _c;
+  const restoredVideoIds = /* @__PURE__ */ new Set();
+  const old = mediaOf(existingDetail);
+  if (!old.videos.size && !old.images.length) return { detail, restoredVideoIds };
+  const present = embeddedIds(detail);
+  let segments = fenceSegments(detail);
+  const added = [];
+  for (const [id, alt] of old.videos) {
+    if (present.has(id)) continue;
+    let converted = false;
+    segments = segments.map(([isFence, piece]) => {
+      var _a3, _b3, _c2, _d, _e;
+      if (isFence || converted) return [isFence, piece];
+      let out = piece;
+      const md = new RegExp(MD_LINK2.source, "g");
+      for (const m of piece.matchAll(md)) {
+        if (youtubeVideoId((_b3 = (_a3 = m[2]) != null ? _a3 : m[3]) != null ? _b3 : "") !== id) continue;
+        out = `${piece.slice(0, m.index)}![${(_c2 = m[1]) != null ? _c2 : ""}](${watchUrl(id)})${piece.slice(((_d = m.index) != null ? _d : 0) + m[0].length)}`;
+        converted = true;
+        break;
+      }
+      if (!converted) {
+        const html = new RegExp(HTML_LINK.source, "gi");
+        for (const m of piece.matchAll(html)) {
+          if (youtubeVideoId(htmlHref(m[0])) !== id) continue;
+          const text13 = m[0].replace(/<[^>]*>/g, "").trim();
+          out = `${piece.slice(0, m.index)}![${text13.replace(/[[\]\n]/g, " ")}](${watchUrl(id)})${piece.slice(((_e = m.index) != null ? _e : 0) + m[0].length)}`;
+          converted = true;
+          break;
+        }
+      }
+      return [isFence, out];
+    });
+    if (!converted) added.push(`![${alt}](${watchUrl(id)})`);
+    restoredVideoIds.add(id);
+  }
+  const text12 = segments.map((s) => s[1]).join("");
+  const seen = /* @__PURE__ */ new Set();
+  for (const { alt, url } of old.images) {
+    if (text12.includes(url) || seen.has(url)) continue;
+    seen.add(url);
+    added.push(`![${alt}](${url})`);
+  }
+  if (!restoredVideoIds.size && !added.length) return { detail, restoredVideoIds };
+  if (!added.length) return { detail: text12, restoredVideoIds };
+  const eol2 = text12.includes("\r\n") ? "\r\n" : "\n";
+  const parts = text12.split(/(\r?\n)/);
+  let at2 = text12.length;
+  let offset = 0;
+  let fence2 = null;
+  for (let i = 0; i < parts.length; i += 2) {
+    const line4 = (_a2 = parts[i]) != null ? _a2 : "";
+    const mark2 = (_b2 = /^ {0,3}(`{3,}|~{3,})/.exec(line4)) == null ? void 0 : _b2[1];
+    if (fence2) {
+      if (mark2 && mark2[0] === fence2[0] && mark2.length >= fence2.length) fence2 = null;
+    } else if (mark2) fence2 = mark2;
+    else if (UPDATE_LOG_HEADING2.test(line4)) {
+      at2 = offset;
+      break;
+    }
+    offset += line4.length + ((_c = parts[i + 1]) != null ? _c : "").length;
+  }
+  let head2 = text12.slice(0, at2);
+  const rest = text12.slice(at2);
+  if (head2) head2 = head2.replace(/(?:\r?\n)*$/, "") + eol2 + eol2;
+  const block2 = added.join(eol2 + eol2) + eol2;
+  return { detail: head2 + block2 + (rest ? eol2 + rest : ""), restoredVideoIds };
+}
+var htmlHref = (tag) => {
+  var _a2, _b2, _c;
+  const m = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+  return ((_c = (_b2 = (_a2 = m == null ? void 0 : m[1]) != null ? _a2 : m == null ? void 0 : m[2]) != null ? _b2 : m == null ? void 0 : m[3]) != null ? _c : "").trim();
+};
 
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
@@ -116308,7 +116427,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (input2.timeoutMs !== void 0 && (!Number.isInteger(input2.timeoutMs) || input2.timeoutMs < 18e4 || input2.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
@@ -116476,7 +116595,19 @@ ${(_i = input2.userTexts) != null ? _i : ""}`)
       } : null;
       if (videoFilter) {
         result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input2.detail);
-        result.detail = await dropUnplayableVideos(result.detail, input2.detail, this.options.videoPlayable, signal);
+        let restored = /* @__PURE__ */ new Set();
+        if (countsWeb && ((_j = input2.detail) == null ? void 0 : _j.trim())) {
+          const back = restoreDroppedMedia(result.detail, input2.detail);
+          result.detail = back.detail;
+          restored = back.restoredVideoIds;
+        }
+        result.detail = await dropUnplayableVideos(
+          result.detail,
+          input2.detail,
+          this.options.videoPlayable,
+          signal,
+          restored
+        );
       }
       if (readerFacingDetail(input2)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
@@ -116489,7 +116620,7 @@ ${(_i = input2.userTexts) != null ? _i : ""}`)
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
       const aiDecides = input2.aiSections === "decide";
-      if (aiDecides && ((_j = input2.mode) != null ? _j : "task") === "task" && !input2.countRepair && !((_k = input2.detail) == null ? void 0 : _k.trim())) {
+      if (aiDecides && ((_k = input2.mode) != null ? _k : "task") === "task" && !input2.countRepair && !((_l = input2.detail) == null ? void 0 : _l.trim())) {
         const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage2));
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;
@@ -116532,12 +116663,17 @@ ${(_i = input2.userTexts) != null ? _i : ""}`)
             );
             result = {
               ...result,
-              detail: videoFilter ? await dropUnplayableVideos(
-                keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input2.detail),
-                input2.detail,
-                this.options.videoPlayable,
-                signal
-              ) : repaired.detail
+              detail: videoFilter ? await (async () => {
+                var _a3;
+                let kept = keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input2.detail);
+                let restored = /* @__PURE__ */ new Set();
+                if (countsWeb && ((_a3 = input2.detail) == null ? void 0 : _a3.trim())) {
+                  const back = restoreDroppedMedia(kept, input2.detail);
+                  kept = back.detail;
+                  restored = back.restoredVideoIds;
+                }
+                return dropUnplayableVideos(kept, input2.detail, this.options.videoPlayable, signal, restored);
+              })() : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage2), template2), template2);
           } catch (error) {

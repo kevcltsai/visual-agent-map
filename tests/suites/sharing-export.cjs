@@ -1,7 +1,9 @@
 // Sharing P1 (Worker C): the Obsidian-side export pieces that can run without Obsidian: DOM scrub, build lifecycle,
 // size advice, save fallback, and the share dialog's stale/cancel behaviour against a test-double exporter.
 const assert = require('node:assert/strict');
-const { test, load, obsidian, plain } = require('../support.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { test, load, obsidian, plain, root: repoRoot } = require('../support.cjs');
 
 const dom = load('experiences/sharing/share-dom.ts');
 const build = load('experiences/sharing/share-build.ts');
@@ -775,7 +777,7 @@ const anchoredImage = (overrides = {}) => ({
   ...overrides
 });
 
-test('share exporter annotated-image: the payload carries the picture, anchors and links, and never the vault path, relation kind or description', async () => {
+test('share exporter annotated-image: the payload carries the picture, anchors and links with their kind and description, and never the vault path', async () => {
   const harness = matchMapHarness({ canvasItems: [anchoredImage({ path: 'Pics/shared.png' })], notes: { a: 'Body' } });
   await harness.prepare();
   const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
@@ -784,11 +786,11 @@ test('share exporter annotated-image: the payload carries the picture, anchors a
   assert.equal(result.payload.images.length, 1);
   assert.deepEqual(Object.keys(image).sort(), ['anchors', 'asset', 'h', 'id', 'links', 'note', 'w', 'x', 'y']);
   assert.deepEqual(image.anchors, [{ id: 'p1', x: 0.25, y: 0.5, note: 'Ribeye' }, { id: 'p2', x: 1, y: 0 }], 'positions are clamped; the unknown position kind is not in the file');
-  assert.deepEqual(image.links, [{ anchor: 'p1', topic: 'b', ring: true }, { anchor: 'p2', topic: 'a' }], 'either direction of the relation is stored as anchor -> topic');
+  assert.deepEqual(image.links, [{ anchor: 'p1', topic: 'b', ring: true, kind: 'related', description: 'RELATION-DESCRIPTION' }, { anchor: 'p2', topic: 'a', kind: 'supports' }], 'either direction of the relation is stored as anchor -> topic');
   assert.ok(result.payload.assets[image.asset].startsWith('data:image/'));
   const text = harness.serialised(result);
-  for (const secret of ['Pics/shared.png', 'RELATION-DESCRIPTION', 'UNKNOWN-KIND-NOTE', 'supports', 'related', '"path"', 'canvasItems', 'relations']) assert.equal(text.includes(secret), false, secret);
-  for (const secret of ['Pics/shared.png', 'RELATION-DESCRIPTION', 'UNKNOWN-KIND-NOTE']) assert.equal(result.html.includes(secret), false, `file: ${secret}`);
+  for (const secret of ['Pics/shared.png', 'UNKNOWN-KIND-NOTE', '"path"', 'canvasItems', '"relations"']) assert.equal(text.includes(secret), false, secret);
+  for (const secret of ['Pics/shared.png', 'UNKNOWN-KIND-NOTE']) assert.equal(result.html.includes(secret), false, `file: ${secret}`);
 });
 
 test('share exporter annotated-image: a dangling link, an unknown or missing topic, and a repeated anchor id stay out of the file', async () => {
@@ -800,7 +802,7 @@ test('share exporter annotated-image: a dangling link, an unknown or missing top
   const result = harness.exporter.assemble({ includeDetail: false, includeImages: false });
   assert.equal(result.payload.images.length, 1, 'a repeated image id and a non-finite box are dropped');
   assert.deepEqual(plain(result.payload.images[0].anchors), [{ id: 'p1', x: 0.1, y: 0.1 }]);
-  assert.deepEqual(plain(result.payload.images[0].links), [{ anchor: 'p1', topic: 'a' }]);
+  assert.deepEqual(plain(result.payload.images[0].links), [{ anchor: 'p1', topic: 'a', kind: 'related' }]);
 });
 
 test('share exporter annotated-image: the image note and anchor notes are scanned; a note with the map folder or a note path blocks the file, [[x]] becomes plain text', () => {
@@ -819,8 +821,8 @@ test('share exporter annotated-image: a map without annotated images, covers or 
   assert.deepEqual(Object.keys(plain(plainRun.payload)), ['format', 'version', 'title', 'language', 'exportedAt', 'source', 'viewport', 'nodes', 'assets']);
   assert.deepEqual(Object.keys(plain(plainRun.payload.nodes[1])), ['id', 'parentId', 'x', 'y', 'collapsed', 'status', 'title', 'summary']);
   assert.equal(JSON.stringify(plain(plainRun.payload)), '{"format":"vam-share","version":1,"title":"Map","language":"en","exportedAt":' + JSON.stringify(plainRun.payload.exportedAt) + ',"source":{"vamVersion":"1","mapId":"map-1"},"viewport":{"x":0,"y":0,"zoom":1},"nodes":[{"id":"a","parentId":null,"x":0,"y":0,"collapsed":false,"status":"idea","title":"A","summary":"S"},{"id":"b","parentId":"a","x":5,"y":6,"collapsed":false,"status":"idea","title":"B","summary":"S"}],"assets":{}}');
-  // Other canvas items (a plain image, a text-less boundary) add nothing.
-  const other = matchMapHarness({ canvasItems: [{ id: 'i1', kind: 'image', path: 'Pics/other.png', x: 0, y: 0, w: 10, h: 10 }] }).exporter.assemble({ includeDetail: true, includeImages: true });
+  // Other canvas items (an unknown kind, a boundary with no member in the file) add nothing.
+  const other = matchMapHarness({ canvasItems: [{ id: 'i1', kind: 'mystery' }, { id: 'bd', kind: 'boundary', members: ['gone'] }] }).exporter.assemble({ includeDetail: true, includeImages: true });
   assert.equal(JSON.stringify(plain({ ...other.payload, exportedAt: 0 })), JSON.stringify(plain({ ...plainRun.payload, exportedAt: 0 })));
 });
 
@@ -925,4 +927,273 @@ test('share dom: what the stylesheet hides in Obsidian (work-record callouts, hi
   assert.equal(dom.dropHiddenContent(root), 4);
   const texts = node => [node.textContent, ...node.children.flatMap(texts)].filter(Boolean);
   assert.deepEqual(texts(root), ['shown plan', 'kept', 'outside a plan: kept', 'body']);
+});
+
+test('share exporter complete: type and shape come from the note; an argument-map card is always rect; a free picture joins the pictures without its path', async () => {
+  const harness = matchMapHarness({ canvasItems: [{ id: 'free1', kind: 'image', path: 'Pics/other.png', x: 3, y: 4, w: 50, h: 60 }, { id: 'bd', kind: 'boundary', members: ['a', 'b', 'free1'], label: 'Frame' }] });
+  harness.exporter.source.notes.get('a').topicKind = 'hypothesis';
+  harness.exporter.source.notes.get('b').topicKind = 'evidence';
+  await harness.prepare();
+  let result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
+  const [na, nb] = plain(result.payload.nodes);
+  assert.deepEqual([na.kind, na.shape, nb.kind, nb.shape], ['hypothesis', 'diamond', 'evidence', 'folded']);
+  const free = plain(result.payload.images)[0];
+  assert.deepEqual(Object.keys(free).sort(), ['anchors', 'asset', 'free', 'h', 'id', 'w', 'x', 'y']);
+  assert.deepEqual(free.anchors, []);
+  assert.ok(result.payload.assets[free.asset]);
+  assert.equal(harness.serialised(result).includes('Pics/other.png'), false);
+  assert.deepEqual(plain(result.payload.boundaries), [{ id: 'bd', members: ['a', 'b', 'free1'], label: 'Frame' }]);
+  // Images off: the picture is still listed (the viewer draws a text placeholder), with no asset.
+  result = harness.exporter.assemble({ includeDetail: true, includeImages: false });
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 3, y: 4, w: 50, h: 60, anchors: [], free: true }]);
+  // An argument map draws every managed card as a plain rectangle, whatever its type.
+  const fixture = require('../fixtures/argument-map-ui.cjs');
+  const one = fixture.states.facet_matched;
+  const ids = Object.fromEntries(one.notes.map((n, index) => [n.key, index === 0 ? 'a' : index === 1 ? 'b' : `id-${n.key}`]));
+  const argument = matchMapHarness({ extraNodes: one.notes.slice(2).map(n => ({ id: ids[n.key], path: `Folder/${n.key}.md`, parentId: 'a', x: 0, y: 0, collapsed: false })) });
+  argument.exporter.source.map.argumentMap = fixture.bind(one.map.argumentMap, ids);
+  argument.exporter.source.notes.get('a').topicKind = 'hypothesis';
+  argument.exporter.source.notes.get('b').topicKind = 'hypothesis';
+  const managed = require('../support.cjs').load('core/argument-map/model.ts').managedNodeIds(argument.exporter.source.map);
+  assert.ok(managed.has('a') && managed.has('b'), 'the fixture manages both cards');
+  await argument.prepare();
+  const [aa, ab] = plain(argument.exporter.assemble({ includeDetail: true, includeImages: true }).payload.nodes);
+  assert.deepEqual([aa.kind, aa.shape, ab.kind, ab.shape], [undefined, 'rect', undefined, 'rect'], 'a managed argument card is a plain rectangle and carries no type');
+  assert.equal('kind' in aa || 'kind' in ab, false, 'the key is not written at all');
+});
+
+test('share exporter complete: a map without new data adds no new field to the payload, and a vault with a missing free picture still lists it', async () => {
+  const harness = matchMapHarness({ files: [], canvasItems: [{ id: 'free1', kind: 'image', path: 'Gone/x.png', x: 0, y: 0, w: 5, h: 5 }] });
+  await harness.prepare();
+  const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 0, y: 0, w: 5, h: 5, anchors: [], free: true }], 'nothing silently disappears');
+  assert.equal(result.leakCategories.length, 0);
+  assert.equal(harness.serialised(result).includes('Gone/x.png'), false);
+  for (const key of ['attachments', 'relations', 'boundaries']) assert.equal(key in result.payload, false, `no ${key} for a map without them`);
+  for (const node of result.payload.nodes) for (const key of ['kind', 'markers', 'color', 'style', 'links', 'relevance']) assert.equal(key in node, false, `a plain card has no ${key}`);
+});
+
+// ---- P4: inline note embeds ----
+test('share dom: a vam-embed callout keeps its type and its content; a work record or plan block inside the embedded content is dropped, the rest kept', () => {
+  const record = el('div', { class: 'callout', 'data-callout': 'vam-book' }, [el('p', {}, [], 'record')]);
+  const inner = el('div', { class: 'callout-content' }, [el('p', {}, [], 'embedded text'), record]);
+  const box = el('div', { class: 'callout', 'data-callout': 'vam-embed' }, [el('div', { class: 'callout-title' }, [el('div', { class: 'callout-title-inner' }, [], 'Embedded: T')]), inner]);
+  const root = el('div', {}, [box]);
+  assert.equal(dom.dropHiddenContent(root), 1);
+  dom.scrubShareTree(root, { allowStyle: true });
+  assert.equal(root.children[0].getAttribute('data-callout'), 'vam-embed');
+  assert.deepEqual(plain(tags(root).filter(name => name === 'p')), ['p']);
+});
+
+test('share exporter embeds: embedded notes are read from the vault (whole, heading, block), only Markdown notes of the vault, never the note itself, and render through the cleaner', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const clean = load('experiences/sharing/share-clean.ts');
+  const files = { 'Folder/Src.md': { path: 'Folder/Src.md', extension: 'md', text: '---\nk: v\n---\nWhole body\n\n## H\nHeading body\n\nBlock text ^b1\n' }, 'Folder/Data.csv': { path: 'Folder/Data.csv', extension: 'csv', text: 'a,b' }, 'Agent/Hidden.md': { path: 'Agent/Hidden.md', extension: 'md', text: 'internal' } };
+  const reads = [];
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; } },
+    metadataCache: { getFirstLinkpathDest: (ref, from) => files[`Folder/${ref}.md`] ?? files[ref] ?? files[`${ref}.md`] ?? null }
+  };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const detail = '![[Src]]\n\n![[Src#H]]\n\n![[Src#^b1]]\n\n![[Src#Nope]]\n\n![[A]]\n\n![[Data.csv]]\n\n![[Agent/Hidden]]';
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  let markdown = '';
+  exporter.renderOne = async (md, titles, ids, embeds) => {
+    markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, assets: exporter.registry }).markdown;
+    return { html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], mermaidUndrawn: 0, mermaidBlocked: 0 };
+  };
+  await exporter.ensureRendered({ generation: 0, signal: new AbortController().signal, isCurrent: () => true }, () => {});
+  assert.deepEqual([...new Set(reads)], ['Folder/Src.md'], 'only the one vault note is read (once per target as written)');
+  assert.ok(markdown.includes('> [!vam-embed] Embedded: Src\n> Whole body'), markdown);
+  assert.ok(!markdown.includes('k: v'), 'frontmatter is not shown');
+  assert.ok(markdown.includes('> ## H\n> Heading body'));
+  assert.ok(markdown.includes('> [!vam-embed] Embedded: Src\n> Block text\n'));
+  assert.equal((markdown.match(/\[!vam-embed\]/g) ?? []).length, 3, 'a missing heading, the note itself, a non-Markdown file and an internal folder give no box');
+  assert.ok(markdown.includes('Nope') || markdown.includes('Src'), 'the missing heading keeps its title');
+  assert.ok(markdown.includes('Data.csv') && markdown.includes('Hidden'));
+});
+
+// ---- P5: file attachments, and embedded content keeps to its own note ----
+const p5Exporter = (files, extra = {}) => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const binaryReads = [];
+  const byPath = Object.fromEntries(Object.values(files).map(file => [file.path, file]));
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => file.text, readBinary: async file => { binaryReads.push(file.path); return new TextEncoder().encode('ABC').buffer; }, getFileByPath: path => byPath[path] ?? null },
+    metadataCache: { getFirstLinkpathDest: (ref, from) => byPath[ref] ?? files[ref] ?? byPath[`${ref}.md`] ?? null }
+  };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail: extra.detail ?? 'x' }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  return { exporter, binaryReads, node };
+};
+const ticket = () => ({ generation: 0, signal: new AbortController().signal, isCurrent: () => true });
+const mk = (path, size, extension = path.split('.').pop()) => ({ path, name: path.split('/').pop(), basename: path.split('/').pop().replace(/\.[^.]*$/, ''), extension, stat: { size }, text: '' });
+
+test('share exporter attachments: cards carry the file name only; a file over 10 MB, missing or internal is listed without bytes; images off gives no bytes; the bytes are an opaque data URI', async () => {
+  const files = { 'Docs/Private/report.pdf': mk('Docs/Private/report.pdf', 3), 'Docs/big.zip': mk('Docs/big.zip', 10 * 1024 * 1024 + 1), 'Agent/secret.pdf': mk('Agent/secret.pdf', 3), 'Docs/page.html': mk('Docs/page.html', 3) };
+  const { exporter, binaryReads } = p5Exporter(files);
+  const names = ['Docs/Private/report.pdf', 'Docs/big.zip', 'Agent/secret.pdf', 'gone/missing.pdf', 'Docs/page.html', 'Docs/Private/report.pdf'].map(ref => exporter.registerFile(ref, 'Folder/A.md'));
+  assert.deepEqual(plain(names), ['file-1', 'file-2', 'file-3', 'file-4', 'file-5', 'file-1'], 'the same file keeps its name');
+  exporter.rendered.set('a', { html: '', diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: names, mermaidUndrawn: 0, mermaidBlocked: 0 });
+  await exporter.readFiles(ticket());
+  assert.deepEqual(plain(binaryReads), ['Docs/Private/report.pdf', 'Docs/page.html'], 'no read for a big, internal or missing file');
+  const on = exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
+  assert.deepEqual(plain(on.attachments.map(item => [item.name, item.file, item.size, item.asset ?? null])), [['file-1', 'report.pdf', 3, 'file-1'], ['file-2', 'big.zip', 10485761, null], ['file-3', 'secret.pdf', 0, null], ['file-4', 'missing.pdf', 0, null], ['file-5', 'page.html', 3, 'file-5']]);
+  assert.equal(on.assets['file-1'], 'data:application/octet-stream;base64,QUJD');
+  assert.equal(on.assets['file-5'], 'data:application/octet-stream;base64,QUJD', 'an .html file is still opaque bytes');
+  assert.equal(JSON.stringify(on).includes('Docs/Private') || JSON.stringify(on).includes('Agent/'), false, 'no vault path in the payload');
+  const off = exporter.buildPayload({ includeDetail: true, includeImages: false }).payload;
+  assert.equal(off.attachments.length, 5);
+  assert.equal(off.attachments.some(item => item.asset), false);
+  assert.deepEqual(plain(Object.keys(off.assets)), []);
+  assert.equal('attachments' in exporter.buildPayload({ includeDetail: false, includeImages: false }).payload, false);
+  const plainMap = p5Exporter({}).exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
+  assert.equal('attachments' in plainMap, false, 'a map without files has no new field');
+  assert.equal(on.nodes.length, 1);
+});
+
+test('share exporter embeds: embedded images resolve from the embedded note own folder, internal-folder pictures never enter, and a picture dropped in the check cannot return through the embed', async () => {
+  const SOURCE = 'Intro\n\n![[../img/x.png]]\n\n![[../Agent/s.png]]\n\n![alt](../img/y.png)\n\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n';
+  const files = { 'Notes/Sub/Emb.md': { ...mk('Notes/Sub/Emb.md', 5, 'md'), text: SOURCE }, 'Notes/img/x.png': mk('Notes/img/x.png', 5), 'Notes/img/y.png': mk('Notes/img/y.png', 5), 'Agent/s.png': mk('Agent/s.png', 5) };
+  files['Notes/Agent/s.png'] = files['Agent/s.png'];
+  const { exporter, node } = p5Exporter(files, { detail: '![[Notes/Sub/Emb]]' });
+  const read = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 0);
+  const text = [...read.values()][0];
+  assert.ok(text.includes('![[Notes/img/x.png]]'), text);
+  assert.ok(text.includes('![[Notes/img/y.png|alt]]'), text);
+  assert.ok(!text.includes('Agent/s.png') && !text.includes('../'), text);
+  assert.equal(exporter.embeddedFigureProblems().length, 0, 'a picture without its own source line is not a licence problem');
+  // A picture line followed by a source line: checked, numbered after the card own pictures, and dropped on request.
+  files['Notes/Sub/Emb.md'].text = '![[../img/x.png]]\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n\nKept\n';
+  const before = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 2);
+  assert.ok([...before.values()][0].includes('x.png'));
+  assert.deepEqual(plain(exporter.embeddedFigureProblems().map(item => [item.id, item.index, item.problem])), [['a', 2, 'nc']]);
+  exporter.dropFigures(new Map([['a', new Set([2])]]));
+  const after = await exporter.readEmbeds('![[Notes/Sub/Emb]]', 'Folder/A.md', 'a', 2);
+  assert.equal([...after.values()][0].trim(), 'Kept');
+  assert.equal(node.id, 'a');
+});
+
+// ---- review R1 fixes ----
+test('share exporter links: nodeIds keys are the path without .md, the file name and the title; a name two cards share has no link', () => {
+  const { exporter } = p5Exporter({});
+  const node = (id, path) => ({ id, path, parentId: null, x: 0, y: 0, collapsed: false });
+  exporter.source.map.nodes = [node('water', 'Folder/Water.md'), node('other', 'Other/Water.md'), node('salt', 'Folder/Sub/Salt.md')];
+  exporter.source.notes = new Map([['water', { title: 'Water in food' }], ['other', { title: 'Elsewhere' }], ['salt', { title: 'Salt' }], ['ghost', { title: 'No card' }]]);
+  const ids = plain(Object.fromEntries(exporter.nodeIds()));
+  assert.deepEqual(ids, { 'Folder/Water': 'water', 'Water in food': 'water', 'Other/Water': 'other', Elsewhere: 'other', 'Folder/Sub/Salt': 'salt', Salt: 'salt' });
+  assert.equal('Water' in ids, false, 'the name two cards share goes to no card');
+  assert.equal(exporter.nodeIds().get('Salt'), 'salt');
+  exporter.source.notes.delete('salt');
+  assert.equal(exporter.nodeIds().has('Folder/Sub/Salt'), false, 'a card without a note has no key');
+});
+
+test('share exporter links: a marked link survives the scrub into the final html as a node link, and the exporter applies links after the scrub', () => {
+  const supportHtml = require('../support-html-dom.cjs');
+  const links = load('experiences/sharing/share-node-links.ts');
+  const dom = load('experiences/sharing/share-dom.ts');
+  const root = supportHtml.parse(`<p>See ${links.markNodeLink('water', 'Water')} and <span onclick="x()" data-x="1">${links.markNodeLink('gone', 'Gone')}</span></p>`);
+  dom.scrubShareTree(root);
+  assert.ok(root.childNodes[0].innerHTML.includes(links.NODE_LINK_START), 'the scrub leaves the mark text alone');
+  links.applyNodeLinks(root, new Set(['water']), () => new supportHtml.El('a', root.ownerDocument));
+  const out = supportHtml.serialize(root);
+  assert.ok(out.includes('<a class="vam-node-link" href="#vam-node-water">Water</a>') || out.includes('<a href="#vam-node-water" class="vam-node-link">Water</a>'), out);
+  assert.ok(!/[\uE000-\uE004]/.test(out) && out.includes('Gone'), 'an unknown id ends as text');
+  const source = fs.readFileSync(path.join(repoRoot, 'experiences/sharing/share-exporter.ts'), 'utf8');
+  const body = source.slice(source.indexOf('private finish('));
+  assert.ok(body.indexOf('replaceMediaWithLinks(') < body.indexOf('sanitizeHTMLToDom(') && body.indexOf('scrubShareTree(clean)') < body.indexOf('applyNodeLinks('), 'media links first, then sanitize and scrub, then the node links');
+});
+
+test('share exporter embeds: a picture dropped in the image check is also left out of the embedded note on the first build', async () => {
+  const files = { 'Notes/Sub/Emb.md': { ...mk('Notes/Sub/Emb.md', 5, 'md'), text: '![[../img/x.png]]\nSource: [Site](https://example.org/p) · by X · CC-BY-NC 4.0\n\nKept\n' }, 'Notes/img/x.png': mk('Notes/img/x.png', 5) };
+  const { exporter } = p5Exporter(files, { detail: '![[Notes/Sub/Emb]]' });
+  let seen = null;
+  exporter.renderOne = async (md, titles, ids, embeds) => { seen = [...embeds.values()][0]; return { html: seen, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: [], mermaidUndrawn: 0, mermaidBlocked: 0 }; };
+  exporter.dropFigures(new Map([['a', new Set([0])]]));
+  await exporter.ensureRendered(ticket(), () => {});
+  assert.ok(seen !== null && !seen.includes('x.png') && seen.includes('Kept'), `first build: ${seen}`);
+  exporter.dropFigures(new Map());
+  await exporter.ensureRendered(ticket(), () => {});
+  assert.ok(seen.includes('x.png'), 'cleared: the picture is back');
+});
+
+test('share export P6b: formulas are read before the sanitizer and filled as MathML after scrub and node links, with a visible source fallback', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'experiences/sharing/share-exporter.ts'), 'utf8');
+  const body = source.slice(source.indexOf('private finish('), source.indexOf('private fillFormulas('));
+  assert.ok(body.indexOf('collectFormulas(host)') < body.indexOf('sanitizeHTMLToDom(') && body.indexOf('applyNodeLinks(') < body.indexOf('this.fillFormulas('), 'collect first, fill last');
+  const fill = source.slice(source.indexOf('private fillFormulas('));
+  assert.ok(/mathFromLatex\(/.test(fill) && /MATH_SOURCE_CLASS/.test(fill) && /share\.math_source_note/.test(fill), 'a failed conversion shows the LaTeX and a note');
+  assert.ok(/mjx-math\[data-latex\]/.test(source) && /classList\.contains\("math-block"\)/.test(source), 'LaTeX from data-latex; display from math-block');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.ok(/"share\.math_source_note":/.test(fs.readFileSync(path.join(repoRoot, `i18n/${lang}.ts`), 'utf8')), lang);
+});
+
+test('sharing export R2: embeds inside %% and <!-- --> comments are never read', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const files = { 'Folder/Draft.md': { path: 'Folder/Draft.md', extension: 'md', text: 'Public %%private remark%% tail' } };
+  const reads = [];
+  const app = { vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; } }, metadataCache: { getFirstLinkpathDest: (ref) => files[`Folder/${ref}.md`] ?? null } };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const exporter = new module.ShareExporter(app, { map, notes: new Map(), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const embeds = await exporter.readEmbeds('%% ![[Draft]] %%\n\nx <!-- ![[Draft]] --> y\r\n%%\r\n![[Draft]]\r\n%%', 'Folder/A.md', 'a', 0);
+  assert.equal(embeds.size, 0);
+  assert.deepEqual(reads, []);
+  const shown = await exporter.readEmbeds('![[Draft]]', 'Folder/A.md', 'a', 0);
+  assert.equal(shown.get('Draft'), 'Public  tail');
+});
+
+test('share exporter acceptance fix: the shared map\'s own folder is content even inside a VAM folder; other VAM folders stay out', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const clean = load('experiences/sharing/share-clean.ts');
+  const list = [
+    { path: 'Agent/Topics/M/Notes/Src.md', extension: 'md', name: 'Src.md', text: 'Map body', stat: { size: 8 } },
+    { path: 'Agent/Topics/Other/Notes/X.md', extension: 'md', name: 'X.md', text: 'OTHER-MAP-SECRET', stat: { size: 16 } },
+    { path: 'Agent/Topics/M/Attachments/s.pdf', extension: 'pdf', name: 's.pdf', stat: { size: 3 } },
+    { path: 'Agent/Records/r.pdf', extension: 'pdf', name: 'r.pdf', stat: { size: 3 } },
+    { path: 'Agent/Topics/M/Attachments/board.canvas', extension: 'canvas', name: 'board.canvas', stat: { size: 3 } },
+    { path: 'Agent/Topics/M/Chats/records/c1.jsonl', extension: 'jsonl', name: 'c1.jsonl', stat: { size: 30 } },
+    { path: 'Agent/Topics/M/Chats/topics/t1.jsonl', extension: 'jsonl', name: 't1.jsonl', stat: { size: 30 } },
+    { path: 'Agent/Topics/M/Chats/records/Talk.md', extension: 'md', name: 'Talk.md', text: 'CHAT-RECORD-SECRET', stat: { size: 18 } }
+  ];
+  const byKey = { Src: list[0], X: list[1], 's.pdf': list[2], 'r.pdf': list[3], 'board.canvas': list[4], 'c1.jsonl': list[5], 't1.jsonl': list[6], Talk: list[7] };
+  const reads = [];
+  const app = {
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => { reads.push(file.path); return file.text; }, readBinary: async () => new TextEncoder().encode('ABC').buffer, getFileByPath: path => list.find(file => file.path === path) ?? null },
+    metadataCache: { getFirstLinkpathDest: ref => byKey[ref] ?? null }
+  };
+  const node = { id: 'a', path: 'Agent/Topics/M/Notes/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const detail = '![[Src]]\n\n![[X]]\n\n![[s.pdf]]\n\n![[r.pdf]]\n\n![[board.canvas]]\n\n![[c1.jsonl]]\n\n![[t1.jsonl]]\n\n![[Talk]]';
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', detail }]]);
+  const exporter = new module.ShareExporter(app, { map, notes, mapPath: 'Agent/Topics/M/Map.md' }, { vamVersion: '1', language: 'en', internalFolders: ['Agent'] });
+  let markdown = '';
+  exporter.renderOne = async (md, titles, ids, embeds) => {
+    markdown = clean.cleanShareMarkdown(md, { titleOf: t => titles.get(t), embedOf: t => embeds.get(t), embedTitle: t => `Embedded: ${t}`, attachmentOf: ref => exporter.registerFile(ref, node.path), assets: exporter.registry }).markdown;
+    return { html: markdown, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: [], mermaidUndrawn: 0, mermaidBlocked: 0 };
+  };
+  await exporter.ensureRendered({ generation: 0, signal: new AbortController().signal, isCurrent: () => true }, () => {});
+  assert.deepEqual([...new Set(reads)], ['Agent/Topics/M/Notes/Src.md'], 'only the shared map\'s own note is read');
+  assert.ok(markdown.includes('> Map body'), markdown);
+  assert.equal(markdown.includes('OTHER-MAP-SECRET'), false);
+  assert.equal(markdown.includes('CHAT-RECORD-SECRET'), false, 'a chat record note in the map folder is not embedded');
+  const files = [...exporter.files.values()];
+  assert.deepEqual(files.map(file => [file.file, file.size > 0]), [['s.pdf', true], ['r.pdf', false], ['board.canvas', true], ['c1.jsonl', false], ['t1.jsonl', false]], 'map attachments are found; VAM records and the map\'s chat records are not; a canvas is an attachment');
+});
+
+test('share viewer acceptance fix: buttons with click handlers are built after the note is imported into the page', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(repoRoot, 'experiences/sharing/viewer/detail.ts'), 'utf8');
+  const body = source.slice(source.indexOf('export function fillDetailRoot'));
+  const imported = body.indexOf('doc.importNode(child, true)');
+  assert.ok(imported > 0);
+  assert.ok(body.indexOf('upgradeVideoLinks(target, doc, ui)') > imported, 'video cards are built on the live page');
+  assert.ok(body.indexOf('target.querySelectorAll("a.vam-attachment-card")') > imported, 'attachment cards are built on the live page');
+  assert.equal(body.slice(0, imported).includes('upgradeVideoLinks('), false);
 });

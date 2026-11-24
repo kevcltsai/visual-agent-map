@@ -7,11 +7,28 @@
  */
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { youtubeVideoId } from "../../core/video-embeds";
-import { markdownCodeRanges, normalizeNewlines } from "./share-code";
+import { classifyShareTarget, commentRanges, markdownCodeRanges, normalizeNewlines } from "./share-code";
+export { classifyShareTarget } from "./share-code";
+import { markAttachment, markNodeLink, stripNodeLinkMarks, VIDEO_MARK } from "./share-node-links";
 
 export interface ShareCleanContext {
   /** Title of the note a link target points at, if known. */
   titleOf(target: string): string | undefined;
+  /** The id of the map card a link target points at, if it is one; the link then becomes an in-map link (share-node-links.ts). */
+  nodeIdOf?(target: string): string | undefined;
+  /**
+   * The Markdown a note embed (`![[note]]`, `note#Heading`, `note#^block`; the target as written) shows, if it can be shown
+   * (share-embeds.ts, read by the exporter beforehand). Absent or undefined: the embed becomes its title. An embed in the
+   * middle of a line is cut out of it into its own block.
+   */
+  embedOf?(target: string): string | undefined;
+  /**
+   * A file that is not a note or a picture (pdf, canvas, audio, office file…): the name its card carries (share-node-links.ts),
+   * or undefined when the export cannot offer files (the embed then stays the file name as text).
+   */
+  attachmentOf?(ref: string): string | undefined;
+  /** The callout title of an embed box for a note title (default: the title alone). */
+  embedTitle?(title: string): string;
   /** Shared across the notes of one export so the same file gets the same asset name. */
   assets: AssetRegistry;
 }
@@ -36,7 +53,6 @@ export interface AssetRegistry {
 }
 
 export const SHARE_ASSET_SCHEME = "vam-asset:";
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const isWeb = (value: string): boolean => /^https?:\/\//i.test(value);
 
 export function createAssetRegistry(): AssetRegistry {
@@ -101,7 +117,22 @@ export function dropWritebackBackupLines(text: string): string {
     .join("\n");
 }
 
-function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
+/** `> [!vam-embed] title` and the cleaned content quoted under it, as its own block. One level: the content is cleaned without embeds. */
+function embedBox(title: string, content: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
+  const inner = cleanShareMarkdown(content, { ...ctx, embedOf: undefined });
+  for (const item of inner.attachments)
+    if (!out.attachments.some(known => known.name === item.name)) out.attachments.push(item);
+  out.webImages.push(...inner.webImages);
+  const label = escapeMd(ctx.embedTitle ? ctx.embedTitle(title) : title).replace(/\s+/g, " ");
+  const quoted = inner.markdown
+    .trim()
+    .split("\n")
+    .map(line => (line ? `> ${line}` : ">"));
+  return `\n\n> [!vam-embed] ${label}\n${quoted.join("\n")}\n\n`;
+}
+
+/** `hidden`: the text is inside a `%%`/`<!--` comment, which the renderer hides: embeds there are not expanded, read or registered. */
+function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult, hidden = false): string {
   const attach = (ref: string): string => {
     const decoded = decodeRef(ref.trim());
     const name = ctx.assets.nameFor(decoded);
@@ -126,31 +157,49 @@ function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResul
       label: string | undefined,
       href: string | undefined
     ) => {
+      if ((embed !== undefined || src !== undefined) && hidden) return all;
       if (embed !== undefined) {
         const { target, alias } = splitWikilink(embed);
         const pathPart = target.split("#")[0].trim();
-        if (IMAGE_EXT.test(pathPart)) {
+        const kind = classifyShareTarget(pathPart);
+        if (kind === "image") {
           const altText = alias && !/^\d+(x\d+)?$/.test(alias) ? escapeMd(alias) : "";
           return `![${altText}](${SHARE_ASSET_SCHEME}${attach(pathPart)})`;
         }
-        if (/\.[a-z0-9]{1,5}$/i.test(pathPart) && !/\.md$/i.test(pathPart))
-          return escapeMd(pathPart.split("/").pop() ?? pathPart);
+        if (kind === "attachment") {
+          const file = escapeMd(stripNodeLinkMarks(pathPart.split("/").pop() ?? pathPart));
+          const card = ctx.attachmentOf?.(decodeRef(pathPart));
+          return card ? markAttachment(card, file) : file;
+        }
+        const content = ctx.embedOf?.(target);
+        if (content?.trim()) return embedBox(titleFor(target), content, ctx, out);
         return escapeMd(titleFor(target));
       }
       if (link !== undefined) {
         const { target, alias } = splitWikilink(link);
-        return escapeMd(alias ?? titleFor(target));
+        const text = escapeMd(stripNodeLinkMarks(alias ?? titleFor(target)));
+        const pathPart = target.split("#")[0].trim();
+        const nodeId = pathPart ? ctx.nodeIdOf?.(pathPart) : undefined;
+        return nodeId && text ? markNodeLink(nodeId, text) : text;
       }
       if (src !== undefined) {
         const raw = src
           .trim()
-          .replace(/^<|>$/g, "")
-          .replace(/\s+"[^"]*"$/, "");
+          .replace(/\s+"[^"]*"$/, "")
+          .replace(/^<|>$/g, "");
         // A YouTube embed renders as an iframe, which the shared page does not keep: share it as a plain link instead.
-        if (youtubeVideoId(raw)) return `[▶ ${alt || escapeMd(raw)}](${raw})`;
+        if (youtubeVideoId(raw)) return `[${VIDEO_MARK}▶ ${alt || escapeMd(raw)}](${raw})`;
         if (isWeb(raw)) {
           out.webImages.push({ url: raw, alt: alt ?? "" });
           return `![${alt ?? ""}](${raw})`;
+        }
+        const kind = classifyShareTarget(decodeRef(raw));
+        // A note in image syntax is never read as bytes: it shows as its title, like an unresolved note embed.
+        if (kind === "note") return escapeMd(titleFor(decodeRef(raw)));
+        if (kind === "attachment") {
+          const file = escapeMd(stripNodeLinkMarks(decodeRef(raw).split("/").pop() ?? raw));
+          const card = ctx.attachmentOf?.(decodeRef(raw));
+          return card ? markAttachment(card, file) : file;
         }
         return `![${alt ?? ""}](${SHARE_ASSET_SCHEME}${attach(raw)})`;
       }
@@ -186,13 +235,24 @@ function removeLocalReferenceDefinitions(text: string): string {
  */
 export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCleanResult {
   const out: ShareCleanResult = { markdown: "", attachments: [], webImages: [] };
-  const text = removeLocalReferenceDefinitions(normalizeNewlines(md));
+  // The marks of share-node-links.ts never come from the author: strip them before anything is marked.
+  const text = removeLocalReferenceDefinitions(stripNodeLinkMarks(normalizeNewlines(md)));
+  const code = markdownCodeRanges(text);
+  const comments = commentRanges(text, code);
+  const parts = [
+    ...code
+      .filter(range => !comments.some(comment => range.start >= comment.start && range.start < comment.end))
+      .map(range => ({ ...range, comment: false })),
+    ...comments.map(range => ({ ...range, comment: true }))
+  ].sort((a, b) => a.start - b.start);
   let result = "";
   let from = 0;
-  for (const range of markdownCodeRanges(text)) {
+  for (const range of parts) {
     result +=
       cleanSegment(dropWritebackBackupLines(text.slice(from, range.start)), ctx, out) +
-      text.slice(range.start, range.end);
+      (range.comment
+        ? cleanSegment(text.slice(range.start, range.end), ctx, out, true)
+        : text.slice(range.start, range.end));
     from = range.end;
   }
   out.markdown = result + cleanSegment(dropWritebackBackupLines(text.slice(from)), ctx, out);

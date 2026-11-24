@@ -71,7 +71,8 @@ test('A4 the clip rules are in the viewer stylesheet; only the content is cut, n
   const css = bundle.SHARE_VIEWER_CSS;
   assert.ok(css.includes('.vam-node.is-clipped > .vam-card-fade'));
   assert.ok(css.includes('.vam-node.is-clipped > .vam-card-more'));
-  assert.equal(css.includes('.vam-kind-shape'), false, 'the viewer stylesheet carries no shape rule');
+  // Since share-export-complete the viewer draws topic kinds itself, keyed on its own data-share-* attributes; the plugin's [data-topic-kind] rules stay out.
+  assert.equal(css.includes('[data-topic-kind'), false, 'the plugin shape rules stay out of the viewer stylesheet');
   const own = styles();
   // Obsidian's review rejects clip-path (scripts/check-css.mjs). overflow on the card itself would also cut what is drawn outside it: the tool row above (bottom: calc(100% - 6px)), the "+" (right: -14px), the handles, the scan line and the shape outline.
   assert.doesNotMatch(own, /clip-path\s*:/);

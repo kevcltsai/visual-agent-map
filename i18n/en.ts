@@ -2711,6 +2711,7 @@ export const en = {
   "ui.copy_technical_details": "Copy technical details",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map · read-only",
+  "share.embed_title_0": "Embedded: {0}",
   "share.viewer_made_with": "Made with VAM",
   "share.viewer_install": "Install VAM",
   "share.viewer_goal_0": "Goal: {0}",
@@ -2722,6 +2723,8 @@ export const en = {
   "share.viewer_no_content": "This topic has no notes in the shared file.",
   "share.viewer_image_omitted": "[image not included]",
   "share.viewer_image_source_0": "Source: {0}",
+  "share.viewer_attachment_download_0": "Download ({0})",
+  "share.viewer_attachment_not_included": "Not included",
   "share.viewer_resize_panel": "Resize the side panel",
   "share.viewer_outline": "Outline",
   "share.viewer_untitled": "Untitled map",
@@ -2765,6 +2768,16 @@ export const en = {
   "share.viewer_color_green": "Green",
   "share.viewer_color_blue": "Blue",
   "share.viewer_color_purple": "Purple",
+  "share.viewer_kind_0": "Type: {0}",
+  "share.viewer_relations": "Relations",
+  "share.viewer_frame": "Frame",
+  "share.viewer_frame_named_0": "Frame: {0}",
+  "share.viewer_video_play": "Click to play the YouTube video",
+  "share.viewer_video_note": "The video only connects to YouTube when you play it (the no-cookie version)",
+  "share.viewer_video_open": "Open on YouTube",
+  "share.media_video_0": "Video: {0}",
+  "share.media_audio_0": "Audio: {0}",
+  "share.media_embed_0": "Embedded content: {0}",
   // Share dialog
   "share.title": "Share this map",
   "share.intro":
@@ -2798,6 +2811,7 @@ export const en = {
   "share.mermaid_blocked_note":
     "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
+  "share.math_source_note": "[Formula shown as source: it could not be converted to math notation.]",
   "share.leak_blocked_0":
     "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
   "share.leak_at_0": "In topic “{0}”",

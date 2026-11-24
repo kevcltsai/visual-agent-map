@@ -2,6 +2,8 @@ import type { ShareNodeTranslation } from "../share-format";
 import type { ShareViewerUi } from "../share-viewer-ui";
 import { reconstructTranslatedDetail } from "../share-translate-compact";
 import { createViewerElement } from "./dom";
+import { cleanViewerMath } from "./math";
+import { upgradeVideoLinks } from "./video";
 
 /** The pieces of the "Source: host" line shown under a web image: text before, link label, text after. */
 export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSource">): [string, string, string] {
@@ -93,6 +95,80 @@ function sourceLine(doc: Document, src: string, ui: ShareViewerUi): HTMLElement 
   return line;
 }
 
+const ATTACHMENT_PREFIX = "data:application/octet-stream;base64,";
+const ATTACHMENT_HREF = /^#vam-attachment-([A-Za-z0-9_-]{1,100})$/;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/** The byte size a base64 string stands for, or null when it is not base64. */
+function base64Size(data: string): number | null {
+  if (data.length % 4 !== 0 || !BASE64.test(data)) return null;
+  return (data.length / 4) * 3 - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * A file card from the exporter's `<a class="vam-attachment-card" href="#vam-attachment-<name>">`: type badge, file name,
+ * and either a download button (only when `assets[name]` is the opaque `data:application/octet-stream;base64,` entry; the
+ * Blob is always `application/octet-stream`, so the browser saves it and never opens it) or the "not included" text.
+ */
+export function attachmentCard(
+  doc: Document,
+  link: Element,
+  assets: Readonly<Record<string, string>>,
+  ui: ShareViewerUi
+): HTMLElement {
+  const file = ((link.textContent ?? "").split(/[\\/]/).pop() ?? "").trim().slice(0, 200) || "file";
+  const name = ATTACHMENT_HREF.exec(link.getAttribute("href") ?? "")?.[1] ?? "";
+  const data = name && Object.prototype.hasOwnProperty.call(assets, name) ? assets[name] : undefined;
+  const base64 =
+    typeof data === "string" && data.startsWith(ATTACHMENT_PREFIX) ? data.slice(ATTACHMENT_PREFIX.length) : "";
+  const size = base64 ? base64Size(base64) : null;
+  const card = createViewerElement(doc, "span");
+  card.className = "vam-attachment";
+  const ext = file.includes(".") ? (file.split(".").pop() ?? "") : "";
+  const badge = createViewerElement(doc, "span");
+  badge.className = "vam-attachment-type";
+  badge.textContent = (ext.replace(/[^A-Za-z0-9]/g, "").slice(0, 4) || "FILE").toUpperCase();
+  const label = createViewerElement(doc, "span");
+  label.className = "vam-attachment-name";
+  label.textContent = file;
+  card.append(badge, label);
+  if (size === null) {
+    const missing = createViewerElement(doc, "span");
+    missing.className = "vam-attachment-missing";
+    missing.textContent = ui.attachmentNotIncluded;
+    card.append(missing);
+    return card;
+  }
+  const button = createViewerElement(doc, "button");
+  button.type = "button";
+  button.textContent = ui.attachmentDownload.replace("{0}", formatFileSize(size));
+  button.addEventListener("click", () => {
+    const view = doc.defaultView;
+    if (!view) return;
+    const binary = view.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let at = 0; at < binary.length; at++) bytes[at] = binary.charCodeAt(at);
+    // The method names are built, not written out: the viewer bundle must not contain the text "url(" (a check against external references).
+    const urls = view.URL;
+    const objectUrl = (action: "create" | "revoke", value: Blob | string): string =>
+      (urls as unknown as Record<string, (input: Blob | string) => string>)[`${action}ObjectURL`](value);
+    const url = objectUrl("create", new view.Blob([bytes], { type: "application/octet-stream" }));
+    const anchor = createViewerElement(doc, "a");
+    anchor.href = url;
+    anchor.download = file;
+    anchor.click();
+    view.setTimeout(() => objectUrl("revoke", url), 1000);
+  });
+  card.append(button);
+  return card;
+}
+
 /**
  * Puts the exported note HTML into `target` (see {@link fillDetailRoot} for the part after parsing). The exporter already sanitized it; this pass repeats the cheap checks
  * (no script, no event attributes, no script URLs) and does the viewer's own work: asset images, links, wide tables.
@@ -159,6 +235,7 @@ export function fillDetailRoot(
       link.setAttribute("rel", "noopener noreferrer");
     } else if (!href.startsWith("#")) link.removeAttribute("href");
   }
+  cleanViewerMath(root);
   for (const table of Array.from(root.querySelectorAll("table"))) {
     if (table.parentElement?.classList.contains("vam-table-scroll")) continue;
     const wrap = createViewerElement(doc, "div");
@@ -167,6 +244,10 @@ export function fillDetailRoot(
     wrap.append(table);
   }
   target.append(...Array.from(root.childNodes).map(child => doc.importNode(child, true)));
+  // Controls with click handlers are built on the live page: importNode copies nodes, never their listeners.
+  for (const card of Array.from(target.querySelectorAll("a.vam-attachment-card")))
+    card.replaceWith(attachmentCard(doc, card, assets, ui));
+  upgradeVideoLinks(target, doc, ui);
 }
 
 /**

@@ -38,6 +38,26 @@ export type ShareTranslationLanguage = (typeof SHARE_TRANSLATION_LANGUAGES)[numb
 export const isShareTranslationLanguage = (value: unknown): value is ShareTranslationLanguage =>
   typeof value === "string" && (SHARE_TRANSLATION_LANGUAGES as readonly string[]).includes(value);
 
+/** Topic types the file can name (the map's own list without the ordinary "topic"), and the shapes they take. Literal lists: the viewer bundle imports no plugin module. */
+export const SHARE_NODE_KINDS = ["action", "atomic", "hypothesis", "evidence", "conclusion"] as const;
+export type ShareNodeKind = (typeof SHARE_NODE_KINDS)[number];
+export const SHARE_NODE_SHAPES = ["rect", "ellipse", "diamond", "folded", "hexagon"] as const;
+export type ShareNodeShape = (typeof SHARE_NODE_SHAPES)[number];
+/** The relation kinds of the map (topic relations and anchor relations share them). */
+export const SHARE_RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+] as const;
+export type ShareRelationKind = (typeof SHARE_RELATION_KINDS)[number];
+/** Longest relation description or frame name that travels (the map's own limit is 200). */
+export const SHARE_LABEL_LIMIT = 200;
+const isOneOf = <T extends string>(list: readonly T[], value: unknown): value is T =>
+  typeof value === "string" && (list as readonly string[]).includes(value);
+
 /** One edit to a diagram's flat node list (elements and text nodes in document order, the `<svg>` itself first): a text node's new text, or an element's attributes (a value of null removes the attribute). */
 export type ShareDiagramPatchOp = [number, string] | [number, Record<string, string | null>];
 /**
@@ -70,6 +90,10 @@ export interface ShareMapTranslation {
 /** Size thresholds (bytes) for the preview warning and the "leave the images out" suggestion. */
 export const SHARE_SIZE_WARN_BYTES = 10 * 1024 * 1024;
 export const SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES = 20 * 1024 * 1024;
+/** A file attachment (pdf, office file…) larger than this is listed in the file but its bytes are not embedded. */
+export const SHARE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** The only data-URI prefix an attachment's bytes may carry: the viewer offers it as an opaque download, never opens it. */
+export const SHARE_ATTACHMENT_DATA_PREFIX = "data:application/octet-stream;base64,";
 /** Longest edge (px) of an embedded image. */
 export const SHARE_IMAGE_MAX_EDGE = 1600;
 /** OQ-1 (owner decision): shares include the full note content unless the exporter turns it off. */
@@ -108,6 +132,10 @@ export interface ShareNodePayload {
   style?: TopicStyle[];
   /** Optional (topic-links): normalized http(s) hrefs of the topic. Absent means none; `version` stays 1. The viewer checks each again. */
   links?: string[];
+  /** Optional (share-complete): the topic type (not "topic"); only a whitelisted value is written. Absent means an ordinary topic; `version` stays 1. The viewer checks it again. */
+  kind?: ShareNodeKind;
+  /** Optional (share-complete): the card's shape when it is not the rounded default (an argument-map card is always `rect`); only a whitelisted value is written. The viewer checks it again. */
+  shape?: ShareNodeShape;
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
   /** Optional (share-match-map): this branch's own growth direction (already cleaned by the map reader). Absent means the map's. `version` stays 1. */
@@ -173,9 +201,34 @@ export interface ShareImagePayload {
   h: number;
   asset?: string;
   note?: string;
+  /** Optional (share-complete): `true` for a free picture (a plain image of the map, not an annotated one); the viewer draws it without the annotation bar. */
+  free?: true;
   anchors: ShareAnchorPayload[];
-  /** anchor -> topic relations (either direction in the map); kind and description are not carried. */
-  links?: Array<{ anchor: string; topic: string; ring?: true }>;
+  /** anchor -> topic relations (either direction in the map). `kind` and `description` are optional (share-complete), plain text only; the viewer checks `kind` again. */
+  links?: Array<{ anchor: string; topic: string; ring?: true; kind?: ShareRelationKind; description?: string }>;
+}
+
+/** Optional (share-complete): a relation between two topics in the file; both ends are in `nodes`, never the same. `description` is plain text. */
+export interface ShareRelationPayload {
+  kind: ShareRelationKind;
+  from: string;
+  to: string;
+  description?: string;
+}
+
+/** Optional (share-complete): a frame the map draws around cards. `members` are ids present in the file (topics, pictures, text blocks); `label` is plain text. */
+export interface ShareBoundaryPayload {
+  id: string;
+  members: string[];
+  label?: string;
+}
+
+/** Optional (share-complete): a file a note embeds. `name` is the key of `assets` (when the bytes travel) and of the card; `file` is the file name only, never a path. */
+export interface ShareAttachmentPayload {
+  name: string;
+  file: string;
+  size: number;
+  asset?: string;
 }
 
 export interface SharePayload {
@@ -196,6 +249,12 @@ export interface SharePayload {
   layout?: MapLayout;
   /** Optional (share-match-map): annotated images; absent when the map has none. `version` stays 1. */
   images?: ShareImagePayload[];
+  /** Optional (share-complete): topic relations; absent when the map has none. `version` stays 1. */
+  relations?: ShareRelationPayload[];
+  /** Optional (share-complete): frames around cards; absent when the map has none. `version` stays 1. */
+  boundaries?: ShareBoundaryPayload[];
+  /** Optional (share-complete): files the notes embed; absent when there are none. `version` stays 1. */
+  attachments?: ShareAttachmentPayload[];
   assets: Record<string, string>;
   /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
   contentLanguage?: string;
@@ -215,6 +274,10 @@ export interface ShareNoteInput {
   relevance?: { tier: RelevanceTier; manual?: true };
   /** Legacy `relevance-reason`, still shown when an older note has one. */
   reason?: string;
+  /** Topic type from the note; anything not on the whitelist is dropped when the payload is built. */
+  kind?: unknown;
+  /** The card's shape (computed by the exporter, argument-map cards are rect); anything not on the whitelist is dropped when the payload is built. */
+  shape?: unknown;
   /** Topic marker ids from the note; anything not on the whitelist is dropped when the payload is built. */
   markers?: readonly unknown[];
   /** Topic colour id from the note; anything not on the whitelist is dropped when the payload is built. */
@@ -236,6 +299,8 @@ export interface ShareOptions {
   goal?: string;
   /** name -> data URL, embedded only when includeImages is true. */
   assets?: Record<string, string>;
+  /** Files the notes embed (name, file name, byte size); `assets[name]` holds the bytes when they travel. Kept only with includeDetail. */
+  attachments?: readonly { name: string; file: string; size: number }[];
   /** topic id -> cover picture asset name and look. Used only when includeDetail and includeImages; an asset not in `assets` is ignored. */
   covers?: Readonly<
     Record<
@@ -245,7 +310,7 @@ export interface ShareOptions {
   >;
   /** ring member topic id -> its rendered card height in the map (share-match-map). Absent for maps without rings. */
   ringHeights?: Readonly<Record<string, number>>;
-  /** annotated image id -> asset name. Same rule as `covers`. */
+  /** annotated or free image id -> asset name. Same rule as `covers`. */
   imageAssets?: Readonly<Record<string, string>>;
   /** Turns free text into plain text (the exporter passes `plainWikilinks`); identity when absent. */
   plainText?: (text: string) => string;
@@ -354,7 +419,11 @@ function shareCover(raw: NonNullable<ShareOptions["covers"]>[string], assets: Re
   return out;
 }
 
-/** The map's annotated images for the payload (decision #4: only these; the vault path, relation kind and description stay out). */
+/** One line of plain text with a length limit; undefined when nothing is left. */
+const limitedText = (value: unknown, plain: (text: string) => string): string | undefined =>
+  typeof value === "string" ? optionalText(plain(value).replace(/\s+/g, " ").slice(0, SHARE_LABEL_LIMIT)) : undefined;
+
+/** The map's pictures for the payload: annotated images with anchors and relations, and free images (no anchors). The vault path never travels. */
 function shareImages(
   map: MapDocument,
   nodeIds: ReadonlySet<string>,
@@ -366,12 +435,26 @@ function shareImages(
   const seen = new Set<string>();
   for (const item of map.canvasItems ?? []) {
     const raw = item as unknown as Record<string, unknown>;
-    if (raw.kind !== "annotated-image" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (
+      (raw.kind !== "annotated-image" && raw.kind !== "image") ||
+      typeof raw.id !== "string" ||
+      !raw.id ||
+      seen.has(raw.id)
+    )
+      continue;
     if (![raw.x, raw.y, raw.w, raw.h].every(finiteNumber)) continue;
     const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h] as number[];
     if (!(w > 0 && h > 0)) continue;
     seen.add(raw.id);
-    const image: ShareImagePayload = { id: raw.id, x, y, w, h, anchors: [] };
+    const image: ShareImagePayload = {
+      id: raw.id,
+      x,
+      y,
+      w,
+      h,
+      anchors: [],
+      ...(raw.kind === "image" ? { free: true as const } : {})
+    };
     const asset = assetNames[raw.id];
     if (asset && assets[asset]) image.asset = asset;
     const note = typeof raw.note === "string" ? optionalText(plain(raw.note)) : undefined;
@@ -390,15 +473,93 @@ function shareImages(
     }
     const links: NonNullable<ShareImagePayload["links"]> = [];
     for (const relation of Array.isArray(raw.relations) ? raw.relations : []) {
-      const { from, to, ring } = (relation ?? {}) as { from?: unknown; to?: unknown; ring?: unknown };
+      const { from, to, ring, kind, description } = (relation ?? {}) as {
+        from?: unknown;
+        to?: unknown;
+        ring?: unknown;
+        kind?: unknown;
+        description?: unknown;
+      };
       if (typeof from !== "string" || typeof to !== "string") continue;
       const anchor = anchorIds.has(from) ? from : anchorIds.has(to) ? to : undefined;
       const topic = anchor === from ? to : from;
       if (!anchor || anchorIds.has(topic) || !nodeIds.has(topic)) continue;
-      links.push({ anchor, topic, ...(ring === true ? { ring: true as const } : {}) });
+      const text = limitedText(description, plain);
+      links.push({
+        anchor,
+        topic,
+        ...(ring === true ? { ring: true as const } : {}),
+        ...(isOneOf(SHARE_RELATION_KINDS, kind) ? { kind } : {}),
+        ...(text ? { description: text } : {})
+      });
     }
     if (links.length) image.links = links;
     out.push(image);
+  }
+  return out;
+}
+
+/** The map's topic relations: a known kind, both ends in the file, not the same topic. The description is plain text. */
+function shareRelations(
+  map: MapDocument,
+  nodeIds: ReadonlySet<string>,
+  plain: (text: string) => string
+): ShareRelationPayload[] {
+  const out: ShareRelationPayload[] = [];
+  for (const raw of map.topicRelations ?? []) {
+    const { kind, from, to, description } = (raw ?? {}) as unknown as Record<string, unknown>;
+    if (!isOneOf(SHARE_RELATION_KINDS, kind) || typeof from !== "string" || typeof to !== "string") continue;
+    if (from === to || !nodeIds.has(from) || !nodeIds.has(to)) continue;
+    const text = limitedText(description, plain);
+    out.push({ kind, from, to, ...(text ? { description: text } : {}) });
+  }
+  return out;
+}
+
+const ATTACHMENT_NAME = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** The file list: a safe name, the file name without any folder, a non-negative size; `asset` only when the bytes really are in `assets` with the opaque prefix. */
+function shareAttachments(
+  raw: ShareOptions["attachments"],
+  assets: Record<string, string>,
+  includeDetail: boolean,
+  plain: (text: string) => string
+): ShareAttachmentPayload[] {
+  if (!includeDetail || !raw) return [];
+  const out: ShareAttachmentPayload[] = [];
+  for (const item of raw) {
+    if (!ATTACHMENT_NAME.test(item.name) || out.some(each => each.name === item.name)) continue;
+    const file = plain(item.file.split(/[\\/]/).pop() ?? "").slice(0, 200);
+    if (!file) continue;
+    const size = Number.isFinite(item.size) && item.size > 0 ? Math.floor(item.size) : 0;
+    const data = assets[item.name];
+    out.push({
+      name: item.name,
+      file,
+      size,
+      ...(typeof data === "string" && data.startsWith(SHARE_ATTACHMENT_DATA_PREFIX) ? { asset: item.name } : {})
+    });
+  }
+  return out;
+}
+
+/** The map's boundary frames: members the file does not carry are left out; a frame left with no member is not written. */
+function shareBoundaries(
+  map: MapDocument,
+  present: ReadonlySet<string>,
+  plain: (text: string) => string
+): ShareBoundaryPayload[] {
+  const out: ShareBoundaryPayload[] = [];
+  const seen = new Set<string>();
+  for (const item of map.canvasItems ?? []) {
+    const raw = item as unknown as Record<string, unknown>;
+    if (raw.kind !== "boundary" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (!Array.isArray(raw.members)) continue;
+    const members = [...new Set(raw.members.filter((id): id is string => typeof id === "string" && present.has(id)))];
+    if (!members.length) continue;
+    seen.add(raw.id);
+    const label = limitedText(raw.label, plain);
+    out.push({ id: raw.id, members, ...(label ? { label } : {}) });
   }
   return out;
 }
@@ -441,6 +602,8 @@ export function buildSharePayload(
       const reason = optionalText(note.reason);
       if (reason) out.reason = reason;
     }
+    if (isOneOf(SHARE_NODE_KINDS, note?.kind)) out.kind = note.kind;
+    if (isOneOf(SHARE_NODE_SHAPES, note?.shape)) out.shape = note.shape;
     const markers = readTopicMarkers({ "topic-markers": note?.markers });
     if (markers.length) out.markers = markers;
     const color = readTopicColor({ "topic-color": note?.color });
@@ -477,6 +640,15 @@ export function buildSharePayload(
     assets,
     options.plainText ?? (text => text)
   );
+  const plain = options.plainText ?? ((text: string) => text);
+  const nodeIds = new Set(map.nodes.map(node => node.id));
+  const relations = shareRelations(map, nodeIds, plain);
+  const boundaries = shareBoundaries(
+    map,
+    new Set([...nodeIds, ...images.map(image => image.id), ...textNodes.map(text => text.id)]),
+    plain
+  );
+  const attachments = shareAttachments(options.attachments, withImages ? assets : {}, options.includeDetail, plain);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -491,6 +663,9 @@ export function buildSharePayload(
     ...(summaries.length ? { summaries } : {}),
     ...(stored.direction !== "right" || stored.spacing ? { layout: stored } : {}),
     ...(images.length ? { images } : {}),
+    ...(relations.length ? { relations } : {}),
+    ...(boundaries.length ? { boundaries } : {}),
+    ...(attachments.length ? { attachments } : {}),
     assets
   };
 }

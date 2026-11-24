@@ -124,3 +124,62 @@ export function markdownCodeRanges(markdown: string): CodeRange[] {
 }
 
 export const normalizeNewlines = (text: string): string => text.replace(/\r\n?/g, "\n");
+
+/** Ranges of Obsidian comments (`%%…%%`, `<!--…-->`, possibly multi-line) outside code; an unclosed one runs to the end. Needs `\n` line endings. */
+export function commentRanges(markdown: string, code: CodeRange[] = markdownCodeRanges(markdown)): CodeRange[] {
+  const ranges: CodeRange[] = [];
+  const open = /%%|<!--/g;
+  let at = 0;
+  while (at < markdown.length) {
+    open.lastIndex = at;
+    const found = open.exec(markdown);
+    if (!found) break;
+    if (inside(code, found.index)) {
+      at = found.index + 1;
+      continue;
+    }
+    const closer = found[0] === "%%" ? "%%" : "-->";
+    const close = markdown.indexOf(closer, found.index + found[0].length);
+    const end = close < 0 ? markdown.length : close + closer.length;
+    ranges.push({ start: found.index, end });
+    at = end;
+  }
+  return ranges;
+}
+
+/** Code and comment ranges together, sorted and merged: text the cleaner and exporter must leave exactly as written. */
+export function markdownProtectedRanges(markdown: string): CodeRange[] {
+  const code = markdownCodeRanges(markdown);
+  const all = [...code, ...commentRanges(markdown, code)].sort((a, b) => a.start - b.start);
+  const merged: CodeRange[] = [];
+  for (const range of all) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  return merged;
+}
+
+/** Removes comments (outside code) the way Obsidian's embeds do not show them. */
+export function stripComments(markdown: string): string {
+  let result = "";
+  let from = 0;
+  for (const range of commentRanges(markdown)) {
+    result += markdown.slice(from, range.start);
+    from = range.end;
+  }
+  return result + markdown.slice(from);
+}
+
+const SHARE_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+/**
+ * What an embed target is, from its path alone. One rule for `![[…]]` and `![](…)` (Diagnostic Reset, share-export-complete):
+ * a note (`.md` or no extension) is never shipped as a file, an image becomes an asset, anything else is an attachment.
+ */
+export function classifyShareTarget(path: string): "note" | "image" | "attachment" {
+  const clean = path.split(/[?#]/)[0].trim();
+  if (SHARE_IMAGE_EXT.test(clean)) return "image";
+  // Short extensions are files; a longer word after a dot is a note title (`Q3.Planning`) unless it is a known file type.
+  const ext = /\.([a-z0-9]{1,5}|canvas|keynote|numbers|sketch|excalidraw)$/i.exec(clean);
+  return !ext || ext[1].toLowerCase() === "md" ? "note" : "attachment";
+}

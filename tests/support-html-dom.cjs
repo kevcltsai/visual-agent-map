@@ -59,6 +59,7 @@ class El extends Base {
     if (deep) for (const child of this.childNodes) copy.appendChild(child.cloneNode(true));
     return copy;
   }
+  get children() { return this.childNodes.filter(node => node.nodeType === 1); }
   get innerHTML() { return this.childNodes.map(serializeNode).join(''); }
 }
 

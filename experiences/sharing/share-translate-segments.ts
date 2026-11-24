@@ -97,7 +97,11 @@ const ATOM_CLASSES = new Set([
   "notranslate",
   "vam-image-omitted",
   "vam-mermaid-note",
-  "vam-mermaid-slot"
+  "vam-mermaid-slot",
+  "vam-attachment-card",
+  "vam-media-link",
+  "vam-media-text",
+  "vam-video-link"
 ]);
 /** A web address inside prose is never translated. */
 const URL_IN_TEXT = /(?:https?:\/\/|www\.)[^\s<>"'，。、；：）」』】》]+/gi;

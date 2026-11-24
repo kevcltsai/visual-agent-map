@@ -1,5 +1,5 @@
 // Annotated image P6 (A6): OPML, FreeMind and the private clipboard format never carry an annotated image, its anchors, anchor notes
-// or anchor relations. The share payload does since share-match-map (owner-approved): picture position, anchors, their notes and links, never the path, relation kind or description. PNG / SVG export is covered in steps-canvas-items-view and steps-anchor-relations-view.
+// or anchor relations. The share payload does since share-match-map (owner-approved): picture position, anchors, their notes and links, never the path; since share-export-complete (decision #2) also the relation kind and description. PNG / SVG export is covered in steps-canvas-items-view and steps-anchor-relations-view.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, obsidian } = require('./support.cjs');
@@ -43,15 +43,15 @@ for (const format of ['opml', 'freemind']) {
   });
 }
 
-test('share payload: the annotated image travels as images (anchors, notes, links) and the path, relation kind and description stay out', () => {
+test('share payload: the annotated image travels as images (anchors, notes, links) and its relation kind and description; the path stays out', () => {
   const options = { includeDetail: true, includeImages: true, language: 'en', vamVersion: '0.31.0', exportedAt: '2026-11-05T00:00:00.000Z', assets: {} };
   const notesById = { r: { title: 'Root' }, c: { title: 'Kid' }, d: { title: 'Kid 2' } };
   const { images, ...withImage } = plain(share.buildSharePayload(mapWith(true), notesById, options));
   assert.deepEqual(withImage, plain(share.buildSharePayload(mapWith(false), notesById, options)), 'everything but images is unchanged');
-  assert.deepEqual(images, [{ id: 'img1', x: 500, y: 0, w: 200, h: 100, anchors: [{ id: 'a1', x: 0.5, y: 0.5, note: SECRET }], note: SECRET, links: [{ anchor: 'a1', topic: 'c' }] }]);
+  assert.deepEqual(images, [{ id: 'img1', x: 500, y: 0, w: 200, h: 100, anchors: [{ id: 'a1', x: 0.5, y: 0.5, note: SECRET }], note: SECRET, links: [{ anchor: 'a1', topic: 'c', kind: 'supports', description: SECRET }] }]);
   const text = share.serializeShareJson(share.buildSharePayload(mapWith(true), notesById, options));
-  for (const word of ['canvasItems', 'annotated-image', 'Pics/', '"path"', 'supports', 'description', 'relations']) assert.equal(text.includes(word), false, word);
-  assert.equal(text.split(SECRET).length - 1, 2, 'the image note and the anchor note, nothing else');
+  for (const word of ['canvasItems', 'annotated-image', 'Pics/', '"path"']) assert.equal(text.includes(word), false, word);
+  assert.equal(text.split(SECRET).length - 1, 3, 'the image note, the anchor note and the relation description, nothing else');
   assert.equal('textNodes' in withImage, false);
   assert.equal('summaries' in withImage, false);
 });
@@ -105,8 +105,8 @@ test('P6 A15 share payload: ring relations travel as ring links on the image, an
   const notesById = { r1: { title: 'Part 1' }, r2: { title: 'Part 2' }, r3: { title: 'Part 3' } };
   const { images, ...withImage } = plain(share.buildSharePayload(ringMap(true), notesById, options));
   assert.equal(JSON.stringify(withImage), JSON.stringify(plain(share.buildSharePayload(ringMap(false), notesById, options))));
-  assert.deepEqual(images[0].links, [{ anchor: 'a1', topic: 'r1', ring: true }, { anchor: 'a2', topic: 'r2', ring: true }, { anchor: 'a3', topic: 'r3', ring: true }]);
+  assert.deepEqual(images[0].links, [{ anchor: 'a1', topic: 'r1', ring: true, kind: 'related' }, { anchor: 'a2', topic: 'r2', ring: true, kind: 'related' }, { anchor: 'a3', topic: 'r3', ring: true, kind: 'related' }]);
   assert.equal('ring' in withImage.nodes[0], false);
   const text = share.serializeShareJson(share.buildSharePayload(ringMap(true), notesById, options));
-  for (const word of ['canvasItems', 'Pics/', '"path"', '"kind"']) assert.equal(text.includes(word), false, word);
+  for (const word of ['canvasItems', 'Pics/', '"path"', '"kind":"image"', '"kind":"annotated-image"']) assert.equal(text.includes(word), false, word);
 });

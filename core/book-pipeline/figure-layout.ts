@@ -1,6 +1,13 @@
 // Layout of a checked figure (figure-spec.ts) as a neutral tree; a thin DOM layer turns it into SVG. Pure. Attributes hold only numbers
 // this file computed and fixed class names, never text from the figure; the figure's words go in `text`.
-import type { BarFigure, BoardFigure, FigureSpec, GraphFigure, ScaleFigure } from "./figure-spec";
+import {
+  figNum,
+  type BarFigure,
+  type BoardFigure,
+  type FigureSpec,
+  type GraphFigure,
+  type ScaleFigure
+} from "./figure-spec";
 
 export interface FigureNode {
   tag: "svg" | "g" | "rect" | "line" | "circle" | "polygon" | "path" | "text" | "title" | "defs" | "marker";
@@ -54,11 +61,11 @@ const arrowDefs = (): FigureNode =>
 
 function root(height: number, body: FigureNode[], title: string | undefined, arrows = false): FigureNode {
   const h = Math.min(FIGURE_MAX_HEIGHT, Math.ceil(height));
-  return el("svg", { viewBox: `0 0 ${FIGURE_WIDTH} ${h}`, role: "img", class: "vam-figure-svg" }, [
-    ...(title ? [el("title", {}, [], title)] : []),
-    ...(arrows ? [arrowDefs()] : []),
-    ...body
-  ]);
+  return el(
+    "svg",
+    { viewBox: `0 0 ${FIGURE_WIDTH} ${h}`, ...(title ? { role: "img" } : {}), class: "vam-figure-svg" },
+    [...(title ? [el("title", {}, [], title)] : []), ...(arrows ? [arrowDefs()] : []), ...body]
+  );
 }
 
 function layoutBar(f: BarFigure, title?: string): FigureNode {
@@ -67,7 +74,7 @@ function layoutBar(f: BarFigure, title?: string): FigureNode {
     left = 20,
     span = FIGURE_WIDTH - 2 * left;
   const total = (g: BarFigure["groups"][number]): number =>
-    f.stacked ? g.values.reduce((s, v) => s + Number(v.value), 0) : Math.max(...g.values.map(v => Number(v.value)));
+    f.stacked ? g.values.reduce((s, v) => s + figNum(v.value), 0) : Math.max(...g.values.map(v => figNum(v.value)));
   const top = Math.max(...f.groups.map(total));
   const series: string[] = [];
   for (const g of f.groups) for (const v of g.values) if (v.series && !series.includes(v.series)) series.push(v.series);
@@ -82,18 +89,18 @@ function layoutBar(f: BarFigure, title?: string): FigureNode {
       const w = Math.min(80, slot * 0.7);
       let y = base;
       g.values.forEach((v, i) => {
-        const h = (Number(v.value) / top) * plot;
+        const h = (figNum(v.value) / top) * plot;
         y -= h;
         body.push(rect(cx - w / 2, y, w, h, cls(v, i)));
         if (h >= 16) body.push(label(cx, y + h / 2 + 4, `${v.value}${unit}`, "fig-text-inv"));
       });
-      if (g.values.some(v => (Number(v.value) / top) * plot < 16))
+      if (g.values.some(v => (figNum(v.value) / top) * plot < 16))
         body.push(label(cx, y - 8, g.values.map(v => v.value).join(" / ") + unit, "fig-text-sm"));
     } else {
       const k = g.values.length;
       const w = Math.min(60, (slot * 0.8) / k);
       g.values.forEach((v, i) => {
-        const h = (Number(v.value) / top) * plot;
+        const h = (figNum(v.value) / top) * plot;
         const x = cx - (w * k) / 2 + w * i;
         body.push(
           rect(x, base - h, w, h, cls(v, i)),
@@ -114,9 +121,9 @@ function layoutScale(f: ScaleFigure, title?: string): FigureNode {
   const x0 = 30,
     x1 = FIGURE_WIDTH - 30,
     axis = 104;
-  const lo = Number(f.min),
-    hi = Number(f.max);
-  const X = (v: string): number => x0 + ((Number(v) - lo) / (hi - lo)) * (x1 - x0);
+  const lo = figNum(f.min),
+    hi = figNum(f.max);
+  const X = (v: string): number => x0 + ((figNum(v) - lo) / (hi - lo)) * (x1 - x0);
   const unit = f.unit ?? "";
   const body: FigureNode[] = [line(x0, axis, x1, axis, "fig-axis")];
   f.marks.forEach((m, i) => {

@@ -58,7 +58,9 @@ class Shape extends Error {}
 const bad = (): never => {
   throw new Shape("figure_shape");
 };
-const NUMERIC = /^-?\d+(?:\.\d+)?$/;
+const NUMERIC = /^-?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/;
+/** A value string as a number (a thousands separator as written in the text is dropped). */
+export const figNum = (s: string): number => Number(s.replace(/,/g, ""));
 const absent = (v: unknown): boolean => v === undefined || v === null;
 const obj = (v: unknown): Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : bad();
@@ -73,7 +75,7 @@ const bool = (v: unknown): boolean => (typeof v === "boolean" ? v : bad());
 const int = (v: unknown, max: number): number =>
   typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= max ? v : bad();
 const side = (v: unknown): string => {
-  const n = typeof v === "number" ? v : typeof v === "string" && /^\d{1,2}$/.test(v.trim()) ? Number(v) : NaN;
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d{1,2}$/.test(v.trim()) ? figNum(v) : NaN;
   return String(int(n, FIGURE_LIMITS.side));
 };
 const cell = (v: unknown): Cell => {
@@ -88,7 +90,7 @@ function parseBar(r: Record<string, unknown>): BarFigure {
       const v = obj(x);
       const series = optText(v.series);
       const value = num(v.value);
-      if (Number(value) < 0) bad();
+      if (figNum(value) < 0) bad();
       return series === undefined ? { value } : { series, value };
     });
     return { label: text(o.label), values };
@@ -96,7 +98,7 @@ function parseBar(r: Record<string, unknown>): BarFigure {
   const unit = optText(r.unit);
   const stacked = absent(r.stacked) ? false : bool(r.stacked);
   const total = (g: BarFigure["groups"][number]): number =>
-    stacked ? g.values.reduce((s, v) => s + Number(v.value), 0) : Math.max(...g.values.map(v => Number(v.value)));
+    stacked ? g.values.reduce((s, v) => s + figNum(v.value), 0) : Math.max(...g.values.map(v => figNum(v.value)));
   if (!(Math.max(...groups.map(total)) > 0)) bad();
   return { type: "bar", ...(unit === undefined ? {} : { unit }), stacked, groups };
 }
@@ -104,8 +106,8 @@ function parseBar(r: Record<string, unknown>): BarFigure {
 function parseScale(r: Record<string, unknown>): ScaleFigure {
   const min = num(r.min),
     max = num(r.max);
-  if (!(Number(min) < Number(max))) bad();
-  const inside = (v: string): string => (Number(v) >= Number(min) && Number(v) <= Number(max) ? v : bad());
+  if (!(figNum(min) < figNum(max))) bad();
+  const inside = (v: string): string => (figNum(v) >= figNum(min) && figNum(v) <= figNum(max) ? v : bad());
   const marks = arr(r.marks, FIGURE_LIMITS.marks, 1).map((m): ScaleMark => {
     const o = obj(m);
     const label = text(o.label);
@@ -115,7 +117,7 @@ function parseScale(r: Record<string, unknown>): ScaleFigure {
     }
     const from = inside(num(o.from)),
       to = inside(num(o.to));
-    if (!(Number(from) < Number(to))) bad();
+    if (!(figNum(from) < figNum(to))) bad();
     return { label, from, to };
   });
   const unit = optText(r.unit);
@@ -139,7 +141,13 @@ function parseGraph(r: Record<string, unknown>): GraphFigure {
   });
   const layout = r.layout;
   if (layout !== "circle" && layout !== "row") bad();
-  return { type: "graph", directed: bool(r.directed), layout: layout as "circle" | "row", nodes, edges };
+  return {
+    type: "graph",
+    directed: absent(r.directed) ? false : bool(r.directed),
+    layout: layout as "circle" | "row",
+    nodes,
+    edges
+  };
 }
 
 function parseBoard(r: Record<string, unknown>): BoardFigure {
@@ -311,7 +319,12 @@ export function canonicalFigureJson(spec: FigureSpec): string {
   }
 }
 
-/** Strings the figure shows (ids and edge endpoints are only references). */
+/** Strings of a graph that are only references (ids, edge ends): never shown, but kept plain and out of the number check. */
+function referenceStrings(spec: FigureSpec): string[] {
+  return spec.type === "graph" ? [...spec.nodes.map(n => n.id), ...spec.edges.flatMap(e => [e.from, e.to])] : [];
+}
+
+/** Strings the figure shows (ids and edge endpoints are only references, see referenceStrings). */
 function shownStrings(spec: FigureSpec): string[] {
   switch (spec.type) {
     case "bar":
@@ -348,7 +361,8 @@ const hasControl = (s: string): boolean => [...s].some(ch => ch.charCodeAt(0) < 
  */
 export function checkFigure(spec: FigureSpec, chapterText: string): FigureCheck {
   const shown = shownStrings(spec);
-  if (shown.some(s => UNSAFE.test(s) || hasControl(s))) return { ok: false, code: "unsafe_text" };
+  if ([...shown, ...referenceStrings(spec)].some(s => UNSAFE.test(s) || hasControl(s)))
+    return { ok: false, code: "unsafe_text" };
   const known = noteNumbers(chapterText);
   const numbers = shown.flatMap(numberTokens);
   if (spec.type === "board") {
@@ -360,4 +374,24 @@ export function checkFigure(spec: FigureSpec, chapterText: string): FigureCheck 
   const body = canonicalFigureJson(spec);
   if (body.length > FIGURE_LIMITS.body) return { ok: false, code: "bad_body" };
   return { ok: true, body };
+}
+
+/** The text without its ```vam-figure fences: a figure already in the chapter (maybe edited by hand) is not a source of numbers. */
+export function stripFigureFences(text: string): string {
+  const out: string[] = [];
+  let open: RegExp | undefined;
+  for (const line of text.split("\n")) {
+    const trimmed = line.replace(/\r$/, "");
+    if (open) {
+      if (open.test(trimmed)) open = undefined;
+      continue;
+    }
+    const m = /^\s*(`{3,}|~{3,})\s*vam-figure\b/.exec(trimmed);
+    if (m) {
+      open = new RegExp(`^\\s*${m[1][0]}{${m[1].length},}\\s*$`);
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n");
 }

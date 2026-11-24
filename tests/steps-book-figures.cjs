@@ -181,3 +181,19 @@ test('layout: text from the figure only appears in text nodes, never in attribut
   assert.ok(!JSON.stringify(walk(tree).map(n => n.attrs)).includes('onload'));
   assert.ok(walk(tree).some(n => n.text === evil));
 });
+
+test('fix batch: thousands separators, graph ids unsafe, directed defaults to false, figure fences stripped, role only with a title', () => {
+  const bar = value => parse({ type: 'bar', stacked: false, groups: [{ label: '人', values: [{ value }] }] });
+  assert.equal(spec.checkFigure(bar('12,000'), '共 12,000 人').ok, true);
+  assert.equal(spec.checkFigure(bar('12000'), '共 12,000 人').ok, true, 'numberTokens drops the comma on both sides');
+  assert.equal(spec.parseFigure({ type: 'bar', stacked: false, groups: [{ label: 'a', values: [{ value: '1,23' }] }] }).code, 'figure_shape');
+  const bars = find(layout.layoutFigure(bar('12,000')), 'rect', 'fig-bar-0');
+  assert.ok(bars[0].attrs.height > 0);
+  const g = id => parse({ type: 'graph', layout: 'row', nodes: [{ id, label: '甲' }, { id: 'b', label: '乙' }], edges: [{ from: id, to: 'b' }] });
+  assert.equal(g('a').directed, false);
+  for (const id of ['a<b', 'a[1]', 'http://x']) assert.equal(spec.checkFigure(g(id), '甲 乙').code, 'unsafe_text', id);
+  assert.equal(spec.stripFigureFences('a 25\n```vam-figure\n{"x":"99"}\n```\nb\n~~~vam-figure\n7\n~~~\nc').replace(/\n/g, '|'), 'a 25|b|c');
+  const s = parse({ type: 'scale', min: '1', max: '2', marks: [{ label: 'a', at: '1' }] });
+  assert.equal(layout.layoutFigure(s).attrs.role, undefined);
+  assert.equal(layout.layoutFigure(s, 'T').attrs.role, 'img');
+});

@@ -242,6 +242,7 @@ import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
+import { stripFigureFences } from "../../core/book-pipeline/figure-spec";
 import {
   checkDiagram,
   checkFigureDraft,
@@ -5577,6 +5578,8 @@ export class BookPipelineRuns {
         if (want.length) {
           diagramStats.asked = want.length;
           const text = stripImageLines(chapterBody(first.detail));
+          // A figure already in the chapter (maybe hand-edited) is not a source of numbers for the checks.
+          const checkText = stripFigureFences(text);
           let drafts: DiagramDraft[] = [];
           try {
             drafts = await untilAborted(
@@ -5597,7 +5600,7 @@ export class BookPipelineRuns {
             const slot = want.find(item => item.index === draft.slot);
             if (!slot) continue;
             if (draft.mermaid === undefined) {
-              const figure = checkFigureDraft(draft, text);
+              const figure = checkFigureDraft(draft, checkText);
               let figureCode: string | undefined = figure.ok ? undefined : figure.code;
               const figureTitle = diagramTitle(draft.title, slot.explains, language);
               if (
@@ -5616,7 +5619,7 @@ export class BookPipelineRuns {
               drawnDiagrams.set(slot.index, { title: figureTitle, mermaid: figure.body, fence: "vam-figure" });
               continue;
             }
-            const checked = checkDiagram(draft, text);
+            const checked = checkDiagram(draft, checkText);
             let code: string | undefined = checked.ok ? undefined : checked.code;
             let title = "";
             if (checked.ok) {

@@ -2,6 +2,7 @@ import { createBookStructurePort } from "./experiences/visual-map/book-structure
 import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { upgradeSocialVideoLinks } from "./experiences/markdown-context/social-video-cards";
+import { markPictureParagraphs } from "./experiences/markdown-context/picture-paragraphs";
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
@@ -1478,6 +1479,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     }));
     this.addChild(markdownSelectionAi);
     // Tag reading-view blocks with their source lines so an action on a rendered image finds its embed.
+    this.registerMarkdownPostProcessor(element => markPictureParagraphs(element));
     this.registerMarkdownPostProcessor((element, context) => {
       const section = context.getSectionInfo(element);
       if (!section || !element.querySelector("img, .internal-embed")) return;

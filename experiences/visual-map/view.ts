@@ -4284,6 +4284,11 @@ export class VisualAgentMapView extends ItemView {
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
     });
     if (before && before.parentElement === host) host.insertBefore(bar, before);
+    // Keyboard focus inside the bar (:focus-visible on what got focus) is a class, so the narrow layout can show the icons for it without
+    // `:has`. The stylesheet pairs it with :focus-within, so the mark left after focus moves out does nothing and needs no clearing.
+    bar.addEventListener("focusin", event =>
+      bar.toggleClass("is-focus-visible", (event.target as Element | null)?.matches?.(":focus-visible") === true)
+    );
     // The bar is outside contentEl, which carries the map's Esc handling: an open suggestion list closes here too.
     bar.addEventListener("keydown", event => {
       const suggest = this.goalSuggest.task;

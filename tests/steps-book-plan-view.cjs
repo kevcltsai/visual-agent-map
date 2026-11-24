@@ -154,3 +154,43 @@ test('the plan-review bar hint sends the owner to the chief editor in one senten
     assert.equal(hint.split(/[。.!?！？]/).filter(x => x.trim()).length, 1, 'one sentence');
   }
 });
+
+// Stand-ins for the two class marks that replace `:has` (Obsidian's scan warns about it): just children, child nodes, tag, class and attributes.
+function node(tag, { cls = [], attrs = {}, kids = [], text = false } = {}) {
+  const classes = new Set(cls);
+  const n = { tagName: tag.toUpperCase(), classList: { add: c => classes.add(c), contains: c => classes.has(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) }, getAttribute: a => attrs[a] ?? null, classes };
+  n.children = kids; n.childNodes = text ? [...kids, { nodeType: 3 }] : kids; n.firstElementChild = kids[0] ?? null;
+  return n;
+}
+
+test('markEmptyReviewContent: a proofread box whose content is one empty paragraph is marked; any text, a second element or a button is not', () => {
+  const box = kids => node('div', { cls: ['callout-content'], kids });
+  const empty = box([node('p')]), text = box([node('p', { text: true })]), two = box([node('p'), node('p')]), button = box([node('p'), node('button')]);
+  dom.markEmptyReviewContent({ querySelectorAll: s => (assert.equal(s, '.callout[data-callout="vam-review"] .callout-content'), [empty, text, two, button]) });
+  assert.deepEqual([empty, text, two, button].map(b => b.classes.has('vam-review-content-empty')), [true, false, false, false]);
+  text.childNodes = text.children = [node('p')]; text.firstElementChild = text.children[0];
+  dom.markEmptyReviewContent({ querySelectorAll: () => [text] });
+  assert.ok(text.classes.has('vam-review-content-empty'), 'checked again on the next render');
+});
+
+test('markPictureParagraphs: a paragraph with its own <img> or an image embed is a picture paragraph; a note embed, a nested image or plain text is not', () => {
+  const { markPictureParagraphs } = load('experiences/markdown-context/picture-paragraphs.ts');
+  const p = kids => node('p', { kids });
+  const img = p([node('img')]);
+  const loaded = p([node('span', { cls: ['internal-embed', 'image-embed'] })]);
+  const loading = p([node('span', { cls: ['internal-embed'], attrs: { src: 'Bees/hive.PNG' } })]);
+  const note = p([node('span', { cls: ['internal-embed'], attrs: { src: 'Another note' } })]);
+  const nested = p([node('a', { kids: [node('img')] })]);
+  const plain = p([]);
+  const all = [img, loaded, loading, note, nested, plain];
+  markPictureParagraphs({ tagName: 'DIV', querySelectorAll: s => (assert.equal(s, 'p'), all) });
+  assert.deepEqual(all.map(x => x.classes.has('vam-picture-paragraph')), [true, true, true, false, false, false]);
+  const own = p([node('img')]); markPictureParagraphs(own); assert.ok(own.classes.has('vam-picture-paragraph'), 'the section element itself can be the paragraph');
+});
+
+test('stylesheet: picture paragraphs and the empty proofread box use the marks, not :has', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.ok(css.includes('.markdown-preview-view.visual-agent-map-node p.vam-picture-paragraph { margin-block: 1.6em 2em;'));
+  assert.ok(css.includes('> .el-p > p:not(.vam-picture-paragraph) { margin-block: 0; text-align: justify; }'));
+  assert.doesNotMatch(css, /:has\(/);
+});

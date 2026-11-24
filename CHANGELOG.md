@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- The stylesheet no longer uses `:has` or `all`, which the Obsidian plugin review flagged; pictures, the book page, the goal bar icons, the usage filter, the picture-book loading shimmer and the empty proofread box look the same.
+
 ## [0.35.1] - 2026-11-25
 
 ### Fixes

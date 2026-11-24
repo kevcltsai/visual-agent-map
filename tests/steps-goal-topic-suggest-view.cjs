@@ -128,6 +128,16 @@ test('goal recommend: the button asks for the usage confirmation once, makes ONE
   assert.equal(h.control.usageAsks, 1);
 });
 
+test('goal bar: keyboard focus inside it (:focus-visible on what got focus) marks the bar .is-focus-visible; mouse focus does not, and the mark counts only with :focus-within', async () => {
+  const h = await harness();
+  const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
+  const target = visible => ({ matches: s => s === ':focus-visible' && visible });
+  bar.fire('focusin', { target: target(true) }); assert.ok(bar.hasClass('is-focus-visible'), 'keyboard focus');
+  bar.fire('focusin', { target: target(false) }); assert.ok(!bar.hasClass('is-focus-visible'), 'the focus a mouse click leaves');
+  // Focus leaving needs no listener (the goal bar listens to no blur or focusout): the rule also asks :focus-within.
+  assert.ok(ACTION_RULES.filter(r => r.tokens.includes('.is-focus-visible')).every(r => r.tokens.includes(':focus-within')), 'the mark only counts while focus is inside');
+});
+
 test('goal recommend: the count follows the checked rows and Add is disabled at 0', async () => {
   const h = await harness();
   await h.open();
@@ -589,20 +599,20 @@ const STATES = [
 ];
 
 // What the stylesheet shows of the icons, for a set of conditions ({ hover, focusWithin, focusVisible, attachment }) at a width: a small cascade over the
-// rules whose subject is `.vam-goal-actions` under `.vam-goal-bar` (pseudo-classes :hover, :focus-within, :has(:focus-visible), class .has-attachment),
+// rules whose subject is `.vam-goal-actions` under `.vam-goal-bar` (pseudo-classes :hover, :focus-within, classes .is-focus-visible (the view's mark for :focus-visible inside the bar), .has-attachment),
 // the narrow container block counted only when narrow. Specificity = number of classes and pseudo-classes; later rules win ties. Returns { opacity, pointerEvents }.
 const NARROW_SPAN = (() => { const i = STYLES.indexOf('@container vam-goal-host (max-width: 600px) {'); assert.ok(i >= 0, 'the narrow container block exists'); const m = STYLES.slice(i).match(/\n\}/); return [i, i + m.index]; })();
 const ACTION_RULES = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(m => {
   const at = m.index + m[1].length - m[1].trimStart().length, narrowRule = at > NARROW_SPAN[0] && at < NARROW_SPAN[1];
   return m[1].split(',').map(x => x.trim()).flatMap(sel => {
-    const parsed = sel.match(/^(\.view-header\.vam-goal-host )?(?:\.vam-goal-bar((?::hover|:focus-within|:has\(:focus-visible\)|\.has-attachment)*) )?\.vam-goal-actions$/);
+    const parsed = sel.match(/^(\.view-header\.vam-goal-host )?(?:\.vam-goal-bar((?::hover|:focus-within|\.is-focus-visible|\.has-attachment)*) )?\.vam-goal-actions$/);
     if (!parsed) return [];
-    const tokens = (parsed[2] ?? '').match(/:hover|:focus-within|:has\(:focus-visible\)|\.has-attachment/g) ?? [];
+    const tokens = (parsed[2] ?? '').match(/:hover|:focus-within|\.is-focus-visible|\.has-attachment/g) ?? [];
     return [{ tokens, narrowRule, headerOnly: !!parsed[1], spec: tokens.length + (parsed[2] === undefined ? 1 : 2) + (parsed[1] ? 2 : 0), at, opacity: m[2].match(/opacity:\s*([\d.]+)/)?.[1], pe: m[2].match(/pointer-events:\s*(\w+)/)?.[1] }];
   });
 });
 const actionsStyle = (floating, on) => {
-  const key = { ':hover': on.hover, ':focus-within': on.focusWithin, ':has(:focus-visible)': on.focusVisible, '.has-attachment': on.attachment };
+  const key = { ':hover': on.hover, ':focus-within': on.focusWithin, '.is-focus-visible': on.focusVisible, '.has-attachment': on.attachment };
   const hits = ACTION_RULES.filter(r => (floating || !r.narrowRule) && r.tokens.every(t => key[t])).sort((a, b) => a.spec - b.spec || a.at - b.at);
   const last = prop => hits.filter(r => r[prop] !== undefined).at(-1)?.[prop];
   return { opacity: last('opacity'), pointerEvents: last('pe') };
@@ -872,7 +882,7 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-actions\.is-vacant \{ display: none; \}`), 'narrow header row: an empty slot is not drawn (no empty box floats under the goal)');
   assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar\.is-editing \.vam-goal-actions \{ width: auto; \}`), 'narrow header row: the editing slot is as wide as its content');
   assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 0; pointer-events: none; \}`), 'narrow header row: the focus a mouse click leaves does not show the icons');
-  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar:hover \.vam-goal-actions, ` + HS + String.raw`\.vam-goal-bar:has\(:focus-visible\) \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}`));
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar:hover \.vam-goal-actions, ` + HS + String.raw`\.vam-goal-bar\.is-focus-visible:focus-within \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}`));
   // The toolbar fallback keeps the bar's slot at every width: no rule in the narrow block that touches the icons, their slot or the strip may reach it, so every such rule is scoped to the header row.
   for (const line of narrowBlock.split('\n')) { const [selectors, body] = line.split('{'); if (body === undefined || !/vam-goal-actions|::after/.test(selectors)) continue; for (const sel of selectors.split(',')) assert.ok(sel.trim().startsWith('.view-header.vam-goal-host '), `narrow rule not scoped to the header row: ${sel.trim()}`); }
   assert.match(rule('.vam-toolbar > .vam-goal-bar'), /flex-basis: 280px/);

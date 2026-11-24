@@ -142,7 +142,7 @@ test('isolated targeted runner executes only the requested suite in a separate n
   const env = { ...process.env, CI: 'false', VAM_CI_SHARD: '', VAM_ISOLATED_SUITES: '1', VAM_AFFECTED_TESTS: 'tests/suites/check-workflows.cjs' };
   const run = spawnSync(process.execPath, ['tests/run.cjs', '--layer=unit'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr + run.stdout);
-  assert.match(run.stdout, /check-workflows/);
+  assert.match(run.stdout, /check workflows:/);
   assert.doesNotMatch(run.stdout, /test-affected: a source change/);
 });
 test('test-affected: a rename lists both paths, and a table older or newer than HEAD adds every file that differs from its commit', async () => {

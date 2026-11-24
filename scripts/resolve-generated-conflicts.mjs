@@ -10,8 +10,8 @@ export function generatedConflictPlan(unmerged, unstaged, untracked) {
   if ([...unstaged, ...untracked].some(path => !generated.has(path))) throw new Error("Stage the intended source resolutions and remove unrelated unstaged/untracked source changes first.");
   return conflicts;
 }
-export function resolveGenerated(directory = root) {
-  const git = (...args) => execFileSync("git", args, { cwd: directory, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\0").filter(Boolean);
+export function resolveGenerated() {
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\0").filter(Boolean);
   generatedConflictPlan(git("diff", "--name-only", "--diff-filter=U", "-z"), git("diff", "--name-only", "-z"), git("ls-files", "--others", "--exclude-standard", "-z"));
   timedSync("generated-rebuild", () => buildProduct({ ...process.env, VAM_CLEAN_BUILD: "1" }));
   process.stdout.write("Generated outputs rebuilt from resolved sources. Review the diff, then explicitly stage the two generated files and continue the existing merge/rebase. No Git index entries were changed.\n");

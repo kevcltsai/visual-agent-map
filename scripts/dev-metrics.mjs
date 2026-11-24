@@ -43,7 +43,9 @@ export function matchingEvidence(file, identity) {
     return readFileSync(file, "utf8").split("\n").flatMap(line => {
       try {
         const row = JSON.parse(line);
-        if (row.version !== 1 || row.outcome !== "ok" || row.stage !== "affected-verification" || row.commit !== identity.commit || row.fingerprint !== identity.fingerprint) return [];
+        if (row.version !== 1 || row.outcome !== "ok" || row.stage !== "affected-verification" || row.commit !== identity.commit || row.fingerprint !== identity.fingerprint ||
+            !["full", "files", "none"].includes(row.mode) || !Number.isFinite(row.durationMs) || row.durationMs < 0 ||
+            typeof row.at !== "string" || !Number.isFinite(Date.parse(row.at))) return [];
         return [{ at: row.at, stage: row.stage, mode: row.mode, durationMs: row.durationMs, isolatedSuites: row.isolatedSuites }];
       } catch { return []; }
     }).slice(-10);

@@ -88,6 +88,7 @@ if (process.env.VAM_ISOLATED_SUITES === '1' && process.env.VAM_AFFECTED_TESTS &&
   const env = { ...process.env, VAM_ISOLATED_TEST_LAYER: process.argv.find(value => value.startsWith('--layer='))?.split('=')[1] || '' };
   delete env.VAM_ISOLATED_SUITES;
   delete env.VAM_AFFECTED_TESTS;
+  delete env.NODE_TEST_CONTEXT; // nested runner must start its own per-file processes
   const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...selected.map(suite => path.join(directory, suite))], { env, stdio: 'inherit' });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;

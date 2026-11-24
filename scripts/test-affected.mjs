@@ -381,12 +381,18 @@ async function main(argv) {
   // A fresh worktree has no ignored test-deps.json. Fetch the same CI table the harness used to fetch,
   // before selecting tests; read-only plan mode, CI cache and explicit test tables are not changed.
   if (argv.includes("--run")) fetchDepsTable(root);
-  const result = localPlan(root, args[0] || "origin/main");
-  report(result, argv.includes("--json"));
-  if (!argv.includes("--run")) return;
-  if (result.mode === "none") return;
+  const base = args[0] || "origin/main";
+  let result = localPlan(root, base);
+  if (!argv.includes("--run") || result.mode === "none") {
+    report(result, argv.includes("--json"));
+    return;
+  }
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:affected", { blocking: true }); // spawnSync below: see enterHeavy
+  // A queued run may see different sources when it finally owns the lock.
+  result = localPlan(root, base);
+  report(result, argv.includes("--json"));
+  if (result.mode === "none") return;
   const env = { ...process.env };
   // A full fallback must not inherit an earlier selective run's filter.
   delete env.VAM_AFFECTED_TESTS;

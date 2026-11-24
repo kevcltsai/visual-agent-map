@@ -23,7 +23,6 @@ import {
   noteLanguageOf,
   tNote,
   translate,
-  type ContentLanguage,
   translateNote,
   uiLanguageOfHeadings,
   uiLocale,

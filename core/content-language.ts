@@ -300,4 +300,3 @@ export function mapChatLanguageSources(message: string): string[] {
   }
   return [message];
 }
-

@@ -267,8 +267,9 @@ export function renderBookSettingsFields(
     const label = t(FIELD_LABEL[field]);
     const id = `vam-book-start-${field}`;
     parent.createEl("label", { text: label, attr: { for: id } });
-    // The wrapper carries the loading shimmer over an empty field (CSS only; typing hides it).
-    const area = parent.createDiv({ cls: "vam-book-start-field-wrap" }).createEl("textarea", {
+    // The shimmer after the field shows over it while loading and the field is empty (CSS only; typing hides it).
+    const wrap = parent.createDiv({ cls: "vam-book-start-field-wrap" });
+    const area = wrap.createEl("textarea", {
       cls: "vam-book-start-field",
       attr: {
         id,
@@ -278,6 +279,7 @@ export function renderBookSettingsFields(
         placeholder: t("coffee.book_setting_empty")
       }
     });
+    wrap.createSpan({ cls: "vam-book-start-shimmer", attr: { "aria-hidden": "true" } });
     area.value = current[field] ?? "";
     areas.set(field, area);
     // The warning line follows the text as it is edited; it only informs.

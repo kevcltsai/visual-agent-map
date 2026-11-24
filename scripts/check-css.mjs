@@ -5,6 +5,8 @@
 //     stylelint-no-unsupported-browser-features); the feature ids and line numbers of the 0.22.0
 //     (`text-decoration`, styles.css:1069) and 0.23.0 (`css-clip-path`, styles.css:146) scan warnings reproduce
 //     exactly with doiuse + caniuse-lite at Chrome 142 (Electron 39, Obsidian 1.11.x). Partial support counts.
+//  3. no `:has()` selector and no `all` property: the review's CSS LINT warns 'Avoid :has — it can cause significant
+//     performance issues due to broad selector invalidation.' and 'Unexpected property "all"' (0.32.0–0.35.1 scans).
 // Usage: node scripts/check-css.mjs   (run from `npm run lint`)
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -53,8 +55,20 @@ export async function findUnsupported(css, file = "input.css") {
   return found;
 }
 
+export function findScanFlags(css, file = "input.css") {
+  const found = [];
+  const root = postcss.parse(css, { from: file });
+  root.walkRules((rule) => {
+    if (/:has\(/i.test(rule.selector)) found.push({ line: rule.source.start.line, message: "Avoid :has (Obsidian's scan warns about selector invalidation); mark the element with a class instead." });
+  });
+  root.walkDecls((decl) => {
+    if (decl.prop.toLowerCase() === "all") found.push({ line: decl.source.start.line, message: 'Unexpected property "all" (Obsidian\'s scan warns); reset the properties one by one.' });
+  });
+  return found;
+}
+
 export async function checkCss(css, file) {
-  return [...findImportant(css), ...(await findUnsupported(css, file))].sort((a, b) => a.line - b.line);
+  return [...findImportant(css), ...findScanFlags(css, file), ...(await findUnsupported(css, file))].sort((a, b) => a.line - b.line);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -66,5 +80,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     }
   }
   if (failures) process.exit(1);
-  process.stdout.write(`CSS lint: no !important or partially supported browser feature (${BROWSERS.join(", ")}) in ${FILES.join(", ")}.\n`);
+  process.stdout.write(`CSS lint: no !important, :has, all, or partially supported browser feature (${BROWSERS.join(", ")}) in ${FILES.join(", ")}.\n`);
 }

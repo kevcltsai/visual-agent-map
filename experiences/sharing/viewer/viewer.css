@@ -197,6 +197,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .vam-video-icon { width: 46px; height: 32px; border-radius: 8px; background: #e33; display: grid; place-items: center; }
 .vam-sample-detail .vam-video-icon::after { content: ""; border-left: 13px solid #fff; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 3px; }
 .vam-sample-detail .vam-video-frame { width: 100%; height: 100%; border: 0; }
+/* An Instagram post or reel is portrait. */
+.vam-sample-detail .vam-video-stage.vam-video-tall { aspect-ratio: 9 / 16; width: 360px; }
 .vam-sample-detail .vam-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }
 .vam-sample-detail .vam-video-card > a { display: inline-block; margin-top: 2px; font-size: var(--font-ui-smaller); }
 .vam-sample-detail .vam-media-text { color: var(--text-muted); }

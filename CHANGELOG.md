@@ -2,20 +2,48 @@
 
 ## [Unreleased]
 
-- When sharing is blocked because a note would leak private text, the share dialog now names each topic and shows the text around the problem (for example a `[[2,0],[0,1]]` matrix that reads as a link), so you know what to fix. That text is shown only in the dialog, never written to the file.
-- Picture books now give every card (the preface, each chapter and each section) one cover picture. It is found with the card's first picture search, saved in a `封面圖` (or `Covers`) folder inside the book's folder, and shown under the card's title and on the mind map card. A card with no suitable cover says so; a cover that may not fit is marked, needs a look and is listed on the closing page. A cover you replaced, turned off or edited is never searched for or changed again. The covers add no calls beyond the start dialog's estimate, which now says it includes them.
-- Picture-book progress now names the card being fixed by its place (preface, chapter n or the section name) and counts done cards; the plan gate no longer shows a trial note on the preface.
-- Picture-book maps now treat the root card as a preface, the first level as chapters (numbered) and the cards below as sections. Cards are labelled Preface, Chapter n or Section, and a planned card lists its content headings. The trial is the preface, chapter 1 and its sections, and the gate, progress lines and start dialog count cards, chapters and sections.
-- Map chat now searches for images when you set picture rules (put pictures in, image URLs, captions) even without saying "search for images", and keeps doing so in every round of an automatic continuation.
-- A mind map's data sources are now used by expand, merge, multi-topic research and its retries, rerun with Standard, chat synthesis, topic chat and map chat replies, and outline import. Sources stay read-only, untrusted reference material.
-- Hypothesis research now tells fact questions from causal questions. The current-situation card shows the type, and you can change it on the definitions card before you re-run.
-- Fact questions skip the hypothesis stage: the conclusion card is one of holds, does not hold, holds in part or not enough data, built from the facets, and says how many facets lacked data.
-- Causal questions stop when the current situation does not match, and otherwise compare the verified hypotheses in the conclusion.
-- Each hypothesis now has one core piece of evidence, marked "Core". Supplementary evidence that is not found no longer blocks a hypothesis.
-- A new group, "Hypotheses with evidence, unconfirmed", holds hypotheses that have evidence but were not confirmed. "Eliminated" now holds only hypotheses the evidence refuted.
-- Evidence from a page that is not an official, academic or major news source now needs a second independent source; without one it counts as uncertain and cannot carry a facet on its own.
-- Hypothesis-research maps made before this change still open and show as before. An unfinished one cannot be resumed; use "Re-run with these assumptions" on its definitions card to start a new map.
-- Topic chat Synthesize now asks how deep to integrate when the subtopics have subtopics of their own, integrates the whole subtree (rewriting each note, with a backup) instead of re-researching the direct subtopics, and tells how many topics it read and how many were not researched.
+### Fixes
+
+- The stylesheet no longer uses `:has` or `all`, which the Obsidian plugin review flagged; pictures, the book page, the goal bar icons, the usage filter, the picture-book loading shimmer and the empty proofread box look the same.
+
+## [0.35.1] - 2026-11-25
+
+### Fixes
+
+- The plugin file is smaller (about 4.3 MB instead of 6.5 MB), so Obsidian Sync Standard plans can sync it again.
+
+## [0.35.0] - 2026-11-25
+
+### Make a picture book
+
+Say "I want a picture book about how bees make honey": a chief editor plans the preface, chapters and sections, you confirm the plan, an author writes each chapter with pictures, and a different AI model proofreads it.
+
+- Chapters can include charts and diagrams the AI draws, and every card gets a cover picture.
+- Stop at any step, rerun one card, or give up the book and keep the map.
+
+### Start from one picture
+
+Ask the map chat for "back stretches": it puts a picture of the back muscles on the map, pins an anchor on each muscle and links each one to stretch pictures and videos.
+
+- Click an anchor to hide or show the topics it links to.
+
+### Share the whole map
+
+A map saved as one HTML file now keeps what you built: topic types and shapes, relation lines, frames and pictures on the map, embedded notes, attachments, math, and videos that play with a click.
+
+### Play Facebook and Instagram videos
+
+Paste a Facebook or Instagram video link into a note: it plays right inside the note, on map cards and in shared pages.
+
+### Changed
+
+- Hypothesis research is hidden for now. Hypothesis maps you already made still open.
+- Map chat can carry out a long plan by itself, and picks up an interrupted plan when you type "continue".
+- A map's data sources can also be folders outside the vault, and expand, synthesis and both chats now use them.
+
+### Fixes
+
+- A blocked share now names the topic and text to fix; Cmd+V with nothing focused pastes onto the map again; research that rewrites a note keeps its videos and pictures; plus many sharing, picture-book and map chat fixes.
 
 ## [0.34.0] - 2026-11-11
 

@@ -2,41 +2,42 @@
 
 **English** · [繁體中文](README.zh-TW.md)
 
-### Explore big questions with visual AI research in Obsidian
+### Research a question, write a picture book, or explore from one picture in Obsidian
 
-**Start with a question. See the pieces. Follow the ideas worth exploring.** Build a visual research map, or talk through a new idea in Coffee Tables. Everything you keep is editable Markdown in your vault.
+Start with a question, a topic or a picture. VAM's AI lays it out as a visual map, researches it with you, and keeps everything as editable Markdown in your vault.
 
-[**Get started**](#get-started) · [See the 0.34.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.34.0) · [Installation guide](INSTALL.md)
+[**Get started**](#get-started) · [See the 0.35.1 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.35.1) · [Installation guide](INSTALL.md)
 
-![Example Visual Agent Map research map with connected topic cards in Obsidian](assets/screenshots/map-overview.png)
+## Mind map: from one question to topics
 
-## Two ways to explore
+![A Visual Agent Map mind map in Obsidian with one question split into connected topic cards](assets/screenshots/map-overview.png)
 
-- **Visual maps.** Break a question into topics and research any branch with AI, or check a claim with hypothesis research (Beta), which looks for evidence and stops when it is not enough. Draft a multi-level outline, chat with any single topic to research, expand or synthesize it, pick a note style for each topic type (section structure, voice, format rules and how a note is updated, such as Textbook, or AI suggested for general topics; or write your own in Markdown), merge related topics, research several topics in the background, give a map its own data sources, and mark points on a picture with anchors linked to topics. Manual mapping needs no AI.
-  - **Talk to your map.** Open the AI chat beside the map and say what you want in plain language: build a whole map from one sentence, add, move or rename topics, research or expand a branch, find pictures, place anchors on a selected annotated image, or edit the notes you point it to. Large changes are shown as a plan first, and every action gets a result line.
-  - **Quick or Standard.** Quick answers from the model's own knowledge without the web; Standard searches the web and may add images. Choose per research or expansion.
-- **Coffee Tables.** Bring an unfinished idea to a conversation with simulated AI guests, then revisit the observer's insights.
+Type one question and VAM splits it into topics on a map. Research any branch (Quick answers from the model's own knowledge, Standard searches the web), expand it further, or just tell the map chat what to change. You can also build a map by hand with no AI.
 
-When a map is ready, save it as one HTML file you can open in any browser, even offline (images that link to the web need a connection), or send to someone else, optionally with AI-translated versions.
+## Picture book: from one topic to a whole book
+
+![A picture-book map with a preface, chapters and sections, and one illustrated chapter open beside it](assets/screenshots/picture-book.png)
+
+Name a topic and collect pictures for it: a chief editor plans the preface, chapters and sections, and you confirm the plan before anything is written. An author then writes each chapter with pictures and diagrams, and a different AI model proofreads it, so the book reads from start to finish instead of as loose notes. You can stop at any step, or give up the book and keep the map.
+
+## Start from one picture
+
+![A picture of the back muscles with anchors on each muscle, linked to stretch topics](assets/screenshots/image-anchors.png)
+
+Put one picture at the centre and pin anchors on its parts. Ask for "back stretches", for example: VAM finds a picture of the back muscles, puts an anchor on each sore muscle, and links each one to a topic with matching stretch pictures and videos.
+
+Also: save any map as one HTML file that opens in any browser, and talk an unfinished idea through with AI guests in Coffee Tables.
 
 ## Get started
 
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+** on desktop.
-2. VAM opens a blank mind map on first use: start with one sentence, or add topics yourself. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
+2. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
 
-The interface is available in English, Traditional Chinese and Simplified Chinese. AI answers follow the language you write in, including Japanese, Korean, Spanish and other languages.
-
-Setup details, troubleshooting, and known limitations are in [INSTALL.md](INSTALL.md).
-
-## Contributing checks
-
-- `npm run verify` runs the same checks as CI (lint, format, tests, committed artifacts).
-- Run `git config core.hooksPath .githooks` so it runs automatically before every push.
-- Never bypass it with `--no-verify`.
+The interface is in English, Traditional Chinese and Simplified Chinese; AI answers follow the language you write in. Setup details, troubleshooting and known limitations are in [INSTALL.md](INSTALL.md).
 
 ## Privacy
 
-VAM has no telemetry and does not store API keys. AI tasks send relevant content through your local CLI to OpenAI or Anthropic, so your provider allowance or charges may apply. The map AI chat sends the map outline, the titles of your other maps, the cards you select or reference, an annotated image you select (the picture itself), the note open beside the map (in full, shown as a removable chip), notes or text you drop in, and the last few messages; it can edit those notes and create new ones in your vault. Research, expansion and synthesis also read the items in the map's data sources. Saving map AI conversations is off by default; when turned on, they are stored in your vault. VAM runs the Codex or Claude Code program you installed; when you use Standard research or picture search, that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded directly from the websites that host them. When the picture-book writer's picture search leaves a picture position empty, VAM itself searches Wikimedia Commons (commons.wikimedia.org) for it, sending only a short search line for that position. When research writes a YouTube video into a note, VAM asks YouTube's oEmbed service (www.youtube.com) whether that video is public and playable, sending only the video address, and removes the video if it is private or deleted. A share file is saved in your vault or the place you choose, and VAM never uploads it; whether to publish it is up to you. Images in a share file that link to the web are loaded by the reader's browser from the original site. When a picture book looks for pictures, the AI may take a body picture from any website (the cover still uses only Wikimedia Commons). VAM sends at most 3 non-Wikimedia candidate pictures per chapter to the AI to look at, downloading each once in memory (shrunk before it is sent) and never saving it; a picture it cannot read (too large, not an image) is skipped. When you share, VAM lists the pictures whose licence is unknown or restricted so you can decide whether to leave them out.
+VAM has no telemetry and stores no API keys. AI features start the Codex or Claude Code program you installed as a separate program on your computer, which sends the relevant notes, map content and selected pictures to OpenAI or Anthropic (your plan's allowance or charges apply) and searches the web in Standard mode and picture search. Picture books may also search Wikimedia Commons directly, and research checks YouTube videos with YouTube's oEmbed service. A map's data source can also be a folder outside the vault that you add: VAM only reads it, and keeps the list of those folders in one file on this device, outside the vault. Share files are never uploaded. Full details: [Data and permissions](INSTALL.md#data-and-permissions).
 
 ## Credits and license
 

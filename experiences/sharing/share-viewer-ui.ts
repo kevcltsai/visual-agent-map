@@ -99,6 +99,10 @@ export interface ShareViewerUi {
   /** The note under the play card when the file is opened from disk: play opens YouTube in a new tab. */
   videoNoteLocal: string;
   videoOpen: string;
+  /** The same three texts for a Facebook or Instagram video, `{0}` the site's name. */
+  videoPlaySite: string;
+  videoNoteSite: string;
+  videoOpenSite: string;
 }
 
 /**
@@ -205,5 +209,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   videoPlay: "Click to play the YouTube video",
   videoNote: "The video only connects to YouTube when you play it (the no-cookie version)",
   videoNoteLocal: "Opened from a file, the video plays on YouTube in a new tab",
-  videoOpen: "Open on YouTube"
+  videoOpen: "Open on YouTube",
+  videoPlaySite: "Click to play the {0} video",
+  videoNoteSite: "The video only connects to {0} when you play it",
+  videoOpenSite: "Open on {0}"
 };

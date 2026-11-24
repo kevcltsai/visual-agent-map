@@ -82,7 +82,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['core/social-video.ts', 'experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -106,7 +106,9 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
     const urls = [...shell.matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
     // P6: the only other addresses are YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only
     // after a click) and the watch page a click opens in a new tab when the file is opened from disk.
-    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/', 'https://www.youtube.com/watch'].sort());
+    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/', 'https://www.youtube.com/watch',
+      // Facebook and Instagram players (frame-src) and the bases the viewer builds their embed and watch addresses from.
+      'https://www.facebook.com', 'https://www.instagram.com', 'https://www.facebook.com/', 'https://www.instagram.com/', 'https://fb.watch/'].sort());
     assert.doesNotMatch(shell, /<script[^>]*\ssrc=/i);
     assert.doesNotMatch(shell, /<link\b/i);
     assert.doesNotMatch(shell, /@import/i);
@@ -2364,7 +2366,7 @@ test('sharing video: the player is never in the file; the viewer drops an iframe
 
 test('sharing video: the file policy allows only the no-cookie player frame, and every language has the card text', () => {
   const shell = html.renderShareShell(text.shareViewerUiFor('en'));
-  assert.ok(shell.includes(`content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com"`), 'exact policy');
+  assert.ok(shell.includes(`content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com https://www.facebook.com https://www.instagram.com"`), 'exact policy');
   assert.equal((shell.match(/frame-src/g) ?? []).length, 1);
   for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) {
     const ui = Object.values(text.shareViewerUiExtras([lang]).uiByLanguage)[0];
@@ -2391,4 +2393,35 @@ test('sharing video: opened from a local file (file://), play opens YouTube in a
   assert.equal(card.all().filter(node => node.localName === 'iframe').length, 0);
   assert.equal(card.kids[1].text, ui.videoNoteLocal, 'the note says it plays on YouTube in a new tab');
   for (const lang of ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es']) assert.ok(text.shareViewerUiFor(lang).videoNoteLocal.length > 3, lang);
+});
+
+test('sharing video: Facebook and Instagram play in the card both from a file and from a web address, with their official embed', () => {
+  const video = load('experiences/sharing/viewer/video.ts');
+  const ui = text.shareViewerUiFor('en');
+  for (const protocol of ['file:', 'http:']) {
+    const { doc, root } = videoFixture([['https://www.instagram.com/reel/DgF28H6PcXh/', 'vam-video-link'], ['https://www.facebook.com/facebook/videos/1128464476453508/', 'vam-video-link']]);
+    doc.location = { protocol };
+    video.upgradeVideoLinks(root, doc, ui);
+    const [ig, fb] = root.kids;
+    for (const [card, site, src, tall] of [[ig, 'Instagram', 'https://www.instagram.com/reel/DgF28H6PcXh/embed', true], [fb, 'Facebook', 'https://www.facebook.com/plugins/video.php?href=https%3A%2F%2Fwww.facebook.com%2Ffacebook%2Fvideos%2F1128464476453508%2F&show_text=false', false]]) {
+      assert.equal(card.className, 'vam-video-card', `${protocol} ${site}`);
+      assert.equal(card.all().filter(node => node.localName === 'iframe').length, 0, 'nothing loads before the click');
+      const button = card.kids[0].kids[0];
+      assert.equal(button.localName, 'button', `${protocol} ${site}: plays in the card`);
+      assert.equal(button.getAttribute('aria-label'), `${ui.videoPlaySite.replace('{0}', site)}: Cat video`);
+      assert.equal(card.kids[1].text, ui.videoNoteSite.replace('{0}', site));
+      assert.equal(card.kids[2].text, ui.videoOpenSite.replace('{0}', site));
+      button.handlers.click();
+      const frames = card.all().filter(node => node.localName === 'iframe');
+      assert.equal(frames.length, 1);
+      assert.equal(frames[0].attrs.src, src);
+      assert.equal(frames[0].attrs.sandbox, 'allow-scripts allow-same-origin allow-presentation allow-popups');
+      assert.equal(frames[0].attrs.referrerpolicy, 'strict-origin-when-cross-origin');
+      assert.equal((frames[0].className ?? '').includes('vam-video-tall'), tall);
+    }
+  }
+  const shell = html.renderShareShell(ui);
+  assert.ok(shell.includes('frame-src https://www.youtube-nocookie.com https://www.facebook.com https://www.instagram.com"'), 'the policy allows exactly the three player hosts');
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) for (const key of ['videoPlaySite', 'videoNoteSite', 'videoOpenSite']) assert.match(text.shareViewerUiFor(lang)[key], /\{0\}/, `${lang}.${key}`);
+  assert.equal(text.shareViewerUiFor('zh-TW').videoOpenSite, '在 {0} 開啟');
 });

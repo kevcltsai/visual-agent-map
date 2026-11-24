@@ -32,7 +32,13 @@ import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
-import { dropUnplayableVideos, keepOpenedVideoEmbeds, videoUrlsInText, type VideoPlayableCheck } from "./video-embeds";
+import {
+  dropUnplayableVideos,
+  keepOpenedVideoEmbeds,
+  restoreDroppedMedia,
+  videoUrlsInText,
+  type VideoPlayableCheck
+} from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -372,7 +378,20 @@ export class AiTaskService {
           : null;
       if (videoFilter) {
         result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
-        result.detail = await dropUnplayableVideos(result.detail, input.detail, this.options.videoPlayable, signal);
+        // Research rewrites the note and may drop its videos and pictures; an edit task may delete them on purpose.
+        let restored = new Set<string>();
+        if (countsWeb && input.detail?.trim()) {
+          const back = restoreDroppedMedia(result.detail, input.detail);
+          result.detail = back.detail;
+          restored = back.restoredVideoIds;
+        }
+        result.detail = await dropUnplayableVideos(
+          result.detail,
+          input.detail,
+          this.options.videoPlayable,
+          signal,
+          restored
+        );
       }
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
@@ -442,12 +461,16 @@ export class AiTaskService {
             result = {
               ...result,
               detail: videoFilter
-                ? await dropUnplayableVideos(
-                    keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail),
-                    input.detail,
-                    this.options.videoPlayable,
-                    signal
-                  )
+                ? await (async () => {
+                    let kept = keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail);
+                    let restored = new Set<string>();
+                    if (countsWeb && input.detail?.trim()) {
+                      const back = restoreDroppedMedia(kept, input.detail);
+                      kept = back.detail;
+                      restored = back.restoredVideoIds;
+                    }
+                    return dropUnplayableVideos(kept, input.detail, this.options.videoPlayable, signal, restored);
+                  })()
                 : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);

@@ -846,7 +846,10 @@ test('start card (2026-11-23 mockup 10, 11): an ⓘ beside each model label expl
   assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader);
   // Motion is CSS, with Obsidian variables, and stops for reduced motion.
   assert.match(css, /\.vam-book-start-spinner \{[^}]*border-top-color: var\(--interactive-accent\)[^}]*animation: vam-book-start-spin/);
-  assert.match(css, /\.is-loading \.vam-book-start-field-wrap:has\(\.vam-book-start-field:placeholder-shown\)::after \{[^}]*animation: vam-book-start-shimmer/);
+  assert.match(css, /\.is-loading \.vam-book-start-field:placeholder-shown \+ \.vam-book-start-shimmer \{[^}]*animation: vam-book-start-shimmer/);
+  const wraps = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-field-wrap'));
+  assert.ok(wraps.length > 0, 'the fields have wrappers');
+  for (const wrap of wraps) assert.deepEqual(wrap.children.map(c => c.tag + '.' + c.classes[0]), ['textarea.vam-book-start-field', 'span.vam-book-start-shimmer'], 'the shimmer directly follows its field (the CSS uses `field:placeholder-shown + shimmer`)');
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.vam-book-start-spinner, [^}]*animation: none; \}/);
   assert.doesNotMatch(css, /\.vam-book-start-estimate \{[^}]*font-weight/, 'the cost line is not bold');
   modal.close();

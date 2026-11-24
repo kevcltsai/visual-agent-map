@@ -179,21 +179,153 @@ export type VideoPlayableCheck = (id: string, signal?: AbortSignal) => Promise<b
 
 /**
  * `detail` without the YouTube embeds that `check` says are unplayable. Only ids that are new (not in `existingDetail`, which is the
- * user's own choice) are asked, all at once; null (cannot tell) or a thrown error keeps the embed, so no content is lost to a network error.
+ * user's own choice) are asked, all at once, plus the ids in `alsoCheck` (restored from the old note, so not the user's choice now);
+ * null (cannot tell) or a thrown error keeps the embed, so no content is lost to a network error.
  */
 export async function dropUnplayableVideos(
   detail: string,
   existingDetail: string | undefined,
   check: VideoPlayableCheck | undefined,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  alsoCheck: ReadonlySet<string> = new Set()
 ): Promise<string> {
   if (!check) return detail;
   const existing = embeddedIds(existingDetail ?? "");
-  const ids = [...embeddedIds(detail)].filter(id => !existing.has(id));
+  const all = [...embeddedIds(detail)];
+  const ids = all.filter(id => !existing.has(id) || alsoCheck.has(id));
   if (!ids.length) return detail;
   const verdicts = await Promise.all(ids.map(id => check(id, signal).catch(() => null)));
   const bad = new Set(ids.filter((_, i) => verdicts[i] === false));
   if (!bad.size) return detail;
-  const good = ids.filter(id => !bad.has(id)).map(id => `https://www.youtube.com/watch?v=${id}`);
-  return keepOpenedVideoEmbeds(detail, good, existingDetail);
+  const good = all.filter(id => !bad.has(id)).map(id => `https://www.youtube.com/watch?v=${id}`);
+  return keepOpenedVideoEmbeds(detail, good);
 }
+
+const UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
+const MD_LINK = /(?<!!)\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)]*))(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/;
+const HTML_LINK = /<a\b[^>]*>[\s\S]*?<\/a\s*>/i;
+const watchUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`;
+
+/** `text` cut into [isFence, piece] runs; a piece keeps its line ends. */
+function fenceSegments(text: string): Array<[boolean, string]> {
+  const lines = text.split(/(\r?\n)/);
+  const out: Array<[boolean, string]> = [];
+  let fence: string | null = null;
+  const push = (isFence: boolean, piece: string): void => {
+    const last = out[out.length - 1];
+    if (last && last[0] === isFence) last[1] += piece;
+    else out.push([isFence, piece]);
+  };
+  for (let i = 0; i < lines.length; i += 2) {
+    const piece = (lines[i] ?? "") + (lines[i + 1] ?? "");
+    const mark = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i] ?? "")?.[1];
+    if (fence) {
+      push(true, piece);
+      if (mark && mark[0] === fence[0] && mark.length >= fence.length) fence = null;
+    } else if (mark) {
+      fence = mark;
+      push(true, piece);
+    } else push(false, piece);
+  }
+  return out;
+}
+
+/** The embeds an old note has outside code fences: YouTube ids with their alt text, and non-YouTube images in order. */
+function mediaOf(text: string): { videos: Map<string, string>; images: Array<{ alt: string; url: string }> } {
+  const videos = new Map<string, string>();
+  const images: Array<{ alt: string; url: string }> = [];
+  for (const [isFence, piece] of fenceSegments(text)) {
+    if (isFence) continue;
+    for (const m of piece.matchAll(EMBED)) {
+      const url = m[2] ?? m[3] ?? "";
+      const id = youtubeVideoId(url);
+      if (id) {
+        if (!videos.has(id)) videos.set(id, m[1] ?? "");
+      } else if (url && !looksLikeYoutube(url)) images.push({ alt: m[1] ?? "", url });
+    }
+    for (const id of embeddedIds(piece)) if (!videos.has(id)) videos.set(id, "");
+  }
+  return { videos, images };
+}
+
+/**
+ * Research rewrites a note and may drop its videos and pictures. Puts back what the old note had and `detail` lost: a YouTube link
+ * (`[t](url)` or `<a href>`) turns back into the embed, an embed with no trace is added again, and an image whose url is nowhere in
+ * `detail` is added again. Added lines go in their own paragraphs before the update log, or at the end. `detail` is returned
+ * unchanged when nothing is missing.
+ */
+export function restoreDroppedMedia(
+  detail: string,
+  existingDetail: string
+): { detail: string; restoredVideoIds: Set<string> } {
+  const restoredVideoIds = new Set<string>();
+  const old = mediaOf(existingDetail);
+  if (!old.videos.size && !old.images.length) return { detail, restoredVideoIds };
+  const present = embeddedIds(detail);
+  let segments = fenceSegments(detail);
+  const added: string[] = [];
+  for (const [id, alt] of old.videos) {
+    if (present.has(id)) continue;
+    let converted = false;
+    segments = segments.map(([isFence, piece]) => {
+      if (isFence || converted) return [isFence, piece];
+      let out = piece;
+      const md = new RegExp(MD_LINK.source, "g");
+      for (const m of piece.matchAll(md)) {
+        if (youtubeVideoId(m[2] ?? m[3] ?? "") !== id) continue;
+        out = `${piece.slice(0, m.index)}![${m[1] ?? ""}](${watchUrl(id)})${piece.slice((m.index ?? 0) + m[0].length)}`;
+        converted = true;
+        break;
+      }
+      if (!converted) {
+        const html = new RegExp(HTML_LINK.source, "gi");
+        for (const m of piece.matchAll(html)) {
+          if (youtubeVideoId(htmlHref(m[0])) !== id) continue;
+          const text = m[0].replace(/<[^>]*>/g, "").trim();
+          out = `${piece.slice(0, m.index)}![${text.replace(/[[\]\n]/g, " ")}](${watchUrl(id)})${piece.slice((m.index ?? 0) + m[0].length)}`;
+          converted = true;
+          break;
+        }
+      }
+      return [isFence, out];
+    });
+    if (!converted) added.push(`![${alt}](${watchUrl(id)})`);
+    restoredVideoIds.add(id);
+  }
+  const text = segments.map(s => s[1]).join("");
+  const seen = new Set<string>();
+  for (const { alt, url } of old.images) {
+    if (text.includes(url) || seen.has(url)) continue;
+    seen.add(url);
+    added.push(`![${alt}](${url})`);
+  }
+  if (!restoredVideoIds.size && !added.length) return { detail, restoredVideoIds };
+  if (!added.length) return { detail: text, restoredVideoIds };
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const parts = text.split(/(\r?\n)/);
+  let at = text.length;
+  let offset = 0;
+  let fence: string | null = null;
+  for (let i = 0; i < parts.length; i += 2) {
+    const line = parts[i] ?? "";
+    const mark = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence) {
+      if (mark && mark[0] === fence[0] && mark.length >= fence.length) fence = null;
+    } else if (mark) fence = mark;
+    else if (UPDATE_LOG_HEADING.test(line)) {
+      at = offset;
+      break;
+    }
+    offset += line.length + (parts[i + 1] ?? "").length;
+  }
+  let head = text.slice(0, at);
+  const rest = text.slice(at);
+  if (head) head = head.replace(/(?:\r?\n)*$/, "") + eol + eol;
+  const block = added.join(eol + eol) + eol;
+  return { detail: head + block + (rest ? eol + rest : ""), restoredVideoIds };
+}
+
+const htmlHref = (tag: string): string => {
+  const m = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+  return (m?.[1] ?? m?.[2] ?? m?.[3] ?? "").trim();
+};

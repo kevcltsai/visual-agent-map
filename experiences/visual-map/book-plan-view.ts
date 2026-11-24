@@ -177,6 +177,16 @@ export function markAttentionCallouts(root: HTMLElement, rerun: () => void): voi
     });
   }
 }
+/** Marks a proofread box whose content area holds only one empty paragraph (its hidden marker lines), so the stylesheet hides that area without `:has`. */
+export const REVIEW_EMPTY_CLASS = "vam-review-content-empty";
+export function markEmptyReviewContent(root: HTMLElement): void {
+  for (const content of Array.from(
+    root.querySelectorAll<HTMLElement>('.callout[data-callout="vam-review"] .callout-content')
+  )) {
+    const only = content.children.length === 1 ? content.firstElementChild : null;
+    content.classList.toggle(REVIEW_EMPTY_CLASS, only?.tagName === "P" && only.childNodes.length === 0);
+  }
+}
 const CALLOUT_ATTENTION = `.callout[data-callout="vam-review"][data-callout-metadata="${ATTENTION_HOOK}"]`;
 
 const touchesCallout = (mutation: MutationRecord): boolean =>
@@ -204,6 +214,7 @@ export function registerBookPlanView(
   plugin.registerMarkdownPostProcessor((element, ctx) => {
     markPlanCallouts(element, envOf(ctx.sourcePath));
     markAttentionCallouts(element, () => rerun(ctx.sourcePath));
+    markEmptyReviewContent(element);
   });
   plugin.registerEditorExtension(
     ViewPlugin.fromClass(
@@ -218,6 +229,7 @@ export function registerBookPlanView(
               const notePath = path();
               if (notePath) rerun(notePath);
             });
+            markEmptyReviewContent(view.dom);
           };
           this.observer = new MutationObserver(mutations => {
             if (mutations.some(touchesCallout)) mark();

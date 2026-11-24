@@ -80,7 +80,8 @@
 .vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
 .vam-usage-title { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
 .vam-usage-filter { display: inline-flex; padding: 2px; border-radius: var(--radius-s); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
-.vam-usage-filter-option { all: unset; box-sizing: border-box; padding: 2px 9px; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
+/* Plain text in a pill, not an Obsidian button: the button look is reset property by property (the CSS lint flags `all`). */
+.vam-usage-filter-option { box-sizing: border-box; display: inline; align-items: normal; justify-content: normal; width: auto; height: auto; margin: 0; padding: 2px 9px; border: 0; background: none; box-shadow: none; font-family: inherit; line-height: inherit; letter-spacing: inherit; text-align: inherit; text-transform: inherit; white-space: inherit; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
 .vam-usage-filter-option.is-selected { background: var(--background-primary); color: var(--interactive-accent); font-weight: var(--font-bold); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
 .vam-usage-filter-option:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-section { display: grid; gap: 6px; }
@@ -498,12 +499,12 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   .view-header.vam-goal-host .vam-goal-actions { min-width: 0; position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
   /* Bridges the gap between the goal and the icons, so the pointer keeps the bar hovered on its way there. The bar owns it; the view measures it (bar bottom to icon top, as wide as the icons) and leaves it out where something clickable lies in the gap. */
   .view-header.vam-goal-host .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
-  /* Here the icons float over what is under the row, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
+  /* Here the icons float over what is under the row, so they show only while the pointer is on the goal or the keyboard is in it (.is-focus-visible:focus-within; the view sets the class from :focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
   .view-header.vam-goal-host .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
   /* The way off the goal to the icons is rarely straight down the bridge: they stay a moment after the pointer leaves, so a diagonal path still reaches them. */
   .view-header.vam-goal-host .vam-goal-actions { transition: opacity 0s linear 300ms, pointer-events 0s linear 300ms; transition-behavior: allow-discrete; }
-  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
-  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { transition-delay: 0s; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar.is-focus-visible:focus-within .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar.is-focus-visible:focus-within .vam-goal-actions { transition-delay: 0s; }
   /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
   .view-header.vam-goal-host .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
   .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }
@@ -1032,19 +1033,19 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .markdown-preview-view.visual-agent-map-node h2 { margin-block: 2.4em 0.8em; padding-bottom: 0.35em; border-bottom: 1px solid var(--background-modifier-border); }
 .markdown-preview-view.visual-agent-map-node h3 { margin-block: 2em 0.5em; }
 .visual-agent-map-node img:not([width]) { display: block; width: auto; max-height: 22em; margin-inline: auto; }
-/* A picture's paragraph is the picture plus its caption and source lines. */
-.markdown-preview-view.visual-agent-map-node p:has(> img, > .image-embed) { margin-block: 1.6em 2em; color: var(--text-muted); font-size: 0.85em; line-height: 1.55; text-align: center; text-wrap: balance; }
-.markdown-preview-view.visual-agent-map-node p:has(> img) > img + br { display: none; }
+/* A picture's paragraph (marked .vam-picture-paragraph by a post processor) is the picture plus its caption and source lines. */
+.markdown-preview-view.visual-agent-map-node p.vam-picture-paragraph { margin-block: 1.6em 2em; color: var(--text-muted); font-size: 0.85em; line-height: 1.55; text-align: center; text-wrap: balance; }
+.markdown-preview-view.visual-agent-map-node p.vam-picture-paragraph > img + br { display: none; }
 /* The cap is 22 body ems; inside the smaller caption paragraph that is 22 / 0.85. */
-.markdown-preview-view.visual-agent-map-node p:has(> img) > img { max-height: 25.88em; margin-bottom: 0.5em; }
+.markdown-preview-view.visual-agent-map-node p.vam-picture-paragraph > img { max-height: 25.88em; margin-bottom: 0.5em; }
 /* Picture-book page (a card with a book role, marked on the leaf by styleNodeLeaf): set like a printed page. A serif face (Latin first, then Chinese), a narrower page, paragraphs told apart by a first-line indent instead of a gap, a paper-toned ground. Reading view only. */
 .vam-book-page .markdown-preview-view.visual-agent-map-node { --font-text: "Iowan Old Style", "Palatino Linotype", Georgia, "Songti TC", "Noto Serif TC", "PMingLiU", serif; --file-line-width: 33em; --line-height-normal: 1.9; --h3-size: 1.35em; background-color: color-mix(in srgb, var(--background-primary) 93%, var(--color-yellow)); }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h1 { margin-block: 1.2em 1.6em; letter-spacing: 0.12em; text-align: center; }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h2 { margin-block: 2.4em 1em; border-bottom: 0; letter-spacing: 0.3em; text-align: center; }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h3 { margin-block: 2.2em 0.9em; }
-.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(:has(> img, > .image-embed)) { margin-block: 0; text-align: justify; }
+.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(.vam-picture-paragraph) { margin-block: 0; text-align: justify; }
 /* The first-line indent is an empty inline box: the `text-indent` property is outside the CSS lint's supported set. */
-.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(:has(> img, > .image-embed))::before { content: ""; display: inline-block; width: 2em; }
+.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(.vam-picture-paragraph)::before { content: ""; display: inline-block; width: 2em; }
 @media (max-width: 900px) { .vam-inspector { width: 260px; } }
 @media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); } .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; } }
 
@@ -2307,11 +2308,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-start-suggesting { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-book-start-spinner { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid var(--background-modifier-border); border-top-color: var(--interactive-accent); animation: vam-book-start-spin 0.9s linear infinite; }
 .vam-book-start-field-wrap { position: relative; }
+.vam-book-start-shimmer { display: none; }
 .vam-book-start-settings.is-loading .vam-book-start-field:placeholder-shown::placeholder { color: transparent; }
-.vam-book-start-settings.is-loading .vam-book-start-field-wrap:has(.vam-book-start-field:placeholder-shown)::after { content: ""; position: absolute; left: 10px; top: 50%; width: 55%; height: 10px; margin-top: -5px; border-radius: 4px; pointer-events: none; background: linear-gradient(90deg, var(--background-modifier-border) 0%, var(--interactive-normal) 50%, var(--background-modifier-border) 100%); background-size: 200% 100%; animation: vam-book-start-shimmer 1.4s ease-in-out infinite; }
+.vam-book-start-settings.is-loading .vam-book-start-field:placeholder-shown + .vam-book-start-shimmer { display: block; position: absolute; left: 10px; top: 50%; width: 55%; height: 10px; margin-top: -5px; border-radius: 4px; pointer-events: none; background: linear-gradient(90deg, var(--background-modifier-border) 0%, var(--interactive-normal) 50%, var(--background-modifier-border) 100%); background-size: 200% 100%; animation: vam-book-start-shimmer 1.4s ease-in-out infinite; }
 @keyframes vam-book-start-spin { to { transform: rotate(360deg); } }
 @keyframes vam-book-start-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-@media (prefers-reduced-motion: reduce) { .vam-book-start-spinner, .vam-book-start-settings.is-loading .vam-book-start-field-wrap::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .vam-book-start-spinner, .vam-book-start-settings.is-loading .vam-book-start-shimmer { animation: none; } }
 .vam-book-start-hint { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-warning, var(--text-muted)); white-space: pre-line; }
 .vam-book-start-hint.is-empty { display: none; }
 .vam-book-start-field.vam-book-start-suggested::placeholder { font-style: italic; color: var(--text-muted); opacity: 0.85; }
@@ -2377,7 +2379,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .theme-dark .callout[data-callout="vam-review"] { --callout-color: 166, 140, 255; }
 /* The box's hidden %%marker%% lines leave empty paragraphs in reading view: they must not stretch the box into a blank block under its title. */
 .callout[data-callout="vam-review"] .callout-content > p:empty { display: none; }
-.callout[data-callout="vam-review"] .callout-content:has(> p:empty:only-child) { display: none; }
+.callout[data-callout="vam-review"] .callout-content.vam-review-content-empty { display: none; }
 .view-action.vam-book-apply-notes { width: auto; gap: 4px; padding-inline: 6px; }
 .vam-book-apply-label { font-size: var(--font-ui-smaller); }
 .vam-book-note-selected { margin-block: 0 8px; padding: 4px 8px; border-left: 3px solid var(--interactive-accent); color: var(--text-muted); }
@@ -2415,3 +2417,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-figure .fig-box { fill: var(--interactive-accent); fill-opacity: 0.25; stroke: var(--interactive-accent); stroke-width: 1.5; }
 .vam-figure .fig-arc { stroke: var(--interactive-accent); stroke-width: 1.5; fill: none; }
 .vam-figure .vam-figure-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+
+/* Facebook and Instagram video card in rendered Markdown (experiences/markdown-context/social-video-cards.ts). */
+.vam-social-video-card { margin: 8px 0; }
+.vam-social-video-stage { border-radius: 8px; background: var(--background-modifier-hover); aspect-ratio: 16 / 9; max-width: 560px; display: grid; place-items: center; overflow: hidden; }
+.vam-social-video-stage.vam-social-video-tall { aspect-ratio: 9 / 16; max-width: 360px; }
+.vam-social-video-frame { width: 100%; height: 100%; border: 0; }
+.vam-social-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }

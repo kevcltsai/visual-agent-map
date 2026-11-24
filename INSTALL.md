@@ -71,6 +71,8 @@ VAM has no telemetry and does not store API keys. AI tasks send relevant content
 
 The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are not an OS sandbox. VAM runs the CLI program you installed, and when you use Standard research or picture search that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded from their websites. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Share files are written only where you choose in the save window; VAM never uploads them. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
 
+The map AI chat also sends an annotated image you select (the picture itself). Research, expansion and synthesis read the items in the map's data sources. A data source can be a folder outside the vault that you add; VAM reads it only as reference for that map, and the folder list stays on this device. Saving map AI conversations is off by default; when turned on, they are stored in your vault. When the picture-book writer's picture search leaves a picture position empty, VAM itself searches Wikimedia Commons (commons.wikimedia.org), sending only a short search line for that position. When research writes a YouTube video into a note, VAM asks YouTube's oEmbed service (www.youtube.com) whether that video is public and playable, sending only the video address, and removes the video if it is private or deleted. A picture book may take a body picture from any website (the cover uses only Wikimedia Commons); VAM sends at most 3 non-Wikimedia candidate pictures per chapter to the AI to look at, downloading each once in memory (shrunk before it is sent) and never saving it, and skips a picture it cannot read. Images in a share file that link to the web are loaded by the reader's browser from the original site; whether to publish a share file is up to you. When you share, VAM lists the pictures whose licence is unknown or restricted so you can decide whether to leave them out.
+
 ## Known limitations
 
 Desktop only. Windows and Linux remain unverified.
@@ -88,6 +90,12 @@ Map AI chat: tested live with Claude only; Codex was not tested live in the chat
 Share files: web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
 Coffee Tables stores what it needs to continue a conversation in the hidden `Coffee Tables/.sessions` folder. Obsidian Sync skips hidden folders, so on other devices you can read synced conversations but not continue them; continue them on the device where they started.
+
+## Contributing checks
+
+- `npm run verify` runs the same checks as CI (lint, format, tests, committed artifacts).
+- Run `git config core.hooksPath .githooks` so it runs automatically before every push.
+- Never bypass it with `--no-verify`.
 
 ---
 
@@ -164,6 +172,8 @@ VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關
 
 CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
 
+地圖 AI 對話也會送出你選取的標註圖（圖片本身）。研究、展開與收斂會讀取地圖資料來源裡的項目。資料來源也可以是你加入的 Vault 外資料夾；VAM 只把它當成該地圖的參考讀取，資料夾清單只存在這台裝置。保存地圖 AI 對話預設關閉；開啟後對話會存在你的 vault。圖文書找圖後仍有空著的圖位時，VAM 會自己向 Wikimedia Commons（commons.wikimedia.org）搜尋，只送出該圖位的一行簡短搜尋文字。研究把 YouTube 影片寫進筆記時，VAM 會向 YouTube 的 oEmbed 服務（www.youtube.com）確認該影片是公開且可播放的，只送出影片網址；私人或已刪除的影片會被移除。圖文書的內文圖片可能來自任何網站（封面只用 Wikimedia Commons）；VAM 每章最多把 3 張非 Wikimedia 的候選圖片交給 AI 檢視，每張只在記憶體下載一次（送出前先縮小）、不存檔，讀不了的圖片會略過。分享檔裡連到網路的圖片，會由讀者的瀏覽器向原網站載入；要不要發佈分享檔由你決定。分享時，VAM 會列出授權不明或受限的圖片，讓你決定是否拿掉。
+
 ## 已知限制
 
 僅支援桌面版。Windows 與 Linux 尚未驗證。
@@ -181,3 +191,9 @@ AI 從網路找到的圖片不一定能自由使用，請查看各自的來源�
 分享檔：網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
 
 Coffee Tables 把接續對談所需的資料存在隱藏資料夾 `Coffee Tables/.sessions`。Obsidian Sync 不同步隱藏資料夾，因此在其他裝置上可以閱讀同步過去的對談，但無法接著聊；請回到開始對談的裝置繼續。
+
+## 貢獻檢查
+
+- `npm run verify` 與 CI 執行同一組檢查（lint、格式、測試、已提交產物）。
+- 執行 `git config core.hooksPath .githooks`，每次 push 前會自動跑。
+- 不要用 `--no-verify` 跳過。

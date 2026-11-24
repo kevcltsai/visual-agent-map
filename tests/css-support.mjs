@@ -23,6 +23,12 @@ test("!important is still flagged", async () => {
   assert.deepEqual(found.map((f) => f.line), [1]);
 });
 
+// 0.35.1 scan CSS LINT warnings: 'Unexpected property "all"' (styles.css:83) and 'Avoid :has' (styles.css:505, 506, 1036, 1037, 1039, 1045, 1047, 2311, 2380).
+test("0.35.1 :has selectors and the all property are flagged", async () => {
+  const css = '.a { all: unset; }\n.b:has(> img) { color: red; }\n.c:not(:has(.d))::before { content: ""; }\n.e { color: red; }';
+  assert.deepEqual((await checkCss(css, "fixture.css")).map((f) => f.line), [1, 2, 3]);
+});
+
 test("shipped stylesheets pass", async () => {
   for (const file of FILES) assert.deepEqual(await checkCss(readFileSync(resolve(root, file), "utf8"), file), [], file);
 });

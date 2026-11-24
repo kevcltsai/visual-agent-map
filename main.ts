@@ -1,6 +1,8 @@
 import { createBookStructurePort } from "./experiences/visual-map/book-structure-port";
 import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
+import { upgradeSocialVideoLinks } from "./experiences/markdown-context/social-video-cards";
+import { markPictureParagraphs } from "./experiences/markdown-context/picture-paragraphs";
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
@@ -1443,6 +1445,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
+    // Facebook and Instagram videos in notes and card previews play in a card (Obsidian itself embeds only YouTube).
+    this.registerMarkdownPostProcessor(element => {
+      upgradeSocialVideoLinks(element, {
+        play: site => t("share.viewer_video_play_site").replace("{0}", site),
+        note: site => t("share.viewer_video_note_site").replace("{0}", site),
+        open: site => t("share.viewer_video_open_site").replace("{0}", site)
+      });
+    });
     for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     registerBookFigures(this);
@@ -1469,6 +1479,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     }));
     this.addChild(markdownSelectionAi);
     // Tag reading-view blocks with their source lines so an action on a rendered image finds its embed.
+    this.registerMarkdownPostProcessor(element => markPictureParagraphs(element));
     this.registerMarkdownPostProcessor((element, context) => {
       const section = context.getSectionInfo(element);
       if (!section || !element.querySelector("img, .internal-embed")) return;

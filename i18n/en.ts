@@ -2811,6 +2811,7 @@ export const en = {
   "share.mermaid_blocked_note":
     "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
+  "share.math_source_note": "[Formula shown as source: it could not be converted to math notation.]",
   "share.leak_blocked_0":
     "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
   "share.leak_at_0": "In topic “{0}”",

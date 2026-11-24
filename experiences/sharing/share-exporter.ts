@@ -15,6 +15,7 @@ import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
 import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
 import { applyNodeLinks } from "./share-node-links";
 import { replaceMediaWithLinks } from "./share-media";
+import { mathFromLatex, MATHML_NS, MATH_NOTE_CLASS, MATH_SOURCE_CLASS } from "./share-math";
 import {
   assertCurrent,
   assetNamesInHtml,
@@ -180,6 +181,33 @@ const IMAGE_MIME: Record<string, string> = {
 };
 /** Embedded images are re-encoded as WebP at this quality (OQ-8). */
 export const SHARE_WEBP_QUALITY = 0.82;
+const FORMULA_SLOT = "vam-math-slot";
+interface Formula {
+  latex: string;
+  display: boolean;
+}
+
+/**
+ * Takes every rendered formula (`.math`) out of the note and leaves a slot; returns the LaTeX and display mode of each.
+ * A formula whose LaTeX cannot be read keeps an empty source, which the fill step shows as the note's fallback line.
+ */
+function collectFormulas(host: HTMLElement): Formula[] {
+  const formulas: Formula[] = [];
+  for (const unit of Array.from(host.querySelectorAll<HTMLElement>(".math"))) {
+    if (!unit.isConnected || unit.parentElement?.closest(".math")) continue;
+    const latex =
+      unit.querySelector("mjx-math[data-latex]")?.getAttribute("data-latex") ??
+      unit.getAttribute("data-latex") ??
+      unit.querySelector("annotation")?.textContent ??
+      "";
+    const slot = createSpan();
+    slot.className = FORMULA_SLOT;
+    formulas.push({ latex, display: unit.classList.contains("math-block") });
+    unit.replaceWith(slot);
+  }
+  return formulas;
+}
+
 const MERMAID_UNIT = ".mermaid-wrapper, .mermaid";
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -751,6 +779,8 @@ export class ShareExporter {
       },
       tag => createEl(tag)
     );
+    // Formulas: the LaTeX is read now (the sanitizer would flatten MathJax's markup to bare characters) and MathML is made later.
+    const formulas = collectFormulas(host);
     const clean = createDiv();
     clean.append(sanitizeHTMLToDom(host.innerHTML));
     unwrapLocalLinks(clean, () => createSpan());
@@ -761,6 +791,7 @@ export class ShareExporter {
       () => createEl("a"),
       new Set(this.files.keys())
     );
+    this.fillFormulas(clean, formulas);
     const slots = Array.from(clean.querySelectorAll(".vam-mermaid-slot"));
     slots.forEach((slot, index) => {
       const diagram = diagrams[index];
@@ -772,6 +803,42 @@ export class ShareExporter {
     const placed = placeDiagrams(finalSvgs, diagrams, diagramSources);
     const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
     return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
+  }
+
+  /** Each formula slot becomes MathML from MathJax, rebuilt from a whitelist; without usable MathML it becomes the LaTeX source and a note. */
+  private fillFormulas(clean: HTMLElement, formulas: readonly Formula[]): void {
+    const mathJax = (
+      activeWindow as unknown as { MathJax?: { tex2mml?: (latex: string, options: { display: boolean }) => string } }
+    ).MathJax;
+    const tex2mml = mathJax?.tex2mml
+      ? (latex: string, options: { display: boolean }) => mathJax.tex2mml!(latex, options)
+      : undefined;
+    const deps = {
+      tex2mml,
+      parse: (mml: string) => new DOMParser().parseFromString(mml, "text/html").querySelector("math"),
+      create: (name: string) => activeDocument.createElementNS(MATHML_NS, name)
+    };
+    Array.from(clean.querySelectorAll(`.${FORMULA_SLOT}`)).forEach((slot, index) => {
+      const formula = formulas[index];
+      if (!formula) {
+        slot.remove();
+        return;
+      }
+      const math = mathFromLatex(formula.latex, formula.display, deps);
+      if (math) {
+        slot.replaceWith(math);
+        return;
+      }
+      const wrap = formula.display ? createDiv() : createSpan();
+      const code = createEl("code");
+      code.className = MATH_SOURCE_CLASS;
+      code.textContent = formula.latex;
+      const note = createSpan();
+      note.className = MATH_NOTE_CLASS;
+      note.textContent = ` ${translate(this.config.language, "share.math_source_note")}`;
+      wrap.append(code, note);
+      slot.replaceWith(wrap);
+    });
   }
 
   /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */

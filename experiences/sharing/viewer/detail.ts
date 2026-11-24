@@ -2,6 +2,7 @@ import type { ShareNodeTranslation } from "../share-format";
 import type { ShareViewerUi } from "../share-viewer-ui";
 import { reconstructTranslatedDetail } from "../share-translate-compact";
 import { createViewerElement } from "./dom";
+import { cleanViewerMath } from "./math";
 import { upgradeVideoLinks } from "./video";
 
 /** The pieces of the "Source: host" line shown under a web image: text before, link label, text after. */
@@ -237,6 +238,7 @@ export function fillDetailRoot(
     } else if (!href.startsWith("#")) link.removeAttribute("href");
   }
   upgradeVideoLinks(root, doc, ui);
+  cleanViewerMath(root);
   for (const table of Array.from(root.querySelectorAll("table"))) {
     if (table.parentElement?.classList.contains("vam-table-scroll")) continue;
     const wrap = createViewerElement(doc, "div");

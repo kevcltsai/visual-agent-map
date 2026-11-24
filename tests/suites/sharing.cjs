@@ -981,3 +981,58 @@ test('share viewer video: the viewer id parser agrees with the plugin parser on 
   assert.equal(viewerVideo.viewerYoutubeId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
   assert.equal(viewerVideo.viewerYoutubeId('https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ'), null);
 });
+
+// ---- share-complete P6b: math as MathML ----
+const shareMath = load('experiences/sharing/share-math.ts');
+const viewerMath = load('experiences/sharing/viewer/math.ts');
+const outer = el => { const d = new supportHtml.El('div', supportHtml.parse('').ownerDocument); d.append(el); return supportHtml.serialize(d); };
+const mathDeps = (mml, extra = {}) => ({
+  tex2mml: mml === undefined ? undefined : () => mml,
+  parse: text => supportHtml.parse(text).children.find(el => el.localName === 'math') ?? null,
+  create: name => new supportHtml.El(name, supportHtml.parse('').ownerDocument),
+  ...extra
+});
+const HOSTILE_MML = '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" class="x" style="color:red" onload="evil()" href="javascript:evil()"><semantics><mrow><msup onclick="e()" href="https://e.example" style="x:y"><mi mathvariant="italic" class="c">x</mi><mn>2</mn></msup><maction actiontype="toggle"><mi>HIDDEN</mi></maction><mfrac linethickness="2"><mn>1</mn><mn>3</mn></mfrac><script>alert(1)</script></mrow><annotation encoding="application/x-tex">x^2 LATEX</annotation><annotation-xml encoding="x"><mi>AXML</mi></annotation-xml></semantics></math>';
+
+test('share math: the whitelist keeps structure and drops maction, href, annotation-xml, annotation, onload, style, class and script', () => {
+  const math = shareMath.mathFromLatex('x^2', false, mathDeps(HOSTILE_MML));
+  const out = outer(math);
+  assert.ok(out.includes('<msup>') && out.includes('<mfrac linethickness="2">') && out.includes('mathvariant="italic"'), out);
+  assert.ok(!/maction|HIDDEN|AXML|LATEX|annotation|alert|script|href|onload|onclick|style|class=|xmlns|javascript/i.test(out), out);
+  assert.ok(!out.includes('display='), 'inline math carries no display attribute');
+});
+
+test('share math: block math gets display="block"; the namespace factory is used for every element', () => {
+  const made = [];
+  const math = shareMath.mathFromLatex('x', true, mathDeps(HOSTILE_MML, { create: name => (made.push(name), new supportHtml.El(name, supportHtml.parse('').ownerDocument)) }));
+  assert.equal(math.getAttribute('display'), 'block');
+  assert.ok(made.includes('math') && made.includes('msup') && !made.includes('maction') && !made.includes('script'), made.join());
+});
+
+test('share math: no MathJax, a throwing tex2mml, an empty or non-math result, or empty LaTeX gives null (the caller shows the source)', () => {
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps(undefined)), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('', {})), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<p>no math</p>')), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<math></math>')), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<math><mi>x</mi></math>', { tex2mml: () => { throw new Error('boom'); } })), null);
+  assert.equal(shareMath.mathFromLatex('  ', false, mathDeps('<math><mi>x</mi></math>')), null);
+});
+
+test('share math: an unknown element is unwrapped (its text kept), text stays text', () => {
+  const math = shareMath.mathFromLatex('x', false, mathDeps('<math><mrow><foo><mi>a&lt;b</mi></foo></mrow></math>'));
+  assert.equal(outer(math), '<math><mrow><mi>a&lt;b</mi></mrow></math>');
+});
+
+test('viewer math: the viewer whitelist is the same lists as share-math, and it cleans a hand-edited file', () => {
+  assert.deepEqual(plain(viewerMath.VIEWER_MATHML_ELEMENTS), plain(shareMath.MATHML_ELEMENTS));
+  assert.deepEqual(plain(viewerMath.VIEWER_MATHML_ATTRIBUTES), plain(shareMath.MATHML_ATTRIBUTES));
+  const root = supportHtml.parse('<p>a <math display="block" onload="x()"><msup class="c"><mi>x</mi><mn>2</mn></msup><maction><mi>H</mi></maction><mfrac><mn>1</mn><mn>2</mn></mfrac><annotation-xml><mi>A</mi></annotation-xml></math></p>');
+  viewerMath.cleanViewerMath(root);
+  assert.equal(supportHtml.serialize(root), '<p>a <math display="block"><msup><mi>x</mi><mn>2</mn></msup><mfrac><mn>1</mn><mn>2</mn></mfrac></math></p>');
+});
+
+test('share math: MathML carries no link, so the local-reference count and the leak scan see nothing in it', () => {
+  const math = shareMath.mathFromLatex('x', false, mathDeps(HOSTILE_MML));
+  const html = outer(math);
+  assert.ok(!/href|src=|http|file:|app:/i.test(html), html);
+});

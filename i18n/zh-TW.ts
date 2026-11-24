@@ -2628,6 +2628,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.mermaid_undrawn_warning_0": "有 {0} 張圖表未能在時限內畫完，只以原始碼呈現。",
   "share.mermaid_blocked_note": "［圖表未繪製：製作此檔時尚未允許 Mermaid，改顯示原始碼。］",
   "share.mermaid_undrawn_note": "［圖表未能畫完，改顯示原始碼。］",
+  "share.math_source_note": "［公式無法轉成數學記號，改顯示原始碼。］",
   "share.leak_blocked_0":
     "未存檔：檔案會含有私人資訊（{0}）。請回到來源筆記移除這些內容，或關閉會帶入完整筆記的選項，再重新分享。",
   "share.leak_at_0": "在議題「{0}」",

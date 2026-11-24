@@ -1122,3 +1122,13 @@ test('share exporter embeds: a picture dropped in the image check is also left o
   await exporter.ensureRendered(ticket(), () => {});
   assert.ok(seen.includes('x.png'), 'cleared: the picture is back');
 });
+
+test('share export P6b: formulas are read before the sanitizer and filled as MathML after scrub and node links, with a visible source fallback', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'experiences/sharing/share-exporter.ts'), 'utf8');
+  const body = source.slice(source.indexOf('private finish('), source.indexOf('private fillFormulas('));
+  assert.ok(body.indexOf('collectFormulas(host)') < body.indexOf('sanitizeHTMLToDom(') && body.indexOf('applyNodeLinks(') < body.indexOf('this.fillFormulas('), 'collect first, fill last');
+  const fill = source.slice(source.indexOf('private fillFormulas('));
+  assert.ok(/mathFromLatex\(/.test(fill) && /MATH_SOURCE_CLASS/.test(fill) && /share\.math_source_note/.test(fill), 'a failed conversion shows the LaTeX and a note');
+  assert.ok(/mjx-math\[data-latex\]/.test(source) && /classList\.contains\("math-block"\)/.test(source), 'LaTeX from data-latex; display from math-block');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.ok(/"share\.math_source_note":/.test(fs.readFileSync(path.join(repoRoot, `i18n/${lang}.ts`), 'utf8')), lang);
+});

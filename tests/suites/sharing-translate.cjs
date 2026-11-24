@@ -716,3 +716,14 @@ test('share translate segments: the embed box title and its text are units like 
   const units = segments.extractSegments(html.parse('<div class="callout" data-callout="vam-embed"><div class="callout-title"><div class="callout-title-inner">Embedded: Source</div></div><div class="callout-content"><p>Embedded body text</p></div></div>')).units.map(unit => unit.text);
   assert.ok(units.includes('Embedded: Source') && units.includes('Embedded body text'));
 });
+
+test('share translate P6b: MathML and the source fallback are atoms; a translated note keeps the formula untouched', () => {
+  const original = '<p>Let <math><msup><mi>x</mi><mn>2</mn></msup></math> be big and <code class="vam-math-source">a_1</code><span class="vam-math-note"> note</span>.</p><math display="block"><mfrac><mn>1</mn><mn>3</mn></mfrac></math>';
+  const units = segments.extractSegments(html.parse(original)).units.map(unit => unit.text);
+  assert.ok(units.some(text => /^Let ⟦1\/⟧ be big and ⟦2\/⟧/.test(text)), units.join('|'));
+  assert.ok(!units.some(text => /\bx\b|a_1|^2$|^1$/.test(text.replace(/⟦[^⟧]*⟧/g, ''))), 'math text is never sent');
+  const tree = html.parse(original);
+  segments.applyTranslations(segments.extractSegments(tree), unit => tagged(unit.text));
+  const out = html.serialize(tree);
+  assert.ok(out.includes('<math><msup><mi>x</mi><mn>2</mn></msup></math>') && out.includes('<math display="block"><mfrac><mn>1</mn><mn>3</mn></mfrac></math>') && out.includes('a_1'), out);
+});

@@ -3,6 +3,7 @@ import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
 import { MAP_CHAT_AUTO_MAX_CALLS } from "./map-chat-chain";
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
+import { videoUrlsInText, youtubeVideoId } from "./video-embeds";
 
 /**
  * Plan confirmation. Most replies are applied at once; a reply that can do a lot of damage or cost a lot is shown as a plan
@@ -457,6 +458,22 @@ export function chatResearchMode(
 }
 /** The research options of a mode (the view hands in `aiModeOptions(mode, "research")`; core does not import an experience). */
 export type ChatModeOptions = (mode: MapAiMode) => { researchMode: ResearchMode; researchDepth: ResearchDepth };
+/**
+ * A YouTube url the chat model wrote into a research direction is passed on only when the user wrote it (`userWords`: their
+ * messages of this conversation): the research keeps a pasted video, so a url the chat model made up must not reach it.
+ */
+export function keepPastedVideoUrls(actions: readonly MapChatAction[], userWords: string): MapChatAction[] {
+  const pasted = new Set(videoUrlsInText(userWords).map(url => youtubeVideoId(url)));
+  return actions.map(action => {
+    if (action.kind !== "run_map_action" || !action.direction) return action;
+    const urls = videoUrlsInText(action.direction).filter(url => !pasted.has(youtubeVideoId(url)));
+    if (!urls.length) return action;
+    let direction = action.direction;
+    for (const url of urls) direction = direction.split(url).join("");
+    return { ...action, direction };
+  });
+}
+
 /**
  * The research a reply asks for: the options of its mode (`optionsOf`). Quick never looks for images; Standard does only when
  * the user asked for them. `direction` is the extra requirement. A reply of the earlier step version reads as "not named" (no

@@ -17,13 +17,13 @@ const PLAIN = (over = {}) => ({ id: 'img2', kind: 'image', path: 'attachments/b.
 /** A fake chat panel: the calls the send makes, recorded, with the busy state a real turn has. */
 function fakeChat(control) {
   const chat = {
-    draft: '', isBusy: false, marks: [], calls: [], turnsList: [], plans: [], lines: [], transcript: [],
+    draft: '', isBusy: false, marks: [], calls: [], turnsList: [], plans: [], lines: [], transcriptList: [], transcript: () => chat.transcriptList,
     attachments: () => [], currentNote: () => null, turns: () => [], pendingPlan: () => chat.plans.find(p => p.state === 'pending') ?? null,
-    begin(message, origin, again, stage) { chat.isBusy = true; const turn = { message, origin }; chat.turnsList.push(turn); chat.transcript.push({ role: 'user', text: message, origin }); chat.calls.push(['begin', message, stage]); return turn; },
+    begin(message, origin, again, stage) { chat.isBusy = true; const turn = { message, origin }; chat.turnsList.push(turn); chat.transcriptList.push({ role: 'user', text: message, origin }); chat.calls.push(['begin', message, stage]); return turn; },
     hasTurn: turn => chat.turnsList.includes(turn),
     retract(turn, draft) { if (!chat.turnsList.includes(turn)) return false; chat.turnsList.splice(chat.turnsList.indexOf(turn), 1); chat.isBusy = false; chat.calls.push(['retract', draft]); if (draft !== undefined) chat.draft = draft; return true; },
     setStage: stage => chat.calls.push(['stage', stage]), clearSlow() {}, showSlow() {}, refreshSpeaker() {}, addOpening() {}, restartWaiting() {}, streamReply() {},
-    finish(reply, lines) { chat.isBusy = false; chat.lines.push(lines); chat.transcript.push({ role: 'assistant', text: reply, lines }); chat.calls.push(['finish', reply]); },
+    finish(reply, lines) { chat.isBusy = false; chat.lines.push(lines); chat.transcriptList.push({ role: 'assistant', text: reply, lines }); chat.calls.push(['finish', reply]); },
     fail(text) { chat.isBusy = false; chat.calls.push(['fail', text]); },
     markStopped() { chat.isBusy = false; chat.calls.push(['stopped']); },
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
@@ -216,7 +216,7 @@ test('send: no picture selected, the request is the one it is today (no selected
   assert.equal('imageDataUrl' in request, false);
   assert.equal(request.context.selectedImage, undefined);
   assert.equal(request.context.json.includes('selectedImage'), false);
-  assert.equal('imageId' in h.chat.transcript[0].origin, false, 'origin has no picture');
+  assert.equal('imageId' in h.chat.transcriptList[0].origin, false, 'origin has no picture');
 });
 
 test('send: a selected annotated image goes with its words in the context and its picture as imageDataUrl; origin keeps only the id', async () => {
@@ -228,8 +228,8 @@ test('send: a selected annotated image goes with its words in the context and it
   const sent = JSON.parse(request.context.json).selectedImage;
   assert.deepEqual(plain(sent), { id: 'img1', kind: 'annotated-image', note: 'Cow cuts', anchors: [{ id: 'old1', x: 0.1, y: 0.1, note: 'Chuck' }], relations: [], imageAttached: true });
   assert.equal(request.context.json.includes('data:image'), false, 'the picture is not in the prompt text');
-  assert.equal(h.chat.transcript[0].origin.imageId, 'img1');
-  assert.equal(JSON.stringify(h.chat.transcript[0].origin).includes('data:image'), false);
+  assert.equal(h.chat.transcriptList[0].origin.imageId, 'img1');
+  assert.equal(JSON.stringify(h.chat.transcriptList[0].origin).includes('data:image'), false);
   assert.equal(request.context.selectedImage.kind, 'annotated');
 });
 
@@ -343,7 +343,7 @@ test('send: a retry reads the picture again (origin carries only the id)', async
   const h = await harness();
   h.select('img1');
   await h.send('place anchors');
-  const origin = h.chat.transcript[0].origin;
+  const origin = h.chat.transcriptList[0].origin;
   h.view.chatImageId = null; // the selection moved on; the retry is about the same picture
   await h.view.sendMapChat(origin);
   assert.equal(h.control.reads, 2);
@@ -365,7 +365,7 @@ test('plan: "show me first" offers a plan for anchors and writes nothing; Apply 
   await until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
   assert.equal((await h.image()).anchors.length, 2);
   assert.equal((await h.image()).relations.length, 1);
-  for (const part of [h.chat.transcript, h.chat.plans.map(c => ({ ...c, apply: undefined, cancel: undefined })), h.chat.lines, h.chat.calls]) assert.equal(DATA_URL.test(JSON.stringify(part)), false);
+  for (const part of [h.chat.transcriptList, h.chat.plans.map(c => ({ ...c, apply: undefined, cancel: undefined })), h.chat.lines, h.chat.calls]) assert.equal(DATA_URL.test(JSON.stringify(part)), false);
   assert.equal(DATA_URL.test(JSON.stringify(h.view.history.undoEntry)), false);
 });
 

@@ -99,7 +99,8 @@ test('a list item whose whole content was a removed embed goes with its marker; 
 });
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
-  assert.match(source, /opened: countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]/);
+  assert.match(source, /\.\.\.\(countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]\)/);
+  assert.match(source, /\.\.\.videoUrlsInText\(`\$\{input\.task\}\\n\$\{input\.userTexts \?\? ""\}`\)/);
   assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, videoFilter\.opened, input\.detail\)/);
   assert.match(source, /if \(keepsEvents \|\| countsWeb\) webEvents\.push\(event\)/);
 });
@@ -154,4 +155,39 @@ test('count repair: an un-opened id added by the repair is removed; the opened i
   assert.equal(h.calls.length, 2, 'the count repair ran');
   assert.ok(result.detail.includes(`watch?v=${A}`), 'the opened id stays');
   assert.ok(!result.detail.includes(B), 'the repair cannot add a video the provider never opened');
+});
+
+// ---- A video the user pasted in the instruction (share-export-leftovers 04) ----
+test('AiTaskService: a video the user pasted in the task stays even when no page was opened; an invented one still goes', async () => {
+  const h = rigService(() => reply(`x\n\n![](https://www.youtube.com/watch?v=${A})\n\n![](https://youtu.be/${B})\n`));
+  const result = await h.service.askModel(ctx({ task: `Research this.\n\nAdd this video: https://youtu.be/${A}` }), 'gpt-6-luna', 'low');
+  assert.ok(result.detail.includes(`![](https://www.youtube.com/watch?v=${A})`), 'the pasted video stays');
+  assert.ok(!result.detail.includes(B), 'a video nobody pasted or opened is still removed');
+});
+test('AiTaskService: a video in the user\'s own text nodes counts as pasted', async () => {
+  const h = rigService(() => reply(`x\n\n![](https://youtu.be/${A})\n`));
+  const result = await h.service.askModel(ctx({ userTexts: `- my note https://www.youtube.com/watch?v=${A}` }), 'gpt-6-luna', 'low');
+  assert.ok(result.detail.includes(`watch?v=${A}`));
+});
+test('videoUrlsInText: plain YouTube urls of the text, nothing for look-alike hosts or other sites', () => {
+  const { videoUrlsInText } = S.load('core/video-embeds.ts');
+  assert.deepEqual(
+    [...videoUrlsInText(`see https://youtu.be/${A}, (https://www.youtube.com/watch?v=${B}) and https://youtube.com.evil.example/watch?v=${A} or https://example.org`)],
+    [`https://youtu.be/${A}`, `https://www.youtube.com/watch?v=${B}`]
+  );
+});
+test('map chat: a YouTube url the chat model wrote into a research direction stays only when the user pasted it', () => {
+  const { keepPastedVideoUrls } = S.load('core/map-chat-plan.ts');
+  const research = direction => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction });
+  const actions = [research(`Use https://youtu.be/${A} and https://www.youtube.com/watch?v=${B} please`), { kind: 'select_topics', nodeIds: ['n1'], all: false }];
+  const out = keepPastedVideoUrls(actions, `把這支加進去 https://www.youtube.com/watch?v=${A}`);
+  assert.equal(out[0].direction, `Use https://youtu.be/${A} and  please`);
+  assert.deepEqual(out[1], actions[1], 'other actions are untouched');
+  assert.equal(keepPastedVideoUrls([research('no video here')], '')[0].direction, 'no video here');
+});
+test('hook: the map chat conversation checks pasted videos against what the user wrote, history included', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences', 'visual-map', 'map-chat-conversation.ts'), 'utf8');
+  assert.match(source, /keepPastedVideoUrls\(\s*resolveSelectionTargets\(outcome\.actions\),\s*userWords\s*\)/);
+  assert.match(source, /\.filter\(item => item\.role === "user" && !item\.auto\)/);
+  assert.match(source, /autoOrigin \? "" : origin\.text/);
 });

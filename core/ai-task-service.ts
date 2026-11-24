@@ -32,7 +32,7 @@ import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
-import { keepOpenedVideoEmbeds } from "./video-embeds";
+import { keepOpenedVideoEmbeds, videoUrlsInText } from "./video-embeds";
 import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -357,11 +357,16 @@ export class AiTaskService {
           openedUrls: openedUrlsFromEvents(webEvents),
           searchQueries: searchQueriesFromEvents(webEvents)
         };
-      // A YouTube embed stays only when this call opened that video's page; a run that opens no pages (Quick) keeps none.
-      // The count repair's detail goes through the same filter below, with this call's opened pages.
+      // A YouTube embed stays only when this call opened that video's page or the user pasted it (the task text or their own text
+      // nodes); a run that opens no pages (Quick) keeps only pasted ones. The count repair's detail goes through the same filter below.
       const videoFilter =
         (context.mode ?? "task") === "task" && role === undefined && !input.countRepair
-          ? { opened: countsWeb ? openedUrlsFromEvents(webEvents) : [] }
+          ? {
+              opened: [
+                ...(countsWeb ? openedUrlsFromEvents(webEvents) : []),
+                ...videoUrlsInText(`${input.task}\n${input.userTexts ?? ""}`)
+              ]
+            }
           : null;
       if (videoFilter) result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
       if (readerFacingDetail(input)) {

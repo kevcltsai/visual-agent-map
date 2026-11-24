@@ -54,6 +54,8 @@ import {
   type ForbiddenString,
   type LeakCategory
 } from "./share-leak-scan";
+import { readArgumentMap, managedNodeIds } from "../../core/argument-map/model";
+import { TOPIC_KIND_SHAPES, shapeKindFor } from "../visual-map/topic-kind-shape";
 import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
@@ -647,7 +649,7 @@ export class ShareExporter {
     }
     for (const item of this.source.map.canvasItems ?? []) {
       const raw = item as unknown as Record<string, unknown>;
-      if (raw.kind === "annotated-image" && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+      if ((raw.kind === "annotated-image" || raw.kind === "image") && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
         this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
     }
   }
@@ -739,6 +741,11 @@ export class ShareExporter {
     const omitted = translate(language, "share.viewer_image_omitted");
     const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name]) => name));
     const notesById: Record<string, ShareNoteInput> = {};
+    // Every card of a usable argument map is a plain rectangle, whatever its type (the map's own rule).
+    const argumentIds =
+      this.source.map.argumentMap !== undefined && readArgumentMap(this.source.map).kind === "usable"
+        ? managedNodeIds(this.source.map)
+        : new Set<string>();
     let notesWithContent = 0;
     let undrawn = 0;
     let blocked = 0;
@@ -749,6 +756,8 @@ export class ShareExporter {
         title: plainWikilinks(note.title),
         summary: plainWikilinks(note.summary),
         status: note.status,
+        ...(note.topicKind ? { kind: note.topicKind } : {}),
+        shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,
         ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),
         ...(note.color ? { color: note.color } : {}),

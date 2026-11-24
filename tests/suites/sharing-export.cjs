@@ -775,7 +775,7 @@ const anchoredImage = (overrides = {}) => ({
   ...overrides
 });
 
-test('share exporter annotated-image: the payload carries the picture, anchors and links, and never the vault path, relation kind or description', async () => {
+test('share exporter annotated-image: the payload carries the picture, anchors and links with their kind and description, and never the vault path', async () => {
   const harness = matchMapHarness({ canvasItems: [anchoredImage({ path: 'Pics/shared.png' })], notes: { a: 'Body' } });
   await harness.prepare();
   const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
@@ -784,11 +784,11 @@ test('share exporter annotated-image: the payload carries the picture, anchors a
   assert.equal(result.payload.images.length, 1);
   assert.deepEqual(Object.keys(image).sort(), ['anchors', 'asset', 'h', 'id', 'links', 'note', 'w', 'x', 'y']);
   assert.deepEqual(image.anchors, [{ id: 'p1', x: 0.25, y: 0.5, note: 'Ribeye' }, { id: 'p2', x: 1, y: 0 }], 'positions are clamped; the unknown position kind is not in the file');
-  assert.deepEqual(image.links, [{ anchor: 'p1', topic: 'b', ring: true }, { anchor: 'p2', topic: 'a' }], 'either direction of the relation is stored as anchor -> topic');
+  assert.deepEqual(image.links, [{ anchor: 'p1', topic: 'b', ring: true, kind: 'related', description: 'RELATION-DESCRIPTION' }, { anchor: 'p2', topic: 'a', kind: 'supports' }], 'either direction of the relation is stored as anchor -> topic');
   assert.ok(result.payload.assets[image.asset].startsWith('data:image/'));
   const text = harness.serialised(result);
-  for (const secret of ['Pics/shared.png', 'RELATION-DESCRIPTION', 'UNKNOWN-KIND-NOTE', 'supports', 'related', '"path"', 'canvasItems', 'relations']) assert.equal(text.includes(secret), false, secret);
-  for (const secret of ['Pics/shared.png', 'RELATION-DESCRIPTION', 'UNKNOWN-KIND-NOTE']) assert.equal(result.html.includes(secret), false, `file: ${secret}`);
+  for (const secret of ['Pics/shared.png', 'UNKNOWN-KIND-NOTE', '"path"', 'canvasItems', '"relations"']) assert.equal(text.includes(secret), false, secret);
+  for (const secret of ['Pics/shared.png', 'UNKNOWN-KIND-NOTE']) assert.equal(result.html.includes(secret), false, `file: ${secret}`);
 });
 
 test('share exporter annotated-image: a dangling link, an unknown or missing topic, and a repeated anchor id stay out of the file', async () => {
@@ -800,7 +800,7 @@ test('share exporter annotated-image: a dangling link, an unknown or missing top
   const result = harness.exporter.assemble({ includeDetail: false, includeImages: false });
   assert.equal(result.payload.images.length, 1, 'a repeated image id and a non-finite box are dropped');
   assert.deepEqual(plain(result.payload.images[0].anchors), [{ id: 'p1', x: 0.1, y: 0.1 }]);
-  assert.deepEqual(plain(result.payload.images[0].links), [{ anchor: 'p1', topic: 'a' }]);
+  assert.deepEqual(plain(result.payload.images[0].links), [{ anchor: 'p1', topic: 'a', kind: 'related' }]);
 });
 
 test('share exporter annotated-image: the image note and anchor notes are scanned; a note with the map folder or a note path blocks the file, [[x]] becomes plain text', () => {
@@ -819,8 +819,8 @@ test('share exporter annotated-image: a map without annotated images, covers or 
   assert.deepEqual(Object.keys(plain(plainRun.payload)), ['format', 'version', 'title', 'language', 'exportedAt', 'source', 'viewport', 'nodes', 'assets']);
   assert.deepEqual(Object.keys(plain(plainRun.payload.nodes[1])), ['id', 'parentId', 'x', 'y', 'collapsed', 'status', 'title', 'summary']);
   assert.equal(JSON.stringify(plain(plainRun.payload)), '{"format":"vam-share","version":1,"title":"Map","language":"en","exportedAt":' + JSON.stringify(plainRun.payload.exportedAt) + ',"source":{"vamVersion":"1","mapId":"map-1"},"viewport":{"x":0,"y":0,"zoom":1},"nodes":[{"id":"a","parentId":null,"x":0,"y":0,"collapsed":false,"status":"idea","title":"A","summary":"S"},{"id":"b","parentId":"a","x":5,"y":6,"collapsed":false,"status":"idea","title":"B","summary":"S"}],"assets":{}}');
-  // Other canvas items (a plain image, a text-less boundary) add nothing.
-  const other = matchMapHarness({ canvasItems: [{ id: 'i1', kind: 'image', path: 'Pics/other.png', x: 0, y: 0, w: 10, h: 10 }] }).exporter.assemble({ includeDetail: true, includeImages: true });
+  // Other canvas items (an unknown kind, a boundary with no member in the file) add nothing.
+  const other = matchMapHarness({ canvasItems: [{ id: 'i1', kind: 'mystery' }, { id: 'bd', kind: 'boundary', members: ['gone'] }] }).exporter.assemble({ includeDetail: true, includeImages: true });
   assert.equal(JSON.stringify(plain({ ...other.payload, exportedAt: 0 })), JSON.stringify(plain({ ...plainRun.payload, exportedAt: 0 })));
 });
 
@@ -925,4 +925,45 @@ test('share dom: what the stylesheet hides in Obsidian (work-record callouts, hi
   assert.equal(dom.dropHiddenContent(root), 4);
   const texts = node => [node.textContent, ...node.children.flatMap(texts)].filter(Boolean);
   assert.deepEqual(texts(root), ['shown plan', 'kept', 'outside a plan: kept', 'body']);
+});
+
+test('share exporter complete: type and shape come from the note; an argument-map card is always rect; a free picture joins the pictures without its path', async () => {
+  const harness = matchMapHarness({ canvasItems: [{ id: 'free1', kind: 'image', path: 'Pics/other.png', x: 3, y: 4, w: 50, h: 60 }, { id: 'bd', kind: 'boundary', members: ['a', 'b', 'free1'], label: 'Frame' }] });
+  harness.exporter.source.notes.get('a').topicKind = 'hypothesis';
+  harness.exporter.source.notes.get('b').topicKind = 'evidence';
+  await harness.prepare();
+  let result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
+  const [na, nb] = plain(result.payload.nodes);
+  assert.deepEqual([na.kind, na.shape, nb.kind, nb.shape], ['hypothesis', 'diamond', 'evidence', 'folded']);
+  const free = plain(result.payload.images)[0];
+  assert.deepEqual(Object.keys(free).sort(), ['anchors', 'asset', 'h', 'id', 'w', 'x', 'y']);
+  assert.deepEqual(free.anchors, []);
+  assert.ok(result.payload.assets[free.asset]);
+  assert.equal(harness.serialised(result).includes('Pics/other.png'), false);
+  assert.deepEqual(plain(result.payload.boundaries), [{ id: 'bd', members: ['a', 'b', 'free1'], label: 'Frame' }]);
+  // Images off: the picture is still listed (the viewer draws a text placeholder), with no asset.
+  result = harness.exporter.assemble({ includeDetail: true, includeImages: false });
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 3, y: 4, w: 50, h: 60, anchors: [] }]);
+  // An argument map draws every managed card as a plain rectangle, whatever its type.
+  const fixture = require('../fixtures/argument-map-ui.cjs');
+  const one = fixture.states.facet_matched;
+  const ids = Object.fromEntries(one.notes.map((n, index) => [n.key, index === 0 ? 'a' : index === 1 ? 'b' : `id-${n.key}`]));
+  const argument = matchMapHarness({ extraNodes: one.notes.slice(2).map(n => ({ id: ids[n.key], path: `Folder/${n.key}.md`, parentId: 'a', x: 0, y: 0, collapsed: false })) });
+  argument.exporter.source.map.argumentMap = fixture.bind(one.map.argumentMap, ids);
+  argument.exporter.source.notes.get('a').topicKind = 'hypothesis';
+  argument.exporter.source.notes.get('b').topicKind = 'hypothesis';
+  const managed = require('../support.cjs').load('core/argument-map/model.ts').managedNodeIds(argument.exporter.source.map);
+  assert.ok(managed.has('a') && managed.has('b'), 'the fixture manages both cards');
+  await argument.prepare();
+  const [aa, ab] = plain(argument.exporter.assemble({ includeDetail: true, includeImages: true }).payload.nodes);
+  assert.deepEqual([aa.kind, aa.shape, ab.kind, ab.shape], ['hypothesis', 'rect', 'hypothesis', 'rect']);
+});
+
+test('share exporter complete: a map without new data keeps its payload, and a vault with a missing free picture still lists it', async () => {
+  const harness = matchMapHarness({ files: [], canvasItems: [{ id: 'free1', kind: 'image', path: 'Gone/x.png', x: 0, y: 0, w: 5, h: 5 }] });
+  await harness.prepare();
+  const result = harness.exporter.assemble({ includeDetail: true, includeImages: true });
+  assert.deepEqual(plain(result.payload.images), [{ id: 'free1', x: 0, y: 0, w: 5, h: 5, anchors: [] }], 'nothing silently disappears');
+  assert.equal(result.leakCategories.length, 0);
+  assert.equal(harness.serialised(result).includes('Gone/x.png'), false);
 });

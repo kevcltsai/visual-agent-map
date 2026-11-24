@@ -106754,6 +106754,18 @@ var SHARE_TRANSLATION_LANGUAGES = [
   "es"
 ];
 var SHARE_UNKNOWN_LANGUAGE = "und";
+var SHARE_NODE_KINDS = ["action", "atomic", "hypothesis", "evidence", "conclusion"];
+var SHARE_NODE_SHAPES = ["rect", "ellipse", "diamond", "folded", "hexagon"];
+var SHARE_RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+var SHARE_LABEL_LIMIT = 200;
+var isOneOf = (list2, value) => typeof value === "string" && list2.includes(value);
 var SHARE_SIZE_WARN_BYTES = 10 * 1024 * 1024;
 var SHARE_SIZE_SUGGEST_NO_IMAGES_BYTES = 20 * 1024 * 1024;
 var SHARE_IMAGE_MAX_EDGE = 1600;
@@ -106833,13 +106845,14 @@ function shareCover(raw, assets) {
   if (raw.position === "bottom" || raw.position === "left" || raw.position === "right") out.position = raw.position;
   return out;
 }
+var limitedText = (value, plain) => typeof value === "string" ? optionalText(plain(value).replace(/\s+/g, " ").slice(0, SHARE_LABEL_LIMIT)) : void 0;
 function shareImages(map, nodeIds, assetNames, assets, plain) {
   var _a2;
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
     const raw = item;
-    if (raw.kind !== "annotated-image" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (raw.kind !== "annotated-image" && raw.kind !== "image" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
     if (![raw.x, raw.y, raw.w, raw.h].every(finiteNumber)) continue;
     const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h];
     if (!(w > 0 && h > 0)) continue;
@@ -106863,24 +106876,59 @@ function shareImages(map, nodeIds, assetNames, assets, plain) {
     }
     const links = [];
     for (const relation of Array.isArray(raw.relations) ? raw.relations : []) {
-      const { from, to, ring } = relation != null ? relation : {};
+      const { from, to, ring, kind, description } = relation != null ? relation : {};
       if (typeof from !== "string" || typeof to !== "string") continue;
       const anchor = anchorIds.has(from) ? from : anchorIds.has(to) ? to : void 0;
       const topic = anchor === from ? to : from;
       if (!anchor || anchorIds.has(topic) || !nodeIds.has(topic)) continue;
-      links.push({ anchor, topic, ...ring === true ? { ring: true } : {} });
+      const text11 = limitedText(description, plain);
+      links.push({
+        anchor,
+        topic,
+        ...ring === true ? { ring: true } : {},
+        ...isOneOf(SHARE_RELATION_KINDS, kind) ? { kind } : {},
+        ...text11 ? { description: text11 } : {}
+      });
     }
     if (links.length) image.links = links;
     out.push(image);
   }
   return out;
 }
+function shareRelations(map, nodeIds, plain) {
+  var _a2;
+  const out = [];
+  for (const raw of (_a2 = map.topicRelations) != null ? _a2 : []) {
+    const { kind, from, to, description } = raw != null ? raw : {};
+    if (!isOneOf(SHARE_RELATION_KINDS, kind) || typeof from !== "string" || typeof to !== "string") continue;
+    if (from === to || !nodeIds.has(from) || !nodeIds.has(to)) continue;
+    const text11 = limitedText(description, plain);
+    out.push({ kind, from, to, ...text11 ? { description: text11 } : {} });
+  }
+  return out;
+}
+function shareBoundaries(map, present, plain) {
+  var _a2;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
+    const raw = item;
+    if (raw.kind !== "boundary" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (!Array.isArray(raw.members)) continue;
+    const members = [...new Set(raw.members.filter((id) => typeof id === "string" && present.has(id)))];
+    if (!members.length) continue;
+    seen.add(raw.id);
+    const label = limitedText(raw.label, plain);
+    out.push({ id: raw.id, members, ...label ? { label } : {} });
+  }
+  return out;
+}
 function buildSharePayload(map, notesById, options) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d;
   const withImages = options.includeImages && options.includeDetail;
   const assets = options.includeImages ? { ...options.assets } : {};
   const nodes = map.nodes.map((node) => {
-    var _a3, _b3, _c2, _d, _e, _f;
+    var _a3, _b3, _c2, _d2, _e, _f;
     const note = notesById[node.id];
     const fallbackTitle = (_b3 = (_a3 = node.path.split("/").pop()) == null ? void 0 : _a3.replace(/\.md$/i, "")) != null ? _b3 : node.id;
     const out = {
@@ -106897,7 +106945,7 @@ function buildSharePayload(map, notesById, options) {
       out.width = clampCardWidth(node.width);
     if (node.height !== void 0 && clampCardHeight(node.height) !== void 0)
       out.height = clampCardHeight(node.height);
-    const ringHeight = (_d = options.ringHeights) == null ? void 0 : _d[node.id];
+    const ringHeight = (_d2 = options.ringHeights) == null ? void 0 : _d2[node.id];
     if (typeof ringHeight === "number" && Number.isFinite(ringHeight) && ringHeight >= 1 && ringHeight <= 2e4)
       out.ringHeight = Math.round(ringHeight);
     if (note == null ? void 0 : note.relevance) {
@@ -106906,6 +106954,8 @@ function buildSharePayload(map, notesById, options) {
       const reason = optionalText(note.reason);
       if (reason) out.reason = reason;
     }
+    if (isOneOf(SHARE_NODE_KINDS, note == null ? void 0 : note.kind)) out.kind = note.kind;
+    if (isOneOf(SHARE_NODE_SHAPES, note == null ? void 0 : note.shape)) out.shape = note.shape;
     const markers = readTopicMarkers({ "topic-markers": note == null ? void 0 : note.markers });
     if (markers.length) out.markers = markers;
     const color2 = readTopicColor({ "topic-color": note == null ? void 0 : note.color });
@@ -106941,6 +106991,14 @@ function buildSharePayload(map, notesById, options) {
     assets,
     (_c = options.plainText) != null ? _c : (text11) => text11
   );
+  const plain = (_d = options.plainText) != null ? _d : (text11) => text11;
+  const nodeIds = new Set(map.nodes.map((node) => node.id));
+  const relations2 = shareRelations(map, nodeIds, plain);
+  const boundaries = shareBoundaries(
+    map,
+    /* @__PURE__ */ new Set([...nodeIds, ...images.map((image) => image.id), ...textNodes.map((text11) => text11.id)]),
+    plain
+  );
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -106955,6 +107013,8 @@ function buildSharePayload(map, notesById, options) {
     ...summaries.length ? { summaries } : {},
     ...stored.direction !== "right" || stored.spacing ? { layout: stored } : {},
     ...images.length ? { images } : {},
+    ...relations2.length ? { relations: relations2 } : {},
+    ...boundaries.length ? { boundaries } : {},
     assets
   };
 }
@@ -109885,7 +109945,7 @@ ${fence2}`, host, "", child);
     }
     for (const item of (_b2 = this.source.map.canvasItems) != null ? _b2 : []) {
       const raw = item;
-      if (raw.kind === "annotated-image" && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+      if ((raw.kind === "annotated-image" || raw.kind === "image") && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
         this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
     }
   }
@@ -109962,11 +110022,12 @@ ${fence2}`, host, "", child);
     };
   }
   buildPayload(options) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const language2 = this.config.language;
     const omitted = translate(language2, "share.viewer_image_omitted");
     const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name2]) => name2));
     const notesById = {};
+    const argumentIds = this.source.map.argumentMap !== void 0 && readArgumentMap(this.source.map).kind === "usable" ? managedNodeIds(this.source.map) : /* @__PURE__ */ new Set();
     let notesWithContent = 0;
     let undrawn = 0;
     let blocked = 0;
@@ -109977,14 +110038,16 @@ ${fence2}`, host, "", child);
         title: plainWikilinks(note.title),
         summary: plainWikilinks(note.summary),
         status: note.status,
+        ...note.topicKind ? { kind: note.topicKind } : {},
+        shape: TOPIC_KIND_SHAPES[shapeKindFor((_a2 = note.topicKind) != null ? _a2 : "topic", argumentIds.has(node.id))].shape,
         ...note.relevance ? { relevance: note.relevance } : {},
-        ...((_a2 = note.markers) == null ? void 0 : _a2.length) ? { markers: note.markers } : {},
+        ...((_b2 = note.markers) == null ? void 0 : _b2.length) ? { markers: note.markers } : {},
         ...note.color ? { color: note.color } : {},
-        ...((_b2 = note.style) == null ? void 0 : _b2.length) ? { style: note.style } : {},
-        ...((_c = note.links) == null ? void 0 : _c.length) ? { links: note.links } : {}
+        ...((_c = note.style) == null ? void 0 : _c.length) ? { style: note.style } : {},
+        ...((_d = note.links) == null ? void 0 : _d.length) ? { links: note.links } : {}
       };
       const rendered = this.rendered.get(node.id);
-      if ((_d = note.detail) == null ? void 0 : _d.trim()) notesWithContent++;
+      if ((_e = note.detail) == null ? void 0 : _e.trim()) notesWithContent++;
       if (rendered && options.includeDetail) {
         undrawn += rendered.mermaidUndrawn;
         blocked += rendered.mermaidBlocked;
@@ -110010,12 +110073,12 @@ ${fence2}`, host, "", child);
       includeImages: options.includeImages && options.includeDetail,
       language: language2,
       vamVersion: this.config.vamVersion,
-      exportedAt: ((_g = (_f = (_e = this.config).now) == null ? void 0 : _f.call(_e)) != null ? _g : /* @__PURE__ */ new Date()).toISOString(),
+      exportedAt: ((_h = (_g = (_f = this.config).now) == null ? void 0 : _g.call(_f)) != null ? _h : /* @__PURE__ */ new Date()).toISOString(),
       goal: this.source.goal,
       assets,
       covers,
       imageAssets: Object.fromEntries(this.imageNames),
-      ...((_h = this.source.ringHeights) == null ? void 0 : _h.size) ? { ringHeights: Object.fromEntries(this.source.ringHeights) } : {},
+      ...((_i = this.source.ringHeights) == null ? void 0 : _i.size) ? { ringHeights: Object.fromEntries(this.source.ringHeights) } : {},
       plainText: plainWikilinks
     });
     return { payload, failed, notesWithContent, undrawn, blocked };

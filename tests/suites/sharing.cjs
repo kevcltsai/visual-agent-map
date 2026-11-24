@@ -500,7 +500,7 @@ test('sharing text-nodes: no text nodes means no key and unchanged bytes; text n
   const before = format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options()));
   assert.ok(!before.includes('textNodes'));
   const emptyItems = fixtureMap();
-  emptyItems.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  emptyItems.canvasItems = [{ id: 'img', kind: 'mystery' }];
   assert.equal(format.serializeShareJson(format.buildSharePayload(emptyItems, notesById, options())), before);
   const map = fixtureMap();
   const first = map.nodes[0].id;
@@ -595,7 +595,7 @@ test('sharing summaries: no bracket means no key and unchanged bytes; a bracket 
   assert.equal(format.buildSharePayload(map, notesById, options({ includeDetail: false })).summaries.length, 1);
   // Other canvas items alone leave the bytes unchanged.
   const other = fixtureMap();
-  other.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  other.canvasItems = [{ id: 'img', kind: 'mystery' }];
   assert.equal(format.serializeShareJson(format.buildSharePayload(other, notesById, options())), before);
 });
 
@@ -711,4 +711,80 @@ test('sharing clean: the write-back\'s own backup log line is removed (any note 
   assert.ok(out.includes('171239.md，我刪過一段'), 'an edited line stays for the leak gate');
   assert.ok(out.includes('Agent Workspace/x 2026-11-22 171239.md'), 'code stays');
   assert.ok(out.includes('> [!note]- 研究備註') && out.includes('body'));
+});
+
+// share-complete P1: kind, shape, relations, boundaries, free pictures. Only whitelisted values travel; plain text only.
+test('sharing complete: kind and shape take whitelisted values only; rounded and topic are not written', () => {
+  const { notesById } = cleanedNotes();
+  const ids = Object.keys(notesById);
+  const withNote = (id, extra) => ({ ...notesById, [id]: { ...notesById[id], ...extra } });
+  const build = notes => format.buildSharePayload(fixtureMap(), notes, options());
+  const base = build(notesById);
+  assert.ok(base.nodes.every(node => !('kind' in node) && !('shape' in node)), 'no new data, no new keys');
+  assert.ok(!format.serializeShareJson(base).includes('relations') && !format.serializeShareJson(base).includes('boundaries'));
+  const good = build(withNote(ids[0], { kind: 'hypothesis', shape: 'diamond' })).nodes[0];
+  assert.equal(good.kind, 'hypothesis');
+  assert.equal(good.shape, 'diamond');
+  for (const [kind, shape] of [['topic', 'rounded'], ['<img onerror=1>', 'url(x)'], [42, {}], ['__proto__', 'circle'], ['Hypothesis', 'RECT']]) {
+    const node = build(withNote(ids[0], { kind, shape })).nodes[0];
+    assert.ok(!('kind' in node) && !('shape' in node), `${String(kind)}/${String(shape)} is dropped`);
+  }
+});
+
+test('sharing complete: relations keep known kinds with both ends in the file; unknown kind, missing end, self link and markup stay out', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  const evil = '</script><img src=x onerror=alert(1)>[[private/path]]';
+  map.topicRelations = [
+    { kind: 'supports', from: a, to: b, description: ` line one\n  two ${evil} ` },
+    { kind: 'cites', from: a, to: b },
+    { kind: 'related', from: a, to: 'gone' },
+    { kind: 'related', from: 'gone', to: b },
+    { kind: 'related', from: a, to: a },
+    { kind: 'contradicts', from: b, to: a, description: 'x'.repeat(500) },
+    null,
+    { kind: 'verifies', from: 7, to: b }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options({ plainText: text => text.replace(/\[\[([^\]]+)\]\]/g, '$1') }));
+  assert.equal(payload.version, 1);
+  assert.equal(payload.relations.length, 2);
+  assert.deepEqual(plain(payload.relations[0]), { kind: 'supports', from: a, to: b, description: `line one two ${evil.replace('[[private/path]]', 'private/path')}` });
+  assert.equal(payload.relations[1].description.length, 200);
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('</script') && !json.includes('<!--') && !json.includes('<img'), 'every < is escaped');
+  assert.equal(JSON.parse(json).relations[0].description.includes('<img src=x'), true, 'kept as text, never as markup');
+});
+
+test('sharing complete: boundaries keep members present in the file; a frame with none left is not written; the label is plain text', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  map.canvasItems = [
+    { id: 'bd1', kind: 'boundary', members: [a, 'gone', b, a], label: '<b>Group</b> [[x]]' },
+    { id: 'bd2', kind: 'boundary', members: ['gone'] },
+    { id: 'bd3', kind: 'boundary', members: [a] },
+    { id: 'bd1', kind: 'boundary', members: [b] },
+    { id: 'img1', kind: 'image', path: 'Secret/vault/pic.png', x: 1, y: 2, w: 30, h: 40 },
+    { id: 'bd4', kind: 'boundary', members: ['img1', 'ghost'] }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options({ plainText: text => text.replace(/\[\[([^\]]+)\]\]/g, '$1') }));
+  assert.deepEqual(plain(payload.boundaries), [{ id: 'bd1', members: [a, b], label: '<b>Group</b> x' }, { id: 'bd3', members: [a] }, { id: 'bd4', members: ['img1'] }]);
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('Secret/vault') && !json.includes('"path"'), 'a free picture never carries its vault path');
+  assert.deepEqual(plain(payload.images), [{ id: 'img1', x: 1, y: 2, w: 30, h: 40, anchors: [] }], 'a free picture without an attached file is listed without an asset');
+});
+
+test('sharing complete: image links carry a whitelisted kind and plain description; an unknown kind is left out of the link only', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  map.canvasItems = [
+    { id: 'im', kind: 'annotated-image', path: 'p.png', x: 0, y: 0, w: 10, h: 10, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }], relations: [
+      { kind: 'supports', from: 'p1', to: a, description: ' why ' },
+      { kind: 'bogus', from: 'p1', to: b, description: '</script>' }
+    ] }
+  ];
+  const links = format.buildSharePayload(map, notesById, options()).images[0].links;
+  assert.deepEqual(plain(links), [{ anchor: 'p1', topic: a, kind: 'supports', description: 'why' }, { anchor: 'p1', topic: b, description: '</script>' }]);
 });

@@ -5,12 +5,18 @@ import {
   MarkdownRenderer,
   normalizePath,
   sanitizeHTMLToDom,
-  type App
+  type App,
+  type TFile
 } from "obsidian";
 import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
+import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
+import { classifyShareTarget, markdownProtectedRanges, normalizeNewlines } from "./share-code";
+import { applyNodeLinks } from "./share-node-links";
+import { replaceMediaWithLinks } from "./share-media";
+import { mathFromLatex, MATHML_NS, MATH_NOTE_CLASS, MATH_SOURCE_CLASS } from "./share-math";
 import {
   assertCurrent,
   assetNamesInHtml,
@@ -38,6 +44,8 @@ import {
 import {
   buildSharePayload,
   fitWithin,
+  SHARE_ATTACHMENT_DATA_PREFIX,
+  SHARE_ATTACHMENT_MAX_BYTES,
   SHARE_IMAGE_MAX_EDGE,
   type ShareLanguage,
   type ShareOriginalLanguage,
@@ -54,10 +62,13 @@ import {
   type ForbiddenString,
   type LeakCategory
 } from "./share-leak-scan";
+import { readArgumentMap, managedNodeIds } from "../../core/argument-map/model";
+import { RECORDS_SUBPATH } from "../../core/map-chat-records";
+import { TOPIC_KIND_SHAPES, shapeKindFor } from "../visual-map/topic-kind-shape";
 import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
-import { withoutFigures } from "./share-image-check";
+import { figuresOf, withoutFigures, type FigureProblem } from "./share-image-check";
 import { topLevelSvgs } from "./share-translate-segments";
 
 /** Everything the exporter reads from the open map. A snapshot: later edits to the map do not change an export in progress. */
@@ -103,6 +114,31 @@ export interface ShareBuildResult {
   mermaidBlocked: number;
 }
 
+const payloadNodeIds = (nodes: readonly { id: string }[]): string[] => nodes.map(node => node.id);
+
+/** The file cards (`#vam-attachment-<name>`) in a note's final html. */
+function fileNamesInHtml(html: string): string[] {
+  return [...new Set([...html.matchAll(/href="#vam-attachment-([A-Za-z0-9_-]+)"/g)].map(match => match[1]))];
+}
+
+/** Base64 of the bytes, in slices so a big file does not overflow the call stack. */
+function bytesToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let at = 0; at < bytes.length; at += 0x8000) binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  return btoa(binary);
+}
+
+/** A licence problem of a picture inside an embedded note: `index` continues the card's own picture numbers (see readEmbeds). */
+export interface EmbeddedFigure {
+  id: string;
+  index: number;
+  alt: string;
+  host: string;
+  problem: FigureProblem;
+  note: string;
+}
+
 interface RenderedNote {
   html: string;
   /** Diagrams in the final html: the place among its top-level `<svg>` elements and the source the renderer showed. */
@@ -112,6 +148,8 @@ interface RenderedNote {
   /** Links in the renderer's output (before sanitizing) that lead outside the page; above 0 blocks a file with notes. */
   localRefs: number;
   attachments: string[];
+  /** Names of the file cards (not pictures) the final html carries. */
+  files: string[];
   mermaidUndrawn: number;
   mermaidBlocked: number;
 }
@@ -133,6 +171,9 @@ const platformRebuildDom: RebuildDom = {
   createDiv: () => createDiv()
 };
 
+/** The map folder's subfolder that holds map and topic chat records (RECORDS_SUBPATH, TOPIC_CHAT_SUBPATH). */
+const MAP_CHATS_FOLDER = RECORDS_SUBPATH.split("/")[0];
+
 const IMAGE_MIME: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -145,6 +186,33 @@ const IMAGE_MIME: Record<string, string> = {
 };
 /** Embedded images are re-encoded as WebP at this quality (OQ-8). */
 export const SHARE_WEBP_QUALITY = 0.82;
+const FORMULA_SLOT = "vam-math-slot";
+interface Formula {
+  latex: string;
+  display: boolean;
+}
+
+/**
+ * Takes every rendered formula (`.math`) out of the note and leaves a slot; returns the LaTeX and display mode of each.
+ * A formula whose LaTeX cannot be read keeps an empty source, which the fill step shows as the note's fallback line.
+ */
+function collectFormulas(host: HTMLElement): Formula[] {
+  const formulas: Formula[] = [];
+  for (const unit of Array.from(host.querySelectorAll<HTMLElement>(".math"))) {
+    if (!unit.isConnected || unit.parentElement?.closest(".math")) continue;
+    const latex =
+      unit.querySelector("mjx-math[data-latex]")?.getAttribute("data-latex") ??
+      unit.getAttribute("data-latex") ??
+      unit.querySelector("annotation")?.textContent ??
+      "";
+    const slot = createSpan();
+    slot.className = FORMULA_SLOT;
+    formulas.push({ latex, display: unit.classList.contains("math-block") });
+    unit.replaceWith(slot);
+  }
+  return formulas;
+}
+
 const MERMAID_UNIT = ".mermaid-wrapper, .mermaid";
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -351,6 +419,13 @@ export class ShareExporter {
   private readonly images = new Map<string, string | null>();
   private readonly registry = createAssetRegistry();
   private readonly ownerPath = new Map<string, string>();
+  /** File name (`file-N`) -> the vault file a card stands for (null: not found or not shareable) and its size. Names are shared across the notes of one export. */
+  private readonly files = new Map<string, { path: string | null; file: string; size: number }>();
+  private readonly fileNames = new Map<string, string>();
+  /** topic id -> the licence problems of the pictures its embedded notes show (numbered after the card's own pictures). */
+  private readonly embeddedFigures = new Map<string, EmbeddedFigure[]>();
+  /** File name -> `data:application/octet-stream;base64,…`, or null when it is too big or could not be read. */
+  private readonly fileData = new Map<string, string | null>();
   /** topic id -> asset name of its cover picture; annotated image id -> asset name of its picture (set by ensureImages). */
   private readonly coverNames = new Map<string, string>();
   private readonly imageNames = new Map<string, string>();
@@ -370,6 +445,26 @@ export class ShareExporter {
     this.component.load();
   }
 
+  /** The pictures of embedded notes with a licence problem, known once the notes have been read (the dialog adds them to its check). */
+  embeddedFigureProblems(): EmbeddedFigure[] {
+    return [...this.embeddedFigures.values()].flat();
+  }
+
+  /** The vault file a reference points at, written as the author's link or as a path relative to `fromPath`'s folder. */
+  private locateFile(ref: string, fromPath: string): TFile | null {
+    const folder = fromPath.split("/").slice(0, -1).join("/");
+    const relative = resolveRelative(folder, ref);
+    const candidates = [
+      this.app.metadataCache.getFirstLinkpathDest(ref, fromPath)?.path,
+      relative ? normalizePath(relative) : undefined
+    ];
+    for (const path of candidates) {
+      const file = path ? this.app.vault.getFileByPath(path) : null;
+      if (file) return file;
+    }
+    return null;
+  }
+
   /** Leaves the chosen pictures (topic id -> picture indexes, see share-image-check) out of the file; the topics whose choice changed render again. */
   dropFigures(choice: ReadonlyMap<string, ReadonlySet<number>>): void {
     const same = (a: ReadonlySet<number> | undefined, b: ReadonlySet<number> | undefined): boolean =>
@@ -387,6 +482,9 @@ export class ShareExporter {
     this.container = null;
     this.rendered.clear();
     this.images.clear();
+    this.files.clear();
+    this.fileNames.clear();
+    this.fileData.clear();
   }
 
   private host(): HTMLElement {
@@ -397,6 +495,24 @@ export class ShareExporter {
       this.container.setAttribute("aria-hidden", "true");
     }
     return this.container;
+  }
+
+  /** Link target (path without .md, file name, or title) -> card id; a name two cards share is left out, so a link never goes to the wrong card. */
+  private nodeIds(): Map<string, string> {
+    const found = new Map<string, string | null>();
+    const add = (key: string, id: string): void => {
+      found.set(key, found.has(key) && found.get(key) !== id ? null : id);
+    };
+    for (const node of this.source.map.nodes) {
+      const title = this.source.notes.get(node.id)?.title;
+      if (!title) continue;
+      add(node.path.replace(/\.md$/i, ""), node.id);
+      add(node.path.split("/").pop()?.replace(/\.md$/i, "") ?? node.path, node.id);
+      add(title, node.id);
+    }
+    const out = new Map<string, string>();
+    for (const [key, id] of found) if (id) out.set(key, id);
+    return out;
   }
 
   private titles(): Map<string, string> {
@@ -431,10 +547,15 @@ export class ShareExporter {
     const total = this.source.map.nodes.filter(node => this.renderSource(node.id)).length;
     let done = total - nodes.length;
     const titles = this.titles();
+    const nodeIds = this.nodeIds();
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
-      const result = await this.renderOne(this.renderSource(node.id), titles, ticket);
+      const detail = this.renderSource(node.id);
+      const own = this.source.notes.get(node.id)?.detail ?? "";
+      const embeds = await this.readEmbeds(detail, node.path, node.id, figuresOf(own).length);
+      assertCurrent(ticket);
+      const result = await this.renderOne(detail, titles, nodeIds, embeds, node.path, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
@@ -444,8 +565,81 @@ export class ShareExporter {
     onProgress({ phase: "render", done: total, total });
   }
 
-  private async renderOne(detail: string, titles: Map<string, string>, ticket: BuildTicket): Promise<RenderedNote> {
-    const cleaned = cleanShareMarkdown(detail, { titleOf: target => titles.get(target), assets: this.registry });
+  /**
+   * The text each `![[note]]`, `![[note#Heading]]` or `![[note#^block]]` of a note shows, by the target as written. Only
+   * Markdown notes of the vault count; the note itself (a cycle), a missing note, heading or block, and a vault-internal
+   * folder are left out, so the cleaner shows their title only.
+   */
+  private async readEmbeds(
+    detail: string,
+    fromPath: string,
+    topicId: string,
+    firstIndex: number
+  ): Promise<Map<string, string>> {
+    const found = new Map<string, string>();
+    const isInternal = (path: string): boolean => this.isInternalFile(path);
+    const drop = this.dropped.get(topicId) ?? new Set<number>();
+    const problems: EmbeddedFigure[] = [];
+    let next = firstIndex;
+    const plain = normalizeNewlines(detail);
+    const hidden = markdownProtectedRanges(plain);
+    for (const match of plain.matchAll(/!\[\[([^\]\n]+)\]\]/g)) {
+      const at = match.index ?? 0;
+      if (hidden.some(range => at >= range.start && at < range.end)) continue;
+      const target = match[1].split(/\\?\|/)[0].trim();
+      if (found.has(target)) continue;
+      const hash = target.indexOf("#");
+      const linkPath = (hash < 0 ? target : target.slice(0, hash)).trim();
+      if (!linkPath || classifyShareTarget(linkPath) !== "note") continue;
+      const file: TFile | null = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath);
+      if (!file || file.extension !== "md" || file.path === fromPath) continue;
+      if (isInternal(file.path)) continue;
+      let content = extractEmbedContent(await this.app.vault.cachedRead(file), hash < 0 ? "" : target.slice(hash + 1));
+      if (!content) continue;
+      // The embedded note's pictures are checked and dropped like the card's own (numbered after them), then every file
+      // reference is anchored to the embedded note's own folder (internal folders and missing files become plain text).
+      const figures = figuresOf(content);
+      for (const figure of figures)
+        if (figure.problem)
+          problems.push({
+            id: topicId,
+            index: next + figure.index,
+            alt: figure.alt,
+            host: figure.host,
+            problem: figure.problem,
+            note: file.basename
+          });
+      content = withoutFigures(
+        content,
+        new Set(figures.filter(item => drop.has(next + item.index)).map(item => item.index))
+      );
+      content = anchorEmbeddedFiles(content, ref => {
+        const found = this.locateFile(ref, file.path);
+        return found && !isInternal(found.path) ? found.path : null;
+      });
+      next += figures.length;
+      found.set(target, content);
+    }
+    this.embeddedFigures.set(topicId, problems);
+    return found;
+  }
+
+  private async renderOne(
+    detail: string,
+    titles: Map<string, string>,
+    nodeIds: Map<string, string>,
+    embeds: ReadonlyMap<string, string>,
+    fromPath: string,
+    ticket: BuildTicket
+  ): Promise<RenderedNote> {
+    const cleaned = cleanShareMarkdown(detail, {
+      titleOf: target => titles.get(target),
+      nodeIdOf: target => nodeIds.get(target),
+      embedOf: target => embeds.get(target),
+      attachmentOf: ref => this.registerFile(ref, fromPath),
+      embedTitle: title => translate(this.config.language, "share.embed_title_0", title),
+      assets: this.registry
+    });
     const host = this.host().createDiv();
     const child = new Component();
     this.component.addChild(child);
@@ -463,6 +657,7 @@ export class ShareExporter {
         diagrams: finished.diagrams,
         diagramsUnsourced: finished.unsourced,
         localRefs: finished.localRefs,
+        files: fileNamesInHtml(finished.html),
         // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
         attachments: cleaned.attachments.map(item => item.name).filter(name => used.has(name)),
         mermaidUndrawn: finished.undrawn,
@@ -578,10 +773,32 @@ export class ShareExporter {
         caption.textContent = note("share.mermaid_undrawn_note");
         pre.after(caption);
       }
+    // Video, audio and frames are never carried: each becomes a link card (or visible text) before the sanitizer sees it.
+    replaceMediaWithLinks(
+      host,
+      {
+        label: (kind, name) =>
+          translate(
+            this.config.language,
+            kind === "video" ? "share.media_video_0" : kind === "audio" ? "share.media_audio_0" : "share.media_embed_0",
+            name
+          ).replace(/[:：]\s*$/, "")
+      },
+      tag => createEl(tag)
+    );
+    // Formulas: the LaTeX is read now (the sanitizer would flatten MathJax's markup to bare characters) and MathML is made later.
+    const formulas = collectFormulas(host);
     const clean = createDiv();
     clean.append(sanitizeHTMLToDom(host.innerHTML));
     unwrapLocalLinks(clean, () => createSpan());
     scrubShareTree(clean);
+    applyNodeLinks(
+      clean,
+      new Set(this.source.map.nodes.filter(node => this.source.notes.has(node.id)).map(node => node.id)),
+      () => createEl("a"),
+      new Set(this.files.keys())
+    );
+    this.fillFormulas(clean, formulas);
     const slots = Array.from(clean.querySelectorAll(".vam-mermaid-slot"));
     slots.forEach((slot, index) => {
       const diagram = diagrams[index];
@@ -593,6 +810,92 @@ export class ShareExporter {
     const placed = placeDiagrams(finalSvgs, diagrams, diagramSources);
     const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
     return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
+  }
+
+  /** Each formula slot becomes MathML from MathJax, rebuilt from a whitelist; without usable MathML it becomes the LaTeX source and a note. */
+  private fillFormulas(clean: HTMLElement, formulas: readonly Formula[]): void {
+    const mathJax = (
+      activeWindow as unknown as { MathJax?: { tex2mml?: (latex: string, options: { display: boolean }) => string } }
+    ).MathJax;
+    const tex2mml = mathJax?.tex2mml
+      ? (latex: string, options: { display: boolean }) => mathJax.tex2mml!(latex, options)
+      : undefined;
+    const deps = {
+      tex2mml,
+      parse: (mml: string) => new DOMParser().parseFromString(mml, "text/html").querySelector("math"),
+      create: (name: string) => activeDocument.createElementNS(MATHML_NS, name)
+    };
+    Array.from(clean.querySelectorAll(`.${FORMULA_SLOT}`)).forEach((slot, index) => {
+      const formula = formulas[index];
+      if (!formula) {
+        slot.remove();
+        return;
+      }
+      const math = mathFromLatex(formula.latex, formula.display, deps);
+      if (math) {
+        slot.replaceWith(math);
+        return;
+      }
+      const wrap = formula.display ? createDiv() : createSpan();
+      const code = createEl("code");
+      code.className = MATH_SOURCE_CLASS;
+      code.textContent = formula.latex;
+      const note = createSpan();
+      note.className = MATH_NOTE_CLASS;
+      note.textContent = ` ${translate(this.config.language, "share.math_source_note")}`;
+      wrap.append(code, note);
+      slot.replaceWith(wrap);
+    });
+  }
+
+  /**
+   * True for a file in one of VAM's own folders, except the folder of the map being shared: that map's notes and
+   * attachments are its content. Its chat records (map and topic chats) and every other VAM folder stay out.
+   */
+  private isInternalFile(path: string): boolean {
+    const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
+    if (mapFolder && path.startsWith(`${mapFolder}/`)) return path.startsWith(`${mapFolder}/${MAP_CHATS_FOLDER}/`);
+    return (this.config.internalFolders ?? []).some(folder => path === folder || path.startsWith(`${folder}/`));
+  }
+
+  /** The card name for a non-picture file a note embeds; a file that cannot be found or lives in a vault-internal folder still gets a card (it says the file is not included). */
+  private registerFile(ref: string, fromPath: string): string {
+    let found: TFile | null = this.app.metadataCache.getFirstLinkpathDest(ref, fromPath);
+    if (found && this.isInternalFile(found.path)) found = null;
+    // A note is never shipped as raw bytes, whatever syntax pointed at it.
+    if (found && found.extension.toLowerCase() === "md") found = null;
+    const key = found ? found.path : `?${ref}`;
+    const existing = this.fileNames.get(key);
+    if (existing) return existing;
+    const name = `file-${this.fileNames.size + 1}`;
+    this.fileNames.set(key, name);
+    this.files.set(name, {
+      path: found?.path ?? null,
+      file: (found?.name ?? ref.split(/[\\/]/).pop() ?? ref).trim(),
+      size: found?.stat.size ?? 0
+    });
+    return name;
+  }
+
+  /** Reads the bytes of the files the notes show, once each; a file over the size limit or unreadable stays null. */
+  private async readFiles(ticket: BuildTicket): Promise<void> {
+    const names = new Set([...this.rendered.values()].flatMap(note => note.files));
+    for (const name of names) {
+      if (this.fileData.has(name)) continue;
+      const entry = this.files.get(name);
+      const file = entry?.path ? this.app.vault.getFileByPath(entry.path) : null;
+      let data: string | null = null;
+      if (file && entry && entry.size > 0 && entry.size <= SHARE_ATTACHMENT_MAX_BYTES) {
+        try {
+          data = SHARE_ATTACHMENT_DATA_PREFIX + bytesToBase64(await this.app.vault.readBinary(file));
+        } catch {
+          data = null;
+        }
+      }
+      assertCurrent(ticket);
+      if (this.disposed) return;
+      this.fileData.set(name, data);
+    }
   }
 
   /** The vault file a registered image name points at, or null when it cannot be found or is not a known image type. */
@@ -647,7 +950,12 @@ export class ShareExporter {
     }
     for (const item of this.source.map.canvasItems ?? []) {
       const raw = item as unknown as Record<string, unknown>;
-      if (raw.kind === "annotated-image" && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+      if (
+        (raw.kind === "annotated-image" || raw.kind === "image") &&
+        typeof raw.id === "string" &&
+        typeof raw.path === "string" &&
+        raw.path
+      )
         this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
     }
   }
@@ -680,6 +988,7 @@ export class ShareExporter {
       done++;
     }
     onProgress({ phase: "images", done: names.length, total: names.length });
+    await this.readFiles(ticket);
   }
 
   forbiddenStrings(): ForbiddenString[] {
@@ -739,6 +1048,11 @@ export class ShareExporter {
     const omitted = translate(language, "share.viewer_image_omitted");
     const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name]) => name));
     const notesById: Record<string, ShareNoteInput> = {};
+    // Every card of a usable argument map is a plain rectangle, whatever its type (the map's own rule).
+    const argumentIds =
+      this.source.map.argumentMap !== undefined && readArgumentMap(this.source.map).kind === "usable"
+        ? managedNodeIds(this.source.map)
+        : new Set<string>();
     let notesWithContent = 0;
     let undrawn = 0;
     let blocked = 0;
@@ -749,6 +1063,8 @@ export class ShareExporter {
         title: plainWikilinks(note.title),
         summary: plainWikilinks(note.summary),
         status: note.status,
+        ...(note.topicKind && !argumentIds.has(node.id) ? { kind: note.topicKind } : {}),
+        shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,
         ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),
         ...(note.color ? { color: note.color } : {}),
@@ -770,6 +1086,19 @@ export class ShareExporter {
     const assets: Record<string, string> = {};
     if (options.includeDetail && options.includeImages)
       for (const [name, data] of this.images) if (data) assets[name] = data;
+    // The files the shown notes carry as cards; their bytes travel only with notes and images on, and only when they were read (size limit).
+    const fileNames = options.includeDetail
+      ? [...new Set(payloadNodeIds(this.source.map.nodes).flatMap(id => this.rendered.get(id)?.files ?? []))]
+      : [];
+    const attachments = fileNames.flatMap(name => {
+      const entry = this.files.get(name);
+      return entry ? [{ name, file: entry.file, size: entry.size }] : [];
+    });
+    if (options.includeDetail && options.includeImages)
+      for (const { name } of attachments) {
+        const data = this.fileData.get(name);
+        if (data) assets[name] = data;
+      }
     const covers: NonNullable<ShareOptions["covers"]> = Object.fromEntries(
       [...this.coverNames].map(([id, asset]) => [id, { asset, ...this.source.coverLooks?.get(id) }])
     );
@@ -781,6 +1110,7 @@ export class ShareExporter {
       exportedAt: (this.config.now?.() ?? new Date()).toISOString(),
       goal: this.source.goal,
       assets,
+      attachments,
       covers,
       imageAssets: Object.fromEntries(this.imageNames),
       ...(this.source.ringHeights?.size ? { ringHeights: Object.fromEntries(this.source.ringHeights) } : {}),
@@ -835,7 +1165,7 @@ export class ShareExporter {
     const counts = {
       topics: payload.nodes.length,
       notesWithContent: scoped.notesWithContent,
-      images: Object.keys(payload.assets).length
+      images: Object.values(payload.assets).filter(data => data.startsWith("data:image/")).length
     };
     const shared = {
       payload,

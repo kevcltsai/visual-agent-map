@@ -82,7 +82,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -104,7 +104,8 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
   for (const lang of LANGUAGES) {
     const shell = html.renderShareShell(text.shareViewerUiFor(lang));
     const urls = [...shell.matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
-    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE].sort());
+    // P6: the only other address is YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only after a click).
+    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/'].sort());
     assert.doesNotMatch(shell, /<script[^>]*\ssrc=/i);
     assert.doesNotMatch(shell, /<link\b/i);
     assert.doesNotMatch(shell, /@import/i);
@@ -119,7 +120,7 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
 });
 
 test('sharing viewer: the viewer program has no eval and writes titles and summaries with textContent only', () => {
-  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts', 'cover-dom.ts', 'image-data.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
+  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts', 'cover-dom.ts', 'image-data.ts', 'video.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
   const js = bundle.SHARE_VIEWER_JS;
   for (const source of [...sources, js]) {
     assert.doesNotMatch(source, /\beval\s*\(/);
@@ -194,7 +195,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     const ui = text.shareViewerUiFor(lang);
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -322,7 +323,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     const ui = dictionaries.SHARE_VIEWER_UI_EXTRA[code];
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -1457,7 +1458,11 @@ test('sharing viewer images: image-data keeps only what a viewer may draw (asset
   assert.equal(image.src, undefined, 'a web address is not a picture');
   assert.equal(image.note, '<img src=x onerror=1> two', 'the note stays a plain string');
   assert.deepEqual(image.anchors.map(a => [a.id, a.x, a.y, a.linked]), [['a1', 0.25, 0.75, true], ['a2', 1, 0, true]]);
-  assert.deepEqual(image.links, [{ anchor: 'a1', topic: 't1', ring: true }, { anchor: 'a2', topic: 't2', ring: false }]);
+  assert.deepEqual(image.links, [{ anchor: 'a1', topic: 't1', ring: true, description: '' }, { anchor: 'a2', topic: 't2', ring: false, description: '' }]);
+  assert.equal(image.free, false, 'an image the file does not mark free is annotated, whatever it holds');
+  assert.equal(read([{ ...base, free: true }])[0].free, true);
+  for (const free of [1, 'true', {}, null]) assert.equal(read([{ ...base, free }])[0].free, false, `free must be exactly true: ${JSON.stringify(free)}`);
+  assert.equal(read([{ ...base, asset: 'web' }])[0].free, false, 'an old picture with no anchors, links or note stays annotated');
 });
 
 test('sharing viewer images: only the picture, bar and anchor rules of the map are taken from .vam-view; the viewer stylesheet lets a press pan', async () => {
@@ -2090,4 +2095,281 @@ test('sharing viewer fold R2-F3: opening a file whose expanded covered cards ove
     assert.ok(report.settled.hits.length > 0, 'the saved places overlap, so there is something an arrangement would move');
     assert.equal(places(report.settled), places(report.first), 'no card moved when the covers loaded');
   });
+});
+
+// share-complete P2: types, frames and free pictures in the viewer.
+test('sharing viewer shapes: the copied shape drawing, padding and table equal the map\'s topic-kind-shape.ts for every type', () => {
+  const copy = load('experiences/sharing/viewer/topic-shapes.ts');
+  // A tiny element that records what the two drawings do (the map's version binds to Obsidian's createSvg / addClass).
+  const make = tag => { const el = { tag, attrs: {}, children: [] }; el.setAttribute = (k, v) => { el.attrs[k] = v; }; el.addClass = c => { el.attrs.class = c; }; el.appendChild = child => { el.children.push(child); return child; }; return el; };
+  const strip = el => ({ tag: el.tag, attrs: el.attrs, children: el.children.map(strip) });
+  const doc = { createElementNS: (_ns, tag) => make(tag) };
+  const original = load('experiences/visual-map/topic-kind-shape.ts', {}, { createSvg: tag => make(tag) });
+  {
+    const kinds = Object.keys(original.TOPIC_KIND_SHAPES);
+    assert.deepEqual(plain(Object.fromEntries(kinds.map(kind => [kind, original.TOPIC_KIND_SHAPES[kind].shape]))), plain(copy.TOPIC_KIND_SHAPES), 'kind -> shape table');
+    assert.deepEqual(plain(copy.VIEWER_KINDS), kinds.filter(kind => kind !== 'topic'));
+    for (const kind of kinds) {
+      const shape = original.TOPIC_KIND_SHAPES[kind].shape;
+      const cardA = make('div'), cardB = make('div');
+      const drawn = original.renderShapeBackground(cardA, kind);
+      if (shape === 'rounded') { assert.equal(copy.readViewerShape(shape), undefined, 'rounded is never a viewer shape'); assert.ok(!drawn); continue; }
+      const mine = copy.renderShapeBackground(doc, cardB, shape);
+      assert.deepEqual(plain(strip(cardB)), plain(strip(cardA)), `${kind} drawing`);
+      assert.equal(Boolean(mine), Boolean(drawn), kind);
+      for (const width of [120, 280, 400]) for (const height of [0, 30, 90, 200]) assert.deepEqual(plain(copy.shapeInsets(shape, { width, height })), plain(original.shapeInsets(kind, { width, height })), `${kind} ${width}x${height}`);
+    }
+  }
+});
+
+test('sharing viewer shapes: only whitelisted words are read; relation and frame readers keep ids that exist and plain text', () => {
+  const copy = load('experiences/sharing/viewer/topic-shapes.ts');
+  for (const bad of ['topic', 'Atomic', '<b>', 'evil" onclick="x', '', 5, null, {}, ['atomic']]) assert.equal(copy.readViewerKind(bad), undefined, String(bad));
+  for (const bad of ['rounded', 'circle', 'RECT', '', 5, null, ['rect']]) assert.equal(copy.readViewerShape(bad), undefined, String(bad));
+  const data = load('experiences/sharing/viewer/relation-data.ts');
+  const ids = new Set(['a', 'b']);
+  assert.deepEqual(plain(data.readFrames([{ id: 'f', members: ['a', 'gone', 5, 'a'], label: ' <b>x</b>\n y ' }, { id: 'g', members: ['gone'] }, { id: 'f', members: ['b'] }, { members: ['a'] }, 'x'], ids)), [{ id: 'f', members: ['a'], label: '<b>x</b> y' }]);
+  assert.deepEqual(plain(data.readFrames({}, ids)), []);
+});
+
+test('sharing viewer: the new interface text for types, relations and frames exists in all six languages', () => {
+  const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
+  assert.equal(everyUi.length, 6);
+  const kinds = ['action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+  const relations = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
+  for (const ui of everyUi) {
+    assert.match(ui.kindLabel, /\{0\}/, `${ui.lang}.kindLabel`);
+    assert.match(ui.frameNamed, /\{0\}/, `${ui.lang}.frameNamed`);
+    for (const key of ['frameLabel', 'relationsHeading']) assert.ok(String(ui[key]).trim(), `${ui.lang}.${key}`);
+    for (const id of kinds) assert.ok(ui.kindNames[id]?.trim(), `${ui.lang}.kind.${id}`);
+    for (const id of relations) assert.ok(ui.relationNames[id]?.trim(), `${ui.lang}.relation.${id}`);
+  }
+});
+
+test('sharing viewer types, frames and free pictures: whitelisted kinds draw the map\'s shape, forged ones draw nothing, frames wrap drawn members, a free picture has no bar (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-kinds-'));
+  try {
+    const data = payload();
+    const ids = data.nodes.slice(0, 6).map(n => n.id);
+    data.nodes[0].kind = 'hypothesis'; data.nodes[0].shape = 'diamond';
+    data.nodes[1].kind = 'conclusion';
+    data.nodes[2].kind = 'evil" onclick="document.title=1'; data.nodes[2].shape = 'circle';
+    data.nodes[3].kind = 'topic'; data.nodes[3].shape = 'rounded';
+    data.nodes[4].shape = 'rect';
+    data.nodes[5].kind = ['atomic'];
+    data.assets = { ...data.assets, pic: pngDataUri(4, 3, [9, 8, 7]) };
+    data.images = [
+      { id: 'freeok', x: 900, y: 0, w: 120, h: 90, asset: 'pic', free: true, anchors: [] },
+      { id: 'freegone', x: 900, y: 200, w: 120, h: 90, free: true, anchors: [] },
+      { id: 'oldplain', x: 900, y: 400, w: 120, h: 90, asset: 'pic', anchors: [] }
+    ];
+    data.boundaries = [
+      { id: 'f1', members: [ids[0], ids[1], 'not-in-file', 'freeok'], label: '<img src=x onerror="document.title=1">' },
+      { id: 'f2', members: ['not-in-file'], label: 'ghost' },
+      { id: 'f3', members: [ids[4]] },
+      { id: 'f4" onmouseover="x', members: [ids[3]] }
+    ];
+    const out = path.join(directory, 'kinds.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = id => document.querySelector('[data-node-id="' + id + '"]');
+        const rect = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+        const frame = id => document.querySelector('[data-frame-id="' + id + '"]');
+        const f1 = frame('f1');
+        const members = ${JSON.stringify([ids[0], ids[1]])}.map(id => rect(card(id)));
+        return {
+          cards: ${JSON.stringify(ids)}.map(id => { const c = card(id); return { kind: c.dataset.shareKind ?? null, shape: c.dataset.shareShape ?? null, svg: c.querySelectorAll('svg.vam-kind-shape').length, polygons: c.querySelectorAll('svg.vam-kind-shape polygon').length, label: c.getAttribute('aria-label'), kindText: c.querySelector('.vam-card-kind')?.textContent ?? null, padding: c.style.padding }; }),
+          frames: [...document.querySelectorAll('.vam-share-frame')].map(f => f.dataset.frameId),
+          frameLabel: f1 && f1.querySelector('.vam-share-frame-label')?.textContent,
+          frameChildren: f1 ? f1.querySelectorAll('*').length : -1,
+          frameAria: f1 && f1.getAttribute('aria-label'),
+          frameRole: f1 && f1.getAttribute('role'),
+          frameContains: f1 ? members.every(m => { const r = rect(f1); return r.l <= m.l && r.t <= m.t && r.r >= m.r && r.b >= m.b; }) : false,
+          frameBehind: !!document.querySelector('.vam-share-frames') && !!(document.querySelector('.vam-share-frames').compareDocumentPosition(card(${JSON.stringify(ids[0])})) & Node.DOCUMENT_POSITION_FOLLOWING),
+          pics: ['freeok', 'freegone', 'oldplain'].map(id => { const e = document.querySelector('[data-item-id="' + id + '"]'); return { annotated: e.classList.contains('is-annotated'), bar: !!e.querySelector('.vam-annotated-bar'), missing: e.classList.contains('is-missing'), name: e.querySelector('.vam-canvas-image-name')?.textContent ?? null, img: !!e.querySelector('img') }; }),
+          title: document.title, injected: document.querySelectorAll('img[src="x"]').length
+        };
+      })()`);
+    });
+    const [hyp, con, forged, plainTopic, rectOnly, listKind] = report.cards;
+    assert.equal(hyp.kind, 'hypothesis'); assert.equal(hyp.shape, 'diamond'); assert.equal(hyp.svg, 1); assert.equal(hyp.polygons, 1);
+    assert.match(hyp.label, /Type: Hypothesis/); assert.equal(hyp.kindText, 'Hypothesis');
+    assert.ok(hyp.padding, 'the text is fitted inside the shape');
+    assert.equal(con.kind, 'conclusion'); assert.equal(con.shape, 'hexagon', 'a kind without a shape takes the map\'s shape for it'); assert.equal(con.svg, 1);
+    for (const card of [forged, plainTopic, listKind]) { assert.equal(card.kind, null); assert.equal(card.shape, null); assert.equal(card.svg, 0); assert.equal(card.kindText, null); assert.ok(!/Type:/.test(card.label ?? ''), 'no type text'); }
+    assert.equal(rectOnly.shape, 'rect'); assert.equal(rectOnly.kind, null); assert.equal(rectOnly.svg, 0, 'a rectangle is the card\'s own frame');
+    assert.deepEqual(report.frames, ['f1', 'f3', null], 'a frame with no member in the file is not drawn; an id outside the safe charset is drawn without a frame id');
+    assert.equal(report.frameLabel, '<img src=x onerror="document.title=1">', 'a frame name stays text');
+    assert.equal(report.frameChildren, 1); assert.equal(report.frameRole, 'group'); assert.match(report.frameAria, /^Frame: /);
+    assert.equal(report.frameContains, true, 'the frame is drawn outside its members');
+    assert.equal(report.frameBehind, true);
+    assert.deepEqual(plain(report.pics[0]), { annotated: false, bar: false, missing: false, name: null, img: true });
+    assert.equal(report.pics[1].annotated, false); assert.equal(report.pics[1].bar, false); assert.equal(report.pics[1].missing, true); assert.equal(report.pics[1].name, '[image not included]');
+    assert.equal(report.pics[2].annotated, true, 'an old file\'s picture with no anchors stays annotated'); assert.equal(report.pics[2].bar, true);
+    assert.notEqual(report.title, '1'); assert.equal(report.injected, 0);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer relations: lines, arrows and names for known kinds only; folded ends draw nothing; the panel lists them as text; note links go only to cards in the file (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-rel-'));
+  try {
+    const data = payload();
+    data.nodes.find(node => node.id === 'heat').collapsed = true;
+    data.nodes.find(node => node.id === 'root').detailHtml = '<p><a class="vam-node-link" href="#vam-node-ghost">G</a> <a class="vam-node-link" href="#vam-node-water">W</a></p>';
+    data.relations = [
+      { kind: 'supports', from: 'water', to: 'salt', description: '<img src=x onerror="window.__pwned=1">hostile' },
+      { kind: 'contradicts', from: 'salt', to: 'water' },
+      { kind: 'derives_from', from: 'water', to: 'root' },
+      { kind: 'related', from: 'salt', to: 'root' },
+      { kind: 'evil" onload="window.__pwned=1', from: 'water', to: 'salt' },
+      { kind: 'supports', from: 'maillard', to: 'salt' },
+      { kind: 'supports', from: 'water', to: 'nowhere' }
+    ];
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'rel.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(500);
+      const lines = await evaluate(`(() => ({ paths: [...document.querySelectorAll('.vam-edges path.vam-relation')].map(e => e.getAttribute('class')), polygons: document.querySelectorAll('.vam-edges polygon').length, gaps: document.querySelectorAll('.vam-edges .vam-relation-gap').length, labels: [...document.querySelectorAll('.vam-edges text.vam-relation-label')].map(e => e.textContent), evil: !!document.querySelector('[class*="evil"]'), pwned: !!window.__pwned }))()`);
+      await evaluate(`document.querySelector('[data-node-id="water"]').click()`);
+      await wait(200);
+      const panel = await evaluate(`(() => ({ rows: [...document.querySelectorAll('.vam-relation-item')].map(e => e.textContent), imgs: document.querySelectorAll('.vam-relations img').length, pwned: !!window.__pwned }))()`);
+      await evaluate(`document.querySelector('[data-node-id="root"]').click()`);
+      await wait(200);
+      await evaluate(`document.querySelector('a.vam-node-link[href="#vam-node-ghost"]').click()`);
+      const afterGhost = await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`);
+      await evaluate(`document.querySelector('a.vam-node-link[href="#vam-node-water"]').click()`);
+      await wait(200);
+      return { lines, panel, afterGhost, afterWater: await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`), hash: await evaluate('location.hash') };
+    });
+    assert.deepEqual(report.lines.paths.sort(), ['vam-relation vam-relation-contradicts', 'vam-relation vam-relation-derives_from', 'vam-relation vam-relation-related', 'vam-relation vam-relation-supports'], 'forged kind, folded end and unknown end draw nothing');
+    assert.equal(report.lines.polygons, 4, 'supports 1, contradicts head and bar 2, derives 1, related 0');
+    assert.equal(report.lines.gaps, 1);
+    assert.deepEqual(report.lines.labels.sort(), ['Contradicts', 'Derives from', 'Related', 'Supports']);
+    assert.equal(report.lines.evil, false);
+    assert.equal(report.lines.pwned, false);
+    assert.equal(report.panel.rows.length, 3, 'water: supports out, contradicts in, derives_from out');
+    assert.ok(report.panel.rows.some(row => row.includes('hostile') && row.includes('<img')), 'the description is shown as text');
+    assert.equal(report.panel.imgs, 0);
+    assert.equal(report.panel.pwned, false);
+    assert.equal(report.afterGhost, 'root', 'a link to an id that is not in the file does nothing');
+    assert.equal(report.afterWater, 'water');
+    assert.equal(report.hash, '', 'the link never changes the address');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+// ---- share-complete P5: file cards ----
+test('sharing viewer attachments: a card offers an opaque download only for a well-formed octet-stream entry; everything else says not included', () => {
+  const made = [];
+  const makeEl = tag => ({ tag, attrs: {}, children: [], className: '', textContent: '', listeners: {}, setAttribute(k, v) { this.attrs[k] = v; }, append(...c) { this.children.push(...c); }, addEventListener(type, fn) { this.listeners[type] = fn; }, click() { made.push({ href: this.href, download: this.download }); } });
+  const blobs = []; const revoked = []; const timers = [];
+  const doc = { createElement: makeEl, defaultView: { atob: value => Buffer.from(value, 'base64').toString('binary'), Blob: class { constructor(parts, init) { blobs.push({ parts, type: init.type }); } }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: url => revoked.push(url) }, setTimeout: fn => timers.push(fn) } };
+  const ui = { attachmentDownload: 'Download ({0})', attachmentNotIncluded: 'Not included' };
+  const link = (name, text) => ({ textContent: text, getAttribute: () => `#vam-attachment-${name}` });
+  const texts = card => card.children.map(child => child.textContent);
+  const ok = viewerDetail.attachmentCard(doc, link('file-1', 'page.html'), { 'file-1': 'data:application/octet-stream;base64,QUJD' }, ui);
+  assert.deepEqual(texts(ok), ['HTML', 'page.html', 'Download (3 B)']);
+  ok.children[2].listeners.click();
+  assert.equal(blobs[0].type, 'application/octet-stream', '.html is still an opaque Blob');
+  assert.deepEqual(made, [{ href: 'blob:x', download: 'page.html' }]);
+  assert.equal(revoked.length, 0); timers.forEach(fn => fn()); assert.deepEqual(revoked, ['blob:x'], 'the URL is revoked after the click');
+  const notIncluded = ['data:text/html;base64,QUJD', 'data:image/svg+xml;base64,QUJD', 'data:application/octet-stream;base64,@@@', 'data:application/octet-stream;base64,QUJ', 5, undefined];
+  for (const data of notIncluded) assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('file-1', 'a.svg'), { 'file-1': data }, ui)), ['SVG', 'a.svg', 'Not included']);
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('nope', 'a.pdf'), { 'file-1': 'data:application/octet-stream;base64,QUJD' }, ui)).slice(2), ['Not included'], 'an unknown name');
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('__proto__', 'a.pdf'), {}, ui)).slice(2), ['Not included']);
+  assert.deepEqual(texts(viewerDetail.attachmentCard(doc, link('file-1', 'Private/Dir/archive.tar.gz'), {}, ui)).slice(0, 2), ['GZ', 'archive.tar.gz'], 'a path in the text shows its file name only');
+  assert.equal(viewerDetail.formatFileSize(412 * 1024), '412 KB');
+  assert.equal(viewerDetail.formatFileSize(5 * 1024 * 1024), '5.0 MB');
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) { const u = text.shareViewerUiFor(lang); assert.match(u.attachmentDownload, /\{0\}/, lang); assert.ok(u.attachmentNotIncluded, lang); }
+  assert.equal(text.shareViewerUiFor('zh-TW').attachmentNotIncluded, '未附上');
+});
+
+// ---- share-complete P6: click-to-play video ----
+class VNode {
+  constructor(tag) { this.localName = tag; this.attrs = {}; this.kids = []; this.parent = null; this.handlers = {}; this.className = ''; this.text = ''; }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  removeAttribute(k) { delete this.attrs[k]; }
+  append(...nodes) { for (const node of nodes) { node.parent = this; this.kids.push(node); } }
+  replaceChildren(...nodes) { this.kids = []; this.append(...nodes); }
+  replaceWith(node) { const at = this.parent.kids.indexOf(this); this.parent.kids[at] = node; node.parent = this.parent; this.parent = null; }
+  addEventListener(type, fn) { this.handlers[type] = fn; }
+  set textContent(value) { this.text = value; this.kids = []; }
+  get textContent() { return this.text; }
+  all() { return this.kids.flatMap(kid => [kid, ...kid.all()]); }
+}
+const videoFixture = hrefs => {
+  const doc = { createElement: tag => new VNode(tag) };
+  const root = new VNode('div');
+  const links = hrefs.map(([href, cls]) => { const a = new VNode('a'); a.setAttribute('href', href); if (cls) a.setAttribute('class', cls); a.text = '▶ Cat video'; return a; });
+  root.append(...links);
+  root.querySelectorAll = selector => { assert.equal(selector, 'a.vam-video-link'); return root.kids.filter(kid => kid.localName === 'a' && (kid.attrs.class ?? '').split(' ').includes('vam-video-link')); };
+  return { doc, root, links };
+};
+
+test('sharing video: only a marked link to a real YouTube video becomes a card; a look-alike host or an author link stays a link', () => {
+  const video = load('experiences/sharing/viewer/video.ts');
+  const ui = text.shareViewerUiFor('en');
+  const { doc, root, links } = videoFixture([['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'vam-video-link'], ['https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ', 'vam-video-link'], ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', ''], ['https://youtu.be/short', 'vam-video-link'], ['https://youtu.be/dQw4w9WgXcQ"onload=1', 'vam-video-link']]);
+  video.upgradeVideoLinks(root, doc, ui);
+  assert.deepEqual(root.kids.map(kid => kid.localName), ['div', 'a', 'a', 'a', 'a'], 'one card, the other four are untouched');
+  assert.equal(links[1].getAttribute('class'), 'vam-video-link', 'a fake host keeps its link');
+  const card = root.kids[0];
+  assert.equal(card.className, 'vam-video-card');
+  assert.equal(card.all().filter(node => node.localName === 'iframe').length, 0, 'no iframe before the click');
+  assert.equal(card.all().filter(node => node.localName === 'iframe' || node.attrs.src).length, 0, 'nothing that could load');
+  const open = card.kids[2];
+  assert.equal(open, links[0]);
+  assert.equal(open.text, ui.videoOpen, 'the original link stays as the fallback');
+  assert.equal(open.getAttribute('href'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(card.kids[1].text, ui.videoNote);
+  const button = card.kids[0].kids[0];
+  assert.equal(button.localName, 'button'); assert.equal(button.getAttribute('type') ?? button.type, 'button');
+  button.handlers.click();
+  const frames = card.all().filter(node => node.localName === 'iframe');
+  assert.equal(frames.length, 1);
+  assert.deepEqual(plain(frames[0].attrs), {
+    src: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1',
+    allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin',
+    sandbox: 'allow-scripts allow-same-origin allow-presentation allow-popups', title: 'Cat video'
+  });
+});
+
+test('sharing video: the player is never in the file; the viewer drops an iframe that arrives in a note and rebuilds the detail (and so the player) for each card', () => {
+  const detail = read('experiences/sharing/viewer/detail.ts');
+  assert.match(detail, /"script, iframe, frame, object, embed, applet, link, meta, base"/);
+  assert.ok(detail.indexOf('upgradeVideoLinks(target, doc, ui)') > detail.indexOf('root.querySelectorAll("script, iframe'), 'the strip runs before the viewer builds its own player');
+  const main = read('experiences/sharing/viewer/main.ts');
+  assert.match(main, /inspector\.replaceChildren\(\);/);
+  assert.match(main, /const detail = make\("div", "vam-sample-detail"\);/, 'each selection builds a new detail');
+  assert.ok(/if \(\/\^\[A-Za-z0-9_-\]\{1,100\}\$\/\.test\(frame\.id\)\) el\.dataset\.frameId = frame\.id;/.test(main), 'frame ids are written only when safe');
+  assert.ok(!bundle.SHARE_VIEWER_JS.includes('youtube-nocookie.com') || bundle.SHARE_VIEWER_JS.includes('vam-video-card'), 'the bundle carries the player builder');
+  for (const forbidden of [/url\(/, /<\/script/i, /<!--/]) { assert.doesNotMatch(bundle.SHARE_VIEWER_JS, forbidden); assert.doesNotMatch(bundle.SHARE_VIEWER_CSS, forbidden); }
+});
+
+test('sharing video: the file policy allows only the no-cookie player frame, and every language has the card text', () => {
+  const shell = html.renderShareShell(text.shareViewerUiFor('en'));
+  assert.ok(shell.includes(`content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com"`), 'exact policy');
+  assert.equal((shell.match(/frame-src/g) ?? []).length, 1);
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) {
+    const ui = Object.values(text.shareViewerUiExtras([lang]).uiByLanguage)[0];
+    for (const key of ['videoPlay', 'videoNote', 'videoOpen']) assert.ok(typeof ui[key] === 'string' && ui[key].length > 3, `${lang}.${key}`);
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').videoNote, '播放時才會連到 YouTube（不記錄 cookie 的版本）');
+  assert.equal(text.shareViewerUiFor('zh-TW').videoOpen, '在 YouTube 開啟');
+  assert.equal(text.shareViewerUiFor('zh-TW').videoPlay, '按一下播放 YouTube 影片');
 });

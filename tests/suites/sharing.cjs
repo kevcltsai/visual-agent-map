@@ -143,7 +143,7 @@ test('sharing: a YouTube embed is shared as a plain link, not an image or iframe
   const result = clean.cleanShareMarkdown('Stretch ![Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and ![](https://youtu.be/dQw4w9WgXcQ)', ctx);
   assert.equal(
     result.markdown,
-    'Stretch [▶ Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and [▶ https://youtu.be/dQw4w9WgXcQ](https://youtu.be/dQw4w9WgXcQ)'
+    'Stretch [\uE004▶ Cat stretch](https://www.youtube.com/watch?v=dQw4w9WgXcQ) and [\uE004▶ https://youtu.be/dQw4w9WgXcQ](https://youtu.be/dQw4w9WgXcQ)'
   );
   assert.deepEqual(plain(result.webImages), [], 'a video is never fetched as a web image');
 });
@@ -500,7 +500,7 @@ test('sharing text-nodes: no text nodes means no key and unchanged bytes; text n
   const before = format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options()));
   assert.ok(!before.includes('textNodes'));
   const emptyItems = fixtureMap();
-  emptyItems.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  emptyItems.canvasItems = [{ id: 'img', kind: 'mystery' }];
   assert.equal(format.serializeShareJson(format.buildSharePayload(emptyItems, notesById, options())), before);
   const map = fixtureMap();
   const first = map.nodes[0].id;
@@ -595,7 +595,7 @@ test('sharing summaries: no bracket means no key and unchanged bytes; a bracket 
   assert.equal(format.buildSharePayload(map, notesById, options({ includeDetail: false })).summaries.length, 1);
   // Other canvas items alone leave the bytes unchanged.
   const other = fixtureMap();
-  other.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  other.canvasItems = [{ id: 'img', kind: 'mystery' }];
   assert.equal(format.serializeShareJson(format.buildSharePayload(other, notesById, options())), before);
 });
 
@@ -711,4 +711,391 @@ test('sharing clean: the write-back\'s own backup log line is removed (any note 
   assert.ok(out.includes('171239.md，我刪過一段'), 'an edited line stays for the leak gate');
   assert.ok(out.includes('Agent Workspace/x 2026-11-22 171239.md'), 'code stays');
   assert.ok(out.includes('> [!note]- 研究備註') && out.includes('body'));
+});
+
+// share-complete P1: kind, shape, relations, boundaries, free pictures. Only whitelisted values travel; plain text only.
+test('sharing complete: kind and shape take whitelisted values only; rounded and topic are not written', () => {
+  const { notesById } = cleanedNotes();
+  const ids = Object.keys(notesById);
+  const withNote = (id, extra) => ({ ...notesById, [id]: { ...notesById[id], ...extra } });
+  const build = notes => format.buildSharePayload(fixtureMap(), notes, options());
+  const base = build(notesById);
+  assert.ok(base.nodes.every(node => !('kind' in node) && !('shape' in node)), 'no new data, no new keys');
+  assert.ok(!format.serializeShareJson(base).includes('relations') && !format.serializeShareJson(base).includes('boundaries'));
+  const good = build(withNote(ids[0], { kind: 'hypothesis', shape: 'diamond' })).nodes[0];
+  assert.equal(good.kind, 'hypothesis');
+  assert.equal(good.shape, 'diamond');
+  for (const [kind, shape] of [['topic', 'rounded'], ['<img onerror=1>', 'url(x)'], [42, {}], ['__proto__', 'circle'], ['Hypothesis', 'RECT']]) {
+    const node = build(withNote(ids[0], { kind, shape })).nodes[0];
+    assert.ok(!('kind' in node) && !('shape' in node), `${String(kind)}/${String(shape)} is dropped`);
+  }
+});
+
+test('sharing complete: relations keep known kinds with both ends in the file; unknown kind, missing end, self link and markup stay out', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  const evil = '</script><img src=x onerror=alert(1)>[[private/path]]';
+  map.topicRelations = [
+    { kind: 'supports', from: a, to: b, description: ` line one\n  two ${evil} ` },
+    { kind: 'cites', from: a, to: b },
+    { kind: 'related', from: a, to: 'gone' },
+    { kind: 'related', from: 'gone', to: b },
+    { kind: 'related', from: a, to: a },
+    { kind: 'contradicts', from: b, to: a, description: 'x'.repeat(500) },
+    null,
+    { kind: 'verifies', from: 7, to: b }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options({ plainText: text => text.replace(/\[\[([^\]]+)\]\]/g, '$1') }));
+  assert.equal(payload.version, 1);
+  assert.equal(payload.relations.length, 2);
+  assert.deepEqual(plain(payload.relations[0]), { kind: 'supports', from: a, to: b, description: `line one two ${evil.replace('[[private/path]]', 'private/path')}` });
+  assert.equal(payload.relations[1].description.length, 200);
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('</script') && !json.includes('<!--') && !json.includes('<img'), 'every < is escaped');
+  assert.equal(JSON.parse(json).relations[0].description.includes('<img src=x'), true, 'kept as text, never as markup');
+});
+
+test('sharing complete: boundaries keep members present in the file; a frame with none left is not written; the label is plain text', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  map.canvasItems = [
+    { id: 'bd1', kind: 'boundary', members: [a, 'gone', b, a], label: '<b>Group</b> [[x]]' },
+    { id: 'bd2', kind: 'boundary', members: ['gone'] },
+    { id: 'bd3', kind: 'boundary', members: [a] },
+    { id: 'bd1', kind: 'boundary', members: [b] },
+    { id: 'img1', kind: 'image', path: 'Secret/vault/pic.png', x: 1, y: 2, w: 30, h: 40 },
+    { id: 'bd4', kind: 'boundary', members: ['img1', 'ghost'] }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options({ plainText: text => text.replace(/\[\[([^\]]+)\]\]/g, '$1') }));
+  assert.deepEqual(plain(payload.boundaries), [{ id: 'bd1', members: [a, b], label: '<b>Group</b> x' }, { id: 'bd3', members: [a] }, { id: 'bd4', members: ['img1'] }]);
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('Secret/vault') && !json.includes('"path"'), 'a free picture never carries its vault path');
+  assert.deepEqual(plain(payload.images), [{ id: 'img1', x: 1, y: 2, w: 30, h: 40, anchors: [], free: true }], 'a free picture without an attached file is listed without an asset');
+});
+
+test('sharing complete: image links carry a whitelisted kind and plain description; an unknown kind is left out of the link only', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const [a, b] = map.nodes.map(node => node.id);
+  map.canvasItems = [
+    { id: 'im', kind: 'annotated-image', path: 'p.png', x: 0, y: 0, w: 10, h: 10, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }], relations: [
+      { kind: 'supports', from: 'p1', to: a, description: ' why ' },
+      { kind: 'bogus', from: 'p1', to: b, description: '</script>' }
+    ] }
+  ];
+  const links = format.buildSharePayload(map, notesById, options()).images[0].links;
+  assert.deepEqual(plain(links), [{ anchor: 'p1', topic: a, kind: 'supports', description: 'why' }, { anchor: 'p1', topic: b, description: '</script>' }]);
+});
+
+// ---- share-complete P3: links between the notes of one map ----
+const nodeLinks = load('experiences/sharing/share-node-links.ts');
+const supportHtml = require('../support-html-dom.cjs');
+const applyLinks = (html, ids) => {
+  const root = supportHtml.parse(html);
+  nodeLinks.applyNodeLinks(root, new Set(ids), () => new supportHtml.El('a', root.ownerDocument));
+  return supportHtml.serialize(root);
+};
+const markdownOf = (md, nodeIdOf) => clean.cleanShareMarkdown(md, { titleOf: target => (target === 'Water' ? 'Water in food' : undefined), nodeIdOf, assets: clean.createAssetRegistry() }).markdown;
+
+test('share node links: a wikilink to a map card is marked, a non-map wikilink stays plain text', () => {
+  const idOf = target => (target === 'Water' ? 'water' : undefined);
+  const md = markdownOf('See [[Water]], [[Water|the wet one]] and [[Elsewhere]] and [[#Heading]].', idOf);
+  const html = applyLinks(`<p>${md}</p>`, ['water']);
+  assert.match(html, /<a class="vam-node-link" href="#vam-node-water">Water in food<\/a>/);
+  assert.match(html, /<a class="vam-node-link" href="#vam-node-water">the wet one<\/a>/);
+  assert.ok(html.includes('and Elsewhere and Heading.'), 'no link for a target that is not a card');
+  assert.ok(!/[-]/.test(html), 'no mark character is left');
+  assert.equal((html.match(/<a /g) ?? []).length, 2);
+});
+
+test('share node links: private-use characters typed by the author cannot forge a link', () => {
+  const md = markdownOf('Clickwater and [[Water]]', target => (target === 'Water' ? 'water' : undefined));
+  assert.ok(!/Click/.test(md), 'the forged marks are gone from the markdown');
+  const html = applyLinks(`<p>${md}</p>`, ['water']);
+  assert.equal((html.match(/<a /g) ?? []).length, 1, 'only the real wikilink became a link');
+  assert.ok(html.includes('Clickwater'), 'the forged text stays plain');
+  // A mark that reaches the html anyway (a renderer that split it, an id not in the file, an unsafe id) ends as text.
+  assert.ok(!/<a /.test(applyLinks('<p>xghost</p>', ['water'])));
+  assert.equal(applyLinks('<p>x"onmouseover=1</p>', ['"onmouseover=1']), '<p>x</p>');
+  assert.equal(nodeLinks.markNodeLink('a b', 'T'), 'T', 'an id outside the safe charset is not marked');
+  assert.equal(applyLinks('<p><a href="https://example.org">xwater</a></p>', ['water']), '<p><a href="https://example.org">x</a></p>', 'no link inside a link');
+});
+
+test('share node links: the generated link carries only href and class', () => {
+  const root = supportHtml.parse('<p>Twater</p>');
+  nodeLinks.applyNodeLinks(root, new Set(['water']), () => new supportHtml.El('a', root.ownerDocument));
+  const link = root.childNodes[0].childNodes[0];
+  assert.equal(link.localName, 'a');
+  assert.deepEqual([...link.attrs.keys()].sort(), ['class', 'href']);
+});
+
+// ---- P4: inline note embeds ----
+const embeds = load('experiences/sharing/share-embeds.ts');
+const NOTE = '---\ntitle: Source\n---\nIntro line\n\n# Top\nTop text\n## Part A\nA text ![[Other]] and ![[pic.png]]\n### Deep\nDeep text\n## Part B\nB text\n\nA block para ^blk1\n\n- item one ^li1\n  - child\n- item two\n';
+const embedCtx = (map, extra = {}) => ({ titleOf: t => ({ Source: 'Source Title', Other: 'Other Title' })[t], assets: clean.createAssetRegistry(), embedOf: t => map[t], ...extra });
+
+test('sharing embeds: whole note without frontmatter, heading section to the next same-or-higher heading, block paragraph and list item', () => {
+  const whole = embeds.extractEmbedContent(NOTE, '');
+  assert.ok(whole.startsWith('Intro line') && !whole.includes('title: Source'));
+  assert.equal(embeds.extractEmbedContent(NOTE, 'Part A'), '## Part A\nA text [[Other]] and ![[pic.png]]\n### Deep\nDeep text');
+  assert.equal(embeds.extractEmbedContent(NOTE, 'part   b'), '## Part B\nB text\n\nA block para ^blk1\n\n- item one ^li1\n  - child\n- item two', 'case and spacing are ignored; the section runs to the end');
+  assert.equal(embeds.extractEmbedContent(NOTE, '^blk1'), 'A block para');
+  assert.equal(embeds.extractEmbedContent(NOTE, '^li1'), '- item one\n  - child');
+  assert.equal(embeds.extractEmbedContent(NOTE, 'Missing'), undefined);
+  assert.equal(embeds.extractEmbedContent(NOTE, '^nope'), undefined);
+  assert.equal(embeds.extractEmbedContent('```\n# Not heading\n```\n# Real\nx', 'Not heading'), undefined, 'a # line in a code fence is not a heading');
+  assert.equal(embeds.extractEmbedContent('---\na: 1\n---\n', ''), undefined, 'an empty note shows nothing');
+  assert.equal(embeds.extractEmbedContent('Line one\r\n\r\nPara ^b\r\n', '^b'), 'Para', 'CRLF');
+});
+
+test('sharing embeds: the cleaner puts the content in a vam-embed callout; nested note embeds become titles, images stay', () => {
+  const content = embeds.extractEmbedContent(NOTE, 'Part A');
+  const out = clean.cleanShareMarkdown('Before\n\n![[Source#Part A]]\n\nAfter', embedCtx({ 'Source#Part A': content }, { embedTitle: t => `Embedded: ${t}` }));
+  assert.equal(out.markdown, 'Before\n\n\n\n> [!vam-embed] Embedded: Source Title\n> ## Part A\n> A text Other Title and ![](vam-asset:image-1)\n> ### Deep\n> Deep text\n\n\n\nAfter');
+  assert.deepEqual(plain(out.attachments), [{ ref: 'pic.png', name: 'image-1' }]);
+});
+
+test('sharing embeds: no content (self, cycle, not found) keeps the title only; an embed in the middle of a line is cut into its own block', () => {
+  assert.equal(clean.cleanShareMarkdown('See ![[Source]] now', embedCtx({})).markdown, 'See Source Title now');
+  const mid = clean.cleanShareMarkdown('See ![[Source]] now', embedCtx({ Source: 'Body' })).markdown;
+  assert.match(mid, /^See \n\n> \[!vam-embed\] Source Title\n> Body\n\n now$/);
+});
+
+test('sharing embeds: embedded content gets the same cleaning (private links, local reference definitions, writeback lines, marks), and the embed does not recurse', () => {
+  const body = 'Link [[private/Path/Secret]] and [x](Private/Folder/y.md)\n\n[ref]: Private/z.md\n\n![[Other]]';
+  const out = clean.cleanShareMarkdown('![[Source]]', embedCtx({ Source: embeds.extractEmbedContent(body, '') }, { embedOf: t => ({ Source: embeds.extractEmbedContent(body, ''), Other: 'LOOP' })[t] }));
+  assert.ok(!out.markdown.includes('private/Path') && !out.markdown.includes('Private/') && !out.markdown.includes('LOOP'), out.markdown);
+  assert.match(out.markdown, /> Link Secret and x/);
+  assert.match(out.markdown, /> Other Title/);
+});
+
+test('sharing embeds: the embed box title and content survive a script or iframe in the embedded text only as text that the scrub later drops (leak scan has nothing to find)', () => {
+  const out = clean.cleanShareMarkdown('![[Source]]', embedCtx({ Source: '<script>alert(1)</script>\n\n<iframe src="https://evil.example"></iframe>' }));
+  assert.match(out.markdown, /> <script>alert\(1\)<\/script>/);
+  assert.match(out.markdown, /\[!vam-embed\]/);
+});
+
+// ---- share-complete P5: file attachment cards ----
+const attachCtx = extra => ({ titleOf: () => undefined, assets: clean.createAssetRegistry(), attachmentOf: ref => (ref.endsWith('.pdf') ? 'file-1' : undefined), ...extra });
+
+test('sharing attachments: a file embed becomes a mark that carries the name; without the hook it stays the escaped file name', () => {
+  const md = clean.cleanShareMarkdown('See ![[Docs/Sub/report.pdf]] here', attachCtx()).markdown;
+  assert.ok(md.startsWith('See ') && md.includes('file-1'), md);
+  assert.ok(!md.includes('Docs/') && !md.includes('Sub'), 'only the base name is in the text');
+  assert.equal(clean.cleanShareMarkdown('See ![[Docs/report.pdf]]', { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown, 'See report.pdf');
+  assert.equal(clean.cleanShareMarkdown('![[a.mp4]]', attachCtx()).markdown, 'a.mp4', 'a file the hook refuses stays text');
+});
+
+test('sharing attachments: the card carries only href and class; an unknown name, a mark inside a link or typed by the author gives plain text', () => {
+  const applyCards = (html, names) => {
+    const root = supportHtml.parse(html);
+    nodeLinks.applyNodeLinks(root, new Set(), () => new supportHtml.El('a', root.ownerDocument), new Set(names));
+    return supportHtml.serialize(root);
+  };
+  const mark = nodeLinks.markAttachment('file-1', 'r.pdf');
+  const html = applyCards(`<p>${mark}</p>`, ['file-1']);
+  assert.equal(html, '<p><a class="vam-attachment-card" href="#vam-attachment-file-1">r.pdf</a></p>');
+  assert.equal(applyCards(`<p>${mark}</p>`, ['file-2']), '<p>r.pdf</p>', 'a name the file does not have is text');
+  assert.equal(applyCards(`<p><a href="https://e.example">${mark}</a></p>`, ['file-1']), '<p><a href="https://e.example">r.pdf</a></p>');
+  assert.equal(nodeLinks.markAttachment('a"b', 'x'), 'x', 'an unsafe name is not marked');
+  // The author types the marks: cleaning strips them, so no card is forged.
+  const typed = clean.cleanShareMarkdown('evil.exefile-1 and ![[x.pdf]]', attachCtx()).markdown;
+  assert.equal((typed.match(//g) ?? []).length, 1, 'only the real embed keeps its mark');
+});
+
+test('sharing attachments: payload lists the file name only; bytes only with notes and images on; wrong prefix or no entry gives no asset; old maps are unchanged', () => {
+  const { notesById } = cleanedNotes();
+  const OCT = 'data:application/octet-stream;base64,QUJD';
+  const files = [{ name: 'file-1', file: 'Private/Folder/report.pdf', size: 3 }, { name: 'file-2', file: 'x.html', size: 5 }, { name: 'bad name', file: 'z', size: 1 }];
+  const withData = format.buildSharePayload(fixtureMap(), notesById, options({ attachments: files, assets: { 'file-1': OCT, 'file-2': 'data:text/html;base64,QUJD' } }));
+  assert.deepEqual(plain(withData.attachments), [{ name: 'file-1', file: 'report.pdf', size: 3, asset: 'file-1' }, { name: 'file-2', file: 'x.html', size: 5 }]);
+  assert.ok(!JSON.stringify(withData).includes('Private/Folder'), 'no vault path in the file');
+  const noImages = format.buildSharePayload(fixtureMap(), notesById, options({ includeImages: false, attachments: files, assets: { 'file-1': OCT } }));
+  assert.ok(noImages.attachments.every(item => !('asset' in item)));
+  assert.equal(noImages.assets['file-1'], undefined);
+  const noDetail = format.buildSharePayload(fixtureMap(), notesById, options({ includeDetail: false, attachments: files }));
+  assert.equal('attachments' in noDetail, false);
+  const old = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.equal('attachments' in old, false);
+  assert.equal(format.serializeShareJson(old), format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options({ attachments: [] }))));
+  assert.equal(format.SHARE_ATTACHMENT_MAX_BYTES, 10 * 1024 * 1024);
+});
+
+test('sharing embeds: embedded file references are anchored to the embedded note own folder; internal or missing files become plain text', () => {
+  const resolve = ref => ({ '../img/x.png': 'Notes/img/x.png', 'a.pdf': 'Notes/Sub/a.pdf', 'Agent/s.png': null })[ref] ?? null;
+  const out = embeds.anchorEmbeddedFiles('![[../img/x.png|cap]] ![](../img/x.png) ![[a.pdf]] ![[Agent/s.png]] ![](Agent/s.png) ![w](https://e.example/p.png) ![[Note]] ![[gone.png]]\n```\n![[a.pdf]]\n```', resolve);
+  assert.ok(out.startsWith('![[Notes/img/x.png|cap]] ![[Notes/img/x.png]] ![[Notes/Sub/a.pdf]] '), out);
+  assert.ok(!out.includes('Agent/s.png') && !out.includes('![[gone.png]]') && !out.includes('![[../img'), out);
+  assert.ok(out.includes('![w](https://e.example/p.png)') && out.includes('![[Note]]'));
+  assert.ok(out.endsWith('```\n![[a.pdf]]\n```'), 'code is left alone');
+});
+
+// ---- share-complete P6: video and other media ----
+const media = load('experiences/sharing/share-media.ts');
+const videoCore = load('core/video-embeds.ts');
+const viewerVideo = load('experiences/sharing/viewer/video.ts');
+const mediaLabels = { label: (kind, host) => `${{ video: 'Video', audio: 'Audio', embed: 'Embedded' }[kind]}${host ? `: ${host}` : ''}` };
+const mediaOf = html => {
+  const root = supportHtml.parse(html);
+  media.replaceMediaWithLinks(root, mediaLabels, tag => new supportHtml.El(tag, root.ownerDocument));
+  return supportHtml.serialize(root);
+};
+
+test('share media: iframe, video, audio, embed and object with a web source become a link card with the host', () => {
+  assert.equal(mediaOf('<iframe src="https://evil.example/x"></iframe>'), '<a class="vam-media-link" href="https://evil.example/x">Embedded: evil.example</a>');
+  assert.equal(mediaOf('<video src="http://www.cdn.example/v.mp4" controls></video>'), '<a class="vam-media-link" href="https://www.cdn.example/v.mp4">Video: cdn.example</a>');
+  assert.equal(mediaOf('<video><source src="https://cdn.example/v.webm" type="video/webm"></video>'), '<a class="vam-media-link" href="https://cdn.example/v.webm">Video: cdn.example</a>');
+  assert.equal(mediaOf('<audio src="https://cdn.example/a.mp3"></audio>'), '<a class="vam-media-link" href="https://cdn.example/a.mp3">Audio: cdn.example</a>');
+  assert.equal(mediaOf('<embed src="//cdn.example/e.swf"><object data="https://cdn.example/o"></object>'), '<a class="vam-media-link" href="https://cdn.example/e.swf">Embedded: cdn.example</a><a class="vam-media-link" href="https://cdn.example/o">Embedded: cdn.example</a>');
+});
+
+test('share media: a source that is not a web address is visible text with no link and no address', () => {
+  for (const src of ['javascript:alert(1)', 'file:///Users/me/secret.mp4', 'data:text/html;base64,AAAA', 'app://abc/v.mp4', 'obsidian://open?vault=V', ' java\nscript:x']) {
+    const out = mediaOf(`<p>before</p><iframe src="${src}"></iframe><video src="${src}"></video>`);
+    assert.ok(!/<a |href|<iframe|<video|src=/.test(out), out);
+    assert.ok(/Embedded/.test(out) && /Video/.test(out), `visible, not silent: ${out}`);
+    assert.ok(!/secret|Users|alert/.test(out), `no address leaks: ${out}`);
+  }
+  assert.equal(mediaOf('<video></video>'), '<span class="vam-media-text">Video</span>', 'a media element with no source is a label too');
+  assert.equal(mediaOf('<p>plain <a href="https://example.org">link</a></p>'), '<p>plain <a href="https://example.org">link</a></p>', 'other content is untouched');
+});
+
+test('share media: the video mark makes only the cleaner\'s own https link a video link; an author class never survives', () => {
+  const marked = `<p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">${nodeLinks.VIDEO_MARK}▶ Cat</a> <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">plain</a> <a class="vam-video-link x" href="https://youtu.be/dQw4w9WgXcQ">forged</a> <a href="javascript:x">${nodeLinks.VIDEO_MARK}bad</a></p>`;
+  const out = applyLinks(marked, []);
+  assert.ok(out.includes('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="vam-video-link">▶ Cat</a>'), out);
+  assert.ok(out.includes('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">plain</a>'), 'an author link stays plain');
+  assert.ok(out.includes('<a class="x" href="https://youtu.be/dQw4w9WgXcQ">forged</a>'), 'a hand-written video class is removed');
+  assert.ok(out.includes('<a href="javascript:x">bad</a>') && !/[\uE000-\uE004]/.test(out), 'the mark is gone everywhere, a non-https link gets no class');
+  assert.equal(nodeLinks.stripNodeLinkMarks(`a${nodeLinks.VIDEO_MARK}b`), 'ab');
+  assert.ok(!clean.cleanShareMarkdown(`x${nodeLinks.VIDEO_MARK}y`, { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown.includes(nodeLinks.VIDEO_MARK), 'typed marks are stripped from the author text');
+});
+
+test('share viewer video: the viewer id parser agrees with the plugin parser on every address', () => {
+  const urls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'http://youtube.com/watch?v=dQw4w9WgXcQ&t=5', 'https://m.youtube.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ?si=x', 'https://www.youtube.com/shorts/dQw4w9WgXcQ', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://www.youtube.com/live/dQw4w9WgXcQ', 'https://www.youtube.com/v/dQw4w9WgXcQ',
+    'https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ', 'https://evil.com/youtube.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'https://youtu.be.evil.example/dQw4w9WgXcQ', 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=short', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ"onload=1', 'https://www.youtube.com/watch', 'https://youtu.be/', 'javascript:alert(1)', 'ftp://youtu.be/dQw4w9WgXcQ', 'not a url', '', ' https://youtu.be/dQw4w9WgXcQ '];
+  for (const url of urls) assert.equal(viewerVideo.viewerYoutubeId(url), videoCore.youtubeVideoId(url), url);
+  assert.equal(viewerVideo.viewerYoutubeId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  assert.equal(viewerVideo.viewerYoutubeId('https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ'), null);
+});
+
+// ---- share-complete P6b: math as MathML ----
+const shareMath = load('experiences/sharing/share-math.ts');
+const viewerMath = load('experiences/sharing/viewer/math.ts');
+const outer = el => { const d = new supportHtml.El('div', supportHtml.parse('').ownerDocument); d.append(el); return supportHtml.serialize(d); };
+const mathDeps = (mml, extra = {}) => ({
+  tex2mml: mml === undefined ? undefined : () => mml,
+  parse: text => supportHtml.parse(text).children.find(el => el.localName === 'math') ?? null,
+  create: name => new supportHtml.El(name, supportHtml.parse('').ownerDocument),
+  ...extra
+});
+const HOSTILE_MML = '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" class="x" style="color:red" onload="evil()" href="javascript:evil()"><semantics><mrow><msup onclick="e()" href="https://e.example" style="x:y"><mi mathvariant="italic" class="c">x</mi><mn>2</mn></msup><maction actiontype="toggle"><mi>HIDDEN</mi></maction><mfrac linethickness="2"><mn>1</mn><mn>3</mn></mfrac><script>alert(1)</script></mrow><annotation encoding="application/x-tex">x^2 LATEX</annotation><annotation-xml encoding="x"><mi>AXML</mi></annotation-xml></semantics></math>';
+
+test('share math: the whitelist keeps structure and drops maction, href, annotation-xml, annotation, onload, style, class and script', () => {
+  const math = shareMath.mathFromLatex('x^2', false, mathDeps(HOSTILE_MML));
+  const out = outer(math);
+  assert.ok(out.includes('<msup>') && out.includes('<mfrac linethickness="2">') && out.includes('mathvariant="italic"'), out);
+  assert.ok(!/maction|HIDDEN|AXML|LATEX|annotation|alert|script|href|onload|onclick|style|class=|xmlns|javascript/i.test(out), out);
+  assert.ok(!out.includes('display='), 'inline math carries no display attribute');
+});
+
+test('share math: block math gets display="block"; the namespace factory is used for every element', () => {
+  const made = [];
+  const math = shareMath.mathFromLatex('x', true, mathDeps(HOSTILE_MML, { create: name => (made.push(name), new supportHtml.El(name, supportHtml.parse('').ownerDocument)) }));
+  assert.equal(math.getAttribute('display'), 'block');
+  assert.ok(made.includes('math') && made.includes('msup') && !made.includes('maction') && !made.includes('script'), made.join());
+});
+
+test('share math: no MathJax, a throwing tex2mml, an empty or non-math result, or empty LaTeX gives null (the caller shows the source)', () => {
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps(undefined)), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('', {})), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<p>no math</p>')), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<math></math>')), null);
+  assert.equal(shareMath.mathFromLatex('x^2', false, mathDeps('<math><mi>x</mi></math>', { tex2mml: () => { throw new Error('boom'); } })), null);
+  assert.equal(shareMath.mathFromLatex('  ', false, mathDeps('<math><mi>x</mi></math>')), null);
+});
+
+test('share math: an unknown element is unwrapped (its text kept), text stays text', () => {
+  const math = shareMath.mathFromLatex('x', false, mathDeps('<math><mrow><foo><mi>a&lt;b</mi></foo></mrow></math>'));
+  assert.equal(outer(math), '<math><mrow><mi>a&lt;b</mi></mrow></math>');
+});
+
+test('viewer math: the viewer whitelist is the same lists as share-math, and it cleans a hand-edited file', () => {
+  assert.deepEqual(plain(viewerMath.VIEWER_MATHML_ELEMENTS), plain(shareMath.MATHML_ELEMENTS));
+  assert.deepEqual(plain(viewerMath.VIEWER_MATHML_ATTRIBUTES), plain(shareMath.MATHML_ATTRIBUTES));
+  const root = supportHtml.parse('<p>a <math display="block" onload="x()"><msup class="c"><mi>x</mi><mn>2</mn></msup><maction><mi>H</mi></maction><mfrac><mn>1</mn><mn>2</mn></mfrac><annotation-xml><mi>A</mi></annotation-xml></math></p>');
+  viewerMath.cleanViewerMath(root);
+  assert.equal(supportHtml.serialize(root), '<p>a <math display="block"><msup><mi>x</mi><mn>2</mn></msup><mfrac><mn>1</mn><mn>2</mn></mfrac></math></p>');
+});
+
+test('share math: MathML carries no link, so the local-reference count and the leak scan see nothing in it', () => {
+  const math = shareMath.mathFromLatex('x', false, mathDeps(HOSTILE_MML));
+  const html = outer(math);
+  assert.ok(!/href|src=|http|file:|app:/i.test(html), html);
+});
+
+// ---- R2: commented embeds stay hidden, markdown file embeds become cards ----
+const readsOf = () => { const reads = []; return { reads, ctx: extra => ({ titleOf: () => undefined, assets: clean.createAssetRegistry(), embedOf: t => { reads.push(t); return 'body'; }, attachmentOf: ref => reads.push(`att:${ref}`) && 'file-1', ...extra }) }; };
+
+test('sharing R2: an embed inside %% or <!-- --> is left untouched: no expansion, no read, no asset or attachment', () => {
+  const { reads, ctx } = readsOf();
+  for (const md of ['%% ![[Draft]] %%', 'see <!-- ![[D2]] --> now', 'a\n%%\nx ![[Draft]]\n![[pic.png]] ![[f.pdf]] ![](a.png)\n%%\nb', '<!--\n![[D2]]\n-->']) {
+    const out = clean.cleanShareMarkdown(md, ctx());
+    assert.equal(out.markdown, md);
+    assert.ok(!out.markdown.includes('vam-embed') && !out.attachments.length);
+  }
+  assert.deepEqual(reads, []);
+  const open = clean.cleanShareMarkdown('x ![[Draft]]', ctx()).markdown;
+  assert.ok(open.includes('[!vam-embed]'), 'outside a comment it still expands');
+  assert.equal(clean.cleanShareMarkdown('`%%` ![[Draft]] `%%`', ctx()).markdown.includes('[!vam-embed]'), true, '%% in code opens no comment');
+});
+
+test('sharing R2: embedded content drops comments (outside code) before it is quoted', () => {
+  assert.equal(embeds.extractEmbedContent('Public %%private remark%% tail', ''), 'Public  tail');
+  assert.equal(embeds.extractEmbedContent('A\n%%\n![[Draft]]\nsecret\n%%\nB', ''), 'A\n\nB');
+  assert.equal(embeds.extractEmbedContent('x <!-- secret --> y', ''), 'x  y');
+  assert.equal(embeds.extractEmbedContent('`%% keep %%` and ```a %% b```', ''), '`%% keep %%` and ```a %% b```');
+  assert.equal(embeds.extractEmbedContent('```\n%% keep %%\n```', ''), '```\n%% keep %%\n```');
+});
+
+test('sharing R2: ![](doc.pdf) is an attachment card, not an image asset', () => {
+  const out = clean.cleanShareMarkdown('![](Docs/doc.pdf) ![x](p.png)', attachCtx());
+  assert.ok(out.markdown.includes('file-1') && !out.markdown.includes('vam-asset:image-1](') , out.markdown);
+  assert.ok(!/!\[\]\(vam-asset:/.test(out.markdown) && /\(vam-asset:image-1\)/.test(out.markdown), out.markdown);
+  assert.equal(clean.cleanShareMarkdown('![](doc.pdf)', { titleOf: () => undefined, assets: clean.createAssetRegistry() }).markdown, 'doc.pdf');
+});
+
+test('sharing R3: one target rule for both embed syntaxes; a note is never an attachment', () => {
+  const sharing = load('experiences/sharing/share-clean.ts');
+  assert.equal(sharing.classifyShareTarget('Other.md'), 'note');
+  assert.equal(sharing.classifyShareTarget('Other'), 'note');
+  assert.equal(sharing.classifyShareTarget('Docs/x.MD'), 'note');
+  assert.equal(sharing.classifyShareTarget('a.png'), 'image');
+  assert.equal(sharing.classifyShareTarget('a.pdf?x=1'), 'attachment');
+  const calls = [];
+  const ctx = { titleOf: () => undefined, assets: sharing.createAssetRegistry(), attachmentOf: ref => { calls.push(ref); return 'file-1'; } };
+  for (const md of ['![](Other.md)', '![x](Notes/Other.md "t")', '![[Other.md]]', '![](<my note.md> "t")']) {
+    const out = sharing.cleanShareMarkdown(md, ctx);
+    assert.equal(out.markdown.includes('vam-asset:'), false, md);
+    assert.equal(out.attachments.length, 0, md);
+  }
+  assert.deepEqual(calls, [], 'no note reaches attachmentOf');
+  const pdf = sharing.cleanShareMarkdown('![](<my doc.pdf> "t")', ctx);
+  assert.equal(pdf.markdown.includes('vam-asset:'), false, 'angle brackets and a title still give an attachment');
+  assert.deepEqual(calls, ['my doc.pdf']);
+});
+
+test('sharing acceptance fix: long extensions such as .canvas are attachments, not notes', () => {
+  const sharing = load('experiences/sharing/share-clean.ts');
+  assert.equal(sharing.classifyShareTarget('board.canvas'), 'attachment');
+  assert.equal(sharing.classifyShareTarget('deck.keynote'), 'attachment');
+  assert.equal(sharing.classifyShareTarget('Q3.Planning'), 'note', 'a long word after a dot is a note title');
+  assert.equal(sharing.classifyShareTarget('Notes.Conclusion'), 'note');
+  const embeds = load('experiences/sharing/share-embeds.ts');
+  const anchored = embeds.anchorEmbeddedFiles('![](<my doc.pdf> "t") ![[board.canvas]]', ref => `Here/${ref}`);
+  assert.ok(anchored.includes('![[Here/my doc.pdf]]'), anchored);
+  assert.ok(anchored.includes('![[Here/board.canvas]]'), anchored);
 });

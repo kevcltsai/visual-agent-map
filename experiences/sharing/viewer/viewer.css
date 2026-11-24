@@ -27,6 +27,7 @@
   --color-green: #08b94e;
   --color-blue: #086ddd;
   --color-purple: #7852ee;
+  --color-cyan: #00bfbc;
   --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);
   --radius-s: 4px;
@@ -64,6 +65,7 @@
     --color-green: #44cf6e;
     --color-blue: #027aff;
     --color-purple: #a882ff;
+    --color-cyan: #53dfdd;
     --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
     --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);
   }
@@ -177,8 +179,26 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-sample-detail .callout-icon { display: inline-flex; flex: none; }
 .vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }
 .vam-sample-detail .callout-content p:first-child { margin-top: 4px; }
+.vam-sample-detail .callout[data-callout="vam-embed"] { padding: 6px 10px; border-radius: 0 var(--radius-m) var(--radius-m) 0; background: var(--background-secondary); border-left: 3px solid var(--interactive-accent); }
+.vam-sample-detail .callout[data-callout="vam-embed"] .callout-title { font-weight: 400; font-size: 0.85em; color: var(--text-muted); }
+.vam-sample-detail .callout[data-callout="vam-embed"] .callout-icon { display: none; }
 .vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-sample-detail .vam-attachment { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); max-width: 100%; }
+.vam-sample-detail .vam-attachment-type { font-size: 0.7em; font-weight: 600; padding: 1px 5px; border-radius: 3px; background: var(--background-modifier-border); color: var(--text-muted); }
+.vam-sample-detail .vam-attachment-name { overflow-wrap: anywhere; }
+.vam-sample-detail .vam-attachment-missing { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.vam-sample-detail .vam-math-note { color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.vam-sample-detail math[display="block"] { display: block; margin: 0.6em 0; text-align: center; overflow-x: auto; }
+.vam-sample-detail .vam-video-card { margin: 8px 0; }
+.vam-sample-detail .vam-video-stage { border-radius: 8px; background: #111; color: #eee; aspect-ratio: 16 / 9; max-width: 100%; display: grid; place-items: center; text-align: center; overflow: hidden; }
+.vam-sample-detail .vam-video-play { display: grid; gap: 6px; justify-items: center; background: none; border: 0; color: inherit; font: inherit; font-size: 0.85em; cursor: pointer; padding: 10px; width: 100%; height: 100%; align-content: center; }
+.vam-sample-detail .vam-video-icon { width: 46px; height: 32px; border-radius: 8px; background: #e33; display: grid; place-items: center; }
+.vam-sample-detail .vam-video-icon::after { content: ""; border-left: 13px solid #fff; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 3px; }
+.vam-sample-detail .vam-video-frame { width: 100%; height: 100%; border: 0; }
+.vam-sample-detail .vam-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }
+.vam-sample-detail .vam-video-card > a { display: inline-block; margin-top: 2px; font-size: var(--font-ui-smaller); }
+.vam-sample-detail .vam-media-text { color: var(--text-muted); }
 .vam-sample-detail .internal-link { color: inherit; text-decoration: none; }
 /* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */
 .vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }
@@ -211,6 +231,50 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-anchor-line { fill: none; stroke: var(--interactive-accent); stroke-width: 2.25px; pointer-events: none; }
 /* No picture in the file (images off, structure only, unreadable): a grey placeholder, not the accent frame the map draws around a picture it has. */
 .vam-view .vam-canvas-image.is-annotated.is-missing { background: var(--background-secondary); border-color: var(--background-modifier-border-hover); box-shadow: none; }
+/* Topic types and shapes (share-complete P2): the map's rules from styles.css (V1.6), keyed on the viewer's own whitelisted attributes data-share-kind and data-share-shape. */
+.vam-node[data-share-kind="atomic"] { --vam-kind-hue: var(--color-cyan); }
+.vam-node[data-share-kind="hypothesis"] { --vam-kind-hue: var(--color-purple); }
+.vam-node[data-share-kind="evidence"] { --vam-kind-hue: var(--color-green); }
+.vam-node[data-share-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
+.vam-node[data-share-kind="action"] { --vam-kind-hue: var(--color-orange); }
+.vam-node[data-share-kind] { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--text-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
+.vam-node[data-share-kind][data-relevance="side"] { --vam-kind-dash: 6 4; }
+.vam-node[data-share-kind].is-selected { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
+.vam-node[data-share-kind="action"] { border-radius: 3px; border-color: var(--vam-kind-line); background: var(--vam-kind-fill); }
+.vam-node[data-share-shape="rect"]:not([data-share-kind]) { border-radius: 3px; }
+.vam-node[data-share-shape="ellipse"], .vam-node[data-share-shape="diamond"], .vam-node[data-share-shape="folded"], .vam-node[data-share-shape="hexagon"] { isolation: isolate; padding: 28px 40px; border-color: transparent; background: transparent; box-shadow: none; }
+.vam-node[data-share-shape="ellipse"].is-selected, .vam-node[data-share-shape="diamond"].is-selected, .vam-node[data-share-shape="folded"].is-selected, .vam-node[data-share-shape="hexagon"].is-selected { outline: 0; border-color: transparent; }
+.vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
+.vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill, var(--vam-card-bg)); stroke: var(--vam-kind-line, var(--text-muted)); stroke-width: var(--vam-kind-width, 2px); stroke-dasharray: var(--vam-kind-dash, none); stroke-linejoin: round; }
+.vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line, var(--text-muted)); stroke-width: var(--vam-kind-width, 2px); stroke-linejoin: round; }
+.vam-node[data-share-kind="atomic"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.vam-node[data-share-kind="hypothesis"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.vam-node[data-share-kind="hypothesis"] .vam-card-summary, .vam-node[data-share-kind="atomic"] .vam-card-summary { -webkit-line-clamp: 2; }
+.vam-card-kind { display: block; font-size: var(--font-ui-smaller); line-height: 1.3; color: var(--text-muted); }
+/* Frames (map boundaries): a dashed outline round their members, behind the cards. */
+.vam-share-frames { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.vam-share-frame { position: absolute; box-sizing: border-box; border: 2px dashed var(--interactive-accent); border-radius: 12px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
+.vam-share-frame-label { position: absolute; left: 10px; top: -12px; max-width: calc(100% - 20px); padding: 1px 10px; border-radius: 999px; border: 1px solid var(--interactive-accent); background: var(--background-primary); color: var(--text-accent); font-size: var(--font-ui-smaller); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Semantic lines and the relations list (share-complete P3): the map's rules from styles.css, same names. */
+.vam-relation { fill: none; stroke: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke-width: var(--vam-relation-width, 1.75px); pointer-events: none; }
+.vam-relation-supports { stroke-dasharray: none; }
+.vam-relation-contradicts { stroke-dasharray: 8 4; }
+.vam-relation-verifies { stroke-dasharray: 1 5; stroke-linecap: round; }
+.vam-relation-derives_from { --vam-relation-width: 4.5px; }
+.vam-relation-related { --vam-relation-width: 1.25px; }
+.vam-relation-prerequisite { stroke-dasharray: 10 4 2 4; }
+.vam-relation-gap { fill: none; stroke: var(--background-primary); stroke-width: 1.5px; pointer-events: none; }
+.vam-relation-arrow { fill: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke: none; }
+.vam-relation-arrow-bar { fill: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke: none; }
+.vam-relation-label { fill: var(--text-muted); font-weight: 500; stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+[data-relation-labels="hidden"] .vam-relation-label { display: none; }
+.vam-relations { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
+.vam-relations strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }
+.vam-relation-item { display: flex; flex-direction: column; gap: 2px; }
+.vam-relation-item button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }
+.vam-relation-item > span { overflow-wrap: anywhere; font-size: var(--font-ui-small); }
+.vam-relation-description { color: var(--text-muted); padding: 0 8px; }
+a.vam-node-link { cursor: pointer; }
 
 /* Book figures (```vam-figure) in a share: the same rules as styles.css, with fallbacks so the viewer reads well in light and dark. */
 .vam-figure { max-width: 480px; margin: 0.5em auto; }

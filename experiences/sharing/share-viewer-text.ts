@@ -37,6 +37,8 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     noContent: text("share.viewer_no_content"),
     imageOmitted: text("share.viewer_image_omitted"),
     imageSource: text("share.viewer_image_source_0"),
+    attachmentDownload: text("share.viewer_attachment_download_0"),
+    attachmentNotIncluded: text("share.viewer_attachment_not_included"),
     resizePanel: text("share.viewer_resize_panel"),
     outline: text("share.viewer_outline"),
     untitledMap: text("share.viewer_untitled"),
@@ -83,7 +85,29 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
       green: text("share.viewer_color_green"),
       blue: text("share.viewer_color_blue"),
       purple: text("share.viewer_color_purple")
-    }
+    },
+    kindLabel: text("share.viewer_kind_0"),
+    kindNames: {
+      action: text("ui.topic_kind_action"),
+      atomic: text("ui.topic_kind_atomic"),
+      hypothesis: text("ui.topic_kind_hypothesis"),
+      evidence: text("ui.topic_kind_evidence"),
+      conclusion: text("ui.topic_kind_conclusion")
+    },
+    relationNames: {
+      supports: text("ui.relation_name_supports"),
+      contradicts: text("ui.relation_name_contradicts"),
+      verifies: text("ui.relation_name_verifies"),
+      derives_from: text("ui.relation_name_derives_from"),
+      related: text("ui.relation_name_related"),
+      prerequisite: text("ui.relation_name_prerequisite")
+    },
+    relationsHeading: text("share.viewer_relations"),
+    frameLabel: text("share.viewer_frame"),
+    frameNamed: text("share.viewer_frame_named_0"),
+    videoPlay: text("share.viewer_video_play"),
+    videoNote: text("share.viewer_video_note"),
+    videoOpen: text("share.viewer_video_open")
   };
 }
 

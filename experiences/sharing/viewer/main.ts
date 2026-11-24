@@ -18,11 +18,14 @@ import {
 import { arrangeMapWithRings, ringImagesInTheWay, ringOutwardDirections } from "../../../map-layout-text";
 import { isBranchDirection } from "../../../layouts/compose";
 import { withTextParents } from "../../../map-graph";
-import type { AnnotatedImageItem, CanvasItem, TextItem } from "../../visual-map/canvas-items";
+import { boundaryBounds, type AnnotatedImageItem, type CanvasItem, type TextItem } from "../../visual-map/canvas-items";
 import { ringMembers, ringSide } from "../../visual-map/image-ring";
 import {
   pointToBoxPathData,
   pointToBoxStraightPathData,
+  relationAxisFor,
+  relationLabelPoint,
+  relationPathData,
   treeEdgePathData,
   fishboneSpinePathData,
   type RelationBox
@@ -40,6 +43,15 @@ import { markerSymbol, readTopicMarkers, type TopicMarker } from "../../../topic
 import { pickShareLanguage, shareLanguageKey } from "./language";
 import { buildCover, placeCardCover, removeCardCover } from "./cover-dom";
 import { readCover, readImages, type ViewerCover, type ViewerImage } from "./image-data";
+import { arrowPolygons, readFrames, readRelations, type ViewerRelationKind } from "./relation-data";
+import {
+  fitShapePadding,
+  readViewerKind,
+  readViewerShape,
+  renderShapeBackground,
+  TOPIC_KIND_SHAPES,
+  type ViewerShape
+} from "./topic-shapes";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
 export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=share";
@@ -118,6 +130,18 @@ function uiFrom(raw: unknown): ShareViewerUi {
       const value = (colors as Record<string, unknown>)[id];
       if (typeof value === "string" && value.trim()) ui.colorNames[id] = value;
     }
+  const nameMap = (field: string, fallback: Record<string, string>): Record<string, string> => {
+    const out = { ...fallback };
+    const given = raw && typeof raw === "object" ? (raw as Record<string, unknown>)[field] : undefined;
+    if (given && typeof given === "object")
+      for (const id of Object.keys(fallback)) {
+        const value = (given as Record<string, unknown>)[id];
+        if (typeof value === "string" && value.trim()) out[id] = value;
+      }
+    return out;
+  };
+  ui.kindNames = nameMap("kindNames", SHARE_VIEWER_UI_DEFAULT.kindNames);
+  ui.relationNames = nameMap("relationNames", SHARE_VIEWER_UI_DEFAULT.relationNames);
   return ui;
 }
 
@@ -302,7 +326,17 @@ export function startViewer(doc: Document): void {
       summaries.push({ id: item.id, members, side, text: item.text });
     }
   }
+  const frames = readFrames(
+    data.boundaries,
+    new Set([...byId.keys(), ...images.map(image => image.id), ...texts.map(text => text.id)])
+  );
+  const relations = readRelations(data.relations, new Set(byId.keys()));
+  const hasNamedLines = relations.length > 0 || images.some(image => image.links.some(link => link.kind));
+  /** The frames' rectangles as last drawn (stage coordinates); "show all" counts them. */
+  let frameRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+  let framesLayer: HTMLElement | null = null;
   const textEls = new Map<string, HTMLElement>();
+  const cardShapes = new Map<string, ViewerShape>();
   const kidsOf = new Map<string, MapNode[]>();
   for (const node of nodes) if (node.parentId) kidsOf.set(node.parentId, [...(kidsOf.get(node.parentId) ?? []), node]);
 
@@ -513,6 +547,10 @@ export function startViewer(doc: Document): void {
   const edges = doc.createElementNS(SVG_NS, "svg");
   edges.setAttribute("class", "vam-edges");
   edges.setAttribute("aria-hidden", "true");
+  if (frames.length) {
+    framesLayer = make("div", "vam-share-frames");
+    stage.append(framesLayer);
+  }
   stage.append(edges);
   const summaryLayer = make("div", "vam-summaries");
   summaryLayer.setAttribute("role", "group");
@@ -562,6 +600,7 @@ export function startViewer(doc: Document): void {
   let suppressClick = false;
   let panelWidth = Number(storageGet(PANEL_WIDTH_KEY)) || PANEL_DEFAULT;
   const cards = new Map<string, HTMLElement>();
+  const FRAME_PADDING = 16;
   /** Set once the reader has panned, zoomed or dragged: a late change of size (a font, a picture) then no longer moves the view. */
   let viewTouched = false;
   const imageEls = new Map<string, HTMLElement>();
@@ -593,6 +632,9 @@ export function startViewer(doc: Document): void {
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
     const percent = `${Math.round(view.zoom * 100)}%`;
     zoomLabel.textContent = percent;
+    // Only a file that has named lines carries the attribute: a plain file keeps its page unchanged.
+    if (hasNamedLines && view.zoom < 0.6) stage.setAttribute("data-relation-labels", "hidden");
+    else stage.removeAttribute("data-relation-labels");
     zoomLabel.setAttribute("aria-label", fill(ui.zoomReset, percent));
   }
   function zoomBy(factor: number, point?: { x: number; y: number }): void {
@@ -628,6 +670,12 @@ export function startViewer(doc: Document): void {
       minY = Math.min(minY, el.offsetTop - (bar ? bar.offsetHeight + 8 : 0));
       maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
       maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+    }
+    for (const rect of frameRects) {
+      minX = Math.min(minX, rect.x);
+      minY = Math.min(minY, rect.y);
+      maxX = Math.max(maxX, rect.x + rect.w);
+      maxY = Math.max(maxY, rect.y + rect.h);
     }
     // Free text blocks count too (canvas-text-node decision #8); attached ones follow their topic.
     for (const text of texts) {
@@ -725,9 +773,36 @@ export function startViewer(doc: Document): void {
     (byId.has(id)
       ? medianHeight([...cards.entries()].map(([key, card]) => ringHeights.get(key) || card.offsetHeight))
       : undefined);
+  /** Draws each frame round the members that are drawn (cards, pictures, text blocks) with `boundaryBounds`, 16px out; a frame with no drawn member is skipped. */
+  function drawFrames(): void {
+    frameRects = [];
+    const layer = framesLayer;
+    if (!layer) return;
+    layer.replaceChildren();
+    const rectOf = (id: string): { x: number; y: number; w: number; h: number } | null => {
+      const el = cards.get(id) ?? imageEls.get(id) ?? textEls.get(id);
+      return el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : null;
+    };
+    for (const frame of frames) {
+      const rect = boundaryBounds(frame.members, rectOf, FRAME_PADDING);
+      if (!rect) continue;
+      frameRects.push(rect);
+      const el = make("div", "vam-share-frame");
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(frame.id)) el.dataset.frameId = frame.id;
+      el.setAttribute("role", "group");
+      el.setAttribute("aria-label", frame.label ? fill(ui.frameNamed, frame.label) : ui.frameLabel);
+      el.style.left = `${Math.round(rect.x)}px`;
+      el.style.top = `${Math.round(rect.y)}px`;
+      el.style.width = `${Math.round(rect.w)}px`;
+      el.style.height = `${Math.round(rect.h)}px`;
+      if (frame.label) el.append(make("span", "vam-share-frame-label", frame.label));
+      layer.append(el);
+    }
+  }
   /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
     edges.replaceChildren();
+    drawFrames();
     const mapDirection = mapLayout.direction;
     const rings = images.length ? ringOutwardDirections(nodes, imageItems(), cardHeightOf) : new Map<string, string>();
     const drawnTexts = new Map<string, string>();
@@ -808,8 +883,55 @@ export function startViewer(doc: Document): void {
         edges.append(path);
       }
     }
+    drawRelations();
     drawAnchorLines();
     drawSummaries();
+  }
+  /** The middle of a path the geometry modules wrote ("M x y C x y, x y, x y"): where a relation's name sits. */
+  function labelAt(d: string): { x: number; y: number } | undefined {
+    const n = (d.match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi) ?? []).map(Number);
+    if (n.length !== 8 || !n.every(Number.isFinite)) return undefined;
+    return { x: (n[0] + 3 * n[2] + 3 * n[4] + n[6]) / 8, y: (n[1] + 3 * n[3] + 3 * n[5] + n[7]) / 8 };
+  }
+  /** One semantic line: the stroke in the kind's pattern, an arrowhead unless "related", a canvas-coloured gap for "derives from", and its name. */
+  function drawRelationShape(d: string, kind: ViewerRelationKind, at: { x: number; y: number } | undefined): void {
+    const path = doc.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", `vam-relation vam-relation-${kind}`);
+    edges.append(path);
+    if (kind === "derives_from") {
+      const gap = doc.createElementNS(SVG_NS, "path");
+      gap.setAttribute("d", d);
+      gap.setAttribute("class", "vam-relation-gap");
+      edges.append(gap);
+    }
+    if (kind !== "related") {
+      arrowPolygons(d, kind === "contradicts").forEach((points, index) => {
+        const polygon = doc.createElementNS(SVG_NS, "polygon");
+        polygon.setAttribute("points", points);
+        polygon.setAttribute("class", index === 0 ? "vam-relation-arrow" : "vam-relation-arrow-bar");
+        edges.append(polygon);
+      });
+    }
+    if (!at) return;
+    const label = doc.createElementNS(SVG_NS, "text");
+    label.setAttribute("class", "vam-relation-label");
+    label.setAttribute("x", String(at.x));
+    label.setAttribute("y", String(at.y));
+    label.textContent = ui.relationNames[kind];
+    edges.append(label);
+  }
+  /** The lines between topic cards that the map owner drew; an end that is not on screen (folded away) gets no line. */
+  function drawRelations(): void {
+    const axis = relationAxisFor(mapLayout.direction);
+    for (const relation of relations) {
+      const from = cards.get(relation.from);
+      const to = cards.get(relation.to);
+      if (!from || !to) continue;
+      const a = boxOf(from);
+      const b = boxOf(to);
+      drawRelationShape(relationPathData(a, b, axis), relation.kind, relationLabelPoint(a, b, axis));
+    }
   }
   /**
    * The line from each linked anchor to its topic card, as the map draws it (view.ts anchorPathData): straight to the facing edge
@@ -837,11 +959,13 @@ export function startViewer(doc: Document): void {
                 { x: box.x, y: box.y, w: box.width, h: box.height }
               )
             : null;
+        const d = side ? pointToBoxStraightPathData(point, box, side, true) : pointToBoxPathData(point, box, true);
+        if (link.kind) {
+          drawRelationShape(d, link.kind, link.ring && link.kind === "related" ? undefined : labelAt(d));
+          continue;
+        }
         const path = doc.createElementNS(SVG_NS, "path");
-        path.setAttribute(
-          "d",
-          side ? pointToBoxStraightPathData(point, box, side, true) : pointToBoxPathData(point, box, true)
-        );
+        path.setAttribute("d", d);
         path.setAttribute("class", "vam-anchor-line");
         edges.append(path);
       }
@@ -934,6 +1058,7 @@ export function startViewer(doc: Document): void {
   function renderCards(): void {
     for (const card of cards.values()) card.remove();
     cards.clear();
+    cardShapes.clear();
     const hidden = hiddenIds();
     for (const node of nodes) {
       if (hidden.has(node.id)) continue;
@@ -957,11 +1082,20 @@ export function startViewer(doc: Document): void {
       if (styles.includes("border-thick")) card.dataset.topicStyleBorder = "thick";
       if (styles.includes("text-small")) card.dataset.topicStyleSize = "small";
       else if (styles.includes("text-large")) card.dataset.topicStyleSize = "large";
+      // Only a whitelisted word becomes an attribute or a drawn shape; a kind alone takes the map's shape for it.
+      const kind = readViewerKind(item.kind);
+      const shape = readViewerShape(item.shape) ?? (kind ? readViewerShape(TOPIC_KIND_SHAPES[kind]) : undefined);
+      if (kind) card.dataset.shareKind = kind;
+      if (shape) {
+        card.dataset.shareShape = shape;
+        if (renderShapeBackground(doc, card, shape)) cardShapes.set(node.id, shape);
+      }
       const markedName = nameWithMarkers(String(shown.title ?? ""), markers);
-      card.setAttribute(
-        "aria-label",
-        color ? `${markedName}${cjk() ? "，" : ", "}${fill(ui.colorLabel, ui.colorNames[color])}` : markedName
-      );
+      const separator = cjk() ? "，" : ", ";
+      const labelParts = [markedName];
+      if (color) labelParts.push(fill(ui.colorLabel, ui.colorNames[color]));
+      if (kind) labelParts.push(fill(ui.kindLabel, ui.kindNames[kind]));
+      card.setAttribute("aria-label", labelParts.join(separator));
       if (count) card.setAttribute("aria-expanded", String(!node.collapsed));
       const header = make("div", "vam-node-header");
       card.append(header);
@@ -981,6 +1115,11 @@ export function startViewer(doc: Document): void {
         toggle.title = toggleText;
       }
       button(cardTools, ui.detailsButton, undefined, () => select(node.id));
+      if (kind) {
+        const kindEl = make("span", "vam-card-kind", ui.kindNames[kind]);
+        kindEl.setAttribute("aria-hidden", "true");
+        card.append(kindEl);
+      }
       const title = make("h3", "vam-card-title", String(shown.title ?? ""));
       card.append(title);
       let summaryEl: HTMLElement | null = null;
@@ -1077,6 +1216,10 @@ export function startViewer(doc: Document): void {
   }
   /** Marks the fixed-height cards whose content does not fit, so the fade and the ellipsis show (read after layout, not at render). */
   function markClipped(): void {
+    for (const [id, shape] of cardShapes) {
+      const card = cards.get(id);
+      if (card) fitShapePadding(card, shape);
+    }
     for (const [id, card] of cards) {
       if (!byId.get(id)?.height) continue;
       card.classList.remove("is-clipped");
@@ -1090,16 +1233,18 @@ export function startViewer(doc: Document): void {
     if (!imageLayer) return;
     imageLayer.setAttribute("role", "group");
     for (const image of images) {
-      const el = make("div", "vam-canvas-image is-annotated");
+      const el = make("div", image.free ? "vam-canvas-image" : "vam-canvas-image is-annotated");
       el.dataset.itemId = image.id;
       el.setAttribute("role", "group");
-      const bar = make("div", "vam-annotated-bar");
-      const pill = make("span", "vam-annotated-pill");
-      const pillIcon = make("span", "vam-annotated-pill-icon");
-      pillIcon.append(icon("pin"));
-      pill.append(pillIcon, make("span", "vam-annotated-pill-text"));
-      bar.append(pill, make("span", "vam-annotated-note"), make("span", "vam-annotated-count"));
-      el.append(bar);
+      if (!image.free) {
+        const bar = make("div", "vam-annotated-bar");
+        const pill = make("span", "vam-annotated-pill");
+        const pillIcon = make("span", "vam-annotated-pill-icon");
+        pillIcon.append(icon("pin"));
+        pill.append(pillIcon, make("span", "vam-annotated-pill-text"));
+        bar.append(pill, make("span", "vam-annotated-note"), make("span", "vam-annotated-count"));
+        el.append(bar);
+      }
       const placeholder = (): void => {
         el.querySelector("img")?.remove();
         el.classList.add("is-missing");
@@ -1147,6 +1292,13 @@ export function startViewer(doc: Document): void {
     for (const image of images) {
       const el = imageEls.get(image.id);
       if (!el) continue;
+      if (image.free) {
+        // A free picture has no bar or note; only a missing one has text (the placeholder).
+        const name = el.querySelector(".vam-canvas-image-name");
+        if (name) name.textContent = ui.imageOmitted;
+        if (el.classList.contains("is-missing")) el.setAttribute("aria-label", ui.imageOmitted);
+        continue;
+      }
       el.setAttribute(
         "aria-label",
         image.note ? `${ui.annotatedImage}${cjk() ? "：" : ": "}${image.note}` : ui.annotatedImage
@@ -1405,6 +1557,57 @@ export function startViewer(doc: Document): void {
     applyPanelWidth();
     refreshOutline();
   }
+  /** The relations that touch a card, in file order: topic relations first, then those through a picture's anchors (the picture's name is not shown, the other end is the card). */
+  function relationRows(id: string): Array<{ text: string; description: string; otherId: string | null }> {
+    const rows: Array<{ text: string; description: string; otherId: string | null }> = [];
+    const titleOf = (key: string): string => (info.has(key) ? String(textOf(info.get(key)!).title ?? "") : "");
+    for (const relation of relations) {
+      if (relation.from !== id && relation.to !== id) continue;
+      const out = relation.from === id;
+      const otherId = out ? relation.to : relation.from;
+      const name = ui.relationNames[relation.kind];
+      rows.push({
+        text: out ? `${name} \u2192 ${titleOf(otherId)}` : `${titleOf(otherId)} \u2192 ${name}`,
+        description: relation.description,
+        otherId
+      });
+    }
+    // A picture's anchor tied to this card: the anchor's note stands for the other end (nothing to jump to).
+    for (const image of images)
+      for (const link of image.links) {
+        if (link.topic !== id || !link.kind) continue;
+        const anchor = image.anchors.find(each => each.id === link.anchor);
+        rows.push({
+          text: anchor?.note ? `${anchor.note} \u2192 ${ui.relationNames[link.kind]}` : ui.relationNames[link.kind],
+          description: link.description,
+          otherId: null
+        });
+      }
+    return rows;
+  }
+  // A link from one note to another card of this map (share-node-links.ts): never follows the address; goes to the card only when the file has it.
+  inspector.addEventListener("click", event => {
+    const link = (event.target as Element | null)?.closest?.("a.vam-node-link");
+    if (!link) return;
+    event.preventDefault();
+    const href = link.getAttribute("href") ?? "";
+    if (!href.startsWith("#vam-node-")) return;
+    const targetId = href.slice("#vam-node-".length);
+    if (!byId.has(targetId) || !info.has(targetId)) return;
+    if (!cards.has(targetId)) {
+      for (
+        let parent = byId.get(targetId)?.parentId, guard = 0;
+        parent && guard++ <= nodes.length;
+        parent = byId.get(parent)?.parentId ?? null
+      ) {
+        const ancestor = byId.get(parent);
+        if (ancestor?.collapsed) ancestor.collapsed = false;
+      }
+      relayout(targetId);
+    }
+    select(targetId);
+    center(targetId);
+  });
   function select(id: string): void {
     const node = byId.get(id);
     const source = info.get(id);
@@ -1439,6 +1642,35 @@ export function startViewer(doc: Document): void {
       else fillDetail(doc, detail, item.detailHtml, assets, ui);
     } else detail.append(make("p", "vam-inspector-empty", ui.noContent));
     inspector.append(detail);
+    const related = relationRows(id);
+    if (related.length) {
+      const list = make("div", "vam-relations");
+      list.append(make("strong", undefined, ui.relationsHeading));
+      for (const row of related) {
+        const item = make("div", "vam-relation-item");
+        const otherId = row.otherId;
+        if (otherId)
+          button(item, row.text, undefined, () => {
+            if (!cards.has(otherId)) {
+              for (
+                let parent = byId.get(otherId)?.parentId, guard = 0;
+                parent && guard++ <= nodes.length;
+                parent = byId.get(parent)?.parentId ?? null
+              ) {
+                const ancestor = byId.get(parent);
+                if (ancestor?.collapsed) ancestor.collapsed = false;
+              }
+              relayout(otherId);
+            }
+            select(otherId);
+            center(otherId);
+          });
+        else item.append(make("span", undefined, row.text));
+        if (row.description) item.append(make("span", "vam-relation-description", row.description));
+        list.append(item);
+      }
+      inspector.append(list);
+    }
     const kids = kidsOf.get(id) ?? [];
     if (kids.length) {
       const list = make("div", "vam-subtopics");

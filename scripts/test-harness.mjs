@@ -28,6 +28,8 @@ export function ownerVaultPath(checkout = root, env = process.env) {
 }
 export const canonicalVault = ownerVaultPath();
 const assets = ["main.js", "manifest.json", "styles.css"];
+const viewerArtifact = "experiences/sharing/viewer-bundle.generated.ts";
+const buildHashes = directory => ({ ...hashes(directory), viewer: hash(readFileSync(join(directory, viewerArtifact))) });
 const marker = ".vam-test-environment.json";
 const obsidianApp = "/Applications/Obsidian.app";
 const hash = data => createHash("sha256").update(data).digest("hex");
@@ -143,6 +145,21 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   if (manifest.id !== "visual-agent-map" || installedManifest.id !== manifest.id || installedManifest.version !== record.version) throw new Error("Installed plugin identity/version does not match the owned test-vault record.");
   if (record.profile !== "onboarding" && !isOwnerVault(vault, owner)) ensureSourceSelectionFixture(vault, record.workspaceRoot, { preserveExisting: true });
   if (!isOwnerVault(vault, owner)) ensureNativeMenusOff(vault);
+  // Identical verified files need no copy. Still validate settings/fixtures and update
+  // the source record atomically when preview/verification or runtime identity changed.
+  if (JSON.stringify(hashes(artifact)) === JSON.stringify(record.hashes)) {
+    let verified;
+    try { verified = verifyTestVault(vault, artifact, owner); } catch { /* repair via normal staging */ }
+    if (verified) {
+      if (JSON.stringify(record.source) === JSON.stringify(source)) return record;
+      const staging = mkdtempSync(join(plugin, ".vam-record-"));
+      try {
+        writeFileSync(join(staging, marker), JSON.stringify({ ...record, source }, null, 2));
+        renameSync(join(staging, marker), recordPath);
+        return { ...record, source };
+      } finally { rmSync(staging, { recursive: true, force: true }); }
+    }
+  }
   const staging = mkdtempSync(join(plugin, ".vam-update-")), replaced = [];
   try {
     for (const name of assets) copyFileSync(join(artifact, name), join(staging, name));
@@ -254,28 +271,36 @@ export function sessionVault(name) {
 // candidate can bypass build; preview is explicitly unverified and never a runtime PASS.
 export function prepareSessionCandidate({
   mode = "affected", execute = run, lookup = greenInstallRun, fingerprint = sourceFingerprint,
-  artifactHashes = () => ({ ...hashes(root), viewer: hash(readFileSync(join(root, "experiences/sharing/viewer-bundle.generated.ts"))) }),
+  artifactHashes = () => buildHashes(root),
   env = process.env
 } = {}) {
   if (!["affected", "full", "preview"].includes(mode)) throw new Error("Unknown session verification mode.");
   const before = fingerprint();
-  const green = mode === "affected" && env.CI !== "true" && env.VAM_CLEAN_BUILD !== "1" ? lookup() : null;
-  if (!green) execute("npm", ["run", "build"]);
+  const canReuse = mode === "affected" && env.CI !== "true" && env.VAM_CLEAN_BUILD !== "1";
+  let green = canReuse ? lookup() : null;
+  const buildReused = !!green;
+  if (!green) {
+    execute("npm", ["run", "build"]);
+    if (canReuse) green = lookup();
+  }
+  const testEnv = { ...env };
+  for (const key of ["VAM_AFFECTED_TESTS", "VAM_ISOLATED_SUITES", "VAM_ISOLATED_TEST_LAYER", "VAM_CI_SHARD", "VAM_CI_REPORT_DIR"]) delete testEnv[key];
   const built = artifactHashes();
   let verification;
   if (green) {
     process.stdout.write(`Session vault: reusing committed artifacts from full CI run ${green.id} for ${green.sha}; checking the local vault harness.\n`);
-    execute(process.execPath, ["--test", "tests/test-vault.mjs"]);
-    verification = { kind: "ci-full", ...green, localVaultTest: true, buildReused: true };
+    timedSync("local-vault-test", () => execute(process.execPath, ["--test", "tests/test-vault.mjs"], testEnv));
+    recordDevEvent("ci-reuse-install", 0, "ok", { commit: green.sha, runId: green.id });
+    verification = { kind: "ci-full", ...green, localVaultTest: true, buildReused };
   } else if (mode === "preview") {
     verification = { kind: "preview-unverified" };
     process.stdout.write("PREVIEW ONLY: backend verification NOT RUN; not acceptance evidence.\n");
   } else if (mode === "full") {
-    execute("npm", ["run", "test:unit"]);
-    execute("npm", ["run", "test:integration"]);
+    execute("npm", ["run", "test:unit"], testEnv);
+    execute("npm", ["run", "test:integration"], testEnv);
     verification = { kind: "local-full" };
   } else {
-    execute("npm", ["run", "test:affected"]);
+    execute("npm", ["run", "test:affected"], testEnv);
     verification = { kind: "local-affected" };
   }
   if (fingerprint() !== before) throw new Error("Source changed during session preparation; rerun the harness before E2E.");
@@ -335,18 +360,19 @@ export function greenInstallRun(directory = root, lookup = (dir, sha) => execFil
     const sha = git("rev-parse", "HEAD");
     if (!/^[0-9a-f]{40}$/.test(sha) || sha !== git("rev-parse", "refs/remotes/origin/main")) return null;
     if (git("status", "--porcelain", "--untracked-files=all")) return null;
-    for (const name of assets) {
+    const matches = () => [...assets, viewerArtifact].every(name => {
       const committed = execFileSync("git", ["show", `${sha}:${name}`], { cwd: directory, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
-      if (hash(committed) !== hash(readFileSync(join(directory, name)))) return null;
-    }
+      return hash(committed) === hash(readFileSync(join(directory, name)));
+    });
+    if (!matches()) return null;
     const id = lookup(directory, sha);
-    if (!/^\d+$/.test(id || "") || git("rev-parse", "HEAD") !== sha || git("rev-parse", "refs/remotes/origin/main") !== sha || git("status", "--porcelain", "--untracked-files=all")) return null;
+    if (!/^\d+$/.test(id || "") || git("rev-parse", "HEAD") !== sha || git("rev-parse", "refs/remotes/origin/main") !== sha || git("status", "--porcelain", "--untracked-files=all") || !matches()) return null;
     return { sha, id };
   } catch { return null; }
 }
 
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
+function run(command, args, env = process.env) {
+  const result = spawnSync(command, args, { cwd: root, stdio: "inherit", env });
   if (result.error || result.status !== 0) throw new Error(`Failed: ${command} ${args.join(" ")}`, { cause: result.error });
 }
 
@@ -396,32 +422,16 @@ export function main(args = process.argv.slice(2)) {
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });
     else assertOwnerIdle(canonicalVault);
-    run("npm", ["run", "build"]);
-    const builtHashes = hashes(root);
-    // The build regenerates ignored artifacts; anchor the non-destructive update
-    // check after those expected outputs exist, then protect them through verification.
-    const fingerprint = sourceFingerprint();
-    const green = greenInstallRun();
-    if (green) {
-      process.stdout.write(`Owner vault verification: reusing full CI run ${green.id} for ${green.sha} (clean commit, matching artifacts); checking the local vault harness.\n`);
-      timedSync("local-vault-test", () => run(process.execPath, ["--test", "tests/test-vault.mjs"]));
-      recordDevEvent("ci-reuse-install", 0, "ok", { commit: green.sha, runId: green.id });
-    }
-    else {
-      // Every doubt (missing/stale table, unknown file) is answered with the full suite.
-      run("npm", ["run", "test:affected"]);
-    }
-    assertSourceUnchanged(fingerprint);
-    if (JSON.stringify(hashes(root)) !== JSON.stringify(builtHashes)) throw new Error("Build artifacts changed during tests.");
+    const { fingerprint, verification } = prepareSessionCandidate();
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
-    const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint: sourceFingerprint() };
+    const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint };
     const runtime = installedObsidianRuntime();
-    source.verification = green ? { kind: "ci-full", ...green, localVaultTest: true } : { kind: "local-affected" };
+    source.verification = verification;
     source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
     const record = timedSync("install", () => updateCurrentTestVault({ source, ownerIdleConfirmed }));
     const appProfile = join(canonicalVault, ".vam-app");
-    if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, installedObsidianRuntime());
+    if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, runtime);
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
     if (!instanceRunning(appProfile)) return launchObsidian(appProfile);
     return reloadRunningPlugin(canonicalVault).then(result => {

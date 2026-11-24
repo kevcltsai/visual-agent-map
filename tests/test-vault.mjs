@@ -556,14 +556,16 @@ test('owner install reuses full CI only for the exact clean landed commit with m
   const { folder } = environment(t);
   const { main: checkout } = repoWithWorktree(folder);
   const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  for (const name of ['main.js', 'manifest.json', 'styles.css']) writeFileSync(join(checkout, name), 'committed ' + name);
-  git('add', 'main.js', 'manifest.json', 'styles.css'); git('commit', '-qm', 'artifacts'); git('push', '-q', 'origin', 'main'); git('fetch', '-q', 'origin');
+  const viewer = 'experiences/sharing/viewer-bundle.generated.ts';
+  mkdirSync(join(checkout, 'experiences/sharing'), { recursive: true });
+  for (const name of ['main.js', 'manifest.json', 'styles.css', viewer]) writeFileSync(join(checkout, name), 'committed ' + name);
+  git('add', 'main.js', 'manifest.json', 'styles.css', viewer); git('commit', '-qm', 'artifacts'); git('push', '-q', 'origin', 'main'); git('fetch', '-q', 'origin');
   const sha = git('rev-parse', 'HEAD');
   const lookup = (dir, candidate) => { assert.equal(dir, checkout); assert.equal(candidate, sha); return '12345'; };
   assert.deepEqual(greenInstallRun(checkout, lookup), { sha, id: '12345' });
   assert.equal(greenInstallRun(checkout, () => { throw new Error('no full green CI'); }), null);
   assert.equal(greenInstallRun(checkout, () => 'not a run id'), null);
-  for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', 'new.ts']) {
+  for (const name of ['a.txt', 'main.js', 'manifest.json', 'styles.css', viewer, 'new.ts']) {
     const path = join(checkout, name);
     const original = existsSync(path) ? readFileSync(path) : null;
     writeFileSync(path, 'dirty');
@@ -721,7 +723,7 @@ test('session preparation selects exactly one verification policy, preserves ful
   const green = { sha: 'a'.repeat(40), id: '123' };
   for (const [mode, proof, env, expected, calls] of [
     ['affected', green, {}, 'ci-full', ['lookup', '--test tests/test-vault.mjs']],
-    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'run test:affected']],
+    ['affected', null, {}, 'local-affected', ['lookup', 'run build', 'lookup', 'run test:affected']],
     ['affected', green, { VAM_CLEAN_BUILD: '1' }, 'local-affected', ['run build', 'run test:affected']],
     ['affected', green, { CI: 'true' }, 'local-affected', ['run build', 'run test:affected']],
     ['preview', green, {}, 'preview-unverified', ['run build']],
@@ -746,4 +748,26 @@ test('session preparation selects exactly one verification policy, preserves ful
   assert.throws(() => main(['--session=a', '--preview', '--full']), /Conflicting session options/);
   assert.throws(() => main(['--session=a', '--stop', '--preview']), /Conflicting session options/);
   assert.throws(() => main(['--update-current', '--preview']), /Unknown argument/);
+});
+
+test('same session bytes skip asset replacement but update preview verification record', t => {
+  const { vault } = environment(t);
+  const previous = { fingerprint: 'same', verification: { kind: 'preview-unverified' } };
+  prepareTestVault({ vault, source: previous });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  const file = join(plugin, 'main.js');
+  const before = readFileSync(file);
+  const current = { fingerprint: 'same', verification: { kind: 'local-full' } };
+  assert.deepEqual(updateCurrentTestVault({ vault, source: current }).source, current);
+  assert.deepEqual(readFileSync(file), before);
+  assert.deepEqual(verifyTestVault(vault).source, current);
+  writeFileSync(file, 'tampered');
+  updateCurrentTestVault({ vault, source: current });
+  assert.deepEqual(readFileSync(file), before, 'tamper forces normal repair');
+});
+test('session full does not inherit selective test or CI shard settings', () => {
+  const env = { VAM_AFFECTED_TESTS: 'other', VAM_CI_SHARD: '1/4', VAM_ISOLATED_SUITES: '1' };
+  const calls = [];
+  prepareSessionCandidate({ mode: 'full', env, fingerprint: () => 'x', artifactHashes: () => ({ x: 'y' }), execute: (_command, args, childEnv) => calls.push({ args, env: childEnv }) });
+  for (const call of calls.slice(1)) for (const key of Object.keys(env)) assert.equal(call.env[key], undefined);
 });

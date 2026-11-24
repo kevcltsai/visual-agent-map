@@ -13679,7 +13679,12 @@ function registerInternalMarkerPresentation(plugin) {
 }
 
 // core/social-video.ts
-var FACEBOOK_HOSTS = /* @__PURE__ */ new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"]);
+var FACEBOOK_HOSTS = /* @__PURE__ */ new Set([
+  "facebook.com",
+  "www.facebook.com",
+  "m.facebook.com",
+  "web.facebook.com"
+]);
 var INSTAGRAM_HOSTS = /* @__PURE__ */ new Set(["instagram.com", "www.instagram.com"]);
 var NUMERIC_ID = /^\d{5,25}$/;
 var FB_WATCH_CODE = /^[A-Za-z0-9_-]{4,40}$/;
@@ -13716,16 +13721,19 @@ function socialVideoOf(value) {
     let href = null;
     const v = (_a2 = url.searchParams.get("v")) != null ? _a2 : "";
     if (parts[0] === "watch" && parts.length === 1 && NUMERIC_ID.test(v)) href = at(`watch/?v=${v}`, FACEBOOK);
-    else if (parts[0] === "reel" && parts.length === 2 && NUMERIC_ID.test(parts[1])) href = at(`reel/${parts[1]}`, FACEBOOK);
+    else if (parts[0] === "reel" && parts.length === 2 && NUMERIC_ID.test(parts[1]))
+      href = at(`reel/${parts[1]}`, FACEBOOK);
     else if (parts[1] === "videos" && PAGE_NAME.test(parts[0])) {
       const id = parts[parts.length - 1];
-      if ((parts.length === 3 || parts.length === 4) && NUMERIC_ID.test(id)) href = at(`${parts[0]}/videos/${id}/`, FACEBOOK);
+      if ((parts.length === 3 || parts.length === 4) && NUMERIC_ID.test(id))
+        href = at(`${parts[0]}/videos/${id}/`, FACEBOOK);
     }
     return href ? { source: "facebook", embed: facebookEmbed(href), watch: href } : null;
   }
   if (INSTAGRAM_HOSTS.has(host)) {
     const kind = parts[0] === "reels" ? "reel" : parts[0];
-    if (!["p", "reel", "tv"].includes(kind != null ? kind : "") || parts.length < 2 || parts.length > 3 || !INSTAGRAM_CODE.test(parts[1])) return null;
+    if (!["p", "reel", "tv"].includes(kind != null ? kind : "") || parts.length < 2 || parts.length > 3 || !INSTAGRAM_CODE.test(parts[1]))
+      return null;
     if (parts.length === 3 && parts[2] !== "embed") return null;
     const watch = at(`${kind}/${parts[1]}/`, INSTAGRAM);
     return { source: "instagram", embed: `${watch}embed`, watch };

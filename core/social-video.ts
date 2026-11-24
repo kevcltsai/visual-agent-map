@@ -13,7 +13,12 @@ export interface SocialVideo {
   watch: string;
 }
 
-const FACEBOOK_HOSTS: ReadonlySet<string> = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"]);
+const FACEBOOK_HOSTS: ReadonlySet<string> = new Set([
+  "facebook.com",
+  "www.facebook.com",
+  "m.facebook.com",
+  "web.facebook.com"
+]);
 const INSTAGRAM_HOSTS: ReadonlySet<string> = new Set(["instagram.com", "www.instagram.com"]);
 const NUMERIC_ID = /^\d{5,25}$/;
 const FB_WATCH_CODE = /^[A-Za-z0-9_-]{4,40}$/;
@@ -54,16 +59,24 @@ export function socialVideoOf(value: string): SocialVideo | null {
     let href: string | null = null;
     const v = url.searchParams.get("v") ?? "";
     if (parts[0] === "watch" && parts.length === 1 && NUMERIC_ID.test(v)) href = at(`watch/?v=${v}`, FACEBOOK);
-    else if (parts[0] === "reel" && parts.length === 2 && NUMERIC_ID.test(parts[1])) href = at(`reel/${parts[1]}`, FACEBOOK);
+    else if (parts[0] === "reel" && parts.length === 2 && NUMERIC_ID.test(parts[1]))
+      href = at(`reel/${parts[1]}`, FACEBOOK);
     else if (parts[1] === "videos" && PAGE_NAME.test(parts[0])) {
       const id = parts[parts.length - 1];
-      if ((parts.length === 3 || parts.length === 4) && NUMERIC_ID.test(id)) href = at(`${parts[0]}/videos/${id}/`, FACEBOOK);
+      if ((parts.length === 3 || parts.length === 4) && NUMERIC_ID.test(id))
+        href = at(`${parts[0]}/videos/${id}/`, FACEBOOK);
     }
     return href ? { source: "facebook", embed: facebookEmbed(href), watch: href } : null;
   }
   if (INSTAGRAM_HOSTS.has(host)) {
     const kind = parts[0] === "reels" ? "reel" : parts[0];
-    if (!["p", "reel", "tv"].includes(kind ?? "") || parts.length < 2 || parts.length > 3 || !INSTAGRAM_CODE.test(parts[1])) return null;
+    if (
+      !["p", "reel", "tv"].includes(kind ?? "") ||
+      parts.length < 2 ||
+      parts.length > 3 ||
+      !INSTAGRAM_CODE.test(parts[1])
+    )
+      return null;
     if (parts.length === 3 && parts[2] !== "embed") return null;
     const watch = at(`${kind}/${parts[1]}/`, INSTAGRAM);
     return { source: "instagram", embed: `${watch}embed`, watch };

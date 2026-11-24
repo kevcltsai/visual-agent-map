@@ -68361,7 +68361,7 @@ var MAP_CHAT_EXAMPLES = [
   },
   {
     book: true,
-    isNew: false,
+    isNew: true,
     icon: "\u{1F4D6}",
     label: "ui.map_chat_example_book",
     prompt: "ui.map_chat_example_book_prompt",

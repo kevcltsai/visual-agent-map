@@ -4,7 +4,7 @@
 //   node scripts/test-affected.mjs --write-deps <dir>  merges the records tests/build.cjs wrote into <dir> (VAM_TEST_DEPS_DIR) with a static scan into test-deps.json
 // Every doubt is answered with the full suite: a missing or stale table, an unknown changed file, or any error here.
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -356,16 +356,60 @@ export function fetchDepsTable(directory = defaultRoot, exec = execFileSync, env
   if (env.CI === "true" || env.VAM_TEST_DEPS_FILE) return false;
   const table = join(directory, "test-deps.json");
   if (existsSync(table)) return false;
-  let scratch;
+  return downloadDepsTable(directory, exec, table);
+}
+
+// Refresh only an expensive local plan, and at most once per base in a short
+// interval. The old table remains valid as a conservative fallback; never
+// replace it with an older, unrelated or malformed download.
+export function refreshDepsTable(directory = defaultRoot, base = "origin/main", result = localPlan(directory, base), exec = execFileSync, env = process.env, now = Date.now()) {
+  if (env.CI === "true" || env.VAM_TEST_DEPS_FILE || (result.mode !== "full" && (result.mode !== "files" || result.files.length <= MAX_ISOLATED_SUITES))) return false;
+  const table = join(directory, "test-deps.json");
+  if (!existsSync(table)) return false;
+  try {
+    const baseSha = git(directory, "rev-parse", base).trim();
+    if (!/^[0-9a-f]{40}$/.test(baseSha)) return false;
+    let old;
+    try { old = parseDeps(readFileSync(table, "utf8")); } catch { /* refresh malformed table too */ }
+    if (old?.sha === baseSha) return false;
+    if (changedFiles(directory, base).some(fullSuiteReason)) return false;
+    const cache = join(directory, "node_modules/.cache/vam");
+    mkdirSync(cache, { recursive: true });
+    const stamp = join(cache, "deps-refresh.json");
+    let last;
+    try { last = JSON.parse(readFileSync(stamp, "utf8")); } catch { /* first attempt */ }
+    if (last?.base === baseSha && Number.isFinite(last.at) && now >= last.at && now - last.at < 10 * 60_000) return false;
+    writeFileSync(stamp, JSON.stringify({ base: baseSha, at: now }));
+    return downloadDepsTable(directory, exec, table, next => {
+      const candidate = parseDeps(next);
+      if (!isAncestor(directory, candidate.sha, baseSha)) return false;
+      return !old || (candidate.sha !== old.sha && (!isAncestor(directory, old.sha, baseSha) || isAncestor(directory, old.sha, candidate.sha)));
+    });
+  } catch { return false; }
+}
+
+function downloadDepsTable(directory, exec, table, accept = () => true) {
+  let scratch, staging;
   try {
     const rows = exec("gh", ["run", "list", "--workflow", "ci.yml", "--branch", "main", "--limit", "20", "--json", "databaseId,displayTitle,conclusion", "--jq", '.[] | select(.conclusion == "success") | select(.displayTitle | startswith("CI full")) | .databaseId'], { cwd: directory, timeout: 20_000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
     const id = rows.split("\n").map(line => line.trim()).find(line => /^\d+$/.test(line));
     if (!id) return false;
     scratch = mkdtempSync(join(tmpdir(), "vam-deps-"));
     exec("gh", ["run", "download", id, "-n", "test-deps", "-D", scratch], { cwd: directory, timeout: 20_000, stdio: "ignore" });
-    copyFileSync(join(scratch, "test-deps.json"), table);
+    const downloaded = join(scratch, "test-deps.json");
+    const bytes = readFileSync(downloaded, "utf8");
+    parseDeps(bytes);
+    if (!accept(bytes)) return false;
+    const cache = join(directory, "node_modules/.cache/vam");
+    mkdirSync(cache, { recursive: true });
+    staging = mkdtempSync(join(cache, "deps-"));
+    copyFileSync(downloaded, join(staging, "test-deps.json"));
+    renameSync(join(staging, "test-deps.json"), table);
     return true;
-  } catch { return false; } finally { if (scratch) rmSync(scratch, { recursive: true, force: true }); }
+  } catch { return false; } finally {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+    if (staging) rmSync(staging, { recursive: true, force: true });
+  }
 }
 
 async function main(argv) {
@@ -383,6 +427,7 @@ async function main(argv) {
   if (argv.includes("--run")) fetchDepsTable(root);
   const base = args[0] || "origin/main";
   let result = localPlan(root, base);
+  if (argv.includes("--run") && refreshDepsTable(root, base, result)) result = localPlan(root, base);
   if (!argv.includes("--run") || result.mode === "none") {
     report(result, argv.includes("--json"));
     return;

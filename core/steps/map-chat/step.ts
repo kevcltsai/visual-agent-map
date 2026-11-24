@@ -1060,7 +1060,7 @@ export function parseMapChat(
 
 /**
  * The message sent into a turn that is already running, when the user adds to the request. English in every interface
- * language (like Coffee Tables' steering lines); the text is embedded as a JSON string so it cannot change the instructions.
+ * language; the text is embedded as a JSON string so it cannot change the instructions.
  */
 export function renderMapChatSteer(text: string): string {
   return renderTemplate(steerTemplate, { text: JSON.stringify(text) });

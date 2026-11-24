@@ -5,7 +5,7 @@
  */
 
 export interface StepDefinition<Input, Output> {
-  /** Stable identifier such as `coffee.table`. */
+  /** Stable identifier such as `map-chat`. */
   readonly id: string;
   /** Bump when the prompt, schema or parser changes in a way that matters for logs and replay. */
   readonly version: number;
@@ -36,7 +36,7 @@ export interface StepResult<Output> {
   raw: string;
 }
 
-/** The label that identifies the step and its version in logs, for example `coffee.table@1`. */
+/** The label that identifies the step and its version in logs, for example `map-chat@1`. */
 export function stepLabel(step: Pick<StepDefinition<unknown, unknown>, "id" | "version">): string {
   return `${step.id}@${step.version}`;
 }

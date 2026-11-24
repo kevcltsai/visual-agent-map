@@ -170,17 +170,11 @@ test('L6: parseMap keeps a valid layout through a round trip and drops an invali
   assert.equal('layout' in core.parseMap(text), false);
 });
 
-test('L7: layoutDirectionOf reads the map, and AIM maps or missing fields are always right', () => {
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left' } }), 'left');
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'right' } }), 'right');
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left' }, aim: { version: 1 } }), 'right');
-  assert.equal(layout.layoutDirectionOf({}), 'right');
-  assert.equal(layout.layoutDirectionOf(null), 'right');
-  assert.equal(layout.layoutDirectionOf(undefined), 'right');
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'down' } }), 'right');
-  assert.equal(layout.isLayoutDirection('left'), true);
-  assert.equal(layout.isLayoutDirection('right'), true);
-  for (const value of ['down', '', null, undefined, 1, {}]) assert.equal(layout.isLayoutDirection(value), false);
+test('L7: layoutOf reads the map, and AIM maps or missing fields are always right', () => {
+  for (const value of [{}, null, undefined, { layout: { direction: 'left' }, aim: { version: 1 } }])
+    assert.equal(layout.layoutOf(value).direction, 'right');
+  for (const direction of ['left', 'right', 'down', 'up'])
+    assert.equal(layout.layoutOf({ layout: { direction } }).direction, direction);
 });
 
 const geometry = load('experiences/visual-map/relation-geometry.ts');

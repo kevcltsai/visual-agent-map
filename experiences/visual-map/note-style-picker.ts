@@ -1,5 +1,6 @@
 import { Modal, Notice, normalizePath, TFile, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
+import { errorMessage } from "../../core/error-message";
 import { emptyNoteStyleStore, type NoteStyleStore } from "../../ai/note-style-store";
 import type { TopicKind } from "../../note-values";
 import { builtinRef } from "../../core/blocks/block-files";
@@ -98,8 +99,7 @@ export function actionNotice(message: string, label: string, run: () => void, ti
 
 /** Shows a failure; a bad style file gets an "Open this file" button. */
 export function errorNotice(error: unknown): Notice {
-  const message = (error as { message?: unknown } | null)?.message;
-  const text = typeof message === "string" ? message : String(error);
+  const text = errorMessage(error);
   if (error instanceof NoteStyleFileError) return actionNotice(text, t("ui.note_style_open_file"), error.open);
   return new Notice(text);
 }

@@ -88,6 +88,18 @@ test('malformed maps fail before data can be overwritten', () => {
   }
   assert.throws(() => core.parseMap('No map data'));
 });
+test('saved parent validation accepts a deep unordered forest and rejects distant cycles or missing parents', () => {
+  const count = 2500;
+  const nodes = Array.from({ length: count }, (_, i) => node(String(i), i === 0 ? null : String(i - 1))).reverse();
+  const parse = list => core.parseMap(core.serializeMap(map(list)));
+  assert.equal(parse(nodes).nodes.length, count);
+  const root = nodes[nodes.length - 1];
+  assert.throws(() => parse(nodes.map(n => n === root ? { ...n, parentId: String(count - 1) } : n)));
+  assert.throws(() => parse(nodes.map(n => n === root ? { ...n, parentId: 'missing' } : n)));
+  assert.throws(() => parse([node('self', 'self')]));
+  assert.equal(parse([node('')]).nodes.length, 1, 'legacy empty-id root remains readable');
+});
+
 test('undo and redo preserve ordering; new edit invalidates redo', () => {
   const h = new core.History(); h.push('move'); h.push('delete'); assert.equal(h.undo(), 'delete'); assert.equal(h.undo(), 'move'); assert.equal(h.redo(), 'move'); h.push('edit'); assert.equal(h.canRedo, false); assert.equal(h.undo(), 'edit');
 });

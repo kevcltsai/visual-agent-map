@@ -17,7 +17,7 @@ export type InstructionLanguage = "zh" | "en";
 export type NoteLanguage = "zh-TW" | "en";
 /**
  * How a prompt names a language. `plain` is the bare name, `region` adds the regional variant, `usage` adds the usage
- * clause (used by the built-in Coffee Tables style). Each form exists in both instruction languages so a prompt reads
+ * clause for naming the regional form of a language. Each form exists in both instruction languages so a prompt reads
  * naturally whichever fragment set it lives in. The spellings are exactly those of the prompt files, which is what keeps
  * the zh-TW and en prompts byte-identical to the text they replaced.
  */
@@ -93,7 +93,7 @@ export const LANGUAGES = [
     intl: "zh-CN",
     prompt: {
       // The region form names the Mainland standard (the counterpart of the Taiwan variant above); the usage form is the
-      // Coffee Tables style clause, "usage" in the same sense as the Taiwan row.
+      // Regional style clause, "usage" in the same sense as the Taiwan row.
       zh: { plain: "简体中文", region: "简体中文（中国大陆）", usage: "简体中文（中国大陆用法）" },
       en: {
         plain: "Simplified Chinese",

@@ -488,6 +488,25 @@ export interface AimMapData {
 }
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+/** Validate the saved parent forest in one pass without rebuilding a child index for every node. */
+function validParentGraph(nodes: MapNode[]): boolean {
+  // Preserve the old empty-id behavior: childIndex treats a null parent as an empty string.
+  if (nodes.some(node => node.id === "")) return nodes.every(node => canParent(nodes, node.id, node.parentId));
+  const parents = new Map(nodes.map(node => [node.id, node.parentId]));
+  const resolved = new Set<string>();
+  for (const node of nodes) {
+    const pending = new Set<string>();
+    let id: string | null = node.id;
+    while (id !== null && !resolved.has(id)) {
+      if (pending.has(id) || !parents.has(id)) return false;
+      pending.add(id);
+      id = parents.get(id)!;
+    }
+    for (const visited of pending) resolved.add(visited);
+  }
+  return true;
+}
+
 export function canParent(nodes: MapNode[], id: string, parentId: string | null): boolean {
   return (
     parentId === null ||
@@ -634,9 +653,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       aimQuestionRequests.add(question.requestId);
     }
   }
-  for (const n of map.nodes)
-    if (!canParent(map.nodes, n.id, n.parentId))
-      throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
+  if (!validParentGraph(map.nodes)) throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
   cleanBranchLayouts(map.nodes, map.layout?.direction ?? "right", map.aim !== undefined);
   if (
     !map.viewport ||

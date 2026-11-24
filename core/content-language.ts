@@ -29,7 +29,7 @@ export type DetectedLanguage = OutputOnlyId | "zh-TW" | "zh-CN" | typeof LATIN_T
 const OUTPUT_ROWS: ReadonlyArray<OutputLanguageEntry> = OUTPUT_LANGUAGES;
 
 /** True for an output-only language id (never an interface language); persisted values are checked with this. */
-export const isOutputOnlyLanguage = (value: unknown): value is OutputOnlyId =>
+const isOutputOnlyLanguage = (value: unknown): value is OutputOnlyId =>
   OUTPUT_LANGUAGES.some(item => item.id === value);
 
 /** Han text whose characters do not settle the script (shared characters only, or a tie): the interface decides. */

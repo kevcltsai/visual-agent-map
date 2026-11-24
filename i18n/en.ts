@@ -30,7 +30,7 @@ export const en = {
   "ui.open_or_create_map_hint": "Open an existing mind map or create a new one.",
   "ui.interface_language": "Interface language",
   "ui.interface_language_description":
-    "Controls VAM and Coffee Tables only; it is independent of Obsidian’s language. Existing notes and conversation text are preserved.",
+    "Controls VAM only, independently of Obsidian’s language. Existing notes and chat text are preserved.",
   "ui.open_map": "Open mind map",
   "ui.command_open_map": "Open mind map",
   "ui.map_chat_toggle_command": "Toggle map AI chat",
@@ -85,10 +85,9 @@ export const en = {
   "ui.shortcut_clear_selection": "Clear the selection",
   "ui.model_discovery_summary_0_1": "Codex: {0} · Claude CLI candidates: {1}",
   "ui.my_editable_mind_map": "My editable mind map",
-  "ui.language_changed_content_preserved":
-    "VAM and Coffee Tables are now in English. Existing notes and conversation text are unchanged.",
+  "ui.language_changed_content_preserved": "VAM is now in English. Existing notes and chat text are unchanged.",
   "ui.language_change_save_failed": "Could not save the language setting. The previous language is still active.",
-  "ui.language_view_refresh_failed": "An open VAM or Coffee Tables view could not refresh after the language change.",
+  "ui.language_view_refresh_failed": "An open VAM view could not refresh after the language change.",
   "ui.language_change_partial_failure":
     "The language setting was saved, but an open view did not refresh. Close and reopen that view.",
   "ui.claude_cli_path": "Claude Code CLI path",

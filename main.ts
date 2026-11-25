@@ -1902,8 +1902,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     let changed = false;
     const failed: string[] = [];
     const nodePaths = new Set<string>();
+    const rebase = chainRebase(pairs);
     for (const { file, map } of await this.repo.readableMaps()) {
-      const rebased = rebaseMapNotePaths(map, chainRebase(pairs));
+      const rebased = rebaseMapNotePaths(map, rebase);
       for (const node of map.nodes) nodePaths.add(node.path);
       if (!rebased) continue;
       try {
@@ -1917,7 +1918,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const path of failed) {
       try {
         const map = await this.repo.readMap(path);
-        if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+        if (!rebaseMapNotePaths(map, rebase)) continue;
         await this.repo.saveMap(path, map);
         changed = true;
       } catch (retryError) {

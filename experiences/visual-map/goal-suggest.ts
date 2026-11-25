@@ -113,9 +113,12 @@ export class GoalSuggest {
     }, 0);
     this.cancelFocusReturn = cancel;
   }
-  /** Another surface (the goal editor, a new grading) takes the spot: the open task closes without a repaint. */
+  /**
+   * Another surface (the goal editor, a new grading) takes the spot: the open task closes without a repaint. An Add the
+   * user already confirmed keeps running and still reports what it added.
+   */
   dismiss(): void {
-    if (this.task) this.end(this.task, { refocus: false, repaint: false });
+    if (this.task?.state === "ready") this.end(this.task, { refocus: false, repaint: false });
   }
   /** The goal bar is redrawn: its old DOM is gone, so the listener and the panel handle are dropped (the task keeps running). */
   detach(): void {

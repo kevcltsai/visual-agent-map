@@ -159,6 +159,15 @@ test('goal suggest: draw on another map aborts the task and draws nothing', () =
   assert.equal(findAll(s.bar, i => hasCls(i, 'vam-goal-suggest')).length, 0);
 });
 
+test('goal suggest: dismiss while Add is applying keeps the confirmed cards and the announcement', async () => {
+  const s = setup({ mutate: async work => { s.suggest.dismiss(); await work(); } });
+  s.suggest.open(MAP, [sug('a', 'One', 'core')], true); s.draw();
+  addBtn(s.bar).click();
+  await new Promise(r => setImmediate(r));
+  assert.deepEqual(s.log.added, [['a', 'One']]);
+  assert.equal(s.suggest.task, null); assert.deepEqual(s.log.announced, ['Added 1 topics']);
+});
+
 test('goal suggest: Add adds the checked cards with the list tier, announces, closes, and writes no summary', async () => {
   const s = setup();
   s.suggest.open(MAP, [sug('a', 'One', 'core'), sug('b', 'Two', 'support')], true); s.draw();

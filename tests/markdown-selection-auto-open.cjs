@@ -124,7 +124,7 @@ test('the setting defaults to on, keeps older saved settings on, and is wired in
   const { DEFAULT_SETTINGS } = load('repository.ts', { obsidian: { App: class {}, TFile: class {}, TFolder: class {}, normalizePath: value => value, parseYaml: () => ({}), stringifyYaml: () => '' } });
   assert.equal(DEFAULT_SETTINGS.markdownSelectionAiAutoOpen, true);
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.match(main, /markdownSelectionAiAutoOpen: saved\?\.markdownSelectionAiAutoOpen !== false/);
+  assert.match(fs.readFileSync(path.join(root, 'settings-from-saved.ts'), 'utf8'), /markdownSelectionAiAutoOpen: saved\?\.markdownSelectionAiAutoOpen !== false/);
   assert.match(main, /autoOpen: \(\) => this\.settings\.markdownSelectionAiAutoOpen/);
   const tab = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
   assert.match(tab, /this\.plugin\.settings\.markdownSelectionAiAutoOpen = value/);

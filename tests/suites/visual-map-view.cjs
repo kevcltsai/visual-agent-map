@@ -1028,7 +1028,7 @@ integrationTest('canvas hint: a solid chip that goes away after the first zoom o
   assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.plugin\.settings\.canvasHintSeen\s*\?\s*overlay\.createSpan\(\{\s*cls: "vam-hint vam-canvas-hint"/, 'the normal hint shows only until seen; select mode draws none (the selection bar owns that corner)');
   assert.match(source, /if \(moved\) this\.markCanvasHintSeen\(\);/, 'a pan counts');
   assert.match(source, /event\.preventDefault\(\);\s*\/\/[^\n]*\n\s*this\.markCanvasHintSeen\(\);/, 'a wheel zoom counts');
-  assert.match(fs.readFileSync(path.join(root, 'main.ts'), 'utf8'), /canvasHintSeen: saved\?\.canvasHintSeen === true/);
+  assert.match(fs.readFileSync(path.join(root, 'settings-from-saved.ts'), 'utf8'), /canvasHintSeen: saved\?\.canvasHintSeen === true/);
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^\.vam-canvas-overlay > \.vam-canvas-hint \{ position: absolute;[^}]*border: 1px solid var\(--background-modifier-border\);[^}]*background: var\(--background-primary\);/m, 'a solid chip with a border');
   const { translate } = load('i18n.ts');

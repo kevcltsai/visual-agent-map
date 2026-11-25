@@ -542,7 +542,7 @@ export function emptyAttempts(): StepAttempts {
 /** A card's attempt counts; zeros when it has none yet. */
 export function attemptsOf(data: BookPipelineData, nodeId: string): StepAttempts {
   const entry = nodeId === "global" ? undefined : data.attempts[nodeId];
-  return isObject(entry) ? { ...emptyAttempts(), ...(entry as unknown as StepAttempts) } : emptyAttempts();
+  return isObject(entry) ? { ...emptyAttempts(), ...entry } : emptyAttempts();
 }
 
 /** Takes one call from the budget, or null when none is left. */

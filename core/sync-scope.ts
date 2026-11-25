@@ -8,7 +8,7 @@
 export const UNSYNCED_LIMIT = 500;
 
 /** What one read-back covers: the paths and their event numbers, and the full mark's number, when taken. */
-export interface UnsyncedSnapshot {
+interface UnsyncedSnapshot {
   readonly paths: ReadonlyMap<string, number>;
   /** The event number of the full mark, or null without one. */
   readonly full: number | null;

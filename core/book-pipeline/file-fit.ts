@@ -5,7 +5,7 @@
 import { slotKeywords } from "./image-slots";
 
 /** What the slot asks for: its line in the book's language, the planner's English search terms, and the finder's subject and English search words. */
-export interface SlotAsk {
+interface SlotAsk {
   explains: string;
   /** The planner's English search terms (the card plan's slot field). */
   terms?: readonly string[];

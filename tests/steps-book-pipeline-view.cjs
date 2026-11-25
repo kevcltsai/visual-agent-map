@@ -1761,7 +1761,7 @@ test('review box: the modify listener goes through registerEvent (released with 
   await r.view.bookNoteChain;
   assert.equal(r.view.bookResolved.size, 1);
   r.view.bookResolved.set('x', 'y');
-  assert.match(view_ts, /async onClose\(\): Promise<void> \{[^}]*this\.bookResolved\.clear\(\);/);
+  assert.match(view_ts, /async onClose\(\): Promise<void> \{[^}]*this\.dropBookReviewSession\(\);/);
 });
 test('review box: the chapter callouts have their own look in the stylesheet (vam-trial info, vam-review the AI purple, light and dark) and vam-book stays hidden', () => {
   assert.match(css, /\.callout\[data-callout="vam-trial"\] \{[^}]*--callout-color: var\(--color-blue-rgb\)/);
@@ -2075,4 +2075,48 @@ test('fix again (view): the button opens the card and moves the keyboard to Canc
   // the keyboard targets exist in the bar
   assert.ok(/\.vam-book-fix-again-cancel/.test(view_ts) && /\.vam-book-fix-again"/.test(view_ts));
   assert.match(main_ts, /fixBookAgain\(mapPath: string\): Promise<void> \{\s*return this\.bookPipelineRuns\.fixAgain\(mapPath\);/);
+});
+
+test('book review lifecycle: departing map releases folds, resolved IDs and rerun memory', async () => {
+  const r = await boxRig();
+  r.view.bookFoldDelayMs = 60_000;
+  r.view.scheduleBookFold(r.ids.a);
+  r.view.bookFoldDue.add('old');
+  r.view.bookResolved.set(r.ids.a, 'fp');
+  const memory = r.view.bookReview;
+  memory.unchanged.add(r.ids.a);
+  r.view.dropBookReviewSession();
+  assert.equal(r.view.bookFoldTimers.size, 0);
+  assert.equal(r.view.bookFoldDue.size, 0);
+  assert.equal(r.view.bookResolved.size, 0);
+  assert.notEqual(r.view.bookReview, memory);
+  assert.equal(r.view.bookReview.unchanged.size, 0);
+});
+
+test('book review lifecycle: queued ID cannot resolve in a replacement map with the same card ID', async () => {
+  const r = await boxRig();
+  let release;
+  r.view.bookNoteChain = new Promise(resolve => { release = resolve; });
+  const old = r.view.queueBookResolve(r.ids.a);
+  const calls = [];
+  r.view.resolveBookNote = async id => calls.push(id);
+  r.view.dropBookReviewSession();
+  const live = r.view.queueBookResolve(r.ids.a);
+  release();
+  await Promise.all([old, live]);
+  assert.deepEqual(calls, [r.ids.a]);
+});
+
+test('book review lifecycle: a late note read cannot overwrite the replacement session', async () => {
+  const r = await boxRig();
+  // boxRig stubs the reader for other tests; exercise the product implementation here.
+  r.view.rereadBookCard = bundle.VisualAgentMapView.prototype.rereadBookCard;
+  let resolve;
+  r.plugin.repo.readNote = () => new Promise(done => { resolve = done; });
+  const pending = r.view.rereadBookCard(r.ids.a);
+  const current = r.view.notes.get(r.ids.a);
+  r.view.dropBookReviewSession();
+  resolve({ title: 'stale result' });
+  await pending;
+  assert.equal(r.view.notes.get(r.ids.a), current);
 });

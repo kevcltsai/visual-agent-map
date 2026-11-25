@@ -2439,12 +2439,12 @@ export class Repository {
         if (!(this.app.vault.getAbstractFileByPath(desired) instanceof TFolder))
           throw new Error(this.message("error.move_not_applied"));
       }
-      const map = await this.readMap(next);
-      map.title = title;
       const rebasePath = (path: string): string =>
         path.startsWith(`${originalRoot}/`) ? `${desired}/${path.slice(originalRoot.length + 1)}` : path;
-      rebaseMapNotePaths(map, rebasePath);
-      await this.saveMap(next, map);
+      await this.updateMap(next, map => {
+        map.title = title;
+        rebaseMapNotePaths(map, rebasePath);
+      });
       await rebuild();
       return next;
     } catch (error) {

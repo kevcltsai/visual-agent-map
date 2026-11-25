@@ -98,3 +98,12 @@ test('collapsedAncestors terminates on a parent cycle', () => {
   const nodes = [node('a', 'b', true), node('b', 'c', true), node('c', 'a', true)];
   assert.deepEqual(plain(collapsedAncestors(nodes, 'a')).sort(), ['b', 'c']);
 });
+
+test('shared search normalization preserves case, script, spaces and non-Han text', () => {
+  const { foldSearchText: shared } = load('i18n/han-fold.ts');
+  for (const [input, expected] of [['İstanbul 圖', 'istanbul 图'], ['  髮型 ABC  ', '  发型 abc  '], ['😀 123', '😀 123'], ['', '']]) {
+    assert.equal(shared(input), expected);
+    assert.equal(foldSearchText(input), expected);
+    assert.equal(foldOutlineSearch(input), expected);
+  }
+});

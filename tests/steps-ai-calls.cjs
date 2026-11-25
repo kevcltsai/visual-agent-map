@@ -331,17 +331,20 @@ test('capabilities: Claude has no image generation, takes 1568px / 5 MiB images 
   assert.equal(mod.aiRuntimeForModel('claude:opus', { claude: () => ({ runTask: async () => '' }), codex: () => ({ runTask: async () => '' }) }).capabilities, mod.CLAUDE_CAPABILITIES);
 });
 
-test('providerStepRunner passes the request imageDataUrl to the task controls and leaves the controls as they were without one', async () => {
+test('providerStepRunner forwards request image and map attribution without per-runner adapters', async () => {
   const { providerStepRunner } = load('core/provider-step-runner.ts');
   const seen = [];
-  const aiCalls = { run: async (_prepared, options) => { seen.push(options.task); return 'raw'; } };
+  const usage = [];
+  const aiCalls = { run: async (_prepared, options) => { seen.push(options.task); usage.push(options.usage); return 'raw'; } };
   const runner = providerStepRunner(aiCalls, { name: 'map-chat', topic: () => 't', stopped: () => new Error('stopped'), stream: true });
   const base = { model: 'gpt-6-luna', reasoning: 'low' };
-  await runner({ ...base, imageDataUrl: 'data:image/png;base64,AAAA' }, new AbortController().signal, prepared());
+  await runner({ ...base, imageDataUrl: 'data:image/png;base64,AAAA', usageMapPath: 'Maps/A/Map.md' }, new AbortController().signal, prepared());
   await runner(base, new AbortController().signal, prepared());
   assert.equal(seen[0].imageDataUrl, 'data:image/png;base64,AAAA');
   assert.deepEqual(plain(seen[1]), { textOnly: true, searchBudget: 0, stream: true }, 'no picture: the controls are exactly what they were');
   assert.equal('imageDataUrl' in seen[1], false);
+  assert.equal(usage[0].mapPath, 'Maps/A/Map.md');
+  assert.equal(usage[1].mapPath, undefined);
 });
 
 test('a runtime without imageInput is told apart by capabilitiesFor(model).imageInput; both shipped runtimes take images', () => {

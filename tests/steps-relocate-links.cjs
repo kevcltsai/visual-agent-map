@@ -271,6 +271,24 @@ test('link-rewrite: code is ignored, other files are untouched, and Markdown lin
   assert.deepEqual([...result.unsupported], ['](A/X.md)']);
 });
 
+test('link-rewrite: a relative Markdown link that moves together with its note stays valid and is not reported', () => {
+  const { rewriteLinkTargets } = linkRewrite;
+  // A topic folder rename moves the note and the image it shows by the same prefix: `../Attachments/x.png` still resolves.
+  const moves = new Map([
+    ['T/Notes/a.md', 'U/Notes/a.md'],
+    ['T/Attachments/x.png', 'U/Attachments/x.png']
+  ]);
+  const resolve = link => ({ '../Attachments/x.png': 'T/Attachments/x.png' })[link];
+  const text = 'see ![route](../Attachments/x.png)';
+  const together = rewriteLinkTargets(text, resolve, moves, 'T/Notes/a.md');
+  assert.equal(together.text, text);
+  assert.equal(together.hits, 1);
+  assert.deepEqual([...together.unsupported], []);
+  // A note that stays where it is (or no linker given) would break: still left to Obsidian.
+  assert.deepEqual([...rewriteLinkTargets(text, resolve, moves, 'Other/b.md').unsupported], ['](../Attachments/x.png)']);
+  assert.deepEqual([...rewriteLinkTargets(text, resolve, moves).unsupported], ['](../Attachments/x.png)']);
+});
+
 // ---- View-layer rollback and undo, with the link index on (the production move path) ----------------------------
 // setLifecycle (not part of the link work) re-writes `agent-map-id:` at the end of the frontmatter after a park and
 // unpark; the line is compared by value elsewhere, so it is dropped here and everything else stays byte-for-byte.

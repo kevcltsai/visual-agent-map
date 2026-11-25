@@ -25,6 +25,16 @@ function stripMd(path: string): string {
 function baseOf(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
+/** A `./` or `../` reference joined onto a folder, `.` and `..` collapsed; null when it climbs above the vault root. */
+function joinRelative(folder: string, ref: string): string | null {
+  const parts: string[] = [];
+  for (const part of `${folder}/${ref}`.split("/")) {
+    if (!part || part === ".") continue;
+    if (part !== "..") parts.push(part);
+    else if (!parts.pop()) return null;
+  }
+  return parts.join("/");
+}
 
 /** The leading frontmatter block (with its closing line) and the rest of the note. */
 export function splitFrontmatter(text: string): { head: string; body: string } {
@@ -116,13 +126,17 @@ export interface LinkRewrite {
 /**
  * Retargets the links of `text` that resolve to a moved file. `resolve` maps a link path to the vault path of the file
  * it names (undefined when it names none); `moves` maps each moved file's old path to its new path. Links in code are
- * ignored, like Obsidian does. Markdown-style links `[x](path.md)` to a moved file are reported as unsupported.
+ * ignored, like Obsidian does. Markdown-style links `[x](path.md)` to a moved file are reported as unsupported, except a
+ * relative one (`../Attachments/x.png`) that still names the moved file from `linker`'s new place (both moved together).
  */
 export function rewriteLinkTargets(
   text: string,
   resolve: (linkPath: string) => string | undefined,
-  moves: ReadonlyMap<string, string>
+  moves: ReadonlyMap<string, string>,
+  linker?: string
 ): LinkRewrite {
+  const linkerTo = linker === undefined ? undefined : moves.get(linker);
+  const linkerFolder = linkerTo?.slice(0, Math.max(0, linkerTo.lastIndexOf("/")));
   const unsupported: string[] = [];
   let hits = 0,
     out = "",
@@ -152,7 +166,10 @@ export function rewriteLinkTargets(
     const path = resolve(linkPathOf(decoded));
     if (path !== undefined && moves.has(path)) {
       hits++;
-      unsupported.push(match[0]);
+      const ref = linkPathOf(decoded);
+      const stillValid =
+        linkerFolder !== undefined && /^\.\.?\//.test(ref) && joinRelative(linkerFolder, ref) === moves.get(path);
+      if (!stillValid) unsupported.push(match[0]);
     }
   }
   return { text: out + text.slice(cursor), hits, unsupported };

@@ -81,6 +81,44 @@ test('A3 arrangeNewBranch makes room for a wide parent and wide new children', (
   assert.equal(left.c.x, 800 - COLUMN - 240);
 });
 
+test('horizontal layout keeps exact width offsets throughout a deep mixed-width tree', () => {
+  const levels = 64;
+  const nodes = Array.from({ length: levels }, (_, depth) =>
+    node(`n${depth}`, depth ? `n${depth - 1}` : null, { width: 200 + (depth % 7) * 57 }));
+  // A wider sibling contributes to its entire column, even when it has no descendants.
+  nodes.push(node('wide-sibling', 'n8', { width: 560 }));
+  const widest = Array.from({ length: levels }, (_, depth) =>
+    Math.max(0, nodes[depth].width - graph.CARD_WIDTH, depth === 9 ? 560 - graph.CARD_WIDTH : 0));
+  for (const direction of ['right', 'left']) {
+    const arranged = byId(layout.arrangeMap(nodes, undefined, heightOf, direction));
+    const root = arranged.n0.x;
+    for (let depth = 1; depth < levels; depth++) {
+      const shift = direction === 'right'
+        ? widest.slice(0, depth).reduce((total, width) => total + width, 0)
+        : widest.slice(1, depth + 1).reduce((total, width) => total + width, 0);
+      assert.equal(arranged[`n${depth}`].x - root,
+        (direction === 'right' ? 1 : -1) * (COLUMN * depth + shift));
+    }
+    assert.equal(arranged['wide-sibling'].x, arranged.n9.x);
+  }
+});
+
+test('balanced new branches retain sibling order and keep existing cards fixed', () => {
+  const base = [
+    node('r', null, { x: 800, y: 400 }),
+    node('old-left', 'r', { x: 440, y: 400 }),
+    node('old-right', 'r', { x: 1160, y: 400 }),
+    node('a', 'r'), node('b', 'r'), node('a1', 'a'), node('a2', 'a'), node('b1', 'b')
+  ];
+  const fresh = new Set(['a', 'b', 'a1', 'a2', 'b1']);
+  const placed = byId(layout.arrangeNewBranch(base, 'r', fresh, heightOf, undefined, 'balanced'));
+  for (const old of base.slice(0, 3)) assert.equal(placed[old.id], old);
+  assert.ok((placed.a.x - placed.r.x) * (placed.b.x - placed.r.x) < 0);
+  assert.ok(placed.a1.y < placed.a2.y);
+  assert.ok(Math.abs(placed.a1.x - placed.r.x) > Math.abs(placed.a.x - placed.r.x));
+  assert.ok(Math.abs(placed.b1.x - placed.r.x) > Math.abs(placed.b.x - placed.r.x));
+});
+
 // ---- View: the width handle (A5, unit level) -------------------------------------------------------------------------
 const support = require('./support.cjs');
 const viewHarness = (width) => {

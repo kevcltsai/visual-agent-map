@@ -4,7 +4,7 @@ import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
-import { CARD_WIDTH, parentIdsForNode, visibleNodes, type MapNode } from "./map-graph";
+import { CARD_WIDTH, childIndex, parentIdsForNode, visibleNodes, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
 
@@ -214,17 +214,16 @@ function horizontalPositions(input: HorizontalInput): {
   // A wider card pushes the columns after it (right) or itself (left) further out; without custom widths every excess is 0.
   const widest: number[] = [];
   for (const [id, depth] of depths) widest[depth] = Math.max(widest[depth] ?? 0, widthExcess(byId.get(id)!));
-  const shiftAt = (depth: number) => {
-    let total = 0;
-    if (sign > 0) for (let k = 0; k < depth; k++) total += widest[k] ?? 0;
-    else for (let k = 1; k <= depth; k++) total += widest[k] ?? 0;
-    return total;
-  };
+  // All cards at a depth share the same shift. Accumulate once in the original summation order.
+  // Right includes the preceding column; left includes the current one (not the root).
+  const shifts: number[] = [0];
+  for (let depth = 1; depth < widest.length; depth++)
+    shifts[depth] = shifts[depth - 1] + (widest[sign > 0 ? depth - 1 : depth] ?? 0);
   for (const [id, point] of result) {
     const depth = depths.get(id)!;
     // Growing left, a text block narrower than a card keeps its right edge where a card's would be (next to its topic).
     const narrow = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id)!)) : 0;
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow;
+    point.x = left + sign * (depth * COLUMN + shifts[depth]) + narrow;
   }
   return { placed: result, sizes };
 }
@@ -461,9 +460,10 @@ function arrangeBalancedBranch(
     const side = knownSide(kid, parent);
     if (side) loads[side] += sizes.get(kid.id)! + gap;
   }
+  const freshChildren = childIndex(fresh);
   const { sizes: freshSizes } = horizontalPositions({
     roots,
-    kidsOf: node => fresh.filter(item => item.parentId === node.id),
+    kidsOf: node => freshChildren.get(node.id) ?? [],
     joinsOf: () => [],
     heightFor: node => cardHeight(heightOf, node.id),
     column: 0,
@@ -473,10 +473,7 @@ function arrangeBalancedBranch(
     top: 0
   });
   const sides = greedySides(roots, root => freshSizes.get(root.id)!, gap, loads);
-  const below = (id: string): string[] => [
-    id,
-    ...fresh.filter(item => item.parentId === id).flatMap(item => below(item.id))
-  ];
+  const below = (id: string): string[] => [id, ...(freshChildren.get(id) ?? []).flatMap(item => below(item.id))];
   let current = nodes;
   const pending = new Set(newIds);
   for (const side of ["right", "left"] as const) {

@@ -5480,7 +5480,7 @@ export class BookPipelineRuns {
       await lookRound();
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
-        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const provisional = choosePictures(slots, perSlot, taken, language);
         const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
         const tried = [
           ...new Set([
@@ -5500,13 +5500,7 @@ export class BookPipelineRuns {
       // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
       // per chapter; its candidates are probed, deduped and chosen like the finder's.
       if (this.ports.fetchCommons) {
-        const provisional = choosePictures(
-          { id: nodeId, title: first.title },
-          coverSlot ? [coverSlot, ...slots] : slots,
-          perSlot,
-          taken,
-          language
-        );
+        const provisional = choosePictures(coverSlot ? [coverSlot, ...slots] : slots, perSlot, taken, language);
         // The cover is the last one asked of Commons, so it never takes a body picture's share of the chapter's requests.
         const lacking = asked.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
         if (lacking.length) {
@@ -5552,7 +5546,7 @@ export class BookPipelineRuns {
       // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
       const canDraw = !!this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true);
       if (heldUnfit.size) {
-        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const provisional = choosePictures(slots, perSlot, taken, language);
         const usable = new Map<number, FoundImage[]>();
         for (const [index, list] of heldUnfit) {
           // Held back from the last resort only when the diagram step will really be asked for this slot; otherwise it is placed, off.
@@ -5569,7 +5563,7 @@ export class BookPipelineRuns {
       }
       // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
       if (this.ports.drawDiagrams && canDraw) {
-        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const provisional = choosePictures(slots, perSlot, taken, language);
         const want = slots.filter(slot => {
           const outcome = provisional.get(slot.index);
           return (
@@ -5659,7 +5653,6 @@ export class BookPipelineRuns {
     const refusedTaken = new Set<string>();
     // The cover is slot 0 and decided first, so it takes its picture before any body slot can; its key is claimed with the rest.
     const outcomes = choosePictures(
-      { id: nodeId, title: latest.title },
       coverSlot ? [coverSlot, ...slots] : slots,
       perSlot,
       key => {

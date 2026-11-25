@@ -3,7 +3,11 @@ export const abortError = (): Error => Object.assign(new Error("Aborted"), { nam
 
 /** The call's result, or a rejection the moment `signal` aborts: a provider that ignores abort must not hang Stop. */
 export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
-  if (signal.aborted) return Promise.reject(new Error("aborted"));
+  if (signal.aborted) {
+    // The caller has already started work. Its eventual rejection still needs an observer.
+    void work.catch(() => undefined);
+    return Promise.reject(new Error("aborted"));
+  }
   return new Promise<T>((resolve, reject) => {
     const onAbort = (): void => reject(new Error("aborted"));
     signal.addEventListener("abort", onAbort, { once: true });

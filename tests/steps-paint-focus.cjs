@@ -355,3 +355,22 @@ test('P1 observed: the card handoff is not gated by mapWindowIsActive (title but
   await h.view.refreshFromPlugin();
   assert.ok(h.active() === h.doc.body, 'gated: the title button did not');
 });
+
+test('relevance height cache keeps folded cards only within their map and never imports old DOM measurements into a new map', async () => {
+  const h = await harness();
+  h.view.render();
+  Object.defineProperty(leafCard(h), 'offsetHeight', { value: 310, configurable: true });
+  h.view.render();
+  assert.equal(h.view.sortHeightOf(h.ids.leaf), 310);
+  h.view.map = { ...h.view.map, id: 'another-map', nodes: h.view.map.nodes.map(node =>
+    node.id === h.ids.leaf ? { ...node, height: 140 } : node
+  ) };
+  assert.equal(h.view.sortHeightOf(h.ids.leaf), 140, 'stale cache ignored even before the new paint');
+  h.view.render();
+  assert.equal(h.view.sortHeightOf(h.ids.leaf), 140, 'old map DOM was not measured into the new cache');
+  h.view.render();
+  assert.equal(h.view.sortHeightOf(h.ids.leaf), 50, 'next paint can use new DOM heights');
+  h.view.map = { ...h.view.map, nodes: h.view.map.nodes.filter(node => node.id !== h.ids.leaf) };
+  h.view.render();
+  assert.equal(h.view.drawnHeights.has(h.ids.leaf), false, 'deleted card cannot retain a cached height');
+});

@@ -69,8 +69,38 @@ export function treeDepthResolver(nodes: MapNode[], index?: ReadonlyMap<string, 
     const cached = known.get(id);
     if (cached !== undefined) return cached;
     byId ??= new Map(nodes.map(node => [node.id, node]));
-    const depth = depthOf(nodes, id, byId);
+    // Cache only complete, acyclic paths. The old bounded walk defines the result of corrupt cycles
+    // and weighted depths that reach its limit; do not use those truncated values as ancestor depths.
+    const chain: MapNode[] = [];
+    const seen = new Set<string>();
+    let depth = 0;
+    let node = byId.get(id);
+    while (node?.parentId) {
+      const cached = known.get(node.id);
+      if (cached !== undefined) {
+        depth = cached;
+        break;
+      }
+      if (seen.has(node.id)) return depthOf(nodes, id, byId);
+      seen.add(node.id);
+      chain.push(node);
+      node = byId.get(node.parentId);
+    }
+    for (let at = chain.length - 1; at >= 0; at--) {
+      depth += chain[at].afterTextId ? 2 : 1;
+      if (depth > nodes.length) return depthOf(nodes, id, byId);
+      known.set(chain[at].id, depth);
+    }
     known.set(id, depth);
     return depth;
+  };
+}
+
+/** One synchronous geometry pass: measure a DOM endpoint once. A new pass always reads fresh boxes. */
+export function edgeBoxReader<Element, Box>(measure: (element: Element) => Box): (element: Element) => Box {
+  const boxes = new Map<Element, Box>();
+  return element => {
+    if (!boxes.has(element)) boxes.set(element, measure(element));
+    return boxes.get(element)!;
   };
 }

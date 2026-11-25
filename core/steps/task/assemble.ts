@@ -75,7 +75,7 @@ import {
   SYNTHESIZE_TOP,
   textbookDetailStructure
 } from "./fragments";
-import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
+import { isQuickTask, quickGuidance, readerFacingDetail } from "./prompt-policy";
 import { renderTemplate } from "../../step-runner";
 import SynthesizeOutlineLabelZH from "./synthesize-outline-label.zh.md";
 import SynthesizeOutlineLabelEN from "./synthesize-outline-label.en.md";

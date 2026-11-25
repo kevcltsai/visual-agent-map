@@ -302,3 +302,16 @@ test('a folder rename where both the card source-path write and the map retry fa
   const errorLines = h.logged.filter(([level, line]) => level === 'error' && /injected write failure .*\/Map\.md/.test(line));
   assert.equal(errorLines.length > 0, true, 'the second error is in the log, not dropped');
 });
+
+test('rename-batch index agrees with the ordered scan for repeated paths and rollbacks', () => {
+  const names = ['A', 'B', 'C', ''];
+  const events = names.flatMap(from => names.map(to => [from, to]));
+  for (const x of events) for (const y of events) for (const z of events) {
+    const pairs = [x, y, z];
+    const rebase = batch.chainRebase(pairs);
+    for (const name of [...names, 'missing']) assert.equal(rebase(name), batch.rebasePath(pairs, name));
+  }
+  const pairs = Array.from({ length: 5000 }, (_, i) => ['old/' + i, 'new/' + i]);
+  const rebase = batch.chainRebase(pairs);
+  for (const [from, to] of pairs) assert.equal(rebase(from), to);
+});

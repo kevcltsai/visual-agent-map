@@ -106,6 +106,32 @@ export function branchSize(index: Map<string, MapNode[]>, id: string): number {
   walkDescendants(index, id, found);
   return found.size;
 }
+/** Counts every branch once per tree snapshot; malformed duplicate ids and cycles keep the original distinct-id walk. */
+export function branchSizeResolver(index: Map<string, MapNode[]>): (id: string) => number {
+  const parentOf = new Map<string, string>();
+  const remaining = new Map<string, number>();
+  const counts = new Map<string, number>();
+  for (const [parent, children] of index) {
+    for (const node of children) {
+      if (!node.id || parentOf.has(node.id)) return id => branchSize(index, id);
+      parentOf.set(node.id, parent);
+      remaining.set(node.id, index.get(node.id)?.length ?? 0);
+      counts.set(node.id, 0);
+    }
+  }
+  const ready = [...remaining].filter(([, count]) => count === 0).map(([id]) => id);
+  while (ready.length) {
+    const id = ready.pop()!;
+    const parent = parentOf.get(id)!;
+    if (!remaining.has(parent)) continue;
+    counts.set(parent, counts.get(parent)! + counts.get(id)! + 1);
+    const left = remaining.get(parent)! - 1;
+    remaining.set(parent, left);
+    if (left === 0) ready.push(parent);
+  }
+  return id => (remaining.get(id) === 0 ? counts.get(id)! : branchSize(index, id));
+}
+
 export function descendants(nodes: MapNode[], id: string): Set<string> {
   const found = new Set<string>();
   walkDescendants(childIndex(nodes), id, found);

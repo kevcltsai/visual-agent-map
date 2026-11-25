@@ -3,7 +3,9 @@ import {
   CARD_WIDTH,
   clampCardHeight,
   clampCardWidth,
-  descendants,
+  childIndex,
+  branchSizeResolver,
+  walkDescendants,
   type MapNode
 } from "../../../map-graph";
 import {
@@ -30,7 +32,7 @@ import {
   fishboneSpinePathData,
   type RelationBox
 } from "../../visual-map/relation-geometry";
-import { branchDirectionResolver, lineKind, treeDepthResolver } from "../../visual-map/tree-edge-rules";
+import { branchDirectionResolver, edgeBoxReader, lineKind, treeDepthResolver } from "../../visual-map/tree-edge-rules";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
@@ -301,12 +303,19 @@ export function startViewer(doc: Document): void {
       });
     }
   }
+  const textById = new Map(texts.map(text => [text.id, text]));
+  const textsByParent = new Map<string, typeof texts>();
+  for (const text of texts) {
+    if (!text.parentId) continue;
+    const siblings = textsByParent.get(text.parentId);
+    if (siblings) siblings.push(text);
+    else textsByParent.set(text.parentId, [text]);
+  }
   // A topic that follows a text block (text-then-topic): the link counts only when that block is in the payload on the same parent.
   for (const item of data.nodes) {
     const node = item && typeof item.id === "string" ? byId.get(item.id) : undefined;
     if (!node || typeof item.afterTextId !== "string" || !node.parentId) continue;
-    if (texts.some(text => text.id === item.afterTextId && text.parentId === node.parentId))
-      node.afterTextId = item.afterTextId;
+    if (textById.get(item.afterTextId)?.parentId === node.parentId) node.afterTextId = item.afterTextId;
   }
   // Summary brackets (summary-bracket): plain text and one SVG path per bracket; the run is the payload's member list.
   const sideOf = (value: unknown): SummarySide | null =>
@@ -337,8 +346,11 @@ export function startViewer(doc: Document): void {
   let framesLayer: HTMLElement | null = null;
   const textEls = new Map<string, HTMLElement>();
   const cardShapes = new Map<string, ViewerShape>();
-  const kidsOf = new Map<string, MapNode[]>();
-  for (const node of nodes) if (node.parentId) kidsOf.set(node.parentId, [...(kidsOf.get(node.parentId) ?? []), node]);
+  const graphChildren = childIndex(nodes);
+  const branchCount = branchSizeResolver(graphChildren);
+  // Keep the outline's old convention: root cards are not children of the empty id.
+  const kidsOf = new Map(graphChildren);
+  kidsOf.delete("");
 
   // ---- language: a translated file lists its languages (the original first); a plain file has one and no menu.
   const extras = readUiExtras(doc);
@@ -801,6 +813,10 @@ export function startViewer(doc: Document): void {
   }
   /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
+    // A synchronous draw supersedes the queued drag/cover draw.
+    if (edgeFrame !== null) window.cancelAnimationFrame?.(edgeFrame);
+    edgeFrame = null;
+    edgeGeneration++;
     edges.replaceChildren();
     drawFrames();
     const mapDirection = mapLayout.direction;
@@ -809,15 +825,15 @@ export function startViewer(doc: Document): void {
     for (const text of texts) if (text.parentId && textEls.has(text.id)) drawnTexts.set(text.id, text.parentId);
     const directionOf = branchDirectionResolver(nodes, mapDirection, drawnTexts, rings);
     const edgeDepth = treeDepthResolver(nodes, byId);
-    const treeLine = (parent: HTMLElement, child: HTMLElement, direction: string, depth: number): string =>
-      direction === "right"
-        ? edgePathData(
-            parent.offsetLeft + parent.offsetWidth,
-            parent.offsetTop + parent.offsetHeight / 2,
-            child.offsetLeft,
-            child.offsetTop + child.offsetHeight / 2
-          )
-        : treeEdgePathData(boxOf(parent), boxOf(child), direction as LayoutKind, depth);
+    const boxFor = edgeBoxReader(boxOf);
+    const lines: SVGPathElement[] = [];
+    const treeLine = (parent: HTMLElement, child: HTMLElement, direction: string, depth: number): string => {
+      const a = boxFor(parent);
+      const b = boxFor(child);
+      return direction === "right"
+        ? edgePathData(a.x + a.width, a.y + a.height / 2, b.x, b.y + b.height / 2)
+        : treeEdgePathData(a, b, direction as LayoutKind, depth);
+    };
     for (const node of nodes) {
       // A topic that follows a drawn text block gets its line from the block.
       const afterText = node.afterTextId && textEls.has(node.afterTextId) ? node.afterTextId : null;
@@ -831,7 +847,7 @@ export function startViewer(doc: Document): void {
       path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
       const childInfo = info.get(node.id);
       if (childInfo && styleOf(childInfo).includes("line-thick")) path.setAttribute("data-line-thick", "");
-      edges.append(path);
+      lines.push(path);
     }
     for (const text of texts) {
       const parent = text.parentId ? cards.get(text.parentId) : undefined;
@@ -840,7 +856,7 @@ export function startViewer(doc: Document): void {
       const path = doc.createElementNS(SVG_NS, "path");
       path.setAttribute("d", treeLine(parent, child, directionOf(text.parentId), edgeDepth(text.parentId) + 1));
       path.setAttribute("class", "vam-edge vam-text-edge");
-      edges.append(path);
+      lines.push(path);
     }
     // Free text linked to topics (canvas-text-node): a dashed line, no arrow, no label.
     for (const text of texts) {
@@ -849,19 +865,21 @@ export function startViewer(doc: Document): void {
       for (const id of text.links) {
         const to = cards.get(id);
         if (!to) continue;
-        const toRight = from.offsetLeft + from.offsetWidth / 2 <= to.offsetLeft + to.offsetWidth / 2;
+        const a = boxFor(from);
+        const b = boxFor(to);
+        const toRight = a.x + a.width / 2 <= b.x + b.width / 2;
         const path = doc.createElementNS(SVG_NS, "path");
         path.setAttribute(
           "d",
           edgePathData(
-            toRight ? from.offsetLeft + from.offsetWidth : from.offsetLeft,
-            from.offsetTop + from.offsetHeight / 2,
-            toRight ? to.offsetLeft : to.offsetLeft + to.offsetWidth,
-            to.offsetTop + to.offsetHeight / 2
+            toRight ? a.x + a.width : a.x,
+            a.y + a.height / 2,
+            toRight ? b.x : b.x + b.width,
+            b.y + b.height / 2
           )
         );
         path.setAttribute("class", "vam-edge vam-text-link");
-        edges.append(path);
+        lines.push(path);
       }
     }
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
@@ -869,20 +887,21 @@ export function startViewer(doc: Document): void {
       for (const head of nodes) {
         const headEl = cards.get(head.id);
         if (head.parentId || !headEl) continue;
-        const topics = nodes
+        const topics = (kidsOf.get(head.id) ?? [])
           .filter(node => node.parentId === head.id && !node.afterTextId && cards.has(node.id))
-          .map(node => boxOf(cards.get(node.id)!));
-        const d = fishboneSpinePathData(boxOf(headEl), topics);
+          .map(node => boxFor(cards.get(node.id)!));
+        const d = fishboneSpinePathData(boxFor(headEl), topics);
         if (!d) continue;
         const path = doc.createElementNS(SVG_NS, "path");
         path.setAttribute("class", "vam-edge");
         path.setAttribute("data-spine", "");
         path.setAttribute("d", d);
-        edges.append(path);
+        lines.push(path);
       }
     }
-    drawRelations();
-    drawAnchorLines();
+    for (const line of lines) edges.append(line);
+    drawRelations(boxFor);
+    drawAnchorLines(boxFor);
     drawSummaries();
   }
   /** The middle of a path the geometry modules wrote ("M x y C x y, x y, x y"): where a relation's name sits. */
@@ -920,14 +939,14 @@ export function startViewer(doc: Document): void {
     edges.append(label);
   }
   /** The lines between topic cards that the map owner drew; an end that is not on screen (folded away) gets no line. */
-  function drawRelations(): void {
+  function drawRelations(boxFor: typeof boxOf): void {
     const axis = relationAxisFor(mapLayout.direction);
     for (const relation of relations) {
       const from = cards.get(relation.from);
       const to = cards.get(relation.to);
       if (!from || !to) continue;
-      const a = boxOf(from);
-      const b = boxOf(to);
+      const a = boxFor(from);
+      const b = boxFor(to);
       drawRelationShape(relationPathData(a, b, axis), relation.kind, relationLabelPoint(a, b, axis));
     }
   }
@@ -935,7 +954,7 @@ export function startViewer(doc: Document): void {
    * The line from each linked anchor to its topic card, as the map draws it (view.ts anchorPathData): straight to the facing edge
    * for a card of a picture's ring, a curve for the others. A card that is not drawn gets no line; no name and no arrowhead.
    */
-  function drawAnchorLines(): void {
+  function drawAnchorLines(boxFor: typeof boxOf): void {
     if (!images.length) return;
     const ringed = new Set(ringMembers(imageItems(), nodes).map(member => member.imageId));
     for (const image of images) {
@@ -944,7 +963,7 @@ export function startViewer(doc: Document): void {
         const card = cards.get(link.topic);
         if (!anchor || !card) continue;
         const point = { x: image.x + anchor.x * image.w, y: image.y + anchor.y * image.h };
-        const box = boxOf(card);
+        const box = boxFor(card);
         const inside =
           box.x + box.width / 2 > image.x &&
           box.x + box.width / 2 < image.x + image.w &&
@@ -975,7 +994,9 @@ export function startViewer(doc: Document): void {
     for (const summary of summaries) {
       const rects: BraceRect[] = [];
       for (const id of summary.members) {
-        for (const each of [id, ...descendants(nodes, id)]) {
+        const below = new Set<string>();
+        walkDescendants(graphChildren, id, below);
+        for (const each of [id, ...below]) {
           const card = cards.get(each);
           if (card)
             rects.push({
@@ -1006,11 +1027,14 @@ export function startViewer(doc: Document): void {
       summaryLayer.append(el);
     }
   }
-  let edgeFrame = 0;
+  let edgeFrame: number | null = null;
+  let edgeGeneration = 0;
   const scheduleEdges = (): void => {
-    if (edgeFrame) return;
+    if (edgeFrame !== null) return;
+    const generation = ++edgeGeneration;
     edgeFrame = window.requestAnimationFrame(() => {
-      edgeFrame = 0;
+      if (generation !== edgeGeneration) return;
+      edgeFrame = null;
       drawEdges();
     });
   };
@@ -1027,8 +1051,8 @@ export function startViewer(doc: Document): void {
   const placeTexts = (parentId: string): void => {
     const parent = byId.get(parentId);
     if (!parent) return;
-    for (const text of texts) {
-      const el = text.parentId === parentId ? textEls.get(text.id) : undefined;
+    for (const text of textsByParent.get(parentId) ?? []) {
+      const el = textEls.get(text.id);
       if (!el) continue;
       el.style.left = `${parent.x + text.dx}px`;
       el.style.top = `${parent.y + text.dy}px`;
@@ -1044,13 +1068,10 @@ export function startViewer(doc: Document): void {
       const el = make("div", `vam-text-node${parent ? "" : " is-free"}`);
       el.setAttribute("role", "note");
       el.textContent = text.text;
-      if (!parent) {
-        el.style.left = `${text.dx}px`;
-        el.style.top = `${text.dy}px`;
-      }
+      el.style.left = `${(parent?.x ?? 0) + text.dx}px`;
+      el.style.top = `${(parent?.y ?? 0) + text.dy}px`;
       stage.append(el);
       textEls.set(text.id, el);
-      if (parent) placeTexts(parent.id);
     }
   }
   function renderCards(): void {
@@ -1062,7 +1083,7 @@ export function startViewer(doc: Document): void {
       if (hidden.has(node.id)) continue;
       const item = info.get(node.id)!;
       const shown = textOf(item);
-      const count = descendants(nodes, node.id).size;
+      const count = branchCount(node.id);
       const tier = isTier(item.tier) ? item.tier : undefined;
       const card = make("div", `vam-node${node.id === selected ? " is-selected" : ""}`);
       card.dataset.nodeId = node.id;
@@ -1167,11 +1188,10 @@ export function startViewer(doc: Document): void {
   }
   /** A cover's real shape is known: the cards are taller or shorter, so the lines are drawn again and, while the reader has not moved the view, the view shows everything again. */
   function afterCoverSized(): void {
-    markClipped();
-    scheduleEdges();
-    if (coverRefit) return;
+    if (coverRefit !== null) return;
     coverRefit = window.requestAnimationFrame(() => {
-      coverRefit = 0;
+      coverRefit = null;
+      markClipped();
       // Once the reader has folded or unfolded, covers sized after it can overlap what was just arranged: the map's settle pass, once per frame.
       // Opening a file never gets here with a change (it keeps the saved places).
       if (arranged && needsSecondPass()) {
@@ -1180,17 +1200,17 @@ export function startViewer(doc: Document): void {
         const anchor = anchorId ? cards.get(anchorId) : undefined;
         const before = anchor?.getBoundingClientRect();
         layout();
-        drawEdges();
         if (anchor && before) {
           const rect = anchor.getBoundingClientRect();
           view = { ...view, x: view.x + before.left - rect.left, y: view.y + before.top - rect.top };
           transform();
         }
       }
+      drawEdges();
       if (!viewTouched && selected === null && !pointers.size) fit();
     });
   }
-  let coverRefit = 0;
+  let coverRefit: number | null = null;
   /** The card the reader last folded or unfolded by itself (a whole-map level action clears it). */
   let lastActed: string | null = null;
   /** True after the first fold change or Auto layout: until then the saved places are what is drawn. */
@@ -1330,10 +1350,9 @@ export function startViewer(doc: Document): void {
     const widthOf = (id: string): number | undefined => textEls.get(id)?.offsetWidth || undefined;
     // A text block that has topics after it takes part as a node (its drawn size), so those topics land after it and clear of it.
     // Under a topic that has such followers, its other text blocks take part too, or the followers could land on them.
+    const followers = new Set(nodes.map(node => node.afterTextId));
     const followed = new Set(
-      texts
-        .filter(text => text.parentId && textEls.has(text.id) && nodes.some(node => node.afterTextId === text.id))
-        .map(text => text.parentId)
+      texts.filter(text => text.parentId && textEls.has(text.id) && followers.has(text.id)).map(text => text.parentId)
     );
     const leading = texts.filter(text => text.parentId && textEls.has(text.id) && followed.has(text.parentId));
     if (images.some(image => image.links.some(link => link.ring))) {
@@ -1362,7 +1381,7 @@ export function startViewer(doc: Document): void {
             image.y = (item as AnnotatedImageItem).y;
           }
         } else if (item.kind === "text") {
-          const text = texts.find(each => each.id === (item as TextItem).id);
+          const text = textById.get((item as TextItem).id);
           const parent = text?.parentId ? byId.get(text.parentId) : undefined;
           if (!text) continue;
           text.dx = (item as TextItem).x - (parent ? parent.x : 0);

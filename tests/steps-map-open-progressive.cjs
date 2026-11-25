@@ -127,6 +127,95 @@ async function harness({ count = 3, running = [], gate = true, heights = 100 } =
 }
 const flush = async () => { await tick(); flushRaf(); await tick(); };
 
+// Use the real refresh entry point with the suite's deterministic clock and a controlled mutation queue.
+function refreshFixture() {
+  resetClock();
+  const view = Object.create(VisualAgentMapView.prototype);
+  const queue = [], calls = { hydrate: 0, render: 0, history: 0, rebuild: 0 };
+  Object.assign(view, {
+    path: MAP, map: { nodes: [{ path: 'Note.md' }], title: 'Original' },
+    mapOpenEpoch: 1, closed: false, dragging: false, refreshTimer: null,
+    typingInField: () => false, enqueue: work => queue.push(work),
+    history: { clear: () => calls.history++ },
+    plugin: { repo: { readMap: async () => ({ nodes: [], title: 'Read' }) }, rebuildDerivedData: async () => { calls.rebuild++; } },
+    hydrate: async current => { assert.ok(current()); calls.hydrate++; },
+    render: () => calls.render++
+  });
+  const fire = () => {
+    const timer = clock.timers.find(t => t.ms === 400);
+    assert.ok(timer);
+    clock.timers = clock.timers.filter(t => t !== timer);
+    timer.fn();
+  };
+  return { view, queue, calls, fire };
+}
+
+test('map refresh: same-session note change hydrates and renders, even after the first timer was replaced', async () => {
+  const f = refreshFixture();
+  f.view.changed({ path: 'Note.md' });
+  const stale = clock.timers[0].fn;
+  f.view.changed({ path: 'Note.md' });
+  stale();
+  assert.equal(f.queue.length, 0);
+  assert.equal(clock.timers.length, 1);
+  f.fire();
+  assert.equal(f.view.refreshTimer, null);
+  await f.queue[0]();
+  assert.deepEqual(f.calls, { hydrate: 1, render: 1, history: 0, rebuild: 0 });
+});
+
+test('map refresh: closed or replaced sessions drop pending timer and queued work', async () => {
+  const f = refreshFixture();
+  f.view.changed({ path: 'Note.md' });
+  f.view.mapOpenEpoch++;
+  f.fire();
+  assert.equal(f.queue.length, 0);
+  f.view.changed({ path: 'Note.md' });
+  f.fire();
+  f.view.path = 'Other.md';
+  await f.queue[0]();
+  assert.deepEqual(f.calls, { hydrate: 0, render: 0, history: 0, rebuild: 0 });
+  f.view.closed = true;
+  f.view.changed({ path: 'Note.md' });
+  assert.equal(clock.timers.length, 0);
+});
+
+test('map refresh: a map read returning after close cannot adopt stale state', async () => {
+  const f = refreshFixture();
+  const before = f.view.map;
+  let release;
+  f.view.plugin.repo.readMap = () => new Promise(resolve => { release = resolve; });
+  f.view.changed({ path: MAP });
+  f.fire();
+  const done = f.queue[0]();
+  f.view.closed = true;
+  release({ nodes: [], title: 'Late' });
+  await done;
+  assert.equal(f.view.map, before);
+  assert.deepEqual(f.calls, { hydrate: 0, render: 0, history: 0, rebuild: 0 });
+});
+
+test('map refresh: cancelled hydration cannot render, and explicit timer cancellation drops a late callback', async () => {
+  const f = refreshFixture();
+  let release, current;
+  f.view.hydrate = fence => { current = fence; return new Promise(resolve => { release = resolve; }); };
+  f.view.changed({ path: 'Note.md' });
+  f.fire();
+  const done = f.queue[0]();
+  f.view.mapOpenEpoch++;
+  assert.equal(current(), false);
+  release();
+  await done;
+  assert.equal(f.calls.render, 0);
+  f.view.changed({ path: 'Note.md' });
+  const late = clock.timers[0].fn;
+  f.view.cancelPendingRefresh();
+  late();
+  assert.equal(clock.timers.length, 0);
+  assert.equal(f.view.refreshTimer, null);
+  assert.equal(f.queue.length, 1);
+});
+
 test('a: no frame before the delay; then unread cards are grey placeholders titled from the cache or the file name', async () => {
   const h = await harness();
   const done = h.open();

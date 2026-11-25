@@ -119,6 +119,70 @@ test('mouse-driven focus and Show all still persist the viewport', async () => {
   assert.ok(second.view.map.viewport.y >= 58, 'Show all leaves the toolbar inset');
 });
 
+test('pending viewport flush claims the timer before writing and never writes twice', async () => {
+  const { view } = makeView();
+  let writes = 0;
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  view.persistViewport = async () => {
+    assert.equal(view.viewportTimer, null);
+    writes++;
+    await gate;
+  };
+  await view.flushPendingViewport();
+  assert.equal(writes, 0);
+  view.viewportTimer = setTimeout(() => assert.fail('flushed timer fired'), 60000);
+  try {
+    const first = view.flushPendingViewport();
+    await view.flushPendingViewport();
+    assert.equal(writes, 1);
+    release();
+    await first;
+  } finally {
+    if (view.viewportTimer !== null) clearTimeout(view.viewportTimer);
+  }
+});
+
+test('pending viewport flush propagates a write failure without leaving the timer armed', async () => {
+  const { view } = makeView();
+  view.persistViewport = async () => { throw new Error('write failed'); };
+  view.viewportTimer = setTimeout(() => assert.fail('flushed timer fired'), 60000);
+  try {
+    await assert.rejects(view.flushPendingViewport(), /write failed/);
+    assert.equal(view.viewportTimer, null);
+  } finally {
+    if (view.viewportTimer !== null) clearTimeout(view.viewportTimer);
+  }
+});
+
+test('viewport persistence stamps only the map whose path was written', async () => {
+  const { view } = makeView();
+  view.map.aim = {};
+  const old = view.map;
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let writtenPath;
+  const stored = { viewport: null };
+  view.plugin.repo.updateMap = async (path, change) => {
+    writtenPath = path;
+    change(stored);
+    await gate;
+    return { aim: { contentLanguage: 'en' }, outputLanguage: 'en' };
+  };
+  const write = view.persistViewport();
+  view.path = 'Other.md';
+  view.map = { ...old, aim: {}, viewport: { x: 9, y: 9, zoom: 2 } };
+  release();
+  await write;
+  assert.equal(writtenPath, 'Map.md');
+  assert.deepEqual({ ...stored.viewport }, { x: 40, y: 40, zoom: 1 });
+  assert.equal(view.map.aim.contentLanguage, undefined);
+  assert.equal(view.map.outputLanguage, undefined);
+  await view.persistViewport();
+  assert.equal(view.map.aim.contentLanguage, 'en');
+  assert.equal(view.map.outputLanguage, 'en');
+});
+
 test('Bug bash E #23: Show all and the branch frame use the width a card was resized to, not 280, so a wide rightmost card is not clipped', () => {
   const { view, nodes } = makeView();
   nodes[1].x = 400; nodes[1].y = 300; nodes[1].width = 560;

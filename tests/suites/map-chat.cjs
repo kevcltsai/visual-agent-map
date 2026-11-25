@@ -1132,6 +1132,27 @@ test('map chat 15: dispose() of the panel clears the stage and its timer', () =>
   s.f.panel.dispose(); assert.equal(s.intervals.size, 0); assert.equal(s.f.panel.stage, null); s.tickSeconds(5);
 });
 
+test('map chat paint lifecycle: disposing a waiting panel releases its timer and deferred scroll, even if old callbacks arrive', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  f.panel.setChainWaiting({ kinds: ['research'], total: 1, settled: 0 }, 'next');
+  assert.equal(s.intervals.size, 1);
+  s.clock.run();
+  let paints = 0;
+  f.panel.paintWait = () => { paints++; };
+  f.panel.scrollToEnd = () => { paints++; };
+  f.panel.scrollToEndWhenSettled();
+  const lateFrame = s.clock.queue.find(Boolean);
+  const lateWait = [...s.intervals.values()][0].fn;
+  assert.equal(typeof lateFrame, 'function');
+  f.panel.dispose();
+  assert.equal(s.intervals.size, 0);
+  assert.equal(s.clock.queue.filter(Boolean).length, 0);
+  assert.equal(f.panel.chainWaiting, null);
+  lateFrame(); lateWait();
+  assert.equal(paints, 0);
+});
+
 integrationTest('map chat 15: the view turns a Codex writing event into the Writing stage, and a late event after Stop or an unrelated event changes nothing', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred(); let progress;

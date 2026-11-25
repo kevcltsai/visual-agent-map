@@ -293,7 +293,7 @@ import { canvasImageSpot, placeNewMember, ringMembers, ringSide, type Rect as Ri
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
-import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
+import { branchDirectionResolver, lineKind, treeDepthResolver } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
@@ -1931,6 +1931,8 @@ export class VisualAgentMapView extends ItemView {
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
+  private coverGeneration = 0;
+  private coverPending = new WeakSet<HTMLImageElement>();
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
   private statusBarObserver: ResizeObserver | null = null;
@@ -2034,14 +2036,16 @@ export class VisualAgentMapView extends ItemView {
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
     try {
+      const cut = this.cutIds();
       for (const id of ids) {
         const node = shown.get(id),
           old = this.cardEls.get(id);
         if (!node || !old?.isConnected) continue;
         const hadFocus = activeDocument.activeElement === old;
-        this.renderNode(node);
+        this.renderNode(node, cut);
         const fresh = this.cardEls.get(id);
         if (fresh && fresh !== old) {
+          this.releaseCardCover(old);
           old.replaceWith(fresh);
           if (hadFocus) fresh.focus({ preventScroll: true });
         }
@@ -3100,7 +3104,6 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   async onClose(): Promise<void> {
-    this.closeTopicLinkMenu();
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
@@ -3114,7 +3117,7 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
-    this.cancelLinking(false);
+    this.dropCanvasInteractionModes();
     for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
@@ -3175,11 +3178,7 @@ export class VisualAgentMapView extends ItemView {
     this.anchorDragCancel?.(false);
     // Closing the map's view stops its picture-book run (resumable); the run's calls cannot outlive the view that drives them.
     if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
@@ -3386,6 +3385,18 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /** Captures this open of a map, not a mutable map object that can be refreshed in place. */
+  private captureMapSession(): () => boolean {
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    return () => !this.closed && this.path === path && this.mapOpenEpoch === epoch && !!this.map;
+  }
+  /** A queued gesture must still belong to the map where the user made it when it reaches the mutation queue. */
+  private enqueueMapSession(work: () => Promise<void>, isCurrent = this.captureMapSession()): void {
+    this.enqueue(async () => {
+      if (isCurrent()) await work();
+    });
+  }
   /**
    * A card dropped while notes are still being read is written after the read (the queue holds it). By then the view may be
    * closed or showing another map, and the card is not where the drop saw it: the write is dropped, never applied to the wrong map.
@@ -3395,12 +3406,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(work);
       return;
     }
-    const epoch = this.mapOpenEpoch,
-      path = this.path;
-    this.enqueue(async () => {
-      if (this.closed || this.mapOpenEpoch !== epoch || this.path !== path || !this.map) return;
-      await work();
-    });
+    this.enqueueMapSession(work);
   }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   private outputLanguageMemory(): OutputLanguageMemory {
@@ -3545,9 +3551,7 @@ export class VisualAgentMapView extends ItemView {
       this.exitPresentation(false);
     }
     if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
+      await this.flushPendingViewport();
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
@@ -3572,7 +3576,10 @@ export class VisualAgentMapView extends ItemView {
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
-    if (this.path !== path) this.hiddenAnchors.clear();
+    if (this.path !== path) {
+      this.dropCanvasInteractionModes();
+      this.hiddenAnchors.clear();
+    }
     this.path = path;
     this.map = map;
     this.selection.exitMultiSelect("openMap");
@@ -7903,13 +7910,13 @@ export class VisualAgentMapView extends ItemView {
     if (was && announce) this.announcer?.setText(t("ui.anchor_pick_cancelled"));
   }
   /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelPlacing(announce: boolean): void {
+  private cancelPlacing(announce: boolean, restoreFocus = true): void {
     const placing = this.placing;
     this.endPlacingListeners?.();
     this.placing = null;
     if (!placing) return;
     if (announce) this.announcer?.setText(t("ui.anchor_place_cancelled"));
-    this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
   }
   private finishPlacing(at: { x: number; y: number }): void {
     const placing = this.placing;
@@ -8628,8 +8635,10 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
-  private liveLinks(text: TextItem): string[] {
-    const alive = new Set((this.map?.nodes ?? []).map(node => node.id));
+  private liveLinks(
+    text: TextItem,
+    alive: ReadonlySet<string> = new Set((this.map?.nodes ?? []).map(node => node.id))
+  ): string[] {
     return (text.links ?? []).filter(id => alive.has(id));
   }
   /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
@@ -8782,13 +8791,20 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Leaves link mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelLinking(announce: boolean): void {
+  private cancelLinking(announce: boolean, restoreFocus = true): void {
     const id = this.linkingTextId;
     this.endLinkListeners?.();
     this.linkingTextId = null;
     if (!id) return;
     if (announce) this.announcer?.setText(t("ui.text_link_cancelled"));
-    this.textEls.get(id)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.textEls.get(id)?.focus?.({ preventScroll: true });
+  }
+  /** Ends map-owned interactions before switching maps or closing; never focus a departing element. */
+  private dropCanvasInteractionModes(): void {
+    this.cancelLinking(false, false);
+    this.cancelPicking(false);
+    this.cancelPlacing(false, false);
+    this.closeTopicLinkMenu();
   }
   /** Writes the link as one undo step, then leaves link mode; a repeat is announced and not written twice. */
   private finishLinking(cardId: string): void {
@@ -9931,7 +9947,7 @@ export class VisualAgentMapView extends ItemView {
       images = imageFilesFrom({ files: all });
     for (const other of all.filter(item => !images.includes(item)))
       new Notice(t("ui.canvas_image_refused", other.name || "?"));
-    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+    if (images.length) this.enqueueMapSession(() => this.attachCardImages(node, images));
   }
   /**
    * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
@@ -9941,9 +9957,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
     if (!this.map || !this.cardAcceptsImages(node)) return;
-    const mapPath = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let first = true;
     for (const file of files) {
       const label = file.name || "?";
@@ -9955,10 +9969,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -9969,7 +9983,7 @@ export class VisualAgentMapView extends ItemView {
       const setCover = first;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale() || !this.map) return;
+        if (!isCurrent() || !this.map) return;
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction()
           .createAttachment("image", { name, data, sourcePath: node.path })
@@ -10379,6 +10393,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
   private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const isCurrent = this.captureMapSession();
     const input = this.contentEl.createEl("input", {
       cls: "vam-sr-only",
       attr: { type: "file", accept: "image/*", multiple: "" }
@@ -10386,7 +10401,7 @@ export class VisualAgentMapView extends ItemView {
     input.addEventListener("change", () => {
       const chosen = Array.from(input.files ?? []);
       input.remove();
-      if (chosen.length) this.queueCanvasImages(chosen, point);
+      if (chosen.length && isCurrent()) this.queueCanvasImages(chosen, point);
     });
     input.click();
   }
@@ -10405,7 +10420,7 @@ export class VisualAgentMapView extends ItemView {
     const target = this.map?.nodes.find(item => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
       event.preventDefault();
-      this.enqueue(() => this.attachCardImages(target, images));
+      this.enqueueMapSession(() => this.attachCardImages(target, images));
       return true;
     }
     if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
@@ -10417,7 +10432,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Fences the gesture on this map and this open of it, then queues the writes. */
   private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
-    this.enqueue(() => this.insertCanvasImages(files, point));
+    this.enqueueMapSession(() => this.insertCanvasImages(files, point));
   }
   /**
    * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
@@ -10426,9 +10441,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
     if (!this.canEditCanvasItems()) return;
-    const path = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let offset = 0;
     for (const file of files) {
       const label = file.name || "?";
@@ -10440,10 +10453,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -10460,7 +10473,7 @@ export class VisualAgentMapView extends ItemView {
         y = point.y + offset;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale()) return;
+        if (!isCurrent()) return;
         this.focusItemId = id;
         await this.mapChangeSnapshots(
           (map, attachment) => {
@@ -11127,7 +11140,7 @@ export class VisualAgentMapView extends ItemView {
     for (const view of this.plugin.views()) {
       if (view === this || view.path !== from) continue;
       if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
-      await view.flushForCrossMap();
+      await view.flushPendingViewport();
     }
     let sourceMap: MapDocument;
     try {
@@ -11221,13 +11234,6 @@ export class VisualAgentMapView extends ItemView {
           if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
       }
     });
-  }
-  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
-  private async flushForCrossMap(): Promise<void> {
-    if (this.viewportTimer === null) return;
-    window.clearTimeout(this.viewportTimer);
-    this.viewportTimer = null;
-    await this.persistViewport();
   }
   /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
   private crossMapEntry(id: string): Action {
@@ -11752,11 +11758,7 @@ export class VisualAgentMapView extends ItemView {
         return file instanceof TFile ? () => this.app.vault.readBinary(file) : null;
       },
       path: () => this.path,
-      fence: () => {
-        const mapPath = this.path,
-          epoch = this.mapOpenEpoch;
-        return (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-      },
+      fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";
@@ -11922,11 +11924,7 @@ export class VisualAgentMapView extends ItemView {
           action: () =>
             this.enqueue(async () => {
               if (!this.map) return;
-              if (this.viewportTimer !== null) {
-                window.clearTimeout(this.viewportTimer);
-                this.viewportTimer = null;
-                await this.persistViewport();
-              }
+              if (this.viewportTimer !== null) await this.flushPendingViewport();
               const path = this.path,
                 file = this.plugin.repo.file(path),
                 content = await this.app.vault.read(file),
@@ -11987,11 +11985,7 @@ export class VisualAgentMapView extends ItemView {
     this.restoreMapFocus(this.lastMapFocus);
   }
   private async restoreDeletedMapFromUi(): Promise<void> {
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
     if (this.history.undoEntry === this.deletedMap?.deleteAction) {
       await this.travel(false);
       this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
@@ -12166,6 +12160,8 @@ export class VisualAgentMapView extends ItemView {
     this.inlineSummaryInput = null;
     // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
     for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    // The link menu's document listener outlives its DOM unless it is explicitly closed.
+    this.closeTopicLinkMenu();
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
     this.removeGoalBar();
     this.contentEl.empty();
@@ -12435,7 +12431,8 @@ export class VisualAgentMapView extends ItemView {
     const fits: Array<() => void> = [];
     this.pendingCardFits = fits;
     try {
-      for (const node of shown) this.renderNode(node);
+      const cut = this.cutIds();
+      for (const node of shown) this.renderNode(node, cut);
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
@@ -12588,7 +12585,7 @@ export class VisualAgentMapView extends ItemView {
     this.fillEmptyMap(box);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
-  private renderNode(shownNode: MapNode): void {
+  private renderNode(shownNode: MapNode, cut: ReadonlySet<string> = this.cutIds()): void {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
     const index = this.paintCardIndex ?? cardIndex(this.map?.nodes ?? []);
@@ -12604,7 +12601,7 @@ export class VisualAgentMapView extends ItemView {
       card.addClass("vam-node-loading");
       card.setAttr("aria-busy", "true");
     }
-    this.paintCut(card, node.id);
+    this.paintCut(card, node.id, cut.has(node.id));
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(index.depth(node)));
@@ -13822,8 +13819,17 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
+    this.coverGeneration++;
     this.coverObserver?.disconnect();
     this.coverObserver = null;
+    this.coverPending = new WeakSet();
+  }
+  private releaseCardCover(card: HTMLElement): void {
+    const cover = cardCovers.get(card);
+    if (!cover) return;
+    this.coverPending.delete(cover.img);
+    this.coverObserver?.unobserve(cover.img);
+    cardCovers.delete(card);
   }
   /**
    * Puts a fixed-height cover frame before the card's title when the note's metadata names a local image (frontmatter
@@ -13833,9 +13839,8 @@ export class VisualAgentMapView extends ItemView {
   private paintCover(card: HTMLElement, notePath: string): void {
     const old = cardCovers.get(card);
     if (old) {
-      this.coverObserver?.unobserve(old.img);
+      this.releaseCardCover(card);
       old.frame.remove();
-      cardCovers.delete(card);
     }
     const placed = this.paintCoverFrame(card, notePath);
     // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
@@ -13877,15 +13882,19 @@ export class VisualAgentMapView extends ItemView {
     // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
     const known = coverShapes.get(imagePath);
     if (known) placeCoverFrame(parts, known, mask);
+    const generation = this.coverGeneration;
+    const current = (): boolean =>
+      !this.closed && generation === this.coverGeneration && cardCovers.get(card)?.img === img;
     // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
     img.addEventListener("error", () => {
-      this.coverObserver?.unobserve(img);
+      if (!current()) return;
+      this.releaseCardCover(card);
       frame.remove();
-      cardCovers.delete(card);
       arrangeCover(card, null, "top");
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
+      if (!current()) return;
       const shape = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
       if (!shape || frame.hasClass("is-sized")) return;
       coverShapes.set(imagePath, shape);
@@ -13898,14 +13907,17 @@ export class VisualAgentMapView extends ItemView {
       return { frame, position };
     }
     this.coverObserver ??= new IntersectionObserver(entries => {
+      if (this.closed || generation !== this.coverGeneration) return;
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const target = entry.target as HTMLImageElement;
+        if (!this.coverPending.delete(target)) continue;
         const real = target.getAttribute("data-src");
         if (real) target.setAttr("src", real);
         this.coverObserver?.unobserve(target);
       }
     });
+    this.coverPending.add(img);
     this.coverObserver.observe(img);
     return { frame, position };
   }
@@ -14111,11 +14123,13 @@ export class VisualAgentMapView extends ItemView {
   async prepareShare(timeoutMs = 3000): Promise<void> {
     if (!this.map || this.notesLoading()) return;
     const waits: Promise<void>[] = [];
+    const finish: Array<() => void> = [];
     for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
       const card = this.cardEls.get(id);
       const cover = card ? cardCovers.get(card) : undefined;
       if (!cover || cover.frame.classList.contains("is-sized")) continue;
       const img = cover.img;
+      this.coverPending.delete(img);
       this.coverObserver?.unobserve(img);
       waits.push(
         new Promise<void>(resolve => {
@@ -14124,6 +14138,7 @@ export class VisualAgentMapView extends ItemView {
             img.removeEventListener("error", done);
             resolve();
           };
+          finish.push(done);
           img.addEventListener("load", done);
           img.addEventListener("error", done);
           // A lazy image off screen never loads, whatever its src: without this the wait always runs out.
@@ -14143,6 +14158,8 @@ export class VisualAgentMapView extends ItemView {
         })
       ]);
       window.clearTimeout(timer);
+      // A timed-out image may never emit another event. Release every wait listener even then.
+      for (const done of finish) done();
     }
     try {
       await this.plugin.mutate(async () => undefined, { sync: false });
@@ -19601,13 +19618,23 @@ export class VisualAgentMapView extends ItemView {
         this.viewportQueued = false;
       });
   }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushPendingViewport(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
+    const path = this.path;
     const viewport = { ...this.map.viewport };
-    const written = await this.plugin.repo.updateMap(this.path, map => {
+    const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });
+    // A late write for the previous map must not stamp the newly opened map.
+    if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)
@@ -24365,6 +24392,7 @@ export class VisualAgentMapView extends ItemView {
     movingImageId?: string
   ): { update: (dx: number, dy: number) => void } {
     const nodes = this.map?.nodes ?? [];
+    const edgeDepth = treeDepthResolver(nodes);
     const directionOf = branchDirectionResolver(
       nodes,
       layoutOf(this.map).direction,
@@ -24393,7 +24421,7 @@ export class VisualAgentMapView extends ItemView {
         parentId,
         childId,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
-        depth: depthOf(nodes, childId)
+        depth: edgeDepth(childId)
       });
     }
     const linked: { key: string; fromId: string; toId: string }[] = [];
@@ -24500,6 +24528,7 @@ export class VisualAgentMapView extends ItemView {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = this.map?.nodes ?? [];
+    const edgeDepth = treeDepthResolver(nodes);
     const directionOf = branchDirectionResolver(
       nodes,
       mapDirection,
@@ -24521,7 +24550,7 @@ export class VisualAgentMapView extends ItemView {
       touching.push({
         key,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
-        depth: depthOf(nodes, childId),
+        depth: edgeDepth(childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
@@ -24630,6 +24659,7 @@ export class VisualAgentMapView extends ItemView {
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
+    const edgeDepth = treeDepthResolver(allNodes);
     const directionOf = branchDirectionResolver(
       allNodes,
       mapDirection,
@@ -24676,7 +24706,7 @@ export class VisualAgentMapView extends ItemView {
                 child.offsetLeft,
                 child.offsetTop + child.offsetHeight / 2
               )
-            : treeEdgePathData(boxOf(parent), boxOf(child), direction, depthOf(allNodes, node.id))
+            : treeEdgePathData(boxOf(parent), boxOf(child), direction, edgeDepth(node.id))
         );
         path.addClass("vam-edge");
         if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -24696,11 +24726,15 @@ export class VisualAgentMapView extends ItemView {
         this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);
       }
     }
+    // Both kinds of text edge share one lookup, preserving the first matching text item in map order.
+    const textsById = new Map<string, TextItem>();
+    if (this.textEls.size)
+      for (const item of this.map.canvasItems ?? [])
+        if (item.kind === "text" && !textsById.has((item as TextItem).id))
+          textsById.set((item as TextItem).id, item as TextItem);
     // A text node hangs from its topic by the same kind of line.
     for (const [textId, textEl] of this.textEls) {
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       const parent = text?.parentId ? this.cardEls.get(text.parentId) : undefined;
       if (!text || !parent || textEl.classList.contains("is-free")) continue;
       const direction = directionOf(text.parentId as string) as LayoutKind;
@@ -24714,20 +24748,20 @@ export class VisualAgentMapView extends ItemView {
               textEl.offsetLeft,
               textEl.offsetTop + textEl.offsetHeight / 2
             )
-          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, depthOf(allNodes, text.parentId as string) + 1)
+          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, edgeDepth(text.parentId as string) + 1)
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");
       lines.push(path);
     }
     // A free text block is joined to the cards it links to by a dashed line: no arrow, no label (canvas-text-node decision #2).
+    let alive: Set<string> | undefined;
     for (const [textId, textEl] of this.textEls) {
       if (!textEl.classList.contains("is-free")) continue;
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       if (!text) continue;
-      for (const cardId of this.liveLinks(text)) {
+      alive ??= new Set(allNodes.map(node => node.id));
+      for (const cardId of this.liveLinks(text, alive)) {
         const card = this.cardEls.get(cardId);
         if (!card) continue;
         const path = createSvg("path");
@@ -24797,14 +24831,34 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from: card, to: card, key, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
+    // Measure every endpoint once, before adding SVG elements; paths and labels share the same geometry.
+    const axis = relationAxisFor(layoutOf(this.map).direction);
+    const boxes = new Map<HTMLElement, CardBox>();
+    const boxFor = (card: HTMLElement): CardBox => {
+      let box = boxes.get(card);
+      if (!box) {
+        box = boxOf(card);
+        boxes.set(card, box);
+      }
+      return box;
+    };
+    const measured = links.map(link => {
+      const to = boxFor(link.to);
+      if (link.anchor)
+        return {
+          ...link,
+          d: this.anchorPathData(link.anchor, to),
+          at: this.anchorLabelPoint(link.anchor, to)
+        };
+      const from = boxFor(link.from);
+      return { ...link, d: relationPathData(from, to, axis), at: relationLabelPoint(from, to, axis) };
+    });
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
-    // In a map that grows sideways the lines lean to the left and right edges, in one that grows up or down to the ends.
-    const axis = relationAxisFor(layoutOf(this.map).direction);
-    for (const link of links) {
-      const d = this.relationLinkPath(link, axis),
+    for (const link of measured) {
+      const d = link.d,
         marker =
           link.kind === "related"
             ? null
@@ -24865,7 +24919,7 @@ export class VisualAgentMapView extends ItemView {
       this.edgesEl.appendChild(hit);
       this.relationHitEls.set(key, hit);
     }
-    for (const link of links) {
+    for (const link of measured) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
       if (link.anchor) label.setAttribute("data-anchor-relation", "");
@@ -24873,12 +24927,7 @@ export class VisualAgentMapView extends ItemView {
         label.addClass("is-ring-quiet");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(
-        link.key,
-        link.anchor
-          ? this.anchorLabelPoint(link.anchor, boxOf(link.to))
-          : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
-      );
+      this.placeRelationLabel(link.key, link.at);
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
@@ -24917,14 +24966,6 @@ export class VisualAgentMapView extends ItemView {
     return side
       ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor)
       : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
-  }
-  private relationLinkPath(
-    link: { from: HTMLElement; to: HTMLElement; anchor?: AnchorLine },
-    axis: ReturnType<typeof relationAxisFor>
-  ): string {
-    return link.anchor
-      ? this.anchorPathData(link.anchor, boxOf(link.to))
-      : relationPathData(boxOf(link.from), boxOf(link.to), axis);
   }
   /**
    * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing

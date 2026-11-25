@@ -123,6 +123,29 @@ test('P5 cut: writes the private format, marks the source cards and names them "
   assert.equal(h.view.cardEls.get(h.ids.leaf).classes.has('is-cut'), false);
 });
 
+test('card paint batches share the cut index; standalone card rendering still reads current clipboard state', async () => {
+  const h = await harness();
+  cutOf(h, ['branch']);
+  const source = require('node:fs').readFileSync(nodePath.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const partial = source.slice(source.indexOf('private rebuildLoadedCards('), source.indexOf('private lockWhileLoading('));
+  const full = source.slice(source.indexOf('private paint(): void'), source.indexOf('private emptyCanvasState('));
+  for (const batch of [partial, full]) {
+    assert.equal((batch.match(/this\.cutIds\(\)/g) || []).length, 1);
+    assert.match(batch, /this\.renderNode\(node, cut\)/);
+  }
+  const cut = h.view.cutIds();
+  const original = h.view.cutIds.bind(h.view);
+  let reads = 0;
+  h.view.cutIds = () => { reads++; return original(); };
+  for (const node of h.map().nodes) h.view.renderNode(node, cut);
+  assert.equal(reads, 0, 'shared membership does not allocate a set for every card');
+  assert.deepEqual(marked(h).sort(), ['branch', 'kid']);
+  h.sessionFor(h.plugin).cancelCut();
+  h.view.renderNode(h.map().nodes.find(n => n.id === h.ids.branch));
+  assert.equal(reads, 1);
+  assert.equal(h.view.cardEls.get(h.ids.branch).classes.has('is-cut'), false);
+});
+
 test('P5 cut then paste under another card moves the same notes: one history step, undo puts them back', async () => {
   const h = await harness();
   cutOf(h, ['branch']);

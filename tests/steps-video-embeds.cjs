@@ -99,10 +99,13 @@ test('a list item whose whole content was a removed embed goes with its marker; 
 });
 test('hook: ai-task-service filters task-mode details with the opened urls of countsWeb runs and none otherwise', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'ai-task-service.ts'), 'utf8');
-  assert.match(source, /\.\.\.\(countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]\)/);
+  assert.match(source, /const openedUrls = countsWeb \? openedUrlsFromEvents\(webEvents\) : \[\]/);
+  assert.match(source, /\[\.\.\.openedUrls, \.\.\.videoUrlsInText/);
   assert.match(source, /\.\.\.videoUrlsInText\(`\$\{input\.task\}\\n\$\{input\.userTexts \?\? ""\}`\)/);
-  assert.match(source, /keepOpenedVideoEmbeds\(result\.detail, videoFilter\.opened, input\.detail\)/);
-  assert.match(source, /if \(keepsEvents \|\| countsWeb\) webEvents\.push\(event\)/);
+  assert.match(source, /keepOpenedVideoEmbeds\(detail, urls, input\.detail\)/);
+  assert.match(source, /filterVideos\(result\.detail, videoUrls\)/);
+  assert.match(source, /filterVideos\(repaired\.detail, videoUrls\)/);
+  assert.match(source, /webEvents\.push\(event\)/);
 });
 
 // ---- AiTaskService behaviour (reviewer R1): a fake runtime with web events ----
@@ -137,6 +140,21 @@ test('AiTaskService: a research run keeps the embed of an opened video and remov
   const result = await h.service.askModel(ctx({ researchMode: 'research', researchDepth: 'normal' }), 'gpt-6-luna', 'low');
   assert.ok(result.detail.includes(`![](https://www.youtube.com/watch?v=${A})`));
   assert.ok(!result.detail.includes(B));
+});
+test('research retry: only the successful attempt can authorize new video embeds', async () => {
+  const h = rigService(call => {
+    if (call.n === 1) {
+      call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${A}`));
+      throw Object.assign(new Error('no search'), { name: 'SearchNotPerformedError' });
+    }
+    call.controls.onWebSearchEvent?.(openPage(`https://www.youtube.com/watch?v=${B}`));
+    return reply(`x\n\n![](https://youtu.be/${A})\n\n![](https://youtu.be/${B})`);
+  });
+  const result = await h.service.askModel(ctx({ researchMode: 'research', researchDepth: 'normal' }), 'gpt-6-luna', 'low');
+  assert.equal(h.calls.length, 2);
+  assert.equal(result.retrievals, 1);
+  assert.ok(!result.detail.includes(A));
+  assert.ok(result.detail.includes(B));
 });
 test('AiTaskService: a Quick run opens no page, so every embed goes', async () => {
   const h = rigService(call => reply(`x\n\n![](https://youtu.be/${A})\n`));

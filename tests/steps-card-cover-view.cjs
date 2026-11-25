@@ -42,7 +42,7 @@ const make = (cache, extra = {}) => {
       }
     },
     selection: new (S.load('experiences/visual-map/topic-selection.ts').TopicSelection)(),
-    coverObserver: null, ...extra
+    coverObserver: null, coverGeneration: 0, coverPending: new WeakSet(), ...extra
   });
   return view;
 };
@@ -79,6 +79,39 @@ test('topic-cover wins over the embed, and painting again replaces the frame', (
   view.paintCover(c, 'Topics/n.md');
   assert.equal(frames(c).length, 1);
   assert.equal(imgs(c)[0].attrs['data-src'], 'app://res/img/b.jpg');
+});
+
+test('obsolete cover callbacks cannot load, remove or resize a replacement cover', () => {
+  before();
+  const view = make({ embeds: [{ link: 'img/redraw.png' }] });
+  const c = card();
+  let resized = 0;
+  view.afterCoverSized = () => { resized++; };
+  view.paintCover(c, 'Topics/n.md');
+  const [old] = imgs(c), observer = observers[0];
+  view.paintCover(c, 'Topics/n.md');
+  const [fresh] = imgs(c);
+  observer.callback([{ target: old, isIntersecting: true }]);
+  assert.equal(old.attrs.src, undefined, 'queued observation of a replaced cover is ignored');
+  old.naturalWidth = 400; old.naturalHeight = 200;
+  old.fire('load'); old.fire('error');
+  assert.equal(resized, 0);
+  assert.equal(imgs(c)[0], fresh);
+  observer.callback([{ target: fresh, isIntersecting: true }]);
+  assert.equal(fresh.attrs.src, 'app://res/img/redraw.png');
+  view.releaseCovers();
+  view.paintCover(c, 'Topics/n.md');
+  const [newest] = imgs(c);
+  observer.callback([{ target: newest, isIntersecting: true }]);
+  assert.equal(newest.attrs.src, undefined, 'an old observer cannot load a new generation');
+  fresh.naturalWidth = 400; fresh.naturalHeight = 200;
+  fresh.fire('load'); fresh.fire('error');
+  assert.equal(resized, 0);
+  assert.equal(imgs(c)[0], newest);
+  view.releaseCardCover(c);
+  assert.equal(observers[1].observed.has(newest), false);
+  observers[1].callback([{ target: newest, isIntersecting: true }]);
+  assert.equal(newest.attrs.src, undefined, 'a replaced card has no pending observer');
 });
 
 test('counterexample 1: a cover file that does not exist adds no frame, no image and no console error', () => {
@@ -541,7 +574,10 @@ test('share snapshot: ring heights are read after the covers load, not while the
 test('share snapshot: a picture that never arrives times out and writes no ring heights; a failed picture counts as measured', async () => {
   before();
   const slow = shareView();
+  const listeners = name => (slow.img.listeners[name] ?? []).length;
+  const beforeWait = [listeners('load'), listeners('error')];
   await slow.view.prepareShare(30);
+  assert.deepEqual([listeners('load'), listeners('error')], beforeWait, 'timeout releases the temporary listeners');
   assert.equal(slow.view.shareSnapshot().ringHeights, undefined);
   const failed = shareView();
   const pending = failed.view.prepareShare(2000);

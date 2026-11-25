@@ -8,7 +8,7 @@ export interface ModelChoice {
   reasoning: ReasoningLevel;
 }
 
-export interface ModelResolutionInput {
+interface ModelResolutionInput {
   /** A model chosen for this one run only. An empty model does not count as chosen. */
   runOnce?: { model: string; reasoning?: ReasoningLevel } | null;
   /** The topic's own manual model, or the nearest manual ancestor's (null when there is none). */

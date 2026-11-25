@@ -1504,6 +1504,31 @@ test('sharing viewer images: new interface text exists in every language and the
   }
 });
 
+test('tree edge depth resolver shares a lazy index and preserves missing, text and cyclic parent rules', () => {
+  const { depthOf, treeDepthResolver } = load('experiences/visual-map/tree-edge-rules.ts');
+  const nodes = [
+    { id: 'root', parentId: null },
+    { id: 'child', parentId: 'root' },
+    { id: 'text-child', parentId: 'child', afterTextId: 'text' },
+    { id: 'orphan', parentId: 'missing' },
+    { id: 'cycle-a', parentId: 'cycle-b' },
+    { id: 'cycle-b', parentId: 'cycle-a', afterTextId: 'text' }
+  ];
+  const ids = [...nodes.map(n => n.id), 'missing'];
+  const expected = ids.map(id => depthOf(nodes, id));
+  const map = nodes.map.bind(nodes);
+  let scans = 0;
+  nodes.map = (...args) => { scans++; return map(...args); };
+  const resolve = treeDepthResolver(nodes);
+  assert.equal(scans, 0);
+  for (let pass = 0; pass < 2; pass++) assert.deepEqual(ids.map(resolve), expected);
+  assert.equal(scans, 1);
+  const indexed = treeDepthResolver(nodes, new Map(nodes.map(n => [n.id, n])));
+  const before = scans;
+  assert.deepEqual(ids.map(indexed), expected);
+  assert.equal(scans, before, 'viewer can reuse its existing node index');
+});
+
 test('sharing viewer images: a file with no pictures, covers or layout draws none of them (headless Chrome)', async t => {
   await withChrome(t, 'vam-share-noimg-', async (chrome, directory) => {
     const report = await dumpDomLight(chrome, directory, await pageOf(directory, payload()), 60000, async send => {

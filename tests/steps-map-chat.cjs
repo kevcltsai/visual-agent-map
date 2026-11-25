@@ -1556,6 +1556,24 @@ test('one or two new cards and no layout line: counts and lines are unchanged', 
   assert.deepEqual(plain(splitChatLines(lines, ['Arranged', 'Undo'])), { results: lines, notes: [] });
 });
 
+test('result lines preserve order, duplicates and identity while counts exclude notes of every status', () => {
+  const note = { status: 'failed', text: 'Undo' };
+  const skippedNote = { status: 'skipped', text: 'Undo' };
+  const failed = { status: 'failed', text: 'Failed' };
+  const done = { status: 'done', text: 'Added' };
+  const skipped = { status: 'skipped', text: 'Skipped' };
+  const lines = [note, failed, done, skippedNote, skipped, done];
+  const split = splitChatLines(lines, ['Undo', 'Undo']);
+  assert.deepEqual(plain(split), { results: [failed, done, skipped, done], notes: [note, skippedNote] });
+  assert.equal(split.results[1], done);
+  assert.equal(split.results[3], done);
+  assert.equal(split.notes[0], note);
+  assert.deepEqual(plain(countChatLines(lines, 'Undo')), { done: 2, skipped: 1, failed: 1 });
+  assert.deepEqual(plain(countChatLines(lines)), { done: 2, skipped: 2, failed: 2 });
+  assert.deepEqual(plain(countChatLines([], 'Undo')), { done: 0, skipped: 0, failed: 0 });
+  assert.deepEqual(plain(splitChatLines([], 'Undo')), { results: [], notes: [] });
+});
+
 // ---- AI chat sorts the cards under one parent (persona 23) ------------------------------------------------------------------
 test('persona 23: reorder_topics keeps the listed children of one parent in the given order; a new: card of this reply can be listed', () => {
   const got = parse(reply(

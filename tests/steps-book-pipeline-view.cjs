@@ -2120,3 +2120,16 @@ test('book review lifecycle: a late note read cannot overwrite the replacement s
   await pending;
   assert.equal(r.view.notes.get(r.ids.a), current);
 });
+
+test('book review lifecycle: renaming the open map keeps its queued review work', async () => {
+  const r = await boxRig();
+  let release;
+  r.view.bookNoteChain = new Promise(resolve => { release = resolve; });
+  const calls = [];
+  r.view.resolveBookNote = async id => calls.push(id);
+  const queued = r.view.queueBookResolve(r.ids.a);
+  r.view.path = `${r.view.path.replace(/\.md$/, '')} renamed.md`;
+  release();
+  await queued;
+  assert.deepEqual(calls, [r.ids.a]);
+});

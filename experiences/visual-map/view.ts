@@ -17765,9 +17765,9 @@ export class VisualAgentMapView extends ItemView {
   /** The review's logical map session; ordinary paints and read-backs do not replace it. */
   private bookReviewSession(): () => boolean {
     const epoch = this.bookReviewEpoch;
-    const path = this.path;
     const mapId = this.map?.id;
-    return () => !this.closed && this.bookReviewEpoch === epoch && this.path === path && this.map?.id === mapId;
+    // No path check: renaming or moving the open map keeps its review (a switch or delete already bumps the epoch).
+    return () => !this.closed && this.bookReviewEpoch === epoch && this.map?.id === mapId;
   }
 
   private dropBookReviewSession(): void {
@@ -17780,9 +17780,11 @@ export class VisualAgentMapView extends ItemView {
 
   private queueBookResolve(id: string): Promise<void> {
     const current = this.bookReviewSession();
-    this.bookNoteChain = this.bookNoteChain.then(async () => {
-      if (current()) await this.resolveBookNote(id);
-    }).catch(() => undefined);
+    this.bookNoteChain = this.bookNoteChain
+      .then(async () => {
+        if (current()) await this.resolveBookNote(id);
+      })
+      .catch(() => undefined);
     return this.bookNoteChain;
   }
   /**
@@ -17833,20 +17835,17 @@ export class VisualAgentMapView extends ItemView {
       this.bookResolved.set(id, entry.fp);
       // "Keep my version" is recorded once, at the tick (the box still asks its question): a later save of the note never moves the kept
       // record to the new text.
+      // The note writes are scoped to the note, not the view: a confirmed answer is written through even if the view moves on.
       if (state.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
-      if (!current()) return;
       await this.plugin.bookCallouts.markHandled(node.path);
       if (current()) this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
       // "Keep my version" ticked while no view was there to see it (the box still asks its question): recorded now, once.
       if (state?.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
-      if (!current()) return;
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
-      if (!current()) return;
       if (entry.problems.every(problem => problem.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
-        if (!current()) return;
         await this.plugin.bookCallouts.reconcile(mapPath, this.bookMayCarryCallouts);
         if (current()) await this.rereadBookCard(id);
       }

@@ -27,6 +27,9 @@ export async function readStoreText(adapter: StoreAdapter, path: string): Promis
  */
 export async function writeStoreAtomically(adapter: StoreAdapter, path: string, text: string): Promise<void> {
   const temporary = `${path}.tmp`;
+  // A previous write may have removed the old file but failed to publish its complete temp file.
+  // Recover that snapshot before a retry can truncate it. The primary still wins when both exist.
+  if (!(await adapter.exists(path)) && (await adapter.exists(temporary))) await adapter.rename(temporary, path);
   await adapter.write(temporary, text);
   if (await adapter.exists(path)) await adapter.remove(path);
   await adapter.rename(temporary, path);

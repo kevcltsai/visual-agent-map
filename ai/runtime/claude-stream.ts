@@ -1,4 +1,5 @@
 import type { AiMilestones } from "../../ai-exchange-log";
+import { claudeReportedUsage } from "../../core/ai-usage-measurement";
 import { StructuredPreview, type PartialFields } from "../partial-structured";
 import type { ResearchStageName } from "../research-observer";
 
@@ -78,18 +79,7 @@ export class ClaudeTranscriptFacts {
     const record = item as ClaudeRecord;
     if (record.type === "result") {
       // Claude reports cached prompt tokens separately from `input_tokens`; all three are input the call sent.
-      const parts = [
-        record.usage?.input_tokens,
-        record.usage?.cache_creation_input_tokens,
-        record.usage?.cache_read_input_tokens
-      ].filter((value): value is number => typeof value === "number");
-      const input = parts.length ? parts.reduce((total, value) => total + value, 0) : undefined;
-      const output = record.usage?.output_tokens;
-      if (typeof input === "number" || typeof output === "number")
-        this.usage = {
-          ...(typeof input === "number" ? { inputTokens: input } : {}),
-          ...(typeof output === "number" ? { outputTokens: output } : {})
-        };
+      this.usage = claudeReportedUsage(record.usage) ?? this.usage;
       return;
     }
     if (record.parent_tool_use_id) return;

@@ -232,7 +232,6 @@ import {
   applyCollapseLevel,
   canParent,
   clone,
-  branchSize,
   childIndex,
   descendants,
   History,
@@ -258,6 +257,7 @@ import {
   CARD_WIDTH_MAX,
   CARD_WIDTH_MIN,
   CARD_WIDTH_STEP,
+  branchSizeResolver,
   clampCardHeight,
   clampCardWidth
 } from "../../map-graph";
@@ -293,7 +293,7 @@ import { canvasImageSpot, placeNewMember, ringMembers, ringSide, type Rect as Ri
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
-import { branchDirectionResolver, lineKind, treeDepthResolver } from "./tree-edge-rules";
+import { branchDirectionResolver, edgeBoxReader, lineKind, treeDepthResolver } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
@@ -1638,8 +1638,10 @@ export class VisualAgentMapView extends ItemView {
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
   /** Card heights as drawn by the last render; the relevance sort reads these so every `canvasNodes()` call of one render agrees. */
   private drawnHeights = new Map<string, number>();
+  private drawnHeightsMap: string | null = null;
   private sortHeightOf = (id: string): number | undefined =>
-    this.drawnHeights.get(id) || this.map?.nodes.find(node => node.id === id)?.height;
+    (this.drawnHeightsMap === this.map?.id ? this.drawnHeights.get(id) : undefined) ||
+    this.map?.nodes.find(node => node.id === id)?.height;
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -1907,7 +1909,7 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
-  private paintChildIndex: Map<string, MapNode[]> | null = null;
+  private paintBranchSize: ((id: string) => number) | null = null;
   /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
   private paintCardIndex: CardIndex | null = null;
   /** The book structure computed once for a whole paint (every card asks for its place); null outside a paint. */
@@ -2034,7 +2036,7 @@ export class VisualAgentMapView extends ItemView {
     const shown = new Map(this.canvasNodes().map(node => [node.id, node]));
     const fits: Array<() => void> = [];
     this.renderingCard = true;
-    this.paintChildIndex = childIndex(this.map.nodes);
+    this.paintBranchSize = branchSizeResolver(childIndex(this.map.nodes));
     this.paintCardIndex = cardIndex(this.map.nodes);
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
@@ -2055,7 +2057,7 @@ export class VisualAgentMapView extends ItemView {
       }
     } finally {
       this.renderingCard = false;
-      this.paintChildIndex = null;
+      this.paintBranchSize = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -3149,6 +3151,8 @@ export class VisualAgentMapView extends ItemView {
     this.pendingSummary = null;
     this.summaryEditDraft = null;
     this.releaseCovers();
+    this.drawnHeights.clear();
+    this.drawnHeightsMap = null;
     this.unbindClipboard?.();
     this.unbindClipboard = null;
     this.statusBarObserver?.disconnect();
@@ -12362,7 +12366,20 @@ export class VisualAgentMapView extends ItemView {
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
     // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
-    for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    const mapId = this.map?.id ?? null;
+    if (this.drawnHeightsMap !== mapId) {
+      // The DOM still belongs to the previous map. Never use its heights for ids reused in this map.
+      this.drawnHeights.clear();
+      this.drawnHeightsMap = mapId;
+    } else {
+      const live = new Set(this.map?.nodes.map(node => node.id) ?? []);
+      for (const id of this.drawnHeights.keys()) if (!live.has(id)) this.drawnHeights.delete(id);
+      for (const [id, card] of this.cardEls) {
+        if (!live.has(id)) continue;
+        const height = card.offsetHeight;
+        if (height > 0) this.drawnHeights.set(id, height);
+      }
+    }
     // The link menu's document listener outlives its DOM unless it is explicitly closed.
     this.closeTopicLinkMenu();
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
@@ -12627,8 +12644,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
-    // Every card shows its branch size: one child index per paint keeps that linear in the map size.
-    this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    // Every card shows its branch size: count all branches once for this paint.
+    this.paintBranchSize = this.map ? branchSizeResolver(childIndex(this.map.nodes)) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     this.paintBookStructure = { value: this.bookStructureNow() };
     const fits: Array<() => void> = [];
@@ -12638,7 +12655,7 @@ export class VisualAgentMapView extends ItemView {
       for (const node of shown) this.renderNode(node, cut);
     } finally {
       this.renderingCard = false;
-      this.paintChildIndex = null;
+      this.paintBranchSize = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -13171,9 +13188,7 @@ export class VisualAgentMapView extends ItemView {
     // branch's count) stays in the header. The floating tools are icon-only buttons: AI explore, Details, fold, this card
     // (structure), select subtopics and remove. Add text is in the card's + menu only.
     const tools = card.createDiv("vam-node-tools");
-    const count = this.paintChildIndex
-      ? branchSize(this.paintChildIndex, node.id)
-      : descendants(this.map!.nodes, node.id).size;
+    const count = this.paintBranchSize?.(node.id) ?? descendants(this.map!.nodes, node.id).size;
     if (count) {
       if (node.collapsed) {
         // A folded branch keeps its count on the card; expanding is a header button.
@@ -13985,9 +14000,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
     if (this.noteLoad) return;
-    // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
-    // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
-    if (this.renderHold > 0 || this.history.grouping) return;
+    // A chat reply or an active drag has not finished placing its cards. Preserve the previous heights until it is done.
+    if (this.renderHold > 0 || this.history.grouping || this.dragging) return;
     const now = new Map<string, number>();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
     const first = this.heightsSeenMap !== this.map.id;
@@ -13995,7 +14009,7 @@ export class VisualAgentMapView extends ItemView {
     const grew = cardsChangedHeight(first ? new Map() : previous, now);
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
-    if (!grew.size || this.settling || this.dragging) return;
+    if (!grew.size || this.settling) return;
     if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
     this.settling = true;
     const mapId = this.map.id;
@@ -24893,16 +24907,20 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** The head and first-level topic boxes of one spine, read from the cards on screen. */
-  private spineBoxes(headId: string): { head: CardBox; topics: { id: string; box: CardBox }[] } | null {
+  private spineBoxes(
+    headId: string,
+    nodes = this.canvasNodes(),
+    boxFor = boxOf
+  ): { head: CardBox; topics: { id: string; box: CardBox }[] } | null {
     const head = this.cardEls.get(headId);
     if (!head || !this.map) return null;
     const topics: { id: string; box: CardBox }[] = [];
-    for (const node of this.canvasNodes()) {
+    for (const node of nodes) {
       if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
-      if (card) topics.push({ id: node.id, box: boxOf(card) });
+      if (card) topics.push({ id: node.id, box: boxFor(card) });
     }
-    return { head: boxOf(head), topics };
+    return { head: boxFor(head), topics };
   }
   /**
    * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
@@ -24945,6 +24963,8 @@ export class VisualAgentMapView extends ItemView {
     // Lines are collected first and added after every position is read: adding each one before reading the next card's
     // position would make the browser lay out the stage again for every line.
     const lines: SVGPathElement[] = [];
+    const boxFor = edgeBoxReader(boxOf);
+    const shown = this.canvasNodes();
     // An argument map's tree edges end in an arrowhead on the parent's right edge (one per parent, none for the proposition
     // and the eliminated group); every other map draws none.
     const argumentRead = this.map.argumentMap === undefined ? null : readArgumentMap(this.map);
@@ -24957,7 +24977,7 @@ export class VisualAgentMapView extends ItemView {
           )
         : null;
     const tipped = new Set<string>();
-    for (const node of this.canvasNodes()) {
+    for (const node of shown) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
         // A topic that follows a drawn text block gets its line from the block; when the block is not drawn, from the topic.
@@ -24973,16 +24993,13 @@ export class VisualAgentMapView extends ItemView {
         const path = createSvg("path");
         // The edge follows its parent's arrangement, which a branch of its own may change.
         const direction = lineKind(allNodes, sourceId, node.id, directionOf(parentId)) as LayoutKind;
+        const a = boxFor(parent);
+        const b = boxFor(child);
         path.setAttribute(
           "d",
           direction === "right"
-            ? edgePathData(
-                parent.offsetLeft + parent.offsetWidth,
-                parent.offsetTop + parent.offsetHeight / 2,
-                child.offsetLeft,
-                child.offsetTop + child.offsetHeight / 2
-              )
-            : treeEdgePathData(boxOf(parent), boxOf(child), direction, edgeDepth(node.id))
+            ? edgePathData(a.x + a.width, a.y + a.height / 2, b.x, b.y + b.height / 2)
+            : treeEdgePathData(a, b, direction, edgeDepth(node.id))
         );
         path.addClass("vam-edge");
         if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -24995,7 +25012,7 @@ export class VisualAgentMapView extends ItemView {
           if (!tipped.has(parentId)) {
             tipped.add(parentId);
             lines.push(
-              argumentTipPath(parent.offsetLeft + parent.offsetWidth, parent.offsetTop + parent.offsetHeight / 2)
+              argumentTipPath(a.x + a.width, a.y + a.height / 2)
             );
           }
         }
@@ -25015,16 +25032,13 @@ export class VisualAgentMapView extends ItemView {
       if (!text || !parent || textEl.classList.contains("is-free")) continue;
       const direction = directionOf(text.parentId as string) as LayoutKind;
       const path = createSvg("path");
+      const a = boxFor(parent);
+      const b = boxFor(textEl);
       path.setAttribute(
         "d",
         direction === "right"
-          ? edgePathData(
-              parent.offsetLeft + parent.offsetWidth,
-              parent.offsetTop + parent.offsetHeight / 2,
-              textEl.offsetLeft,
-              textEl.offsetTop + textEl.offsetHeight / 2
-            )
-          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, edgeDepth(text.parentId as string) + 1)
+          ? edgePathData(a.x + a.width, a.y + a.height / 2, b.x, b.y + b.height / 2)
+          : treeEdgePathData(a, b, direction, edgeDepth(text.parentId as string) + 1)
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");
@@ -25041,29 +25055,30 @@ export class VisualAgentMapView extends ItemView {
         const card = this.cardEls.get(cardId);
         if (!card) continue;
         const path = createSvg("path");
-        path.setAttribute("d", relationPathData(boxOf(textEl), boxOf(card)));
+        path.setAttribute("d", relationPathData(boxFor(textEl), boxFor(card)));
         path.addClass("vam-text-link");
         path.setAttribute("data-text-id", textId);
         path.setAttribute("data-card-id", cardId);
         lines.push(path);
       }
     }
-    for (const line of lines) this.edgesEl.appendChild(line);
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {
-      for (const node of this.canvasNodes()) {
+      const children = childIndex(shown);
+      for (const node of shown) {
         if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
         const path = createSvg("path");
         path.addClass("vam-edge");
         path.setAttribute("data-spine", "");
         if (!this.map.aim) path.setAttribute("data-parent-line", "");
         this.spineEls.set(node.id, path);
-        this.placeSpine(node.id);
-        if (path.getAttribute("d")) this.edgesEl.appendChild(path);
+        this.placeSpine(node.id, undefined, this.spineBoxes(node.id, children.get(node.id) ?? [], boxFor));
+        if (path.getAttribute("d")) lines.push(path);
         else this.spineEls.delete(node.id);
       }
     }
-    this.drawRelations();
+    for (const line of lines) this.edgesEl.appendChild(line);
+    this.drawRelations(boxFor);
     this.syncRelationClasses();
   }
   /**
@@ -25074,7 +25089,7 @@ export class VisualAgentMapView extends ItemView {
    * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
    * draws none, and its file keeps the key.
    */
-  private drawRelations(): void {
+  private drawRelations(boxFor = edgeBoxReader(boxOf)): void {
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
@@ -25109,15 +25124,6 @@ export class VisualAgentMapView extends ItemView {
     if (!links.length) return;
     // Measure every endpoint once, before adding SVG elements; paths and labels share the same geometry.
     const axis = relationAxisFor(layoutOf(this.map).direction);
-    const boxes = new Map<HTMLElement, CardBox>();
-    const boxFor = (card: HTMLElement): CardBox => {
-      let box = boxes.get(card);
-      if (!box) {
-        box = boxOf(card);
-        boxes.set(card, box);
-      }
-      return box;
-    };
     const measured = links.map(link => {
       const to = boxFor(link.to);
       if (link.anchor)

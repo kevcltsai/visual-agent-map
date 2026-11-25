@@ -7,11 +7,11 @@ const code = buildSync({ entryPoints: ['ai/runtime/codex-app-server.ts'] }).outp
 function fixture(autoInitialize = true) {
   const children = []; const requests = []; let threadCounter = 0;
   const spawn = () => {
-    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.killed = false;
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.killed = false; child.requests = [];
     child.kill = () => { child.killed = true; return true; };
     child.send = message => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`));
     child.stdin = { write: line => {
-      const message = JSON.parse(line); requests.push(message);
+      const message = JSON.parse(line); requests.push(message); child.requests.push(message);
       const respond = result => process.nextTick(() => child.send({ id: message.id, result }));
       if (message.method === 'initialize' && autoInitialize) respond({});
       if (message.method === 'thread/start') respond({ thread: { id: `thread-${++threadCounter}` } });
@@ -77,4 +77,53 @@ test('Codex stdout and stderr keep a multi-byte character split across chunks', 
   assert.ok(!seen.join('').includes('�'));
   split(child.stderr, '錯誤：點');
   assert.equal(runtime.stderr, '錯誤：點');
+});
+
+test('an acknowledged initializer cannot initialize a replacement process', async () => {
+  const { runtime, children } = fixture(false);
+  const old = runtime.start();
+  const rejected = assert.rejects(old, /stopped|停止/i);
+  const original = children[0];
+  original.send({ id: original.requests.find(r => r.method === 'initialize').id, result: {} });
+  // The initialize response resolved, but its async continuation has not run yet.
+  runtime.stop();
+  const replacement = runtime.start();
+  const next = children[1];
+  try {
+    await rejected;
+    assert.equal(next.requests.filter(r => r.method === 'initialized').length, 0);
+    next.send({ id: next.requests.find(r => r.method === 'initialize').id, result: {} });
+    await replacement;
+    assert.equal(next.requests.filter(r => r.method === 'initialized').length, 1);
+    assert.equal(next.killed, false);
+  } finally { runtime.stop(); await replacement.catch(() => undefined); }
+});
+
+test('abort in the request callback does not send a model turn', async () => {
+  const { runtime, requests } = fixture();
+  const controller = new AbortController();
+  try {
+    await assert.rejects(runtime.runTask('stop before send', 'model', 'low', null, {
+      signal: controller.signal, onRequest: () => controller.abort()
+    }), error => error.name === 'AbortError');
+    assert.equal(requests.filter(r => r.method === 'turn/start').length, 0);
+    assert.equal(requests.filter(r => r.method === 'thread/unsubscribe').length, 1);
+  } finally { runtime.stop(); }
+});
+
+test('a stopped turn never sends its unsubscribe to a replacement process', async () => {
+  const { runtime, children, requests } = fixture();
+  const old = runtime.runTask('old turn', 'model', 'low', null);
+  const rejected = assert.rejects(old, /stopped|停止/i);
+  try {
+    for (let i = 0; i < 10 && !requests.some(r => r.method === 'turn/start'); i++) await tick();
+    assert.ok(requests.some(r => r.method === 'turn/start'));
+    runtime.stop();
+    const replacement = runtime.start();
+    await rejected;
+    await replacement;
+    assert.equal(children.length, 2);
+    assert.equal(children[1].requests.filter(r => r.method === 'thread/unsubscribe' || r.method === 'turn/interrupt').length, 0);
+    assert.equal(children[1].killed, false);
+  } finally { runtime.stop(); }
 });

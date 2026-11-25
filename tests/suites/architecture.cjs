@@ -41,3 +41,9 @@ test('escapeRegExp treats every metacharacter as literal text', () => {
     assert.ok(!pattern.test(input + 'x'), input);
   }
 });
+
+test('shared record guard preserves the non-null, non-array object check', () => {
+  const { isRecord } = load('core/is-record.ts');
+  for (const value of [{}, { a: 1 }, Object.create(null), new Date()]) assert.equal(isRecord(value), true);
+  for (const value of [null, undefined, [], [1], '', 'text', 0, 1, false, true, () => {}]) assert.equal(isRecord(value), false);
+});

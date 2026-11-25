@@ -8,6 +8,7 @@ import {
 } from "../../note-values";
 import { normalizeRelationDescription, type TopicRelation, type TopicRelationKind } from "../../map-model";
 import { OUTLINE_TITLE_LIMIT } from "./outline-import";
+import { isRecord } from "../../core/is-record";
 
 /**
  * Private clipboard format v1 for copying a branch (`vam-branch`). The clipboard is untrusted input: parsing builds
@@ -78,8 +79,6 @@ const RELATION_KIND_RECORD: Record<TopicRelationKind, true> = {
 };
 const RELATION_KINDS: readonly string[] = Object.keys(RELATION_KIND_RECORD);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 /** Own properties only, so an inherited or `__proto__` value is never read as a field. */
 const own = (record: Record<string, unknown>, key: string): unknown =>
   Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;

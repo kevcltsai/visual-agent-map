@@ -2,8 +2,7 @@ import { estimateTokens } from "../../../ai/context-builder";
 import type { ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { inLanguageNaming } from "../_shared/fragments";
-import { noteNumbers } from "../chart/insert";
-import { linksOf } from "../task/merge-check";
+import { linksOf, normalNumber, noteNumbers } from "../../evidence-tokens";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
 
@@ -81,11 +80,6 @@ export function citation(value: unknown, allowed: ReadonlySet<string>, what: str
   }
   return out;
 }
-
-const normalNumber = (token: string): string => {
-  const value = Number(token);
-  return Number.isFinite(value) && token.length < 16 ? String(value) : token;
-};
 
 /**
  * No-memory check: every number and URL in the reply's free text must already be in the request's free text. Identifiers

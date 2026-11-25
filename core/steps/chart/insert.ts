@@ -1,4 +1,7 @@
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
+import { noteNumbers, numberTokens } from "../../evidence-tokens";
+
+export { noteNumbers, numberTokens } from "../../evidence-tokens";
 
 export const CHART_SHAPES = [
   "stages",
@@ -32,34 +35,6 @@ export type ChartCode =
   | "runtime_error";
 
 export type ApplyChartsResult = { ok: true; detail: string } | { ok: false; code: ChartCode; index: number };
-
-/** Digits that belong to an identifier (A1, v2, C4, H2O, quadrant-1) are not quantities. */
-export function numberTokens(text: string): string[] {
-  const s = text.normalize("NFKC"),
-    out: string[] = [];
-  const re = /\d{1,3}(?:,\d{3})+(?!\d)(?:\.\d+)?|\d+(?:\.\d+)?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(s))) {
-    const p = m.index > 0 ? s[m.index - 1] : "",
-      pp = m.index > 1 ? s[m.index - 2] : "";
-    if (/[A-Za-z_]/.test(p)) continue;
-    if (p === "-" && /[A-Za-z]/.test(pp)) continue;
-    out.push(m[0].replace(/,/g, ""));
-  }
-  return out;
-}
-
-/** Numbers a chart may use: those in the note body, never in diagrams, link targets, URLs, footnote markers or comments. */
-export function noteNumbers(detail: string): Set<string> {
-  let t = detail.replace(/\r\n/g, "\n");
-  t = t.replace(/^[ \t]*(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n[\s\S]*?\n[ \t]*\1[ \t]*$/gm, "");
-  t = t
-    .replace(/\]\([^)]*\)/g, "]")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/\[\^[^\]]*\]/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
-  return new Set(numberTokens(t));
-}
 
 export function existingDiagrams(detail: string): { count: number; types: string[] } {
   const lines = detail.replace(/\r\n/g, "\n").split("\n"),

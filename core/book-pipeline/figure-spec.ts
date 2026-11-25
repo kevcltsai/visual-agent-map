@@ -1,7 +1,7 @@
 // Structured book figures (bar, scale, graph, board): the model fills a small JSON, the plugin checks it against the chapter text and
 // draws it (figure-layout.ts). Pure functions only. Every number is a string exactly as written in the text ("69.0", not 69), so a
 // number check is a string lookup; coordinates (board rows/columns of a cell) are positions the plugin draws, not quantities.
-import { noteNumbers, numberTokens } from "../steps/chart/insert";
+import { noteNumbers, numberTokens } from "../evidence-tokens";
 
 export type FigureCode = "figure_type" | "figure_shape" | "unsafe_text" | "number_not_in_text" | "bad_body";
 

@@ -89,12 +89,14 @@ test('main task routing: Codex local and web, Claude without the prefix; the sch
 });
 
 test('main task controls: signal reaches the runtime and aborts with the caller, timeout, search flags, accepted and web callbacks', async () => {
-  const h = rig({ handler: call => answer(call) });
+  const event = { method: 'item/started', params: {} };
+  const h = rig({ handler: call => { call.controls.onWebSearchEvent?.(event); return answer(call); } });
   const controller = new AbortController(), accepted = () => {}, webEvents = [], web = event => webEvents.push(event);
   await h.service.askModel(context({ researchMode: 'research', timeoutMs: 240_000 }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
   const controls = h.state.calls[0].controls;
   assert.equal(controls.onAccepted, accepted);
-  controls.onWebSearchEvent?.({ method: 'item/started', params: {} }); assert.deepEqual(webEvents, [{ method: 'item/started', params: {} }], 'web events reach the caller (a standard research counts them on the way)');
+  assert.deepEqual(webEvents, [event], 'web events reach the caller while the request runs');
+  controls.onWebSearchEvent?.(event); assert.deepEqual(webEvents, [event], 'late web events are ignored');
   assert.equal(controls.timeoutMs, 240_000); assert.equal(controls.timeoutMessage, translate('en', 'ui.aim_task_timeout', 4));
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, undefined);
   assert.ok(controls.signal instanceof AbortSignal);
@@ -105,6 +107,34 @@ test('main task controls: signal reaches the runtime and aborts with the caller,
   const m = rig({ handler: call => { seen = call.controls.signal; assert.equal(seen.aborted, false); midCall.abort(); assert.equal(seen.aborted, true, 'the caller\'s abort reaches the runtime signal'); return answer(call); } });
   await assert.rejects(m.service.askModel(context(), 'gpt-6-luna', 'low', midCall.signal), error => error.name === 'AbortError');
   assert.notEqual(seen, midCall.signal);
+});
+
+test('research provider call shares the plugin registry and releases its own key on global stop', async () => {
+  const activeTasks = new Map();
+  const owner = new AbortController();
+  activeTasks.set('note.md', owner);
+  const h = rig({ extra: { activeTasks }, handler: call => {
+    const registered = [...activeTasks.entries()].filter(([key]) => key.startsWith('ai-task:'));
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0][1].signal, call.controls.signal);
+    for (const controller of activeTasks.values()) controller.abort();
+    assert.equal(call.controls.signal.aborted, true);
+    return answer(call); // Even an uncooperative runtime must not commit a stopped reply.
+  } });
+  await assert.rejects(h.service.askModel(context(), 'gpt-6-luna', 'low'), error => error.name === 'AbortError');
+  assert.equal(owner.signal.aborted, true);
+  assert.deepEqual([...activeTasks.keys()], ['note.md']);
+});
+
+test('research success removes its own registry key without deleting another owner', async () => {
+  const owner = new AbortController(), activeTasks = new Map([['note.md', owner]]);
+  const h = rig({ extra: { activeTasks }, handler: call => {
+    assert.equal([...activeTasks.values()].some(controller => controller.signal === call.controls.signal), true);
+    return answer(call);
+  } });
+  assert.equal((await h.service.askModel(context(), 'gpt-6-luna', 'low')).summary, 'S');
+  assert.deepEqual([...activeTasks.entries()], [['note.md', owner]]);
+  assert.equal(owner.signal.aborted, false);
 });
 
 // ---- 2. failures ----
@@ -284,6 +314,30 @@ test('re-send with a runtime that ignores the abort: the first entry is failed a
   assert.ok(!h.of(first.id).includes('received'));
 });
 
+test('a replaced research attempt cannot contribute late web events or acceptance to its replacement', async () => {
+  const clock = fakeClock(); let resend, accepted = 0, oldReply, nextReply;
+  const h = rig({ clock, handler: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted?.();
+    call.controls.onRequest({ n: call.n });
+    return new Promise(resolve => {
+      if (call.n === 1) oldReply = resolve;
+      else nextReply = resolve;
+    });
+  } });
+  const events = [];
+  const done = h.service.askModel(context({ researchMode: 'research' }), 'claude:sonnet', 'low', undefined, h.mark, () => { accepted++; }, event => events.push(event), {
+    onSlow: (_id, _slow, handle) => { if (handle) resend = handle; }
+  });
+  await waitFor(() => h.state.calls.length === 1); clock.advance(20_000); resend();
+  await waitFor(() => h.state.calls.length === 2);
+  const [first, second] = h.state.calls;
+  first.controls.onWebSearchEvent?.(webEvent); first.controls.onAccepted?.();
+  second.controls.onWebSearchEvent?.(webEvent);
+  nextReply(GOOD); const result = await done;
+  assert.equal(accepted, 2); assert.equal(result.retrievals, 1); assert.deepEqual(events, [webEvent]);
+  oldReply(GOOD); await flush();
+});
+
 // ---- reference rounds ----
 test('reference rounds: four extract, one reduce and the main task each end parsed with no completed', async () => {
   const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
@@ -432,6 +486,19 @@ test('chart abort while the runtime runs: one failed with the error message, no 
   assert.deepEqual(h.names(), ['begin', 'ox', 'sent', 'failed']);
   assert.equal(count(h, 'failed'), 1); assert.equal(count(h, 'completed'), 0);
   assert.match(h.order.at(-1)[2], /^(AbortError: )?Aborted$/);
+});
+
+test('chart provider call shares the registry and releases the key even when stopped globally', async () => {
+  const activeTasks = new Map();
+  const h = rig({ extra: { activeTasks, mermaidParses: async () => true }, handler: call => {
+    const registered = [...activeTasks.entries()].filter(([key]) => key.startsWith('chart:'));
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0][1].signal, call.controls.signal);
+    registered[0][1].abort();
+    return answer(call, chartReply());
+  } });
+  await assert.rejects(h.service.chartDetail({ input: chartBase(), detail: NOTE, model: 'gpt-6-luna' }), error => error.name === 'AbortError');
+  assert.equal(activeTasks.size, 0);
 });
 
 test('chart: an already aborted signal throws before anything is logged or called', async () => {
@@ -729,4 +796,43 @@ test('noContentLog: the exchange log gets the omitted markers, not the prompt or
   const loud = rig({ handler: call => answer(call, reply) });
   await loud.service.askModel(context({ task: `Do ${SECRET}` }), 'gpt-6-luna', 'low', undefined, loud.mark);
   assert.ok(JSON.stringify(loud.order.filter(e => e[0] === 'sent' || e[0] === 'received')).includes(SECRET), 'default: unchanged');
+});
+
+test('noContentLog redacts provider failures while returning the original error to the caller', async () => {
+  const secret = 'private chapter content in provider error';
+  const h = rig({ handler: call => { call.controls.onRequest({ private: secret }); throw new Error(secret); } });
+  await assert.rejects(h.service.askModel(context({ noContentLog: true }), 'gpt-6-luna', 'low', undefined, h.mark), /private chapter content/);
+  assert.equal(h.order.filter(event => event[0] === 'failed').length, 1);
+  assert.equal(h.order.find(event => event[0] === 'failed')[2], 'failed');
+  assert.ok(!JSON.stringify(h.order).includes(secret));
+});
+
+test('reference extraction failure stops sibling requests and preserves the original error', async () => {
+  const boom = new Error('extract failure'); let rejectFirst;
+  const h = rig({ handler: call => {
+    call.controls.onRequest({ n: call.n });
+    if (call.n === 1) return new Promise((_resolve, reject) => { rejectFirst = reject; });
+    return new Promise((_resolve, reject) => {
+      call.controls.signal.addEventListener('abort', () => reject(abortError('sibling stopped')), { once: true });
+    });
+  } });
+  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(90_001) }));
+  const done = h.service.condenseReferences(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }] }), 'gpt-6-luna', 'low');
+  await waitFor(() => h.state.calls.length === 3);
+  rejectFirst(boom);
+  await assert.rejects(done, error => error === boom);
+  await flush();
+  assert.equal(h.state.calls.length, 3, 'no fourth extract starts after a sibling fails');
+  assert.ok(h.state.calls.slice(1).every(call => call.controls.signal.aborted));
+});
+
+test('research stopped during async Mermaid validation does not return a parsed result', async () => {
+  const controller = new AbortController();
+  let release;
+  const h = rig({ extra: { mermaidSyntax: async () => { await new Promise(resolve => { release = resolve; }); return true; } }, handler: call => answer(call, JSON.stringify({ summary: 'S', detail: 'D\n\n```mermaid\ngraph TD\n  A --> B\n```', suggestions: [], visualReferences: [] })) });
+  const done = h.service.askModel(context(), 'gpt-6-luna', 'low', controller.signal, h.mark);
+  await waitFor(() => !!release);
+  controller.abort(); release();
+  await assert.rejects(done, error => error.name === 'AbortError');
+  assert.equal(h.names().includes('parsed'), false);
 });

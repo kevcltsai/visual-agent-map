@@ -36,9 +36,7 @@ function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
 }
 /** The shipped build: AIM was removed, so this is `load` (tests/suites/legacy-aim-map.cjs keeps its name for what it loads). */
 const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues);
-const core = load('map-model.ts');
-const layout = load('map-layout.ts');
-const logging = load('log-manager.ts');
+let core, layout, logging;
 const node = (id, parentId = null, collapsed = false) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed });
 const map = nodes => ({ id: 'map', title: '測試心智圖', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } });
 const plain = obj => JSON.parse(JSON.stringify(obj));
@@ -77,7 +75,7 @@ function withExpansionCoordinator(plugin) {
   plugin.expansionCoordinator = new ShallowExpansionCoordinator(plugin.activeTasks, plugin.expansionBatches);
   attachTopicRuns(plugin);
   // The real plugin resolves the current model one way (ADR-021); a double over settings answers the same.
-  plugin.currentModelChoice ??= () => ({ model: plugin.settings.cliModel, reasoning: normalizeReasoningLevel(plugin.settings.cliReasoning) });
+  plugin.currentModelChoice ??= () => ({ model: plugin.settings.cliModel, reasoning: repositoryModule().normalizeReasoningLevel(plugin.settings.cliReasoning) });
   return plugin;
 }
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
@@ -98,8 +96,11 @@ const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, setTo
   parseYaml: cachedParseYaml,
   stringifyYaml: obj => YAML.stringify(obj, null, { nullStr: '', lineWidth: 0, aliasDuplicateObjects: false })
 };
-const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
+// Preserve shared module identity without evaluating unused product modules for basic helpers.
+let repository;
+const repositoryModule = () => (repository ??= load('repository.ts', { obsidian }));
 function fixture(language = 'zh-TW', options = {}) {
+  const { Repository, DEFAULT_SETTINGS } = repositoryModule();
   const files = new Map(), contents = new Map(), trashed = [];
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; // Obsidian's vault tree hides dot-files and dot-folders; the adapter (disk) listing below still reports them.
     if (item.parent instanceof TFolder && !item.name.startsWith('.') && !item.parent.children.includes(item)) item.parent.children.push(item); };
@@ -142,4 +143,4 @@ const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, deferred, until };
+module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, get core() { return core ??= load('map-model.ts'); }, get layout() { return layout ??= load('map-layout.ts'); }, get logging() { return logging ??= load('log-manager.ts'); }, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, get Repository() { return repositoryModule().Repository; }, get DEFAULT_SETTINGS() { return repositoryModule().DEFAULT_SETTINGS; }, get normalizeReasoningLevel() { return repositoryModule().normalizeReasoningLevel; }, fixture, topicNote, deferred, until };

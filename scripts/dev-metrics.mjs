@@ -51,8 +51,42 @@ export function matchingEvidence(file, identity) {
     }).slice(-10);
   } catch { return []; }
 }
+// Descriptive stage durations from existing local events, not an end-to-end or before/after benchmark.
+export function summarizeDevEvents(raw) {
+  const groups = new Map();
+  let invalid = 0;
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let row;
+    try { row = JSON.parse(line); } catch { invalid++; continue; }
+    if (row?.version !== 1 || !stages.has(row.stage) ||
+      !["ok", "error"].includes(row.outcome) || !Number.isFinite(row.durationMs) || row.durationMs < 0) {
+      invalid++; continue;
+    }
+    const mode = ["full", "files", "none"].includes(row.mode) ? row.mode : "unavailable";
+    const key = JSON.stringify([row.stage, row.outcome, mode]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row.durationMs);
+  }
+  const rows = [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([key, durations]) => {
+    const [stage, outcome, mode] = JSON.parse(key);
+    durations.sort((a, b) => a - b);
+    const percentile = p => durations[Math.ceil(durations.length * p) - 1];
+    return { stage, outcome, mode, samples: durations.length, p50Ms: percentile(0.5), p95Ms: percentile(0.95) };
+  });
+  return { schema: 1, scope: "local stage events; mixed candidates; durations are not additive wall time", informationalOnly: true, invalid, rows };
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv[2] !== "--evidence") throw new Error("Usage: node scripts/dev-metrics.mjs --evidence");
-  const identity = candidateEvidence();
-  process.stdout.write(JSON.stringify({ candidate: identity, evidence: matchingEvidence(telemetryFile(), identity), informationalOnly: true, note: "Local records are not permission to skip a gate; full CI and host/runtime evidence remain authoritative." }, null, 2) + "\n");
+  if (process.argv.length === 3 && process.argv[2] === "--summary") {
+    const file = telemetryFile();
+    if (!file) throw new Error("Local development telemetry is unavailable.");
+    let raw;
+    try { raw = readFileSync(file, "utf8"); } catch { throw new Error("Unable to read local development telemetry."); }
+    process.stdout.write(JSON.stringify(summarizeDevEvents(raw), null, 2) + "\n");
+  } else {
+    if (process.argv.length !== 3 || process.argv[2] !== "--evidence") throw new Error("Usage: node scripts/dev-metrics.mjs --evidence | --summary");
+    const identity = candidateEvidence();
+    process.stdout.write(JSON.stringify({ candidate: identity, evidence: matchingEvidence(telemetryFile(), identity), informationalOnly: true, note: "Local records are not permission to skip a gate; full CI and host/runtime evidence remain authoritative." }, null, 2) + "\n");
+  }
 }

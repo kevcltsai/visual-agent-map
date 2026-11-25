@@ -74,7 +74,7 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
    * The waiting process if it was started for exactly `key`. Another key gets null and the slot stays: an unrelated
    * call (chart job, merge, another card) must not kill the process the open dialog is about to use.
    */
-  take(key: string): T | null {
+  take(key: string, prepare?: () => void): T | null {
     const slot = this.slot;
     if (!slot) return null;
     if (slot.exited) {
@@ -84,6 +84,14 @@ export class ClaudeWarmPool<T extends WarmProcess = WarmProcess> {
     if (slot.key !== key) return null;
     this.slot = null;
     this.clearIdle(slot);
+    // The receiver's synchronous preflight must succeed before ownership is transferred.
+    // If it fails, kill only this claimed process, not a replacement idle slot.
+    try {
+      prepare?.();
+    } catch (error) {
+      if (!slot.exited) this.kill(slot);
+      throw error;
+    }
     return slot.child;
   }
   /** Kills the waiting process (an unused dialog, Stop, unload, runtime reset). Safe to call at any time. */

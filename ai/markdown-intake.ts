@@ -8,7 +8,7 @@ import { dedupeImageEmbeds } from "../core/image-keys";
  * destinations that also need it are `intakeAiMarkdownChecked` (an await), so a caller keeps its stale checks and its
  * write free of an await it did not ask for.
  */
-export type AiMarkdownTarget =
+type AiMarkdownTarget =
   /** guard -> compose (sync business steps of the caller) -> dedupe (images in `seenImages` and earlier in the text). */
   | { kind: "task-detail"; seenImages?: Iterable<string>; compose?: (guarded: string) => string }
   /** guard (frontmatter, inserted range [at, at + insertedLength)) -> dedupe (file, inserted range [at, length - tail)). */
@@ -16,7 +16,7 @@ export type AiMarkdownTarget =
   /** neutralize. */
   | { kind: "argument-detail" };
 
-export type CheckedAiMarkdownTarget =
+type CheckedAiMarkdownTarget =
   /** guard -> dedupe -> neutralize -> parser demote. */
   | { kind: "chat-topic-detail" }
   /** guard (frontmatter) -> dedupe (file) -> neutralize -> parser demote. */

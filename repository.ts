@@ -1871,6 +1871,25 @@ export class Repository {
     return prior;
   }
 
+  /** Rebase a candidate map without overwriting intervening edits; journal the actual replaced bytes before publishing. */
+  private async rebaseMapPaths(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (content: string) => void
+  ): Promise<void> {
+    let print: string | undefined;
+    await this.app.vault.process(file, content => {
+      const map = parseMap(content);
+      const before = coordinatePrint(map);
+      if (!rebaseMapNotePaths(map, rebase)) return content;
+      const text = writeMapContent(content, map);
+      print = this.printAfterWrite(file.path, before, coordinatePrint(map));
+      recordPrior(content);
+      return text;
+    });
+    if (print !== undefined) this.writtenCoordinates.set(file.path, print);
+  }
+
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {
     const content = await this.app.vault.read(file),
       fm = frontmatter(content);
@@ -2374,7 +2393,7 @@ export class Repository {
         markedFiles: key => this.markedFiles(key),
         rebaseNoteLists: (file, rebase) => this.rebaseNoteLists(file, rebase),
         readableMaps: () => this.readableMaps(),
-        saveMap: (path, map) => this.saveMap(path, map)
+        rebaseMapPaths: (file, rebase, recordPrior) => this.rebaseMapPaths(file, rebase, recordPrior)
       },
       moves,
       onProgress

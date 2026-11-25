@@ -250,7 +250,7 @@ const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'experiences/visual-map/expansion-batch.ts', count: 1, reason: 'batch Stop key (parent path), a whole-job key' },
   { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons (registerTask goes through the ports() call and is outside this pattern)' }
 ];
-const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];
+const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/ai-task-service.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];
 
 // Every runtime.runTask call outside ai/runtime/ is a provider adapter (or the runtime behind one), pinned by
 // file, enclosing function and count so a new direct call anywhere fails this test.

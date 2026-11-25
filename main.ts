@@ -1905,14 +1905,26 @@ export default class VisualAgentMapPlugin extends Plugin {
     const failed: string[] = [];
     const nodePaths = new Set<string>();
     const rebase = chainRebase(pairs);
+    // The scan identifies affected maps; it is not a write snapshot. Apply only the path change to the
+    // current Map.md inside vault.process, preserving concurrent structural and coordinate edits.
+    const save = async (path: string): Promise<void> => {
+      let rebased = false;
+      const current = await this.repo.updateMap(path, map => {
+        rebased = rebaseMapNotePaths(map, rebase);
+      });
+      changed ||= rebased;
+      for (const node of current.nodes) nodePaths.add(node.path);
+    };
     for (const { file, map } of await this.repo.readableMaps()) {
       const rebased = rebaseMapNotePaths(map, rebase);
-      for (const node of map.nodes) nodePaths.add(node.path);
-      if (!rebased) continue;
+      if (!rebased) {
+        for (const node of map.nodes) nodePaths.add(node.path);
+        continue;
+      }
       try {
-        await this.repo.saveMap(file.path, map);
-        changed = true;
+        await save(file.path);
       } catch {
+        for (const node of map.nodes) nodePaths.add(node.path);
         failed.push(file.path);
       }
     }
@@ -1921,8 +1933,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       try {
         const map = await this.repo.readMap(path);
         if (!rebaseMapNotePaths(map, rebase)) continue;
-        await this.repo.saveMap(path, map);
-        changed = true;
+        await save(path);
       } catch (retryError) {
         error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
       }

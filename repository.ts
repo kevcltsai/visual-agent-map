@@ -1,4 +1,35 @@
-import { DETAIL_START, splitOpenItems, noteContentLanguage, placeholder, previewHeading, CANONICAL_HEADINGS, isCanonical, noteHeadingSet, writtenHeadingSet, canonicalHeadings, isBookCardFrontmatter, decodeCalloutSections, previewSection, detailWithOpenItems, section, replaceSection, originMarkdown, readThinkingOrigin, replaceSummarySection, removeSection, ensurePreview, withoutReference, detailWithVisualReferences, initialPreview, PREVIEW_MANUAL, readPreviewAutoHash, followedPreview, noteBody, normalizeBodyOrder, localizeHeadings } from "./core/repository-note-body";
+import {
+  DETAIL_START,
+  splitOpenItems,
+  noteContentLanguage,
+  placeholder,
+  previewHeading,
+  CANONICAL_HEADINGS,
+  isCanonical,
+  noteHeadingSet,
+  writtenHeadingSet,
+  canonicalHeadings,
+  isBookCardFrontmatter,
+  decodeCalloutSections,
+  previewSection,
+  detailWithOpenItems,
+  section,
+  replaceSection,
+  originMarkdown,
+  readThinkingOrigin,
+  replaceSummarySection,
+  removeSection,
+  ensurePreview,
+  withoutReference,
+  detailWithVisualReferences,
+  initialPreview,
+  PREVIEW_MANUAL,
+  readPreviewAutoHash,
+  followedPreview,
+  noteBody,
+  normalizeBodyOrder,
+  localizeHeadings
+} from "./core/repository-note-body";
 import { REFERENCE_TEXT, relationReferences, derivedLabelLanguage, withReferenceLinks, noteLink } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";

@@ -158,6 +158,24 @@ test('counterexample 1c: switching the map while the bytes are read writes nothi
   assert.equal(h.counts.createBinary, 0);
 });
 
+test('a queued card image is dropped before reading its bytes when the originating session changes', async () => {
+  for (const paste of [false, true]) {
+    const h = await harness();
+    const before = h.note();
+    let reads = 0;
+    const image = { ...file(png()), arrayBuffer: async () => { reads++; return png(); } };
+    if (paste) {
+      h.view.selection.setSelected(h.node.id);
+      assert.equal(h.view.pasteCanvasImages(clipboardEvent([image])), true);
+    } else h.view.onCardDrop(dragEvent([image]), card(), h.node);
+    h.view.mapOpenEpoch++;
+    await h.settle();
+    assert.equal(reads, 0);
+    assert.equal(h.counts.createBinary, 0);
+    assert.equal(h.note(), before);
+  }
+});
+
 test('counterexample 2: undo removes the embed and topic-cover and keeps the file', async () => {
   const h = await harness();
   const before = h.note();

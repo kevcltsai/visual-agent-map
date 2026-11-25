@@ -1,5 +1,6 @@
 import { readStoreText, writeStoreAtomically, type StoreAdapter } from "../store-adapter";
 import { promptMetrics, type AiExchange } from "../ai-exchange-log";
+import { isRecord } from "./is-record";
 
 /** What the user was doing when the model was called; anything the service cannot classify is "other". */
 export type UsageAction = "research" | "expand" | "synthesize" | "writeback" | "other";
@@ -52,8 +53,6 @@ interface UsageFile {
 }
 
 const ZERO = (): UsageTokens => ({ inputTokens: 0, outputTokens: 0 });
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
 const isTokens = (value: unknown): value is UsageTokens =>
   isRecord(value) && isCount(value.inputTokens) && isCount(value.outputTokens);

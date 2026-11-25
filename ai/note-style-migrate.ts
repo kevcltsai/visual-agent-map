@@ -6,6 +6,7 @@ import { isBuiltinTemplateId, type DetailSection, type DetailTemplate } from "./
 import { normalizeStyleContent, serializeLegacyV1 } from "./note-style-file";
 import { validatePartName, type NameCategory, type StyleKind } from "./note-style-recipe";
 import { isBuiltinPreset, type PromptPreset } from "./prompt-presets";
+import { trimBlankLines } from "../core/trim-blank-lines";
 
 /**
  * The conversion of the 0.28.0 note style data (custom detail templates, custom tone presets, the default template) into
@@ -88,20 +89,11 @@ class Namer {
   }
 }
 
-const trimBlankLines = (text: string): string => {
-  const lines = text.split("\n");
-  let start = 0;
-  let end = lines.length;
-  while (start < end && !lines[start].trim()) start++;
-  while (end > start && !lines[end - 1].trim()) end--;
-  return lines.slice(start, end).join("\n");
-};
-
 /** The sections of a template as the text of a structure file (the legacy export's section layout, without its header). */
 function templateSectionsText(template: DetailTemplate, language: UiLanguage): string {
   const head = serializeLegacyV1({ ...template, sections: [] }, language);
   const full = serializeLegacyV1(template, language);
-  return trimBlankLines(full.startsWith(head) ? full.slice(head.length) : full);
+  return trimBlankLines((full.startsWith(head) ? full.slice(head.length) : full).split("\n"));
 }
 
 const sectionShape = (section: Pick<DetailSection, "name" | "description" | "count"> & { callouts?: unknown }) =>

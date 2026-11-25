@@ -88,6 +88,35 @@ test('anchor relation: one line from the anchor to the nearest card edge, keyed 
   // The same six on a single image through different anchors would clash on the pair rule, so one image per kind above is the fixture.
 });
 
+test('relation drawing measures each shared card once before SVG writes and remeasures on the next draw', () => {
+  const h = harness({
+    relations: [rel('supports', 'p1', 'a'), rel('related', 'p2', 'a')],
+    topicRelations: [rel('supports', 'root', 'a'), rel('related', 'a', 'b')]
+  });
+  const counts = new Map();
+  let wrote = false;
+  const append = h.view.edgesEl.appendChild.bind(h.view.edgesEl);
+  h.view.edgesEl.appendChild = child => { wrote = true; return append(child); };
+  let width = 280;
+  for (const [id, card] of h.view.cardEls) {
+    Object.defineProperty(card, 'offsetWidth', { configurable: true, get() {
+      assert.equal(wrote, false, 'endpoint measured before SVG writes');
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+      return id === 'a' ? width : 280;
+    } });
+  }
+  h.view.drawRelations();
+  assert.equal(h.view.relationEls.size, 4);
+  assert.deepEqual([...counts.entries()].sort(), [['a', 1], ['b', 1], ['root', 1]]);
+  const before = [...h.view.relationEls.values()].map(path => path.attrs.d);
+  width = 360;
+  wrote = false;
+  counts.clear();
+  h.view.drawRelations();
+  assert.deepEqual([...counts.entries()].sort(), [['a', 1], ['b', 1], ['root', 1]]);
+  assert.notDeepEqual([...h.view.relationEls.values()].map(path => path.attrs.d), before);
+});
+
 test('direction follows from to: an anchor as the target puts the arrowhead on the anchor', () => {
   const h = harness({ relations: [rel('supports', 'a', 'p1'), rel('supports', 'p2', 'b')] });
   h.view.draw();

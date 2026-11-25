@@ -2,8 +2,8 @@
  * Progress of a whole multi-step instruction ("整段流程"): the model names the steps in its first reply and later only moves their
  * status. Pure data, no Obsidian. The names are plain text from the model: shown as text, never an action or a link.
  */
-export type MapChatStepStatus = "done" | "current" | "todo";
-export interface MapChatProgressStep {
+type MapChatStepStatus = "done" | "current" | "todo";
+interface MapChatProgressStep {
   name: string;
   status: MapChatStepStatus;
 }

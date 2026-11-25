@@ -479,8 +479,7 @@ export class AiTaskService {
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
-            if (signal?.aborted || isAbortError(error) || isBudgetExhausted(error))
-              throw error;
+            if (signal?.aborted || isAbortError(error) || isBudgetExhausted(error)) throw error;
           } finally {
             // The repair has its own entry, which the caller finishes; close the first one that it supersedes.
             if (this.options.exchangeLoggingEnabled()) exchanges?.completed(firstExchangeId);
@@ -751,8 +750,7 @@ export class AiTaskService {
       remaining,
       provider
     });
-    const aborted = (error: unknown): boolean =>
-      !!signal?.aborted || isAbortError(error);
+    const aborted = (error: unknown): boolean => !!signal?.aborted || isAbortError(error);
     const codeOf = (error: unknown): ChartCode => (error instanceof ChartRejected ? error.code : "runtime_error");
     const notAdded = (code: ChartCode): string => translate(this.options.language(), "log.chart_not_added_0", code);
     const warn = (code: ChartCode): void => console.warn("Visual Agent Map chart step", code);

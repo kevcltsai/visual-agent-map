@@ -83,9 +83,7 @@ export function providerStepRunner<
           ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),
           ...(hooks?.onStreamMode ? { onStreamMode: hooks.onStreamMode } : {}),
           ...(hooks?.onSteer ? { onSteer: hooks.onSteer } : {}),
-          ...(hooks?.onText && !claudeModelChoice(request.model)
-            ? { onText: hooks.onText }
-            : {})
+          ...(hooks?.onText && !claudeModelChoice(request.model) ? { onText: hooks.onText } : {})
         }
       },
       (raw, exchange) => {

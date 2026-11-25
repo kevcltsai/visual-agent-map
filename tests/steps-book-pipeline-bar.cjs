@@ -884,3 +884,90 @@ test('fix again focus: opening the card puts the keyboard on Cancel, closing it 
   proto2.askBookAbandon.call(asking, 'p', true);
   assert.deepEqual([asking.bookAbandonAsking, asking.bookFixAgainAsking], ['p', null]);
 });
+
+// ---- "Book settings" beside Stop (2026-11-25) ----
+const settingsBundle = loadSource(`
+export { BookSettingsViewModal } from "./experiences/visual-map/book-pipeline-start-modal";
+export { effectiveSettings } from "./core/book-pipeline/settings";
+export { parseBookPlanDecisions } from "./core/book-pipeline/plan-text";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment });
+const settingsData = (over = {}) => ({ v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', ...over });
+const drawSettings = (state, actions) => { const bar = dom.element('div'); bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, ...actions }); return bar; };
+const buttonTexts = bar => dom.findAll(bar, i => i.tag === 'button').map(b => b.text);
+
+test('book settings button: planning, writing, plan review, budget and map-changed bars each show it once, right before Stop', () => {
+  setUiLanguage('zh-TW');
+  const cases = {
+    planning: settingsData({ phase: 'planning' }),
+    writing: settingsData(),
+    gate1: settingsData({ phase: 'gate1', planReview: true, trial: ['a'], globalPlanned: true }),
+    budget: settingsData({ status: 'stopped', pauseReason: 'budget' }),
+    changed: settingsData({ status: 'stopped', pauseReason: 'map', changed: { added: ['x'], missing: ['y'] } })
+  };
+  for (const [mode, data] of Object.entries(cases)) {
+    const live = { runId: 'r', phase: data.phase, status: 'running', active: true, total: 3, counts: { pending: 3, planned: 0, written: 0, checked: 0, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x' };
+    const state = bundle.bookBarState(data, data.status === 'running' ? live : undefined, () => undefined);
+    assert.equal(state.mode, mode);
+    const bar = drawSettings(state, { showSettings() {} });
+    const names = buttonTexts(bar);
+    assert.equal(names.filter(n => n === '書本設定').length, 1, `${mode}: one book settings button`);
+    assert.equal(names.indexOf('書本設定') + 1, names.indexOf('停止'), `${mode}: right before Stop`);
+  }
+});
+
+test('book settings button: two Stop buttons (map changed + rerun) still draw only one; no action, no button; a click calls the action; stopped/done bars (no Stop) show none', () => {
+  setUiLanguage('zh-TW');
+  const changed = bundle.bookBarState(settingsData({ status: 'stopped', pauseReason: 'map', changed: { added: ['x'], missing: ['y'] } }), undefined, () => undefined);
+  const two = drawSettings({ ...changed, rerun: true }, { showSettings() {} });
+  assert.equal(all(two, 'vam-book-stop').length, 2);
+  assert.equal(all(two, 'vam-book-settings-view').length, 1);
+  assert.equal(all(drawSettings(changed, {}), 'vam-book-settings-view').length, 0, 'a bar drawn without the action shows none');
+  const calls = [];
+  const live = { runId: 'r', phase: 'writing', status: 'running', active: true, total: 3, counts: { pending: 3, planned: 0, written: 0, checked: 0, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x' };
+  const bar = drawSettings(bundle.bookBarState(settingsData(), live, () => undefined), { showSettings: () => calls.push('settings') });
+  one(bar, 'vam-book-settings-view').click();
+  assert.deepEqual(calls, ['settings']);
+  const stopped = bundle.bookBarState(settingsData({ status: 'stopped', pauseReason: 'user' }), undefined, () => undefined);
+  assert.equal(all(drawSettings(stopped, { showSettings() {} }), 'vam-book-settings-view').length, 0);
+});
+
+test('book settings modal: six labels with their values, the empty-field line for a missing one, the hint and Close; values are plain text', () => {
+  settingsBundle.setUiLanguage('zh-TW');
+  const modal = new settingsBundle.BookSettingsViewModal({}, { reader: EVIL, goal: '  ', tone: 'calm' });
+  modal.open();
+  const dts = dom.findAll(modal.contentEl, i => i.tag === 'dt').map(i => i.text);
+  const dds = dom.findAll(modal.contentEl, i => i.tag === 'dd');
+  assert.deepEqual(dts, ['讀者', '學習目標', '想看的角度', '語氣', '每章字數', '寫作風格']);
+  assert.equal(dds[0].text, EVIL, 'set as text, never parsed');
+  assert.equal(dds[0].children.length, 0);
+  assert.deepEqual(dds.map(d => d.text).slice(1), ['留空 → 由總編輯決定', '留空 → 由總編輯決定', 'calm', '留空 → 由總編輯決定', '留空 → 由總編輯決定']);
+  assert.ok(texts(modal.contentEl).some(x => x.includes('要改，先按「停止」，再跟總編輯說')));
+  const close = dom.findAll(modal.modalEl, i => i.tag === 'button' && i.text === '關閉')[0];
+  assert.ok(close);
+  close.click();
+  assert.equal(modal.closeCount, 1);
+});
+
+test('book settings: the shown values are the root frontmatter first, then the plan decisions', () => {
+  const raw = '## 全書企劃\n\n### 編輯決定\n- 語氣：plan tone\n- 讀者：plan reader\n';
+  const decided = settingsBundle.parseBookPlanDecisions(raw);
+  const shown = settingsBundle.effectiveSettings({ reader: 'own reader' }, decided);
+  assert.equal(shown.reader, 'own reader');
+  assert.equal(shown.tone ?? '', decided.tone ?? '');
+});
+
+test('book settings: the view reads the root card and opens the modal with the effective values; an unreadable root or no root gives a Notice and no modal', async () => {
+  setUiLanguage('zh-TW');
+  const proto = bundle.VisualAgentMapView.prototype;
+  const opened = [];
+  const view = (readBookCardForChat, nodes) => ({ map: { nodes }, app: {}, plugin: { readBookCardForChat }, openMapModal: m => { opened.push(m); return m; } });
+  const before = notices.length;
+  await proto.showBookSettings.call(view(async () => ({ settings: { reader: 'own' }, raw: '' }), [{ id: 'k', path: 'k.md', parentId: 'r' }, { id: 'r', path: 'r.md' }]));
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].values.reader, 'own');
+  await proto.showBookSettings.call(view(async () => { throw new Error('gone'); }, [{ id: 'r', path: 'r.md' }]));
+  await proto.showBookSettings.call(view(async () => ({ settings: {}, raw: '' }), []));
+  assert.equal(opened.length, 1, 'no modal for a failed read or a map without a root');
+  assert.equal(notices.length - before, 2);
+});

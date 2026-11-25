@@ -114,10 +114,11 @@ export class ChatImageFinder {
   /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
   searches = new Map<number, AbortController>();
   sequence = 0;
+  private generation = 0;
   /** Cards of a map with a queued or running picture search (key: chatImageTopicKey), with the search's controller. */
   topics = new Map<string, AbortController>();
   running = 0;
-  waiters: (() => void)[] = [];
+  waiters: (() => boolean)[] = [];
   /** Writes of pictures go one after another (the searches overlap, the writes and their undo steps do not). */
   writes: Promise<unknown> = Promise.resolve();
 
@@ -133,6 +134,7 @@ export class ChatImageFinder {
 
   /** Every picture search the chat started stops; a result that still arrives is neither shown nor written. */
   stopAll(): void {
+    this.generation += 1;
     const searches = [...this.searches.values()];
     this.searches.clear();
     for (const controller of searches) controller.abort();
@@ -153,6 +155,9 @@ export class ChatImageFinder {
     if (!ids.length) return { skipped: "ui.map_chat_skip_images_dup" };
     for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: ports.where().path, id: map.id };
+    const generation = this.generation;
+    const current = (): boolean => this.currentSession(chat, anchor, generation);
+    if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
     // Web text can reach the model once research ran: the search words then come from the cards' own titles, never from the model.
     const words = readsResearch ? "" : cleanImageQuery(direction);
     const jobs: {
@@ -167,12 +172,14 @@ export class ChatImageFinder {
       const node = map.nodes.find(item => item.id === id);
       if (!node) continue;
       const note = await ports.readNote(node.path, map);
+      if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
       const title = cleanImageQuery(note.title);
       // One target keeps the words as they are; several are told apart by their card ("牛肋眼 西式做法" style). A research
       // conversation uses the parent card's title and the card's own.
       const parent = node.parentId ? map.nodes.find(item => item.id === node.parentId) : undefined;
       const parentTitle =
         readsResearch && parent ? cleanImageQuery((await ports.readNote(parent.path, map)).title) : "";
+      if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
       const joined = cleanImageQuery(
         (readsResearch ? [parentTitle, title] : ids.length > 1 ? [words, title] : [words || title])
           .filter(Boolean)
@@ -193,6 +200,7 @@ export class ChatImageFinder {
       blocks.push(block);
       // Checked before any AI call is spent: a card that cannot take a picture right now says why and the others go on.
       const reason = query ? await ports.preflight(block) : t("ui.map_chat_skip_unavailable");
+      if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
       if (reason) {
         block.state = "empty";
         block.reason = reason;
@@ -205,6 +213,7 @@ export class ChatImageFinder {
     // of this reply's searches, in this action or in the ones that follow.
     if (batch.declined) return { skipped: "ui.map_chat_skip_not_started" };
     for (const model of new Set(jobs.map(job => job.model))) {
+      if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
       if (batch.asked.has(model)) continue;
       let ok = false;
       try {
@@ -218,9 +227,7 @@ export class ChatImageFinder {
       }
       batch.asked.add(model);
     }
-    const here = ports.where();
-    if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
-      return { skipped: "ui.map_chat_skip_map_changed" };
+    if (!current()) return { skipped: "ui.map_chat_skip_map_changed" };
     for (const job of jobs) {
       const { block, controller } = job;
       // The card counts as being searched from here until its job ends, fails or is stopped (any abort releases it).
@@ -246,12 +253,15 @@ export class ChatImageFinder {
     // At most CHAT_IMAGE_SEARCH_PARALLEL searches run at once in this view (across the actions of a reply); the others wait in order.
     for (const job of jobs)
       void (async (): Promise<void> => {
-        await this.acquireSlot();
+        const acquired = await this.acquireSlot(job.controller.signal);
         try {
-          await this.run(job.block, job.controller, chat, job.model);
+          if (acquired) await this.run(job.block, job.controller, chat, job.model);
         } finally {
-          job.release?.();
-          this.releaseSlot();
+          if (job.release) {
+            job.controller.signal.removeEventListener("abort", job.release);
+            job.release();
+          }
+          if (acquired) this.releaseSlot();
           if (job.key !== undefined && this.searches.get(job.key) === job.controller) this.searches.delete(job.key);
         }
       })();
@@ -276,6 +286,9 @@ export class ChatImageFinder {
     if (!query) return { skipped: "ui.map_chat_skip_unavailable" };
     if (batch.declined) return { skipped: "ui.map_chat_skip_not_started" };
     const anchor = { path: ports.where().path, id: map.id };
+    const generation = this.generation;
+    if (!this.currentSession(chat, anchor, generation)) return { skipped: "ui.map_chat_skip_map_changed" };
+    if (signal?.aborted) return { skipped: "ui.map_chat_skip_not_started" };
     const model = ports.canvasModel();
     const block: MapChatImages = {
       query,
@@ -303,9 +316,7 @@ export class ChatImageFinder {
       }
       batch.asked.add(model);
     }
-    const here = ports.where();
-    if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
-      return { skipped: "ui.map_chat_skip_map_changed" };
+    if (!this.currentSession(chat, anchor, generation)) return { skipped: "ui.map_chat_skip_map_changed" };
     if (signal?.aborted) return { skipped: "ui.map_chat_skip_not_started" };
     const controller = new AbortController();
     const key = ++this.sequence;
@@ -316,16 +327,22 @@ export class ChatImageFinder {
       controller.abort();
       ports.settle(chat, block, { state: "stopped" });
     };
+    const onChainAbort = (): void => block.stop?.();
+    const unlink = (): void => signal?.removeEventListener("abort", onChainAbort);
+    signal?.addEventListener("abort", onChainAbort, { once: true });
+    controller.signal.addEventListener("abort", unlink, { once: true });
     ports.added(chat, [block]);
-    signal?.addEventListener("abort", () => block.stop?.(), { once: true });
+    if (signal?.aborted) onChainAbort();
     const placed = (async (): Promise<string | null> => {
-      await this.acquireSlot();
+      const acquired = await this.acquireSlot(controller.signal);
       try {
-        return await this.runCanvas(block, controller, chat, model);
+        return acquired ? await this.runCanvas(block, controller, chat, model) : null;
       } catch {
         return null;
       } finally {
-        this.releaseSlot();
+        unlink();
+        controller.signal.removeEventListener("abort", unlink);
+        if (acquired) this.releaseSlot();
         if (this.searches.get(key) === controller) this.searches.delete(key);
       }
     })();
@@ -403,18 +420,46 @@ export class ChatImageFinder {
     }
   }
 
-  private async acquireSlot(): Promise<void> {
+  private currentSession(chat: MapChatPanel, anchor: { path: string; id: string }, generation: number): boolean {
+    const here = this.ports.where();
+    return (
+      this.generation === generation &&
+      !here.closed &&
+      here.chat === chat &&
+      here.path === anchor.path &&
+      here.mapId === anchor.id
+    );
+  }
+
+  private async acquireSlot(signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) return false;
     if (this.running < CHAT_IMAGE_SEARCH_PARALLEL) {
       this.running += 1;
-      return;
+      return true;
     }
-    // The place is handed over by releaseSlot, so the count stays as it is.
-    await new Promise<void>(resolve => this.waiters.push(resolve));
+    // Cancellation removes a queued job immediately. Active jobs keep their slot until their underlying work settles.
+    return new Promise<boolean>(resolve => {
+      const cancel = (): void => {
+        const at = this.waiters.indexOf(grant);
+        if (at >= 0) this.waiters.splice(at, 1);
+        signal.removeEventListener("abort", cancel);
+        resolve(false);
+      };
+      const grant = (): boolean => {
+        signal.removeEventListener("abort", cancel);
+        const acquired = !signal.aborted;
+        resolve(acquired);
+        return acquired;
+      };
+      this.waiters.push(grant);
+      signal.addEventListener("abort", cancel, { once: true });
+    });
   }
   private releaseSlot(): void {
-    const next = this.waiters.shift();
-    if (next) next();
-    else this.running -= 1;
+    while (this.waiters.length) {
+      if (this.waiters.shift()?.()) return;
+    }
+    this.running -= 1;
   }
 
   /**

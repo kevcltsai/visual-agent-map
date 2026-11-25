@@ -15,6 +15,11 @@ import { BOOK_SETTING_INPUT_MAX, cleanBookSettingsInput } from "../../core/book-
 import { PLAN_EDIT_MIN_CARDS } from "../../core/book-pipeline/machine";
 import { syncModelSelect } from "../../core/model-discovery";
 import { BOOK_POOL, LOOKS_PER_CHAPTER } from "./book-pipeline-run";
+import {
+  EDIT_MESSAGE_CHARS,
+  type EditSettingsResult,
+  type EditSettingsTurn
+} from "../../core/steps/book-pipeline/edit-settings";
 
 /**
  * The card shown when "Picture book" is pressed: what will happen, about how long and how many AI calls, the model of each
@@ -24,6 +29,9 @@ import { BOOK_POOL, LOOKS_PER_CHAPTER } from "./book-pipeline-run";
 
 /** How long the start card waits for its grey suggestions before it stays blank. */
 export const BOOK_SUGGEST_TIMEOUT_MS = 20_000;
+
+/** How long one turn with the chief editor waits before it is dropped as failed. */
+export const BOOK_EDIT_TIMEOUT_MS = 60_000;
 
 /**
  * One AI call of each step, measured in a live full run (2026-11-20, 15 chapters; the 75th percentile of each step's call time) with the
@@ -206,6 +214,14 @@ export interface BookStartInput {
   deletedChapterTitles?: readonly string[];
   /** Titles of the chapters still on the map (a mention of one is not a mention of a deleted chapter inside it). */
   chapterTitles?: readonly string[];
+  /**
+   * One turn with the chief editor (the chat beside the fields; no chat without it). `settings` is what the fields show (typed text, else the grey
+   * suggestion). The call is dropped by `signal` when the card closes, Start is pressed or {@link BOOK_EDIT_TIMEOUT_MS} passes.
+   */
+  editSettings?: (
+    request: { message: string; settings: BookSettings; turns: EditSettingsTurn[]; model: string },
+    signal: AbortSignal
+  ) => Promise<EditSettingsResult>;
   /** Called once, after the card closed, with what the owner changed and the suggestions to take (possibly nothing), and the four models picked in the card (saved only now, never by a Cancel). */
   onStart: (patch: BookSettingsPatch, models: BookStartModels) => void;
   /** Called when the card closes for any reason: a suggestion still being made is dropped. */
@@ -221,8 +237,38 @@ const FIELD_LABEL: Record<BookSettingField, TranslationKey> = {
   style: "ui.book_setting_style"
 };
 
+/** A read-only look at a book's six settings (the bar's "Book settings"): a field with no value shows the empty-field line. */
+export class BookSettingsViewModal extends Modal {
+  constructor(
+    app: App,
+    private values: BookSettings
+  ) {
+    super(app);
+  }
+  onOpen(): void {
+    const { contentEl } = this;
+    this.titleEl.setText(t("ui.book_settings_view"));
+    const list = contentEl.createEl("dl", { cls: "vam-book-settings-list" });
+    for (const field of BOOK_SETTING_FIELDS) {
+      list.createEl("dt", { text: t(FIELD_LABEL[field]) });
+      const value = this.values[field]?.trim();
+      list.createEl("dd", { text: value || t("ui.book_setting_empty"), cls: value ? "" : "is-empty" });
+    }
+    contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_settings_view_hint") });
+    const actions = modalActions(this);
+    const close = actions.createEl("button", { text: t("ui.close") });
+    close.addEventListener("click", () => this.close());
+    close.focus();
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 export interface BookSettingsFields {
   areas: Map<BookSettingField, HTMLTextAreaElement>;
+  /** Each field's label (the start card hangs its "chief editor changed this" mark on it). */
+  labels: Map<BookSettingField, HTMLElement>;
   /** Show these as grey italic suggestions in the fields that are empty; typed text is never touched. */
   suggest: (suggestions: BookSettings) => void;
 }
@@ -263,10 +309,11 @@ export function renderBookSettingsFields(
   chapterTitles: readonly string[] = []
 ): BookSettingsFields {
   const areas = new Map<BookSettingField, HTMLTextAreaElement>();
+  const labels = new Map<BookSettingField, HTMLElement>();
   for (const field of BOOK_SETTING_FIELDS) {
     const label = t(FIELD_LABEL[field]);
     const id = `vam-book-start-${field}`;
-    parent.createEl("label", { text: label, attr: { for: id } });
+    labels.set(field, parent.createEl("label", { text: label, attr: { for: id } }));
     // The shimmer after the field shows over it while loading and the field is empty (CSS only; typing hides it).
     const wrap = parent.createDiv({ cls: "vam-book-start-field-wrap" });
     const area = wrap.createEl("textarea", {
@@ -301,6 +348,7 @@ export function renderBookSettingsFields(
   }
   return {
     areas,
+    labels,
     suggest: suggestions => {
       for (const [field, area] of areas) {
         const text = suggestions[field];
@@ -364,6 +412,15 @@ export class BookStartModal extends Modal {
   private suggestingEl: HTMLElement | null = null;
   private settingsEl: HTMLElement | null = null;
   private estimateEl: HTMLElement | null = null;
+  /** The chat with the chief editor (only with `editSettings`): the turn in flight, the finished turns, and what each field was set to by the editor. */
+  private pending: AbortController | null = null;
+  private pendingTimer: number | null = null;
+  private turns: EditSettingsTurn[] = [];
+  private marks = new Map<BookSettingField, { written: string; chip: HTMLElement | null }>();
+  private chatLog: HTMLElement | null = null;
+  private chatInput: HTMLInputElement | null = null;
+  private chatSend: HTMLButtonElement | null = null;
+  private chatBusy: HTMLElement | null = null;
   constructor(
     app: App,
     private input: BookStartInput
@@ -380,6 +437,7 @@ export class BookStartModal extends Modal {
     this.settingsEl?.removeClass("is-loading");
     this.suggestingEl?.remove();
     this.suggestingEl = null;
+    this.refreshSend();
     if (!suggestions) return;
     for (const field of BOOK_SETTING_FIELDS) {
       const text = suggestions[field];
@@ -388,6 +446,7 @@ export class BookStartModal extends Modal {
       if (text && !this.input.settings[field]?.trim() && !typedNow) this.suggested[field] = text;
     }
     this.fields?.suggest(this.suggested);
+    this.refreshSend();
   }
   onOpen(): void {
     this.opened = true;
@@ -414,12 +473,15 @@ export class BookStartModal extends Modal {
     this.suggestingEl.setAttr("role", "status");
     settings.addClass("is-loading");
     this.settingsEl = settings;
+    const split = this.input.editSettings ? settings.createDiv({ cls: "vam-book-start-split" }) : null;
+    if (split) this.renderChat(split.createDiv({ cls: "vam-book-start-chat" }));
     this.fields = renderBookSettingsFields(
-      settings,
+      split ? split.createDiv({ cls: "vam-book-start-fields" }) : settings,
       this.input.settings,
       this.input.deletedChapterTitles,
       this.input.chapterTitles
     );
+    for (const [field, area] of this.fields.areas) area.addEventListener("input", () => this.refreshMark(field));
     this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
@@ -433,6 +495,152 @@ export class BookStartModal extends Modal {
       cancel.focus();
     }, 0);
   }
+  /** What the fields show now: typed text, else the grey suggestion, else nothing. This is what the chief editor is told. */
+  private visibleSettings(): BookSettings {
+    const out: BookSettings = {};
+    for (const [field, area] of this.fields?.areas ?? []) {
+      const value = area.value.trim() || this.suggested[field] || "";
+      if (value) out[field] = value;
+    }
+    return out;
+  }
+  /** The "chief editor changed this" mark follows the field: it stays while the text is still what the editor wrote and goes with a hand edit or an undo. */
+  private refreshMark(field: BookSettingField): void {
+    const mark = this.marks.get(field);
+    const label = this.fields?.labels.get(field);
+    if (!mark || !label) return;
+    const on = !!mark.written && this.fields?.areas.get(field)?.value === mark.written;
+    if (on && !mark.chip)
+      mark.chip = label.createSpan({ cls: "vam-book-start-edited", text: t("ui.book_chat_edited") });
+    if (!on && mark.chip) {
+      mark.chip.remove();
+      mark.chip = null;
+    }
+  }
+  private renderChat(parent: HTMLElement): void {
+    parent.createEl("label", { text: t("ui.book_chat_label"), attr: { for: "vam-book-chat-input" } });
+    const log = parent.createDiv({ cls: "vam-book-chat-log", attr: { role: "log", "aria-live": "polite" } });
+    this.chatLog = log;
+    this.chatBusy = parent.createEl("p", { cls: "vam-book-chat-busy is-empty", attr: { role: "status" } });
+    const row = parent.createDiv({ cls: "vam-book-chat-row" });
+    const box = row.createEl("input", {
+      cls: "vam-book-chat-input",
+      attr: {
+        id: "vam-book-chat-input",
+        type: "text",
+        maxlength: String(EDIT_MESSAGE_CHARS),
+        placeholder: t("ui.book_chat_placeholder")
+      }
+    });
+    const send = row.createEl("button", { cls: "mod-cta vam-book-chat-send", text: t("ui.book_chat_send") });
+    this.chatInput = box;
+    this.chatSend = send;
+    box.addEventListener("input", () => this.refreshSend());
+    box.addEventListener("keydown", event => {
+      // Enter sends; a key that confirms an IME composition is not a send.
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      this.sendChat();
+    });
+    send.addEventListener("click", () => this.sendChat());
+    this.refreshSend();
+  }
+  /** One sentence at a time: the send button waits while a turn is in flight or the grey suggestions are still loading. */
+  private refreshSend(): void {
+    if (!this.chatSend || !this.chatInput) return;
+    this.chatSend.disabled = !!this.pending || !!this.suggestingEl || !this.chatInput.value.trim();
+  }
+  private sendChat(): void {
+    const edit = this.input.editSettings;
+    const box = this.chatInput;
+    if (!edit || !box || this.pending || this.suggestingEl || this.started || !this.opened) return;
+    const message = box.value.trim().slice(0, EDIT_MESSAGE_CHARS);
+    if (!message) return;
+    box.value = "";
+    this.chatLog?.createDiv({ cls: "vam-book-chat-me", text: message });
+    const run = new AbortController();
+    this.pending = run;
+    this.chatBusy?.setText(t("ui.book_chat_thinking"));
+    this.chatBusy?.removeClass("is-empty");
+    this.refreshSend();
+    this.pendingTimer = window.setTimeout(() => run.abort(), BOOK_EDIT_TIMEOUT_MS);
+    const asked = {
+      message,
+      settings: this.visibleSettings(),
+      turns: this.turns.slice(),
+      model: this.input.models.plan
+    };
+    let call: Promise<EditSettingsResult>;
+    try {
+      call = edit(asked, run.signal);
+    } catch (error) {
+      call = Promise.reject(error instanceof Error ? error : new Error("edit failed"));
+    }
+    const aborted = new Promise<never>((_, reject) =>
+      run.signal.addEventListener("abort", () => reject(new Error("edit dropped")), { once: true })
+    );
+    Promise.race([call, aborted]).then(
+      result => {
+        // A card that closed, started or moved to another turn ignores a late answer.
+        if (this.pending !== run) return;
+        this.finishTurn();
+        this.applyEdit(message, result);
+      },
+      () => {
+        if (this.pending !== run) return;
+        this.finishTurn();
+        this.chatLog?.createDiv({ cls: "vam-book-chat-failed", text: t("ui.book_chat_failed") });
+      }
+    );
+    call.catch(() => undefined);
+  }
+  private finishTurn(): void {
+    if (this.pendingTimer !== null) window.clearTimeout(this.pendingTimer);
+    this.pendingTimer = null;
+    this.pending = null;
+    this.chatBusy?.setText("");
+    this.chatBusy?.addClass("is-empty");
+    this.refreshSend();
+  }
+  /** Stop any turn in flight: its answer, early or late, is dropped. */
+  private dropPending(): void {
+    const run = this.pending;
+    this.pending = null;
+    if (this.pendingTimer !== null) window.clearTimeout(this.pendingTimer);
+    this.pendingTimer = null;
+    run?.abort();
+  }
+  private applyEdit(message: string, result: EditSettingsResult): void {
+    const undo: { field: BookSettingField; before: string; written: string }[] = [];
+    for (const field of BOOK_SETTING_FIELDS) {
+      const text = result.changes[field];
+      const area = this.fields?.areas.get(field);
+      if (!text || !area) continue;
+      undo.push({ field, before: area.value, written: text });
+      area.value = text;
+      area.removeClass("vam-book-start-suggested");
+      this.marks.set(field, { written: text, chip: this.marks.get(field)?.chip ?? null });
+      this.refreshMark(field);
+    }
+    const bubble = this.chatLog?.createDiv({ cls: "vam-book-chat-ed" });
+    bubble?.createEl("b", { text: t("ui.book_chat_editor") });
+    bubble?.createSpan({ cls: "vam-book-chat-reply", text: result.reply });
+    if (bubble && undo.length) {
+      const button = bubble.createEl("button", { cls: "vam-book-chat-undo", text: t("ui.book_chat_undo") });
+      button.addEventListener("click", () => {
+        // Only a field still holding what this turn wrote goes back; a field edited by hand since keeps the hand edit.
+        for (const item of undo) {
+          const area = this.fields?.areas.get(item.field);
+          if (!area || area.value !== item.written) continue;
+          area.value = item.before;
+          if (!item.before.trim() && this.suggested[item.field]) area.addClass("vam-book-start-suggested");
+          this.refreshMark(item.field);
+        }
+        button.remove();
+      });
+    }
+    this.turns.push({ owner: message, editor: result.reply });
+  }
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {
     this.estimateEl?.setText(
@@ -441,6 +649,7 @@ export class BookStartModal extends Modal {
   }
   onClose(): void {
     this.opened = false;
+    this.dropPending();
     if (this.focusTimer !== null) window.clearTimeout(this.focusTimer);
     this.focusTimer = null;
     this.contentEl.empty();
@@ -449,6 +658,7 @@ export class BookStartModal extends Modal {
   private start(): void {
     if (this.started) return;
     this.started = true;
+    this.dropPending();
     const typed: Partial<Record<BookSettingField, string>> = {};
     for (const [field, area] of this.fields?.areas ?? []) typed[field] = area.value;
     const patch = bookSettingsPatch(this.input.settings, typed, this.suggested);

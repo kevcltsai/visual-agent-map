@@ -292,3 +292,51 @@ test('findCanvas: a write that is refused settles the block empty with the reaso
   assert.equal(await found.placed, null);
   assert.deepEqual(plainOf(w.settles.at(-1).patch), { state: 'empty', reason: 'refused' });
 });
+
+test('chat image finder: stopAll invalidates a search still awaiting usage confirmation', async () => {
+  const w = world(['a']);
+  let confirm;
+  w.ports.confirmUsage = () => new Promise(resolve => { confirm = resolve; });
+  const pending = w.find(['a']);
+  await flush();
+  w.finder.stopAll();
+  confirm(true);
+  assert.deepEqual(plainOf(await pending), { skipped: 'ui.map_chat_skip_map_changed' });
+  await flush();
+  assert.equal(w.searches.length, 0);
+});
+
+test('findCanvas: a queued canceled job resolves immediately without waiting for running searches', async () => {
+  const w = canvasWorld();
+  const active = await Promise.all([w.canvas('a'), w.canvas('b'), w.canvas('c')]);
+  const queued = await w.canvas('d');
+  await flush();
+  assert.equal(w.searches.length, 3);
+  assert.equal(w.finder.waiters.length, 1);
+  queued.block.stop();
+  await flush();
+  assert.equal(w.finder.waiters.length, 0);
+  assert.equal(await queued.placed, null);
+  assert.equal(w.finder.running, 3);
+  for (const s of w.searches) s.resolve([]);
+  await Promise.all(active.map(f => f.placed));
+  assert.equal(w.finder.running, 0);
+});
+
+test('findCanvas: parent abort listener is removed after completion and on stop', async () => {
+  for (const stopped of [false, true]) {
+    const w = canvasWorld(), controller = new AbortController();
+    const signal = controller.signal;
+    let added = 0, removed = 0;
+    const add = signal.addEventListener.bind(signal), remove = signal.removeEventListener.bind(signal);
+    signal.addEventListener = (...args) => { added++; return add(...args); };
+    signal.removeEventListener = (...args) => { removed++; return remove(...args); };
+    const found = await w.canvas('a', newChatImageBatch(), signal);
+    await flush();
+    assert.equal(added, 1);
+    if (stopped) { found.block.stop(); assert.ok(removed >= 1); }
+    w.searches[0].resolve([]);
+    await found.placed;
+    assert.ok(removed >= 1);
+  }
+});

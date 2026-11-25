@@ -177,3 +177,57 @@ test('research progress: the re-send handle lives only while slow and for the cu
   store.newAttempt('a.md', 'a2', 30);
   assert.equal(store.get('a.md').slow, false); assert.equal(store.get('a.md').resend, undefined);
 });
+
+test('research progress: background preview updates without subscribers allocate no timers', () => {
+  const { store, clock, unsubscribe } = setup();
+  store.begin('a.md', 'a1', 0);
+  store.preview('a.md', 'a1', { summary: 'first' });
+  assert.equal(clock.timers.size, 1);
+  unsubscribe();
+  store.preview('a.md', 'a1', { summary: 'background' });
+  store.stage('a.md', 'a1', 'writing', clock.now());
+  store.preview('a.md', 'a1', { summary: 'latest' });
+  assert.equal(clock.timers.size, 0);
+  assert.equal(store.get('a.md').preview.summary, 'latest');
+  const calls = [];
+  store.subscribe(path => calls.push(path));
+  store.preview('a.md', 'a1', { summary: 'resumed' });
+  assert.deepEqual(calls, ['a.md'], 'first observed update is immediate');
+  store.preview('a.md', 'a1', { summary: 'resumed again' });
+  assert.equal(clock.timers.size, 1);
+});
+
+test('research progress: late canceled callback cannot consume a replacement timer', () => {
+  const { store, clock, calls } = setup();
+  store.begin('a.md', 'a1', 0);
+  store.preview('a.md', 'a1', { summary: 'old' });
+  const old = [...clock.timers.values()][0].callback;
+  store.newAttempt('a.md', 'a2', 0);
+  store.preview('a.md', 'a2', { summary: 'new' });
+  const before = calls.length;
+  old();
+  assert.equal(calls.length, before);
+  assert.equal(clock.timers.size, 1);
+  store.preview('a.md', 'a2', { summary: 'newest' });
+  assert.equal(clock.timers.size, 1);
+  clock.advance(200);
+  assert.equal(calls.length, before + 1);
+  assert.equal(store.get('a.md').preview.summary, 'newest');
+});
+
+test('research progress: cancel also releases an opaque undefined timer handle', () => {
+  const clock = fakeClock();
+  let callback;
+  let canceled = 0;
+  clock.setTimeout = fn => { callback = fn; return undefined; };
+  clock.clearTimeout = handle => { assert.equal(handle, undefined); canceled++; };
+  const store = new ResearchProgressStore(clock);
+  let calls = 0;
+  const stop = store.subscribe(() => calls++);
+  store.begin('a.md', 'a1', 0);
+  store.preview('a.md', 'a1', { summary: 'pending' });
+  stop();
+  assert.equal(canceled, 1);
+  callback();
+  assert.equal(calls, 1);
+});

@@ -1847,9 +1847,12 @@ export class Repository {
       );
   }
 
-  /** Rebases one managed note's citation lists from its current frontmatter inside `vault.process`; returns the replaced content, or null if unchanged. */
-  private async rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null> {
-    let prior: string | null = null;
+  /** Rebases one managed note's current citation lists and records the exact before/after bytes inside the write. */
+  private async rebaseNoteLists(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void> {
     await this.app.vault.process(file, content => {
       const fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) return content;
@@ -1865,17 +1868,17 @@ export class Repository {
       if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
       if (sources.some(path => rebase(path) !== path)) patch.sourcePaths = sources.map(rebase);
       if (!Object.keys(patch).length) return content;
-      prior = content;
-      return this.patchedNote(file.path, content, patch, {});
+      const text = this.patchedNote(file.path, content, patch, {});
+      recordPrior(content, text);
+      return text;
     });
-    return prior;
   }
 
   /** Rebase a candidate map without overwriting intervening edits; journal the actual replaced bytes before publishing. */
   private async rebaseMapPaths(
     file: TFile,
     rebase: (path: string) => string,
-    recordPrior: (content: string) => void
+    recordPrior: (before: string, after: string) => void
   ): Promise<void> {
     let print: string | undefined;
     await this.app.vault.process(file, content => {
@@ -1884,7 +1887,7 @@ export class Repository {
       if (!rebaseMapNotePaths(map, rebase)) return content;
       const text = writeMapContent(content, map);
       print = this.printAfterWrite(file.path, before, coordinatePrint(map));
-      recordPrior(content);
+      recordPrior(content, text);
       return text;
     });
     if (print !== undefined) this.writtenCoordinates.set(file.path, print);
@@ -2391,7 +2394,7 @@ export class Repository {
         rebuildDerivedData: scope => this.rebuildDerivedData(scope),
         noteRestoredMap: (path, text) => this.noteRestoredMap(path, text),
         markedFiles: key => this.markedFiles(key),
-        rebaseNoteLists: (file, rebase) => this.rebaseNoteLists(file, rebase),
+        rebaseNoteLists: (file, rebase, recordPrior) => this.rebaseNoteLists(file, rebase, recordPrior),
         readableMaps: () => this.readableMaps(),
         rebaseMapPaths: (file, rebase, recordPrior) => this.rebaseMapPaths(file, rebase, recordPrior)
       },

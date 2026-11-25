@@ -87,6 +87,8 @@ export interface AiTaskServiceOptions {
   defaultReasoning: () => ReasoningLevel;
   exchangeLoggingEnabled: () => boolean;
   exchanges: () => AiExchangeLog | null;
+  /** The plugin-wide registry shared with every other AiCalls consumer. */
+  activeTasks?: Map<string, AbortController>;
   /** Where each provider call's token usage is recorded (always on, unlike the exchange log). Absent or null: not recorded. */
   usage?: () => Pick<AiUsageStore, "record"> | null;
   codexRuntime: (directory: string, local: boolean) => CodexAppServerRuntime;
@@ -686,6 +688,7 @@ export class AiTaskService {
           codex: local => this.options.codexRuntime(pluginDirectory, local)
         }),
       ...(this.options.usage ? { usage: this.options.usage } : {}),
+      ...(this.options.activeTasks ? { activeTasks: this.options.activeTasks } : {}),
       exchanges: () => (exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null)
     });
   }

@@ -60,6 +60,7 @@ export class GoalSuggest {
   task: GoalSuggestTask | null = null;
   private cleanup: (() => void) | null = null;
   private panelEl: HTMLElement | null = null;
+  private cancelFocusReturn: (() => void) | null = null;
   constructor(private readonly ports: GoalSuggestPorts) {}
   private get plugin(): VisualAgentMapPlugin {
     return this.ports.plugin();
@@ -89,25 +90,28 @@ export class GoalSuggest {
   /** Drops the task (aborting its AI call), its listeners and its panel; the late result then fails the fence. */
   end(task: GoalSuggestTask, options: { refocus: boolean; repaint?: boolean }): void {
     if (this.task !== task) return;
-    this.task = null;
-    task.controller.abort();
-    this.cleanup?.();
-    this.cleanup = null;
-    this.panelEl?.remove();
-    this.panelEl = null;
+    this.drop();
     if (this.closed) return;
     if (options.repaint !== false) this.ports.render();
     else this.ports.placeMapTools();
     if (options.refocus) this.ports.focusGoalReturn();
     else if (options.repaint === false) {
       // A press outside: the browser moves (or drops) the focus after this handler, so look again once it settled.
-      window.setTimeout(() => {
-        if (this.closed) return;
-        const doc = this.contentEl?.ownerDocument;
-        const active = doc?.activeElement ?? null;
-        if (!active || active === doc?.body) this.ports.focusGoalReturn();
-      }, 0);
+      this.scheduleFocusReturn(task.mapPath);
     }
+  }
+  private scheduleFocusReturn(mapPath: string): void {
+    const doc = this.contentEl?.ownerDocument;
+    const timerWindow = doc?.defaultView ?? window;
+    const cancel = (): void => timerWindow.clearTimeout(handle);
+    const handle = timerWindow.setTimeout(() => {
+      if (this.cancelFocusReturn !== cancel) return;
+      this.cancelFocusReturn = null;
+      if (this.closed || this.task || this.path !== mapPath || this.contentEl?.ownerDocument !== doc) return;
+      const active = doc?.activeElement ?? null;
+      if (!active || active === doc?.body) this.ports.focusGoalReturn();
+    }, 0);
+    this.cancelFocusReturn = cancel;
   }
   /** Another surface (the goal editor, a new grading) takes the spot: the open task closes without a repaint. */
   dismiss(): void {
@@ -115,8 +119,7 @@ export class GoalSuggest {
   }
   /** The goal bar is redrawn: its old DOM is gone, so the listener and the panel handle are dropped (the task keeps running). */
   detach(): void {
-    this.cleanup?.();
-    this.cleanup = null;
+    this.releaseListener();
     this.panelEl = null;
   }
   /** The view closes: only the document listener goes (the task is stopped by drop). */
@@ -124,10 +127,18 @@ export class GoalSuggest {
     this.cleanup?.();
     this.cleanup = null;
   }
-  /** The map's background work stops (view closed or another map opened): the task is aborted and forgotten. */
+  /** Ends the task and its resources without a repaint or focus change (map departure, close or replacement). */
   drop(): void {
-    this.task?.controller.abort();
+    const cancel = this.cancelFocusReturn;
+    this.cancelFocusReturn = null;
+    cancel?.();
+    const task = this.task;
     this.task = null;
+    this.releaseListener();
+    const panel = this.panelEl;
+    this.panelEl = null;
+    panel?.remove();
+    task?.controller.abort();
   }
   /** True when `node` is inside the list that is on screen. */
   holdsFocus(node: Node): boolean {
@@ -135,6 +146,7 @@ export class GoalSuggest {
   }
   /** Starts the task for the finished run's recommendations and shows the list. */
   open(mapPath: string, suggestions: GoalRecommendSuggestion[], takeFocus: boolean): void {
+    this.drop();
     const task: GoalSuggestTask = {
       mapPath,
       token: ++goalSuggestSeq,
@@ -174,14 +186,16 @@ export class GoalSuggest {
   draw(bar: HTMLElement): void {
     const task = this.task;
     if (!task) return;
-    if (task.mapPath !== this.path) {
-      this.task = null;
-      task.controller.abort();
+    if (!this.current(task)) {
+      this.drop();
       return;
     }
+    this.panelEl?.remove();
+    this.detach();
     const panel = bar.createDiv("vam-goal-suggest vam-goal-attachment");
     this.panelEl = panel;
     const applying = task.state === "applying";
+    const ready = (): boolean => this.panelEl === panel && this.current(task) && task.state === "ready";
     panel.setAttr("role", "group");
     panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
     const boxes: HTMLInputElement[] = [];
@@ -206,6 +220,7 @@ export class GoalSuggest {
         text: t(RELEVANCE_LABEL[item.suggestedTier])
       });
       box.addEventListener("change", () => {
+        if (!ready()) return;
         if (box.checked) task.checked.add(index);
         else task.checked.delete(index);
         syncAdd();
@@ -221,15 +236,17 @@ export class GoalSuggest {
     syncAdd();
     skip.disabled = applying;
     skip.addEventListener("click", event => {
+      if (!ready()) return;
       event.stopPropagation();
       this.end(task, { refocus: true });
     });
     add.addEventListener("click", event => {
+      if (!ready()) return;
       event.stopPropagation();
       this.ports.whenEditing(() => void this.apply(task));
     });
     panel.addEventListener("keydown", event => {
-      if (event.key !== "Escape" || task.state !== "ready") return;
+      if (event.key !== "Escape" || !ready()) return;
       event.preventDefault();
       event.stopPropagation();
       this.end(task, { refocus: true });
@@ -242,6 +259,7 @@ export class GoalSuggest {
     const doc = this.contentEl?.ownerDocument;
     if (doc?.addEventListener && !applying) {
       const outside = (event: Event): void => {
+        if (!ready()) return;
         const target = event.target as Node | null;
         const spark = bar.querySelector?.('.vam-goal-icon[data-goal-action="recommend"]');
         if (!target || panel.contains(target) || spark?.contains(target)) return;
@@ -261,11 +279,10 @@ export class GoalSuggest {
    * a card it holds is raised (same undo step). The summary is not written to the card.
    */
   private async apply(task: GoalSuggestTask): Promise<void> {
-    if (this.task !== task || task.state !== "ready" || !task.checked.size) return;
+    if (!this.current(task) || task.state !== "ready" || !task.checked.size) return;
     task.state = "applying";
     const picked = [...task.checked].sort((a, b) => a - b).flatMap(index => task.suggestions[index] ?? []);
-    this.cleanup?.();
-    this.cleanup = null;
+    this.releaseListener();
     this.ports.render();
     let added = 0;
     let skipped = 0;
@@ -276,11 +293,15 @@ export class GoalSuggest {
           return;
         }
         const fresh = await this.ports.freshNotesOf(picked.map(item => item.parentId));
+        if (!this.current(task)) {
+          skipped = picked.length;
+          return;
+        }
         const mark = this.history.mark();
         try {
           for (const item of picked) {
             const parent = this.map?.nodes.find(node => node.id === item.parentId);
-            if (!this.map || this.closed || !parent || this.stale(item, task, parent, fresh)) {
+            if (!this.current(task) || !this.map || !parent || this.stale(item, task, parent, fresh)) {
               skipped++;
               continue;
             }
@@ -301,7 +322,7 @@ export class GoalSuggest {
     } catch {
       // mutate() has already shown the failure; whatever was added before it is still counted below.
     }
-    if (this.closed) return;
+    if (this.closed || this.task !== task) return;
     this.end(task, { refocus: !added });
     if (skipped) this.ports.notice(t("ui.goal_suggest_skipped_0", skipped));
     if (!added) return;

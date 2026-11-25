@@ -515,3 +515,34 @@ test('relocate: a topic rename keeps a coordinate edit arriving at the map write
   assert.equal(saved.nodes.find(node => node.id === a.id).x, 987);
   assert.ok(saved.nodes.every(node => node.path.startsWith(repo.topicRoot(target) + '/')));
 });
+
+for (const sameFolder of [false, true]) {
+  test(`relocate: failed topic rename restores its actual preimage (same folder: ${sameFolder})`, async () => {
+    const { repo, app, contents, mapPath, a } = await scenario();
+    const target = sameFolder ? mapPath : repo.topicRoot(mapPath) + ' renamed/Map.md';
+    const process = app.vault.process;
+    let injected = false;
+    app.vault.process = async (file, change) => {
+      if (file.path !== target || injected) return process(file, change);
+      injected = true;
+      contents.set(target, contents.get(target).replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+        const edited = JSON.parse(json);
+        edited.nodes.find(node => node.id === a.id).x = 543;
+        return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
+      }));
+      await process(file, change);
+      throw new Error('injected after-apply map write failure');
+    };
+    try {
+      await assert.rejects(repo.renameTopic(mapPath, 'M renamed', sameFolder ? repo.topicRoot(mapPath) : undefined), /injected after-apply map write failure/);
+    } finally {
+      app.vault.process = process;
+    }
+    assert.ok(injected);
+    const restored = await repo.readMap(mapPath);
+    assert.equal(restored.title, 'M');
+    assert.equal(restored.nodes.find(node => node.id === a.id).x, 543);
+    assert.ok(restored.nodes.every(node => node.path.startsWith(repo.topicRoot(mapPath) + '/')));
+    if (!sameFolder) assert.ok(!app.vault.getAbstractFileByPath(target));
+  });
+}

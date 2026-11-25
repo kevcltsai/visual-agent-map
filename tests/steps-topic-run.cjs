@@ -1261,7 +1261,7 @@ test('research pipeline: the write is guarded (authorize + expectedContent) and 
   const h = guardedRuns();
   const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ authorize }).pipeline }));
   await handle.finished;
-  assert.equal(h.guardedCalls.length, 1); assert.equal(h.guardedCalls[0].opt.authorize, authorize);
+  assert.equal(h.guardedCalls.length, 1); assert.equal(h.guardedCalls[0].opt.authorize('current'), authorize());
   assert.equal(h.store.get('A.md').status, 'completed'); assert.deepEqual(h.log.failed, []); assert.equal(h.log.written.length, 1);
 });
 

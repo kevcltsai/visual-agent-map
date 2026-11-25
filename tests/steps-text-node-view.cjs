@@ -389,6 +389,42 @@ test('canvas-text-node: link mode with the keyboard (Enter on a focused card) an
   assert.equal(h.view.linkingTextId, null);
 });
 
+test('closing the view clears canvas mode listeners and callbacks without restoring focus or writing', async () => {
+  const h = await harness(() => [free()]);
+  const released = [];
+  let focus = 0, done = 0;
+  h.view.startLinking('f1');
+  h.view.textEls.get('f1').focus = () => { focus++; };
+  h.view.picking = { topicId: h.root.id, kind: 'supports' };
+  h.view.endPickingListeners = () => { released.push('pick'); h.view.endPickingListeners = null; };
+  h.view.placing = { imageId: 'img', x: 0.5, y: 0.5, done: () => { done++; } };
+  h.view.canvasImageEls.set('img', { focus: () => { focus++; } });
+  h.view.endPlacingListeners = () => { released.push('place'); h.view.endPlacingListeners = null; };
+  h.view.topicLinkMenu = { cleanup: () => released.push('menu'), menu: { remove() {} } };
+  const past = h.view.history.past.length;
+  await h.view.onClose();
+  assert.deepEqual(released, ['pick', 'place', 'menu']);
+  assert.equal(h.view.picking, null);
+  assert.equal(h.view.placing, null);
+  assert.equal(h.view.linkingTextId, null);
+  assert.equal(h.view.topicLinkMenu, null);
+  assert.equal(h.view.stageEl.hasClass('is-linking'), false);
+  assert.equal(focus, 0);
+  assert.equal(done, 0);
+  assert.equal(h.view.history.past.length, past);
+  h.view.dropCanvasInteractionModes();
+  assert.equal(released.length, 3, 'cleanup is idempotent');
+});
+
+test('map switching and full repaint wire cleanup before replacing the old map or DOM', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const open = source.slice(source.indexOf('private async openMapInMutation('), source.indexOf('this.path = path;', source.indexOf('private async openMapInMutation(')));
+  assert.match(open, /this\.dropCanvasInteractionModes\(\)/);
+  const paint = source.slice(source.indexOf('private paint(): void'), source.indexOf('this.contentEl.empty();', source.indexOf('private paint(): void')));
+  assert.match(paint, /this\.closeTopicLinkMenu\(\)/);
+});
+
 test('canvas-text-node: clicking the empty viewport (not the 1px stage) cancels link mode; a card click still links', async () => {
   const h = await harness(() => [free()]);
   const past = h.view.history.past.length;
@@ -452,6 +488,30 @@ test('canvas-text-node: links are drawn as dashed path lines (no marker, no labe
   assert.equal(attr('data-card-id'), h.root.id);
   assert.match(String(attr('d')), /^M /);
   assert.equal(attr('marker-end'), undefined);
+});
+
+test('canvas-text-node: drawing mixed text edges shares live node membership across free blocks', async () => {
+  const h = await harness(({ root, child }) => [
+    txt({ parentId: root.id }),
+    free({ links: [root.id, 'gone'] }),
+    free({ id: 'f2', links: [child.id, 'gone'] })
+  ]);
+  h.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
+  const liveLinks = h.view.liveLinks.bind(h.view);
+  const memberships = [];
+  h.view.liveLinks = (text, alive) => { memberships.push(alive); return liveLinks(text, alive); };
+  h.view.drawEdges();
+  assert.equal(memberships.length, 2);
+  assert.equal(memberships[0]?.has(h.root.id), true);
+  assert.equal(memberships[0], memberships[1], 'free text blocks share one live node index');
+  assert.equal(memberships[0].has('gone'), false);
+  const lines = h.view.edgesEl.children;
+  assert.equal(lines.filter(p => p.classes.includes('vam-text-edge')).length, 1);
+  assert.deepEqual(lines.filter(p => p.classes.includes('vam-text-link')).map(p => p.attrs['data-card-id']), [h.root.id, h.child.id]);
+  h.view.cardEls.delete(h.child.id);
+  h.view.drawEdges();
+  assert.notEqual(memberships[2], memberships[0], 'the next paint builds a fresh index');
+  assert.equal(h.view.edgesEl.children.filter(p => p.classes.includes('vam-text-link')).length, 1);
 });
 
 test('canvas-text-node: deleting a card removes its links in the same step, one undo brings card and link back', async () => {

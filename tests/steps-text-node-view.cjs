@@ -389,6 +389,42 @@ test('canvas-text-node: link mode with the keyboard (Enter on a focused card) an
   assert.equal(h.view.linkingTextId, null);
 });
 
+test('closing the view clears canvas mode listeners and callbacks without restoring focus or writing', async () => {
+  const h = await harness(() => [free()]);
+  const released = [];
+  let focus = 0, done = 0;
+  h.view.startLinking('f1');
+  h.view.textEls.get('f1').focus = () => { focus++; };
+  h.view.picking = { topicId: h.root.id, kind: 'supports' };
+  h.view.endPickingListeners = () => { released.push('pick'); h.view.endPickingListeners = null; };
+  h.view.placing = { imageId: 'img', x: 0.5, y: 0.5, done: () => { done++; } };
+  h.view.canvasImageEls.set('img', { focus: () => { focus++; } });
+  h.view.endPlacingListeners = () => { released.push('place'); h.view.endPlacingListeners = null; };
+  h.view.topicLinkMenu = { cleanup: () => released.push('menu'), menu: { remove() {} } };
+  const past = h.view.history.past.length;
+  await h.view.onClose();
+  assert.deepEqual(released, ['pick', 'place', 'menu']);
+  assert.equal(h.view.picking, null);
+  assert.equal(h.view.placing, null);
+  assert.equal(h.view.linkingTextId, null);
+  assert.equal(h.view.topicLinkMenu, null);
+  assert.equal(h.view.stageEl.hasClass('is-linking'), false);
+  assert.equal(focus, 0);
+  assert.equal(done, 0);
+  assert.equal(h.view.history.past.length, past);
+  h.view.dropCanvasInteractionModes();
+  assert.equal(released.length, 3, 'cleanup is idempotent');
+});
+
+test('map switching and full repaint wire cleanup before replacing the old map or DOM', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const open = source.slice(source.indexOf('private async openMapInMutation('), source.indexOf('this.path = path;', source.indexOf('private async openMapInMutation(')));
+  assert.match(open, /this\.dropCanvasInteractionModes\(\)/);
+  const paint = source.slice(source.indexOf('private paint(): void'), source.indexOf('this.contentEl.empty();', source.indexOf('private paint(): void')));
+  assert.match(paint, /this\.closeTopicLinkMenu\(\)/);
+});
+
 test('canvas-text-node: clicking the empty viewport (not the 1px stage) cancels link mode; a card click still links', async () => {
   const h = await harness(() => [free()]);
   const past = h.view.history.past.length;

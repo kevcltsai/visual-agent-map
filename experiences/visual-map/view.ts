@@ -3099,7 +3099,6 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   async onClose(): Promise<void> {
-    this.closeTopicLinkMenu();
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
@@ -3113,7 +3112,7 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
-    this.cancelLinking(false);
+    this.dropCanvasInteractionModes();
     for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
@@ -3571,7 +3570,10 @@ export class VisualAgentMapView extends ItemView {
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
-    if (this.path !== path) this.hiddenAnchors.clear();
+    if (this.path !== path) {
+      this.dropCanvasInteractionModes();
+      this.hiddenAnchors.clear();
+    }
     this.path = path;
     this.map = map;
     this.selection.exitMultiSelect("openMap");
@@ -7902,13 +7904,13 @@ export class VisualAgentMapView extends ItemView {
     if (was && announce) this.announcer?.setText(t("ui.anchor_pick_cancelled"));
   }
   /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelPlacing(announce: boolean): void {
+  private cancelPlacing(announce: boolean, restoreFocus = true): void {
     const placing = this.placing;
     this.endPlacingListeners?.();
     this.placing = null;
     if (!placing) return;
     if (announce) this.announcer?.setText(t("ui.anchor_place_cancelled"));
-    this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
   }
   private finishPlacing(at: { x: number; y: number }): void {
     const placing = this.placing;
@@ -8783,13 +8785,20 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Leaves link mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelLinking(announce: boolean): void {
+  private cancelLinking(announce: boolean, restoreFocus = true): void {
     const id = this.linkingTextId;
     this.endLinkListeners?.();
     this.linkingTextId = null;
     if (!id) return;
     if (announce) this.announcer?.setText(t("ui.text_link_cancelled"));
-    this.textEls.get(id)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.textEls.get(id)?.focus?.({ preventScroll: true });
+  }
+  /** Ends map-owned interactions before switching maps or closing; never focus a departing element. */
+  private dropCanvasInteractionModes(): void {
+    this.cancelLinking(false, false);
+    this.cancelPicking(false);
+    this.cancelPlacing(false, false);
+    this.closeTopicLinkMenu();
   }
   /** Writes the link as one undo step, then leaves link mode; a repeat is announced and not written twice. */
   private finishLinking(cardId: string): void {
@@ -12167,6 +12176,8 @@ export class VisualAgentMapView extends ItemView {
     this.inlineSummaryInput = null;
     // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
     for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    // The link menu's document listener outlives its DOM unless it is explicitly closed.
+    this.closeTopicLinkMenu();
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
     this.removeGoalBar();
     this.contentEl.empty();

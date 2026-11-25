@@ -2643,10 +2643,20 @@ export class Repository {
       if (!(root instanceof TFolder)) continue;
       for (const child of root.children) {
         if (!(child instanceof TFolder) || this.app.vault.getAbstractFileByPath(`${child.path}/Map.md`)) continue;
-        const prefix = `${child.path}/Notes/`;
-        const noteCount = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(prefix)).length;
-        broken.push({ title: child.name, root: child.path, noteCount });
+        broken.push({ title: child.name, root: child.path, noteCount: 0 });
       }
+    }
+    // Count notes for every missing map in one vault scan, including nested Notes folders.
+    if (broken.length) {
+      const counts = new Map(broken.map(item => [`${item.root}/Notes/`, 0]));
+      for (const file of this.app.vault.getMarkdownFiles()) {
+        for (let i = file.path.indexOf("/Notes/"); i >= 0; i = file.path.indexOf("/Notes/", i + 1)) {
+          const prefix = file.path.slice(0, i + "/Notes/".length);
+          const count = counts.get(prefix);
+          if (count !== undefined) counts.set(prefix, count + 1);
+        }
+      }
+      for (const item of broken) item.noteCount = counts.get(`${item.root}/Notes/`) ?? 0;
     }
     return broken.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -2898,9 +2908,12 @@ export class Repository {
       const note = await this.readNoteIfManaged(file);
       if (!note) continue;
       const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
-      if (referencePaths) await this.updateNote(file.path, { referencePaths });
       const sourcePaths = rebasePathList(note.sourcePaths, pairs);
-      if (sourcePaths) await this.updateNote(file.path, { sourcePaths });
+      if (referencePaths || sourcePaths)
+        await this.updateNote(file.path, {
+          ...(referencePaths ? { referencePaths } : {}),
+          ...(sourcePaths ? { sourcePaths } : {})
+        });
     }
   }
 

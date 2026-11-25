@@ -1,5 +1,5 @@
 import { referenceBatches, type ReferenceGroup } from "../ai/reference-materials";
-import { contentHash } from "./map-chat-context";
+import { contentHash } from "./content-hash";
 import { normalizeVaultPath } from "./map-chat-guard";
 import { estimateCondenseCalls, MAX_CONDENSE_CALLS, sourceText } from "./source-gateway";
 

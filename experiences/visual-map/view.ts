@@ -8626,8 +8626,10 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
-  private liveLinks(text: TextItem): string[] {
-    const alive = new Set((this.map?.nodes ?? []).map(node => node.id));
+  private liveLinks(
+    text: TextItem,
+    alive: ReadonlySet<string> = new Set((this.map?.nodes ?? []).map(node => node.id))
+  ): string[] {
     return (text.links ?? []).filter(id => alive.has(id));
   }
   /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
@@ -24664,11 +24666,14 @@ export class VisualAgentMapView extends ItemView {
         this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);
       }
     }
+    // Both kinds of text edge share one lookup, preserving the first matching text item in map order.
+    const textsById = new Map<string, TextItem>();
+    if (this.textEls.size)
+      for (const item of this.map.canvasItems ?? [])
+        if (item.kind === "text" && !textsById.has(item.id)) textsById.set(item.id, item);
     // A text node hangs from its topic by the same kind of line.
     for (const [textId, textEl] of this.textEls) {
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       const parent = text?.parentId ? this.cardEls.get(text.parentId) : undefined;
       if (!text || !parent || textEl.classList.contains("is-free")) continue;
       const direction = directionOf(text.parentId as string) as LayoutKind;
@@ -24689,13 +24694,13 @@ export class VisualAgentMapView extends ItemView {
       lines.push(path);
     }
     // A free text block is joined to the cards it links to by a dashed line: no arrow, no label (canvas-text-node decision #2).
+    let alive: Set<string> | undefined;
     for (const [textId, textEl] of this.textEls) {
       if (!textEl.classList.contains("is-free")) continue;
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       if (!text) continue;
-      for (const cardId of this.liveLinks(text)) {
+      alive ??= new Set(allNodes.map(node => node.id));
+      for (const cardId of this.liveLinks(text, alive)) {
         const card = this.cardEls.get(cardId);
         if (!card) continue;
         const path = createSvg("path");

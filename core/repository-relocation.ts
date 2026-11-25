@@ -19,9 +19,40 @@ interface RelocationPorts {
  * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
  */
 export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder, target: string): Promise<void> {
+  const origin = item.path;
+  const verifyMove = (): void => {
+    if (!ports.app.vault.getAbstractFileByPath(target)) throw new Error(ports.message("error.move_not_applied"));
+  };
+  const move = async (delegated: boolean): Promise<void> => {
+    const rename = (file: TFile | TFolder, path: string): Promise<void> =>
+      delegated ? ports.app.fileManager.renameFile(file, path) : ports.app.vault.rename(file, path);
+    try {
+      await rename(item, target);
+      verifyMove();
+    } catch (error) {
+      // A rejected rename may already have moved the file. Reverse only the very same file, never a replacement.
+      if (
+        target !== origin &&
+        ports.app.vault.getAbstractFileByPath(target) === item &&
+        !ports.app.vault.getAbstractFileByPath(origin)
+      ) {
+        try {
+          await rename(item, origin);
+          if (ports.app.vault.getAbstractFileByPath(origin) !== item)
+            throw new Error(ports.message("error.move_not_applied"));
+        } catch (rollbackError) {
+          const describe = (failure: unknown): string => (failure instanceof Error ? failure.message : String(failure));
+          throw new Error(
+            translate(ports.language(), "error.move_undo_failed_0", describe(error), describe(rollbackError))
+          );
+        }
+      }
+      throw error;
+    }
+  };
   const resolvedLinks = ports.app.metadataCache.resolvedLinks as Record<string, Record<string, number>> | undefined;
   if (!resolvedLinks) {
-    await ports.app.fileManager.renameFile(item, target);
+    await move(true);
     return;
   }
   const moves = new Map<string, string>();
@@ -33,13 +64,10 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
   const plan = await planLinkRewrites(ports, item, moves, resolvedLinks);
   if (plan.foreign > 0) {
     new Notice(translate(ports.language(), "ui.move_links_dialog_notice_0", plan.foreign));
-    await ports.app.fileManager.renameFile(item, target);
+    await move(true);
     return;
   }
-  const origin = item.path;
-  await ports.app.vault.rename(item, target);
-  // Trust the disk, not the await: the note must really be at its new place before its links are rewritten.
-  if (!ports.app.vault.getAbstractFileByPath(target)) throw new Error(ports.message("error.move_not_applied"));
+  await move(false);
   const written: Array<{ path: string; before: string; after: string }> = [];
   try {
     for (const edit of plan.edits) {

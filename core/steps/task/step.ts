@@ -22,7 +22,7 @@ export interface TaskStepInput {
  * The step id of a task request: the two reference rounds are their own steps; everything else is `task.run`.
  */
 export type TaskStepRole = "reference-extract" | "reference-reduce";
-export function taskStepId(context: TaskContext, role?: TaskStepRole): string {
+export function taskStepId(role?: TaskStepRole): string {
   if (role) return `task.${role}`;
   return "task.run";
 }

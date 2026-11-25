@@ -342,40 +342,45 @@ export class ClaudeCodeCliRuntime {
     // A process pre-started for exactly this command only needs the prompt; a different pre-started process stays for its own run.
     const pool = this.options.warmPool;
     const warmArgs = (pool || steerable) && observed ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
-    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs)) : null;
-    // A steerable observed call always uses the warm command: it is the observed command plus `--input-format stream-json`.
-    if (warmArgs && (warm || steerable)) args = warmArgs;
-    if (outputSchema && controls.stream === true) {
-      try {
-        controls.onStreamMode?.(observed ? "stream-json" : fallback ? "json-fallback" : "json");
-      } catch {
-        /* Diagnostics are best effort. */
+    const prepare = (prespawned: boolean): void => {
+      // The warm command is also used by a cold steerable observed call.
+      if (warmArgs && (prespawned || steerable)) args = warmArgs;
+      if (outputSchema && controls.stream === true) {
+        try {
+          controls.onStreamMode?.(observed ? "stream-json" : fallback ? "json-fallback" : "json");
+        } catch {
+          /* Diagnostics are best effort. */
+        }
       }
-    }
-    controls.onRequest?.({
-      provider: "claude",
-      executable: this.options.executable,
-      args: args.map((arg, index) =>
-        index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg
-      ),
-      input: image ? `<VAM prompt and ${image.media_type} image via stdin>` : "<VAM prompt via stdin>"
-    });
-    this.options.onLog?.(
-      "info",
-      t(
-        "log.claude_starting_0_1",
-        this.options.executable,
-        t(webSearch ? "log.claude_web_search_available" : "log.claude_vam_context_only")
-      )
-    );
-
-    if (warmArgs) {
-      try {
-        controls.onMilestones?.({ prespawned: !!warm });
-      } catch {
-        /* Diagnostics are best effort. */
+      if (controls.signal?.aborted) throw abortError();
+      controls.onRequest?.({
+        provider: "claude",
+        executable: this.options.executable,
+        args: args.map((arg, index) =>
+          index === args.indexOf(JSON.stringify(claudeOutputSchema(outputSchema))) ? "<response-schema>" : arg
+        ),
+        input: image ? `<VAM prompt and ${image.media_type} image via stdin>` : "<VAM prompt via stdin>"
+      });
+      this.options.onLog?.(
+        "info",
+        t(
+          "log.claude_starting_0_1",
+          this.options.executable,
+          t(webSearch ? "log.claude_web_search_available" : "log.claude_vam_context_only")
+        )
+      );
+      if (warmArgs) {
+        try {
+          controls.onMilestones?.({ prespawned });
+        } catch {
+          /* Diagnostics are best effort. */
+        }
       }
-    }
+      // Caller hooks may synchronously stop the call. No process may receive the prompt after that.
+      if (controls.signal?.aborted) throw abortError();
+    };
+    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs), () => prepare(true)) : null;
+    if (!warm) prepare(false);
 
     return new Promise<string>((resolve, reject) => {
       let child: ClaudeProcess;

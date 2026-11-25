@@ -3176,11 +3176,7 @@ export class VisualAgentMapView extends ItemView {
     this.anchorDragCancel?.(false);
     // Closing the map's view stops its picture-book run (resumable); the run's calls cannot outlive the view that drives them.
     if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
@@ -3553,9 +3549,7 @@ export class VisualAgentMapView extends ItemView {
       this.exitPresentation(false);
     }
     if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
+      await this.flushPendingViewport();
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
@@ -11144,7 +11138,7 @@ export class VisualAgentMapView extends ItemView {
     for (const view of this.plugin.views()) {
       if (view === this || view.path !== from) continue;
       if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
-      await view.flushForCrossMap();
+      await view.flushPendingViewport();
     }
     let sourceMap: MapDocument;
     try {
@@ -11238,13 +11232,6 @@ export class VisualAgentMapView extends ItemView {
           if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
       }
     });
-  }
-  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
-  private async flushForCrossMap(): Promise<void> {
-    if (this.viewportTimer === null) return;
-    window.clearTimeout(this.viewportTimer);
-    this.viewportTimer = null;
-    await this.persistViewport();
   }
   /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
   private crossMapEntry(id: string): Action {
@@ -11935,11 +11922,7 @@ export class VisualAgentMapView extends ItemView {
           action: () =>
             this.enqueue(async () => {
               if (!this.map) return;
-              if (this.viewportTimer !== null) {
-                window.clearTimeout(this.viewportTimer);
-                this.viewportTimer = null;
-                await this.persistViewport();
-              }
+              if (this.viewportTimer !== null) await this.flushPendingViewport();
               const path = this.path,
                 file = this.plugin.repo.file(path),
                 content = await this.app.vault.read(file),
@@ -12000,11 +11983,7 @@ export class VisualAgentMapView extends ItemView {
     this.restoreMapFocus(this.lastMapFocus);
   }
   private async restoreDeletedMapFromUi(): Promise<void> {
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
     if (this.history.undoEntry === this.deletedMap?.deleteAction) {
       await this.travel(false);
       this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
@@ -19607,13 +19586,23 @@ export class VisualAgentMapView extends ItemView {
         this.viewportQueued = false;
       });
   }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushPendingViewport(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
+    const path = this.path;
     const viewport = { ...this.map.viewport };
-    const written = await this.plugin.repo.updateMap(this.path, map => {
+    const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });
+    // A late write for the previous map must not stamp the newly opened map.
+    if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)

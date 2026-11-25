@@ -358,3 +358,15 @@ test('bookCardLock: AI off before done, structure off except at the plan review,
   for (const phase of ['planning', 'writing', 'gate2']) assert.deepEqual(plain(model.bookCardLock(phase)), { ai: true, structure: true }, phase);
   assert.deepEqual(plain(model.bookCardLock('gate1')), { ai: true, structure: false });
 });
+
+test('all six pipeline fields can be read, patched and removed without changing their persisted keys', () => {
+  const raw = {
+    'pipeline-stage': 'planned', 'book-role': 'body', 'pipeline-role': 'intro',
+    'book-role-by': 'owner', 'pipeline-issue': 'issue', 'pipeline-seam': 'seam'
+  };
+  const fields = plain(model.readPipelineFields(raw));
+  assert.deepEqual(plain(model.pipelineFrontmatter(fields)), raw);
+  assert.deepEqual(plain(model.pipelineFrontmatter(Object.fromEntries(Object.keys(fields).map(key => [key, null])))),
+    Object.fromEntries(Object.keys(raw).map(key => [key, null])));
+  assert.deepEqual(plain(model.pipelineFrontmatter({})), {});
+});

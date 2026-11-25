@@ -26,6 +26,7 @@ import {
   MAP_CHAT_WIDTH_STEP,
   type ChatLineCounts
 } from "../../core/map-chat-layout";
+import { MapChatPaintScope } from "./map-chat-paint-scope";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -600,6 +601,7 @@ export function pickArgumentSuggestions<T>(pool: readonly T[], random: () => num
  */
 export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTurnHandle> {
   private readonly id = `vam-map-chat-${++panelSequence}`;
+  private readonly paintScope = new MapChatPaintScope();
   private messages: MapChatMessage[] = [];
   /** The chief editor's openings: spoken words that are not a turn; each sits before `messages[at]` (at the end when `at` is past it). */
   private openings: { at: number; message: MapChatMessage }[] = [];
@@ -619,9 +621,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private chainWaitingState: MapChatChainWaiting | null = null;
   /** What the continuation still has to do, as the waiting row says it. */
   private chainWaitingLeft = "";
-  /** When the wait began (the seconds count from there), the timer that rewrites them, and the two texts that change. */
+  /** When the wait began (the seconds count from there) and the two texts that change. */
   private chainWaitingSince = 0;
-  private chainWaitingTimer: { cancel: () => void } | null = null;
   private chainWaitingEls: { label: HTMLElement; elapsed: HTMLElement } | null = null;
   /** The round and the limit of the continuation in flight (1 and the default for an ordinary message). */
   private chainRound = 1;
@@ -712,8 +713,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     MapChatMessage,
     { key: string; row: HTMLElement; body: HTMLElement; more: HTMLButtonElement | null }
   >();
-  /** The animation frame that will lay out the streaming message, if one is waiting. */
-  private frame: { cancel: () => void } | null = null;
   /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
   private stage: { kind: MapChatStage; since: number } | null = null;
   /** The label of the model the running turn was sent with (read once when the turn begins, so a switch mid-turn does not change it). */
@@ -723,12 +722,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     null;
   /** The slow notice of the running turn (no model event for a long while) and what its button does. Null when not shown. */
   private slow: { text: string; resend: () => void } | null = null;
-  /** The one-second timer that rewrites the seconds (only their text). */
-  private stageTimer: { cancel: () => void } | null = null;
   /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
   private wasShown = false;
-  /** The scroll to the end that waits for the overlay's height to be final. */
-  private openFrame: { cancel: () => void } | null = null;
   /** The visible note the user took off the chip; it stays off until another note is visible. */
   private dismissedNote: string | null = null;
   private noteChip: string | null = null;
@@ -891,6 +886,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * `parent`, the window left of the canvas; "hero" is the opening screen, which goes wherever `parent` is.
    */
   mount(parent: HTMLElement, mode: "side" | "hero" = "side"): void {
+    this.paintScope.activate();
     this.hero = mode === "hero";
     if (!this.built) this.build(parent);
     else if (mode === "hero") this.place(parent, null);
@@ -916,14 +912,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.el.remove();
     parent.insertBefore(this.el, ref);
   }
-  /** The view is closing: stop listening for model changes and let go of a resize in progress. */
+  /** The view is closing: release subscriptions, resize listeners and all scheduled paints. */
   dispose(): void {
     this.stopWatching?.();
     this.stopWatching = null;
     this.stopWatchingImage?.();
     this.stopWatchingImage = null;
     this.stopResizing?.();
-    this.cancelFrame();
+    this.paintScope.dispose();
+    this.chainWaitingState = null;
+    this.chainWaitingLeft = "";
+    this.stopWaitTimer();
     this.clearStage();
     this.rows = new WeakMap();
   }
@@ -1171,17 +1170,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           : "ui.map_chat_chain_kind_research"
     );
   }
+  private paintWindow(): Window | undefined {
+    return this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
+  }
   private startWaitTimer(): void {
-    if (!this.built || this.chainWaitingTimer) return;
-    const win =
-      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
-    if (typeof win?.setInterval !== "function") return;
-    const id = win.setInterval(() => this.paintWait(), 1000);
-    this.chainWaitingTimer = { cancel: () => win.clearInterval?.(id) };
+    if (!this.built) return;
+    this.paintScope.interval("chain-wait", this.paintWindow(), () => this.paintWait());
   }
   private stopWaitTimer(): void {
-    this.chainWaitingTimer?.cancel();
-    this.chainWaitingTimer = null;
+    this.paintScope.cancel("chain-wait");
     this.chainWaitingEls = null;
   }
   /** Rewrites the two texts of the waiting row that is on screen (never the row). */
@@ -1544,20 +1541,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (this.built && this.stage) this.liveEl.setText(this.stageLabel(this.stage.kind));
   }
   private startStageTimer(): void {
-    if (!this.built || this.stageTimer) return;
-    const win =
-      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
-    if (typeof win?.setInterval !== "function") return;
-    const id = win.setInterval(() => this.stageEls?.elapsed.setText(this.elapsedText()), 1000);
-    this.stageTimer = { cancel: () => win.clearInterval?.(id) };
+    if (!this.built) return;
+    this.paintScope.interval("stage", this.paintWindow(), () => this.stageEls?.elapsed.setText(this.elapsedText()));
   }
   /** The turn ended (an answer, a failure, Stop, a reset): no stage, no seconds, no timer. */
   private clearStage(): void {
     this.stage = null;
     this.slow = null;
     this.stageEls = null;
-    this.stageTimer?.cancel();
-    this.stageTimer = null;
+    this.paintScope.cancel("stage");
   }
   /** Every list of choices already shown stops working (a pick was made, or a newer message came). */
   private retireChoices(except?: MapChatChoices): void {
@@ -1587,20 +1579,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // The first characters are the proof that the model is writing.
     if (text && this.stage?.kind === "waiting") this.setStage("writing");
     else if (text) this.clearSlow();
-    if (!this.built || this.frame) return;
+    if (!this.built) return;
     // Chunks that arrive within one frame are laid out once, with the newest text.
-    // The window the log is shown in (a popped-out view has its own), because only that one paints its frames.
-    const win =
-      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
-    if (typeof win?.requestAnimationFrame !== "function") {
-      this.layoutStreaming();
-      return;
-    }
-    const id = win.requestAnimationFrame(() => {
-      this.frame = null;
-      this.layoutStreaming();
-    });
-    this.frame = { cancel: () => win.cancelAnimationFrame?.(id) };
+    // The scheduling window can be the popped-out view rather than the main window.
+    this.paintScope.frame("stream", this.paintWindow(), () => this.layoutStreaming());
   }
   /** Lays the streaming message out with the text it has now; no other message is touched. */
   private layoutStreaming(): void {
@@ -1615,8 +1597,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (stick) this.scrollToEnd();
   }
   private cancelFrame(): void {
-    this.frame?.cancel();
-    this.frame = null;
+    this.paintScope.cancel("stream");
   }
   /** The turn ended with an answer and the outcome of each action. */
   finish(reply: string, lines: MapChatLine[]): MapChatLine[] {
@@ -1833,7 +1814,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
-    this.cancelFrame();
+    this.paintScope.reset();
     this.rows = new WeakMap();
     this.messages = [];
     this.openings = [];
@@ -1900,7 +1881,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (this.working) return;
     this.switchAutoApplyOff();
     // Only the messages are replaced: the draft and the references the user added while the record was read stay.
-    this.cancelFrame();
+    this.paintScope.reset();
     this.rows = new WeakMap();
     this.messages = [];
     this.openings = [];
@@ -2739,23 +2720,16 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (stick) this.scrollToEndWhenSettled();
   }
   private cancelOpenFrame(): void {
-    this.openFrame?.cancel();
-    this.openFrame = null;
+    this.paintScope.cancel("scroll");
   }
   /** The overlay's height is final only after the classes are laid out, so the scroll to the end waits for the next frame. */
   private scrollToEndWhenSettled(): void {
     this.cancelOpenFrame();
-    const win =
-      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
-    if (typeof win?.requestAnimationFrame !== "function") {
-      this.scrollToEnd();
-      return;
-    }
-    const id = win.requestAnimationFrame(() => {
-      this.openFrame = null;
-      if (this.shown) this.scrollToEnd();
+    const win = this.paintWindow();
+    const deferred = typeof win?.requestAnimationFrame === "function";
+    this.paintScope.frame("scroll", win, () => {
+      if (!deferred || this.shown) this.scrollToEnd();
     });
-    this.openFrame = { cancel: () => win.cancelAnimationFrame?.(id) };
   }
   /** An empty conversation in the side window shows one line of guidance in place of the log. */
   private renderGuide(): void {

@@ -1597,7 +1597,7 @@ export class TopicRuns {
               ? await repo.updateNoteGuarded(path, patch, {
                   ...writeOptions,
                   expectedContent: raw?.started ?? expectedContent,
-                  authorize: guard.authorize,
+                  authorize: current => !controller.signal.aborted && guard.authorize(current),
                   finalize: guard.finalize
                     ? (content: string) => {
                         const final = guard.finalize(content);
@@ -1630,9 +1630,16 @@ export class TopicRuns {
                 await this.settleRunning(repo, path, { status: note.status });
                 const stopped = controller.signal.aborted;
                 if (exchangeId)
-                  exchanges()?.failed(exchangeId, t(stopped ? "log.stopped_result_not_written" : "log.stale_result_not_written"));
+                  exchanges()?.failed(
+                    exchangeId,
+                    t(stopped ? "log.stopped_result_not_written" : "log.stale_result_not_written")
+                  );
                 fail(
-                  t(stopped ? "ui.research_stopped_existing_content_was_preserved" : "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")
+                  t(
+                    stopped
+                      ? "ui.research_stopped_existing_content_was_preserved"
+                      : "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"
+                  )
                 );
                 return;
               }

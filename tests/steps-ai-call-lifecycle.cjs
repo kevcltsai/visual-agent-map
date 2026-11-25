@@ -188,11 +188,12 @@ for (const kind of Object.keys(KINDS)) {
     assert.equal(mid.active.size, 0);
   });
 
-  test(`${kind}: an external signal that is already aborted reaches the runtime aborted`, async () => {
+  test(`${kind}: an external signal that is already aborted is refused before the runtime is called`, async () => {
     const external = countedSignal(true);
-    const f = fixture(kind, { beforeRequest: (state, args) => { state.sawAborted = args[4].signal.aborted; } });
-    await f.run(spec.request(), external.signal).then(() => null, e => e);
-    assert.equal(f.state.sawAborted, true);
+    const f = fixture(kind);
+    const error = await f.run(spec.request(), external.signal).then(() => null, e => e);
+    assert.ok(error); assert.equal(error.message, spec.stopped);
+    assert.equal(f.state.runtimeCalls.length, 0);
     assert.equal(f.active.size, 0); assert.equal(external.state.listeners, 0);
   });
 }

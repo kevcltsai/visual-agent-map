@@ -84,7 +84,7 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
       ended = false,
       timer: unknown;
     // After a re-send or a stop, whatever the old attempt still reports is dropped.
-    const live = (): boolean => !controller.signal.aborted && !resendRequested;
+    const live = (): boolean => !ended && !controller.signal.aborted && !resendRequested;
     const disarm = (): void => {
       if (timer === undefined) return;
       clock.clearTimeout(timer);
@@ -128,16 +128,21 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
       safe(() => options.onResend?.(attempt));
       controller.abort();
     };
-    safe(() => options.onAttempt?.(attempt));
-    // The race makes the loop independent of a runtime that is slow to honour the abort.
-    const replaced = new Promise<never>((_resolve, reject) =>
-      controller.signal.addEventListener("abort", () => reject(stopped()), { once: true })
-    );
+    // Subscribe before notifying observers: onAttempt may synchronously stop the job.
+    let rejectReplacement: (error: Error) => void = () => undefined;
+    const replaced = new Promise<never>((_resolve, reject) => {
+      rejectReplacement = reject;
+    });
+    const onAbort = (): void => rejectReplacement(stopped());
+    controller.signal.addEventListener("abort", onAbort, { once: true });
     replaced.catch(() => undefined);
     try {
+      safe(() => options.onAttempt?.(attempt));
+      if (!live()) throw stopped();
       const running = options.start(attempt);
       running.catch(() => undefined);
       const sent = await Promise.race([running, replaced]);
+      if (outer?.aborted) throw stopped();
       // A reply that arrives after the user replaced this attempt is discarded.
       if (!(resendRequested && !outer?.aborted)) return sent;
     } catch (error) {
@@ -147,6 +152,7 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
       ended = true;
       disarm();
       outer?.removeEventListener("abort", onOuterAbort);
+      controller.signal.removeEventListener("abort", onAbort);
     }
     safe(() => options.onReplaced?.(attempt));
   }

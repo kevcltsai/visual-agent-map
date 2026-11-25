@@ -206,3 +206,25 @@ test('after the attempt has its answer, Resend does nothing (both modes)', async
     assert.equal(r.starts.length, 1); assert.ok(!r.log.some(line => line.startsWith('resend')), 'no onResend after the runner returned');
   }
 });
+
+test('an onAttempt hook that stops the outer job prevents the provider start', async () => {
+  const outer = new AbortController();
+  const r = rig({ signal: outer.signal, hooks: { onAttempt: () => outer.abort() } });
+  await assert.rejects(r.run, /stopped/);
+  assert.equal(r.starts.length, 0); assert.equal(r.clock.timers.size, 0);
+});
+
+test('completed and failed attempts refuse late model events and cannot re-arm a watchdog', async () => {
+  for (const failed of [false, true]) {
+    const r = rig(); await flush();
+    r.clock.advance(FIRST_EVENT_WAIT_MS);
+    const attempt = r.starts[0].attempt;
+    if (failed) { r.starts[0].reject(new Error('failed')); await assert.rejects(r.run, /failed/); }
+    else { r.starts[0].resolve('ok'); assert.equal(await r.run, 'ok'); }
+    assert.equal(attempt.live(), false);
+    assert.equal(attempt.seen(), false);
+    attempt.arm(); r.clock.advance(120_000);
+    assert.equal(r.clock.timers.size, 0); assert.equal(r.slow.length, 1);
+    assert.ok(!r.log.some(line => line.startsWith('cleared')));
+  }
+});

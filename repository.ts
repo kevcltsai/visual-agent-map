@@ -1635,10 +1635,7 @@ export class Repository {
       fm = frontmatter(content);
     const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
-    const source = text(fm["model-source"], "workspace");
-    const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
-      ? (source as ModelSource)
-      : "workspace";
+    const modelSource = this.modelSourceOf(fm);
     const effective = await this.effectiveModel(
       path,
       text(fm.model),
@@ -1652,6 +1649,15 @@ export class Repository {
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
     );
+    const preview = previewSection(content),
+      contentLanguage = noteContentLanguage(fm),
+      relevance = readRelevance(fm),
+      bookSettings = readBookSettings(fm),
+      topicKind = readTopicKind(fm),
+      markers = readTopicMarkers(fm),
+      links = readTopicLinks(fm),
+      color = readTopicColor(fm),
+      style = readTopicStyle(fm);
     return {
       title: noteTitle(content, fm, file.basename),
       summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
@@ -1661,8 +1667,8 @@ export class Repository {
       thinkingOrigin: readThinkingOrigin(content),
       visualReferences: section(content, "Visual References"),
       newFindings: section(content, "Working Findings") || section(content, "New Findings"),
-      preview: [previewSection(content), section(content, "User Notes")].filter(Boolean).join("\n\n"),
-      previewSection: previewSection(content),
+      preview: [preview, section(content, "User Notes")].filter(Boolean).join("\n\n"),
+      previewSection: preview,
       previewInitialized: fm["preview-initialized"] === true,
       previewAutoHash: readPreviewAutoHash(fm["preview-auto-hash"]),
       model,
@@ -1676,21 +1682,21 @@ export class Repository {
         : {}),
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
-      ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
-      ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
+      ...(contentLanguage ? { contentLanguage } : {}),
+      ...(relevance ? { relevance } : {}),
       ...(readAiLocked(fm) || managedNodeIds(map).has(map?.nodes.find(item => item.path === path)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
       ...readPipelineFields(fm),
-      ...(Object.keys(readBookSettings(fm)).length ? { bookSettings: readBookSettings(fm) } : {}),
-      ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
-      ...(readTopicKind(fm) === "hypothesis"
+      ...(Object.keys(bookSettings).length ? { bookSettings } : {}),
+      ...(topicKind !== "topic" ? { topicKind } : {}),
+      ...(topicKind === "hypothesis"
         ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) }
         : {}),
-      ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
-      ...(readTopicLinks(fm).length ? { links: readTopicLinks(fm) } : {}),
-      ...(readTopicColor(fm) ? { color: readTopicColor(fm) } : {}),
-      ...(readTopicStyle(fm).length ? { style: readTopicStyle(fm) } : {}),
+      ...(markers.length ? { markers } : {}),
+      ...(links.length ? { links } : {}),
+      ...(color ? { color } : {}),
+      ...(style.length ? { style } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],

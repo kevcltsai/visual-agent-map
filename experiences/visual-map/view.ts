@@ -3383,6 +3383,18 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /** Captures this open of a map, not a mutable map object that can be refreshed in place. */
+  private captureMapSession(): () => boolean {
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    return () => !this.closed && this.path === path && this.mapOpenEpoch === epoch && !!this.map;
+  }
+  /** A queued gesture must still belong to the map where the user made it when it reaches the mutation queue. */
+  private enqueueMapSession(work: () => Promise<void>, isCurrent = this.captureMapSession()): void {
+    this.enqueue(async () => {
+      if (isCurrent()) await work();
+    });
+  }
   /**
    * A card dropped while notes are still being read is written after the read (the queue holds it). By then the view may be
    * closed or showing another map, and the card is not where the drop saw it: the write is dropped, never applied to the wrong map.
@@ -3392,12 +3404,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(work);
       return;
     }
-    const epoch = this.mapOpenEpoch,
-      path = this.path;
-    this.enqueue(async () => {
-      if (this.closed || this.mapOpenEpoch !== epoch || this.path !== path || !this.map) return;
-      await work();
-    });
+    this.enqueueMapSession(work);
   }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   private outputLanguageMemory(): OutputLanguageMemory {
@@ -9938,7 +9945,7 @@ export class VisualAgentMapView extends ItemView {
       images = imageFilesFrom({ files: all });
     for (const other of all.filter(item => !images.includes(item)))
       new Notice(t("ui.canvas_image_refused", other.name || "?"));
-    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+    if (images.length) this.enqueueMapSession(() => this.attachCardImages(node, images));
   }
   /**
    * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
@@ -9948,9 +9955,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
     if (!this.map || !this.cardAcceptsImages(node)) return;
-    const mapPath = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let first = true;
     for (const file of files) {
       const label = file.name || "?";
@@ -9962,10 +9967,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -9976,7 +9981,7 @@ export class VisualAgentMapView extends ItemView {
       const setCover = first;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale() || !this.map) return;
+        if (!isCurrent() || !this.map) return;
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction()
           .createAttachment("image", { name, data, sourcePath: node.path })
@@ -10386,6 +10391,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
   private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const isCurrent = this.captureMapSession();
     const input = this.contentEl.createEl("input", {
       cls: "vam-sr-only",
       attr: { type: "file", accept: "image/*", multiple: "" }
@@ -10393,7 +10399,7 @@ export class VisualAgentMapView extends ItemView {
     input.addEventListener("change", () => {
       const chosen = Array.from(input.files ?? []);
       input.remove();
-      if (chosen.length) this.queueCanvasImages(chosen, point);
+      if (chosen.length && isCurrent()) this.queueCanvasImages(chosen, point);
     });
     input.click();
   }
@@ -10412,7 +10418,7 @@ export class VisualAgentMapView extends ItemView {
     const target = this.map?.nodes.find(item => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
       event.preventDefault();
-      this.enqueue(() => this.attachCardImages(target, images));
+      this.enqueueMapSession(() => this.attachCardImages(target, images));
       return true;
     }
     if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
@@ -10424,7 +10430,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Fences the gesture on this map and this open of it, then queues the writes. */
   private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
-    this.enqueue(() => this.insertCanvasImages(files, point));
+    this.enqueueMapSession(() => this.insertCanvasImages(files, point));
   }
   /**
    * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
@@ -10433,9 +10439,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
     if (!this.canEditCanvasItems()) return;
-    const path = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let offset = 0;
     for (const file of files) {
       const label = file.name || "?";
@@ -10447,10 +10451,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -10467,7 +10471,7 @@ export class VisualAgentMapView extends ItemView {
         y = point.y + offset;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale()) return;
+        if (!isCurrent()) return;
         this.focusItemId = id;
         await this.mapChangeSnapshots(
           (map, attachment) => {
@@ -11752,11 +11756,7 @@ export class VisualAgentMapView extends ItemView {
         return file instanceof TFile ? () => this.app.vault.readBinary(file) : null;
       },
       path: () => this.path,
-      fence: () => {
-        const mapPath = this.path,
-          epoch = this.mapOpenEpoch;
-        return (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-      },
+      fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";

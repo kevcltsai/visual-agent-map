@@ -39,6 +39,10 @@ export interface MapSourcesPanelHost {
   id: string;
   sources: readonly MapSource[];
   currentMapPath: string;
+  /** False once this panel's logical session or map has ended. */
+  isActive?(): boolean;
+  /** Registers the live picker for cancellation when the session ends. */
+  registerPickerClose?(close: () => void): void;
   /** The other maps' rows (the panel drops the current map itself). */
   mapItems(): Promise<MapSwitcherItem[]>;
   /** `quiet` = a drop or pick that the panel announces once itself through `announce`; no per-item announcement. */
@@ -350,6 +354,7 @@ export function drawMapSourcesPanel(
   focus: MapSourcesPanelFocus
 ): HTMLElement {
   const session = (host.session ??= newMapSourcesSession());
+  const isActive = (): boolean => host.isActive?.() !== false;
   const panel = parent.createDiv({
     cls: "vam-map-sources-panel",
     attr: { id: host.id, role: "dialog", "aria-label": t("ui.map_sources_title") }
@@ -394,7 +399,9 @@ export function drawMapSourcesPanel(
 
   /** Sorts a batch into add / refuse; adds what can be added and keeps the reasons for the rest. */
   const commit = async (items: DragEntry[], outside: string[]): Promise<void> => {
+    if (!isActive()) return;
     const mapPaths = (await host.mapItems().catch(() => [] as MapSwitcherItem[])).map(item => item.mapPath);
+    if (!isActive()) return;
     const lines = outside.map(name => t("ui.map_sources_reject_line_0", name, t("ui.map_sources_reject_outside")));
     const accepted: MapSource[] = [];
     for (const item of items) {
@@ -457,6 +464,7 @@ export function drawMapSourcesPanel(
   search.createSpan({ cls: "vam-map-sources-pick-label", text: t("ui.map_sources_search") });
   search.addEventListener("click", event => {
     event.stopPropagation();
+    if (!isActive() || host.isPickerOpen()) return;
     session.rejected = [];
     session.added = "";
     repaint();
@@ -499,7 +507,7 @@ export function drawMapSourcesPanel(
     });
     const submit = async (): Promise<void> => {
       const text = input.value.trim();
-      if (!text || addButton.disabled) return;
+      if (!isActive() || !text || addButton.disabled) return;
       addButton.disabled = true;
       let result: ExternalAddFailure | "stale" | null;
       try {
@@ -508,7 +516,7 @@ export function drawMapSourcesPanel(
         result = "missing";
       }
       addButton.disabled = false;
-      if (result === "stale") return;
+      if (!isActive() || result === "stale") return;
       if (result === null) {
         session.pathDraft = "";
         session.externalRejected = "";
@@ -634,7 +642,17 @@ async function openSearch(
   returnFocus: HTMLElement,
   choose: (items: DragEntry[]) => void
 ): Promise<void> {
-  const items = await searchItems(host);
+  const isActive = (): boolean => host.isActive?.() !== false;
+  if (!isActive() || host.isPickerOpen()) return;
+  host.setPickerOpen(true);
+  let items: SearchItem[];
+  try {
+    items = await searchItems(host);
+  } catch {
+    if (isActive()) host.setPickerOpen(false);
+    return;
+  }
+  if (!isActive()) return;
   const modal = new MapSourcePickerModal<SearchItem>(
     host.app,
     items,
@@ -655,12 +673,13 @@ async function openSearch(
     }
   );
   // The panel stays open behind the list; focus goes back to the search button (the list closes before it picks).
-  host.setPickerOpen(true);
   const hostClose = (modal as { onClose?: () => void }).onClose;
   modal.onClose = (): void => {
     hostClose?.call(modal);
+    if (!isActive()) return;
     host.setPickerOpen(false);
     if (returnFocus.isConnected !== false) returnFocus.focus();
   };
+  host.registerPickerClose?.(() => modal.close());
   modal.open();
 }

@@ -18,23 +18,23 @@ function newTask(mapPath, ids = ['a', 'b']) {
 
 function world(options = {}) {
   const state = { closed: false, path: 'map.md', content: 'same' };
-  const asks = [], changes = [], notices = [], writes = [], checks = [];
+  const asks = [], changes = [], notices = [], writes = [], checks = [], progress = [], events = [];
   const ports = {
     path: () => state.path,
     closed: () => state.closed,
     changed: () => { changes.push(1); },
     language: () => 'en',
     detailTemplate: () => ({}),
-    progress: () => ({ observer: undefined, end: () => {} }),
+    progress: task => ({ observer: { onAttempt: id => events.push([task, id]) }, end: () => progress.push(task) }),
     snapshot: async () => ({ group: { documents: [] }, mapGroups: [], content: options.contents ? options.contents.shift() : state.content }),
-    ask: (context, model, reasoning, signal) => new Promise((resolve, reject) => asks.push({ context, signal, resolve, reject })),
-    check: async (task, result) => { checks.push(result); return { ok: true, missing: [], added: [] }; },
+    ask: (context, model, reasoning, signal, observer) => new Promise((resolve, reject) => asks.push({ context, signal, observer, resolve, reject })),
+    check: async (task, result) => { checks.push(result); return options.check ? options.check(task, result) : { ok: true, missing: [], added: [] }; },
     recordFailure: (label, error) => `${label}: ${error}`,
     notice: message => { notices.push(message); },
     write: async (...args) => { writes.push(args); if (options.write) await options.write(...args); }
   };
   const drafts = new MergeDrafts(ports);
-  return { drafts, state, asks, changes, notices, writes, checks };
+  return { drafts, state, asks, changes, notices, writes, checks, progress, events };
 }
 
 test('merge drafts: Stop while the model works forgets the task, and the late result writes and says nothing', async () => {
@@ -116,5 +116,61 @@ test('merge drafts: after a written AI merge the view is told to repaint once mo
   await task.run;
   assert.equal(w.writes.length, 1);
   assert.equal(w.changes.length, atWrite + 1, 'a repaint after the write returned, with the task already gone');
+  assert.equal(w.drafts.has('map.md'), false);
+});
+
+test('merge drafts: Stop during a preservation check prevents both repair and write', async () => {
+  for (const ok of [true, false]) {
+    let finishCheck;
+    const w = world({ check: () => new Promise(resolve => { finishCheck = resolve; }) });
+    const task = newTask('map.md');
+    w.drafts.start(task, () => {});
+    await flush();
+    w.asks[0].resolve(RESULT);
+    await flush();
+    assert.equal(w.checks.length, 1);
+    w.drafts.stop(task);
+    assert.deepEqual(w.progress, [task], 'progress is released before the check returns');
+    finishCheck({ ok, missing: [], added: [] });
+    await flush();
+    assert.equal(w.asks.length, 1, 'no repair request after Stop');
+    await task.run;
+    assert.equal(w.writes.length, 0);
+    assert.deepEqual(w.progress, [task], 'progress ended exactly once');
+    assert.deepEqual(w.notices, []);
+  }
+});
+
+test('merge drafts: replacing a running task cancels its progress and suppresses obsolete observer and error events', async () => {
+  const w = world();
+  const old = w.drafts.start(newTask('map.md'), () => {});
+  await flush();
+  const next = w.drafts.start(newTask('map.md'), () => {});
+  await flush();
+  assert.equal(old.controller.signal.aborted, true);
+  assert.deepEqual(w.progress, [old]);
+  assert.equal(w.drafts.tasks.get('map.md'), next);
+  w.asks[0].observer.onAttempt('obsolete', 1);
+  w.asks[1].observer.onAttempt('current', 1);
+  assert.deepEqual(w.events, [[next, 'current']]);
+  const before = w.changes.length;
+  w.asks[0].reject(new Error('late'));
+  await old.run;
+  assert.equal(w.changes.length, before);
+  assert.deepEqual(w.notices, []);
+  w.asks[1].resolve(RESULT);
+  await next.run;
+  assert.equal(w.writes.length, 1);
+  assert.deepEqual(w.progress, [old, next]);
+  assert.equal(w.drafts.has('map.md'), false);
+});
+
+test('merge drafts: stopping during registration never starts a snapshot or progress', async () => {
+  const w = world();
+  const task = newTask('map.md');
+  w.drafts.start(task, () => w.drafts.stop(task));
+  await task.run;
+  assert.deepEqual(w.asks, []);
+  assert.deepEqual(w.progress, []);
   assert.equal(w.drafts.has('map.md'), false);
 });

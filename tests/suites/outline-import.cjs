@@ -1228,3 +1228,47 @@ integrationTest('view: the outline box and the quick-explore review hand the AI 
   await quick.create([{ index: 0, title: 'A', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Renamed', level: 1, parent: null, line: 0 }], {});
   assert.deepEqual([...sent[2].map(node => node.summary)], ['a', 'ax', undefined]);
 });
+
+integrationTest('outline preparation: a pending usage prompt reserves the slot and departure rejects late confirmation', async () => {
+  const h = await draftHarness();
+  let release;
+  h.plugin.confirmAiUsage = (_model, run) => new Promise(resolve => {
+    release = async () => { await run(); resolve(true); };
+  });
+  const generator = h.view.outlineGenerator('T');
+  const pending = generator.generate({ topic: 'T', presetText: 'p' }, new AbortController().signal, () => draftInputs());
+  const rejected = assert.rejects(pending, /did not start/);
+  await assert.rejects(generator.generate({ topic: 'T2', presetText: 'p' }, new AbortController().signal, () => draftInputs()), /running/i);
+  h.view.dropMapBackground();
+  await release();
+  await rejected;
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.outlineStarting, null);
+  assert.equal(h.view.outlineDraftTask, null);
+});
+
+integrationTest('outline preparation: Stop while sources are read prevents the provider call', async () => {
+  const h = await draftHarness();
+  let release;
+  h.view.withOutlineSources = request => new Promise(resolve => { release = () => resolve(request); });
+  const run = h.view.outlineGenerator('T').generate({ topic: 'T', presetText: 'p' }, new AbortController().signal, () => draftInputs());
+  await until(() => !!release);
+  dom.button(h.bar(), 'Stop research').click();
+  release();
+  await run;
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.outlineDraftTask.state, 'stopped');
+  assert.equal(h.view.outlineStarting, null);
+});
+
+integrationTest('quick outline: a result from a departed session cannot repopulate the summary cache', async () => {
+  const h = await draftHarness();
+  const quick = h.view.quickOutline(h.oldRoot);
+  const run = quick.generate({ presetId: 'knowledge-tree', language: 'en' }, new AbortController().signal);
+  const rejected = assert.rejects(run, /did not start/);
+  await until(() => h.gates.length);
+  h.view.dropMapBackground();
+  h.gates[0].resolve('# T\n## Late\n');
+  await rejected;
+  assert.equal(h.view.quickOutlineSummaries.size, 0);
+});

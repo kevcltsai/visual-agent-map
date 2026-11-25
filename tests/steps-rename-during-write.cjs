@@ -162,3 +162,30 @@ test('relocate and followPath: a path already followed still clears; an unrelate
   assert.equal(view.path, 'R/Map.md');
   assert.equal(cleared, 2);
 });
+
+test('renaming or moving the open map keeps its AI background tasks alive and their Stop/Dismiss working', () => {
+  const view = Object.create(VisualAgentMapView.prototype);
+  const outline = { mapPath: 'M/Map.md', controller: new AbortController(), state: 'running' };
+  const review = { mapPath: 'M/Map.md', controller: new AbortController(), state: 'running' };
+  const starting = new AbortController();
+  Object.assign(view, {
+    path: 'M/Map.md', closed: false, backgroundEpoch: 0, map: { id: 'map-1', nodes: [] },
+    history: { clear() {} }, outlineDraftTask: outline, structureReviewTask: review,
+    startingTasks: new Map([['k', starting]]), render() {}
+  });
+  const session = view.captureBackgroundSession();
+  view.followPath('M/Map.md', 'N/Map.md');
+  view.relocate(new Map([['N/Map.md', 'R/Map.md']]));
+  assert.equal(view.path, 'R/Map.md');
+  assert.equal(session(), true, 'the map id is the same, so the session survives the move');
+  assert.equal(view.backgroundEpoch, 0);
+  for (const signal of [outline.controller.signal, review.controller.signal, starting.signal]) assert.equal(signal.aborted, false);
+  assert.equal(view.outlineDraftTask, outline);
+  assert.equal(view.structureReviewTask, review);
+  assert.equal(outline.mapPath, 'R/Map.md');
+  assert.equal(review.mapPath, 'R/Map.md');
+  assert.equal(view.startingTasks.size, 1);
+  view.stopStructureReview(review);
+  assert.equal(review.controller.signal.aborted, true, 'Stop still works after the rename');
+  assert.equal(view.structureReviewTask, null);
+});

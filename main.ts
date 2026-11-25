@@ -1204,15 +1204,18 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   async mutate(work: () => Promise<void>, options: { sync?: boolean | "full" } = {}): Promise<void> {
     const result = this.queue.then(async () => {
+      if (this.unloaded) throw new Error(t("error.unloaded_write_not_performed"));
       this.writing++;
       try {
         await work();
-        if (options.sync !== false) await this.readBackViews(options.sync === "full");
+        if (!this.unloaded && options.sync !== false) await this.readBackViews(options.sync === "full");
       } finally {
         this.writing--;
       }
     });
     this.queue = result.catch(error => {
+      // Unload deliberately refuses queued work; do not show a notice from an obsolete plugin instance.
+      if (this.unloaded) return;
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
@@ -1230,8 +1233,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     const views = this.views();
     if (full) for (const view of views) view.unsynced.markFull(this.syncSeq);
     const start = this.syncSeq;
-    for (const view of views) await view.synchronize({ seq: start });
-    if (this.syncSeq !== start) this.runMutation(async () => {});
+    for (const view of views) {
+      if (this.unloaded) return;
+      await view.synchronize({ seq: start });
+    }
+    if (!this.unloaded && this.syncSeq !== start) this.runMutation(async () => {});
   }
   /**
    * A setting that a note read resolves (the current model and reasoning level) changed, with no file written: the next

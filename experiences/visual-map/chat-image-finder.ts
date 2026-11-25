@@ -423,8 +423,11 @@ export class ChatImageFinder {
   private currentSession(chat: MapChatPanel, anchor: { path: string; id: string }, generation: number): boolean {
     const here = this.ports.where();
     return (
-      this.generation === generation && !here.closed && here.chat === chat &&
-      here.path === anchor.path && here.mapId === anchor.id
+      this.generation === generation &&
+      !here.closed &&
+      here.chat === chat &&
+      here.path === anchor.path &&
+      here.mapId === anchor.id
     );
   }
 

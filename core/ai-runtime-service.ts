@@ -225,10 +225,13 @@ export class AiRuntimeService {
   }
 
   diagnostic(configured: string): { executable: string; installed: boolean } {
-    const executable = this.resolveExecutable(configured);
+    const found = this.findExecutable(configured);
+    const executable = found || configured;
     // Without a working probe nothing can be judged missing: report installed and let the spawn report its own error.
     if (this.probe.available && !this.probe.available()) return { executable, installed: true };
-    return { executable, installed: this.probe.firstExisting([executable]) !== null };
+    // A successful search already proved existence. Only a bare-name fallback was not probed by that search.
+    const installed = Boolean(found) || (!/[/\\]/.test(configured) && this.probe.firstExisting([configured]) !== null);
+    return { executable, installed };
   }
 
   codex(pluginDirectory: string, local = false): CodexAppServerRuntime {
@@ -280,15 +283,16 @@ export class AiRuntimeService {
   }
 
   resolveExecutable(configured: string): string {
+    return this.findExecutable(configured) || configured;
+  }
+
+  private findExecutable(configured: string): string | null {
     const environment = currentProcessEnvironment();
     const home = environment.HOME || "";
     // nvm is optional: a missing directory lists as nothing.
     const nvmVersions =
       home && !/[/\\]/.test(configured) ? this.probe.listDirectory(join(home, ".nvm/versions/node")) : [];
-    return (
-      this.probe.firstExisting(executableCandidates(configured, home, environment.PATH || "", nvmVersions)) ||
-      configured
-    );
+    return this.probe.firstExisting(executableCandidates(configured, home, environment.PATH || "", nvmVersions));
   }
 
   cliEnvironment(executable: string): ProcessEnvironment {

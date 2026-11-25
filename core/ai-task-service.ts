@@ -256,16 +256,15 @@ export class AiTaskService {
     // The picture-book's in-place fix edits a chapter that was researched when it was written: no retrieval is not a failure there (live v6).
     const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
-    // Argument-evidence only: this call's web events, kept so the pages the provider opened can back a source proof.
+    // Research web events support source proof, video validation and full-text retrieval.
     const webEvents: CodexWebSearchEvent[] = [];
     // A standard research that asks for a file's full text: the raw files the provider opened are fetched after the reply.
     const fullText = countsWeb && readerFacingDetail(input) && wantsFullText(context);
-    const keepsEvents = shape.argumentEvidenceNeedIds !== undefined || fullText;
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {
           if (event.method === "item/completed") retrievals++;
           // Kept for the argument proof and for the video check below (only the pages this call opened may be embedded).
-          if (keepsEvents || countsWeb) webEvents.push(event);
+          webEvents.push(event);
           onWebSearchEvent?.(event);
         }
       : onWebSearchEvent;
@@ -360,39 +359,30 @@ export class AiTaskService {
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
-      if (keepsEvents && shape.argumentEvidenceNeedIds !== undefined)
+      const openedUrls = countsWeb ? openedUrlsFromEvents(webEvents) : [];
+      if (shape.argumentEvidenceNeedIds !== undefined)
         result.evidence = {
-          openedUrls: openedUrlsFromEvents(webEvents),
+          openedUrls,
           searchQueries: searchQueriesFromEvents(webEvents)
         };
       // A YouTube embed stays only when this call opened that video's page or the user pasted it (the task text or their own text
       // nodes); a run that opens no pages (Quick) keeps only pasted ones. The count repair's detail goes through the same filter below.
-      const videoFilter =
+      const videoUrls =
         (context.mode ?? "task") === "task" && role === undefined && !input.countRepair
-          ? {
-              opened: [
-                ...(countsWeb ? openedUrlsFromEvents(webEvents) : []),
-                ...videoUrlsInText(`${input.task}\n${input.userTexts ?? ""}`)
-              ]
-            }
+          ? [...openedUrls, ...videoUrlsInText(`${input.task}\n${input.userTexts ?? ""}`)]
           : null;
-      if (videoFilter) {
-        result.detail = keepOpenedVideoEmbeds(result.detail, videoFilter.opened, input.detail);
+      const filterVideos = async (detail: string, urls: readonly string[]): Promise<string> => {
+        let kept = keepOpenedVideoEmbeds(detail, urls, input.detail);
         // Research rewrites the note and may drop its videos and pictures; an edit task may delete them on purpose.
         let restored = new Set<string>();
         if (countsWeb && input.detail?.trim()) {
-          const back = restoreDroppedMedia(result.detail, input.detail);
-          result.detail = back.detail;
+          const back = restoreDroppedMedia(kept, input.detail);
+          kept = back.detail;
           restored = back.restoredVideoIds;
         }
-        result.detail = await dropUnplayableVideos(
-          result.detail,
-          input.detail,
-          this.options.videoPlayable,
-          signal,
-          restored
-        );
-      }
+        return dropUnplayableVideos(kept, input.detail, this.options.videoPlayable, signal, restored);
+      };
+      if (videoUrls) result.detail = await filterVideos(result.detail, videoUrls);
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);
@@ -460,18 +450,7 @@ export class AiTaskService {
             // references would replace the first reply's with less.
             result = {
               ...result,
-              detail: videoFilter
-                ? await (async () => {
-                    let kept = keepOpenedVideoEmbeds(repaired.detail, videoFilter.opened, input.detail);
-                    let restored = new Set<string>();
-                    if (countsWeb && input.detail?.trim()) {
-                      const back = restoreDroppedMedia(kept, input.detail);
-                      kept = back.detail;
-                      restored = back.restoredVideoIds;
-                    }
-                    return dropUnplayableVideos(kept, input.detail, this.options.videoPlayable, signal, restored);
-                  })()
-                : repaired.detail
+              detail: videoUrls ? await filterVideos(repaired.detail, videoUrls) : repaired.detail
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
@@ -488,7 +467,7 @@ export class AiTaskService {
       // After the count repair, so the repair never sees (or rewrites) the fetched text.
       // Every reader-facing reply passes here: a block the model wrote under the VAM label is never kept as the program's.
       if (ownsFullText) {
-        const opened = fullText ? openedUrlsFromEvents(webEvents) : [];
+        const opened = fullText ? openedUrls : [];
         let files = this.options.fetchPage && opened.length ? await fetchFullTexts(opened, this.options.fetchPage) : [];
         // A top reply is put above the old Detail, which keeps its blocks: only files it does not have yet are added.
         const top = input.updateMode === "top";

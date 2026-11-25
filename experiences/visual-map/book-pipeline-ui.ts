@@ -1085,9 +1085,7 @@ export function bookCardView(
       ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) }
       : {}),
     ...(!accepted && stage === "checked" && issue ? structureNote(issue) : {}),
-    ...(stage === "pending"
-      ? {}
-      : { summaryPrefix: t(planLook ? "ui.book_summary_plan" : "ui.book_summary_done") })
+    ...(stage === "pending" ? {} : { summaryPrefix: t(planLook ? "ui.book_summary_plan" : "ui.book_summary_done") })
   };
 }
 

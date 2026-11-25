@@ -12,7 +12,7 @@ export function rawErrorText(error: unknown): string {
 }
 
 /** True when the raw text must stay out of the main message (it goes under "Technical details"). */
-export function isTechnicalErrorText(raw: string): boolean {
+function isTechnicalErrorText(raw: string): boolean {
   return !raw || raw.length > 400 || TECHNICAL.test(raw);
 }
 

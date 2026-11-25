@@ -4,7 +4,7 @@
  * rewritten and supplies how a link text resolves to a vault path.
  */
 
-export interface WikilinkMatch {
+interface WikilinkMatch {
   /** The link exactly as written, including `!` for an embed. */
   original: string;
   start: number;

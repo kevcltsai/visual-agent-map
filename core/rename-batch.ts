@@ -17,9 +17,14 @@ export function rebasePath(pairs: readonly RenamePair[], path: string): string {
   return path;
 }
 
-/** The rebase function for a list of moves (see {@link rebasePath}), for `rebaseMapNotePaths`. */
+/** The rebase function for one immutable event batch. Walking backwards composes the remaining moves without sorting events. */
 export function chainRebase(pairs: readonly RenamePair[]): (path: string) => string {
-  return path => rebasePath(pairs, path);
+  const destinations = new Map<string, string>();
+  for (let i = pairs.length - 1; i >= 0; i--) {
+    const [from, to] = pairs[i];
+    destinations.set(from, destinations.get(to) ?? to);
+  }
+  return path => destinations.get(path) ?? path;
 }
 
 /**
@@ -28,7 +33,7 @@ export function chainRebase(pairs: readonly RenamePair[]): (path: string) => str
  */
 export function rebasePathList(list: readonly string[], pairs: readonly RenamePair[]): string[] | null {
   if (!mentionsOldPath(list, pairs)) return null;
-  const next = list.map(path => rebasePath(pairs, path));
+  const next = list.map(chainRebase(pairs));
   return next.some((path, index) => path !== list[index]) ? next : null;
 }
 

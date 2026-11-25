@@ -1001,12 +1001,12 @@ test('quality choose: within a chapter the same work is placed once (the next ca
   const slots = slotsOf(2);
   const probed = (name, author) => ({ candidate: { imageUrl: commons(name), sourceUrl: `https://commons.wikimedia.org/wiki/File:${name}`, title: name, caption: 'c', author }, href: commons(name), loaded: true });
   const per = new Map([[1, [probed('Sir_Winston_Churchill_(cropped).jpg', 'Yousuf Karsh')]], [2, [probed('Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf Karsh'), probed('Audrey_Hepburn_Karsh.jpg', 'Yousuf Karsh')]]]);
-  const out = choosePictures({ id: 'n', title: 'T' }, slots, per, () => false, 'en');
+  const out = choosePictures(slots, per, () => false, 'en');
   assert.match(out.get(1).figure.href, /cropped/);
   assert.match(out.get(2).figure.href, /Audrey/);
   assert.ok(out.get(1).figure.work.startsWith('work:'));
   const work = Q.workKey(commons('Sir_Winston_Churchill_(cropped).jpg'), 'Yousuf Karsh');
-  const taken = choosePictures({ id: 'n', title: 'T' }, slots.slice(0, 1), new Map([[1, [probed('Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf Karsh')]]]), key => key === work, 'en');
+  const taken = choosePictures(slots.slice(0, 1), new Map([[1, [probed('Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf Karsh')]]]), key => key === work, 'en');
   assert.equal(taken.get(1).reasonCode, 'not_found');
 });
 

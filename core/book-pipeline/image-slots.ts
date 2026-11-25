@@ -212,13 +212,6 @@ export interface SlotCandidate {
   author?: string;
   license?: string;
 }
-export interface PickContext {
-  chapter: { id: string; title: string };
-  slot: ImageSlot;
-  allSlots: readonly ImageSlot[];
-  /** Picture addresses (and work keys, see workKey) already placed in this chapter: one picture or work is never placed twice (same chapter). */
-  alreadyPicked: ReadonlySet<string>;
-}
 export type SlotPick = { candidate: SlotCandidate } | { none: true; reasonCode: SlotReasonCode; reasonText?: string };
 
 const isHttps = (url: string): boolean => {
@@ -233,10 +226,10 @@ const isHttps = (url: string): boolean => {
  * The seam where the picture-quality work plugs in: synchronous and deterministic. Candidates are already loadable (the caller
  * probes them); this decides which one a slot takes. The default takes the first https candidate not placed yet in the chapter.
  */
-export function pickForSlot(ctx: PickContext, candidates: readonly SlotCandidate[]): SlotPick {
+export function pickForSlot(alreadyPicked: ReadonlySet<string>, candidates: readonly SlotCandidate[]): SlotPick {
   const secure = candidates.filter(item => isHttps(item.imageUrl));
   // One picture is one file: a thumbnail and the original of the same file count as the same address.
-  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
+  const picked = new Set([...alreadyPicked].map(imageKey));
   const hit = secure.find(item => {
     const work = workKey(item.imageUrl, item.author);
     return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
@@ -406,7 +399,6 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
  * A slot without a pick gets the most telling reason. Pure and synchronous, so the caller can claim the picks in the same turn.
  */
 export function choosePictures(
-  chapter: PickContext["chapter"],
   slots: readonly ImageSlot[],
   perSlot: ReadonlyMap<number, readonly ProbedCandidate[]>,
   taken: (key: string) => boolean,
@@ -422,7 +414,7 @@ export function choosePictures(
       return !(work && taken(work));
     });
     const pick = pickForSlot(
-      { chapter, slot, allSlots: slots, alreadyPicked },
+      alreadyPicked,
       usable.map(item => ({ ...item.candidate, imageUrl: item.href as string }))
     );
     if ("candidate" in pick) {

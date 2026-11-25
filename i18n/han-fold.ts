@@ -18,6 +18,10 @@ export const toSimplifiedFold = (text: string): string => {
   return out;
 };
 
+/** Normalizes a search string for case-insensitive, Traditional/Simplified-insensitive matching. */
+export const foldSearchText = (text: string): string =>
+  toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
+
 /**
  * Counts script evidence in text.
  * traditional: characters that have a different Simplified form (keys of the table, e.g. 圖 發 髮 後 灣).

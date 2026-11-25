@@ -170,3 +170,18 @@ test('S-10: dragging a card of a map laid out to the right builds no spine cache
   drag.update(1400, 50);
   assert.equal(calls, 0);
 });
+
+test('tree edges sharing a card measure its box once per draw, then read its changed height on the next draw', async () => {
+  const h = await harness([['Root', null, 0, 100], ['A', 'Root', 360, 0], ['B', 'Root', 360, 220]]);
+  h.place('Root', 0, 100); h.place('A', 360, 0); h.place('B', 360, 220);
+  const root = h.view.cardEls.get(h.named('Root').id);
+  let reads = 0, height = 180;
+  Object.defineProperty(root, 'offsetHeight', { get() { reads++; return height; } });
+  h.view.drawEdges();
+  assert.equal(reads, 1);
+  const before = h.paths().map(path => path.attrs.d);
+  height = 260;
+  h.view.drawEdges();
+  assert.equal(reads, 2);
+  assert.notDeepEqual(h.paths().map(path => path.attrs.d), before);
+});

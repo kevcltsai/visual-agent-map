@@ -9,7 +9,7 @@ const original = '---\nagent-map-node: true\n---\n# Original\n';
 function fixture() {
   const files = new Map(), retained = [], dirs = new Set();
   let text = original, path = 'Note.md', stopped = false, writes = 0;
-  const faults = { backup: false, corruptBackup: false, source: false, cleanup: false, external: false, moved: false, unload: false };
+  const faults = { backup: false, corruptBackup: false, source: false, cleanup: false, external: false, moved: false, unload: false, interleave: 0 };
   const adapter = {
     exists: async p => files.has(p) || dirs.has(p),
     mkdir: async p => { dirs.add(p); },
@@ -32,6 +32,7 @@ function fixture() {
     process: async change => {
       assert.ok(files.has(snapshot), 'verified recovery exists before any source write');
       if (faults.external) text = 'new owner text';
+      if (faults.interleave > 0) { faults.interleave--; text += '|other'; }
       if (faults.moved) path = 'Renamed.md';
       if (faults.unload) stopped = true;
       const next = change(text);
@@ -76,14 +77,36 @@ test('unverified recovery copy cannot authorize a source write', async () => {
   }
 });
 
-test('external content change or rename before the callback refuses a stale write', async () => {
-  for (const fault of ['external', 'moved']) {
-    const f = fixture(); f.faults[fault] = true;
-    await assert.rejects(f.journal.process(f.write), /conflict/);
-    assert.equal(f.text(), fault === 'external' ? 'new owner text' : original);
-    assert.equal(f.writes(), 0);
-    assert.equal(f.files.size, 0);
-  }
+test('a rename before the callback refuses a stale write', async () => {
+  const f = fixture(); f.faults.moved = true;
+  await assert.rejects(f.journal.process(f.write), /conflict/);
+  assert.equal(f.text(), original);
+  assert.equal(f.writes(), 0);
+  assert.equal(f.files.size, 0);
+});
+
+test('an external edit between snapshot and write is retried on the latest content, so both changes apply', async () => {
+  const f = fixture(); f.faults.external = true;
+  f.write.change = current => current + '|vam';
+  assert.equal(await f.journal.process(f.write), 'new owner text|vam');
+  assert.equal(f.text(), 'new owner text|vam');
+  assert.equal(f.writes(), 1);
+  assert.equal(f.files.size, 0);
+});
+
+test('two overlapping writes to the same file both apply', async () => {
+  const f = fixture(); f.faults.interleave = 1;
+  f.write.change = current => current + '|vam';
+  await f.journal.process(f.write);
+  assert.equal(f.text(), original + '|other|vam');
+  assert.equal(f.files.size, 0);
+});
+
+test('a file that keeps changing refuses after the retries and writes nothing', async () => {
+  const f = fixture(); f.faults.interleave = 99;
+  await assert.rejects(f.journal.process(f.write), /conflict/);
+  assert.equal(f.writes(), 0);
+  assert.equal(f.files.size, 0);
 });
 
 test('unload refuses the source callback and leaves the recovery copy alone', async () => {

@@ -41,6 +41,22 @@ export class VaultWriteRecovery {
   }
 
   async process(write: RecoveryWrite): Promise<string> {
+    // Another writer may change the file between our snapshot and Vault.process. Take a fresh snapshot and retry,
+    // so overlapping writers still apply on top of the latest content. Rename/delete and stop still refuse at once.
+    for (let attempt = 1; ; attempt++) {
+      const stale = { value: false };
+      try {
+        return await this.processOnce(write, stale);
+      } catch (error) {
+        if (!stale.value) throw error;
+        if (attempt >= VaultWriteRecovery.MAX_ATTEMPTS) throw write.conflictError();
+      }
+    }
+  }
+
+  private static readonly MAX_ATTEMPTS = 3;
+
+  private async processOnce(write: RecoveryWrite, stale: { value: boolean }): Promise<string> {
     const ensureActive = (): void => {
       if (write.stopped()) throw write.stoppedError();
     };
@@ -79,7 +95,11 @@ export class VaultWriteRecovery {
       ensureActive();
       const result = await write.process(current => {
         ensureActive();
-        if (write.path() !== originalPath || current !== before) throw write.conflictError();
+        if (write.path() !== originalPath) throw write.conflictError();
+        if (current !== before) {
+          stale.value = true;
+          throw write.conflictError();
+        }
         const next = write.change(current);
         // Even a no-op callback can be followed by a physical write in the host.
         mayHaveWritten = true;

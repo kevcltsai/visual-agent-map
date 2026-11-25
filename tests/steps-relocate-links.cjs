@@ -150,6 +150,49 @@ test('relocate: a note edited between planning and writing throws, undoes the mo
   for (const path of [a.path, b.path, g.path]) assert.ok(!contents.get(path)?.includes('Unassigned'), `${path} has no half-written link`);
 });
 
+
+test('relocate: rollback still restores other notes and the moved file when one restore fails', async () => {
+  const { repo, app, contents, files, mapPath, a, b, g } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const original = snapshot(contents);
+  const process = app.vault.process;
+  const written = [];
+  let failed = false;
+  app.vault.process = async (file, change) => {
+    if (failed && file.path === written[1]) throw new Error('injected restore failure');
+    const result = await process(file, change);
+    if (!failed) {
+      written.push(file.path);
+      if (written.length === 2) { failed = true; throw new Error('injected after-write failure'); }
+    }
+    return result;
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+    /injected after-write failure.*injected restore failure/);
+  assert.equal(written.length, 2);
+  assert.ok(files.has(a.path), 'move reversed despite failed restore');
+  assert.equal(contents.get(written[0]), original.get(written[0]), 'other written note restored');
+});
+
+test('relocate: rollback refuses to overwrite a concurrent edit and reports that recovery was incomplete', async () => {
+  const { repo, app, contents, files, mapPath, a, b, g } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const process = app.vault.process;
+  let first;
+  app.vault.process = async (file, change) => {
+    if (!first) { first = file.path; return process(file, change); }
+    if (file.path !== first) {
+      contents.set(first, `${contents.get(first)}\nowner edit after rewrite`);
+      throw new Error('injected later write failure');
+    }
+    return process(file, change);
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+    /injected later write failure.*undoing it also failed.*changed/);
+  assert.ok(files.has(a.path));
+  assert.ok(contents.get(first).endsWith('owner edit after rewrite'));
+});
+
 test('relocate: renaming a topic folder rewrites full-path links to the notes inside, from inside and outside the folder', async () => {
   const { repo, contents, calls, notices, mapPath, a, b, g } = await scenario();
   const otherPath = await repo.createMap('Other');

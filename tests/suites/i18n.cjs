@@ -169,16 +169,34 @@ test('C4: every command keeps its id, takes its name from a ui.command_* key wit
     }
   }
 });
-test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', () => {
-  class MarkdownView { constructor(path) { this.file = { path }; } }
+test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', async () => {
+  class MarkdownView {
+    constructor(path) { this.file = { path }; this.containerEl = { isShown: () => true, getBoundingClientRect: () => ({ top: 0 }) }; }
+  }
   const { default: Plugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
-  const plugin = new Plugin(); let closed = 0, fileCleared = 0, synchronized = 0; plugin.app = { workspace: { getActiveViewOfType: () => ({ leaf: { id: 'map-view' } }), trigger: (event, leaf) => { if (event === 'file-open') { assert.equal(leaf, null); fileCleared++; } else { assert.equal(event, 'active-leaf-change'); assert.equal(leaf.id, 'map-view'); synchronized++; } } } };
-  plugin.detailsPath = 'old-note.md';
-  plugin.detailsLeaf = { view: new MarkdownView('other-user-note.md'), detach: () => { closed++; } };
+  const plugin = new Plugin();
+  let closed = 0, fileCleared = 0, synchronized = 0, revealed = 0, styled = 0;
+  const rightSplit = { collapsed: false };
+  const leaf = { view: new MarkdownView('old-note.md'), getRoot: () => rightSplit, async openFile(file) { this.view.file = file; }, detach() { closed++; } };
+  plugin.app = {
+    metadataCache: { getFileCache: () => ({ frontmatter: { 'agent-map-node': true } }) },
+    workspace: {
+      rightSplit, getLeavesOfType: () => [leaf], getRightLeaf: () => { throw new Error('should reuse the existing topic leaf'); },
+      revealLeaf: async value => { assert.equal(value, leaf); revealed++; },
+      getActiveViewOfType: () => ({ leaf: { id: 'map-view' } }),
+      trigger: (event, value) => { if (event === 'file-open') { assert.equal(value, null); fileCleared++; } else { assert.equal(event, 'active-leaf-change'); assert.equal(value.id, 'map-view'); synchronized++; } }
+    }
+  };
+  plugin.styleNodeLeaf = value => { assert.equal(value, leaf); styled++; };
+  assert.equal(plugin.detailsShown(), true);
+  rightSplit.collapsed = true; assert.equal(plugin.detailsShown(), false); rightSplit.collapsed = false;
+  await plugin.openDetails({ path: 'old-note.md' });
+  leaf.view.file = { path: 'other-user-note.md' };
   plugin.closeStaleDetails(); assert.equal(closed, 0); assert.equal(fileCleared, 0); assert.equal(synchronized, 0);
-  plugin.detailsPath = 'old-note.md';
-  plugin.detailsLeaf = { view: new MarkdownView('old-note.md'), detach: () => { closed++; } };
+  await plugin.openDetails({ path: 'old-note.md' });
   plugin.closeStaleDetails(); assert.equal(closed, 1); assert.equal(fileCleared, 1); assert.equal(synchronized, 1);
+  plugin.closeStaleDetails(); assert.equal(closed, 1);
+  assert.equal(revealed, 2); assert.equal(styled, 2);
 });
 test('topic status labels follow the selected UI language after startup', () => {
   const {topicStatusLabel}=load('i18n.ts');

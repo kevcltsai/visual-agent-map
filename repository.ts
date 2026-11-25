@@ -632,6 +632,12 @@ export class Repository {
     return this.parseNote(path, raw, map, ctx);
   }
 
+  /** The parsed note and the exact same bytes, for a later guarded commit. */
+  async readNoteSnapshot(path: string, map?: MapDocument): Promise<{ note: Note; content: string }> {
+    const content = await this.app.vault.read(this.file(path));
+    return { note: await this.parseNote(path, content, map), content };
+  }
+
   /** Parses already-read note content; `readNote` reads the file once and calls this. */
   private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
@@ -794,6 +800,17 @@ export class Repository {
       return transform(content);
     });
     return outcome;
+  }
+
+  /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */
+  async settleRunningNote(path: string, patch: Pick<NotePatch, "status" | "lastError">): Promise<void> {
+    await this.updateNoteGuarded(path, patch, {
+      authorize: current => {
+        if (current === undefined) return false;
+        const fm = frontmatter(current);
+        return marker(fm["agent-map-node"]) && fm.status === "running";
+      }
+    });
   }
 
   /**
@@ -1821,7 +1838,10 @@ export class Repository {
     }
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1)
-      throw new AggregateError(failures, failures.map(error => error instanceof Error ? error.message : String(error)).join("; "));
+      throw new AggregateError(
+        failures,
+        failures.map(error => (error instanceof Error ? error.message : String(error))).join("; ")
+      );
   }
 
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {

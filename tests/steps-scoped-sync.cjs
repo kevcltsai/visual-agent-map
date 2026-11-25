@@ -26,6 +26,14 @@ function harness() {
     if (hooked) return hooked;
     return realRead(file);
   };
+  const realCached = app.vault.cachedRead;
+  // Hydrate reads go through cachedRead; count and hook them like disk reads.
+  app.vault.cachedRead = async file => {
+    reads.set(file.path, (reads.get(file.path) ?? 0) + 1);
+    const hooked = hook?.(file);
+    if (hooked) return hooked;
+    return realCached.call(app.vault, file);
+  };
   app.workspace = { getLeavesOfType: () => [] };
   const plugin = new Plugin();
   Object.assign(plugin, { app, repo, settings: repo.settings, registerEvent: () => {}, logs: { appendLog() {} } });

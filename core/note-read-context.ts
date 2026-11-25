@@ -2,8 +2,8 @@ import type { MapNode } from "../map-model";
 
 /**
  * Scratch state shared by the `readNote` calls of ONE hydrate. Each file is read once, and each ancestor's frontmatter
- * is parsed once, however many notes inherit from it. It lives for one hydrate only (no global cache), so a later
- * hydrate always sees the disk again. It does not depend on the view.
+ * is parsed once, however many notes inherit from it. It lives for one hydrate only (no global cache). Reads use Obsidian's
+ * cachedRead (kept current by vault writes and the file watcher); writes still read the disk. It does not depend on the view.
  */
 export interface NoteReadContext {
   /** The map's nodes by id, so walking up the parents is a lookup instead of a scan. */

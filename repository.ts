@@ -543,7 +543,7 @@ export class Repository {
       try {
         const file = this.file(path);
         const content = ctx
-          ? await readOnce(ctx, path, () => this.app.vault.read(file))
+          ? await readOnce(ctx, path, () => this.app.vault.cachedRead(file))
           : await this.app.vault.read(file);
         return frontmatter(content);
       } catch {
@@ -630,7 +630,7 @@ export class Repository {
 
   async readNote(path: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
-      raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+      raw = ctx ? await readOnce(ctx, path, () => this.app.vault.cachedRead(file)) : await this.app.vault.read(file);
     return this.parseNote(path, raw, map, ctx);
   }
 

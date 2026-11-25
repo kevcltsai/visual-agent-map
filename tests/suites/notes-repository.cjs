@@ -1811,6 +1811,20 @@ integrationTest('hydrate context indexes note paths and preserves model inherita
   const duplicate = { ...nodes[3], id: 'another-id' };
   assert.equal(createNoteReadContext({ nodes: [nodes[3], duplicate] }).nodesByPath.get(nodes[3].path).id, nodes[3].id);
 });
+integrationTest('hydrate-context reads use cachedRead; snapshot and no-context reads use disk read', async () => {
+  const { createNoteReadContext } = load('core/note-read-context.ts');
+  const { repo, mapDoc, nodes } = await modelTree([['manual', 'claude:opus'], ['inherited']]), app = repo.app;
+  const calls = [];
+  for (const method of ['read', 'cachedRead']) { const original = app.vault[method].bind(app.vault); app.vault[method] = async file => { calls.push(`${method}:${file.path}`); return original(file); }; }
+  await repo.readNote(nodes[1].path, mapDoc, createNoteReadContext(mapDoc));
+  assert.ok(calls.length > 0 && calls.every(item => item.startsWith('cachedRead:')), `hydrate context reads via cachedRead only: ${calls}`);
+  calls.length = 0;
+  await repo.readNote(nodes[1].path, mapDoc);
+  assert.ok(calls.length > 0 && calls.every(item => item.startsWith('read:')), `no-context readNote reads disk: ${calls}`);
+  calls.length = 0;
+  await repo.readNoteSnapshot(nodes[1].path, mapDoc);
+  assert.ok(calls.length > 0 && calls.every(item => item.startsWith('read:')), `readNoteSnapshot reads disk: ${calls}`);
+});
 integrationTest('a manual topic keeps its stored model', async () => {
   const { repo, nodes } = await modelTree([['manual', 'gpt-5.6-luna']]);
   const note = await repo.readNote(nodes[0].path);

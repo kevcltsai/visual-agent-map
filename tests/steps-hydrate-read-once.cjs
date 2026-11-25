@@ -24,7 +24,9 @@ async function build(children = 10, childSource = 'inherited') {
   const reads = new Map();
   const realRead = app.vault.read.bind(app.vault);
   app.vault.read = async file => { reads.set(file.path, (reads.get(file.path) ?? 0) + 1); return realRead(file); };
-  return { repo, app, doc, root, kids, reads, realRead };
+  const realCached = app.vault.cachedRead.bind(app.vault);
+  app.vault.cachedRead = async file => { reads.set(file.path, (reads.get(file.path) ?? 0) + 1); return realCached(file); };
+  return { repo, app, doc, root, kids, reads, realRead, realCached };
 }
 const viewOf = repo => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -83,6 +85,10 @@ test('failedPaths lists a read that threw (note and ancestor) and not a missing 
   h.app.vault.read = async file => {
     if (file.path === ancestorBroken || file.path === noteBroken) throw new Error('disk');
     return h.realRead(file);
+  };
+  h.app.vault.cachedRead = async file => {
+    if (file.path === ancestorBroken || file.path === noteBroken) throw new Error('disk');
+    return h.realCached(file);
   };
   const out = await view.hydrate();
   assert.deepEqual(Array.from(out.failedPaths).sort(), [ancestorBroken, noteBroken].sort());

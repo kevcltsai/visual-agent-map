@@ -3108,7 +3108,6 @@ export class VisualAgentMapView extends ItemView {
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
-    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -3526,6 +3525,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
+    this.clearChatHighlight();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
@@ -6096,6 +6096,7 @@ export class VisualAgentMapView extends ItemView {
   }
   deleted(file: TFile): void {
     if (file.path === this.path) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
       if (this.deletedMap?.path !== file.path) this.history.clear();
@@ -11659,6 +11660,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -11951,6 +11953,7 @@ export class VisualAgentMapView extends ItemView {
                 this.deletedMap = null;
                 throw error;
               }
+              this.clearChatHighlight();
               this.map = null;
               this.path = "";
               await this.plugin.rebuildDerivedData();
@@ -11994,6 +11997,7 @@ export class VisualAgentMapView extends ItemView {
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
     this.path = "";
+    this.clearChatHighlight();
     this.map = null;
     await this.plugin.rebuildDerivedData();
     this.render();
@@ -22661,6 +22665,7 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   private chatSelect(ids: string[]): void {
+    if (this.closed || !this.map) return;
     this.selection.chatSelect(ids);
     this.aiTargets = ids;
     if (!this.closed) this.render();
@@ -22674,12 +22679,22 @@ export class VisualAgentMapView extends ItemView {
     return ids.length ? ids : this.chatSelectionIds();
   }
   private highlightFadeTimer: number | null = null;
+  /** Forgets the departing map's AI targets and cancels its pending fade. */
+  private clearChatHighlight(): void {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = null;
+    this.aiTargets = null;
+  }
   /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
   private armHighlightFade(idleSince: number | null = null): void {
+    if (this.closed || !this.map) return;
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
-    this.highlightFadeTimer = window.setTimeout(() => {
+    const mapId = this.map.id;
+    const timer = window.setTimeout(() => {
+      if (this.highlightFadeTimer !== timer) return;
       this.highlightFadeTimer = null;
-      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      if (this.closed || !this.map || this.map.id !== mapId) return;
+      if (this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
       // The user took over (a Cmd-click, a marquee): what is selected is theirs now and stays.
       if (!this.selection.isPureHighlight()) {
         this.aiTargets = null;
@@ -22692,6 +22707,7 @@ export class VisualAgentMapView extends ItemView {
       this.aiTargets = null;
       this.applySelectionChange(this.selection.clearMulti());
     }, 1000);
+    this.highlightFadeTimer = timer;
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */

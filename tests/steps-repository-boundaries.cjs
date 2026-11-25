@@ -51,7 +51,7 @@ test('relocation delegates to Obsidian when no resolved link index exists', asyn
   const calls = [];
   const file = new TFile('A.md');
   await relocation.relocateFile({
-    app: { metadataCache: {}, fileManager: { renameFile: async (item, target) => calls.push([item.path, target]) } },
+    app: { metadataCache: {}, vault: { getAbstractFileByPath: p => p === file.path ? file : undefined }, fileManager: { renameFile: async (item, target) => { calls.push([item.path, target]); item.path = target; } } },
     language: () => 'en',
     message: key => key,
     markedNotes: async () => { throw new Error('unexpected scan'); }

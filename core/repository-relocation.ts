@@ -19,9 +19,40 @@ interface RelocationPorts {
  * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
  */
 export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder, target: string): Promise<void> {
+  const origin = item.path;
+  const verifyMove = (): void => {
+    if (!ports.app.vault.getAbstractFileByPath(target)) throw new Error(ports.message("error.move_not_applied"));
+  };
+  const move = async (delegated: boolean): Promise<void> => {
+    const rename = (file: TFile | TFolder, path: string): Promise<void> =>
+      delegated ? ports.app.fileManager.renameFile(file, path) : ports.app.vault.rename(file, path);
+    try {
+      await rename(item, target);
+      verifyMove();
+    } catch (error) {
+      // A rejected rename may already have moved the file. Reverse only the very same file, never a replacement.
+      if (
+        target !== origin &&
+        ports.app.vault.getAbstractFileByPath(target) === item &&
+        !ports.app.vault.getAbstractFileByPath(origin)
+      ) {
+        try {
+          await rename(item, origin);
+          if (ports.app.vault.getAbstractFileByPath(origin) !== item)
+            throw new Error(ports.message("error.move_not_applied"));
+        } catch (rollbackError) {
+          const describe = (failure: unknown): string => (failure instanceof Error ? failure.message : String(failure));
+          throw new Error(
+            translate(ports.language(), "error.move_undo_failed_0", describe(error), describe(rollbackError))
+          );
+        }
+      }
+      throw error;
+    }
+  };
   const resolvedLinks = ports.app.metadataCache.resolvedLinks as Record<string, Record<string, number>> | undefined;
   if (!resolvedLinks) {
-    await ports.app.fileManager.renameFile(item, target);
+    await move(true);
     return;
   }
   const moves = new Map<string, string>();
@@ -33,13 +64,10 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
   const plan = await planLinkRewrites(ports, item, moves, resolvedLinks);
   if (plan.foreign > 0) {
     new Notice(translate(ports.language(), "ui.move_links_dialog_notice_0", plan.foreign));
-    await ports.app.fileManager.renameFile(item, target);
+    await move(true);
     return;
   }
-  const origin = item.path;
-  await ports.app.vault.rename(item, target);
-  // Trust the disk, not the await: the note must really be at its new place before its links are rewritten.
-  if (!ports.app.vault.getAbstractFileByPath(target)) throw new Error(ports.message("error.move_not_applied"));
+  await move(false);
   const written: Array<{ path: string; before: string; after: string }> = [];
   try {
     for (const edit of plan.edits) {
@@ -49,30 +77,43 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
       await ports.app.vault.process(file, current => {
         if (current !== edit.before)
           throw new Error(translate(ports.language(), "error.move_links_note_changed_0", path));
+        // Record before publishing: an adapter can reject after applying the callback's result.
+        written.push({ path, before: edit.before, after: edit.after });
         return edit.after;
       });
-      written.push({ path, before: edit.before, after: edit.after });
     }
   } catch (error) {
-    try {
-      for (const entry of written.reverse()) {
+    const rollbackErrors: string[] = [];
+    const describe = (failure: unknown): string => (failure instanceof Error ? failure.message : String(failure));
+    for (const entry of written.reverse()) {
+      try {
         const file = ports.app.vault.getAbstractFileByPath(entry.path);
-        if (file instanceof TFile)
-          await ports.app.vault.process(file, current => (current === entry.after ? entry.before : current));
+        if (!(file instanceof TFile)) throw new Error(`${ports.message("error.file_not_found")}: ${entry.path}`);
+        await ports.app.vault.process(file, current => {
+          if (current === entry.before) return current;
+          if (current !== entry.after)
+            throw new Error(translate(ports.language(), "error.move_links_note_changed_0", entry.path));
+          return entry.before;
+        });
+      } catch (rollbackError) {
+        rollbackErrors.push(describe(rollbackError));
       }
-      const moved = ports.app.vault.getAbstractFileByPath(target);
-      if (moved) await ports.app.vault.rename(moved, origin);
-    } catch (rollbackError) {
-      const original = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        translate(
-          ports.language(),
-          "error.move_undo_failed_0",
-          original,
-          rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-        )
-      );
     }
+    // A single failed restore must not strand the moved file or skip other independent restores.
+    try {
+      const moved = ports.app.vault.getAbstractFileByPath(target);
+      if (moved !== item || ports.app.vault.getAbstractFileByPath(origin))
+        throw new Error(ports.message("error.move_not_applied"));
+      await ports.app.vault.rename(moved, origin);
+      if (ports.app.vault.getAbstractFileByPath(origin) !== item || ports.app.vault.getAbstractFileByPath(target))
+        throw new Error(ports.message("error.move_not_applied"));
+    } catch (rollbackError) {
+      rollbackErrors.push(describe(rollbackError));
+    }
+    if (rollbackErrors.length)
+      throw new Error(
+        translate(ports.language(), "error.move_undo_failed_0", describe(error), rollbackErrors.join("; "))
+      );
     throw error;
   }
 }

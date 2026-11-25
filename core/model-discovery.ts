@@ -1,7 +1,7 @@
 import { t, type TranslationKey } from "../i18n";
 import { CLAUDE_MODEL_CHOICES, type AiProviderId } from "../ai/providers/provider";
 
-export type ModelDiscoveryStatus = "idle" | "loading" | "ready" | "missing" | "error";
+type ModelDiscoveryStatus = "idle" | "loading" | "ready" | "missing" | "error";
 export interface ModelDiscoveryState {
   provider: AiProviderId;
   status: ModelDiscoveryStatus;
@@ -9,7 +9,7 @@ export interface ModelDiscoveryState {
   error?: string;
   reasoningEfforts?: Record<string, string[]>;
 }
-export interface CodexModelCatalog {
+interface CodexModelCatalog {
   models: string[];
   reasoningEfforts: Record<string, string[]>;
 }

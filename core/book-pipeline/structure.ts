@@ -18,7 +18,7 @@ export interface CardPlace {
 }
 
 /** The cards around one card (ids). `previous`/`next` are the chapters of a chapter or preface, the sections of a section. */
-export interface CardNeighbours {
+interface CardNeighbours {
   previous?: string;
   next?: string;
   /** A section's chapter. */

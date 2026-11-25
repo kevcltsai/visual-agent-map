@@ -1496,6 +1496,9 @@ export class VisualAgentMapView extends ItemView {
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
+  private backgroundEpoch = 0;
+  private structureReviewWindow: StructureReviewModal | null = null;
+  private outlineStarting: AbortController | null = null;
   /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
   private structureReviewTask: {
     mapPath: string;
@@ -3185,9 +3188,6 @@ export class VisualAgentMapView extends ItemView {
     this.dropGoalEdit();
     this.abortRelevanceGrade();
     this.plugin.topicRuns.dropSyntheses(this);
-    for (const controller of this.startingTasks.values()) controller.abort();
-    this.startingTasks.clear();
-    this.startingExpand.clear();
     this.mergeDrafts.stopAll();
     this.dropMapBackground();
     this.viewEpoch++;
@@ -3546,17 +3546,36 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesControl?.loadForMap(sources);
     return { failedPaths: Array.from(ctx.failedPaths) };
   }
-  /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
+  /** Logical background session; a reload of the same map does not replace it. */
+  private captureBackgroundSession(): () => boolean {
+    const epoch = this.backgroundEpoch,
+      path = this.path,
+      id = this.map?.id;
+    return () => !this.closed && this.backgroundEpoch === epoch && this.path === path && this.map?.id === id;
+  }
+  /** Background AI work that belongs to the open map, not accepted plugin-owned topic runs. */
   private dropMapBackground(): void {
+    this.backgroundEpoch++;
     this.clearChatHighlight();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
+    const reviewWindow = this.structureReviewWindow;
+    const preparing = this.outlineStarting;
+    const starting = [...this.startingTasks.values()];
     this.structureReviewTask = null;
     this.outlineDraftTask = null;
+    this.structureReviewWindow = null;
+    this.outlineStarting = null;
+    this.startingTasks.clear();
+    this.startingExpand.clear();
     this.goalSuggest.drop();
+    this.abortRelevanceGrade();
+    preparing?.abort();
+    for (const controller of starting) controller.abort();
     review?.controller.abort();
     draft?.controller.abort();
+    reviewWindow?.close();
     this.highlightStructure([]);
   }
   async openMap(path: string): Promise<void> {
@@ -3777,13 +3796,16 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
+    const session = this.captureBackgroundSession();
     this.openMapModal(
       new OutlineImportModal(
         this.app,
-        request =>
-          this.importOutline(
+        request => {
+          if (!session()) return Promise.reject(new Error(t("ui.outline_import_placement_no_map")));
+          return this.importOutline(
             summaries?.size ? { ...request, nodes: applyOutlineSummaries(request.nodes, summaries) } : request
-          ),
+          );
+        },
         this.modelChoices(),
         target,
         placement,
@@ -3822,106 +3844,126 @@ export class VisualAgentMapView extends ItemView {
    * the window hides itself and this view owns the run (status bar with Stop); the result waits there for review.
    */
   private outlineGenerator(initialTopic?: string, prefill?: OutlineDraftPrefill): OutlineGenerator {
+    const session = this.captureBackgroundSession();
     return {
       presets: this.plugin,
       initialTopic,
       ...(prefill ? { prefill } : {}),
       generate: async (request, signal, started) => {
-        if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
-        const settings = this.plugin.settings;
-        // The model menu's pick is for this generation only; the reasoning is the current model's (D5).
-        const current = this.plugin.currentModelChoice();
-        // Under a topic the default follows that topic's manual model (as the window's default entry says); the
-        // reasoning stays the current model's. A new tree or a parent with no manual model uses the current model.
-        const parent =
-          request.placement?.kind === "under"
-            ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
-            : undefined;
-        // AI lock: no outline for a locked parent, read fresh so a lock set meanwhile counts; refused before any AI.
-        const parentNote = parent ? await this.plugin.repo.readNote(parent.path, this.map ?? undefined) : undefined;
-        if (parent && parentNote && this.aiLockReason("addChild", [parent.id], new Map([[parent.id, parentNote]]))) {
-          new Notice(t("ui.ai_locked_notice"));
-          throw new Error(t("ui.ai_locked_notice"));
-        }
-        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined) : null;
-        const { model, reasoning } = resolveTaskModel({
-          runOnce: request.model ? { model: request.model } : null,
-          override: inherited?.origin === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
-          current
-        });
-        const { placement: _placement, ...forService } = request;
-        void _placement;
-        // Under a card whose own title is the topic (the user did not change it): the new subtopics follow the card's note and do not
-        // repeat its current subtopics (quoted as data). A changed topic is a different subject, so nothing of the card is carried.
-        const carry =
-          parent && parentNote && request.topic.trim() === parentNote.title.trim()
-            ? {
-                noteDetail: parentNote.detail,
-                existingChildren: (this.map?.nodes ?? [])
-                  .filter(item => item.parentId === parent.id)
-                  .map(item => this.notes.get(item.id)?.title ?? "")
-              }
-            : {};
+        if (!session() || signal.aborted) throw new Error(t("ui.outline_ai_not_started"));
+        if (this.outlineStarting || this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const controller = new AbortController();
-        // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
+        this.outlineStarting = controller;
         const forward = (): void => controller.abort();
-        signal.addEventListener("abort", forward, { once: true });
-        const run: { task?: NonNullable<VisualAgentMapView["outlineDraftTask"]> } = {};
-        const ran = await this.plugin.confirmAiUsage(model, async () => {
-          if (signal.aborted) return;
-          const inputs = started();
+        const detach = (): void => {
           signal.removeEventListener("abort", forward);
-          const own: NonNullable<VisualAgentMapView["outlineDraftTask"]> = {
-            mapPath: this.path,
-            controller,
-            state: "running",
-            inputs
-          };
-          run.task = own;
-          this.outlineDraftTask = own;
-          if (!this.closed) this.render();
-          try {
-            const result = await this.plugin.outlineGeneration.generate(
-              await this.withOutlineSources(
-                {
-                  ...forService,
-                  ...carry,
-                  ...this.usageMapField(),
-                  language: settings.language,
-                  contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
-                  model,
-                  reasoning
-                },
-                controller.signal
-              ),
-              controller.signal
-            );
-            // Stopped, replaced or the view closed meanwhile: the late result is dropped.
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "done";
-            own.markdown = result.markdown;
-            own.summaries = outlineSummaryBank(result.nodes);
-            backgroundResultNotice(t("ui.outline_ai_ready"), {
-              label: t("ui.background_review"),
-              open: () => this.reopenOutlineDraft(own)
-            });
-          } catch (error) {
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = plainFailure(t("error.plain_outline_context"), error);
-            new Notice(own.message);
+          controller.signal.removeEventListener("abort", detach);
+          if (this.outlineStarting === controller) this.outlineStarting = null;
+        };
+        signal.addEventListener("abort", forward, { once: true });
+        controller.signal.addEventListener("abort", detach, { once: true });
+        const preparing = (): boolean =>
+          session() && this.outlineStarting === controller && !controller.signal.aborted && !signal.aborted;
+        const checkPreparing = (): void => {
+          if (!preparing()) throw new Error(t("ui.outline_ai_not_started"));
+        };
+        try {
+          const settings = this.plugin.settings;
+          // The model menu's pick is for this generation only; the reasoning is the current model's (D5).
+          const current = this.plugin.currentModelChoice();
+          // Under a topic the default follows that topic's manual model (as the window's default entry says); the
+          // reasoning stays the current model's. A new tree or a parent with no manual model uses the current model.
+          const parent =
+            request.placement?.kind === "under"
+              ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
+              : undefined;
+          // AI lock: no outline for a locked parent, read fresh so a lock set meanwhile counts; refused before any AI.
+          const map = this.map ?? undefined;
+          const parentNote = parent ? await this.plugin.repo.readNote(parent.path, map) : undefined;
+          checkPreparing();
+          if (parent && parentNote && this.aiLockReason("addChild", [parent.id], new Map([[parent.id, parentNote]]))) {
+            new Notice(t("ui.ai_locked_notice"));
+            throw new Error(t("ui.ai_locked_notice"));
           }
-          if (!this.closed) this.render();
-        });
-        signal.removeEventListener("abort", forward);
-        if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return run.task.markdown ?? "";
+          const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, map) : null;
+          checkPreparing();
+          const { model, reasoning } = resolveTaskModel({
+            runOnce: request.model ? { model: request.model } : null,
+            override: inherited?.origin === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
+            current
+          });
+          const { placement: _placement, ...forService } = request;
+          void _placement;
+          // Under a card whose own title is the topic (the user did not change it): the new subtopics follow the card's note and do not
+          // repeat its current subtopics (quoted as data). A changed topic is a different subject, so nothing of the card is carried.
+          const carry =
+            parent && parentNote && request.topic.trim() === parentNote.title.trim()
+              ? {
+                  noteDetail: parentNote.detail,
+                  existingChildren: (this.map?.nodes ?? [])
+                    .filter(item => item.parentId === parent.id)
+                    .map(item => this.notes.get(item.id)?.title ?? "")
+                }
+              : {};
+          const run: { task?: NonNullable<VisualAgentMapView["outlineDraftTask"]> } = {};
+          const ran = await this.plugin.confirmAiUsage(model, async () => {
+            if (!preparing()) return;
+            // Transfer to the background task before closing the modal.
+            detach();
+            const inputs = started();
+            if (!session() || controller.signal.aborted) return;
+            const own: NonNullable<VisualAgentMapView["outlineDraftTask"]> = {
+              mapPath: this.path,
+              controller,
+              state: "running",
+              inputs
+            };
+            run.task = own;
+            this.outlineDraftTask = own;
+            if (!this.closed) this.render();
+            try {
+              const requestWithSources = await this.withOutlineSources(
+                {
+                    ...forService,
+                    ...carry,
+                    ...this.usageMapField(),
+                    language: settings.language,
+                    contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
+                    model,
+                    reasoning
+                  },
+                controller.signal
+              );
+              if (!session() || controller.signal.aborted || this.outlineDraftTask !== own) return;
+              const result = await this.plugin.outlineGeneration.generate(requestWithSources, controller.signal);
+              // Stopped, replaced or the view closed meanwhile: the late result is dropped.
+              if (!session() || controller.signal.aborted || this.outlineDraftTask !== own) return;
+              own.state = "done";
+              own.markdown = result.markdown;
+              own.summaries = outlineSummaryBank(result.nodes);
+              backgroundResultNotice(t("ui.outline_ai_ready"), {
+                label: t("ui.background_review"),
+                open: () => this.reopenOutlineDraft(own)
+              });
+            } catch (error) {
+              if (!session() || controller.signal.aborted || this.outlineDraftTask !== own) return;
+              own.state = "failed";
+              own.message = plainFailure(t("error.plain_outline_context"), error);
+              new Notice(own.message);
+            }
+            if (session() && this.outlineDraftTask === own) this.render();
+          });
+          if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
+          return run.task.markdown ?? "";
+        } finally {
+          detach();
+        }
       }
     };
   }
   /** Reopens the import window from a finished, failed or stopped AI outline; the waiting task is consumed. */
   private reopenOutlineDraft(task: NonNullable<VisualAgentMapView["outlineDraftTask"]>): void {
-    if (this.outlineDraftTask !== task || task.state === "running" || this.closed) return;
+    if (this.outlineDraftTask !== task || task.mapPath !== this.path || task.state === "running" || this.closed) return;
     this.outlineDraftTask = null;
     this.render();
     this.openOutlineImport(
@@ -4037,7 +4079,8 @@ export class VisualAgentMapView extends ItemView {
             }
           : {}),
         onDismiss: () => {
-          if (this.structureReviewTask === review) this.structureReviewTask = null;
+          if (this.closed || this.structureReviewTask !== review || review.mapPath !== this.path) return;
+          this.structureReviewTask = null;
           this.render();
         }
       });
@@ -4056,6 +4099,8 @@ export class VisualAgentMapView extends ItemView {
         ...(running
           ? {
               onStop: () => {
+                if (this.closed || this.outlineDraftTask !== draft || draft.mapPath !== this.path) return;
+                if (draft.state !== "running") return;
                 draft.state = "stopped";
                 draft.controller.abort();
                 this.render();
@@ -4063,7 +4108,8 @@ export class VisualAgentMapView extends ItemView {
             }
           : { review: { label: t("ui.background_review"), open: () => this.reopenOutlineDraft(draft) } }),
         onDismiss: () => {
-          if (this.outlineDraftTask === draft) this.outlineDraftTask = null;
+          if (this.closed || this.outlineDraftTask !== draft || draft.mapPath !== this.path) return;
+          this.outlineDraftTask = null;
           this.render();
         }
       });
@@ -4087,17 +4133,25 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Quick explore in the Next Step dialog: the same generator, reviewed in the dialog, then added under the topic. */
   private quickOutline(node: MapNode): QuickOutline {
+    const session = this.captureBackgroundSession();
+    const current = (): boolean =>
+      session() && !!this.map?.nodes.some(item => item.id === node.id && item.path === node.path);
+    const check = (signal?: AbortSignal): void => {
+      if (!current() || signal?.aborted) throw new Error(t("ui.outline_ai_not_started"));
+    };
     const settings = this.plugin.settings;
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
       generate: async (request, signal, steer): Promise<OutlineNode[]> => {
+        check(signal);
         const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+        check(signal);
         if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
-        const result = await this.plugin.outlineGeneration.generate(
-          await this.withOutlineSources(
-            {
+        check(signal);
+        const requestWithSources = await this.withOutlineSources(
+          {
               ...this.usageMapField(),
               topic: note.title,
               presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
@@ -4111,16 +4165,17 @@ export class VisualAgentMapView extends ItemView {
                 .filter(item => item.parentId === node.id)
                 .map(item => this.notes.get(item.id)?.title ?? "")
             },
-            signal
-          ),
-          signal,
-          steer
+          signal
         );
+        check(signal);
+        const result = await this.plugin.outlineGeneration.generate(requestWithSources, signal, steer);
+        check(signal);
         this.quickOutlineSummaries.set(node.id, outlineSummaryBank(result.nodes, true));
         return result.nodes;
       },
-      create: (nodes, options) =>
-        this.importOutline({
+      create: (nodes, options) => {
+        check();
+        return this.importOutline({
           nodes: applyOutlineSummaries(nodes, this.quickOutlineSummaries.get(node.id) ?? new Map()),
           placement: { kind: "under", parentId: node.id },
           source: null,
@@ -4140,7 +4195,8 @@ export class VisualAgentMapView extends ItemView {
               }
             : {}),
           ...(options.noteStyle ? { noteStyle: options.noteStyle } : {})
-        })
+        });
+      }
     };
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
@@ -4152,7 +4208,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** AI structure review of the whole map (`scopeId` null) or one branch; each suggestion is applied on its own. */
   openStructureReview(scopeId: string | null): void {
-    if (!this.map || this.outlineImportTarget().map !== "editable") return;
+    if (this.closed || !this.map || this.outlineImportTarget().map !== "editable" || this.structureReviewWindow) return;
+    const session = this.captureBackgroundSession();
     const existing = this.structureReviewTask;
     if (existing && existing.mapPath === this.path) {
       // One background review at a time; a finished one for this scope reopens instead of starting again.
@@ -4167,12 +4224,13 @@ export class VisualAgentMapView extends ItemView {
     }
     const mapPath = this.path;
     const tree = (): ReturnType<typeof buildStructureReviewNodes> =>
-      this.path === mapPath && this.map
+      session() && this.map
         ? buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), scopeId)
         : [];
     const nodes = tree();
     const rootQuestion = scopeId ? (this.describeForReview(scopeId)?.title ?? "") : this.map.title;
     const staleReason = (suggestion: StructureSuggestion): string | null => {
+      if (!session()) return t("ui.structure_review_stale_missing");
       const current = tree();
       if (!isSuggestionStale(suggestion, current)) return null;
       const byId = new Map(current.map(item => [item.id, item]));
@@ -4187,15 +4245,32 @@ export class VisualAgentMapView extends ItemView {
       extra: Partial<ConstructorParameters<typeof StructureReviewModal>[1]> & {
         review: ConstructorParameters<typeof StructureReviewModal>[1]["review"];
       }
-    ): void =>
-      new StructureReviewModal(this.app, {
+    ): void => {
+      if (!session() || this.structureReviewWindow) return;
+      const windowCurrent = (): boolean => session() && this.structureReviewWindow === modal;
+      const windowStale = (suggestion: StructureSuggestion): string | null =>
+        windowCurrent() ? staleReason(suggestion) : t("ui.structure_review_stale_missing");
+      const modal: StructureReviewModal = new StructureReviewModal(this.app, {
         scope: scopeId ? "branch" : "map",
-        titleOf: id => this.describeForReview(id)?.title ?? "",
-        staleReason,
-        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, staleReason),
-        highlight: ids => this.highlightStructure(ids),
+        titleOf: id => (windowCurrent() ? (this.describeForReview(id)?.title ?? "") : ""),
+        staleReason: windowStale,
+        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, windowStale),
+        highlight: ids => {
+          if (windowCurrent()) this.highlightStructure(ids);
+        },
         ...extra
-      }).open();
+      });
+      const close = modal.onClose;
+      modal.onClose = (): void => {
+        try {
+          close.call(modal);
+        } finally {
+          if (this.structureReviewWindow === modal) this.structureReviewWindow = null;
+        }
+      };
+      this.structureReviewWindow = modal;
+      modal.open();
+    };
     const reopen = (
       result: StructureReviewResult,
       task: NonNullable<VisualAgentMapView["structureReviewTask"]>
@@ -4204,12 +4279,14 @@ export class VisualAgentMapView extends ItemView {
         review: async () => result,
         initial: result,
         consumed: () => {
-          if (this.structureReviewTask === task) this.structureReviewTask = null;
-          if (!this.closed) this.render();
+          if (!session() || this.structureReviewTask !== task) return;
+          this.structureReviewTask = null;
+          this.render();
         }
       });
     showWindow({
       review: async (signal, started) => {
+        if (!session() || signal.aborted) throw new Error(t("ui.structure_review_not_started"));
         const settings = this.plugin.settings;
         const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
@@ -4217,53 +4294,57 @@ export class VisualAgentMapView extends ItemView {
         const forward = (): void => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
         const run: { began: boolean } = { began: false };
-        await this.plugin.confirmAiUsage(model, async () => {
-          if (signal.aborted) return;
-          run.began = true;
+        try {
+          await this.plugin.confirmAiUsage(model, async () => {
+            if (!session() || signal.aborted || controller.signal.aborted) return;
+            if (this.structureReviewTask?.state === "running") return;
+            run.began = true;
+            signal.removeEventListener("abort", forward);
+            const own: NonNullable<VisualAgentMapView["structureReviewTask"]> = {
+              mapPath,
+              scopeId,
+              controller,
+              state: "running",
+              reopen: result => reopen(result, own)
+            };
+            this.structureReviewTask = own;
+            if (!this.closed) this.render();
+            started();
+            try {
+              const review = await this.plugin.structureReview.review(
+                {
+                  rootQuestion,
+                  nodes,
+                  ...this.usageMapField(),
+                  language: settings.language,
+                  contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
+                  model,
+                  reasoning
+                },
+                controller.signal
+              );
+              // Stopped, replaced or the view closed meanwhile: the late result is dropped.
+              if (!session() || controller.signal.aborted || this.structureReviewTask !== own) return;
+              // AI lock: suggestions that touch a locked topic are dropped, and the count is reported.
+              const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
+              if (lockedCount) new Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
+              own.state = "done";
+              own.result = kept;
+              backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
+                label: t("ui.structure_review_view_0", kept.suggestions.length),
+                open: () => this.reopenStructureReview(own)
+              });
+            } catch (error) {
+              if (!session() || controller.signal.aborted || this.structureReviewTask !== own) return;
+              own.state = "failed";
+              own.message = plainFailure(t("error.plain_review_context"), error);
+              new Notice(own.message);
+            }
+            if (session() && this.structureReviewTask === own) this.render();
+          });
+        } finally {
           signal.removeEventListener("abort", forward);
-          const own: NonNullable<VisualAgentMapView["structureReviewTask"]> = {
-            mapPath,
-            scopeId,
-            controller,
-            state: "running",
-            reopen: result => reopen(result, own)
-          };
-          this.structureReviewTask = own;
-          if (!this.closed) this.render();
-          started();
-          try {
-            const review = await this.plugin.structureReview.review(
-              {
-                rootQuestion,
-                nodes,
-                ...this.usageMapField(),
-                language: settings.language,
-                contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
-                model,
-                reasoning
-              },
-              controller.signal
-            );
-            // Stopped, replaced or the view closed meanwhile: the late result is dropped.
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            // AI lock: suggestions that touch a locked topic are dropped, and the count is reported.
-            const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
-            if (lockedCount) new Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
-            own.state = "done";
-            own.result = kept;
-            backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
-              label: t("ui.structure_review_view_0", kept.suggestions.length),
-              open: () => this.reopenStructureReview(own)
-            });
-          } catch (error) {
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = plainFailure(t("error.plain_review_context"), error);
-            new Notice(own.message);
-          }
-          if (!this.closed) this.render();
-        });
-        signal.removeEventListener("abort", forward);
+        }
         if (!run.began) throw new Error(t("ui.structure_review_not_started"));
         // The window already hid itself; the result lives on the status bar.
         return { suggestions: [], rejected: [] };
@@ -4272,12 +4353,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Opens the window on a finished review's suggestions (no Start); closing it drops the waiting result. */
   private reopenStructureReview(task: NonNullable<VisualAgentMapView["structureReviewTask"]>): void {
-    if (this.structureReviewTask !== task || task.state !== "done" || !task.result || this.closed) return;
+    if (
+      this.structureReviewTask !== task || task.mapPath !== this.path || task.state !== "done" || !task.result || this.closed
+    ) return;
     task.reopen(task.result);
   }
   /** Stop on the status bar: the run is aborted and forgotten, so its late result changes nothing. */
   private stopStructureReview(task: NonNullable<VisualAgentMapView["structureReviewTask"]>): void {
-    if (this.structureReviewTask === task) this.structureReviewTask = null;
+    if (this.closed || this.structureReviewTask !== task || task.mapPath !== this.path || task.state !== "running") return;
+    this.structureReviewTask = null;
     task.controller.abort();
     this.render();
   }
@@ -5029,7 +5113,9 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.mutate(async () => {
         guard();
         // AI lock, at write time: the notes are read again, so a lock set after the review still counts.
-        if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
+        const fresh = await this.freshNotes();
+        guard();
+        if (this.structureLockReason(suggestion, fresh)) throw new Error(t("ui.ai_locked_notice"));
         await work();
       });
     if (suggestion.kind === "strengthen")
@@ -5825,10 +5911,11 @@ export class VisualAgentMapView extends ItemView {
     const repo = this.plugin.repo;
     // One operation, one Notice: the shallow research that follows shares this gate.
     const noticeGate = { shown: false };
+    const session = this.captureBackgroundSession();
     // Checked against the map as it is when the work runs; a rejection keeps the import window open.
     const target = (): { map: MapDocument; path: string; parent: MapNode | null } => {
       const where = this.outlineImportTarget();
-      if (!this.map || where.map !== "editable") throw new Error(t("ui.outline_import_placement_no_map"));
+      if (!session() || !this.map || where.map !== "editable") throw new Error(t("ui.outline_import_placement_no_map"));
       if (placement.kind === "tree") return { map: this.map, path: this.path, parent: null };
       const parent = this.map.nodes.find(node => node.id === placement.parentId);
       if (!parent) throw new Error(t("ui.outline_import_selected_missing"));
@@ -5880,6 +5967,10 @@ export class VisualAgentMapView extends ItemView {
             gate: noticeGate
           })
         ).template;
+        if (!session()) {
+          state.rejection = new Error(t("ui.outline_import_placement_no_map"));
+          return;
+        }
         const result = await addOutlineToMap(
           repo,
           map,
@@ -6120,7 +6211,7 @@ export class VisualAgentMapView extends ItemView {
   }
   deleted(file: TFile): void {
     if (file.path === this.path) {
-      this.clearChatHighlight();
+      this.dropMapBackground();
       this.map = null;
       this.path = "";
       this.dropBookReviewSession();
@@ -6262,16 +6353,28 @@ export class VisualAgentMapView extends ItemView {
     if (!progress || progress.get(key)) return { end: () => {} };
     let attempt = "starting";
     progress.begin(key, attempt, Date.now(), model);
+    const entry = progress.get(key);
+    let ended = false;
+    const current = (): boolean => !ended && !!entry && progress.get(key) === entry;
     return {
       observer: {
         onAttempt: id => {
+          if (!current()) return;
           attempt = id;
           progress.newAttempt(key, id, Date.now());
         },
-        onStage: (id, stage, query) => progress.stage(key, id, stage, Date.now(), query),
-        onPreview: (id, fields) => progress.preview(key, id, fields ?? {})
+        onStage: (id, stage, query) => {
+          if (current()) progress.stage(key, id, stage, Date.now(), query);
+        },
+        onPreview: (id, fields) => {
+          if (current()) progress.preview(key, id, fields ?? {});
+        }
       },
-      end: () => progress.end(key, attempt)
+      end: () => {
+        if (!current()) return;
+        ended = true;
+        progress.end(key, attempt);
+      }
     };
   }
   /** Stage text, seconds and the preview line under a synthesis or merge status bar. */
@@ -11688,7 +11791,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
-      this.clearChatHighlight();
+      this.dropMapBackground();
       this.map = null;
       this.path = "";
       this.dropBookReviewSession();
@@ -11982,7 +12085,7 @@ export class VisualAgentMapView extends ItemView {
                 this.deletedMap = null;
                 throw error;
               }
-              this.clearChatHighlight();
+              this.dropMapBackground();
               this.map = null;
               this.path = "";
               this.dropBookReviewSession();
@@ -12026,8 +12129,8 @@ export class VisualAgentMapView extends ItemView {
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
+    this.dropMapBackground();
     this.path = "";
-    this.clearChatHighlight();
     this.map = null;
     this.dropBookReviewSession();
     await this.plugin.rebuildDerivedData();
@@ -14628,29 +14731,44 @@ export class VisualAgentMapView extends ItemView {
    */
   private backgroundHooks(key: string, node?: MapNode): BackgroundHooks {
     let own: AbortController | undefined;
-    // The map this run started on: a result that lands after a map switch belongs to that map, not the open one.
-    const mapPath = this.path;
+    const session = this.captureBackgroundSession();
+    const currentNode = (): MapNode | undefined =>
+      session() && node ? this.map?.nodes.find(item => item.id === node.id && item.path === node.path) : undefined;
     return {
       begin: (controller, kind) => {
+        if (!session() || controller.signal.aborted) {
+          controller.abort();
+          return;
+        }
+        const previous = this.startingTasks.get(key);
         own = controller;
         this.startingTasks.set(key, controller);
+        if (previous !== controller) previous?.abort();
         if (kind === "expand") this.startingExpand.add(key);
         else this.startingExpand.delete(key);
         this.render();
       },
       end: () => {
-        if (own && this.startingTasks.get(key) === own) {
+        const owned = !!own && this.startingTasks.get(key) === own;
+        if (owned) {
           this.startingTasks.delete(key);
           this.startingExpand.delete(key);
         }
         own = undefined;
-        if (!this.closed) this.render();
+        if (owned && session()) this.render();
       },
       completed: (kind, result) => {
-        if (!node || this.closed || this.path !== mapPath) return;
-        const title = this.notes.get(node.id)?.title ?? node.path;
+        const current = currentNode();
+        if (!current) return;
+        const title = this.notes.get(current.id)?.title ?? current.path;
         if (kind === "research") {
-          const view = { label: t("ui.background_view"), open: () => this.openDetails(node) };
+          const view = {
+            label: t("ui.background_view"),
+            open: () => {
+              const current = currentNode();
+              if (current) this.openDetails(current);
+            }
+          };
           // A Quick answer that says the model's knowledge was not enough also offers the Standard run.
           if (result && hasKnowledgeGapMarker(result.detail))
             backgroundResultNotice(t("ui.background_research_gap_0", title), [
@@ -14659,17 +14777,21 @@ export class VisualAgentMapView extends ItemView {
                 label: t("ui.rerun_standard"),
                 open: () => {
                   // The notice outlives a map switch: the re-run belongs to the map the research ran on.
-                  if (this.path !== mapPath) new Notice(t("ui.rerun_standard_other_map"));
-                  else this.rerunStandard(node);
+                  const current = currentNode();
+                  if (!current) new Notice(t("ui.rerun_standard_other_map"));
+                  else this.rerunStandard(current);
                 }
               }
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
+          const count = this.plugin.topicRuns.pending(current.path)?.length ?? 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
-            open: () => this.openNodePanel(node, "proposals")
+            open: () => {
+              const current = currentNode();
+              if (current) this.openNodePanel(current, "proposals");
+            }
           });
         }
       }

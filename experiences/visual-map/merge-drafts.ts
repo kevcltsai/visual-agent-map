@@ -103,27 +103,65 @@ export class MergeDrafts {
   }
   /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
   stop(task: MergeTask): void {
+    const owned = this.tasks.get(task.mapPath) === task;
     this.forget(task.mapPath, task);
     task.controller.abort();
-    this.ports.changed();
+    if (owned && !this.ports.closed()) this.ports.changed();
   }
-  /** The view closes: every run is aborted first, then all are forgotten. */
+  /** The view closes: revoke ownership before aborting, so callbacks cannot see the departing tasks as live. */
   stopAll(): void {
-    for (const task of this.tasks.values()) task.controller.abort();
+    const tasks = [...this.tasks.values()];
     this.tasks.clear();
+    for (const task of tasks) task.controller.abort();
   }
   /** Registers a started merge: the task is set, `registered` runs (dialog hidden, started, render), then the run starts. */
   start(task: MergeTask, registered: () => void): MergeTask {
+    const previous = this.tasks.get(task.mapPath);
+    if (previous === task) return task;
     this.tasks.set(task.mapPath, task);
-    registered();
-    task.run = this.run(task);
+    previous?.controller.abort();
+    try {
+      registered();
+      task.run = this.run(task);
+    } catch (error) {
+      this.forget(task.mapPath, task);
+      task.controller.abort();
+      throw error;
+    }
     return task;
   }
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async run(task: MergeTask): Promise<void> {
-    const language = this.ports.language();
-    const progress = this.ports.progress(task);
+    const signal = task.controller.signal;
+    let endProgress = (): void => {};
     try {
+      if (!this.isLive(task)) return;
+      const language = this.ports.language();
+      const progress = this.ports.progress(task);
+      let ended = false;
+      endProgress = (): void => {
+        if (ended) return;
+        ended = true;
+        signal.removeEventListener("abort", endProgress);
+        progress.end();
+      };
+      signal.addEventListener("abort", endProgress, { once: true });
+      if (!this.isLive(task)) return;
+      // Late progress from a canceled or replaced task must not reset the next task's entry.
+      const guard = <Args extends unknown[]>(callback: (...args: Args) => void) => {
+        return (...args: Args): void => {
+          if (!ended && this.isLive(task)) callback(...args);
+        };
+      };
+      const observer = progress.observer ? { ...progress.observer } : undefined;
+      if (observer) {
+        if (observer.onAttempt) observer.onAttempt = guard(observer.onAttempt);
+        if (observer.onStage) observer.onStage = guard(observer.onStage);
+        if (observer.onPreview) observer.onPreview = guard(observer.onPreview);
+        if (observer.onSlow) observer.onSlow = guard(observer.onSlow);
+        if (observer.onSteer) observer.onSteer = guard(observer.onSteer);
+        if (observer.onStreamMode) observer.onStreamMode = guard(observer.onStreamMode);
+      }
       const snapshot = await this.ports.snapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;
       if (!this.isLive(task)) return;
@@ -148,7 +186,7 @@ export class MergeDrafts {
       };
       const ask = (context: TaskContext): Promise<AiResult> =>
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.
-        this.ports.ask(context, task.model, task.reasoning, task.controller.signal, progress.observer);
+        this.ports.ask(context, task.model, task.reasoning, signal, observer);
       /** The sources must still be what the model was given; a change during any request fails with the stale message. */
       const sourcesUnchanged = async (): Promise<boolean> => {
         if (!this.isLive(task)) return false;
@@ -162,6 +200,7 @@ export class MergeDrafts {
       if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
       // Programmatic content check, one repair round; whatever is still wrong then is applied with a warning.
       let check = await this.ports.check(task, result);
+      if (!this.isLive(task)) return;
       if (!check.ok) {
         try {
           const repaired = await ask({
@@ -177,6 +216,7 @@ export class MergeDrafts {
           });
           if (!(await sourcesUnchanged())) return;
           const again = await this.ports.check(task, repaired);
+          if (!this.isLive(task)) return;
           // A repair that made it worse is not used.
           if (again.missing.length + again.added.length <= check.missing.length + check.added.length) {
             result = repaired;
@@ -191,6 +231,7 @@ export class MergeDrafts {
       }
       // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
       // never saw them, so nothing in them can change what the cards say.
+      if (!this.isLive(task)) return;
       if (snapshot.mapGroups.some(group => group.documents.length)) {
         try {
           const supplement = await ask({
@@ -212,25 +253,32 @@ export class MergeDrafts {
         }
       }
       // The result is final: the unsaved preview goes away before anything is written.
-      progress.end();
+      if (!this.isLive(task)) return;
+      endProgress();
+      if (!this.isLive(task)) return;
       task.state = "applying";
       task.draft = result;
       this.ports.changed();
+      if (!this.isLive(task)) return;
       await this.ports.write(task, result, check);
-      // The write is done and the task forgotten: one last repaint, so every toolbar piece that follows the map (the book bar's counts) shows the merged map.
-      if (!this.ports.closed()) this.ports.changed();
+      // The write may already have forgotten the task before repainting the merged map.
+      const owner = this.tasks.get(task.mapPath);
+      this.forget(task.mapPath, task);
+      if (!task.controller.signal.aborted && !this.ports.closed() && (!owner || owner === task)) this.ports.changed();
     } catch (error) {
       // Nothing was written (a write that fails midway has already rolled itself back); the task is forgotten.
-      const live = this.tasks.get(task.mapPath) === task;
-      if (live) this.forget(task.mapPath, task);
+      const live = this.isLive(task);
+      if (!live) return;
+      this.forget(task.mapPath, task);
       if (!this.ports.closed()) this.ports.changed();
-      if (task.controller.signal.aborted || this.ports.closed()) return;
+      if (task.controller.signal.aborted || this.ports.closed() || this.tasks.has(task.mapPath)) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
       if (isAiLockedError(error)) this.ports.notice(t("ui.ai_locked_notice"));
       else
         this.ports.notice(stale ? t("ui.merge_draft_stale") : this.ports.recordFailure(t("log.merge_failed"), error));
     } finally {
-      progress.end();
+      this.forget(task.mapPath, task);
+      endProgress();
     }
   }
 }

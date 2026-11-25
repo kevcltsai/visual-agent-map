@@ -715,3 +715,23 @@ test('turning records off asks keep/delete with count N', async () => {
     assert.deepEqual(trashed, []);
   }
 });
+
+test('saved settings normalization is available without the plugin shell and preserves its public facade', () => {
+  const direct = load('settings-from-saved.ts');
+  const shell = load('main.ts', { obsidian });
+  for (const [saved, locale] of [
+    [null, 'zh-TW'],
+    [{ mapChatModel: ' legacy-model ', cliModel: 'new-model', previewSize: 'small' }, 'en'],
+    [{ noteStyleByKind: { topic: 'builtin:topic', bogus: 'builtin:topic' }, noteStyleDefaults: { voice: 'builtin:academic', format: 'builtin:standard' }, noteStyleRecipe: { migrated: 1, mapsNotified: true, legacy: { templates: { old: 'style:New' }, tones: {} } } }, 'zh-CN'],
+    [{ noteStyleByKind: [], noteStyleDefaults: false, noteStyleRecipe: { migrated: 2 }, previewScale: 'bad' }, 'en']
+  ]) {
+    const before = JSON.stringify(saved);
+    assert.deepEqual(plain(direct.settingsFromSaved(saved, locale)), plain(shell.settingsFromSaved(saved, locale)));
+    assert.equal(direct.hasLegacyChatModel(saved), shell.hasLegacyChatModel(saved));
+    assert.equal(JSON.stringify(saved), before);
+  }
+  for (const name of ['normalizeNoteStyleByKind', 'normalizeNoteStyleDefaults', 'normalizeNoteStyleRecipeMarker']) {
+    assert.equal(typeof direct[name], 'function');
+    assert.equal(typeof shell[name], 'function');
+  }
+});

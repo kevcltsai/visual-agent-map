@@ -35,7 +35,7 @@ const BRANCH_ON_ID = [
   new RegExp(`\\bnew Set\\(\\[[^\\]]*${QUOTE}${LANGUAGE_IDS}${QUOTE}[^\\]]*\\]\\)\\.has\\(`)
 ];
 // Tables keyed by NoteLanguage are the one allowed shape of per-language data; each is listed with its file and declaration.
-const NOTE_LANGUAGE_TABLES = [{ file: 'repository.ts', declaration: /^const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>>/ }];
+const NOTE_LANGUAGE_TABLES = [{ file: 'core/repository-note-references.ts', declaration: /^export const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>>/ }];
 // Display-only uses of note.* / detail.* keys in the interface language (never written into notes).
 const NOTE_KEY_IN_UI_ALLOWLIST = [{ file: 'ui/preview-utils.ts', call: 't("note.visual_reference")', reason: 'alt text of an image shown in the preview pane, not written to a note' }];
 

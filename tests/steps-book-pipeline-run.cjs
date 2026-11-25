@@ -1999,6 +1999,68 @@ test('apply notes: cancel, a late answer after dispose, and the caller signal wr
   }
 });
 
+test('apply notes: a pre-aborted caller is refused before any map read, backup or model call', async () => {
+  const r = await notesRig();
+  const controller = new AbortController();
+  controller.abort();
+  const before = await r.state();
+  const backupCount = r.stat.backups.length;
+  const readMap = r.ports.readMap;
+  let reads = 0;
+  r.ports.readMap = (...args) => { reads++; return readMap(...args); };
+  await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[1].id, { signal: controller.signal }), refusal('cancelled'));
+  assert.equal(reads, 0);
+  assert.equal(r.stat.backups.length, backupCount);
+  assert.equal(r.calls.length, 0);
+  assert.equal((await r.state()).budget.used, before.budget.used);
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false);
+});
+
+test('apply notes: cancellation while reading text prevents backup and model dispatch', async () => {
+  const r = await notesRig();
+  const entered = defer(), release = defer();
+  const read = r.ports.notes.readText;
+  r.ports.notes = { ...r.ports.notes, readText: async path => {
+    entered.resolve();
+    await release.promise;
+    return read(path);
+  } };
+  const before = await r.state(), raw = r.cardRaw(), backupCount = r.stat.backups.length;
+  const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const rejected = assert.rejects(job, refusal('cancelled'));
+  await entered.promise;
+  r.runs.cancelNotes(r.mapPath);
+  release.resolve();
+  await rejected;
+  assert.equal(r.stat.backups.length, backupCount);
+  assert.equal(r.calls.length, 0);
+  assert.equal((await r.state()).budget.used, before.budget.used);
+  assert.equal(r.cardRaw(), raw);
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false);
+});
+
+test('apply notes: disposal during context read prevents model dispatch and budget use', async () => {
+  const r = await notesRig();
+  const entered = defer(), release = defer();
+  const read = r.ports.readCard;
+  r.ports.readCard = async (...args) => {
+    entered.resolve();
+    await release.promise;
+    return read(...args);
+  };
+  const before = await r.state(), raw = r.cardRaw();
+  const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const rejected = assert.rejects(job, refusal('disposed'));
+  await entered.promise;
+  r.runs.dispose();
+  release.resolve();
+  await rejected;
+  assert.equal(r.calls.length, 0);
+  assert.equal((await r.state()).budget.used, before.budget.used);
+  assert.equal(r.cardRaw(), raw);
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false);
+});
+
 test('apply notes: a paragraph edited during the call is skipped (marked in its note), no body change means no seam', async () => {
   const gate = defer();
   const r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });

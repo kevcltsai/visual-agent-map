@@ -453,10 +453,13 @@ export class MapChatConversation {
       : chat.begin(message, origin, Boolean(again), "preparing");
     run.turn = turn;
     let sent = false;
+    let abandoned = false;
     // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     // `ends` is why the continuation (if one was running) ends with it.
     const abandon = (reason?: string, ends: MapChatChainInterrupt = "map_changed"): void => {
+      if (abandoned) return;
+      abandoned = true;
       if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
       // Take the turn back first: the end sentence goes under the last reply, which must be the one before this round, not the
       // round that is being taken back (its sentence would go with it).
@@ -472,6 +475,15 @@ export class MapChatConversation {
       abandon(undefined, "stopped");
     };
     this.prepAbandon = stopPreparing;
+    const preparingCurrent = (): boolean =>
+      !abandoned &&
+      !preparing.signal.aborted &&
+      !this.ports.closed() &&
+      !this.applying &&
+      this.ports.panel() === chat &&
+      chat.hasTurn(turn) &&
+      this.ports.path() === anchor.path &&
+      this.ports.map()?.id === anchor.id;
     // The follow-ups of this turn. Rows that wait are told to the panel as the machine queues them (once each, the panel
     // ignores a state it already shows); a retry asks the question with the follow-ups that went in, and only those.
     const steerRows = new Map<TopicSteerEntry, MapChatSteer>();
@@ -497,7 +509,7 @@ export class MapChatConversation {
       return;
     }
     // Stop, closing the view or a map switch while the request was being built: no usage notice, no setup guide.
-    if (this.ports.closed() || !chat.hasTurn(turn)) {
+    if (!preparingCurrent()) {
       abandon();
       return;
     }
@@ -507,13 +519,7 @@ export class MapChatConversation {
         request.model,
         async () => {
           // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
-          if (
-            this.ports.closed() ||
-            this.applying ||
-            !chat.hasTurn(turn) ||
-            this.ports.path() !== anchor.path ||
-            this.ports.map()?.id !== anchor.id
-          ) {
+          if (!preparingCurrent()) {
             abandon();
             return;
           }
@@ -714,7 +720,7 @@ export class MapChatConversation {
         // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
         {
           noticeOpening: () => {
-            if (chat.hasTurn(turn)) chat.setStage("consent");
+            if (preparingCurrent()) chat.setStage("consent");
           }
         }
       );

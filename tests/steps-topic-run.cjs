@@ -59,6 +59,43 @@ test('the module imports neither obsidian nor the view', () => {
   assert.doesNotMatch(src, /from\s+["']obsidian["']/); assert.doesNotMatch(src, /from\s+["'][^"']*view["']/);
 });
 
+test('progress ownership: a completed request cannot claim or end a replacement entry', () => {
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const progress = new ResearchProgressStore();
+  const runs = fresh({ progress: () => progress });
+  const first = runs.startProgress('A.md', 'model');
+  first.observer.onAttempt('old', 1);
+  first.end();
+  const next = runs.startProgress('A.md', 'model');
+  next.observer.onAttempt('next', 1);
+  first.observer.onAttempt('late', 2);
+  first.observer.onStage('next', 'writing');
+  first.observer.onPreview('next', { summary: 'stale' });
+  first.end();
+  assert.equal(progress.get('A.md').attemptId, 'next');
+  assert.equal(progress.get('A.md').stage, 'waiting');
+  assert.equal(progress.get('A.md').preview, undefined);
+  next.end();
+  assert.equal(progress.get('A.md'), undefined);
+});
+
+test('progress ownership: research cannot steal a replacement chart entry even before its final cleanup', () => {
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const progress = new ResearchProgressStore();
+  const runs = fresh({ progress: () => progress });
+  const research = runs.startProgress('A.md', 'model', 'style', true);
+  research.observer.onAttempt('research', 1);
+  progress.begin('A.md', 'charts-1', 5, 'chart-model');
+  progress.stage('A.md', 'charts-1', 'charts', 5);
+  research.observer.onAttempt('late', 2);
+  research.observer.onSlow('charts-1', true);
+  research.end();
+  assert.equal(progress.get('A.md').attemptId, 'charts-1');
+  assert.equal(progress.get('A.md').stage, 'charts');
+  assert.equal(progress.get('A.md').slow, false);
+  assert.equal(runs.startProgress('A.md', 'model').observer, undefined);
+});
+
 // ---- chart queue ----
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 function chartRuns({ chart, eligible = true, disposed = false } = {}) {
@@ -704,7 +741,7 @@ test('integrateDirection: a normal run registers, asks, offers at most 2 directi
   assert.equal(h.log.asks[0].context.mode, 'synthesize'); assert.equal(h.log.asks[0].model, 'm1');
   assert.equal(h.found.length, 1); assert.equal(h.found[0].length, 2); assert.deepEqual(h.fails, []);
   assert.deepEqual(h.events, [['started', true], ['accepted'], ['accepted'], ['settled', false]], 'accepted twice, as in 307bcd7 (inside the ask, then after the answer)');
-  assert.deepEqual(h.log.progress.map(entry => entry[0]), ['begin', 'end', 'end']);
+  assert.deepEqual(h.log.progress.map(entry => entry[0]), ['begin', 'end']);
   assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false, 'no activeTasks entry (the registry controller stops this run)');
 });
 

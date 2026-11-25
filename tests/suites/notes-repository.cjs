@@ -4,6 +4,28 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test, integrationTest, root, load, core, layout, node, map, plain, tree, TFolder, obsidian, DEFAULT_SETTINGS, fixture, topicNote } = require('../support.cjs');
+integrationTest('repository: unload after a vault process is queued refuses the callback without changing the note', async () => {
+  const { repo, app, contents } = fixture('en');
+  const n = await topicNote(repo);
+  const original = contents.get(n.path);
+  let entered, release;
+  const started = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const process = app.vault.process;
+  app.vault.process = async (file, change) => {
+    entered();
+    await gate;
+    return process(file, change);
+  };
+  const writing = repo.updateNote(n.path, { summary: 'late result' });
+  const rejected = assert.rejects(writing);
+  await started;
+  repo.dispose();
+  release();
+  await rejected;
+  assert.equal(contents.get(n.path), original);
+});
+
 integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));

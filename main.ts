@@ -1101,6 +1101,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Syntax check against the runtime parser of Obsidian's `loadMermaid`; shared by AI task results and map chat note edits. */
   readonly mermaidSyntax = mermaidSyntaxCheck(loadMermaid);
   private readonly aiTaskOptions = {
+    activeTasks: this.activeTasks,
     pluginDirectory: () => this.pluginDirectory(),
     language: () => this.settings.language,
     defaultReasoning: () => this.settings.cliReasoning,

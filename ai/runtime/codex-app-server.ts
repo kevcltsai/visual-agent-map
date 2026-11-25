@@ -590,9 +590,7 @@ export class CodexAppServerRuntime {
     }
     if (message.method === "thread/tokenUsage/updated") {
       // Protocol: ThreadTokenUsageUpdatedNotification { threadId, turnId, tokenUsage: { total, last, modelContextWindow } }.
-      const total = (
-        params as { tokenUsage?: { total?: unknown } } | undefined
-      )?.tokenUsage?.total;
+      const total = (params as { tokenUsage?: { total?: unknown } } | undefined)?.tokenUsage?.total;
       state.usage = codexReportedUsage(total) ?? state.usage;
       return;
     }

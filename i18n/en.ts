@@ -1018,7 +1018,8 @@ export const en = {
   "ui.usage_unreadable":
     "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
   "ui.usage_footer_scope": "Counts only AI requests sent by VAM.",
-  "ui.usage_footer_estimates": "Values marked ~ are estimates or incomplete subtotals; missing token counts are not included.",
+  "ui.usage_footer_estimates":
+    "Values marked ~ are estimates or incomplete subtotals; missing token counts are not included.",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "The map or parent topic changed while AI was running. No subtopics were created.",
   "ui.creating_subtopics": "Creating subtopics…",

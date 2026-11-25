@@ -79,8 +79,10 @@ function isEntry(value: unknown): value is UsageEntry {
 
 const isFolded = (value: unknown): boolean =>
   isTokens(value) &&
-  ((value as { estimated?: unknown }).estimated === undefined || (value as { estimated?: unknown }).estimated === true) &&
-  ((value as { incomplete?: unknown }).incomplete === undefined || (value as { incomplete?: unknown }).incomplete === true);
+  ((value as { estimated?: unknown }).estimated === undefined ||
+    (value as { estimated?: unknown }).estimated === true) &&
+  ((value as { incomplete?: unknown }).incomplete === undefined ||
+    (value as { incomplete?: unknown }).incomplete === true);
 const isMaps = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(

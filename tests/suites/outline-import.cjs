@@ -1202,6 +1202,7 @@ integrationTest('view: a renamed ancestor in the outline box or the review list 
   await modal.create({ nodes: api.parseOutline('# Renamed\n## A\n### X\n### Y\n## B').nodes, source: null, shallowResearch: false });
   assert.deepEqual([...sent[0].map(node => node.summary)], [undefined, 'a', 'ax', 'ay', 'b'], 'text box: only the root renamed');
   view.quickOutlineSummaries.set('p1', api.outlineSummaryBank(generated, true));
+  view.map = { id: 'm1', nodes: [{ id: 'p1', path: 'x.md' }] }; // create() only imports under a card still on the open map
   const quick = view.quickOutline({ id: 'p1', path: 'x.md' });
   await quick.create([{ index: 0, title: 'A2', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Y', level: 2, parent: 0, line: 0 }], {});
   assert.deepEqual([...sent[1].map(node => node.summary)], [undefined, 'ax', 'ay'], 'review list: ancestor renamed');
@@ -1224,6 +1225,7 @@ integrationTest('view: the outline box and the quick-explore review hand the AI 
   await modal.create({ nodes: api.parseOutline('# R').nodes, source: null, shallowResearch: false });
   assert.equal(sent[1][0].summary, undefined, 'a window without a draft adds nothing');
   view.quickOutlineSummaries.set('p1', api.outlineSummaryBank(generated, true));
+  view.map = { id: 'm1', nodes: [{ id: 'p1', path: 'x.md' }] }; // create() only imports under a card still on the open map
   const quick = view.quickOutline({ id: 'p1', path: 'x.md' });
   await quick.create([{ index: 0, title: 'A', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Renamed', level: 1, parent: null, line: 0 }], {});
   assert.deepEqual([...sent[2].map(node => node.summary)], ['a', 'ax', undefined]);

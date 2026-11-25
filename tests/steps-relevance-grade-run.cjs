@@ -202,7 +202,8 @@ test('relevance run: normal completion writes the tier and never releases anothe
   await flush();
   w.calls.recommend[0].resolve(answer());
   await pending;
-  assert.deepEqual(w.calls.writeRelevance, [['a.md', { tier: 'core' }]]);
+  // The recorded objects come from the vm realm: compare a plain copy of the same content.
+  assert.deepEqual(JSON.parse(JSON.stringify(w.calls.writeRelevance)), [['a.md', { tier: 'core' }]]);
   assert.equal(w.log.pushes.length, 1);
   assert.equal(w.log.opened.length, 1);
   assert.equal(w.plugin.relevanceGrades.get(MAP).status, 'done');

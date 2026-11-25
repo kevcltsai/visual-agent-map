@@ -3564,9 +3564,13 @@ export class VisualAgentMapView extends ItemView {
   /** Logical background session; a reload of the same map does not replace it. */
   private captureBackgroundSession(): () => boolean {
     const epoch = this.backgroundEpoch,
-      path = this.path,
       id = this.map?.id;
-    return () => !this.closed && this.backgroundEpoch === epoch && this.path === path && this.map?.id === id;
+    return () => !this.closed && this.backgroundEpoch === epoch && this.map?.id === id;
+  }
+  /** A rename or move keeps the open map's background work: the view-owned tasks follow the new path. */
+  private followTaskPaths(next: string): void {
+    if (this.outlineDraftTask) this.outlineDraftTask.mapPath = next;
+    if (this.structureReviewTask) this.structureReviewTask.mapPath = next;
   }
   /** Background AI work that belongs to the open map, not accepted plugin-owned topic runs. */
   private dropMapBackground(): void {
@@ -3904,7 +3908,8 @@ export class VisualAgentMapView extends ItemView {
           checkPreparing();
           const { model, reasoning } = resolveTaskModel({
             runOnce: request.model ? { model: request.model } : null,
-            override: inherited?.origin === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
+            override:
+              inherited?.origin === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
             current
           });
           const { placement: _placement, ...forService } = request;
@@ -4151,8 +4156,7 @@ export class VisualAgentMapView extends ItemView {
   /** Quick explore in the Next Step dialog: the same generator, reviewed in the dialog, then added under the topic. */
   private quickOutline(node: MapNode): QuickOutline {
     const session = this.captureBackgroundSession();
-    const current = (): boolean =>
-      session() && !!this.map?.nodes.some(item => item.id === node.id && item.path === node.path);
+    const current = (): boolean => session() && !!this.map?.nodes.some(item => item.id === node.id);
     const check = (signal?: AbortSignal): void => {
       if (!current() || signal?.aborted) throw new Error(t("ui.outline_ai_not_started"));
     };
@@ -4241,9 +4245,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const mapPath = this.path;
     const tree = (): ReturnType<typeof buildStructureReviewNodes> =>
-      session() && this.map
-        ? buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), scopeId)
-        : [];
+      session() && this.map ? buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), scopeId) : [];
     const nodes = tree();
     const rootQuestion = scopeId ? (this.describeForReview(scopeId)?.title ?? "") : this.map.title;
     const staleReason = (suggestion: StructureSuggestion): string | null => {
@@ -4277,10 +4279,12 @@ export class VisualAgentMapView extends ItemView {
         },
         ...extra
       });
-      const close = modal.onClose;
+      const close = (): void => {
+        StructureReviewModal.prototype.onClose.call(modal);
+      };
       modal.onClose = (): void => {
         try {
-          close.call(modal);
+          close();
         } finally {
           if (this.structureReviewWindow === modal) this.structureReviewWindow = null;
         }
@@ -4388,7 +4392,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stop on the status bar: the run is aborted and forgotten, so its late result changes nothing. */
   private stopStructureReview(task: NonNullable<VisualAgentMapView["structureReviewTask"]>): void {
-    if (this.closed || this.structureReviewTask !== task || task.mapPath !== this.path || task.state !== "running") return;
+    if (this.closed || this.structureReviewTask !== task || task.mapPath !== this.path || task.state !== "running")
+      return;
     this.structureReviewTask = null;
     task.controller.abort();
     this.render();
@@ -6213,7 +6218,7 @@ export class VisualAgentMapView extends ItemView {
     // The rename event may already have moved the view (followPath, while VAM was writing): the steps still clear.
     if (!next && ![...moved.values()].includes(this.path)) return;
     if (next && next !== this.path) {
-      this.dropMapBackground();
+      this.followTaskPaths(next);
       this.path = next;
     }
     this.followedFrom = null;
@@ -6226,8 +6231,8 @@ export class VisualAgentMapView extends ItemView {
    */
   followPath(oldPath: string, newPath: string): void {
     if (this.path !== oldPath || newPath === oldPath) return;
-    this.dropMapBackground();
     this.followedFrom ??= oldPath;
+    this.followTaskPaths(newPath);
     this.path = newPath;
   }
   /**
@@ -12080,7 +12085,7 @@ export class VisualAgentMapView extends ItemView {
       beforeRoot = this.plugin.repo.topicRoot(this.path);
     const nextPath = await this.plugin.repo.renameTopic(this.path, title);
     if (this.path !== nextPath) {
-      this.dropMapBackground();
+      this.followTaskPaths(nextPath);
       this.path = nextPath;
     }
     this.followedFrom = null;
@@ -12090,7 +12095,7 @@ export class VisualAgentMapView extends ItemView {
     const restore = async (map: MapDocument, root: string): Promise<void> => {
       const nextPath = await this.plugin.repo.renameTopic(this.path, map.title, root);
       if (this.path !== nextPath) {
-        this.dropMapBackground();
+        this.followTaskPaths(nextPath);
         this.path = nextPath;
       }
       this.followedFrom = null;
@@ -14785,7 +14790,7 @@ export class VisualAgentMapView extends ItemView {
     let own: AbortController | undefined;
     const session = this.captureBackgroundSession();
     const currentNode = (): MapNode | undefined =>
-      session() && node ? this.map?.nodes.find(item => item.id === node.id && item.path === node.path) : undefined;
+      session() && node ? this.map?.nodes.find(item => item.id === node.id) : undefined;
     return {
       begin: (controller, kind) => {
         if (!session() || controller.signal.aborted) {

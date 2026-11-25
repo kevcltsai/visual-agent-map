@@ -1,7 +1,12 @@
 import type { DetailTemplate } from "../../ai/detail-templates";
 import type { ModelChoice } from "../../ai/model-resolution";
 import type { ReferenceGroup } from "../../ai/reference-materials";
-import type { ResearchObserver } from "../../ai/research-observer";
+import type {
+  ResearchObserver,
+  ResearchPreviewFields,
+  ResearchStageName,
+  SteerSender
+} from "../../ai/research-observer";
 import type { AiResult, TaskContext } from "../../ai/types";
 import { isAiLockedError } from "../../core/ai-lock";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
@@ -153,15 +158,26 @@ export class MergeDrafts {
           if (!ended && this.isLive(task)) callback(...args);
         };
       };
-      const observer = progress.observer ? { ...progress.observer } : undefined;
-      if (observer) {
-        if (observer.onAttempt) observer.onAttempt = guard(observer.onAttempt);
-        if (observer.onStage) observer.onStage = guard(observer.onStage);
-        if (observer.onPreview) observer.onPreview = guard(observer.onPreview);
-        if (observer.onSlow) observer.onSlow = guard(observer.onSlow);
-        if (observer.onSteer) observer.onSteer = guard(observer.onSteer);
-        if (observer.onStreamMode) observer.onStreamMode = guard(observer.onStreamMode);
-      }
+      const source = progress.observer;
+      // Late hooks from a canceled or replaced task are dropped; each call stays a method call on its observer.
+      const observer: ResearchObserver | undefined = source && {
+        ...(source.onAttempt && { onAttempt: guard((id: string, n: number) => source.onAttempt?.(id, n)) }),
+        ...(source.onStage && {
+          onStage: guard((id: string, stage: ResearchStageName, query?: string) => source.onStage?.(id, stage, query))
+        }),
+        ...(source.onPreview && {
+          onPreview: guard((id: string, fields: ResearchPreviewFields | null) => source.onPreview?.(id, fields))
+        }),
+        ...(source.onSlow && {
+          onSlow: guard((id: string, slow: boolean, resend?: () => void) => source.onSlow?.(id, slow, resend))
+        }),
+        ...(source.onSteer && { onSteer: guard((id: string, send: SteerSender) => source.onSteer?.(id, send)) }),
+        ...(source.onStreamMode && {
+          onStreamMode: guard((id: string, mode: "stream-json" | "json" | "json-fallback") =>
+            source.onStreamMode?.(id, mode)
+          )
+        })
+      };
       const snapshot = await this.ports.snapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;
       if (!this.isLive(task)) return;

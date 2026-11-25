@@ -213,6 +213,61 @@ integrationTest('Organize moves mind maps to Mind Maps; every map opens, links a
   assert.equal(again.moves.length, 0, 'idempotent: nothing left to organize');
 });
 
+
+integrationTest('Organize rebases source and reference paths even when the indexed frontmatter is stale', async () => {
+  const vault = await legacyVault();
+  const { repo, app } = vault;
+  await repo.updateNote(vault.cites, { sourcePaths: [vault.betaFirst], referencePaths: [vault.betaFirst] });
+  const getCache = app.metadataCache.getFileCache;
+  app.metadataCache.getFileCache = file => {
+    const cache = getCache(file);
+    if (file.path !== vault.cites) return cache;
+    // Obsidian has indexed the managed-note marker, but not the latest citation edit.
+    return { ...cache, frontmatter: { ...cache.frontmatter, 'source-notes': [], 'reference-materials': [] } };
+  };
+  const before = await repo.readNote(vault.cites);
+  assert.deepEqual(plain(before.sourcePaths), [vault.betaFirst]);
+  assert.deepEqual(plain(before.referencePaths), [vault.betaFirst]);
+  await repo.organizeWorkspaceFolders(await repo.planOrganizeWorkspaceFolders());
+  app.metadataCache.getFileCache = getCache;
+  const after = await repo.readNote(vault.cites);
+  const target = 'Agent Workspace/Mind Maps/Beta/Notes/First.md';
+  assert.deepEqual(plain(after.sourcePaths), [target]);
+  assert.deepEqual(plain(after.referencePaths), [target]);
+  assert.ok(app.vault.getAbstractFileByPath(target));
+  await assertResolves(vault);
+});
+
+integrationTest('Organize journals a citation hidden by stale metadata and restores it on a later failure', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  await repo.updateNote(vault.cites, { referencePaths: [vault.betaFirst] });
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const before = snapshot(vault);
+  const getCache = app.metadataCache.getFileCache;
+  app.metadataCache.getFileCache = file => {
+    const cache = getCache(file);
+    return file.path === vault.cites
+      ? { ...cache, frontmatter: { ...cache.frontmatter, 'source-notes': [], 'reference-materials': [] } }
+      : cache;
+  };
+  const rename = app.fileManager.renameFile;
+  let citationWasRebased = false;
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') {
+      citationWasRebased = contents.get(vault.cites).includes('Agent Workspace/Mind Maps/Beta/Notes/First.md');
+      throw new Error('injected later move failure');
+    }
+    return rename(item, target);
+  };
+  await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure/);
+  app.metadataCache.getFileCache = getCache;
+  app.fileManager.renameFile = rename;
+  assert.ok(citationWasRebased, 'stale-index citation was actually written before rollback');
+  assertUnchanged(vault, before, 'after rollback of stale-index citation');
+  await assertResolves(vault);
+});
+
 integrationTest('Organize keeps a clash-free name: an existing target folder gets a numeric suffix', async () => {
   const vault = await legacyVault();
   await vault.repo.createMap('Alpha');

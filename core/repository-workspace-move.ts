@@ -113,10 +113,8 @@ async function rebasePathPrefix(
   const rebase = (path: string): string =>
     path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
   for (const file of await ports.markedFiles("agent-map-node")) {
-    const cached = ports.app.metadataCache.getFileCache(file)?.frontmatter;
-    const mentions = (list: unknown): boolean =>
-      Array.isArray(list) && list.some(item => typeof item === "string" && item.startsWith(`${from}/`));
-    if (cached && !mentions(cached["source-notes"]) && !mentions(cached["reference-materials"])) continue;
+    // MetadataCache can lag behind a note edit or the preceding move in this batch.
+    // A negative cached match is not proof that the current note has no reference to the old prefix.
     const note = await ports.readNoteIfManaged(file);
     if (!note) continue;
     const patch: NotePatch = {};

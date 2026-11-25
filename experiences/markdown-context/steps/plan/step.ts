@@ -2,7 +2,7 @@ import { renderTemplate, type StepDefinition } from "../../../../core/step-runne
 import { parsePlan, type ContextPlan } from "../../action-plan";
 import template from "./prompt.md";
 
-export interface PlanInput {
+interface PlanInput {
   instruction: string;
   selected: string;
   context: string;

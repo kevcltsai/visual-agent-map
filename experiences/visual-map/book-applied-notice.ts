@@ -1,8 +1,8 @@
 /** The "N paragraphs changed · Undo" box: fixed at the window's bottom right (never over the header buttons) and removed after `ms` by its own timer. */
-export interface NoticeHost {
+interface NoticeHost {
   createDiv(o: { cls: string; attr: Record<string, string> }): NoticeBox;
 }
-export interface NoticeBox {
+interface NoticeBox {
   createSpan(o: { text: string }): unknown;
   createEl(
     tag: "a",

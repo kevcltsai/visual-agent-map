@@ -1,7 +1,7 @@
 /** The pipeline's one log line per event. Only ids, counts, codes and milliseconds: never a title or any note text. */
 import type { PipelineStep } from "./model";
 
-export interface PipelineLogEvent {
+interface PipelineLogEvent {
   event: string;
   runId: string;
   /** A node id, or "global" for the whole-book plan. */

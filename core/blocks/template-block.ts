@@ -2,6 +2,7 @@ import { translate, type ContentLanguage } from "../../i18n";
 import { fencedLines } from "../../ai/markdown-blocks";
 import { CANONICAL_LANGUAGES, parseNoteStyleFile, type NoteStyleIssue } from "../../ai/note-style-file";
 import type { DetailTemplate } from "../../ai/detail-templates";
+import { trimBlankLines } from "../trim-blank-lines";
 
 /**
  * A template block is a markdown text of `##` sections (the same shape as a note style file body). Older texts may carry a
@@ -17,13 +18,6 @@ export function templateFormatHeading(language: ContentLanguage): string {
 }
 
 const unify = (text: string): string => text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-const trimBlankLines = (lines: string[]): string => {
-  let start = 0;
-  let end = lines.length;
-  while (start < end && !lines[start].trim()) start++;
-  while (end > start && !lines[end - 1].trim()) end--;
-  return lines.slice(start, end).join("\n");
-};
 
 /** A format rules text without leading and trailing blank lines (and with line breaks and the BOM unified). */
 export function trimFormatBody(text: string): string {

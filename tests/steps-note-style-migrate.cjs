@@ -16,6 +16,7 @@ export { normalizeTemplates } from "./ai/detail-templates";
 export { normalizePresets } from "./ai/prompt-presets";
 export { previewPrompt, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
 export { parseTemplateBlock } from "./core/blocks/template-block";
+export { trimBlankLines } from "./core/trim-blank-lines";
 export { translate } from "./i18n";
 `);
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -547,4 +548,12 @@ test('language gate: the conversion module does not branch on a language id', ()
   const source = fs.readFileSync(path.join(__dirname, '..', 'ai', 'note-style-migrate.ts'), 'utf8');
   assert.doesNotMatch(source, /["'`](?:zh-TW|zh-CN|en)["'`]/);
   assert.doesNotMatch(source, /startsWith\(["'`]zh/);
+});
+
+
+test('trimBlankLines keeps inner blanks and significant whitespace on non-blank lines', () => {
+  assert.equal(M.trimBlankLines(['', ' \t', '  heading  ', '', ' \t', 'body ', '', '\t']), '  heading  \n\n \t\nbody ');
+  assert.equal(M.trimBlankLines(['', '\t', ' ']), '');
+  assert.equal(M.trimBlankLines([]), '');
+  assert.equal(M.trimBlankLines(['single']), 'single');
 });

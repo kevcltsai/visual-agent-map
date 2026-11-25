@@ -343,7 +343,8 @@ import {
   reviewRun,
   type BookPlanChatDeps
 } from "./book-plan-chat";
-import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
+import { bookAuthorRequirements, effectiveSettings } from "../../core/book-pipeline/settings";
+import { parseBookPlanDecisions } from "../../core/book-pipeline/plan-text";
 import {
   BOOK_SETTING_FIELDS,
   bookCardLock,
@@ -582,6 +583,7 @@ import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
+  BookSettingsViewModal,
   BookStartModal,
   deletedChapterTitles,
   type BookModelChoiceInput
@@ -17586,6 +17588,7 @@ export class VisualAgentMapView extends ItemView {
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
+      showSettings: () => void this.showBookSettings(),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
       mapChanged: {
@@ -17625,6 +17628,19 @@ export class VisualAgentMapView extends ItemView {
       ...(this.bookStructureUndo ? { structureUndo: this.bookStructureUndo } : {}),
       ...(rerunAsk ? { rerunAsk } : {})
     });
+  }
+  /** The bar's "Book settings": the root topic's six settings as the run reads them (its own value, else the plan's decision), read-only. */
+  private async showBookSettings(): Promise<void> {
+    const root = this.map?.nodes.find(node => !node.parentId);
+    try {
+      if (!root) throw new Error("missing");
+      const card = await this.plugin.readBookCardForChat(root.path);
+      this.openMapModal(
+        new BookSettingsViewModal(this.app, effectiveSettings(card.settings, parseBookPlanDecisions(card.raw)))
+      );
+    } catch {
+      new Notice(t("ui.book_settings_view_failed"));
+    }
   }
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
   private readonly bookReview = new BookReviewMemory();

@@ -221,6 +221,34 @@ const FIELD_LABEL: Record<BookSettingField, TranslationKey> = {
   style: "ui.book_setting_style"
 };
 
+/** A read-only look at a book's six settings (the bar's "Book settings"): a field with no value shows the empty-field line. */
+export class BookSettingsViewModal extends Modal {
+  constructor(
+    app: App,
+    private values: BookSettings
+  ) {
+    super(app);
+  }
+  onOpen(): void {
+    const { contentEl } = this;
+    this.titleEl.setText(t("ui.book_settings_view"));
+    const list = contentEl.createEl("dl", { cls: "vam-book-settings-view" });
+    for (const field of BOOK_SETTING_FIELDS) {
+      list.createEl("dt", { text: t(FIELD_LABEL[field]) });
+      const value = this.values[field]?.trim();
+      list.createEl("dd", { text: value || t("ui.book_setting_empty"), cls: value ? "" : "is-empty" });
+    }
+    contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_settings_view_hint") });
+    const actions = modalActions(this);
+    const close = actions.createEl("button", { text: t("ui.close") });
+    close.addEventListener("click", () => this.close());
+    close.focus();
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 export interface BookSettingsFields {
   areas: Map<BookSettingField, HTMLTextAreaElement>;
   /** Show these as grey italic suggestions in the fields that are empty; typed text is never touched. */

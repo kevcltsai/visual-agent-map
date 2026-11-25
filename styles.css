@@ -1998,6 +1998,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-now-at { color: var(--text-muted); }
 .vam-book-bar button.vam-book-stop { border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; color: var(--text-muted); }
 .vam-book-bar button.vam-book-stop:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.vam-book-bar button.vam-book-settings-view { border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; color: var(--text-muted); }
+.vam-book-bar button.vam-book-settings-view:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.vam-book-settings-view { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; margin: 0 0 8px; }
+.vam-book-settings-view dt { color: var(--text-muted); }
+.vam-book-settings-view dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.vam-book-settings-view dd.is-empty { color: var(--text-faint); font-style: italic; }
 .vam-book-plan-hint { padding: 6px 10px; border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--text-accent); font-size: var(--font-ui-small); }
 .vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }

@@ -49,11 +49,28 @@ export function lineKind(nodes: MapNode[], fromId: string, childId: string, dire
     : direction;
 }
 
-export function depthOf(nodes: MapNode[], id: string): number {
-  const byId = new Map(nodes.map(node => [node.id, node]));
+export function depthOf(
+  nodes: MapNode[],
+  id: string,
+  byId: ReadonlyMap<string, MapNode> = new Map(nodes.map(node => [node.id, node]))
+): number {
   let depth = 0;
   // A topic that follows a text block hangs one step lower: its line starts at the block, which hangs on the real parent.
   for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId))
     depth += node.afterTextId ? 2 : 1;
   return depth;
+}
+
+/** One edge pass or drag setup: build the id index only if a depth is needed, then reuse each measured depth. */
+export function treeDepthResolver(nodes: MapNode[], index?: ReadonlyMap<string, MapNode>): (id: string) => number {
+  let byId = index;
+  const known = new Map<string, number>();
+  return id => {
+    const cached = known.get(id);
+    if (cached !== undefined) return cached;
+    byId ??= new Map(nodes.map(node => [node.id, node]));
+    const depth = depthOf(nodes, id, byId);
+    known.set(id, depth);
+    return depth;
+  };
 }

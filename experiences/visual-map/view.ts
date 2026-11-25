@@ -293,7 +293,7 @@ import { canvasImageSpot, placeNewMember, ringMembers, ringSide, type Rect as Ri
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
-import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
+import { branchDirectionResolver, lineKind, treeDepthResolver } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
@@ -2032,12 +2032,13 @@ export class VisualAgentMapView extends ItemView {
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
     try {
+      const cut = this.cutIds();
       for (const id of ids) {
         const node = shown.get(id),
           old = this.cardEls.get(id);
         if (!node || !old?.isConnected) continue;
         const hadFocus = activeDocument.activeElement === old;
-        this.renderNode(node);
+        this.renderNode(node, cut);
         const fresh = this.cardEls.get(id);
         if (fresh && fresh !== old) {
           old.replaceWith(fresh);
@@ -12435,7 +12436,8 @@ export class VisualAgentMapView extends ItemView {
     const fits: Array<() => void> = [];
     this.pendingCardFits = fits;
     try {
-      for (const node of shown) this.renderNode(node);
+      const cut = this.cutIds();
+      for (const node of shown) this.renderNode(node, cut);
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
@@ -12588,7 +12590,7 @@ export class VisualAgentMapView extends ItemView {
     this.fillEmptyMap(box);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
-  private renderNode(shownNode: MapNode): void {
+  private renderNode(shownNode: MapNode, cut: ReadonlySet<string> = this.cutIds()): void {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
     const index = this.paintCardIndex ?? cardIndex(this.map?.nodes ?? []);
@@ -12604,7 +12606,7 @@ export class VisualAgentMapView extends ItemView {
       card.addClass("vam-node-loading");
       card.setAttr("aria-busy", "true");
     }
-    this.paintCut(card, node.id);
+    this.paintCut(card, node.id, cut.has(node.id));
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(index.depth(node)));
@@ -24335,6 +24337,7 @@ export class VisualAgentMapView extends ItemView {
     movingImageId?: string
   ): { update: (dx: number, dy: number) => void } {
     const nodes = this.map?.nodes ?? [];
+    const edgeDepth = treeDepthResolver(nodes);
     const directionOf = branchDirectionResolver(
       nodes,
       layoutOf(this.map).direction,
@@ -24363,7 +24366,7 @@ export class VisualAgentMapView extends ItemView {
         parentId,
         childId,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
-        depth: depthOf(nodes, childId)
+        depth: edgeDepth(childId)
       });
     }
     const linked: { key: string; fromId: string; toId: string }[] = [];
@@ -24470,6 +24473,7 @@ export class VisualAgentMapView extends ItemView {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = this.map?.nodes ?? [];
+    const edgeDepth = treeDepthResolver(nodes);
     const directionOf = branchDirectionResolver(
       nodes,
       mapDirection,
@@ -24491,7 +24495,7 @@ export class VisualAgentMapView extends ItemView {
       touching.push({
         key,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
-        depth: depthOf(nodes, childId),
+        depth: edgeDepth(childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
@@ -24600,6 +24604,7 @@ export class VisualAgentMapView extends ItemView {
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
+    const edgeDepth = treeDepthResolver(allNodes);
     const directionOf = branchDirectionResolver(
       allNodes,
       mapDirection,
@@ -24646,7 +24651,7 @@ export class VisualAgentMapView extends ItemView {
                 child.offsetLeft,
                 child.offsetTop + child.offsetHeight / 2
               )
-            : treeEdgePathData(boxOf(parent), boxOf(child), direction, depthOf(allNodes, node.id))
+            : treeEdgePathData(boxOf(parent), boxOf(child), direction, edgeDepth(node.id))
         );
         path.addClass("vam-edge");
         if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -24688,7 +24693,7 @@ export class VisualAgentMapView extends ItemView {
               textEl.offsetLeft,
               textEl.offsetTop + textEl.offsetHeight / 2
             )
-          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, depthOf(allNodes, text.parentId as string) + 1)
+          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, edgeDepth(text.parentId as string) + 1)
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");

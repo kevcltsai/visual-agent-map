@@ -220,7 +220,7 @@ export class MapSourcesControl {
         },
         externals: this.externalSources,
         externalStatus: label => this.externalStatuses.get(label),
-        addExternal: input => isActive() ? this.addExternalFolder(mapPath, input) : Promise.resolve("stale" as const),
+        addExternal: input => (isActive() ? this.addExternalFolder(mapPath, input) : Promise.resolve("stale" as const)),
         removeExternal: source => {
           if (isActive()) this.removeExternalFolder(mapPath, source);
         },

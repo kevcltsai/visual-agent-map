@@ -90,14 +90,16 @@ export class RelevanceGradeRun {
   private get paintCount(): number {
     return this.ports.paintCount();
   }
-  isCurrent(run: GoalRecommendRun, mapPath: string): boolean {
+  private owns(run: GoalRecommendRun, mapPath: string): boolean {
     return (
       !this.closed &&
       this.path === mapPath &&
-      this.plugin.relevanceGrades.get(mapPath) === run &&
-      run.status === "running" &&
-      !run.controller.signal.aborted
+      run.owner === this.owner &&
+      this.plugin.relevanceGrades.get(mapPath) === run
     );
+  }
+  isCurrent(run: GoalRecommendRun, mapPath: string): boolean {
+    return this.owns(run, mapPath) && run.status === "running" && !run.controller.signal.aborted;
   }
   /** Whether this view owns a grading run that is still running (what closing or switching the map would stop). */
   isRunning(): boolean {
@@ -111,14 +113,16 @@ export class RelevanceGradeRun {
     const run = this.plugin.relevanceGrades.get(mapPath);
     if (!run || run.owner !== this.owner) return;
     this.plugin.relevanceGrades.delete(mapPath);
-    run.controller.abort();
+    if (run.status === "running") run.controller.abort();
   }
   finish(run: GoalRecommendRun, mapPath: string, status: "failed" | "declined", message: string): void {
     if (!this.isCurrent(run, mapPath)) return;
-    this.plugin.releaseWarmClaude?.();
     run.received = undefined;
+    run.awaitingUsage = false;
+    run.writing = false;
     run.status = status;
     run.message = message;
+    this.plugin.releaseWarmClaude?.();
     this.ports.refresh();
   }
   /**
@@ -132,7 +136,7 @@ export class RelevanceGradeRun {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
-    if (!goal || !this.ports.gradeable() || this.ports.notesLoading()) return;
+    if (this.closed || !mapPath || !goal || !this.ports.gradeable() || this.ports.notesLoading()) return;
     if (this.plugin.relevanceGrades.get(mapPath)?.status === "running") return;
     // The run takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
     this.ports.dropGoalSuggest();
@@ -148,17 +152,21 @@ export class RelevanceGradeRun {
     this.plugin.relevanceGrades.set(mapPath, run);
     this.started = true;
     // Stop, closing the view or switching maps before the run took the pre-started process leaves nothing waiting.
-    run.controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
-    this.ports.refresh(true);
+    const signal = run.controller.signal;
+    const releaseWarm = () => this.plugin.releaseWarmClaude?.();
+    signal.addEventListener("abort", releaseWarm, { once: true });
     const settings = this.plugin.settings;
     let result: GoalRecommendResult | undefined;
     let basis: StructureNode[] = [];
     let scope: GoalRecommendScope = "all";
     let pins: RelevancePin[] = [];
     try {
+      this.ports.refresh(true);
       await this.plugin.mutate(async () => {
+        if (!this.isCurrent(run, mapPath)) return;
         const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(mapPath, goal, context);
-        if (this.path !== mapPath) return;
+        // A goal write that already began still gets its undo step if this view owns the run.
+        if (!this.owns(run, mapPath)) return;
         this.ports.setGoal(goal, context);
         // The repository has the last word: a changed setup, or a map with no AI tier yet, is rated in full.
         scope = setupChanged || !this.ports.aiGrades().length ? "all" : "current";
@@ -171,6 +179,7 @@ export class RelevanceGradeRun {
         });
         this.ports.updateHistoryButtons();
       });
+      if (!this.isCurrent(run, mapPath)) return;
       const { model, reasoning } = this.plugin.currentModelChoice();
       // The run stays "running" (the map is locked and Stop works) but the bar must not claim recommending while the
       // usage notice waits for an answer. Only a notice that really opens needs the bar to say so.
@@ -221,13 +230,14 @@ export class RelevanceGradeRun {
       if (!this.isCurrent(run, mapPath)) return;
       if (!started) return this.finish(run, mapPath, "declined", t("ui.relevance_not_started"));
       const answered: GoalRecommendResult | undefined = result;
-      if (!answered) return;
+      if (!answered) return this.finish(run, mapPath, "declined", t("ui.relevance_not_started"));
       // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
       // by then); repaint here only when it did not, so a run costs one repaint after the write.
       const paintedBefore = this.paintCount;
       await this.plugin.mutate(() => this.apply(run, mapPath, basis, answered, { scope, pins }));
+      if (!this.owns(run, mapPath) || run.status !== "done") return;
       if (this.paintCount === paintedBefore) this.ports.refresh();
-      this.ports.openRecommendations(run, mapPath, answered.suggestions);
+      if (this.owns(run, mapPath)) this.ports.openRecommendations(run, mapPath, answered.suggestions);
     } catch (error) {
       this.finish(
         run,
@@ -235,6 +245,8 @@ export class RelevanceGradeRun {
         "failed",
         t("ui.relevance_failed_0", goalRecommendFailureDetail(error, this.plugin.settings.language))
       );
+    } finally {
+      signal.removeEventListener("abort", releaseWarm);
     }
   }
   /**
@@ -251,32 +263,34 @@ export class RelevanceGradeRun {
     graded: GoalRecommendResult,
     meta: { scope: GoalRecommendScope; pins: RelevancePin[] }
   ): Promise<void> {
-    if (!this.isCurrent(run, mapPath) || !this.map) return;
+    const map = this.map;
+    if (!this.isCurrent(run, mapPath) || !map) return;
     const items: GoalRecommendItem[] = graded.items;
-    run.writing = true;
     run.received = undefined;
     const startedAt = Date.now();
     const repo = this.plugin.repo;
     const fresh = new Map<string, Note>();
-    for (const node of this.map.nodes) {
+    for (const node of map.nodes) {
+      if (!this.isCurrent(run, mapPath)) return;
       try {
-        fresh.set(node.id, await repo.readNote(node.path, this.map));
+        fresh.set(node.id, await repo.readNote(node.path, map));
       } catch {
         /* A card whose note cannot be read counts as changed and is skipped below. */
       }
     }
+    if (!this.isCurrent(run, mapPath)) return;
     const current = new Map(
-      buildStructureReviewNodes(this.map.nodes, id => {
+      buildStructureReviewNodes(map.nodes, id => {
         const note = fresh.get(id);
         return note ? { title: note.title, summary: "", status: "" } : undefined;
       }).map(node => [node.id, node])
     );
     // Parent before child, over every card the map holds now (not only the ones the AI saw).
-    const tree = buildStructureReviewNodes(this.map.nodes, () => undefined).map(node => ({
+    const tree = buildStructureReviewNodes(map.nodes, () => undefined).map(node => ({
       id: node.id,
       parentId: node.parentId
     }));
-    const pathOf = new Map(this.map.nodes.map(node => [node.id, node.path]));
+    const pathOf = new Map(map.nodes.map(node => [node.id, node.path]));
     const byId = new Map(items.map(item => [item.id, item]));
     const titleOf = new Map(basis.map(base => [base.id, base.title]));
     const pinned = new Set(meta.pins.map(pin => pin.id));
@@ -301,6 +315,9 @@ export class RelevanceGradeRun {
       ...(graded.anchorsDropped ? { anchorsDropped: graded.anchorsDropped } : {}),
       ...(graded.unchangedIgnored ? { unchangedIgnored: graded.unchangedIgnored } : {})
     };
+    // Once the batch begins, finish the writes against the captured map, not a replacement view.
+    if (!this.isCurrent(run, mapPath)) return;
+    run.writing = true;
     try {
       // Which cards the AI may write: seen by the AI, unchanged since, not locked, not hand-set.
       const writable = new Set<string>();
@@ -370,7 +387,8 @@ export class RelevanceGradeRun {
         "info",
         `Relevance ${meta.scope}: raised ${outcome.raised}, suggestions ${graded.suggestions.length}, suggestionsDropped ${graded.dropped.length}, pinned ${pinned.size}, pinnedIgnored ${graded.pinnedIgnored ?? 0}, anchorsDropped ${graded.anchorsDropped ?? 0}, unchangedIgnored ${graded.unchangedIgnored ?? 0}, written ${outcome.changes.length}, failed ${outcome.failed}, skipped ${outcome.skipped}, ${Date.now() - startedAt} ms`
       );
-      if (outcome.changes.length) {
+      run.writing = false;
+      if (outcome.changes.length && this.owns(run, mapPath)) {
         const changes = outcome.changes;
         const entry: Action = {
           label: t("ui.relevance_history_label"),
@@ -420,6 +438,7 @@ export class RelevanceGradeRun {
     if (!run || run.status !== "running" || run.writing) return;
     run.status = "stopped";
     run.received = undefined;
+    run.awaitingUsage = false;
     run.message = t("ui.relevance_stopped");
     run.controller.abort();
     this.ports.refresh();

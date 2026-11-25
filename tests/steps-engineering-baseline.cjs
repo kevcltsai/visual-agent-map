@@ -102,3 +102,84 @@ test('engineering baseline: offline context and layout controls', t => {
     t.diagnostic(JSON.stringify(report));
   }
 });
+
+test('engineering baseline: simulated store I/O and hydrate cache scope', async t => {
+  const { readStoreText, writeStoreAtomically } = load('store-adapter.ts');
+  const { createNoteReadContext, readOnce } = load('core/note-read-context.ts');
+  const path = 'store.json';
+  const text = JSON.stringify({ text: zhText(4000, 3) });
+  const bytes = Buffer.byteLength(text);
+  function adapterFor(initial) {
+    const files = new Map(initial);
+    const calls = { exists: 0, read: 0, write: 0, rename: 0, remove: 0, readBytes: 0, writtenBytes: 0 };
+    return {
+      files, calls,
+      adapter: {
+        async exists(name) { calls.exists++; return files.has(name); },
+        async read(name) {
+          calls.read++;
+          assert.ok(files.has(name));
+          const value = files.get(name);
+          calls.readBytes += Buffer.byteLength(value);
+          return value;
+        },
+        async write(name, value) {
+          calls.write++; calls.writtenBytes += Buffer.byteLength(value); files.set(name, value);
+        },
+        async rename(from, to) {
+          calls.rename++;
+          assert.ok(files.has(from) && !files.has(to));
+          files.set(to, files.get(from)); files.delete(from);
+        },
+        async remove(name) { calls.remove++; assert.ok(files.delete(name)); }
+      }
+    };
+  }
+  const stores = [];
+  for (const [id, initial] of [
+    ['create', []],
+    ['replace', [[path, 'old']]],
+    ['recover-before-replace', [[path + '.tmp', 'recoverable']]]
+  ]) {
+    const { adapter, files, calls } = adapterFor(initial);
+    await writeStoreAtomically(adapter, path, text);
+    assert.equal(files.get(path), text);
+    assert.equal(files.has(path + '.tmp'), false);
+    assert.equal(calls.write, 1);
+    assert.equal(calls.writtenBytes, bytes);
+    stores.push({ id, ...calls });
+  }
+  const recovery = adapterFor([[path + '.tmp', text]]);
+  assert.equal(await readStoreText(recovery.adapter, path), text);
+  assert.equal(recovery.files.get(path), text);
+  assert.equal(recovery.files.has(path + '.tmp'), false);
+  stores.push({ id: 'recover-on-read', ...recovery.calls });
+
+  const unique = full ? 256 : 8;
+  const repeats = full ? 20 : 2;
+  let reads = 0;
+  const caches = [];
+  const read = async () => { reads++; return text; };
+  for (let round = 0; round < 3; round++) {
+    const ctx = createNoteReadContext();
+    const before = reads;
+    const results = await Promise.all(Array.from({ length: unique * repeats }, (_, i) =>
+      readOnce(ctx, 'note-' + (i % unique), read)));
+    assert.equal(reads - before, unique);
+    assert.equal(ctx.reads.size, unique);
+    assert.ok(results.every(result => result === text));
+    caches.push({ round, requests: results.length, reads: reads - before, cacheEntries: ctx.reads.size, readBytes: unique * bytes });
+  }
+  const failed = createNoteReadContext();
+  const fail = async () => { throw new Error('simulated read failure'); };
+  const a = readOnce(failed, 'missing', fail);
+  const b = readOnce(failed, 'missing', fail);
+  assert.equal(a, b);
+  await assert.rejects(a, /simulated read failure/);
+  assert.equal(failed.failedPaths.has('missing'), true);
+  assert.equal(await readOnce(createNoteReadContext(), 'missing', read), text);
+  if (full) t.diagnostic(JSON.stringify({
+    schema: 1, evidence: 'simulated-io-and-cache-scope', stores, caches,
+    nativeVaultIo: 'NOT RUN', heapAndProcess: 'NOT RUN'
+  }));
+});

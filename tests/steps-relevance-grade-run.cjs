@@ -9,13 +9,13 @@ const flush = async () => { for (let i = 0; i < 5; i++) await new Promise(resolv
 const MAP = 'map.md';
 
 function fakePlugin(options = {}) {
-  const calls = { recommend: [], writeRelevance: [], readNote: [], released: 0 };
+  const calls = { recommend: [], writeRelevance: [], readNote: [], goals: [], usage: 0, released: 0 };
   const plugin = {
     relevanceGrades: new Map(),
     settings: { language: 'en' },
     logs: { appendLog: () => {} },
     repo: {
-      writeRelevanceGoal: async () => ({ previous: undefined, next: undefined, setupChanged: false }),
+      writeRelevanceGoal: async (...args) => { calls.goals.push(args); return options.writeGoal ? options.writeGoal(...args) : { previous: undefined, next: undefined, setupChanged: false }; },
       restoreRelevanceGoal: async () => {},
       readNote: async path => { calls.readNote.push(path); return options.readNote ? options.readNote(path) : { title: path, relevance: undefined }; },
       writeRelevance: async (path, value) => { calls.writeRelevance.push([path, value]); }
@@ -23,20 +23,20 @@ function fakePlugin(options = {}) {
     goalRecommend: { recommend: (request, signal) => new Promise((resolve, reject) => calls.recommend.push({ request, signal, resolve, reject })) },
     currentModelChoice: () => ({ model: 'claude:haiku', reasoning: 'off' }),
     usageNoticePending: () => false,
-    confirmAiUsage: options.confirmAiUsage ?? (async (model, callback) => { await callback(); return true; }),
-    mutate: fn => fn(),
+    confirmAiUsage: async (model, callback) => { calls.usage++; return options.confirmAiUsage ? options.confirmAiUsage(model, callback) : (await callback(), true); },
+    mutate: options.mutate ?? (fn => fn()),
     releaseWarmClaude: () => { calls.released++; }
   };
   return { plugin, calls };
 }
 
 function fakePorts(plugin, state) {
-  const log = { pushes: [], opened: [], notices: [], refreshes: 0 };
+  const log = { pushes: [], opened: [], notices: [], goals: [], refreshes: 0 };
   const map = { title: 'Map', nodes: [{ id: 'root', path: 'root.md', parentId: null }, { id: 'a', path: 'a.md', parentId: 'root' }] };
   const ports = {
-    plugin: () => plugin, path: () => state.path, closed: () => false, map: () => map, notes: () => new Map(),
+    plugin: () => plugin, path: () => state.path, closed: () => !!state.closed, map: () => state.map ?? map, notes: () => new Map(),
     history: () => ({ push: entry => log.pushes.push(entry) }), paintCount: () => 0,
-    gradeable: () => true, notesLoading: () => false, dropGoalSuggest: () => {}, setGoal: () => {},
+    gradeable: () => true, notesLoading: () => false, dropGoalSuggest: () => {}, setGoal: (...args) => log.goals.push(args),
     aiGrades: () => [], pins: () => [], describe: id => ({ title: id, summary: '', status: '' }),
     usageMapField: () => ({}), contentLanguage: language => language, lockedParent: () => false,
     refresh: () => { log.refreshes++; }, paintReceived: () => {}, updateHistoryButtons: () => {},
@@ -129,4 +129,85 @@ test('relevance run: a view that does not own the run cannot abort it; the owner
   assert.equal(registered.controller.signal.aborted, true);
   calls.recommend[0].reject(new Error('end'));
   await started;
+});
+
+const answer = () => ({ items: [{ id: 'a', tier: 'core' }], suggestions: [{ parentId: 'root', title: 'New' }], dropped: [] });
+
+test('relevance run: Stop before the queued goal write skips the write and usage confirmation', async () => {
+  let queued;
+  const w = setup({ mutate: fn => new Promise(resolve => { queued = async () => { await fn(); resolve(); }; }) });
+  const pending = w.run.start('Goal');
+  w.run.stop();
+  await queued();
+  await pending;
+  assert.equal(w.calls.goals.length, 0);
+  assert.equal(w.calls.usage, 0);
+  assert.deepEqual(w.log.goals, []);
+});
+
+test('relevance run: Stop during the goal write preserves its undo step but skips confirmation', async () => {
+  let finish;
+  const w = setup({ writeGoal: () => new Promise(resolve => { finish = resolve; }) });
+  const pending = w.run.start('Goal');
+  w.run.stop();
+  finish({ previous: undefined, next: 'Goal', setupChanged: true });
+  await pending;
+  assert.equal(w.calls.usage, 0);
+  assert.equal(w.log.pushes.length, 1);
+  assert.equal(w.calls.released, 1);
+});
+
+test('relevance run: Stop before queued grading apply produces neither writes nor late UI callbacks', async () => {
+  let queued, count = 0;
+  const w = setup({ mutate: fn => ++count === 1 ? fn() : new Promise(resolve => { queued = async () => { await fn(); resolve(); }; }) });
+  const pending = w.run.start('Goal');
+  await flush();
+  w.calls.recommend[0].resolve(answer());
+  await flush();
+  w.run.stop();
+  const before = w.log.refreshes;
+  await queued();
+  await pending;
+  assert.equal(w.calls.writeRelevance.length, 0);
+  assert.equal(w.log.refreshes, before);
+  assert.deepEqual(w.log.opened, []);
+});
+
+test('relevance run: closing during preparation cannot read or write the replacement map', async () => {
+  let finishRead;
+  const w = setup({ readNote: () => new Promise(resolve => { finishRead = resolve; }) });
+  const pending = w.run.start('Goal');
+  await flush();
+  w.calls.recommend[0].resolve(answer());
+  await flush();
+  assert.deepEqual(w.calls.readNote, ['root.md']);
+  w.run.abort(MAP);
+  w.state.closed = true;
+  w.state.path = 'other.md';
+  w.state.map = { title: 'Other', nodes: [{ id: 'a', path: 'other-a.md', parentId: 'root' }] };
+  const before = w.log.refreshes;
+  finishRead({ title: 'root' });
+  await flush();
+  assert.deepEqual(w.calls.readNote, ['root.md']);
+  await pending;
+  assert.deepEqual(w.calls.writeRelevance, []);
+  assert.deepEqual(w.log.pushes, []);
+  assert.equal(w.log.refreshes, before);
+  assert.deepEqual(w.log.opened, []);
+});
+
+test('relevance run: normal completion writes the tier and never releases another warm process on departure', async () => {
+  const w = setup({ readNote: path => ({ title: path.replace('.md', '') }) });
+  const pending = w.run.start('Goal');
+  await flush();
+  w.calls.recommend[0].resolve(answer());
+  await pending;
+  // The recorded objects come from the vm realm: compare a plain copy of the same content.
+  assert.deepEqual(JSON.parse(JSON.stringify(w.calls.writeRelevance)), [['a.md', { tier: 'core' }]]);
+  assert.equal(w.log.pushes.length, 1);
+  assert.equal(w.log.opened.length, 1);
+  assert.equal(w.plugin.relevanceGrades.get(MAP).status, 'done');
+  w.run.abort(MAP);
+  assert.equal(w.plugin.relevanceGrades.has(MAP), false);
+  assert.equal(w.calls.released, 0);
 });

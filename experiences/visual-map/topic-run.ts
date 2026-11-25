@@ -100,12 +100,15 @@ export interface RunProgress extends ChartProgress {
 export interface RunRepository {
   isDisposed?(): boolean;
   readNote(path: string, map?: MapDocument): Promise<Note>;
+  /** The exact file text used to parse the note, for an atomic result commit. */
+  readNoteSnapshot?(path: string, map?: MapDocument): Promise<{ note: Note; content: string }>;
+  settleRunningNote?(path: string, patch: Pick<NotePatch, "status" | "lastError">): Promise<void>;
   updateNote(
     path: string,
     patch: NotePatch,
     options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean }
   ): Promise<void>;
-  /** The guarded write (`Repository.updateNoteGuarded`); only the picture-book author step asks for it. */
+  /** The guarded write (Repository.updateNoteGuarded); the real repository checks at the vault write boundary. */
   updateNoteGuarded?(
     path: string,
     patch: NotePatch,
@@ -931,7 +934,7 @@ export class TopicRuns {
       await options.onStarted?.();
     } catch (error) {
       try {
-        await repo.updateNote(path, { status: note.status });
+        await this.settleRunning(repo, path, { status: note.status });
       } catch {
         /* Keep the startup error; the registered run still must be released. */
       }
@@ -956,17 +959,19 @@ export class TopicRuns {
       progress.end();
       options.accepted?.();
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      await repo.updateNote(path, { status: note.status });
+      await this.settleRunning(repo, path, { status: note.status });
       // The status is back; this is the file the write-time check compares with (the backup is `original`).
       const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary: string, draft: string): Promise<void> =>
         this.ports.mutate()(async () => {
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
-          const latest = await repo.readNote(path, options.map());
+          const { note: latest, content: expectedContent } = repo.readNoteSnapshot
+            ? await repo.readNoteSnapshot(path, options.map())
+            : { note: await repo.readNote(path, options.map()), content: undefined };
           // The late-result fence: a topic locked while the AI ran gets nothing (its status is already back).
           if (latest.aiLocked) throw aiLockedError();
-          if (noteSnapshot(latest) !== snapshot) throw changed();
+          if (latest.status !== note.status || noteSnapshot(latest) !== snapshot) throw changed();
           const mode: WritebackMode = prepared.updateMode ?? "merge";
           const noteLanguage = noteLanguageOf(outputLanguage);
           const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
@@ -1038,19 +1043,25 @@ export class TopicRuns {
             written = composed.detail;
             record = composed.record;
           }
-          await repo.updateNote(
-            path,
-            {
-              summary: neutralizeText(summary),
-              detail: neutralizeText(written),
-              visualReferences: neutralizeText(references),
-              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-              ...(options.findingsSent() ? { newFindings: "" } : {}),
-              status: "completed",
-              ...formatIssuesPatch(issues, language)
-            },
-            { detailTemplate, newVisualReferences: true }
-          );
+          const patch: NotePatch = {
+            summary: neutralizeText(summary),
+            detail: neutralizeText(written),
+            visualReferences: neutralizeText(references),
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...(options.findingsSent() ? { newFindings: "" } : {}),
+            status: "completed",
+            ...formatIssuesPatch(issues, language)
+          };
+          const writeOptions = { detailTemplate, newVisualReferences: true };
+          if (signal.aborted || prepared.viewChanged()) throw changed();
+          if (repo.updateNoteGuarded) {
+            const outcome = await repo.updateNoteGuarded(path, patch, {
+              ...writeOptions,
+              expectedContent: raw?.started ?? expectedContent,
+              authorize: () => !signal.aborted && !prepared.viewChanged()
+            });
+            if (outcome === "discarded") throw changed();
+          } else await repo.updateNote(path, patch, writeOptions);
           const saved = await repo.readNote(path, options.map());
           await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
           options.queueCharts?.({
@@ -1080,11 +1091,11 @@ export class TopicRuns {
       }
     } catch (error) {
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-        await repo.updateNote(path, { status: note.status });
+        await this.settleRunning(repo, path, { status: note.status });
         fail(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
-        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        await this.settleRunning(repo, path, { status: "error", lastError: failureReason(error) });
         fail(this.ports.recordFailure(t("log.child_integration_failed"), error));
       }
     } finally {
@@ -1180,6 +1191,15 @@ export class TopicRuns {
       free();
       options.settled();
     }
+  }
+
+  private async settleRunning(
+    repo: RunRepository,
+    path: string,
+    patch: Pick<NotePatch, "status" | "lastError">
+  ): Promise<void> {
+    if (repo.settleRunningNote) await repo.settleRunningNote(path, patch);
+    else await repo.updateNote(path, patch);
   }
 
   /** What the chart step needs to keep a "top" write-back's old text: the diagrammed text must still hold it, byte for byte. */
@@ -1410,7 +1430,7 @@ export class TopicRuns {
       raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
-          await repo.updateNote(path, { status: note.status });
+          await this.settleRunning(repo, path, { status: note.status });
         } finally {
           releaseStartup();
         }
@@ -1418,7 +1438,7 @@ export class TopicRuns {
       }
     } catch (error) {
       try {
-        if (startupStatusAttempted) await repo.updateNote(path, { status: note.status });
+        if (startupStatusAttempted) await this.settleRunning(repo, path, { status: note.status });
       } catch {
         /* Keep the startup error; the registered task still must be released. */
       } finally {
@@ -1458,8 +1478,13 @@ export class TopicRuns {
         this.ports.mutate()(async () => {
           // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
           progress.end();
-          const latest = await repo.readNote(path, options.map);
+          const { note: latest, content: expectedContent } = repo.readNoteSnapshot
+            ? await repo.readNoteSnapshot(path, options.map)
+            : { note: await repo.readNote(path, options.map), content: undefined };
           const stale =
+            latest.status !== "running" ||
+            latest.newFindings !== note.newFindings ||
+            latest.visualReferences !== note.visualReferences ||
             latest.thinkingOrigin !== note.thinkingOrigin ||
             latest.title !== note.title ||
             latest.prompt !== note.prompt ||
@@ -1475,7 +1500,7 @@ export class TopicRuns {
           // The late-result fence: a topic locked while the AI ran gets nothing but its status back.
           const locked = latest.aiLocked === true;
           if (controller.signal.aborted || stale || locked) {
-            await repo.updateNote(path, { status: note.status });
+            await this.settleRunning(repo, path, { status: note.status });
             if (exchangeId)
               exchanges()?.failed(
                 exchangeId,
@@ -1542,7 +1567,7 @@ export class TopicRuns {
             raw
           });
           if (!composed.ok) {
-            await repo.updateNote(path, { status: note.status });
+            await this.settleRunning(repo, path, { status: note.status });
             if (exchangeId) exchanges()?.failed(exchangeId, composed.message);
             if (composed.discarded) options.pipeline?.onDiscarded?.();
             fail(composed.message);
@@ -1571,7 +1596,7 @@ export class TopicRuns {
             const outcome = repo.updateNoteGuarded
               ? await repo.updateNoteGuarded(path, patch, {
                   ...writeOptions,
-                  ...(raw ? { expectedContent: raw.started } : {}),
+                  expectedContent: raw?.started ?? expectedContent,
                   authorize: guard.authorize,
                   finalize: guard.finalize
                     ? (content: string) => {
@@ -1583,7 +1608,7 @@ export class TopicRuns {
                 })
               : "discarded";
             if (outcome === "discarded") {
-              await repo.updateNote(path, { status: note.status });
+              await this.settleRunning(repo, path, { status: note.status });
               if (exchangeId)
                 exchanges()?.failed(
                   exchangeId,
@@ -1593,7 +1618,26 @@ export class TopicRuns {
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
               return;
             }
-          } else await repo.updateNote(path, patch, writeOptions);
+          } else {
+            if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+            if (repo.updateNoteGuarded) {
+              const outcome = await repo.updateNoteGuarded(path, patch, {
+                ...writeOptions,
+                expectedContent: raw?.started ?? expectedContent,
+                authorize: () => !controller.signal.aborted
+              });
+              if (outcome === "discarded") {
+                await this.settleRunning(repo, path, { status: note.status });
+                const stopped = controller.signal.aborted;
+                if (exchangeId)
+                  exchanges()?.failed(exchangeId, t(stopped ? "log.stopped_result_not_written" : "log.stale_result_not_written"));
+                fail(
+                  t(stopped ? "ui.research_stopped_existing_content_was_preserved" : "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")
+                );
+                return;
+              }
+            } else await repo.updateNote(path, patch, writeOptions);
+          }
           const saved = await repo.readNote(path, options.map);
           options.onWritten?.({ before: { ...latest, status: note.status }, after: saved });
           if (exchangeId) exchanges()?.completed(exchangeId);
@@ -1617,12 +1661,12 @@ export class TopicRuns {
           progress.end();
           if (options.pipeline && isBudgetExhausted(error)) {
             // Not a failure of the note: it keeps its old status and gets no error text.
-            await repo.updateNote(path, { status: note.status });
+            await this.settleRunning(repo, path, { status: note.status });
             options.pipeline.onBudgetExhausted();
             return;
           }
           if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-            await repo.updateNote(path, { status: note.status });
+            await this.settleRunning(repo, path, { status: note.status });
             fail(t("ui.research_stopped_existing_content_was_preserved"));
             return;
           }
@@ -1637,7 +1681,7 @@ export class TopicRuns {
               exchangeId,
               t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
             );
-          await repo.updateNote(path, {
+          await this.settleRunning(repo, path, {
             status: options.pipeline?.keepStatusOnFailure ? note.status : "error",
             lastError: failureReason(error)
           });

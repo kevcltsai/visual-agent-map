@@ -1,5 +1,4 @@
-export { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
-export type ContextAction = "transform" | "research" | "image_search" | "diagram" | "image_generate" | "clarify";
+type ContextAction = "transform" | "research" | "image_search" | "diagram" | "image_generate" | "clarify";
 export interface ContextPlan {
   action: ContextAction;
   query: string;

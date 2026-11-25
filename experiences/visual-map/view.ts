@@ -1923,7 +1923,7 @@ export class VisualAgentMapView extends ItemView {
     currentId: string | null;
     returnNodeId: string | null;
     returnEl: HTMLElement | null;
-    announceTimer: number | null;
+    cancelAnnouncement: (() => void) | null;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
@@ -2455,7 +2455,7 @@ export class VisualAgentMapView extends ItemView {
       currentId: null,
       returnNodeId: card ? card[0] : null,
       returnEl: card ? null : from,
-      announceTimer: null
+      cancelAnnouncement: null
     };
     this.mountMapSearch();
     this.applySearchMarks();
@@ -2464,35 +2464,52 @@ export class VisualAgentMapView extends ItemView {
   private mountMapSearch(): void {
     const search = this.mapSearch;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
-    if (!search || !overlay) return;
-    this.mapSearchBar = buildMapSearchBar(overlay, {
+    if (!search || !overlay || this.closed || !this.map) return;
+    const live = (): boolean => !this.closed && this.mapSearch === search && this.mapSearchBar === bar;
+    const bar = buildMapSearchBar(overlay, {
       query: search.query,
       label: t("ui.map_search_label"),
       closeLabel: t("ui.map_search_close"),
       countText: this.mapSearchCountText(),
       onInput: value => {
+        if (!live()) return;
         search.query = value;
         search.currentId = null;
         this.applySearchMarks();
         this.announceSearchLater(search);
       },
-      onStep: delta => this.enqueue(() => this.stepMapSearch(delta)),
-      onClose: () => this.closeMapSearch(true)
+      onStep: delta => {
+        if (!live()) return;
+        const query = search.query;
+        this.enqueue(async () => {
+          if (!this.closed && this.mapSearch === search && search.query === query) await this.stepMapSearch(delta);
+        });
+      },
+      onClose: () => {
+        if (live()) this.closeMapSearch(true);
+      }
     });
+    this.mapSearchBar = bar;
   }
   /** Call before a repaint: the returned function (call it after) rebuilds the box and gives the field its focus, query and caret back. */
   private holdMapSearch(): () => void {
     const bar = this.mapSearchBar;
     this.mapSearchBar = null;
-    if (!this.mapSearch) return () => {};
+    const search = this.mapSearch;
+    if (!search) return () => {};
+    if (!this.map || this.closed) {
+      this.closeMapSearch(false);
+      return () => {};
+    }
     const focused = !!bar && this.contentEl?.ownerDocument?.activeElement === bar.input;
     const start = focused ? bar.input.selectionStart : null,
       end = focused ? bar.input.selectionEnd : null;
     return () => {
-      if (!this.mapSearch) return;
+      if (this.closed || this.mapSearch !== search || !this.map || this.mapSearchBar) return;
       this.mountMapSearch();
       this.applySearchMarks();
-      const input = this.mapSearchBar?.input;
+      // mountMapSearch() sets the bar; the guard above narrowed the field to null, so read it fresh.
+      const input = (this.mapSearchBar as MapSearchBar | null)?.input;
       if (!focused || !input || !this.mapWindowIsActive()) return;
       input.focus({ preventScroll: true });
       if (start !== null && end !== null) input.setSelectionRange(start, end);
@@ -2529,21 +2546,29 @@ export class VisualAgentMapView extends ItemView {
     this.mapSearchBar?.setCount(this.mapSearchCountText());
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
-  private announceSearchLater(search: { query: string; announceTimer: number | null }): void {
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
-    search.announceTimer = window.setTimeout(() => {
-      search.announceTimer = null;
+  private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
+    search.cancelAnnouncement?.();
+    const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
+    const cancel = (): void => {
+      if (search.cancelAnnouncement !== cancel) return;
+      search.cancelAnnouncement = null;
+      timerWindow.clearTimeout(handle);
+    };
+    const handle = timerWindow.setTimeout(() => {
+      if (search.cancelAnnouncement !== cancel) return;
+      search.cancelAnnouncement = null;
       if (this.closed || this.mapSearch !== search || search.query === "") return;
       const total = this.mapSearchResult()?.matches.length ?? 0;
       this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
     }, 300);
+    search.cancelAnnouncement = cancel;
   }
   /** Enter / Shift+Enter: jump to the next / previous match (cycling). A match inside folded branches opens them in one history step. */
   private async stepMapSearch(delta: 1 | -1): Promise<void> {
     const search = this.mapSearch;
     if (!search || !this.map || this.closed) return;
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
-    search.announceTimer = null;
+    search.cancelAnnouncement?.();
+    const query = search.query;
     const result = this.mapSearchResult();
     const step = result ? stepSearch(result, search.currentId, delta) : null;
     if (!step) {
@@ -2557,7 +2582,7 @@ export class VisualAgentMapView extends ItemView {
         for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
       });
     }
-    if (this.closed || this.mapSearch !== search) return;
+    if (this.closed || this.mapSearch !== search || search.query !== query || search.currentId !== step.id) return;
     const target = this.map?.nodes.find(item => item.id === step.id);
     if (!target) return;
     // Keyboard-style move: the camera follows in memory and Map.md's viewport is not written.
@@ -2571,7 +2596,7 @@ export class VisualAgentMapView extends ItemView {
   private closeMapSearch(restoreFocus: boolean): void {
     const search = this.mapSearch;
     if (!search) return;
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.cancelAnnouncement?.();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;

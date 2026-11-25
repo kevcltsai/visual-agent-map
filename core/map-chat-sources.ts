@@ -11,7 +11,7 @@ import { estimateCondenseCalls, MAX_CONDENSE_CALLS, sourceText } from "./source-
 export const MAP_CHAT_SOURCE_CHAR_LIMIT = 60_000;
 
 /** The findings of one condensing, kept for the turns after it: the map, and a hash of everything the sources said. */
-interface MapChatSourceCache {
+export interface MapChatSourceCache {
   mapPath: string;
   hash: string;
   text: string;

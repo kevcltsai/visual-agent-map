@@ -90,7 +90,7 @@ test('panel shows totals and the footer; no by-action bars, no request history',
   assert.equal(findAll(h.panel(), i => i.cls === 'vam-usage-section').length, 1, 'totals is the only section');
   assert.equal(findAll(h.panel(), i => i.tag === 'tr').length, 0, 'no request-history table');
   assert.ok(all.includes('Counts only AI requests sent by VAM.'));
-  assert.ok(all.includes('Values marked ~ are estimates.'));
+  assert.ok(all.includes('Values marked ~ are estimates or incomplete subtotals; missing token counts are not included.'));
 });
 
 test('a store change rewrites the numbers in the same elements: nothing is rebuilt', async () => {
@@ -231,7 +231,7 @@ test('counter-example: footer line 2 only while a shown number is estimated; lin
   none.button().click();
   assert.equal(foot(none).length, 2);
   assert.equal(foot(none)[0].text, 'Counts only AI requests sent by VAM.'); assert.equal(foot(none)[0].hidden, false);
-  assert.equal(foot(none)[1].text, 'Values marked ~ are estimates.'); assert.equal(foot(none)[1].hidden, true, 'all real values: no second line');
+  assert.equal(foot(none)[1].text, 'Values marked ~ are estimates or incomplete subtotals; missing token counts are not included.'); assert.equal(foot(none)[1].hidden, true, 'all real values: no second line');
   const h = rig((await newStore(mixed)).store);
   h.button().click();
   assert.equal(foot(h)[1].hidden, false, 'Total includes the estimated Codex row');
@@ -314,4 +314,16 @@ test('mount moves document listeners to the new overlay and close releases its a
   assert.equal(other.doc.listeners.pointerdown.length, 0);
   assert.equal(other.panel(), undefined);
   assert.equal(h.control.parts, null);
+});
+
+test('incomplete subtotals are non-exact and the footer explains missing reports', async () => {
+  const { store } = await newStore([{ inputTokens: 120, outputTokens: 0, incomplete: true }]);
+  const h = rig(store);
+  assert.equal(find(h.button(), i => i.cls === 'vam-usage-number').text, '~120');
+  h.button().click();
+  assert.ok(strongs(h).includes('~120'));
+  assert.equal(foot(h)[1].hidden, false);
+  assert.match(foot(h)[1].text, /missing token counts are not included/);
+  h.control.stop();
+  await store.dispose();
 });

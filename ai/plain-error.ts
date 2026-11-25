@@ -5,7 +5,7 @@ import { classifyProviderError } from "./provider-error";
 const TECHNICAL = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+|\b[45]\d\d\b|<\/?\w+>/i;
 const NETWORK = /timed? ?out|timeout|etimedout|econn|enotfound|network|socket|fetch failed|offline|aborted by/i;
 
-function rawErrorText(error: unknown): string {
+export function rawErrorText(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   if (typeof message === "string") return message.trim();
   return typeof error === "string" ? error.trim() : "";

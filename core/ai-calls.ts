@@ -3,6 +3,7 @@ import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { t } from "../i18n";
 import type { AdmissionContext } from "./admission";
 import { estimateUsageTokens, type AiUsageStore, type UsageAction } from "./ai-usage-store";
+import { normalizeReportedUsage, reportedUsageSubtotal, type ReportedAiUsage } from "./ai-usage-measurement";
 import type { AiRuntime, AiRuntimeCapabilities, AiRuntimePrewarmOptions, RuntimeTaskControls } from "./ai-runtime";
 import { StepRunner, stepLabel, type PreparedStep, type StepProvider } from "./step-runner";
 
@@ -204,7 +205,7 @@ export class AiCalls {
     const id = options.exchangeId ?? randomUUID();
     const milestones: AiMilestones = {};
     const startedMs = Date.now();
-    let reportedUsage: { inputTokens: number; outputTokens: number } | undefined;
+    let reportedUsage: ReportedAiUsage | undefined;
     let reply: string | undefined;
     let sentText = "";
     let provider: "claude" | "codex" | undefined;
@@ -264,11 +265,7 @@ export class AiCalls {
           : {
               onMilestones: (data: AiMilestones): void => {
                 task.onMilestones?.(data);
-                if (data.usage)
-                  reportedUsage = {
-                    inputTokens: data.usage.inputTokens ?? 0,
-                    outputTokens: data.usage.outputTokens ?? 0
-                  };
+                if (data.usage) reportedUsage = normalizeReportedUsage(data.usage) ?? reportedUsage;
                 if (options.milestones !== false) Object.assign(milestones, data);
               }
             }),
@@ -338,7 +335,7 @@ export class AiCalls {
     prompt: string,
     options: AiCallOptions,
     provider: "claude" | "codex" | undefined,
-    reported: { inputTokens: number; outputTokens: number } | undefined,
+    reported: ReportedAiUsage | undefined,
     reply: string | undefined,
     startedMs: number
   ): void {
@@ -348,15 +345,16 @@ export class AiCalls {
       // Real numbers when the provider reported them; otherwise a Codex call is counted from its text (estimated).
       // A generated image comes back as a data: URL, which says nothing about output tokens: only the input is estimated.
       const imageReply = !!options.task?.generateImage || (reply ?? "").startsWith("data:");
+      const subtotal = reportedUsageSubtotal(reported);
       const tokens =
-        reported ??
+        subtotal ??
         (provider === "codex" && (prompt || reply)
           ? {
               inputTokens: estimateUsageTokens(prompt),
               outputTokens: imageReply ? 0 : estimateUsageTokens(reply ?? "")
             }
           : undefined);
-      if (!tokens || (tokens.inputTokens === 0 && tokens.outputTokens === 0)) return;
+      if (!tokens || (!subtotal?.incomplete && tokens.inputTokens === 0 && tokens.outputTokens === 0)) return;
       store.record({
         action: options.usage?.action ?? "other",
         ...(options.usage?.mapPath ? { mapPath: options.usage.mapPath } : {}),
@@ -364,7 +362,7 @@ export class AiCalls {
         provider,
         model: options.model,
         ...tokens,
-        estimated: !reported,
+        estimated: !subtotal,
         durationMs: Date.now() - startedMs
       });
     } catch (error) {

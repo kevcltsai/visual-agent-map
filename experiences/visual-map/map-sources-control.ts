@@ -49,6 +49,7 @@ export class MapSourcesControl {
   private externalStatusRun: AbortController | null = null;
   mapSourcesOpen = false;
   private mapSourcesPickerOpen = false;
+  private closePicker: (() => void) | null = null;
   private mapSourcesSession: MapSourcesSession = newMapSourcesSession();
   private mapSourcesToolsEl: HTMLElement | null = null;
   private mapSourcesButtonEl: HTMLButtonElement | null = null;
@@ -68,8 +69,12 @@ export class MapSourcesControl {
   }
   /** The view closed: drop the panel listeners and stop the background status checks. */
   dispose(): void {
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
+    this.detach();
+    this.mapSourcesOpen = false;
+    this.mapSourcesSession = newMapSourcesSession();
+    this.cancelPicker();
+    this.mapSourcesButtonEl = null;
+    this.mapSourcesToolsEl = null;
     this.clearExternalSources();
   }
   /** A map was opened: its saved sources, then its external list. */
@@ -79,6 +84,8 @@ export class MapSourcesControl {
   }
   /** Progressive open: no sources until the map's own are loaded. */
   reset(): void {
+    this.mapSourcesSession = newMapSourcesSession();
+    this.cancelPicker();
     this.mapSources = [];
     this.clearExternalSources();
   }
@@ -97,6 +104,7 @@ export class MapSourcesControl {
   }
   private drawMapSourcesButton(parent: HTMLElement): void {
     const button = this.ports.button(parent, () => {
+      if (this.ports.closed() || this.mapSourcesButtonEl !== button) return;
       if (this.mapSourcesOpen && this.mapSourcesPanelEl) this.closeMapSourcesPanel(true);
       else this.openMapSourcesPanel();
     });
@@ -163,10 +171,16 @@ export class MapSourcesControl {
     this.mapSourcesPanelEl = null;
     this.mapSourcesOpen = false;
     this.mapSourcesSession = newMapSourcesSession();
-    this.mapSourcesPickerOpen = false;
+    this.cancelPicker();
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
     this.ports.placeTools();
     if (refocus) this.mapSourcesButtonEl?.focus();
+  }
+  private cancelPicker(): void {
+    const close = this.closePicker;
+    this.closePicker = null;
+    this.mapSourcesPickerOpen = false;
+    close?.();
   }
   private drawMapSourcesPanelEl(focus: MapSourcesPanelFocus): void {
     const tools = this.mapSourcesToolsEl;
@@ -175,6 +189,10 @@ export class MapSourcesControl {
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl?.remove();
     const mapPath = this.ports.path();
+    const epoch = this.ports.epoch();
+    const session = this.mapSourcesSession;
+    const isActive = (): boolean =>
+      this.mapSourcesOpen && this.mapSourcesSession === session && this.isCurrentMap(mapPath, epoch);
     const panelCleanups: Array<() => void> = [];
     const panel = drawMapSourcesPanel(
       tools,
@@ -184,22 +202,38 @@ export class MapSourcesControl {
         sources: this.mapSources,
         currentMapPath: mapPath,
         mapItems: () => this.ports.repo().mapSwitcherItems(),
-        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
-        announce: text => this.ports.announce(text),
+        isActive,
+        add: (source, quiet) => {
+          if (isActive()) this.changeMapSources(mapPath, "add", source, quiet);
+        },
+        announce: text => {
+          if (isActive()) this.ports.announce(text);
+        },
         onDragEnd: handler => {
           const doc = this.ports.doc();
           if (!doc?.addEventListener) return;
           doc.addEventListener("dragend", handler, true);
           panelCleanups.push(() => doc.removeEventListener("dragend", handler, true));
         },
-        remove: source => this.changeMapSources(mapPath, "remove", source),
+        remove: source => {
+          if (isActive()) this.changeMapSources(mapPath, "remove", source);
+        },
         externals: this.externalSources,
         externalStatus: label => this.externalStatuses.get(label),
-        addExternal: input => this.addExternalFolder(mapPath, input),
-        removeExternal: source => this.removeExternalFolder(mapPath, source),
-        close: refocus => this.closeMapSourcesPanel(refocus),
+        addExternal: input => (isActive() ? this.addExternalFolder(mapPath, input) : Promise.resolve("stale" as const)),
+        removeExternal: source => {
+          if (isActive()) this.removeExternalFolder(mapPath, source);
+        },
+        close: refocus => {
+          if (isActive()) this.closeMapSourcesPanel(refocus);
+        },
         setPickerOpen: open => {
+          if (!isActive()) return;
           this.mapSourcesPickerOpen = open;
+          if (!open) this.closePicker = null;
+        },
+        registerPickerClose: close => {
+          if (isActive()) this.closePicker = close;
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
         button: () => this.mapSourcesButtonEl,
@@ -215,7 +249,7 @@ export class MapSourcesControl {
     const doc = this.ports.doc();
     if (doc?.addEventListener) {
       const outside = (event: Event): void => {
-        if (this.mapSourcesPickerOpen) return;
+        if (!isActive() || this.mapSourcesPanelEl !== panel || this.mapSourcesPickerOpen) return;
         const target = event.target as Node | null;
         // A press on a draggable row (the file explorer's) starts a drag to the drop zone; it must not close the panel.
         if (
@@ -244,17 +278,23 @@ export class MapSourcesControl {
     panel.style.width = `${width}px`;
     panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
   }
+  private isCurrentMap(mapPath: string, epoch: number): boolean {
+    return !this.ports.closed() && this.ports.path() === mapPath && this.ports.epoch() === epoch;
+  }
   /**
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
   private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource, quiet = false): void {
+    const epoch = this.ports.epoch();
+    const currentSession = (): boolean => this.isCurrentMap(mapPath, epoch);
     const name = mapSourceName(this.ports.app(), source);
     this.ports.enqueue(async () => {
-      if (this.ports.closed() || this.ports.path() !== mapPath) return;
+      if (!currentSession()) return;
       let focus: MapSourcesPanelFocus = { search: true };
       try {
         const current = await this.ports.repo().readMapSources(mapPath);
+        if (!currentSession()) return;
         const at = current.findIndex(item => sameMapSource(item, source));
         if (change === "add" && at >= 0) {
           if (!quiet) this.ports.announce(t("ui.map_sources_already_added_0", name));
@@ -263,16 +303,18 @@ export class MapSourcesControl {
         } else {
           const next = change === "add" ? [...current, source] : current.filter((_, index) => index !== at);
           await this.ports.repo().writeMapSources(mapPath, next);
+          if (!currentSession()) return;
           this.mapSources = next;
           if (change === "remove") focus = { remove: at };
           if (!quiet || change === "remove")
             this.ports.announce(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
         }
       } catch (error) {
+        if (!currentSession()) return;
         new Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
         return;
       }
-      if (this.ports.closed() || this.ports.path() !== mapPath) return;
+      if (!currentSession()) return;
       this.paintMapSourcesButton();
       if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(focus);
     });

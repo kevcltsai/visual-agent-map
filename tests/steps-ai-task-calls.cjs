@@ -312,6 +312,30 @@ test('re-send with a runtime that ignores the abort: the first entry is failed a
   assert.ok(!h.of(first.id).includes('received'));
 });
 
+test('a replaced research attempt cannot contribute late web events or acceptance to its replacement', async () => {
+  const clock = fakeClock(); let resend, accepted = 0, oldReply, nextReply;
+  const h = rig({ clock, handler: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted?.();
+    call.controls.onRequest({ n: call.n });
+    return new Promise(resolve => {
+      if (call.n === 1) oldReply = resolve;
+      else nextReply = resolve;
+    });
+  } });
+  const events = [];
+  const done = h.service.askModel(context({ researchMode: 'research' }), 'claude:sonnet', 'low', undefined, h.mark, () => { accepted++; }, event => events.push(event), {
+    onSlow: (_id, _slow, handle) => { if (handle) resend = handle; }
+  });
+  await waitFor(() => h.state.calls.length === 1); clock.advance(20_000); resend();
+  await waitFor(() => h.state.calls.length === 2);
+  const [first, second] = h.state.calls;
+  first.controls.onWebSearchEvent?.(webEvent); first.controls.onAccepted?.();
+  second.controls.onWebSearchEvent?.(webEvent);
+  nextReply(GOOD); const result = await done;
+  assert.equal(accepted, 2); assert.equal(result.retrievals, 1); assert.deepEqual(events, [webEvent]);
+  oldReply(GOOD); await flush();
+});
+
 // ---- reference rounds ----
 test('reference rounds: four extract, one reduce and the main task each end parsed with no completed', async () => {
   const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
@@ -770,4 +794,13 @@ test('noContentLog: the exchange log gets the omitted markers, not the prompt or
   const loud = rig({ handler: call => answer(call, reply) });
   await loud.service.askModel(context({ task: `Do ${SECRET}` }), 'gpt-6-luna', 'low', undefined, loud.mark);
   assert.ok(JSON.stringify(loud.order.filter(e => e[0] === 'sent' || e[0] === 'received')).includes(SECRET), 'default: unchanged');
+});
+
+test('noContentLog redacts provider failures while returning the original error to the caller', async () => {
+  const secret = 'private chapter content in provider error';
+  const h = rig({ handler: call => { call.controls.onRequest({ private: secret }); throw new Error(secret); } });
+  await assert.rejects(h.service.askModel(context({ noContentLog: true }), 'gpt-6-luna', 'low', undefined, h.mark), /private chapter content/);
+  assert.equal(h.order.filter(event => event[0] === 'failed').length, 1);
+  assert.equal(h.order.find(event => event[0] === 'failed')[2], 'failed');
+  assert.ok(!JSON.stringify(h.order).includes(secret));
 });

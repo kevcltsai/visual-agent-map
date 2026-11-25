@@ -124,14 +124,62 @@ test('a runtime that rejects after the stop keeps its own error', async () => {
   assert.deepEqual(h.events.filter(event => event[0] === 'failed').map(event => event[2]), ['runtime boom']);
 });
 
-test('the runtime gets its own signal; an already aborted caller signal arrives aborted and the caller signal is never aborted by AiCalls', async () => {
+test('an already aborted caller never starts the runtime; a live call gets its own signal', async () => {
   const early = new AbortController(); early.abort();
-  const h = harness({ run: request => { h.seen = request.controls.signal; return 'x'; } });
+  const h = harness();
   await assert.rejects(h.calls.run(prepared(), options({ signal: early.signal }), () => 1));
-  assert.equal(h.seen.aborted, true); assert.notEqual(h.seen, early.signal);
+  assert.equal(h.state.runtimeCalls.length, 0);
+  assert.equal(h.active.size, 0);
   const outer = new AbortController(); const g = harness({ run: request => { g.seen = request.controls.signal; return 'x'; } });
   await g.calls.run(prepared(), options({ signal: outer.signal }), () => 1);
   assert.equal(outer.signal.aborted, false); assert.notEqual(g.seen, outer.signal);
+});
+
+test('Stop during durable admission does not start a provider request or release another owner', async () => {
+  const hold = deferred(), entered = deferred();
+  const h = harness(); let reservations = 0;
+  const owner = new AbortController(); h.active.set('owner', owner);
+  const pending = h.calls.run(prepared(), options({ admission: { reserve: async () => { reservations++; entered.resolve(); await hold.promise; } } }), raw => raw);
+  await entered.promise;
+  h.calls.stopAll(); hold.resolve();
+  await assert.rejects(pending);
+  assert.equal(reservations, 1); // A persisted reservation is not refunded.
+  assert.equal(h.state.runtimeCalls.length, 0);
+  assert.deepEqual([...h.active.keys()], ['owner']);
+  assert.deepEqual(h.names(), ['begin', 'failed']);
+});
+
+test('Stop during asynchronous finish refuses the result and does not mark the exchange completed', async () => {
+  const hold = deferred(), entered = deferred();
+  const h = harness();
+  const pending = h.calls.run(prepared(), options(), async () => { entered.resolve(); await hold.promise; return 'late'; });
+  await entered.promise;
+  h.calls.stopAll(); hold.resolve();
+  await assert.rejects(pending);
+  assert.equal(h.names().includes('completed'), false);
+  assert.equal(h.names().filter(name => name === 'failed').length, 1);
+  assert.equal(h.active.size, 0);
+});
+
+test('an exchange sink lookup failure cannot leak a registered call or abort listener', async () => {
+  const { controller, counts } = listenerCountingSignal();
+  const active = new Map(), boom = mod.makeError('sink lookup failed');
+  const calls = new mod.AiCalls({ activeTasks: active, runtimeFor: () => { throw new Error('unreachable runtime'); }, exchanges: () => { throw boom; } });
+  await assert.rejects(calls.run(prepared(), options({ signal: controller.signal }), raw => raw), error => error === boom);
+  assert.equal(active.size, 0); assert.equal(counts.added - counts.removed, 0);
+});
+
+test('a replacement exchange sink never receives events for the original sink entry', async () => {
+  const events = [], replacementEvents = [];
+  const sink = list => Object.fromEntries(['begin', 'sent', 'received', 'milestones', 'parsed', 'completed', 'failed'].map(name => [name, () => list.push(name)]));
+  let current = sink(events);
+  const replacement = sink(replacementEvents);
+  const calls = new mod.AiCalls({ exchanges: () => current, runtimeFor: () => ({
+    capabilities: mod.CODEX_CAPABILITIES,
+    run: async request => { request.controls.onRequest({}); current = replacement; return 'reply'; }
+  }) });
+  assert.equal(await calls.run(prepared(), options(), raw => raw), 'reply');
+  assert.deepEqual(events, ['begin', 'sent']); assert.deepEqual(replacementEvents, []);
 });
 
 // ---- logging gate ----

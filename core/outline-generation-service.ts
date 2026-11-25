@@ -1,4 +1,4 @@
-import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
+import { claudeModelChoice } from "../ai/providers/provider";
 import type { ResearchSteer } from "../ai/research-observer";
 import { translate, uiLocale } from "../i18n";
 import type { AiCalls } from "./ai-calls";
@@ -56,7 +56,7 @@ export class OutlineGenerationService {
     // A reply with a heading that has no summary, or with a stray non-heading line (such as a `>` line before the root), is
     // asked for once more (one shared retry, at most 2 calls); any other failure goes straight out. The provider runner
     // already parses the reply (a refusal is thrown from `run`), so both calls sit in one guard.
-    const claude = CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model);
+    const claude = !!claudeModelChoice(request.model);
     if (steer && claude) steer.live(false);
     let generation = 0;
     for (let attempt = 1; ; attempt++) {

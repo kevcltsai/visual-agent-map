@@ -1,4 +1,4 @@
-import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
+import { claudeModelChoice } from "../ai/providers/provider";
 import type { CodexActivity } from "../ai/runtime/codex-app-server";
 import type { ReasoningLevel } from "../ai/types";
 import type { AiCalls } from "./ai-calls";
@@ -69,7 +69,7 @@ export function providerStepRunner<
         usage: { mapPath: config.mapPath?.(request) },
         stopped: config.stopped,
         validate: runtime => {
-          if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model))
+          if (runtime.capabilities.id === "claude" && !claudeModelChoice(request.model))
             throw new Error("Unsupported Claude model");
         },
         task: {
@@ -83,9 +83,7 @@ export function providerStepRunner<
           ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),
           ...(hooks?.onStreamMode ? { onStreamMode: hooks.onStreamMode } : {}),
           ...(hooks?.onSteer ? { onSteer: hooks.onSteer } : {}),
-          ...(hooks?.onText && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model)
-            ? { onText: hooks.onText }
-            : {})
+          ...(hooks?.onText && !claudeModelChoice(request.model) ? { onText: hooks.onText } : {})
         }
       },
       (raw, exchange) => {

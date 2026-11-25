@@ -739,8 +739,9 @@ test('steer: an attempt the user replaced takes no addition and nothing reaches 
     call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
     call.controls.onSteer?.(async text => { written.push([call.number, text]); });
     if (call.number === 1) return abortOn(call.controls.signal);
-    return Promise.resolve(h.answer);
+    return new Promise(resolve => { release2 = () => resolve(h.answer); });
   } });
+  let release2;
   const offers = [];
   h.observer.onSteer = (id, send) => { offers.push(id); senders.set(h.calls.length, send); };
   const done = h.ask();
@@ -748,12 +749,16 @@ test('steer: an attempt the user replaced takes no addition and nothing reaches 
   await senders.get(1)('first');
   assert.deepEqual(written, [[1, renderTaskSteer('first')]], 'a live attempt writes the wrapped text');
   h.clock.advance(20_000); h.observer.resend();
-  await done;
-  assert.equal(h.calls.length, 2);
+  await h.waitFor(() => h.calls.length === 2);
   await assert.rejects(senders.get(1)('late'), error => error.name === 'AbortError');
   assert.deepEqual(written.map(entry => entry[0]), [1], 'the replaced attempt wrote nothing more');
   await senders.get(2)('again');
   assert.deepEqual(written.map(entry => entry[0]), [1, 2]);
+  release2();
+  await done;
+  // The replacement did not cancel the task; once the task is over its attempt takes nothing either.
+  await assert.rejects(senders.get(2)('after the end'), error => error.name === 'AbortError');
+  assert.deepEqual(written.map(entry => entry[0]), [1, 2], 'an ended attempt wrote nothing more');
   // A hook the old attempt calls after the replacement is not offered to the observer.
   const offered = offers.length;
   h.calls[0].controls.onSteer(async () => {});
@@ -767,17 +772,20 @@ test('steer: every new attempt binds again through steerObserver, and a json run
   const h = observedHarness({ attempts: call => {
     call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
     call.controls.onSteer?.(async text => { written.push([call.number, text]); });
-    return call.number === 1 ? abortOn(call.controls.signal) : Promise.resolve(h.answer);
+    return call.number === 1 ? abortOn(call.controls.signal) : new Promise(resolve => { release2 = () => resolve(h.answer); });
   } });
+  let release2;
   const base = h.observer;
   const wrapped = steerObserver(base, fake);
   const done = h.service.askModel(h.context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, wrapped);
   await h.waitFor(() => fake.log.some(e => e[0] === 'bind' && e[1]));
   await fake.last('one');
   h.clock.advance(20_000); base.resend();
-  await done;
+  await h.waitFor(() => fake.log.filter(e => e[0] === 'bind' && e[1]).length === 2);
   assert.deepEqual(fake.log, [['bind', null], ['bind', 'fn'], ['bind', null], ['bind', 'fn']], 'each attempt clears, then binds its own handler');
   await fake.last('two');
+  release2();
+  await done;
   assert.deepEqual(written.map(entry => entry[0]), [1, 2], 'one addition per attempt, each to its own process');
   assert.ok(!fake.log.some(e => e[0] === 'live'), 'stream-json stays live');
   // json mode: the steer hook is never offered by the runtime, and the run is marked not live.
@@ -793,7 +801,7 @@ test('steer: no onSteer on the observer means no onSteer control; count repair a
   const seen = [];
   const reply = steerReply();
   const make = () => new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, diagramsEnabled: () => true,
-    codexRuntime: () => { throw new Error('x'); }, claudeRuntime: () => ({ runTask: async (prompt, _m, _e, _s, controls) => { seen.push({ prompt, controls }); controls.onStreamMode?.('stream-json'); controls.onAccepted?.(); return reply; } }) });
+    codexRuntime: () => { throw new Error('x'); }, claudeRuntime: () => ({ runTask: async (prompt, _m, _e, _s, controls) => { seen.push({ prompt, controls }); controls.onStreamMode?.('stream-json'); controls.onAccepted?.(); controls.onSteer?.(async () => {}); return reply; } }) });
   const context = { title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
   const events = [];
   const withSteer = { onAttempt: () => events.push('attempt'), onSteer: () => events.push('steer'), onStreamMode: (id, mode) => events.push(mode) };
@@ -801,6 +809,8 @@ test('steer: no onSteer on the observer means no onSteer control; count repair a
   assert.equal(seen.at(-1).controls.onSteer, undefined, 'an observer without onSteer leaves the request as it was');
   await make().askModel(context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, withSteer);
   assert.equal(typeof seen.at(-1).controls.onSteer, 'function', 'an observer with onSteer opens the hook');
+  assert.deepEqual(events, ['attempt', 'stream-json', 'steer'], 'the hook is offered while the attempt runs');
+  // A hook an ended attempt reports late is not offered to the observer.
   seen.at(-1).controls.onSteer(async () => {});
   assert.deepEqual(events, ['attempt', 'stream-json', 'steer']);
   // Count repair is a plain call even when an observer is given.

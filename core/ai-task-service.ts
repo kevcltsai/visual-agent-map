@@ -16,7 +16,7 @@ import { decidedTemplateFromDetail, demoteUnknownHeadings } from "../ai/detail-s
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
-import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
+import { claudeModelChoice } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
@@ -57,6 +57,10 @@ function cancelled(): Error {
   error.name = "AbortError";
   return error;
 }
+
+function isAbortError(error: unknown): boolean {
+  return !!error && typeof error === "object" && (error as { name?: unknown }).name === "AbortError";
+}
 /** What one attempt of the observed main call needs on top of the shared controls. */
 interface AttemptSetup {
   signal: AbortSignal;
@@ -87,6 +91,8 @@ export interface AiTaskServiceOptions {
   defaultReasoning: () => ReasoningLevel;
   exchangeLoggingEnabled: () => boolean;
   exchanges: () => AiExchangeLog | null;
+  /** The plugin-wide registry shared with every other AiCalls consumer. */
+  activeTasks?: Map<string, AbortController>;
   /** Where each provider call's token usage is recorded (always on, unlike the exchange log). Absent or null: not recorded. */
   usage?: () => Pick<AiUsageStore, "record"> | null;
   codexRuntime: (directory: string, local: boolean) => CodexAppServerRuntime;
@@ -172,7 +178,7 @@ export class AiTaskService {
     )
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
-    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
+    if (provider === "claude" && !claudeModelChoice(model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
 
@@ -304,40 +310,54 @@ export class AiTaskService {
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
       const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => ({ raw: await sendRaw(setup) });
-      const sendRaw = async (setup: AttemptSetup | undefined): Promise<string> =>
-        calls.run(
-          step,
-          {
-            model,
-            effort,
-            topic: context.title,
-            mode: context.mode ?? "task",
-            taskName: "ai-task",
-            signal: setup?.signal ?? signal ?? new AbortController().signal,
-            localCodex: context.researchMode === "local",
-            usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
-            ...(context.admission ? { admission: context.admission } : {}),
-            ...(context.noContentLog ? { noContentLog: true } : {}),
-            requestLog: "request",
-            // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
-            entryEnd: "caller",
-            stopped: cancelled,
-            task: {
-              ...controls,
-              onWebSearchEvent: webHook,
-              ...(setup ? setup.hooks : {})
+      const sendRaw = async (setup: AttemptSetup | undefined): Promise<string> => {
+        let pending = true;
+        const live = (): boolean => pending && !setup?.signal.aborted && !signal?.aborted;
+        try {
+          return await calls.run(
+            step,
+            {
+              model,
+              effort,
+              topic: context.title,
+              mode: context.mode ?? "task",
+              taskName: "ai-task",
+              signal: setup?.signal ?? signal ?? new AbortController().signal,
+              localCodex: context.researchMode === "local",
+              usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
+              ...(context.admission ? { admission: context.admission } : {}),
+              ...(context.noContentLog ? { noContentLog: true } : {}),
+              requestLog: "request",
+              // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
+              entryEnd: "caller",
+              stopped: cancelled,
+              task: {
+                ...controls,
+                onRequest: () => {
+                  if (live()) controls.onRequest();
+                },
+                onWebSearchEvent: webHook
+                  ? event => {
+                      if (live()) webHook(event);
+                    }
+                  : undefined,
+                ...(setup ? setup.hooks : {})
+              },
+              ...(setup
+                ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
+                : {}),
+              onBegin: id => {
+                exchangeId = id;
+                setup?.onExchange(id);
+                onExchange?.(id);
+              }
             },
-            ...(setup
-              ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
-              : {}),
-            onBegin: id => {
-              exchangeId = id;
-              setup?.onExchange(id);
-              onExchange?.(id);
-            }
-          },
-          raw => raw
-        );
+            raw => raw
+          );
+        } finally {
+          pending = false;
+        }
+      };
       // Only the main call of a research request is observed (not reference extraction, a count repair or the chart step).
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -353,9 +373,13 @@ export class AiTaskService {
           // No retrieval at all: asked once more; a second time is a failure and nothing is written from it.
           if (!requiresWeb || attempt >= 2 || signal?.aborted || !isSearchNotPerformed(error)) throw error;
           if (this.options.exchangeLoggingEnabled())
-            exchanges?.failed(exchangeId, error instanceof Error ? error.message : String(error));
+            exchanges?.failed(
+              exchangeId,
+              input.noContentLog ? "failed" : error instanceof Error ? error.message : String(error)
+            );
         }
       }
+      if (signal?.aborted) throw cancelled();
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
@@ -394,6 +418,7 @@ export class AiTaskService {
         result.detail = resolveDetailReferences(result.detail, referenceGroups, input.detail, input.detailTemplate);
       // Every reply of execute passes here (task run, AIM steps, the count repair's own run), before anything is written.
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
+      if (signal?.aborted) throw cancelled();
       if (this.options.exchangeLoggingEnabled()) exchanges?.parsed(exchangeId);
       // "AI suggested", first research: the sections the AI wrote become the note's template (one call; no repair follows).
       const aiDecides = input.aiSections === "decide";
@@ -454,8 +479,7 @@ export class AiTaskService {
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
-            if (signal?.aborted || (error instanceof Error && error.name === "AbortError") || isBudgetExhausted(error))
-              throw error;
+            if (signal?.aborted || isAbortError(error) || isBudgetExhausted(error)) throw error;
           } finally {
             // The repair has its own entry, which the caller finishes; close the first one that it supersedes.
             if (this.options.exchangeLoggingEnabled()) exchanges?.completed(firstExchangeId);
@@ -481,6 +505,7 @@ export class AiTaskService {
           requested
         );
       }
+      if (signal?.aborted) throw cancelled();
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,
         providerMs: Date.now() - providerStarted,
@@ -491,7 +516,9 @@ export class AiTaskService {
       if (this.options.exchangeLoggingEnabled() && !supersededClosed)
         exchanges?.failed(
           exchangeId,
-          t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
+          input.noContentLog
+            ? "failed"
+            : t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
         );
       throw error;
     }
@@ -544,8 +571,8 @@ export class AiTaskService {
         hooks: {
           stream: true,
           onAccepted: (): void => {
-            accepted?.();
             if (!attempt.live()) return;
+            accepted?.();
             if (!mine.acceptedAt) {
               mine.acceptedAt = iso();
               // The card shows "waiting for the model" from acceptance, so the stage list starts there (KPI T1).
@@ -686,6 +713,7 @@ export class AiTaskService {
           codex: local => this.options.codexRuntime(pluginDirectory, local)
         }),
       ...(this.options.usage ? { usage: this.options.usage } : {}),
+      ...(this.options.activeTasks ? { activeTasks: this.options.activeTasks } : {}),
       exchanges: () => (exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null)
     });
   }
@@ -722,8 +750,7 @@ export class AiTaskService {
       remaining,
       provider
     });
-    const aborted = (error: unknown): boolean =>
-      !!signal?.aborted || (error instanceof Error && error.name === "AbortError");
+    const aborted = (error: unknown): boolean => !!signal?.aborted || isAbortError(error);
     const codeOf = (error: unknown): ChartCode => (error instanceof ChartRejected ? error.code : "runtime_error");
     const notAdded = (code: ChartCode): string => translate(this.options.language(), "log.chart_not_added_0", code);
     const warn = (code: ChartCode): void => console.warn("Visual Agent Map chart step", code);
@@ -762,6 +789,7 @@ export class AiTaskService {
           if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
           const charts = step.parse(raw);
           const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
+          if (exchange.signal.aborted) throw new DOMException("Aborted", "AbortError");
           if (!applied.ok) return refuse(applied.code, exchange);
           const template = input.detailTemplate;
           if (countIssues && template && input.detailFormat !== "adaptive") {
@@ -800,10 +828,14 @@ export class AiTaskService {
       const slots = round === 1 ? Math.min(CONDENSE_EXTRACT_CONCURRENCY, batches.length) : 1;
       let next = 0;
       let failed = false;
+      const roundController = new AbortController();
+      const abortRound = (): void => roundController.abort();
+      signal?.addEventListener("abort", abortRound, { once: true });
+      if (signal?.aborted) abortRound();
       const worker = async (): Promise<void> => {
         while (next < batches.length && !failed) {
           const index = next++;
-          if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+          if (roundController.signal.aborted) throw new DOMException("Aborted", "AbortError");
           // The estimate before sending is a worst case; the count here is the hard cap while running.
           if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
           context.onProgress?.(t("ui.reference_processing_progress", index + 1, batches.length));
@@ -829,9 +861,13 @@ export class AiTaskService {
             },
             model,
             reasoning,
-            signal,
+            roundController.signal,
             undefined,
-            onRequestAccepted,
+            onRequestAccepted
+              ? () => {
+                  if (!roundController.signal.aborted) onRequestAccepted();
+                }
+              : undefined,
             undefined,
             undefined,
             round === 1 ? "reference-extract" : "reference-reduce"
@@ -840,14 +876,19 @@ export class AiTaskService {
           findings[index] = result.detail.trim();
         }
       };
-      await Promise.all(
-        Array.from({ length: slots }, () =>
-          worker().catch(error => {
-            failed = true;
-            throw error;
-          })
-        )
-      );
+      try {
+        await Promise.all(
+          Array.from({ length: slots }, () =>
+            worker().catch(error => {
+              failed = true;
+              abortRound();
+              throw error;
+            })
+          )
+        );
+      } finally {
+        signal?.removeEventListener("abort", abortRound);
+      }
       const joined = findings.map(value => `Evidence:\n${value}`).join("\n\n");
       if (joined.length <= 18_000) {
         context.onProgress?.("");

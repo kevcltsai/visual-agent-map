@@ -936,7 +936,7 @@ integrationTest('Organize still restores the topic folders and maps when one jou
   const plan = await repo.planOrganizeWorkspaceFolders();
   const before = snapshot(vault);
   const rename = app.fileManager.renameFile;
-  const modify = app.vault.modify;
+  const process = app.vault.process;
   let rollingBack = false, refused = 0;
   app.fileManager.renameFile = async (item, target) => {
     if (target === 'Agent Workspace/Mind Maps/Gamma') {
@@ -945,12 +945,12 @@ integrationTest('Organize still restores the topic folders and maps when one jou
     }
     return rename(item, target);
   };
-  app.vault.modify = async (file, content) => {
+  app.vault.process = async (file, change) => {
     if (rollingBack && file.path === vault.cites) {
       refused++;
       throw new Error('injected journal restore failure');
     }
-    return modify(file, content);
+    return process(file, change);
   };
   await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure[\s\S]*rollback also failed[\s\S]*injected journal restore failure/);
   assert.ok(refused > 0, 'the journal restore really failed');
@@ -1008,3 +1008,28 @@ for (const failLater of [false, true]) {
     await assertResolves(vault);
   });
 }
+
+integrationTest('Organize reports a journal conflict without overwriting a note edited after its rebase', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const rename = app.fileManager.renameFile;
+  let edited = false;
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') {
+      assert.ok(contents.get(vault.cites).includes('Agent Workspace/Mind Maps/Beta/Notes/First.md'));
+      contents.set(vault.cites, contents.get(vault.cites) + '\nOwner edit after the journaled write\n');
+      edited = true;
+      throw new Error('injected later move failure');
+    }
+    return rename(item, target);
+  };
+  try {
+    await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure[\s\S]*rollback also failed[\s\S]*Journaled file changed/);
+  } finally {
+    app.fileManager.renameFile = rename;
+  }
+  assert.ok(edited);
+  assert.ok(contents.get(vault.cites).includes('Owner edit after the journaled write'));
+  for (const path of Object.values(vault.paths)) assert.ok(app.vault.getAbstractFileByPath(path), path);
+});

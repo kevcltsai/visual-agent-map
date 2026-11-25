@@ -968,7 +968,10 @@ for (const failLater of [false, true]) {
     const { repo, app, contents } = vault;
     const stay = await repo.createMap('Stay');
     const doc = await repo.readMap(stay);
-    doc.nodes.push({ id: 'cross-map', path: vault.betaFirst, parentId: null, x: 10, y: 20, collapsed: false });
+    // A legacy AIM draft may refer to a note owned by another map. Do not assign the same node path to two maps.
+    const own = await repo.createNote('Stay note', 'model', doc, stay, 'workspace');
+    doc.nodes.push(own);
+    doc.aim = { version: 1, branches: [], runs: [], pendingCommits: [], rootDraft: { nodeId: own.id, notePath: vault.betaFirst, title: 'Draft', context: '' } };
     await repo.saveMap(stay, doc);
     const plan = await repo.planOrganizeWorkspaceFolders();
     const rename = app.fileManager.renameFile;
@@ -986,7 +989,7 @@ for (const failLater of [false, true]) {
         contents.set(stay, contents.get(stay).replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
           const edited = JSON.parse(json);
           edited.title = 'Owner title';
-          edited.nodes.find(node => node.id === 'cross-map').x = 777;
+          edited.nodes.find(node => node.id === own.id).x = 777;
           return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
         }));
       }
@@ -1002,8 +1005,8 @@ for (const failLater of [false, true]) {
     assert.ok(injected, 'the owner edit landed inside the candidate write boundary');
     const saved = await repo.readMap(stay);
     assert.equal(saved.title, 'Owner title');
-    assert.equal(saved.nodes.find(node => node.id === 'cross-map').x, 777);
-    assert.equal(saved.nodes.find(node => node.id === 'cross-map').path,
+    assert.equal(saved.nodes.find(node => node.id === own.id).x, 777);
+    assert.equal(saved.aim.rootDraft.notePath,
       failLater ? vault.betaFirst : 'Agent Workspace/Mind Maps/Beta/Notes/First.md');
     await assertResolves(vault);
   });
@@ -1032,4 +1035,40 @@ integrationTest('Organize reports a journal conflict without overwriting a note 
   assert.ok(edited);
   assert.ok(contents.get(vault.cites).includes('Owner edit after the journaled write'));
   for (const path of Object.values(vault.paths)) assert.ok(app.vault.getAbstractFileByPath(path), path);
+});
+
+integrationTest('Organize rollback preserves an edit before a moved topic map write', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const moved = 'Agent Workspace/Mind Maps/Beta/Map.md';
+  const process = app.vault.process;
+  const rename = app.fileManager.renameFile;
+  let edited = false;
+  app.vault.process = async (file, change) => {
+    if (file.path === moved && !edited) {
+      edited = true;
+      contents.set(moved, contents.get(moved).replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+        const map = JSON.parse(json);
+        map.nodes[0].x = 321;
+        return '```agent-map\n' + JSON.stringify(map, null, 2) + '\n```';
+      }));
+    }
+    return process(file, change);
+  };
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') throw new Error('injected later move failure');
+    return rename(item, target);
+  };
+  try {
+    await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure/);
+  } finally {
+    app.vault.process = process;
+    app.fileManager.renameFile = rename;
+  }
+  assert.ok(edited);
+  const restored = await repo.readMap(vault.paths.beta);
+  assert.equal(restored.nodes[0].x, 321);
+  assert.ok(restored.nodes.every(node => node.path.startsWith(LEGACY + '/Beta/')));
+  await assertResolves(vault);
 });

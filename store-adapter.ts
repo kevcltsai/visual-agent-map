@@ -8,17 +8,24 @@ export interface StoreAdapter {
 }
 
 /**
- * The file's text, or null when it does not exist yet (the old ENOENT case). If only `<path>.tmp` exists, a write was
- * interrupted between removing the old file and renaming the temp file; the temp file is complete (it is written
- * before the remove), so it is read and moved back into place.
+ * Decode the primary, or a recoverable temp snapshot. Validate before promoting the temp: older versions could
+ * leave a partial first write there. A rejected snapshot stays untouched, and the caller fails closed.
  */
-export async function readStoreText(adapter: StoreAdapter, path: string): Promise<string | null> {
-  if (await adapter.exists(path)) return adapter.read(path);
+export async function readStoreValue<T>(
+  adapter: StoreAdapter,
+  path: string,
+  decode: (text: string) => T
+): Promise<T | null> {
+  if (await adapter.exists(path)) return decode(await adapter.read(path));
   const temporary = `${path}.tmp`;
   if (!(await adapter.exists(temporary))) return null;
-  const text = await adapter.read(temporary);
+  const value = decode(await adapter.read(temporary));
   await adapter.rename(temporary, path);
-  return text;
+  return value;
+}
+
+export async function readStoreText(adapter: StoreAdapter, path: string): Promise<string | null> {
+  return readStoreValue(adapter, path, text => text);
 }
 
 /**
@@ -30,7 +37,14 @@ export async function writeStoreAtomically(adapter: StoreAdapter, path: string, 
   // A previous write may have removed the old file but failed to publish its complete temp file.
   // Recover that snapshot before a retry can truncate it. The primary still wins when both exist.
   if (!(await adapter.exists(path)) && (await adapter.exists(temporary))) await adapter.rename(temporary, path);
-  await adapter.write(temporary, text);
-  if (await adapter.exists(path)) await adapter.remove(path);
+  if (await adapter.exists(path)) {
+    await adapter.write(temporary, text);
+    await adapter.remove(path);
+  } else {
+    // A partially written first snapshot must not look like a recoverable temp.
+    const staging = `${temporary}.writing`;
+    await adapter.write(staging, text);
+    await adapter.rename(staging, temporary);
+  }
   await adapter.rename(temporary, path);
 }

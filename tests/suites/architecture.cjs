@@ -2,16 +2,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, root, load } = require('../support.cjs');
+const { repoFiles } = require('../support-repo-scan.cjs');
 test('product architecture keeps shell, core, and experiences separated', () => {
   const shell = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.doesNotMatch(shell, /class VisualAgentMapView/);
   assert.doesNotMatch(shell, /class AiTaskService/);
 
-  const coreFiles = fs.readdirSync(path.join(root, 'core')).filter(name => name.endsWith('.ts'));
+  // Existing shared feature imports predate this recursive guard. Pin the exact paths.
+  const existing = new Map([
+    ['core/steps/map-chat/step.ts', '../../../experiences/visual-map/canvas-items'],
+    ['core/steps/outline-generate/step.ts', '../../../experiences/visual-map/outline-import'],
+    ['core/steps/goal-recommend/step.ts', '../../../experiences/visual-map/relevance-pins']
+  ]);
+  const coreFiles = repoFiles(root, { from: 'core' }).filter(name => name.endsWith('.ts'));
   for (const name of coreFiles) {
-    const source = fs.readFileSync(path.join(root, 'core', name), 'utf8');
-    assert.doesNotMatch(source, /(?:\.\.\/)+experiences\//, `core/${name} must not import an experience`);
-    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `core/${name} must not depend on repository settings that include experience state`);
+    let source = fs.readFileSync(path.join(root, name), 'utf8');
+    const exception = existing.get(name);
+    if (exception) {
+      assert.equal(source.split(exception).length, 2, `${name}: remove a retired exception or review a changed one`);
+      source = source.replace(exception, '');
+    }
+    assert.doesNotMatch(source, /(?:\.\.\/)+experiences\//, `${name} must not import an experience`);
+    assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `${name} must not depend on repository settings that include experience state`);
   }
 
   for (const sharedAi of ['types.ts', 'task-policy.ts', 'visual-guidance.ts', 'model-resolution.ts', 'note-style-store.ts', 'note-style-label.ts', 'note-style-references.ts', 'markdown-intake.ts']) {

@@ -1,4 +1,4 @@
-import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
+import { readStoreValue, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import type { Suggestion } from "./ai/types";
 import { t } from "./i18n";
 
@@ -16,28 +16,30 @@ export class PendingSuggestions extends Map<string, Suggestion[]> {
 
   async load(): Promise<void> {
     try {
-      const text = await readStoreText(this.adapter, this.path);
-      if (text === null) return;
-      const parsed: unknown = JSON.parse(text);
-      if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
-      const entries: Array<[string, Suggestion[]]> = [];
-      for (const item of parsed as unknown[]) {
-        if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
-          throw new Error(t("error.pending_suggestions_fields_invalid"));
-        const suggestions = (item[1] as unknown[]).filter((value): value is Suggestion => {
-          if (!value || typeof value !== "object") return false;
-          const suggestion = value as Record<string, unknown>;
-          return (
-            typeof suggestion.title === "string" &&
-            typeof suggestion.task === "string" &&
-            typeof suggestion.contribution === "string" &&
-            (suggestion.parentTitle === undefined || typeof suggestion.parentTitle === "string") &&
-            (suggestion.thinkingOriginBaseline === undefined || typeof suggestion.thinkingOriginBaseline === "string")
-          );
-        });
-        if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
-        entries.push([item[0], suggestions]);
-      }
+      const entries = await readStoreValue(this.adapter, this.path, text => {
+        const parsed: unknown = JSON.parse(text);
+        if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
+        const entries: Array<[string, Suggestion[]]> = [];
+        for (const item of parsed as unknown[]) {
+          if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
+            throw new Error(t("error.pending_suggestions_fields_invalid"));
+          const suggestions = (item[1] as unknown[]).filter((value): value is Suggestion => {
+            if (!value || typeof value !== "object") return false;
+            const suggestion = value as Record<string, unknown>;
+            return (
+              typeof suggestion.title === "string" &&
+              typeof suggestion.task === "string" &&
+              typeof suggestion.contribution === "string" &&
+              (suggestion.parentTitle === undefined || typeof suggestion.parentTitle === "string") &&
+              (suggestion.thinkingOriginBaseline === undefined || typeof suggestion.thinkingOriginBaseline === "string")
+            );
+          });
+          if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
+          entries.push([item[0], suggestions]);
+        }
+        return entries;
+      });
+      if (entries === null) return;
       for (const [key, suggestions] of entries) if (suggestions.length) super.set(key, suggestions);
       this.loadError = null;
     } catch (error: unknown) {

@@ -1,4 +1,4 @@
-import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
+import { readStoreValue, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import { t } from "./i18n";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { isRecord } from "./core/is-record";
@@ -158,29 +158,31 @@ export class AiExchangeLog {
 
   async load(): Promise<void> {
     try {
-      const text = await readStoreText(this.adapter, this.path);
-      if (text === null) return;
-      const parsed: unknown = JSON.parse(text);
-      if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
-      const entries = (parsed as unknown[]).filter((item): item is AiExchange => {
-        if (!item || typeof item !== "object") return false;
-        const entry = item as Record<string, unknown>;
-        return (
-          ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
-            key => typeof entry[key] === "string"
-          ) &&
-          (entry.prompt === undefined || typeof entry.prompt === "string") &&
-          (entry.step === undefined || typeof entry.step === "string") &&
-          (entry.milestones === undefined || isRecord(entry.milestones)) &&
-          (entry.sentAt === undefined || typeof entry.sentAt === "string") &&
-          (entry.completedAt === undefined || typeof entry.completedAt === "string") &&
-          (entry.durationMs === undefined ||
-            (typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0)) &&
-          typeof entry.status === "string" &&
-          ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status)
-        );
+      const entries = await readStoreValue(this.adapter, this.path, text => {
+        const parsed: unknown = JSON.parse(text);
+        if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
+        const entries = (parsed as unknown[]).filter((item): item is AiExchange => {
+          if (!item || typeof item !== "object") return false;
+          const entry = item as Record<string, unknown>;
+          return (
+            ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
+              key => typeof entry[key] === "string"
+            ) &&
+            (entry.prompt === undefined || typeof entry.prompt === "string") &&
+            (entry.step === undefined || typeof entry.step === "string") &&
+            (entry.milestones === undefined || isRecord(entry.milestones)) &&
+            (entry.sentAt === undefined || typeof entry.sentAt === "string") &&
+            (entry.completedAt === undefined || typeof entry.completedAt === "string") &&
+            (entry.durationMs === undefined ||
+              (typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0)) &&
+            typeof entry.status === "string" &&
+            ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status)
+          );
+        });
+        if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
+        return entries;
       });
-      if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
+      if (entries === null) return;
       this.entries = entries.slice(-this.limit);
       this.loadError = null;
       this.emit();

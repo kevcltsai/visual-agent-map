@@ -1,6 +1,6 @@
 import type { NoteLanguage } from "../i18n";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "../ai/types";
-import type { BookRole, BookRoleBy, BookSettings, PipelineStage } from "./book-pipeline/model";
+import type { BookSettings, PipelineFields } from "./book-pipeline/model";
 import type { HypothesisStrength, HypothesisLeaning, TopicKind, NoteRelevance } from "../note-values";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
@@ -9,7 +9,7 @@ export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
 export type TopicCollection = "Notes" | "Unassigned" | "Archive";
-export interface Note {
+export interface Note extends PipelineFields {
   /** The note's stored `content-language` frontmatter, when present. */
   contentLanguage?: NoteLanguage;
   title: string;
@@ -50,15 +50,6 @@ export interface Note {
   relevance?: NoteRelevance;
   /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
   aiLocked?: true;
-  /** Picture-book pipeline fields (frontmatter `pipeline-stage`, `book-role`, `pipeline-issue`, `pipeline-seam`); each absent when the note has none. */
-  pipelineStage?: PipelineStage;
-  bookRole?: BookRole;
-  /** Frontmatter `pipeline-role`: the role the pipeline wrote (a different `book-role` is the owner's). */
-  pipelineRole?: BookRole;
-  /** Frontmatter `book-role-by`: `owner` keeps `book-role` across runs, `ai` lets the plan change it. */
-  bookRoleBy?: BookRoleBy;
-  pipelineIssue?: string;
-  pipelineSeam?: string;
   /** The root topic's `book-*` settings; absent when none is set. */
   bookSettings?: BookSettings;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */

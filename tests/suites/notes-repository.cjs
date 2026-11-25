@@ -2771,3 +2771,38 @@ integrationTest('a reference rewrite failure does not block the later affected n
   assert.deepEqual(Array.from((await repo.readNote(a.path)).sourcePaths), [old]);
   assert.deepEqual(Array.from((await repo.readNote(b.path)).sourcePaths), [next]);
 });
+
+integrationTest('a note snapshot carries the exact parsed content and settlement does not overwrite a later status', async () => {
+  const { repo, app, contents } = fixture();
+  const note = await topicNote(repo, 'Settling');
+  await repo.updateNote(note.path, { status: 'running', detail: 'Original' });
+  const snapshot = await repo.readNoteSnapshot(note.path);
+  assert.equal(snapshot.content, contents.get(note.path));
+  assert.match(snapshot.note.detail, /Original/);
+  await repo.updateNote(note.path, { status: 'completed', detail: 'Owner edit' });
+  const current = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { detail: 'AI edit' }, { expectedContent: snapshot.content }), 'discarded');
+  await repo.settleRunningNote(note.path, { status: 'idea' });
+  assert.equal(contents.get(note.path), current);
+  await repo.updateNote(note.path, { status: 'running' });
+  await repo.settleRunningNote(note.path, { status: 'idea' });
+  assert.equal((await repo.readNote(note.path)).status, 'idea');
+});
+
+integrationTest('a note whose managed marker is removed before a rename commit is left alone', async () => {
+  const { repo, app, contents } = fixture();
+  const note = await topicNote(repo, 'Detached');
+  await repo.updateNote(note.path, { sourcePaths: ['Personal/old.md'] });
+  const process = app.vault.process;
+  let detached;
+  app.vault.process = async (file, change) => {
+    if (file.path === note.path && detached === undefined) {
+      detached = contents.get(note.path).replace(/^agent-map-node:.*$/m, 'agent-map-node: false');
+      contents.set(note.path, detached);
+    }
+    return process(file, change);
+  };
+  await repo.replaceSourcePath('Personal/old.md', 'Personal/new.md');
+  assert.ok(detached);
+  assert.equal(contents.get(note.path), detached);
+});

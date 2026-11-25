@@ -107,7 +107,6 @@ test('S2b: layoutOf returns direction and stored spacing; AIM maps and bad value
   assert.deepEqual(layoutOf({ layout: { direction: 'radial', spacing: 'huge' } }), { direction: 'radial' });
   assert.deepEqual(layoutOf({ layout: { direction: 'fishbone', spacing: 'huge' } }), { direction: 'fishbone' });
   assert.deepEqual(layoutOf({ layout: { direction: 'balanced', spacing: 'huge' } }), { direction: 'balanced' });
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left', spacing: 'compact' } }), 'left');
 });
 
 test('S3: right and left at three spacings never overlap on the sample, converging, sized and wide fixtures', () => {
@@ -331,7 +330,7 @@ test('D-8: arrangeNewBranch in a down map starts one row below the parent (above
   assert.ok(noOverlap(slid, undefined, 24));
 });
 
-test('P1 data: down and up are stored and read back; layoutOf keeps them, layoutDirectionOf (right/left only) still answers right', () => {
+test('P1 data: down and up are stored and read back; layoutOf keeps them', () => {
   for (const direction of ['down', 'up'])
     for (const spacing of [undefined, 'compact', 'spacious']) {
       const value = spacing ? { direction, spacing } : { direction };
@@ -339,8 +338,6 @@ test('P1 data: down and up are stored and read back; layoutOf keeps them, layout
       assert.deepEqual(layoutOf({ layout: value }), value);
       assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
     }
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'down' } }), 'right');
-  assert.equal(layout.isLayoutDirection('down'), false);
   assert.equal(layout.isLayoutKind('up'), true);
   assert.equal(layout.isLayoutKind('balanced'), true);
   assert.equal(layout.isLayoutKind('radial'), true);
@@ -685,7 +682,6 @@ test('R-4: radial and timeline are accepted by the data format; the other arrang
       assert.deepEqual(layoutOf({ layout: value }), value);
       assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
     }
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'radial' } }), 'right');
   const a = { x: 0, y: 0, width: 300, height: 100 }, b = { x: 320, y: 200, width: 300, height: 100 };
   assert.notEqual(geometry.treeEdgePathData(a, b, 'radial'), geometry.treeEdgePathData(a, b, 'right'), 'radial has its own curve');
 });
@@ -925,14 +921,13 @@ test('F-2: fishbone bones are 60 degree straight lines from the topic card edge 
     }
 });
 
-test('P4 data: fishbone is stored and read back; the AIM map and layoutDirectionOf still answer right; arrow keys follow the right layout', () => {
+test('P4 data: fishbone is stored and read back; the AIM map still answers right; arrow keys follow the right layout', () => {
   for (const spacing of [undefined, 'compact', 'spacious']) {
     const value = spacing ? { direction: 'fishbone', spacing } : { direction: 'fishbone' };
     assert.deepEqual(plain(roundTrip(value).layout), value);
     assert.deepEqual(layoutOf({ layout: value }), value);
     assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
   }
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'fishbone' } }), 'right');
   const { neighborKey } = nav();
   for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
     assert.equal(neighborKey('fishbone', key), neighborKey('right', key), key);

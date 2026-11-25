@@ -615,7 +615,7 @@ export class ClaudeCodeCliRuntime {
       try {
         if (steerable || image || warm) {
           const sendInput = (text: string, accepted?: () => void, withImage = false): void => {
-            if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
+            if (!inputOpen || settled) throw new Error("This AI response has already ended.");
             const content = [...(withImage && image ? [{ type: "image", source: image }] : []), { type: "text", text }];
             child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content } })}\n`, error => {
               if (error) {

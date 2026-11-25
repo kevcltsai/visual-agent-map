@@ -76,17 +76,6 @@ export function isLayoutKind(value: unknown): value is LayoutKind {
 /** The direction the cards below a card grow in: the nearest branch layout at or above it, else the map's direction. */
 export { layoutDirectionFor };
 
-export function isLayoutDirection(value: unknown): value is LayoutDirection {
-  return value === "right" || value === "left";
-}
-
-/** The direction a map is laid out in. AIM maps always grow to the right; a missing or unknown choice is "right". */
-export function layoutDirectionOf(map: { layout?: MapLayout; aim?: unknown } | null | undefined): LayoutDirection {
-  if (!map || map.aim) return "right";
-  const direction = map.layout?.direction;
-  return isLayoutDirection(direction) ? direction : "right";
-}
-
 /** The full layout choice of a map (direction and spacing). AIM maps always grow to the right at standard spacing. */
 export function layoutOf(map: { layout?: MapLayout; aim?: unknown } | null | undefined): MapLayout {
   const stored = map && !map.aim ? map.layout?.direction : undefined;
@@ -128,8 +117,11 @@ function structureOf(nodes: MapNode[], folded: boolean) {
   const ids = new Map(nodes.map(node => [node.id, node]));
   const children = new Map<string, MapNode[]>();
   const joins = new Map<string, MapNode[]>();
-  const add = (map: Map<string, MapNode[]>, key: string, node: MapNode) =>
-    map.set(key, [...(map.get(key) ?? []), node]);
+  const add = (map: Map<string, MapNode[]>, key: string, node: MapNode): void => {
+    const list = map.get(key);
+    if (list) list.push(node);
+    else map.set(key, [node]);
+  };
   for (const node of nodes) {
     if (!node.parentId) continue;
     // A conclusion converging on sibling sources joins after all of them instead of hanging under one.

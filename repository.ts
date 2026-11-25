@@ -1418,11 +1418,23 @@ export class Repository {
     );
   }
 
-  async saveMap(path: string, map: MapDocument): Promise<void> {
+  async saveMap(
+    path: string,
+    map: MapDocument,
+    options?: {
+      authorize?: (current: MapDocument) => void;
+      preserveViewport?: boolean;
+      recordWrite?: (before: MapDocument, after: MapDocument) => void;
+    }
+  ): Promise<void> {
     let print = "";
     await this.app.vault.process(this.file(path), content => {
-      const text = writeMapContent(content, map);
-      print = this.printAfterWrite(path, coordinatePrint(parseMap(content)), coordinatePrint(map));
+      const current = parseMap(content);
+      options?.authorize?.(current);
+      const next = options?.preserveViewport ? { ...map, viewport: current.viewport } : map;
+      const text = writeMapContent(content, next);
+      print = this.printAfterWrite(path, coordinatePrint(current), coordinatePrint(next));
+      options?.recordWrite?.(current, next);
       return text;
     });
     this.writtenCoordinates.set(path, print);

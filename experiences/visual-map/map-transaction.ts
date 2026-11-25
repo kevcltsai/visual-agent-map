@@ -157,7 +157,7 @@ interface FileStep {
 interface Journal {
   /** `lost`: the file left `from` but its new path is unknown, so it cannot be put back. */
   files: Array<FileStep & { moved: boolean; lifecycleSet: boolean; lost?: boolean }>;
-  maps: Array<{ mapPath: string; restore: MapDocument; written: boolean }>;
+  maps: Array<{ mapPath: string; restore: MapDocument; after: MapDocument }>;
   /** `restore`: the whole note text read before the write in that direction. */
   notes: Array<{ path: string; restore: string; written: boolean }>;
   /** Files this step stored (created or reused); the created ones are trashed last when the step fails. */
@@ -271,6 +271,10 @@ export function begin(deps: TransactionDeps): Transaction {
   };
   let committed = false;
   const exists = (path: string): boolean => !!repo.app.vault.getAbstractFileByPath(path);
+  const requireMapSnapshot = (current: MapDocument, expected: MapDocument): void => {
+    if (written(current) !== written(expected))
+      throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+  };
 
   /** Writes `files` then `maps`; on failure reverts everything written and throws (AggregateError when reverting also failed). */
   async function run(
@@ -305,15 +309,14 @@ export function begin(deps: TransactionDeps): Transaction {
       }
       for (const step of notes.after) await rewrite(step);
       for (const item of maps) {
-        const next = clone(item.write);
-        if (item.preserveViewport) next.viewport = clone((await repo.readMap(item.mapPath)).viewport);
-        const entry = { mapPath: item.mapPath, restore: item.restore, written: false };
-        journal.maps.push(entry);
-        entry.written = true;
-        await repo.saveMap(item.mapPath, next);
+        await repo.saveMap(item.mapPath, clone(item.write), {
+          authorize: current => requireMapSnapshot(current, item.restore),
+          preserveViewport: item.preserveViewport,
+          recordWrite: (before, after) => journal.maps.push({ mapPath: item.mapPath, restore: before, after })
+        });
       }
       await derive(rebuild, refresh);
-      for (const item of maps) await deps.onApplied(item.mapPath, clone(item.write));
+      for (const item of journal.maps) await deps.onApplied(item.mapPath, clone(item.after));
     } catch (error) {
       await revert(journal, rebuild, error, refresh);
     }
@@ -328,15 +331,14 @@ export function begin(deps: TransactionDeps): Transaction {
   async function revert(journal: Journal, rebuild: boolean, error: unknown, refresh: string[] = []): Promise<never> {
     const problems: unknown[] = [];
     for (const item of [...journal.maps].reverse()) {
-      if (!item.written) continue;
       try {
         const current = await repo.readMap(item.mapPath);
-        // The write may never have happened (the save itself threw before changing the file): nothing to put back.
-        // Compared with positions: a coordinate-only write that did land must still be put back.
+        // The write may have failed before publication. Never restore over a later external edit.
         if (written(current) === written(item.restore)) continue;
-        const next = clone(item.restore);
-        next.viewport = current.viewport;
-        await repo.saveMap(item.mapPath, next);
+        await repo.saveMap(item.mapPath, clone(item.restore), {
+          authorize: latest => requireMapSnapshot(latest, item.after),
+          preserveViewport: true
+        });
       } catch (problem) {
         problems.push(problem);
       }
@@ -375,7 +377,7 @@ export function begin(deps: TransactionDeps): Transaction {
       } catch (problem) {
         problems.push(problem);
       }
-    } else if (refresh.length && journal.maps.some(item => item.written)) {
+    } else if (refresh.length && journal.maps.length > 0) {
       try {
         await derive(false, refresh);
       } catch (problem) {
@@ -444,7 +446,8 @@ export function begin(deps: TransactionDeps): Transaction {
           throw tagged(new Error(t("error.map_transaction_stale")), "guard");
       }
     };
-    const stale = async (direction: "undo" | "redo"): Promise<void> => {
+    const stale = async (direction: "undo" | "redo"): Promise<Map<string, MapDocument>> => {
+      const snapshots = new Map<string, MapDocument>();
       const fail = (): never => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
@@ -460,19 +463,22 @@ export function begin(deps: TransactionDeps): Transaction {
       }
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
-        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
+        const current = await repo.readMap(record.mapPath);
+        if (structure(current) !== structure(expected)) fail();
         // Positions are not content, but a node moved by something other than this plugin must not be overwritten.
         if (await repo.coordinatesChangedOutside(record.mapPath)) fail();
+        snapshots.set(record.mapPath, current);
       }
       // Redo links the same files again; it never recreates one.
       if (direction === "redo") for (const item of attachments) if (!exists(item.path)) fail();
+      return snapshots;
     };
     // The same notes both ways: undo and redo swap before and after.
     const refresh = [...new Set(records.flatMap(record => relationNotePaths(record.before, record.after)))];
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
       if (direction === "undo") choosePark();
       await guarded(direction);
-      await stale(direction);
+      const snapshots = await stale(direction);
       const files: FileStep[] = sequence(direction).map(op =>
         toward(op, direction)
           ? op.kind === "rename"
@@ -486,7 +492,7 @@ export function begin(deps: TransactionDeps): Transaction {
       const maps = records.map(record => ({
         mapPath: record.mapPath,
         write: undoing ? record.before : record.after,
-        restore: undoing ? record.after : record.before,
+        restore: snapshots.get(record.mapPath)!,
         preserveViewport: true
       }));
       const notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] };
@@ -702,8 +708,14 @@ export function begin(deps: TransactionDeps): Transaction {
           records.push({ mapPath, before, after });
           for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;
-          journal.maps.push({ mapPath, restore: before, written: true });
-          await repo.saveMap(mapPath, after);
+          await repo.saveMap(mapPath, after, {
+            authorize: current => requireMapSnapshot(current, before),
+            preserveViewport: true,
+            recordWrite: (current, next) => {
+              journal.maps.push({ mapPath, restore: current, after: next });
+              records[records.length - 1] = { mapPath, before: current, after: next };
+            }
+          });
         }
         await derive(rebuildRequested && rebuildNeeded, refresh);
         for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));

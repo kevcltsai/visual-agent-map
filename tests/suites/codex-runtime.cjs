@@ -114,6 +114,33 @@ integrationTest('Codex App Server uses model/list, selected reasoning and fresh 
   assert.equal(result.summary, 'first');
   assert.equal(second.summary, 'second');
 });
+test('app exit sends SIGKILL to an owned Codex process even after reset dropped the runtime', async () => {
+  const { EventEmitter } = require('node:events');
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+  const signals = [];
+  child.kill = (signal = 'SIGTERM') => {
+    signals.push(signal);
+    if (signal === 'SIGKILL') process.nextTick(() => child.emit('close', null, signal));
+    return true;
+  };
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim());
+    if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(JSON.stringify({ id: message.id, result: {} }) + '\n')));
+    return true;
+  } };
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: () => child } });
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => 'claude', clientVersion: () => '1', onLog() {}, probe: { firstExisting: () => null, listDirectory: () => [] } });
+  await service.codex('/plugin').start();
+  service.reset();
+  assert.deepEqual(signals, ['SIGTERM']);
+  service.terminateOwnedProcesses();
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+  await new Promise(resolve => setImmediate(resolve));
+  service.terminateOwnedProcesses();
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+});
+
 integrationTest('Codex late turn acknowledgement after abort is never reported accepted', async () => {
   const { EventEmitter } = require('node:events'); const sent = []; let turnRequest;
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};

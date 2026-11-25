@@ -546,3 +546,30 @@ for (const sameFolder of [false, true]) {
     if (!sameFolder) assert.ok(!app.vault.getAbstractFileByPath(target));
   });
 }
+
+for (const delegated of [true, false]) {
+  test(`relocate: rejects a silent or after-apply rename failure and preserves the original path (delegated: ${delegated})`, async () => {
+    for (const afterApply of [false, true]) {
+      const { repo, app, files, contents, mapPath, a } = await scenario();
+      if (delegated) Object.defineProperty(app.metadataCache, 'resolvedLinks', { value: undefined, configurable: true });
+      const adapter = delegated ? app.fileManager : app.vault;
+      const method = delegated ? 'renameFile' : 'rename';
+      const rename = adapter[method];
+      const before = snapshot(contents);
+      let calls = 0;
+      adapter[method] = async (item, target) => {
+        if (++calls === 1) {
+          if (!afterApply) return;
+          await rename(item, target);
+          throw new Error('injected after-apply rename failure');
+        }
+        return rename(item, target);
+      };
+      await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+        afterApply ? /injected after-apply rename failure/ : /did not take effect on disk/);
+      assert.equal(calls, afterApply ? 2 : 1);
+      assert.ok(files.has(a.path));
+      assert.deepEqual([...contents.entries()].sort(), [...before.entries()].sort());
+    }
+  });
+}

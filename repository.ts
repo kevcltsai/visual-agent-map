@@ -1286,6 +1286,14 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            // A process callback can run later, after the vault's own file queue releases it.
+            if ((property === "process" || property === "processFrontMatter") && typeof args[1] === "function") {
+              const change = args[1] as (...values: unknown[]) => unknown;
+              args[1] = (...values: unknown[]): unknown => {
+                if (disposed()) throw new Error(message());
+                return change(...values);
+              };
+            }
             return Reflect.apply(call, object, args);
           }
         : (...args: unknown[]): unknown => Reflect.apply(call, object, args);

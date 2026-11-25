@@ -736,22 +736,44 @@ export class TopicRuns {
     };
   }
 
-  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
-  private startProgress(path: string, model: string): { observer?: ResearchObserver; end: () => void } {
+  /** One progress entry, owned by this request until it ends or another job replaces it. */
+  private startProgress(
+    path: string,
+    model: string,
+    style?: string,
+    replace = false
+  ): { observer?: ResearchObserver; end: () => void } {
     const progress = this.ports.progress() as (RunProgress & { get?(path: string): unknown }) | undefined;
-    if (!progress || progress.get?.(path)) return { end: () => {} };
+    if (!progress || (!replace && progress.get?.(path))) return { end: () => {} };
     let attempt = "starting";
-    progress.begin(path, attempt, Date.now(), model);
-    return {
-      observer: {
-        onAttempt: id => {
-          attempt = id;
-          progress.newAttempt(path, id, Date.now());
-        },
-        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
-        onPreview: (id, fields) => progress.preview(path, id, fields ?? {})
+    let ended = false;
+    progress.begin(path, attempt, Date.now(), model, style);
+    const entry = progress.get?.(path);
+    const owns = (): boolean => !ended && (!progress.get || (entry !== undefined && progress.get(path) === entry));
+    const observer: ResearchObserver = {
+      onAttempt: id => {
+        if (!owns()) return;
+        attempt = id;
+        progress.newAttempt(path, id, Date.now());
       },
-      end: () => progress.end(path, attempt)
+      onStage: (id, stage, query) => {
+        if (owns()) progress.stage(path, id, stage, Date.now(), query);
+      },
+      onPreview: (id, fields) => {
+        if (owns()) progress.preview(path, id, fields ?? {});
+      }
+    };
+    if (replace)
+      observer.onSlow = (id, slow, resend) => {
+        if (owns()) progress.markSlow(path, id, slow, resend);
+      };
+    return {
+      observer,
+      end: () => {
+        if (!owns()) return;
+        ended = true;
+        progress.end(path, attempt);
+      }
     };
   }
 
@@ -1356,20 +1378,9 @@ export class TopicRuns {
     if (overrides.signal?.aborted) controller.abort();
     else overrides.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
     activeTasks.set(path, controller);
-    // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
-    // A plugin double without a progress store runs without progress lines.
-    const progress = this.ports.progress() as RunProgress | undefined;
-    let progressAttempt = "starting";
-    progress?.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
-    const observer: ResearchObserver = {
-      onAttempt: id => {
-        progressAttempt = id;
-        progress?.newAttempt(path, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress?.stage(path, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress?.preview(path, id, fields ?? {}),
-      onSlow: (id, slow, resend) => progress?.markSlow(path, id, slow, resend)
-    };
+    // Research replaces any previous progress; other requests leave an existing chart entry alone.
+    const progress = this.startProgress(path, used.model, styleLabel, true);
+    const observer = progress.observer ?? {};
     const releaseRun = (): void => {
       overrides.signal?.removeEventListener("abort", abortFromTaskModal);
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
@@ -1380,7 +1391,7 @@ export class TopicRuns {
       else options.notify?.(message);
     };
     const releaseStartup = (): void => {
-      progress?.end(path, progressAttempt);
+      progress.end();
       releaseRun();
     };
     let startupStatusAttempted = false;
@@ -1446,7 +1457,7 @@ export class TopicRuns {
       .then(result =>
         this.ports.mutate()(async () => {
           // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-          progress?.end(path, progressAttempt);
+          progress.end();
           const latest = await repo.readNote(path, options.map);
           const stale =
             latest.thinkingOrigin !== note.thinkingOrigin ||
@@ -1603,7 +1614,7 @@ export class TopicRuns {
       )
       .catch(error =>
         this.ports.mutate()(async () => {
-          progress?.end(path, progressAttempt);
+          progress.end();
           if (options.pipeline && isBudgetExhausted(error)) {
             // Not a failure of the note: it keeps its old status and gets no error text.
             await repo.updateNote(path, { status: note.status });
@@ -1634,7 +1645,7 @@ export class TopicRuns {
         })
       )
       .finally(() => {
-        progress?.end(path, progressAttempt);
+        progress.end();
         releaseRun();
         this.ports.refreshViews();
       })

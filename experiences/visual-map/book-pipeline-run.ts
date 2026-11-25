@@ -2457,10 +2457,12 @@ export class BookPipelineRuns {
     const refuseIfGone = (): void => {
       if (gone()) throw new BookPipelineRunError(this.disposed ? "disposed" : "cancelled");
     };
+    refuseIfGone();
     const notes = this.ports.notes;
     if (!notes) throw new BookPipelineRunError("unreadable");
     if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
     const map = await this.ports.readMap(mapPath);
+    refuseIfGone();
     const read = readBookPipeline(map);
     if (read.kind === "absent") throw new BookPipelineRunError("missing");
     if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
@@ -2477,19 +2479,21 @@ export class BookPipelineRuns {
     } catch {
       throw new BookPipelineRunError("unreadable");
     }
+    refuseIfGone();
     const items = snapshotNotes(raw);
     if (!items.length) throw new BookPipelineRunError("nothing");
     const sent = items.flatMap(item => (item.encoded ? [item.encoded] : [])).slice(0, MAX_NOTE_PARAGRAPHS);
     if (!sent.length) return { applied: 0, skipped: 0, marked: 0, edits: [] };
     // The copy comes first: when it fails nothing is spent and nothing is replaced.
     const saved = await this.ports.backupNote(path, raw).catch(() => ({ ok: false as const }));
-    if (!saved.ok) throw new BookPipelineRunError("backup_failed");
     refuseIfGone();
+    if (!saved.ok) throw new BookPipelineRunError("backup_failed");
     const rootNode = map.nodes.find(item => !item.parentId);
     const [card, root] = await Promise.all([
       this.ports.readCard(path),
       rootNode ? this.ports.readCard(rootNode.path) : undefined
     ]);
+    refuseIfGone();
     const config = this.ports.config(mapPath);
     const request: ApplyNotesRequest = {
       language: config.language,
@@ -2503,8 +2507,9 @@ export class BookPipelineRuns {
     // One call is one unit, saved through the map guard before the provider is asked; nothing else of the saved state changes.
     const store = new PipelineStore(state, next =>
       this.ports.mutate(async () => {
-        if (gone()) throw new BookPipelineRunError("cancelled");
+        refuseIfGone();
         await this.ports.updateMap(mapPath, doc => {
+          refuseIfGone();
           const found = readBookPipeline(doc);
           if (found.kind !== "usable" || found.data.runId !== state.runId) throw new BookPipelineRunError("stale");
           doc.bookPipeline = {
@@ -2519,6 +2524,7 @@ export class BookPipelineRuns {
     let replies: { id: string; text: string }[];
     let refused: { id: string; reason: string }[];
     try {
+      refuseIfGone();
       const result = await untilAborted(signal, this.ports.runPlan(applyNotesStep, request, { signal, admission }));
       replies = result.paragraphs;
       refused = result.refused;

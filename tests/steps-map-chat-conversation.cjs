@@ -592,7 +592,13 @@ test('turn: buildRequest throws: draft back, interrupt failed, the error as Noti
   assert.equal(all(c, 'notice').length, 0);
 });
 
-for (const [name, setup] of [['closed', r => { r.state.closed = true; }], ['turn gone', r => { r.panel.turn = null; }]]) {
+for (const [name, setup] of [
+  ['closed', r => { r.state.closed = true; }],
+  ['turn gone', r => { r.panel.turn = null; }],
+  ['path changed', r => { r.state.path = 'Other.md'; }],
+  ['map replaced at same path', r => { r.state.map = { id: 'new' }; }],
+  ['panel replaced', r => { r.state.panel = { ...r.panel }; }]
+]) {
   test(`turn: the build finishes after ${name}: abandoned, no usage notice`, async () => {
     const gate = deferred();
     const r = turnRig({ build: () => gate.promise });
@@ -619,7 +625,8 @@ test('turn: Stop while preparing aborts the build signal, puts the draft back, n
   gate.resolve(REQUEST());
   await r.sending;
   assert.equal(all(r, 'confirm').length, 0);
-  assert.equal(all(r, 'retract-false').length, 1, 'the second abandon retracts nothing');
+  assert.equal(all(r, 'retract-false').length, 0, 'late completion cannot abandon the turn twice');
+  assert.equal(all(r, 'interrupt').filter(e => e[1] === 'stopped').length, 1);
   assert.equal(all(r, 'notice').length, 0);
 });
 
@@ -641,7 +648,8 @@ for (const [name, setup] of [
   ['applying', r => { r.conv.applying = true; }],
   ['turn gone', r => { r.panel.turn = null; }],
   ['path changed', r => { r.state.path = 'Other.md'; }],
-  ['map changed', r => { r.state.map = { id: 'other' }; }]
+  ['map changed', r => { r.state.map = { id: 'other' }; }],
+  ['panel replaced', r => { r.state.panel = { ...r.panel }; }]
 ]) {
   test(`turn: the consent window answers late (${name}): abandoned, nothing recorded, registered or sent`, async () => {
     const r = turnRig({ confirmAs: 'hold' });

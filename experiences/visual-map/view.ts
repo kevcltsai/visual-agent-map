@@ -24765,14 +24765,34 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from: card, to: card, key, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
+    // Measure every endpoint once, before adding SVG elements; paths and labels share the same geometry.
+    const axis = relationAxisFor(layoutOf(this.map).direction);
+    const boxes = new Map<HTMLElement, CardBox>();
+    const boxFor = (card: HTMLElement): CardBox => {
+      let box = boxes.get(card);
+      if (!box) {
+        box = boxOf(card);
+        boxes.set(card, box);
+      }
+      return box;
+    };
+    const measured = links.map(link => {
+      const to = boxFor(link.to);
+      if (link.anchor)
+        return {
+          ...link,
+          d: this.anchorPathData(link.anchor, to),
+          at: this.anchorLabelPoint(link.anchor, to)
+        };
+      const from = boxFor(link.from);
+      return { ...link, d: relationPathData(from, to, axis), at: relationLabelPoint(from, to, axis) };
+    });
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
-    // In a map that grows sideways the lines lean to the left and right edges, in one that grows up or down to the ends.
-    const axis = relationAxisFor(layoutOf(this.map).direction);
-    for (const link of links) {
-      const d = this.relationLinkPath(link, axis),
+    for (const link of measured) {
+      const d = link.d,
         marker =
           link.kind === "related"
             ? null
@@ -24833,7 +24853,7 @@ export class VisualAgentMapView extends ItemView {
       this.edgesEl.appendChild(hit);
       this.relationHitEls.set(key, hit);
     }
-    for (const link of links) {
+    for (const link of measured) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
       if (link.anchor) label.setAttribute("data-anchor-relation", "");
@@ -24841,12 +24861,7 @@ export class VisualAgentMapView extends ItemView {
         label.addClass("is-ring-quiet");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(
-        link.key,
-        link.anchor
-          ? this.anchorLabelPoint(link.anchor, boxOf(link.to))
-          : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
-      );
+      this.placeRelationLabel(link.key, link.at);
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
@@ -24885,14 +24900,6 @@ export class VisualAgentMapView extends ItemView {
     return side
       ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor)
       : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
-  }
-  private relationLinkPath(
-    link: { from: HTMLElement; to: HTMLElement; anchor?: AnchorLine },
-    axis: ReturnType<typeof relationAxisFor>
-  ): string {
-    return link.anchor
-      ? this.anchorPathData(link.anchor, boxOf(link.to))
-      : relationPathData(boxOf(link.from), boxOf(link.to), axis);
   }
   /**
    * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing

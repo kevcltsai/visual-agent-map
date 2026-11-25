@@ -30,7 +30,7 @@ import {
   fishboneSpinePathData,
   type RelationBox
 } from "../../visual-map/relation-geometry";
-import { branchDirectionResolver, depthOf as treeDepthOf, lineKind } from "../../visual-map/tree-edge-rules";
+import { branchDirectionResolver, lineKind, treeDepthResolver } from "../../visual-map/tree-edge-rules";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
@@ -808,6 +808,7 @@ export function startViewer(doc: Document): void {
     const drawnTexts = new Map<string, string>();
     for (const text of texts) if (text.parentId && textEls.has(text.id)) drawnTexts.set(text.id, text.parentId);
     const directionOf = branchDirectionResolver(nodes, mapDirection, drawnTexts, rings);
+    const edgeDepth = treeDepthResolver(nodes, byId);
     const treeLine = (parent: HTMLElement, child: HTMLElement, direction: string, depth: number): string =>
       direction === "right"
         ? edgePathData(
@@ -826,7 +827,7 @@ export function startViewer(doc: Document): void {
       if (!parent || !child || !node.parentId) continue;
       const direction = lineKind(nodes, afterText ?? node.parentId, node.id, directionOf(node.parentId));
       const path = doc.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", treeLine(parent, child, direction, treeDepthOf(nodes, node.id)));
+      path.setAttribute("d", treeLine(parent, child, direction, edgeDepth(node.id)));
       path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
       const childInfo = info.get(node.id);
       if (childInfo && styleOf(childInfo).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -839,7 +840,7 @@ export function startViewer(doc: Document): void {
       const path = doc.createElementNS(SVG_NS, "path");
       path.setAttribute(
         "d",
-        treeLine(parent, child, directionOf(text.parentId), treeDepthOf(nodes, text.parentId) + 1)
+        treeLine(parent, child, directionOf(text.parentId), edgeDepth(text.parentId) + 1)
       );
       path.setAttribute("class", "vam-edge vam-text-edge");
       edges.append(path);

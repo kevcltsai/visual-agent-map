@@ -1871,8 +1871,13 @@ test('P4 headings: a planned card with 內容標題 shows them; written/checked 
   assert.equal(ui.bookCardView({ pipelineStage: 'checked', prompt }).points, undefined);
   assert.equal(ui.bookCardView({ pipelineStage: 'planned', prompt: '目標：x' }).points, undefined);
   assert.equal(ui.bookCardView({ pipelineStage: 'planned' }).points, undefined);
+  // A single-chapter rerun passes through "planned": the card keeps the written look (summary, not plan headings).
+  const rerunning = ui.bookCardView({ pipelineStage: 'planned', prompt }, false, false, false, undefined, true);
+  assert.equal(rerunning.points, undefined);
+  assert.equal(rerunning.summaryPrefix, ui.bookCardView({ pipelineStage: 'written', prompt }).summaryPrefix);
   assert.match(view_ts, /bookCard\.points && this\.hasBookPipeline\(\)/);
-  assert.match(view_ts, /bookCardView\(note \?\? \{\}, bookDone, bookStale, this\.isBookCardResolved\(node\.id\), bookPlace\)/);
+  assert.match(view_ts, /bookCardView\(\s*note \?\? \{\},\s*bookDone,\s*bookStale,\s*this\.isBookCardResolved\(node\.id\),\s*bookPlace,\s*bookRerunning\s*\)/);
+  assert.match(view_ts, /getBookPipelineProgress\(this\.path\)\?\.rerun\?\.nodeId === node\.id/);
   assert.match(css, /\.vam-book-points \{/);
 });
 

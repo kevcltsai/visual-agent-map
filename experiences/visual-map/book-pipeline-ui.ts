@@ -1056,19 +1056,22 @@ export interface BookCardView {
 /**
  * `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched.
  * `resolved`: the reader ticked this chapter's box for the attention it has now; its marks go the same way (review-a B3).
+ * `rerunning`: a single-chapter rerun passes through "planned"; the card keeps its written look (summary, not plan headings).
  */
 export function bookCardView(
   note: BookCardInput,
   accepted = false,
   stale = false,
   resolved = false,
-  place?: CardPlace
+  place?: CardPlace,
+  rerunning = false
 ): BookCardView {
   accepted = accepted || resolved;
   const stage = readPipelineStage(note.pipelineStage) ?? "pending";
   const role = readBookRole(note.bookRole);
   const issue = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : undefined;
-  const points = stage === "planned" && typeof note.prompt === "string" ? parseCardPoints(note.prompt) : undefined;
+  const planLook = stage === "planned" && !rerunning;
+  const points = planLook && typeof note.prompt === "string" ? parseCardPoints(note.prompt) : undefined;
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
@@ -1082,9 +1085,7 @@ export function bookCardView(
       ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) }
       : {}),
     ...(!accepted && stage === "checked" && issue ? structureNote(issue) : {}),
-    ...(stage === "pending"
-      ? {}
-      : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") })
+    ...(stage === "pending" ? {} : { summaryPrefix: t(planLook ? "ui.book_summary_plan" : "ui.book_summary_done") })
   };
 }
 

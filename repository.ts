@@ -2579,17 +2579,22 @@ export class Repository {
   }
 
   async reconcileMissingNodePaths(): Promise<number> {
-    const candidates = new Map<string, string[]>();
-    for (const file of await this.markedFiles("agent-map-node")) {
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? frontmatter(await this.app.vault.read(file));
-      const id = text(fm["node-id"]);
-      if (id) candidates.set(id, [...(candidates.get(id) ?? []), file.path]);
-    }
+    let candidates: Map<string, string[]> | undefined;
     let repaired = 0;
     for (const { file, map } of await this.readableMaps()) {
       let changed = false;
       for (const node of [...map.nodes]) {
         if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) continue;
+        // Healthy maps need no candidate index; share one index across all missing nodes.
+        if (!candidates) {
+          candidates = new Map();
+          for (const file of await this.markedFiles("agent-map-node")) {
+            const fm =
+              this.app.metadataCache.getFileCache(file)?.frontmatter ?? frontmatter(await this.app.vault.read(file));
+            const id = text(fm["node-id"]);
+            if (id) candidates.set(id, [...(candidates.get(id) ?? []), file.path]);
+          }
+        }
         const matches = candidates.get(node.id) ?? [];
         if (matches.length !== 1) continue;
         const oldPath = node.path;

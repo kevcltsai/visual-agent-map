@@ -12708,7 +12708,19 @@ export class VisualAgentMapView extends ItemView {
       note && this.hasBookPipeline()
         ? (this.paintBookStructure ? this.paintBookStructure.value : this.bookStructureNow())?.placeOf(node.id)
         : undefined;
-    const bookCard = bookCardView(note ?? {}, bookDone, bookStale, this.isBookCardResolved(node.id), bookPlace);
+    const bookRerunning =
+      !!note &&
+      !!this.path &&
+      this.hasBookPipeline() &&
+      this.plugin.getBookPipelineProgress(this.path)?.rerun?.nodeId === node.id;
+    const bookCard = bookCardView(
+      note ?? {},
+      bookDone,
+      bookStale,
+      this.isBookCardResolved(node.id),
+      bookPlace,
+      bookRerunning
+    );
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)

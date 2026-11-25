@@ -376,6 +376,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-edit-settings.en": {
+      "builder": "core/steps/book-pipeline/edit-settings.ts editSettingsStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-edit-settings.zh": {
+      "builder": "core/steps/book-pipeline/edit-settings.ts editSettingsStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-edit-settings.zh-CN": {
+      "builder": "core/steps/book-pipeline/edit-settings.ts editSettingsStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-expand-requirements.en": {
       "builder": "core/book-pipeline/settings.ts bookExpandRequirements",
       "language": "en",

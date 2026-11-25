@@ -144,6 +144,33 @@ test('logging off at the start stays off even if switched on mid-call; switched 
   assert.deepEqual(mid.names(), ['begin', 'sent']);
 });
 
+test('sent text is collected only for Codex usage estimates, independently of request callbacks', async () => {
+  for (const [capabilities, withUsage, expectedReads] of [
+    [mod.CODEX_CAPABILITIES, false, 0],
+    [mod.CLAUDE_CAPABILITIES, true, 0],
+    [mod.CODEX_CAPABILITIES, true, 1]
+  ]) {
+    let reads = 0, callbacks = 0;
+    const records = [];
+    const runtime = {
+      capabilities,
+      run: async request => {
+        request.controls.onRequest({ get input() { reads++; return [{ type: 'text', text: 'abcdefgh' }]; } });
+        return 'reply';
+      }
+    };
+    const calls = new mod.AiCalls({
+      runtimeFor: () => runtime, exchanges: () => null,
+      ...(withUsage ? { usage: () => ({ record: entry => records.push(entry) }) } : {})
+    });
+    assert.equal(await calls.run(prepared(), options({ task: { onRequest: () => { callbacks++; } } }), raw => raw), 'reply');
+    assert.equal(reads, expectedReads);
+    assert.equal(callbacks, 1);
+    assert.equal(records.length, expectedReads);
+    if (expectedReads) assert.equal(records[0].estimated, true);
+  }
+});
+
 // ---- registry ----
 test('the registry holds the call under taskName:uuid while it runs, in the Map that was passed in, and every ending clears it', async () => {
   const hold = deferred();
@@ -319,6 +346,7 @@ test('run with task.generateImage on a runtime without image generation: refused
   assert.equal(runtimeCalls.length, 0);
   // The same options on a runtime that can draw go through.
   assert.equal(await h.calls.run(prepared(), options({ task: { generateImage: true } }), raw => raw), 'reply');
+  assert.deepEqual(h.state.models, ['gpt-6-luna'], 'the validated image runtime is also the runtime used for the call');
 });
 
 // ---- onBegin, failMessage, entryEnd ----

@@ -275,3 +275,43 @@ test('counter-example: a map whose usage is only folded away (older months) is n
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-empty').hidden, true, 'folded usage is usage: no empty state');
   assert.equal(strongs(h)[0], '500');
 });
+
+
+test('detached usage controls cannot toggle or change the replacement panel', async () => {
+  const h = rig((await newStore(mixed)).store);
+  const oldButton = h.button();
+  oldButton.click();
+  const oldRadio = radios(h)[2];
+  const oldGroup = find(h.panel(), i => i.attrs.role === 'radiogroup');
+  h.mount();
+  oldButton.click();
+  assert.ok(h.panel(), 'the obsolete button cannot close the new panel');
+  oldRadio.click();
+  assert.deepEqual(checked(h), ['Total']);
+  oldGroup.fire('keydown', { key: 'ArrowRight', preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(checked(h), ['Total']);
+  pick(h, 'Claude');
+  assert.deepEqual(checked(h), ['Claude']);
+  h.control.stop();
+  oldButton.click();
+  assert.equal(h.control.open, false);
+});
+
+test('mount moves document listeners to the new overlay and close releases its attachment', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click();
+  const other = rig((await newStore()).store);
+  other.control.stop();
+  other.bar.empty();
+  h.control.mount(other.bar, other.overlay);
+  assert.equal(h.doc.listeners.keydown.length, 0);
+  assert.equal(h.doc.listeners.pointerdown.length, 0);
+  assert.equal(other.doc.listeners.keydown.length, 1);
+  assert.equal(other.doc.listeners.pointerdown.length, 1);
+  assert.ok(other.panel());
+  h.control.close();
+  assert.equal(other.doc.listeners.keydown.length, 0);
+  assert.equal(other.doc.listeners.pointerdown.length, 0);
+  assert.equal(other.panel(), undefined);
+  assert.equal(h.control.parts, null);
+});

@@ -3106,7 +3106,6 @@ export class VisualAgentMapView extends ItemView {
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
-    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -3169,18 +3168,14 @@ export class VisualAgentMapView extends ItemView {
     this.viewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
-    if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.cancelPendingRefresh();
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverCard?.remove();
     this.dragCleanup?.();
     this.anchorDragCancel?.(false);
     // Closing the map's view stops its picture-book run (resumable); the run's calls cannot outlive the view that drives them.
     if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
@@ -3387,6 +3382,18 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /** Captures this open of a map, not a mutable map object that can be refreshed in place. */
+  private captureMapSession(): () => boolean {
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    return () => !this.closed && this.path === path && this.mapOpenEpoch === epoch && !!this.map;
+  }
+  /** A queued gesture must still belong to the map where the user made it when it reaches the mutation queue. */
+  private enqueueMapSession(work: () => Promise<void>, isCurrent = this.captureMapSession()): void {
+    this.enqueue(async () => {
+      if (isCurrent()) await work();
+    });
+  }
   /**
    * A card dropped while notes are still being read is written after the read (the queue holds it). By then the view may be
    * closed or showing another map, and the card is not where the drop saw it: the write is dropped, never applied to the wrong map.
@@ -3396,12 +3403,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(work);
       return;
     }
-    const epoch = this.mapOpenEpoch,
-      path = this.path;
-    this.enqueue(async () => {
-      if (this.closed || this.mapOpenEpoch !== epoch || this.path !== path || !this.map) return;
-      await work();
-    });
+    this.enqueueMapSession(work);
   }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   private outputLanguageMemory(): OutputLanguageMemory {
@@ -3521,6 +3523,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
+    this.clearChatHighlight();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
@@ -3546,9 +3549,7 @@ export class VisualAgentMapView extends ItemView {
       this.exitPresentation(false);
     }
     if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
+      await this.flushPendingViewport();
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
@@ -3574,6 +3575,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     if (this.path !== path) {
+      this.cancelPendingRefresh();
       this.dropCanvasInteractionModes();
       this.hiddenAnchors.clear();
     }
@@ -6017,11 +6019,20 @@ export class VisualAgentMapView extends ItemView {
       .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
       .catch(error => errorNotice(error));
   }
-  changed(file: TFile): void {
-    if (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path)) return;
+  private cancelPendingRefresh(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
-    this.refreshTimer = window.setTimeout(() => {
-      if (this.closed) return;
+    this.refreshTimer = null;
+  }
+  changed(file: TFile): void {
+    if (this.closed || (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path))) return;
+    this.cancelPendingRefresh();
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.path === path && this.mapOpenEpoch === epoch;
+    const timer = window.setTimeout(() => {
+      if (this.refreshTimer !== timer) return;
+      this.refreshTimer = null;
+      if (!isCurrent()) return;
       if (this.dragging) {
         this.changed(file);
         return;
@@ -6033,15 +6044,20 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       this.enqueue(async () => {
-        if (file.path === this.path) {
-          this.map = await this.plugin.repo.readMap(this.path);
+        if (!isCurrent()) return;
+        if (file.path === path) {
+          const map = await this.plugin.repo.readMap(path);
+          if (!isCurrent()) return;
+          this.map = map;
           this.history.clear();
           await this.plugin.rebuildDerivedData();
         }
-        await this.hydrate();
-        this.render();
+        if (!isCurrent()) return;
+        await this.hydrate(isCurrent);
+        if (isCurrent()) this.render();
       });
     }, 400);
+    this.refreshTimer = timer;
   }
   /**
    * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
@@ -6078,6 +6094,7 @@ export class VisualAgentMapView extends ItemView {
   }
   deleted(file: TFile): void {
     if (file.path === this.path) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
       if (this.deletedMap?.path !== file.path) this.history.clear();
@@ -9944,7 +9961,7 @@ export class VisualAgentMapView extends ItemView {
       images = imageFilesFrom({ files: all });
     for (const other of all.filter(item => !images.includes(item)))
       new Notice(t("ui.canvas_image_refused", other.name || "?"));
-    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+    if (images.length) this.enqueueMapSession(() => this.attachCardImages(node, images));
   }
   /**
    * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
@@ -9954,9 +9971,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
     if (!this.map || !this.cardAcceptsImages(node)) return;
-    const mapPath = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let first = true;
     for (const file of files) {
       const label = file.name || "?";
@@ -9968,10 +9983,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -9982,7 +9997,7 @@ export class VisualAgentMapView extends ItemView {
       const setCover = first;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale() || !this.map) return;
+        if (!isCurrent() || !this.map) return;
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction()
           .createAttachment("image", { name, data, sourcePath: node.path })
@@ -10392,6 +10407,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
   private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const isCurrent = this.captureMapSession();
     const input = this.contentEl.createEl("input", {
       cls: "vam-sr-only",
       attr: { type: "file", accept: "image/*", multiple: "" }
@@ -10399,7 +10415,7 @@ export class VisualAgentMapView extends ItemView {
     input.addEventListener("change", () => {
       const chosen = Array.from(input.files ?? []);
       input.remove();
-      if (chosen.length) this.queueCanvasImages(chosen, point);
+      if (chosen.length && isCurrent()) this.queueCanvasImages(chosen, point);
     });
     input.click();
   }
@@ -10418,7 +10434,7 @@ export class VisualAgentMapView extends ItemView {
     const target = this.map?.nodes.find(item => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
       event.preventDefault();
-      this.enqueue(() => this.attachCardImages(target, images));
+      this.enqueueMapSession(() => this.attachCardImages(target, images));
       return true;
     }
     if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
@@ -10430,7 +10446,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Fences the gesture on this map and this open of it, then queues the writes. */
   private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
-    this.enqueue(() => this.insertCanvasImages(files, point));
+    this.enqueueMapSession(() => this.insertCanvasImages(files, point));
   }
   /**
    * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
@@ -10439,9 +10455,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
     if (!this.canEditCanvasItems()) return;
-    const path = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let offset = 0;
     for (const file of files) {
       const label = file.name || "?";
@@ -10453,10 +10467,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -10473,7 +10487,7 @@ export class VisualAgentMapView extends ItemView {
         y = point.y + offset;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale()) return;
+        if (!isCurrent()) return;
         this.focusItemId = id;
         await this.mapChangeSnapshots(
           (map, attachment) => {
@@ -11140,7 +11154,7 @@ export class VisualAgentMapView extends ItemView {
     for (const view of this.plugin.views()) {
       if (view === this || view.path !== from) continue;
       if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
-      await view.flushForCrossMap();
+      await view.flushPendingViewport();
     }
     let sourceMap: MapDocument;
     try {
@@ -11234,13 +11248,6 @@ export class VisualAgentMapView extends ItemView {
           if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
       }
     });
-  }
-  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
-  private async flushForCrossMap(): Promise<void> {
-    if (this.viewportTimer === null) return;
-    window.clearTimeout(this.viewportTimer);
-    this.viewportTimer = null;
-    await this.persistViewport();
   }
   /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
   private crossMapEntry(id: string): Action {
@@ -11651,6 +11658,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -11765,11 +11773,7 @@ export class VisualAgentMapView extends ItemView {
         return file instanceof TFile ? () => this.app.vault.readBinary(file) : null;
       },
       path: () => this.path,
-      fence: () => {
-        const mapPath = this.path,
-          epoch = this.mapOpenEpoch;
-        return (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-      },
+      fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";
@@ -11935,11 +11939,7 @@ export class VisualAgentMapView extends ItemView {
           action: () =>
             this.enqueue(async () => {
               if (!this.map) return;
-              if (this.viewportTimer !== null) {
-                window.clearTimeout(this.viewportTimer);
-                this.viewportTimer = null;
-                await this.persistViewport();
-              }
+              if (this.viewportTimer !== null) await this.flushPendingViewport();
               const path = this.path,
                 file = this.plugin.repo.file(path),
                 content = await this.app.vault.read(file),
@@ -11951,6 +11951,7 @@ export class VisualAgentMapView extends ItemView {
                 this.deletedMap = null;
                 throw error;
               }
+              this.clearChatHighlight();
               this.map = null;
               this.path = "";
               await this.plugin.rebuildDerivedData();
@@ -11994,17 +11995,14 @@ export class VisualAgentMapView extends ItemView {
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
     this.path = "";
+    this.clearChatHighlight();
     this.map = null;
     await this.plugin.rebuildDerivedData();
     this.render();
     this.restoreMapFocus(this.lastMapFocus);
   }
   private async restoreDeletedMapFromUi(): Promise<void> {
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
     if (this.history.undoEntry === this.deletedMap?.deleteAction) {
       await this.travel(false);
       this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
@@ -19607,13 +19605,23 @@ export class VisualAgentMapView extends ItemView {
         this.viewportQueued = false;
       });
   }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushPendingViewport(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
+    const path = this.path;
     const viewport = { ...this.map.viewport };
-    const written = await this.plugin.repo.updateMap(this.path, map => {
+    const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });
+    // A late write for the previous map must not stamp the newly opened map.
+    if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)
@@ -22625,6 +22633,7 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   private chatSelect(ids: string[]): void {
+    if (this.closed || !this.map) return;
     this.selection.chatSelect(ids);
     this.aiTargets = ids;
     if (!this.closed) this.render();
@@ -22638,12 +22647,22 @@ export class VisualAgentMapView extends ItemView {
     return ids.length ? ids : this.chatSelectionIds();
   }
   private highlightFadeTimer: number | null = null;
+  /** Forgets the departing map's AI targets and cancels its pending fade. */
+  private clearChatHighlight(): void {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = null;
+    this.aiTargets = null;
+  }
   /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
   private armHighlightFade(idleSince: number | null = null): void {
+    if (this.closed || !this.map) return;
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
-    this.highlightFadeTimer = window.setTimeout(() => {
+    const mapId = this.map.id;
+    const timer = window.setTimeout(() => {
+      if (this.highlightFadeTimer !== timer) return;
       this.highlightFadeTimer = null;
-      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      if (this.closed || !this.map || this.map.id !== mapId) return;
+      if (this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
       // The user took over (a Cmd-click, a marquee): what is selected is theirs now and stays.
       if (!this.selection.isPureHighlight()) {
         this.aiTargets = null;
@@ -22656,6 +22675,7 @@ export class VisualAgentMapView extends ItemView {
       this.aiTargets = null;
       this.applySelectionChange(this.selection.clearMulti());
     }, 1000);
+    this.highlightFadeTimer = timer;
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */

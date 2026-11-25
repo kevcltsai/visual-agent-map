@@ -32,7 +32,14 @@ import {
   normalizeBodyOrder,
   localizeHeadings
 } from "./core/repository-note-body";
-import { REFERENCE_TEXT, relationReferences, derivedLabelLanguage, withReferenceLinks, noteLink } from "./core/repository-note-references";
+import {
+  REFERENCE_TEXT,
+  relationReferences,
+  derivedLabelLanguage,
+  withReferenceLinks,
+  noteLink,
+  localizeReference
+} from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";

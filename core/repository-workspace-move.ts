@@ -75,12 +75,19 @@ export async function moveTopicsWithRollback(
   } catch (error) {
     const rollbackErrors: string[] = [];
     for (const { move, newMapPath, originalMap, journal } of [...done].reverse()) {
-      try {
-        // Put back the exact text of every note and map the path rebase rewrote, then undo the folder move.
-        for (const prior of [...journal].reverse()) {
+      // A failed journal restore must not suppress restoration of other files or the folder itself.
+      for (const prior of [...journal].reverse()) {
+        try {
           const file = ports.app.vault.getAbstractFileByPath(prior.path);
-          if (file instanceof TFile) await ports.app.vault.modify(file, prior.content);
+          if (!(file instanceof TFile)) throw new Error("Journaled file not found during rollback.");
+          await ports.app.vault.modify(file, prior.content);
+        } catch (rollbackError) {
+          rollbackErrors.push(
+            `${prior.path}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
+          );
         }
+      }
+      try {
         await ports.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
         await ports.app.vault.modify(ports.file(`${move.fromRoot}/Map.md`), originalMap);
         ports.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);

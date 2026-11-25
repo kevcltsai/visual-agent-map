@@ -49,30 +49,43 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
       await ports.app.vault.process(file, current => {
         if (current !== edit.before)
           throw new Error(translate(ports.language(), "error.move_links_note_changed_0", path));
+        // Record before publishing: an adapter can reject after applying the callback's result.
+        written.push({ path, before: edit.before, after: edit.after });
         return edit.after;
       });
-      written.push({ path, before: edit.before, after: edit.after });
     }
   } catch (error) {
-    try {
-      for (const entry of written.reverse()) {
+    const rollbackErrors: string[] = [];
+    const describe = (failure: unknown): string => (failure instanceof Error ? failure.message : String(failure));
+    for (const entry of written.reverse()) {
+      try {
         const file = ports.app.vault.getAbstractFileByPath(entry.path);
-        if (file instanceof TFile)
-          await ports.app.vault.process(file, current => (current === entry.after ? entry.before : current));
+        if (!(file instanceof TFile)) throw new Error(`${ports.message("error.file_not_found")}: ${entry.path}`);
+        await ports.app.vault.process(file, current => {
+          if (current === entry.before) return current;
+          if (current !== entry.after)
+            throw new Error(translate(ports.language(), "error.move_links_note_changed_0", entry.path));
+          return entry.before;
+        });
+      } catch (rollbackError) {
+        rollbackErrors.push(describe(rollbackError));
       }
-      const moved = ports.app.vault.getAbstractFileByPath(target);
-      if (moved) await ports.app.vault.rename(moved, origin);
-    } catch (rollbackError) {
-      const original = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        translate(
-          ports.language(),
-          "error.move_undo_failed_0",
-          original,
-          rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-        )
-      );
     }
+    // A single failed restore must not strand the moved file or skip other independent restores.
+    try {
+      const moved = ports.app.vault.getAbstractFileByPath(target);
+      if (!moved || ports.app.vault.getAbstractFileByPath(origin))
+        throw new Error(ports.message("error.move_not_applied"));
+      await ports.app.vault.rename(moved, origin);
+      if (!ports.app.vault.getAbstractFileByPath(origin) || ports.app.vault.getAbstractFileByPath(target))
+        throw new Error(ports.message("error.move_not_applied"));
+    } catch (rollbackError) {
+      rollbackErrors.push(describe(rollbackError));
+    }
+    if (rollbackErrors.length)
+      throw new Error(
+        translate(ports.language(), "error.move_undo_failed_0", describe(error), rollbackErrors.join("; "))
+      );
     throw error;
   }
 }

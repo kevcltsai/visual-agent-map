@@ -2,7 +2,7 @@
  * Which of the pipeline's hidden `[!vam-book]` callouts the owner may see: the root's book plan and a card's plan block (its Prompt, shown
  * as 提示 / Prompt). Judged by the title text, against the same label tables the notes are written with. Pure.
  */
-import { LANGUAGES, type ContentLanguage, type TranslationKey } from "../../i18n";
+import { LANGUAGES, type TranslationKey } from "../../i18n";
 import { readPipelineStage } from "./model";
 import {
   isBookPlanTitle,
@@ -34,10 +34,6 @@ export function planCalloutKind(title: string): PlanCalloutKind | undefined {
 
 /** The callout metadata of the please-look box (`[!vam-review|vam-attention]`): Obsidian renders it as `data-callout-metadata`, so the rerun button finds the box without reading its title. */
 export const ATTENTION_HOOK = "vam-attention";
-
-/** The language the plan view shows its titles and relabelled fields in: always the book's content language, whatever language the note was stored in. */
-export type PlanLocale = ContentLanguage;
-export const planLocale = (language: ContentLanguage): PlanLocale => language;
 
 /** The callout title of the root's book plan, or of a card's plan by what the card is. */
 export function planTitleKey(kind: PlanCalloutKind["kind"], card: CardKind): TranslationKey {

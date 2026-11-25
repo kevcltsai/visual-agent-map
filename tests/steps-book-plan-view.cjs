@@ -106,10 +106,21 @@ test('markPlanCallouts: an unwritten note opens its plan through Obsidian\'s own
   assert.equal(w.toggle.clicks, 0); assert.ok(written.classes.has('is-collapsed')); assert.equal(w.style.display, 'none', 'a written note keeps the fold');
 });
 
-test('planLocale: always the book language (an English-stored note in a zh-TW book shows zh-TW titles; a zh-stored note in an English book shows English)', () => {
-  assert.equal(view.planLocale('zh-CN'), 'zh-CN');
-  assert.equal(view.planLocale('zh-TW'), 'zh-TW');
-  assert.equal(view.planLocale('en'), 'en');
+test('plan rendering uses the book language for titles and labels regardless of the stored title language', () => {
+  for (const [language, dict] of [['zh-TW', zhTW], ['zh-CN', zhCN], ['en', en]]) {
+    for (const stored of ['全書企劃', 'Book plan']) {
+      const heading = title(stored);
+      const line = { data: '接入點：y' };
+      const content = { childNodes: [line], children: [], ownerDocument: { createTreeWalker: () => {
+        let next = line;
+        return { nextNode: () => { const current = next; next = null; return current; } };
+      } } };
+      const callout = el({}, { '.callout-title-inner': heading, '.callout-content': content });
+      dom.markPlanCallouts(callout, env('written', language));
+      assert.equal(heading.textContent, dict['ui.book_plan_title_book'].replace('{0}', dict['ui.book_bar_plan_go']));
+      assert.equal(line.data, dict['ui.book_plan_label_entry'] + '：y');
+    }
+  }
 });
 
 test('planTitleKey and the titles: preface / chapter / section, in zh-TW, zh-CN and en; the book plan keeps its own title', () => {

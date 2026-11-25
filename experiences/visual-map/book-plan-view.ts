@@ -6,11 +6,9 @@ import {
   ATTENTION_HOOK,
   foldLabelOf,
   planCalloutKind,
-  planLocale,
   planStartsOpen,
   planTitleKey,
-  relabelLine,
-  type PlanLocale
+  relabelLine
 } from "../../core/book-pipeline/plan-view";
 
 /**
@@ -43,7 +41,7 @@ const textNodesOf = (root: Node): Text[] => {
 };
 
 /** Chinese notes: shows a plan line's label under its friendlier name (`接入點：` reads 怎麼開場：) in the book's language. Only the text node is changed, the file is not. */
-function relabel(content: HTMLElement, locale: PlanLocale): void {
+function relabel(content: HTMLElement, locale: ContentLanguage): void {
   for (const node of textNodesOf(content)) {
     const shown = relabelLine(node.data, field => translate(locale, LABEL_KEY[field]));
     if (shown !== undefined) node.data = shown;
@@ -147,7 +145,8 @@ export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
         content.style.removeProperty("display");
       }
     }
-    const locale = planLocale(env.language());
+    // Display in the book's content language, regardless of the stored note language.
+    const locale = env.language();
     relabel(content, locale);
     title.textContent =
       kind.kind === "book"

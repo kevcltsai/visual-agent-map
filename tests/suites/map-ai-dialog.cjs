@@ -387,12 +387,13 @@ integrationTest('research Notice: Re-run with Standard pressed after the view mo
   const hooks = h.view.backgroundHooks(h.parent.path, h.parent);
   hooks.completed('research', { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] });
   const notice = actionNotices(h).at(-1);
-  const before = h.notices.length, original = h.view.path;
-  h.view.path = 'Maps/Other/Other.vam.json';
+  const before = h.notices.length, original = h.view.path, originalMap = h.view.map;
+  // Another map, not a rename: a different map id (a rename keeps the id and its work).
+  h.view.path = 'Maps/Other/Other.vam.json'; h.view.map = { ...originalMap, id: 'other-map' };
   notice.actions[1].click();
   assert.deepEqual(reruns, [], 'no run on the other map');
   assert.equal(h.notices.length, before + 1); assert.match(h.notices.at(-1), /Go back to the map this research ran on/);
-  h.view.path = original;
+  h.view.path = original; h.view.map = originalMap;
   hooks.completed('research', { summary: 'S', detail: 'Model knowledge is insufficient.', suggestions: [], visualReferences: [] });
   actionNotices(h).at(-1).actions[1].click();
   assert.deepEqual(reruns, [h.parent.id], 'back on the original map the button runs');
@@ -582,7 +583,7 @@ integrationTest('multi-select synthesis: Stop during the draft then Try again ru
 integrationTest('synthesis: a result for a map that is no longer open raises no Notice and stores nothing under the new map (Low 1)', async () => {
   const h = await synthesisHarness();
   const hooks = h.view.backgroundHooks(h.parent.path, h.parent);
-  h.view.path = 'Other map.md';
+  h.view.path = 'Other map.md'; h.view.map = { ...h.view.map, id: 'other-map' };
   hooks.completed('research');
   assert.equal(h.notices.length, 0, 'no cross-map Notice');
 });

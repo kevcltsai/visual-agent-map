@@ -347,8 +347,11 @@ export function startViewer(doc: Document): void {
   let framesLayer: HTMLElement | null = null;
   const textEls = new Map<string, HTMLElement>();
   const cardShapes = new Map<string, ViewerShape>();
-  const kidsOf = childIndex(nodes);
-  const branchCount = branchSizeResolver(kidsOf);
+  const graphChildren = childIndex(nodes);
+  const branchCount = branchSizeResolver(graphChildren);
+  // Keep the outline's old convention: root cards are not children of the empty id.
+  const kidsOf = new Map(graphChildren);
+  kidsOf.delete("");
 
   // ---- language: a translated file lists its languages (the original first); a plain file has one and no menu.
   const extras = readUiExtras(doc);
@@ -811,6 +814,10 @@ export function startViewer(doc: Document): void {
   }
   /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
+    // A synchronous draw supersedes the queued drag/cover draw.
+    if (edgeFrame !== null) window.cancelAnimationFrame?.(edgeFrame);
+    edgeFrame = null;
+    edgeGeneration++;
     edges.replaceChildren();
     drawFrames();
     const mapDirection = mapLayout.direction;
@@ -989,7 +996,7 @@ export function startViewer(doc: Document): void {
       const rects: BraceRect[] = [];
       for (const id of summary.members) {
         const below = new Set<string>();
-        walkDescendants(kidsOf, id, below);
+        walkDescendants(graphChildren, id, below);
         for (const each of [id, ...below]) {
           const card = cards.get(each);
           if (card)
@@ -1021,11 +1028,14 @@ export function startViewer(doc: Document): void {
       summaryLayer.append(el);
     }
   }
-  let edgeFrame = 0;
+  let edgeFrame: number | null = null;
+  let edgeGeneration = 0;
   const scheduleEdges = (): void => {
-    if (edgeFrame) return;
+    if (edgeFrame !== null) return;
+    const generation = ++edgeGeneration;
     edgeFrame = window.requestAnimationFrame(() => {
-      edgeFrame = 0;
+      if (generation !== edgeGeneration) return;
+      edgeFrame = null;
       drawEdges();
     });
   };
@@ -1179,11 +1189,10 @@ export function startViewer(doc: Document): void {
   }
   /** A cover's real shape is known: the cards are taller or shorter, so the lines are drawn again and, while the reader has not moved the view, the view shows everything again. */
   function afterCoverSized(): void {
-    markClipped();
-    scheduleEdges();
-    if (coverRefit) return;
+    if (coverRefit !== null) return;
     coverRefit = window.requestAnimationFrame(() => {
-      coverRefit = 0;
+      coverRefit = null;
+      markClipped();
       // Once the reader has folded or unfolded, covers sized after it can overlap what was just arranged: the map's settle pass, once per frame.
       // Opening a file never gets here with a change (it keeps the saved places).
       if (arranged && needsSecondPass()) {
@@ -1192,17 +1201,17 @@ export function startViewer(doc: Document): void {
         const anchor = anchorId ? cards.get(anchorId) : undefined;
         const before = anchor?.getBoundingClientRect();
         layout();
-        drawEdges();
         if (anchor && before) {
           const rect = anchor.getBoundingClientRect();
           view = { ...view, x: view.x + before.left - rect.left, y: view.y + before.top - rect.top };
           transform();
         }
       }
+      drawEdges();
       if (!viewTouched && selected === null && !pointers.size) fit();
     });
   }
-  let coverRefit = 0;
+  let coverRefit: number | null = null;
   /** The card the reader last folded or unfolded by itself (a whole-map level action clears it). */
   let lastActed: string | null = null;
   /** True after the first fold change or Auto layout: until then the saved places are what is drawn. */

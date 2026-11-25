@@ -1,5 +1,14 @@
 import { isPlaceholder } from "./note-placeholder";
-import { isNoteLanguage, NOTE_HEADING_SETS, translate, uiLanguageOfHeadings, type NoteHeadingName, type NoteHeadings, type NoteLanguage, type UiLanguage } from "../i18n";
+import {
+  isNoteLanguage,
+  NOTE_HEADING_SETS,
+  translate,
+  uiLanguageOfHeadings,
+  type NoteHeadingName,
+  type NoteHeadings,
+  type NoteLanguage,
+  type UiLanguage
+} from "../i18n";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "../ai/detail-templates";
 import { fencedLines } from "../ai/markdown-blocks";
 import { contentHash } from "./map-chat-context";

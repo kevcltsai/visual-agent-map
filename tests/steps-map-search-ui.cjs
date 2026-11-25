@@ -296,3 +296,43 @@ test('34: the new CSS stays out of the share viewer: every rule starts with .vam
   assert.ok(rules.length >= 5);
   for (const rule of rules) assert.ok(rule.startsWith('.vam-view '), rule);
 });
+
+test('map search: detached field cannot change the current query or close the new bar', async () => {
+  const h = await harness({ collapse: false });
+  h.press(h.card('alpha')); h.type('plan');
+  const old = h.bar().input;
+  h.view.render();
+  old.value = 'needle'; old.fire('input', { target: old });
+  old.fire('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {} });
+  assert.equal(h.view.mapSearch.query, 'plan');
+  assert.equal(h.bar().input.value, 'plan');
+  assert.ok(h.card('alpha').classes.has('is-search-match'));
+});
+
+test('map search: a queued jump from a closed session cannot jump in its replacement', async () => {
+  const h = await harness({ collapse: false });
+  const queued = [];
+  h.view.enqueue = work => queued.push(work);
+  h.press(h.card('alpha')); h.type('plan'); h.keydown('Enter');
+  assert.equal(queued.length, 1);
+  h.keydown('Escape');
+  h.press(h.card('beta')); h.type('市場');
+  await queued[0]();
+  assert.equal(h.centred.length, 0);
+  assert.equal(h.view.mapSearch.query, '市場');
+});
+
+test('map search: a canceled announcement callback cannot clear or speak for its replacement', async () => {
+  const h = await harness({ collapse: false });
+  h.press(h.card('alpha')); h.type('a');
+  const old = h.timers.at(-1).fn;
+  h.type('plan');
+  const live = h.timers.at(-1).fn;
+  const before = h.spoken();
+  old();
+  assert.equal(h.spoken(), before);
+  assert.ok(h.view.mapSearch.cancelAnnouncement);
+  live();
+  assert.equal(h.spoken(), '1 matches');
+  assert.equal(h.view.mapSearch.cancelAnnouncement, null);
+});

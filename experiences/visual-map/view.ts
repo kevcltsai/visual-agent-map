@@ -343,7 +343,8 @@ import {
   reviewRun,
   type BookPlanChatDeps
 } from "./book-plan-chat";
-import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
+import { bookAuthorRequirements, effectiveSettings } from "../../core/book-pipeline/settings";
+import { parseBookPlanDecisions } from "../../core/book-pipeline/plan-text";
 import {
   BOOK_SETTING_FIELDS,
   bookCardLock,
@@ -582,6 +583,7 @@ import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
+  BookSettingsViewModal,
   BookStartModal,
   deletedChapterTitles,
   type BookModelChoiceInput
@@ -1921,7 +1923,7 @@ export class VisualAgentMapView extends ItemView {
     currentId: string | null;
     returnNodeId: string | null;
     returnEl: HTMLElement | null;
-    announceTimer: number | null;
+    cancelAnnouncement: (() => void) | null;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
@@ -2453,7 +2455,7 @@ export class VisualAgentMapView extends ItemView {
       currentId: null,
       returnNodeId: card ? card[0] : null,
       returnEl: card ? null : from,
-      announceTimer: null
+      cancelAnnouncement: null
     };
     this.mountMapSearch();
     this.applySearchMarks();
@@ -2462,35 +2464,52 @@ export class VisualAgentMapView extends ItemView {
   private mountMapSearch(): void {
     const search = this.mapSearch;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
-    if (!search || !overlay) return;
-    this.mapSearchBar = buildMapSearchBar(overlay, {
+    if (!search || !overlay || this.closed || !this.map) return;
+    const live = (): boolean => !this.closed && this.mapSearch === search && this.mapSearchBar === bar;
+    const bar = buildMapSearchBar(overlay, {
       query: search.query,
       label: t("ui.map_search_label"),
       closeLabel: t("ui.map_search_close"),
       countText: this.mapSearchCountText(),
       onInput: value => {
+        if (!live()) return;
         search.query = value;
         search.currentId = null;
         this.applySearchMarks();
         this.announceSearchLater(search);
       },
-      onStep: delta => this.enqueue(() => this.stepMapSearch(delta)),
-      onClose: () => this.closeMapSearch(true)
+      onStep: delta => {
+        if (!live()) return;
+        const query = search.query;
+        this.enqueue(async () => {
+          if (!this.closed && this.mapSearch === search && search.query === query) await this.stepMapSearch(delta);
+        });
+      },
+      onClose: () => {
+        if (live()) this.closeMapSearch(true);
+      }
     });
+    this.mapSearchBar = bar;
   }
   /** Call before a repaint: the returned function (call it after) rebuilds the box and gives the field its focus, query and caret back. */
   private holdMapSearch(): () => void {
     const bar = this.mapSearchBar;
     this.mapSearchBar = null;
-    if (!this.mapSearch) return () => {};
+    const search = this.mapSearch;
+    if (!search) return () => {};
+    if (!this.map || this.closed) {
+      this.closeMapSearch(false);
+      return () => {};
+    }
     const focused = !!bar && this.contentEl?.ownerDocument?.activeElement === bar.input;
     const start = focused ? bar.input.selectionStart : null,
       end = focused ? bar.input.selectionEnd : null;
     return () => {
-      if (!this.mapSearch) return;
+      if (this.closed || this.mapSearch !== search || !this.map || this.mapSearchBar) return;
       this.mountMapSearch();
       this.applySearchMarks();
-      const input = this.mapSearchBar?.input;
+      // mountMapSearch() sets the bar; the guard above narrowed the field to null, so read it fresh.
+      const input = (this.mapSearchBar as MapSearchBar | null)?.input;
       if (!focused || !input || !this.mapWindowIsActive()) return;
       input.focus({ preventScroll: true });
       if (start !== null && end !== null) input.setSelectionRange(start, end);
@@ -2527,21 +2546,29 @@ export class VisualAgentMapView extends ItemView {
     this.mapSearchBar?.setCount(this.mapSearchCountText());
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
-  private announceSearchLater(search: { query: string; announceTimer: number | null }): void {
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
-    search.announceTimer = window.setTimeout(() => {
-      search.announceTimer = null;
+  private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
+    search.cancelAnnouncement?.();
+    const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
+    const cancel = (): void => {
+      if (search.cancelAnnouncement !== cancel) return;
+      search.cancelAnnouncement = null;
+      timerWindow.clearTimeout(handle);
+    };
+    const handle = timerWindow.setTimeout(() => {
+      if (search.cancelAnnouncement !== cancel) return;
+      search.cancelAnnouncement = null;
       if (this.closed || this.mapSearch !== search || search.query === "") return;
       const total = this.mapSearchResult()?.matches.length ?? 0;
       this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
     }, 300);
+    search.cancelAnnouncement = cancel;
   }
   /** Enter / Shift+Enter: jump to the next / previous match (cycling). A match inside folded branches opens them in one history step. */
   private async stepMapSearch(delta: 1 | -1): Promise<void> {
     const search = this.mapSearch;
     if (!search || !this.map || this.closed) return;
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
-    search.announceTimer = null;
+    search.cancelAnnouncement?.();
+    const query = search.query;
     const result = this.mapSearchResult();
     const step = result ? stepSearch(result, search.currentId, delta) : null;
     if (!step) {
@@ -2555,7 +2582,7 @@ export class VisualAgentMapView extends ItemView {
         for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
       });
     }
-    if (this.closed || this.mapSearch !== search) return;
+    if (this.closed || this.mapSearch !== search || search.query !== query || search.currentId !== step.id) return;
     const target = this.map?.nodes.find(item => item.id === step.id);
     if (!target) return;
     // Keyboard-style move: the camera follows in memory and Map.md's viewport is not written.
@@ -2569,7 +2596,7 @@ export class VisualAgentMapView extends ItemView {
   private closeMapSearch(restoreFocus: boolean): void {
     const search = this.mapSearch;
     if (!search) return;
-    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.cancelAnnouncement?.();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
@@ -3105,8 +3132,7 @@ export class VisualAgentMapView extends ItemView {
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
-    this.bookResolved.clear();
-    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.dropBookReviewSession();
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -3116,7 +3142,6 @@ export class VisualAgentMapView extends ItemView {
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.dropCanvasInteractionModes();
-    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
     this.summaryEditDraft = null;
@@ -3143,7 +3168,6 @@ export class VisualAgentMapView extends ItemView {
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
-    this.bookReview.unchanged.clear();
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
@@ -3169,18 +3193,14 @@ export class VisualAgentMapView extends ItemView {
     this.viewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
-    if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.cancelPendingRefresh();
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverCard?.remove();
     this.dragCleanup?.();
     this.anchorDragCancel?.(false);
     // Closing the map's view stops its picture-book run (resumable); the run's calls cannot outlive the view that drives them.
     if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
@@ -3387,6 +3407,18 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /** Captures this open of a map, not a mutable map object that can be refreshed in place. */
+  private captureMapSession(): () => boolean {
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    return () => !this.closed && this.path === path && this.mapOpenEpoch === epoch && !!this.map;
+  }
+  /** A queued gesture must still belong to the map where the user made it when it reaches the mutation queue. */
+  private enqueueMapSession(work: () => Promise<void>, isCurrent = this.captureMapSession()): void {
+    this.enqueue(async () => {
+      if (isCurrent()) await work();
+    });
+  }
   /**
    * A card dropped while notes are still being read is written after the read (the queue holds it). By then the view may be
    * closed or showing another map, and the card is not where the drop saw it: the write is dropped, never applied to the wrong map.
@@ -3396,12 +3428,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(work);
       return;
     }
-    const epoch = this.mapOpenEpoch,
-      path = this.path;
-    this.enqueue(async () => {
-      if (this.closed || this.mapOpenEpoch !== epoch || this.path !== path || !this.map) return;
-      await work();
-    });
+    this.enqueueMapSession(work);
   }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   private outputLanguageMemory(): OutputLanguageMemory {
@@ -3536,6 +3563,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
+    this.clearChatHighlight();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
@@ -3561,9 +3589,7 @@ export class VisualAgentMapView extends ItemView {
       this.exitPresentation(false);
     }
     if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
+      await this.flushPendingViewport();
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
@@ -3589,6 +3615,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     if (this.path !== path) {
+      this.dropBookReviewSession();
+      this.cancelPendingRefresh();
       this.dropCanvasInteractionModes();
       this.hiddenAnchors.clear();
     }
@@ -6032,11 +6060,20 @@ export class VisualAgentMapView extends ItemView {
       .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
       .catch(error => errorNotice(error));
   }
-  changed(file: TFile): void {
-    if (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path)) return;
+  private cancelPendingRefresh(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
-    this.refreshTimer = window.setTimeout(() => {
-      if (this.closed) return;
+    this.refreshTimer = null;
+  }
+  changed(file: TFile): void {
+    if (this.closed || (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path))) return;
+    this.cancelPendingRefresh();
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.path === path && this.mapOpenEpoch === epoch;
+    const timer = window.setTimeout(() => {
+      if (this.refreshTimer !== timer) return;
+      this.refreshTimer = null;
+      if (!isCurrent()) return;
       if (this.dragging) {
         this.changed(file);
         return;
@@ -6048,15 +6085,20 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       this.enqueue(async () => {
-        if (file.path === this.path) {
-          this.map = await this.plugin.repo.readMap(this.path);
+        if (!isCurrent()) return;
+        if (file.path === path) {
+          const map = await this.plugin.repo.readMap(path);
+          if (!isCurrent()) return;
+          this.map = map;
           this.history.clear();
           await this.plugin.rebuildDerivedData();
         }
-        await this.hydrate();
-        this.render();
+        if (!isCurrent()) return;
+        await this.hydrate(isCurrent);
+        if (isCurrent()) this.render();
       });
     }, 400);
+    this.refreshTimer = timer;
   }
   /**
    * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
@@ -6093,8 +6135,10 @@ export class VisualAgentMapView extends ItemView {
   }
   deleted(file: TFile): void {
     if (file.path === this.path) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
+      this.dropBookReviewSession();
       if (this.deletedMap?.path !== file.path) this.history.clear();
       this.render();
     } else this.changed(file);
@@ -9959,7 +10003,7 @@ export class VisualAgentMapView extends ItemView {
       images = imageFilesFrom({ files: all });
     for (const other of all.filter(item => !images.includes(item)))
       new Notice(t("ui.canvas_image_refused", other.name || "?"));
-    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+    if (images.length) this.enqueueMapSession(() => this.attachCardImages(node, images));
   }
   /**
    * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
@@ -9969,9 +10013,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
     if (!this.map || !this.cardAcceptsImages(node)) return;
-    const mapPath = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let first = true;
     for (const file of files) {
       const label = file.name || "?";
@@ -9983,10 +10025,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -9997,7 +10039,7 @@ export class VisualAgentMapView extends ItemView {
       const setCover = first;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale() || !this.map) return;
+        if (!isCurrent() || !this.map) return;
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction()
           .createAttachment("image", { name, data, sourcePath: node.path })
@@ -10145,13 +10187,16 @@ export class VisualAgentMapView extends ItemView {
     nodeId: string,
     overwrite?: { operation: string; fingerprint: string }
   ): Promise<void> {
+    const current = this.bookReviewSession();
     try {
       await runTrackedRerun(this.bookReview, nodeId, () =>
         this.plugin.rerunBookCard(path, nodeId, overwrite ? { overwrite } : {})
       );
     } finally {
-      await this.rereadBookCard(nodeId);
-      if (!this.closed) this.render();
+      if (current()) {
+        await this.rereadBookCard(nodeId);
+        if (current()) this.render();
+      }
     }
   }
   /** The chapter whose card rerun is waiting for "overwrite your edits?"; bound to the text (integrity fingerprint) it asked about. */
@@ -10407,6 +10452,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
   private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const isCurrent = this.captureMapSession();
     const input = this.contentEl.createEl("input", {
       cls: "vam-sr-only",
       attr: { type: "file", accept: "image/*", multiple: "" }
@@ -10414,7 +10460,7 @@ export class VisualAgentMapView extends ItemView {
     input.addEventListener("change", () => {
       const chosen = Array.from(input.files ?? []);
       input.remove();
-      if (chosen.length) this.queueCanvasImages(chosen, point);
+      if (chosen.length && isCurrent()) this.queueCanvasImages(chosen, point);
     });
     input.click();
   }
@@ -10433,7 +10479,7 @@ export class VisualAgentMapView extends ItemView {
     const target = this.map?.nodes.find(item => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
       event.preventDefault();
-      this.enqueue(() => this.attachCardImages(target, images));
+      this.enqueueMapSession(() => this.attachCardImages(target, images));
       return true;
     }
     if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
@@ -10445,7 +10491,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Fences the gesture on this map and this open of it, then queues the writes. */
   private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
-    this.enqueue(() => this.insertCanvasImages(files, point));
+    this.enqueueMapSession(() => this.insertCanvasImages(files, point));
   }
   /**
    * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
@@ -10454,9 +10500,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
     if (!this.canEditCanvasItems()) return;
-    const path = this.path,
-      epoch = this.mapOpenEpoch,
-      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    const isCurrent = this.captureMapSession();
     let offset = 0;
     for (const file of files) {
       const label = file.name || "?";
@@ -10468,10 +10512,10 @@ export class VisualAgentMapView extends ItemView {
         }
         data = await file.arrayBuffer();
       } catch {
-        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        if (isCurrent()) new Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
-      if (stale()) return;
+      if (!isCurrent()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
         new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
@@ -10488,7 +10532,7 @@ export class VisualAgentMapView extends ItemView {
         y = point.y + offset;
       try {
         // Last check before anything is written: from here the transaction owns the file and its rollback.
-        if (stale()) return;
+        if (!isCurrent()) return;
         this.focusItemId = id;
         await this.mapChangeSnapshots(
           (map, attachment) => {
@@ -11155,7 +11199,7 @@ export class VisualAgentMapView extends ItemView {
     for (const view of this.plugin.views()) {
       if (view === this || view.path !== from) continue;
       if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
-      await view.flushForCrossMap();
+      await view.flushPendingViewport();
     }
     let sourceMap: MapDocument;
     try {
@@ -11249,13 +11293,6 @@ export class VisualAgentMapView extends ItemView {
           if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
       }
     });
-  }
-  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
-  private async flushForCrossMap(): Promise<void> {
-    if (this.viewportTimer === null) return;
-    window.clearTimeout(this.viewportTimer);
-    this.viewportTimer = null;
-    await this.persistViewport();
   }
   /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
   private crossMapEntry(id: string): Action {
@@ -11669,8 +11706,10 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
+      this.clearChatHighlight();
       this.map = null;
       this.path = "";
+      this.dropBookReviewSession();
       this.history.clear();
       this.render();
       return;
@@ -11785,11 +11824,7 @@ export class VisualAgentMapView extends ItemView {
         return file instanceof TFile ? () => this.app.vault.readBinary(file) : null;
       },
       path: () => this.path,
-      fence: () => {
-        const mapPath = this.path,
-          epoch = this.mapOpenEpoch;
-        return (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-      },
+      fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";
@@ -11955,11 +11990,7 @@ export class VisualAgentMapView extends ItemView {
           action: () =>
             this.enqueue(async () => {
               if (!this.map) return;
-              if (this.viewportTimer !== null) {
-                window.clearTimeout(this.viewportTimer);
-                this.viewportTimer = null;
-                await this.persistViewport();
-              }
+              if (this.viewportTimer !== null) await this.flushPendingViewport();
               const path = this.path,
                 file = this.plugin.repo.file(path),
                 content = await this.app.vault.read(file),
@@ -11971,8 +12002,10 @@ export class VisualAgentMapView extends ItemView {
                 this.deletedMap = null;
                 throw error;
               }
+              this.clearChatHighlight();
               this.map = null;
               this.path = "";
+              this.dropBookReviewSession();
               await this.plugin.rebuildDerivedData();
               const deleteAction: Action = {
                 label: t("ui.delete_mind_map"),
@@ -12014,17 +12047,15 @@ export class VisualAgentMapView extends ItemView {
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
     this.path = "";
+    this.clearChatHighlight();
     this.map = null;
+    this.dropBookReviewSession();
     await this.plugin.rebuildDerivedData();
     this.render();
     this.restoreMapFocus(this.lastMapFocus);
   }
   private async restoreDeletedMapFromUi(): Promise<void> {
-    if (this.viewportTimer !== null) {
-      window.clearTimeout(this.viewportTimer);
-      this.viewportTimer = null;
-      await this.persistViewport();
-    }
+    if (this.viewportTimer !== null) await this.flushPendingViewport();
     if (this.history.undoEntry === this.deletedMap?.deleteAction) {
       await this.travel(false);
       this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
@@ -17644,6 +17675,7 @@ export class VisualAgentMapView extends ItemView {
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
+      showSettings: () => void this.showBookSettings(),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
       mapChanged: {
@@ -17684,8 +17716,21 @@ export class VisualAgentMapView extends ItemView {
       ...(rerunAsk ? { rerunAsk } : {})
     });
   }
+  /** The bar's "Book settings": the root topic's six settings as the run reads them (its own value, else the plan's decision), read-only. */
+  private async showBookSettings(): Promise<void> {
+    const root = this.map?.nodes.find(node => !node.parentId);
+    try {
+      if (!root) throw new Error("missing");
+      const card = await this.plugin.readBookCardForChat(root.path);
+      this.openMapModal(
+        new BookSettingsViewModal(this.app, effectiveSettings(card.settings, parseBookPlanDecisions(card.raw)))
+      );
+    } catch {
+      new Notice(t("ui.book_settings_view_failed"));
+    }
+  }
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
-  private readonly bookReview = new BookReviewMemory();
+  private bookReview = new BookReviewMemory();
   /** The book's structure over the cards the run works on (the root is the preface); undefined without a single root. */
   /** The structure of the current run's cards, or undefined (no book run, an unreadable one, or no single root). */
   private bookStructureNow(): BookStructure | undefined {
@@ -17774,8 +17819,31 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Resolutions run one after another (each reads the note and may write it). */
   private bookNoteChain: Promise<void> = Promise.resolve();
+  private bookReviewEpoch = 0;
+
+  /** The review's logical map session; ordinary paints and read-backs do not replace it. */
+  private bookReviewSession(): () => boolean {
+    const epoch = this.bookReviewEpoch;
+    const mapId = this.map?.id;
+    // No path check: renaming or moving the open map keeps its review (a switch or delete already bumps the epoch).
+    return () => !this.closed && this.bookReviewEpoch === epoch && this.map?.id === mapId;
+  }
+
+  private dropBookReviewSession(): void {
+    this.bookReviewEpoch++;
+    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
+    this.bookFoldDue.clear();
+    this.bookResolved.clear();
+    this.bookReview = new BookReviewMemory();
+  }
+
   private queueBookResolve(id: string): Promise<void> {
-    this.bookNoteChain = this.bookNoteChain.then(() => this.resolveBookNote(id)).catch(() => undefined);
+    const current = this.bookReviewSession();
+    this.bookNoteChain = this.bookNoteChain
+      .then(async () => {
+        if (current()) await this.resolveBookNote(id);
+      })
+      .catch(() => undefined);
     return this.bookNoteChain;
   }
   /**
@@ -17785,15 +17853,17 @@ export class VisualAgentMapView extends ItemView {
   private async resolveBookNote(id: string): Promise<void> {
     const map = this.map;
     const mapPath = this.path;
-    if (this.closed || !map || !mapPath) return;
+    const current = this.bookReviewSession();
+    if (!current() || !map || !mapPath) return;
     const read = readBookPipeline(map);
     if (read.kind !== "usable" || read.data.phase !== "gate2" || !effectiveOrder(read.data).includes(id)) return;
     const node = map.nodes.find(item => item.id === id);
     const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
     if (!node || !(file instanceof TFile)) return;
     const text = await this.app.vault.read(file).catch(() => null);
+    if (!current()) return;
     const note = await this.plugin.repo.readNote(node.path).catch(() => null);
-    if (this.closed || this.map !== map || text === null || !note) return;
+    if (!current() || this.map !== map || text === null || !note) return;
     const entry = reviewEntries({
       proofContext: { runId: read.data.runId, revisionOf: other => cardRevision(read.data, other) },
       order: [id],
@@ -17806,8 +17876,9 @@ export class VisualAgentMapView extends ItemView {
     // A hand-edited chapter's "rewrite" tick is a one-time command, not a resolution: it runs now, or waits in the box behind a running book.
     if (isRewriteAsked(state))
       void this.plugin.bookHandEdits.tick(mapPath, id).then(async () => {
+        if (!current()) return;
         await this.rereadBookCard(id);
-        if (!this.closed && this.map === map) this.render();
+        if (current() && this.map === map) this.render();
       });
     if (!entry || !isReviewResolved(state, entry.fp)) {
       this.bookResolved.delete(id);
@@ -17823,9 +17894,10 @@ export class VisualAgentMapView extends ItemView {
       this.bookResolved.set(id, entry.fp);
       // "Keep my version" is recorded once, at the tick (the box still asks its question): a later save of the note never moves the kept
       // record to the new text.
+      // The note writes are scoped to the note, not the view: a confirmed answer is written through even if the view moves on.
       if (state.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
       await this.plugin.bookCallouts.markHandled(node.path);
-      this.scheduleBookFold(id);
+      if (current()) this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
       // "Keep my version" ticked while no view was there to see it (the box still asks its question): recorded now, once.
@@ -17834,10 +17906,10 @@ export class VisualAgentMapView extends ItemView {
       if (entry.problems.every(problem => problem.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
         await this.plugin.bookCallouts.reconcile(mapPath, this.bookMayCarryCallouts);
-        await this.rereadBookCard(id);
+        if (current()) await this.rereadBookCard(id);
       }
     }
-    if (!this.closed && this.map === map) this.render();
+    if (current() && this.map === map) this.render();
   }
   /**
    * The first answer of a box: "keep my version" records the text as kept; "accept as it is" (Primary decision, principle C3: the
@@ -17851,23 +17923,27 @@ export class VisualAgentMapView extends ItemView {
   /** How long a ticked review box stays open under its "handled" title before it folds (mockup ⑦-3; tests shorten it). */
   private bookFoldDelayMs = 3000;
   /** Ticked boxes waiting to fold, by card id. */
-  private readonly bookFoldTimers = new Map<string, number>();
+  private readonly bookFoldTimers = new Map<string, () => void>();
   /** Cards whose wait is over: their next resolution folds the box (and confirms a join). */
   private readonly bookFoldDue = new Set<string>();
   private scheduleBookFold(id: string): void {
     if (this.bookFoldTimers.has(id)) return;
-    const timer = window.setTimeout(() => {
+    const current = this.bookReviewSession();
+    const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
+    const cancel = (): void => timerWindow.clearTimeout(handle);
+    const handle = timerWindow.setTimeout(() => {
+      if (this.bookFoldTimers.get(id) !== cancel) return;
       this.bookFoldTimers.delete(id);
-      if (this.closed) return;
+      if (!current()) return;
       this.bookFoldDue.add(id);
       void this.queueBookResolve(id);
     }, this.bookFoldDelayMs);
-    this.bookFoldTimers.set(id, timer);
+    this.bookFoldTimers.set(id, cancel);
   }
   private cancelBookFold(id: string): void {
-    const timer = this.bookFoldTimers.get(id);
-    if (timer !== undefined) window.clearTimeout(timer);
+    const cancel = this.bookFoldTimers.get(id);
     this.bookFoldTimers.delete(id);
+    cancel?.();
     this.bookFoldDue.delete(id);
   }
   /** A save of a chapter note of the open book: its box may have been ticked or unticked. */
@@ -17897,7 +17973,10 @@ export class VisualAgentMapView extends ItemView {
       if (read.kind !== "usable" || read.data.phase !== "gate2") return;
       // A rewrite queued in a box before the map was closed runs now when nothing is running.
       void this.plugin.bookHandEdits.drain(path);
-      for (const card of this.bookReviewCards(read.data)) await this.queueBookResolve(card.id);
+      for (const card of this.bookReviewCards(read.data)) {
+        if (!isCurrent() || this.closed) return;
+        await this.queueBookResolve(card.id);
+      }
     } catch {
       // Fire and forget from the map opening: the aligner logs its own failures, and nothing here may break the map.
     }
@@ -18039,10 +18118,11 @@ export class VisualAgentMapView extends ItemView {
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
   private async rereadBookCard(id: string): Promise<void> {
+    const current = this.bookReviewSession();
     const node = this.map?.nodes.find(item => item.id === id);
-    if (!node || this.closed) return;
+    if (!node || !current()) return;
     const note = await this.plugin.repo.readNote(node.path).catch(() => null);
-    if (note && !this.closed) this.notes.set(id, note);
+    if (note && current() && this.map?.nodes.find(item => item.id === id)?.path === node.path) this.notes.set(id, note);
   }
   /** Runs a runner entry (these resolve when the drive ends, except confirmGate1: once writing has begun); a refusal becomes a notice, and the map repaints either way. */
   private bookEntry(entry: () => Promise<void>): Promise<void> {
@@ -18122,6 +18202,22 @@ export class VisualAgentMapView extends ItemView {
         chapterTitles
       ),
       chapterTitles: [...chapterTitles.values()],
+      // The chat beside the fields: one call per sentence, on the plan model the card shows now (the card owns the abort and the timeout).
+      ...(typeof this.plugin.editBookSettings === "function"
+        ? {
+            editSettings: (request, signal) =>
+              this.plugin.editBookSettings(
+                {
+                  mapPath: path,
+                  model: request.model,
+                  message: request.message,
+                  settings: request.settings,
+                  turns: request.turns
+                },
+                signal
+              )
+          }
+        : {}),
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();
@@ -19627,13 +19723,23 @@ export class VisualAgentMapView extends ItemView {
         this.viewportQueued = false;
       });
   }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushPendingViewport(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
+    const path = this.path;
     const viewport = { ...this.map.viewport };
-    const written = await this.plugin.repo.updateMap(this.path, map => {
+    const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });
+    // A late write for the previous map must not stamp the newly opened map.
+    if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.
     const stamped = written?.aim?.contentLanguage;
     if (stamped !== undefined && this.map?.aim && this.map.aim.contentLanguage === undefined)
@@ -22645,6 +22751,7 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   private chatSelect(ids: string[]): void {
+    if (this.closed || !this.map) return;
     this.selection.chatSelect(ids);
     this.aiTargets = ids;
     if (!this.closed) this.render();
@@ -22658,12 +22765,22 @@ export class VisualAgentMapView extends ItemView {
     return ids.length ? ids : this.chatSelectionIds();
   }
   private highlightFadeTimer: number | null = null;
+  /** Forgets the departing map's AI targets and cancels its pending fade. */
+  private clearChatHighlight(): void {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = null;
+    this.aiTargets = null;
+  }
   /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
   private armHighlightFade(idleSince: number | null = null): void {
+    if (this.closed || !this.map) return;
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
-    this.highlightFadeTimer = window.setTimeout(() => {
+    const mapId = this.map.id;
+    const timer = window.setTimeout(() => {
+      if (this.highlightFadeTimer !== timer) return;
       this.highlightFadeTimer = null;
-      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      if (this.closed || !this.map || this.map.id !== mapId) return;
+      if (this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
       // The user took over (a Cmd-click, a marquee): what is selected is theirs now and stays.
       if (!this.selection.isPureHighlight()) {
         this.aiTargets = null;
@@ -22676,6 +22793,7 @@ export class VisualAgentMapView extends ItemView {
       this.aiTargets = null;
       this.applySelectionChange(this.selection.clearMulti());
     }, 1000);
+    this.highlightFadeTimer = timer;
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */

@@ -70,14 +70,7 @@ import { withCover } from "./experiences/visual-map/card-cover";
 import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
 import { runEditSettings, type EditSettingsResult } from "./core/steps/book-pipeline/edit-settings";
 import type { BookSettings } from "./core/book-pipeline/model";
-import {
-  t,
-  setUiLanguage,
-  translate,
-  languagePromptName,
-  uiLocale,
-  type TranslationKey
-} from "./i18n";
+import { t, setUiLanguage, translate, languagePromptName, uiLocale, type TranslationKey } from "./i18n";
 import {
   addIcon,
   FileSystemAdapter,

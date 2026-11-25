@@ -106,15 +106,15 @@ function selfTest() {
 const args = process.argv.slice(2);
 try {
   if (args.length === 1 && args[0] === '--self-test') {
-    console.log('Self-tests passed:', selfTest());
+    process.stdout.write(`Self-tests passed: ${selfTest()}\n`);
   } else {
     const sameMachine = args.includes('--same-machine');
     const paths = args.filter(arg => arg !== '--same-machine');
     if (paths.length !== 2 || paths.some(path => path.startsWith('--'))) throw new Error('Usage: node scripts/compare-engineering-baseline.mjs before.tap after.tap [--same-machine]');
     const result = compare(readReport(readFileSync(paths[0], 'utf8')), readReport(readFileSync(paths[1], 'utf8')), sameMachine);
-    console.log(JSON.stringify(result, null, 2));
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   }
 } catch (error) {
-  console.error(error.message);
+  process.stderr.write(`${error.message}\n`);
   process.exitCode = 1;
 }

@@ -88,20 +88,50 @@ export function referenceCatalog(groups: ReferenceGroup[]): string {
     .join("\n");
 }
 
-function resolveWikilinks(text: string, documents: ReferenceDocument[]): string {
-  return text.replace(/\[\[([^\]]+)\]\]/g, (original, target: string) => {
-    const name = target.split("|")[0].trim();
-    const exact = documents.filter(document => document.path === name);
-    const matches = exact.length
-      ? exact
-      : documents.filter(document => {
-          const basename = document.path.split("/").pop() ?? document.path;
-          return basename === name || basename.replace(/\.md$/i, "") === name;
-        });
-    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
-    if (matches.length !== 1 || !matches[0].external) return original;
-    return tNote("note.external_source_0", matches[0].path);
-  });
+/** A resolver is scoped to one transformation, so detail lines reuse the same lookup without retaining documents across calls. */
+function createWikilinkResolver(documents: ReferenceDocument[]): (text: string) => string {
+  type Lookup = Map<string, ReferenceDocument | null>;
+  let index: { exact: Lookup; basename: Lookup } | undefined;
+  let first = true;
+  const add = (map: Lookup, key: string, document: ReferenceDocument): void => {
+    map.set(key, map.has(key) ? null : document);
+  };
+  const build = (): { exact: Lookup; basename: Lookup } => {
+    const exact: Lookup = new Map();
+    const basename: Lookup = new Map();
+    for (const document of documents) {
+      add(exact, document.path, document);
+      const name = document.path.split("/").pop() ?? document.path;
+      const stem = name.replace(/\.md$/i, "");
+      add(basename, name, document);
+      if (stem !== name) add(basename, stem, document);
+    }
+    return { exact, basename };
+  };
+  const find = (name: string): ReferenceDocument | null | undefined => {
+    // A single link does not pay the cost of indexing every document.
+    if (first) {
+      first = false;
+      const exact = documents.filter(document => document.path === name);
+      const matches = exact.length
+        ? exact
+        : documents.filter(document => {
+            const basename = document.path.split("/").pop() ?? document.path;
+            return basename === name || basename.replace(/\.md$/i, "") === name;
+          });
+      return matches.length > 1 ? null : matches[0];
+    }
+    index ??= build();
+    return index.exact.has(name) ? index.exact.get(name) : index.basename.get(name);
+  };
+  return text =>
+    text.replace(/\[\[([^\]]+)\]\]/g, (original, target: string) => {
+      const name = target.split("|")[0].trim();
+      const document = find(name);
+      if (document === null) return tNote("note.source_unconfirmed_0", name);
+      if (!document?.external) return original;
+      return tNote("note.external_source_0", document.path);
+    });
 }
 
 /** Stable short footnote label for a source path (same path => same label across runs). */
@@ -128,7 +158,7 @@ export function resolveSummaryReferences(summary: string, groups: ReferenceGroup
     .replace(new RegExp(String.raw`[ \t]*[（(]\s*${run}\s*[）)]`, "g"), "")
     .replace(new RegExp(String.raw`[ \t]*${run}`, "g"), "")
     .trim();
-  return resolveWikilinks(stripped, documents);
+  return createWikilinkResolver(documents)(stripped);
 }
 
 const FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
@@ -206,6 +236,7 @@ export function resolveDetailReferences(
   template?: DetailTemplate
 ): string {
   const documents = dedupeReferenceGroups(groups).flatMap(group => group.documents);
+  const resolveWikilinks = createWikilinkResolver(documents);
   const cited = new Map<string, string>();
   const source = (line: string): string => {
     const identified = line.replace(/\[S(\d+)\]/g, (original, number: string) => {
@@ -215,7 +246,7 @@ export function resolveDetailReferences(
       cited.set(label, footnoteTarget(document));
       return `[^${label}]`;
     });
-    return documents.length ? resolveWikilinks(identified, documents) : identified;
+    return documents.length ? resolveWikilinks(identified) : identified;
   };
   const lines = detail.split("\n");
   const code = fencedLines(lines);

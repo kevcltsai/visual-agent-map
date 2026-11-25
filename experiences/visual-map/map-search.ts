@@ -1,8 +1,7 @@
-import { toSimplifiedFold } from "../../i18n/han-fold";
+import { foldSearchText } from "../../i18n/han-fold";
 import type { MapNode } from "../../map-graph";
 
-/** Same algorithm as `foldOutlineSearch` in ui/outline-view.ts (a test pins the two together): lower-case, drop U+0307 (Turkish İ), fold Traditional to Simplified. */
-export const foldSearchText = (text: string): string => toSimplifiedFold(text.toLocaleLowerCase().replace(/̇/g, ""));
+export { foldSearchText } from "../../i18n/han-fold";
 
 /** Ids whose title contains the query (literal substring, titles only), in `order`. A blank query matches nothing. */
 export function findMatches(order: string[], titleOf: (id: string) => string, query: string): string[] {

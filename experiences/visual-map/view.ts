@@ -14000,9 +14000,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
     if (this.noteLoad) return;
-    // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
-    // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
-    if (this.renderHold > 0 || this.history.grouping) return;
+    // A chat reply or an active drag has not finished placing its cards. Preserve the previous heights until it is done.
+    if (this.renderHold > 0 || this.history.grouping || this.dragging) return;
     const now = new Map<string, number>();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
     const first = this.heightsSeenMap !== this.map.id;
@@ -14010,7 +14009,7 @@ export class VisualAgentMapView extends ItemView {
     const grew = cardsChangedHeight(first ? new Map() : previous, now);
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
-    if (!grew.size || this.settling || this.dragging) return;
+    if (!grew.size || this.settling) return;
     if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
     this.settling = true;
     const mapId = this.map.id;
@@ -24908,16 +24907,20 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** The head and first-level topic boxes of one spine, read from the cards on screen. */
-  private spineBoxes(headId: string): { head: CardBox; topics: { id: string; box: CardBox }[] } | null {
+  private spineBoxes(
+    headId: string,
+    nodes = this.canvasNodes(),
+    boxFor = boxOf
+  ): { head: CardBox; topics: { id: string; box: CardBox }[] } | null {
     const head = this.cardEls.get(headId);
     if (!head || !this.map) return null;
     const topics: { id: string; box: CardBox }[] = [];
-    for (const node of this.canvasNodes()) {
+    for (const node of nodes) {
       if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
-      if (card) topics.push({ id: node.id, box: boxOf(card) });
+      if (card) topics.push({ id: node.id, box: boxFor(card) });
     }
-    return { head: boxOf(head), topics };
+    return { head: boxFor(head), topics };
   }
   /**
    * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
@@ -25059,9 +25062,9 @@ export class VisualAgentMapView extends ItemView {
         lines.push(path);
       }
     }
-    for (const line of lines) this.edgesEl.appendChild(line);
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {
+      const children = childIndex(shown);
       for (const node of shown) {
         if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
         const path = createSvg("path");
@@ -25069,12 +25072,13 @@ export class VisualAgentMapView extends ItemView {
         path.setAttribute("data-spine", "");
         if (!this.map.aim) path.setAttribute("data-parent-line", "");
         this.spineEls.set(node.id, path);
-        this.placeSpine(node.id);
-        if (path.getAttribute("d")) this.edgesEl.appendChild(path);
+        this.placeSpine(node.id, undefined, this.spineBoxes(node.id, children.get(node.id) ?? [], boxFor));
+        if (path.getAttribute("d")) lines.push(path);
         else this.spineEls.delete(node.id);
       }
     }
-    this.drawRelations();
+    for (const line of lines) this.edgesEl.appendChild(line);
+    this.drawRelations(boxFor);
     this.syncRelationClasses();
   }
   /**
@@ -25085,7 +25089,7 @@ export class VisualAgentMapView extends ItemView {
    * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
    * draws none, and its file keeps the key.
    */
-  private drawRelations(): void {
+  private drawRelations(boxFor = edgeBoxReader(boxOf)): void {
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
@@ -25120,15 +25124,6 @@ export class VisualAgentMapView extends ItemView {
     if (!links.length) return;
     // Measure every endpoint once, before adding SVG elements; paths and labels share the same geometry.
     const axis = relationAxisFor(layoutOf(this.map).direction);
-    const boxes = new Map<HTMLElement, CardBox>();
-    const boxFor = (card: HTMLElement): CardBox => {
-      let box = boxes.get(card);
-      if (!box) {
-        box = boxOf(card);
-        boxes.set(card, box);
-      }
-      return box;
-    };
     const measured = links.map(link => {
       const to = boxFor(link.to);
       if (link.anchor)

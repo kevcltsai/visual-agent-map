@@ -257,8 +257,10 @@ export class ChatImageFinder {
         try {
           if (acquired) await this.run(job.block, job.controller, chat, job.model);
         } finally {
-          job.controller.signal.removeEventListener("abort", job.release!);
-          job.release?.();
+          if (job.release) {
+            job.controller.signal.removeEventListener("abort", job.release);
+            job.release();
+          }
           if (acquired) this.releaseSlot();
           if (job.key !== undefined && this.searches.get(job.key) === job.controller) this.searches.delete(job.key);
         }
@@ -420,8 +422,10 @@ export class ChatImageFinder {
 
   private currentSession(chat: MapChatPanel, anchor: { path: string; id: string }, generation: number): boolean {
     const here = this.ports.where();
-    return this.generation === generation && !here.closed && here.chat === chat &&
-      here.path === anchor.path && here.mapId === anchor.id;
+    return (
+      this.generation === generation && !here.closed && here.chat === chat &&
+      here.path === anchor.path && here.mapId === anchor.id
+    );
   }
 
   private async acquireSlot(signal: AbortSignal): Promise<boolean> {

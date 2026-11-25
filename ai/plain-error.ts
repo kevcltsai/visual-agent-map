@@ -5,14 +5,14 @@ import { classifyProviderError } from "./provider-error";
 const TECHNICAL = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+|\b[45]\d\d\b|<\/?\w+>/i;
 const NETWORK = /timed? ?out|timeout|etimedout|econn|enotfound|network|socket|fetch failed|offline|aborted by/i;
 
-export function rawErrorText(error: unknown): string {
+function rawErrorText(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   if (typeof message === "string") return message.trim();
   return typeof error === "string" ? error.trim() : "";
 }
 
 /** True when the raw text must stay out of the main message (it goes under "Technical details"). */
-export function isTechnicalErrorText(raw: string): boolean {
+function isTechnicalErrorText(raw: string): boolean {
   return !raw || raw.length > 400 || TECHNICAL.test(raw);
 }
 

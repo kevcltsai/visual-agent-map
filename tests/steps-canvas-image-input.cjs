@@ -129,6 +129,45 @@ test('counter-example 2: switching the map while the bytes are read writes nothi
   assert.equal(third.counts.createBinary, 0);
 });
 
+test('a queued canvas image belongs to the map open at the gesture, even before its bytes are read', async () => {
+  for (const changed of ['epoch', 'path', 'close', 'removed']) {
+    const h = await harness();
+    const before = h.fileText();
+    let reads = 0;
+    h.view.onCanvasDrop(dropEvent([{ ...file(png()), arrayBuffer: async () => { reads++; return png(); } }]));
+    // The harness schedules mutation work in a microtask: invalidate the gesture before that work starts.
+    if (changed === 'epoch') h.view.mapOpenEpoch++;
+    if (changed === 'path') h.view.path = 'Other.md';
+    if (changed === 'close') h.view.closed = true;
+    if (changed === 'removed') h.view.map = null;
+    await h.settle();
+    assert.equal(reads, 0, changed);
+    assert.equal(h.counts.createBinary, 0, changed);
+    assert.equal(h.fileText(), before, changed);
+  }
+});
+
+test('a file picker result is ignored after its original map session changes', async () => {
+  const h = await harness();
+  let change, removed = 0, queued = 0;
+  h.view.contentEl.createEl = () => ({
+    files: [file(png())],
+    addEventListener(name, fn) { assert.equal(name, 'change'); change = fn; },
+    click() {},
+    remove() { removed++; }
+  });
+  h.view.queueCanvasImages = () => { queued++; };
+  h.view.openCanvasImagePicker({ x: 1, y: 2 });
+  h.view.mapOpenEpoch++;
+  change();
+  assert.equal(removed, 1);
+  assert.equal(queued, 0);
+  h.view.openCanvasImagePicker({ x: 1, y: 2 });
+  change();
+  assert.equal(removed, 2);
+  assert.equal(queued, 1);
+});
+
 test('counter-example 3: Map.md save fails after the attachment exists: that file is trashed once and nothing is added', async () => {
   const h = await harness();
   const before = h.fileText();

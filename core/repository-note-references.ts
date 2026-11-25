@@ -87,7 +87,7 @@ export function relationReferences(
   return lines;
 }
 
-function localizeReference(value: string, language: NoteLanguage): string {
+export function localizeReference(value: string, language: NoteLanguage): string {
   const match =
     /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
       value

@@ -2508,7 +2508,8 @@ export class VisualAgentMapView extends ItemView {
       if (this.closed || this.mapSearch !== search || !this.map || this.mapSearchBar) return;
       this.mountMapSearch();
       this.applySearchMarks();
-      const input = this.mapSearchBar?.input;
+      // mountMapSearch() sets the bar; the guard above narrowed the field to null, so read it fresh.
+      const input = (this.mapSearchBar as MapSearchBar | null)?.input;
       if (!focused || !input || !this.mapWindowIsActive()) return;
       input.focus({ preventScroll: true });
       if (start !== null && end !== null) input.setSelectionRange(start, end);

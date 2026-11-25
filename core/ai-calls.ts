@@ -13,7 +13,7 @@ export type AiCallExchangeSink = Pick<
 >;
 
 export interface AiCallsOptions {
-  /** The runtime that serves `model`. Called per call, after the call is registered. */
+  /** The runtime that serves `model`. Selected once per call; image generation checks it before registration. */
   runtimeFor(model: string): AiRuntime;
   /** The exchange log, or null when logging is off. Read per call and before every write. */
   exchanges(): AiCallExchangeSink | null;
@@ -129,10 +129,14 @@ export class AiCalls {
    * What the runtime serving `model` can do, without starting it. Throws when `needs` asks for something it cannot do.
    */
   capabilitiesFor(model: string, needs: { imageGeneration?: boolean } = {}): AiRuntimeCapabilities {
-    const { capabilities } = this.options.runtimeFor(model);
-    if (needs.imageGeneration && !capabilities.imageGeneration)
+    return this.runtimeWithCapabilities(model, needs).capabilities;
+  }
+
+  private runtimeWithCapabilities(model: string, needs: { imageGeneration?: boolean }): AiRuntime {
+    const runtime = this.options.runtimeFor(model);
+    if (needs.imageGeneration && !runtime.capabilities.imageGeneration)
       throw new Error(t("ui.context_ai_image_generation_codex"));
-    return capabilities;
+    return runtime;
   }
 
   /** Pre-starts the runtime serving `model` for a call with these settings (no model call); a runtime that cannot pre-start drops any waiting process instead. */
@@ -179,7 +183,9 @@ export class AiCalls {
     options: AiCallOptions,
     finish: (raw: string, exchange: AiCallExchange) => Result | Promise<Result>
   ): Promise<Result> {
-    if (options.task?.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
+    const imageRuntime = options.task?.generateImage
+      ? this.runtimeWithCapabilities(options.model, { imageGeneration: true })
+      : undefined;
     const {
       mode = "task",
       requestLog = "request-and-prompt",
@@ -240,7 +246,7 @@ export class AiCalls {
         step: call.step
       });
       if (started) options.onBegin?.(id);
-      const runtime = this.options.runtimeFor(options.model);
+      const runtime = imageRuntime ?? this.options.runtimeFor(options.model);
       provider = runtime.capabilities.id;
       options.validate?.(runtime);
       const task = options.task ?? {};
@@ -263,7 +269,8 @@ export class AiCalls {
             }),
         onRequest: (data: unknown): void => {
           task.onRequest?.(data);
-          sentText += promptTextOf(data);
+          // Only Codex's fallback usage estimate needs the sent text. Keep logging and caller hooks independent.
+          if (this.options.usage && provider === "codex") sentText += promptTextOf(data);
           if (options.noContentLog) log()?.sent(id, JSON.stringify({ content: "omitted" }));
           else
             log()?.sent(

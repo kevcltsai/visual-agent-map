@@ -59,10 +59,19 @@ export function planSourceDelivery(
   parts: SourceRequestParts,
   allowDirect = true
 ): SourceDelivery {
+  return planWithBatches(groups, parts, allowDirect, () => referenceBatches([...groups]));
+}
+
+function planWithBatches(
+  groups: readonly ReferenceGroup[],
+  parts: SourceRequestParts,
+  allowDirect: boolean,
+  batches: () => string[]
+): SourceDelivery {
   if (!groups.some(group => group.documents.length)) return { kind: "none" };
   if (!allowDirect) return { kind: "condense" };
-  const text = referenceBatches([...groups]).join("\n\n");
-  const full = [parts.sourceContext, text, sourceRegistry(referenceCatalog([...groups]))].filter(Boolean).join("\n\n");
+  const text = batches().join("\n\n");
+  const full = sourceText(groups, text, parts.sourceContext);
   const total = contextTokens({ ...fixedParts(parts), sourceContext: full });
   return total <= requestBudget(parts) ? { kind: "direct", text } : { kind: "condense" };
 }
@@ -72,7 +81,10 @@ export function planSourceDelivery(
  * (each assumed as long as the final limit allows) would still not fit the final limit.
  */
 export function estimateCondenseCalls(groups: readonly ReferenceGroup[]): number {
-  let findings = referenceBatches([...groups]).length;
+  return condenseCallsForBatches(referenceBatches([...groups]).length);
+}
+
+function condenseCallsForBatches(findings: number): number {
   let calls = findings;
   while (findings > 1) {
     findings = Math.max(
@@ -105,11 +117,13 @@ export interface ResolveSourcesInput {
 
 /** Returns the text to put in the request's source context before the catalog, or "" when there are no sources. */
 export async function resolveSourceDelivery(input: ResolveSourcesInput): Promise<string> {
-  const plan = planSourceDelivery(input.groups, input.parts, input.allowDirect && input.prepared === undefined);
+  let packed: string[] | undefined;
+  const batches = () => (packed ??= referenceBatches([...input.groups]));
+  const plan = planWithBatches(input.groups, input.parts, input.allowDirect && input.prepared === undefined, batches);
   if (plan.kind === "none") return "";
   if (input.prepared !== undefined) return input.prepared;
   if (plan.kind === "direct") return plan.text;
-  if (estimateCondenseCalls(input.groups) > MAX_CONDENSE_CALLS) throw input.overBudget();
+  if (condenseCallsForBatches(batches().length) > MAX_CONDENSE_CALLS) throw input.overBudget();
   return input.condense();
 }
 

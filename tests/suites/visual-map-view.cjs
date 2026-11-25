@@ -4121,7 +4121,7 @@ test('bug bash #01: a card cover image is not natively draggable', () => {
   const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
     app: { vault: { getAbstractFileByPath: p => (p === note.path ? note : p === image.path ? image : null), getResourcePath: f => `app://res/${f.path}` },
       metadataCache: { getFileCache: () => ({ embeds: [{ link: 'img/a.png' }] }), getFirstLinkpathDest: () => image } },
-    coverObserver: null
+    coverObserver: null, coverGeneration: 0, coverPending: new WeakSet()
   });
   const card = dom.element('div'); card.createEl('h3', { cls: 'vam-card-title' });
   view.paintCover(card, note.path);

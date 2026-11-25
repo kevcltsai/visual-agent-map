@@ -49,7 +49,8 @@ type NoteSection =
 export const noteContentLanguage = (fm: Record<string, unknown>): NoteLanguage | undefined =>
   isNoteLanguage(fm["content-language"]) ? fm["content-language"] : undefined;
 export const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
-export const previewHeading = (language: NoteLanguage): NoteSection => translate(language, "detail.preview") as NoteSection;
+export const previewHeading = (language: NoteLanguage): NoteSection =>
+  translate(language, "detail.preview") as NoteSection;
 
 /**
  * Managed section headings in the note's own language (C8). Every function of this module works with the English

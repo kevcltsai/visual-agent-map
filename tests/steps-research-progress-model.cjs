@@ -75,10 +75,10 @@ test('startTaskProgress takes the task model and every call site passes the mode
   for (const site of sites) assert.match(site, /, (task\.model|note\.model|chosen\.model|used\.model|model)$/, site);
   assert.equal(sites.filter(site => /, model$/.test(site)).length, 1);
   assert.match(read('experiences/visual-map/topic-run.ts'), /options\.startProgress\(chosen\.model\)/);
-  // The two synthesis runs moved into the run module, which starts their progress with the model that runs the task.
+  // The two synthesis runs and the topic research run start their progress in the run module with the model that runs the task.
   const moduleSites = [...read('experiences/visual-map/topic-run.ts').matchAll(/this\.startProgress\(([^;]*)\);/g)].map(m => m[1]);
-  assert.equal(moduleSites.length, 2);
-  for (const site of moduleSites) assert.match(site, /, used\.model$/, site);
+  assert.equal(moduleSites.length, 3);
+  for (const site of moduleSites) assert.match(site, /^path, used\.model(, styleLabel, true)?$/, site);
   const progress = view();
   const store = new ResearchProgressStore(clock);
   progress.plugin.researchProgress = store;

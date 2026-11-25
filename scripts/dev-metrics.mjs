@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { candidateEvidence } from "./candidate-id.mjs";
-const stages = new Set(["build-viewer", "typecheck", "bundle", "test-unit", "test-integration", "heavy-lock-wait", "owner-idle-wait", "install", "local-vault-test", "ci-reuse-install", "affected-verification", "generated-rebuild"]);
+const stages = new Set(["build-viewer", "typecheck", "bundle", "test-unit", "test-integration", "heavy-lock-wait", "owner-idle-wait", "install", "local-vault-test", "ci-reuse-install", "affected-verification", "generated-rebuild", "affected-plan", "deps-fetch", "deps-refresh", "candidate-evidence", "ci-proof-lookup", "source-fingerprint", "artifact-hashes", "session-prepare", "session-reload"]);
 const hex = /^[0-9a-f]{64}$/;
 const sha = /^[0-9a-f]{40}$/;
 export function telemetryFile(env = process.env) {
@@ -35,6 +35,12 @@ export function timedSync(stage, work, details = {}) {
   const start = performance.now();
   let outcome = "error";
   try { const result = work(); outcome = "ok"; return result; }
+  finally { recordDevEvent(stage, performance.now() - start, outcome, details); }
+}
+export async function timedAsync(stage, work, details = {}) {
+  const start = performance.now();
+  let outcome = "error";
+  try { const result = await work(); outcome = "ok"; return result; }
   finally { recordDevEvent(stage, performance.now() - start, outcome, details); }
 }
 export function matchingEvidence(file, identity) {

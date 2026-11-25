@@ -11,7 +11,7 @@ import { createTestVault, ensureSourceSelectionFixture } from "./create-onboardi
 import { assertOwnerIdle, ownerBusyReasons, waitOwnerIdle } from "./owner-idle.mjs";
 import { connectCdp } from "./obsidian-cdp.mjs";
 import { sourceFingerprint } from "./candidate-id.mjs";
-import { recordDevEvent, timedSync } from "./dev-metrics.mjs";
+import { recordDevEvent, timedSync, timedAsync } from "./dev-metrics.mjs";
 export { sourceFingerprint };
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
@@ -402,19 +402,22 @@ export function prepareSessionCandidate({
   env = process.env
 } = {}) {
   if (!["affected", "full", "preview"].includes(mode)) throw new Error("Unknown session verification mode.");
-  const before = fingerprint();
+  const readFingerprint = () => timedSync("source-fingerprint", fingerprint);
+  const readArtifacts = () => timedSync("artifact-hashes", artifactHashes);
+  const findProof = () => timedSync("ci-proof-lookup", lookup);
+  const before = readFingerprint();
   const canReuse = mode === "affected" && env.CI !== "true" && env.VAM_CLEAN_BUILD !== "1";
-  let green = canReuse ? lookup() : null;
+  let green = canReuse ? findProof() : null;
   const buildReused = !!green;
   let beforeBuild;
   if (!green) {
-    if (canReuse) try { beforeBuild = artifactHashes(); } catch { /* missing artifacts */ }
+    if (canReuse) try { beforeBuild = readArtifacts(); } catch { /* missing artifacts */ }
     execute("npm", ["run", "build"]);
   }
-  const built = artifactHashes();
+  const built = readArtifacts();
   // A second lookup is worthwhile only when the build restored/changed bytes.
   // A missing CI proof for identical artifacts must not cause two network waits.
-  if (!green && canReuse && JSON.stringify(beforeBuild) !== JSON.stringify(built)) green = lookup();
+  if (!green && canReuse && JSON.stringify(beforeBuild) !== JSON.stringify(built)) green = findProof();
   const testEnv = { ...env };
   for (const key of ["VAM_AFFECTED_TESTS", "VAM_ISOLATED_SUITES", "VAM_ISOLATED_TEST_LAYER", "VAM_CI_SHARD", "VAM_CI_REPORT_DIR"]) delete testEnv[key];
   let verification;
@@ -434,8 +437,8 @@ export function prepareSessionCandidate({
     execute("npm", ["run", "test:affected"], testEnv);
     verification = { kind: "local-affected" };
   }
-  if (fingerprint() !== before) throw new Error("Source changed during session preparation; rerun the harness before E2E.");
-  if (JSON.stringify(artifactHashes()) !== JSON.stringify(built)) throw new Error("Build artifacts changed during session preparation.");
+  if (readFingerprint() !== before) throw new Error("Source changed during session preparation; rerun the harness before E2E.");
+  if (JSON.stringify(readArtifacts()) !== JSON.stringify(built)) throw new Error("Build artifacts changed during session preparation.");
   return { fingerprint: before, verification, artifacts: built };
 }
 
@@ -467,7 +470,7 @@ function sessionMainLocked(args, vault, mode) {
   if (exists && args.some(arg => arg.startsWith("--profile="))) throw new Error(`${vault} exists and is updated in place; --profile applies only when it is first created.`);
   if (exists) assertSessionOwner(vault);
   if (reload) { assertSessionOwner(vault); assertSessionIdle(vault); }
-  const { fingerprint, verification, artifacts } = prepareSessionCandidate({ mode });
+  const { fingerprint, verification, artifacts } = timedSync("session-prepare", () => prepareSessionCandidate({ mode }));
   if (instanceRunning(appProfile) !== running) throw new Error("Session Obsidian changed state during preparation; refusing to replace loaded files.");
   const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" }).trim();
   const runtime = installedObsidianRuntime();
@@ -479,7 +482,7 @@ function sessionMainLocked(args, vault, mode) {
   checkCandidate();
   if (reload) {
     ensureSessionProfile(vault, runtime, { running: true });
-    return reloadSessionVault({ vault, source, checkCandidate }).then(record => {
+    return timedAsync("session-reload", () => reloadSessionVault({ vault, source, checkCandidate })).then(record => {
       process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
     });
   }
@@ -570,7 +573,7 @@ export function main(args = process.argv.slice(2)) {
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });
     else assertOwnerIdle(canonicalVault);
-    const { fingerprint, verification, artifacts } = prepareSessionCandidate();
+    const { fingerprint, verification, artifacts } = timedSync("session-prepare", () => prepareSessionCandidate());
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });
     const source = { branch: git("branch", "--show-current").trim(), commit: git("rev-parse", "HEAD").trim(), status: git("status", "--short").trim(), fingerprint };
     const runtime = installedObsidianRuntime();

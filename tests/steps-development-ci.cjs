@@ -62,3 +62,28 @@ test('development timing summary separates modes and outcomes without exposing e
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE/);
   assert.deepEqual(summarizeDevEvents('').rows, []);
 });
+
+test('lazy shared module loads remain visible to the existing conservative dependency scanner', async () => {
+  const { scanTestFile, buildDeps } = await import(pathToFileURL(path.join(root, 'scripts/test-affected.mjs')).href);
+  const helper = 'tests/support.cjs';
+  const consumer = 'tests/suites/example.cjs';
+  const scans = {
+    [helper]: scanTestFile(root, helper),
+    [consumer]: { sources: [], prefixes: [], requires: [helper], reasons: [], cachedLoads: [] }
+  };
+  for (const entry of ['map-model.ts', 'map-layout.ts', 'log-manager.ts', 'repository.ts']) assert.ok(scans[helper].cachedLoads.includes(entry), entry);
+  const deps = buildDeps({ testFiles: [consumer], records: {}, scans, bundles: { 'repository.ts': ['core/example.ts'] }, sha: 'a'.repeat(40) });
+  assert.ok(deps.tests[consumer].sources.map(i => deps.paths[i]).includes('core/example.ts'));
+});
+
+test('new development stage timings use existing event summaries and preserve async failures', async () => {
+  const { timedAsync, summarizeDevEvents } = await import(pathToFileURL(path.join(root, 'scripts/dev-metrics.mjs')).href);
+  const stages = ['affected-plan', 'deps-fetch', 'deps-refresh', 'candidate-evidence', 'ci-proof-lookup', 'source-fingerprint', 'artifact-hashes', 'session-prepare', 'session-reload'];
+  const raw = stages.map(stage => JSON.stringify({ version: 1, stage, outcome: 'ok', durationMs: 1 })).join('\n');
+  const result = summarizeDevEvents(raw);
+  assert.equal(result.invalid, 0);
+  assert.equal(result.rows.length, stages.length);
+  assert.equal(await timedAsync('session-reload', async () => 'loaded'), 'loaded');
+  const failure = new Error('reload failed');
+  await assert.rejects(timedAsync('session-reload', async () => { throw failure; }), error => error === failure);
+});

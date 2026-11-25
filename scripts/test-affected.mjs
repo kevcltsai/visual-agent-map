@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { candidateEvidence } from "./candidate-id.mjs";
-import { recordDevEvent, telemetryFile } from "./dev-metrics.mjs";
+import { recordDevEvent, telemetryFile, timedSync } from "./dev-metrics.mjs";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 export const DEPS_VERSION = 1;
@@ -424,10 +424,12 @@ async function main(argv) {
   }
   // A fresh worktree has no ignored test-deps.json. Fetch the same CI table the harness used to fetch,
   // before selecting tests; read-only plan mode, CI cache and explicit test tables are not changed.
-  if (argv.includes("--run")) fetchDepsTable(root);
+  const execute = argv.includes("--run");
+  if (execute) timedSync("deps-fetch", () => fetchDepsTable(root));
   const base = args[0] || "origin/main";
-  let result = localPlan(root, base);
-  if (argv.includes("--run") && refreshDepsTable(root, base, result)) result = localPlan(root, base);
+  const planLocal = () => execute ? timedSync("affected-plan", () => localPlan(root, base)) : localPlan(root, base);
+  let result = planLocal();
+  if (execute && timedSync("deps-refresh", () => refreshDepsTable(root, base, result))) result = planLocal();
   if (!argv.includes("--run") || result.mode === "none") {
     report(result, argv.includes("--json"));
     return;
@@ -435,7 +437,7 @@ async function main(argv) {
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:affected", { blocking: true }); // spawnSync below: see enterHeavy
   // A queued run may see different sources when it finally owns the lock.
-  result = localPlan(root, base);
+  result = planLocal();
   report(result, argv.includes("--json"));
   if (result.mode === "none") return;
   const env = { ...process.env };
@@ -445,7 +447,7 @@ async function main(argv) {
   delete env.VAM_ISOLATED_TEST_LAYER;
   if (result.mode === "files") env.VAM_AFFECTED_TESTS = result.files.join(",");
   if (result.isolatedSuites) env.VAM_ISOLATED_SUITES = "1";
-  const before = telemetryFile() ? candidateEvidence(root) : null;
+  const before = telemetryFile() ? timedSync("candidate-evidence", () => candidateEvidence(root)) : null;
   const started = performance.now();
   let outcome = "error";
   try {
@@ -455,7 +457,7 @@ async function main(argv) {
     }
     outcome = "ok";
   } finally {
-    const after = before ? candidateEvidence(root) : null;
+    const after = before ? timedSync("candidate-evidence", () => candidateEvidence(root)) : null;
     const identity = before && after?.fingerprint === before.fingerprint ? before : {};
     recordDevEvent("affected-verification", performance.now() - started, outcome, { ...identity, mode: result.mode, isolatedSuites: !!result.isolatedSuites });
   }

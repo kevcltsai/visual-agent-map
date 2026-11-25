@@ -140,7 +140,7 @@ export class UsageControl {
       this.numberEl.setText("–");
       button.setAttr("aria-label", t("ui.usage_button_unavailable"));
     } else {
-      const label = formatTokens(sum(today.value));
+      const label = mark(sum(today.value), today.value.incomplete);
       this.numberEl.setText(label);
       button.setAttr("aria-label", t("ui.usage_button_today_0", label));
     }
@@ -310,18 +310,18 @@ export class UsageControl {
     parts.error.hidden = true;
     for (const section of parts.sections) section.hidden = false;
     const total = (cell: TotalCell, tokens: UsageSum): void => {
-      cell.strong.setText(mark(sum(tokens), tokens.estimated));
+      cell.strong.setText(mark(sum(tokens), tokens.estimated || tokens.incomplete));
       // Input and output on two lines of their own, so a narrow panel never wraps in the middle of a phrase.
-      cell.input.setText(t("ui.usage_in_0", formatTokens(tokens.inputTokens)));
-      cell.output.setText(t("ui.usage_out_0", formatTokens(tokens.outputTokens)));
+      cell.input.setText(t("ui.usage_in_0", mark(tokens.inputTokens, tokens.incomplete)));
+      cell.output.setText(t("ui.usage_out_0", mark(tokens.outputTokens, tokens.incomplete)));
     };
     total(parts.cells.map, map.value);
     total(parts.cells.today, today.value);
     total(parts.cells.month, month.value);
 
-    const noUsage = sum(map.value) === 0;
+    const noUsage = sum(map.value) === 0 && !map.value.incomplete;
     parts.empty.hidden = !noUsage;
-    const anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
+    const anyEstimate = [map.value, today.value, month.value].some(tokens => tokens.estimated || tokens.incomplete);
     parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }

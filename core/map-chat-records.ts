@@ -4,6 +4,7 @@
  * The writer lives in experiences/visual-map/map-chat-record-writer.ts; this file has the format, the path whitelist and the reading.
  */
 
+import { parseVersionedJsonLines, serializeVersionedJsonLine } from "./versioned-json-lines";
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
 import { MAP_CHAT_CHAIN_END_REASONS, resumeRound, type MapChatChainEndReason } from "./map-chat-chain";
 import { normalizeVaultPath } from "./map-chat-guard";
@@ -245,9 +246,7 @@ export function recordFilesIn<T extends { path: string }>(files: readonly T[]): 
 
 /** One line of the file, newline included, with `v:1` first. */
 export function serializeLine(line: RecordLineInput | RecordLine): string {
-  const { v: _ignored, ...rest } = line as { v?: unknown } & Record<string, unknown>;
-  void _ignored;
-  return `${JSON.stringify({ v: RECORD_VERSION, ...rest })}\n`;
+  return serializeVersionedJsonLine(RECORD_VERSION, line);
 }
 
 // ---- reading ----
@@ -274,31 +273,9 @@ function withValidSteers(line: RecordLine): RecordLine {
 
 /** Reads a file's text. A cut or broken line is skipped; a line with another `v` makes the file unrecoverable. */
 export function parseRecord(text: string): ParsedRecord {
-  const lines: RecordLine[] = [];
-  let skipped = 0;
-  let unrecoverable = false;
-  for (const part of text.split("\n")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(trimmed);
-    } catch {
-      skipped++;
-      continue;
-    }
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      skipped++;
-      continue;
-    }
-    // The version comes first: a line of another version is a file this plugin cannot read, whatever else it lacks.
-    const version = (value as { v?: unknown }).v;
-    if (version !== undefined && version !== RECORD_VERSION) unrecoverable = true;
-    else if (version === RECORD_VERSION && typeof (value as { type?: unknown }).type === "string")
-      lines.push(withValidSteers(value as RecordLine));
-    else skipped++;
-  }
-  return { lines, skipped, unrecoverable, cleanEnd: text === "" || text.endsWith("\n") };
+  return parseVersionedJsonLines(text, RECORD_VERSION, value =>
+    typeof value.type === "string" ? withValidSteers(value as unknown as RecordLine) : null
+  );
 }
 
 const lineTime = (line: RecordLine): string | null => {

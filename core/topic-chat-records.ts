@@ -5,6 +5,7 @@
  * The writer lives in experiences/visual-map/topic-chat-record-writer.ts. No raw reply, request context, prompt or secret is stored.
  */
 
+import { parseVersionedJsonLines, serializeVersionedJsonLine } from "./versioned-json-lines";
 import { assertRecordRoot, RecordPathError } from "./map-chat-records";
 
 export const TOPIC_CHAT_RECORD_VERSION = 1;
@@ -87,9 +88,7 @@ export function isTopicChatFilePath(path: string): boolean {
 
 /** One line of the file, newline included, with `v:1` first. */
 export function serializeTopicChatLine(line: TopicChatLineInput | TopicChatLine): string {
-  const { v: _ignored, ...rest } = line as { v?: unknown } & Record<string, unknown>;
-  void _ignored;
-  return `${JSON.stringify({ v: TOPIC_CHAT_RECORD_VERSION, ...rest })}\n`;
+  return serializeVersionedJsonLine(TOPIC_CHAT_RECORD_VERSION, line);
 }
 
 export interface ParsedTopicChat {
@@ -126,33 +125,7 @@ function validLine(value: Record<string, unknown>): TopicChatLine | null {
 
 /** Reads a file's text. A cut or broken line is skipped; a line with another `v` makes the file unrecoverable. */
 export function parseTopicChat(text: string): ParsedTopicChat {
-  const lines: TopicChatLine[] = [];
-  let skipped = 0;
-  let unrecoverable = false;
-  for (const part of text.split("\n")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(trimmed);
-    } catch {
-      skipped++;
-      continue;
-    }
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      skipped++;
-      continue;
-    }
-    const version = (value as { v?: unknown }).v;
-    if (version !== undefined && version !== TOPIC_CHAT_RECORD_VERSION) {
-      unrecoverable = true;
-      continue;
-    }
-    const line = version === TOPIC_CHAT_RECORD_VERSION ? validLine(value as Record<string, unknown>) : null;
-    if (line) lines.push(line);
-    else skipped++;
-  }
-  return { lines, skipped, unrecoverable, cleanEnd: text === "" || text.endsWith("\n") };
+  return parseVersionedJsonLines(text, TOPIC_CHAT_RECORD_VERSION, validLine);
 }
 
 export interface RestoredTopicTurn {

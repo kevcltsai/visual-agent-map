@@ -1805,7 +1805,10 @@ export class Repository {
       try {
         // Keep the indexed candidate filter. The actual rewrite uses the current file, not the earlier note snapshot.
         const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-        if (cached && ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)))
+        if (
+          cached &&
+          ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs))
+        )
           continue;
         const note = await this.readNoteIfManaged(file);
         if (!note) continue;
@@ -1842,6 +1845,30 @@ export class Repository {
         failures,
         failures.map(error => (error instanceof Error ? error.message : String(error))).join("; ")
       );
+  }
+
+  /** Rebases one managed note's citation lists from its current frontmatter inside `vault.process`; returns the replaced content, or null if unchanged. */
+  private async rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null> {
+    let prior: string | null = null;
+    await this.app.vault.process(file, content => {
+      const fm = frontmatter(content);
+      if (!marker(fm["agent-map-node"])) return content;
+      const paths = (key: string): string[] => {
+        const list = fm[key];
+        return Array.isArray(list)
+          ? list.filter((value): value is string => typeof value === "string" && Boolean(value))
+          : [];
+      };
+      const references = paths("reference-materials"),
+        sources = paths("source-notes");
+      const patch: NotePatch = {};
+      if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
+      if (sources.some(path => rebase(path) !== path)) patch.sourcePaths = sources.map(rebase);
+      if (!Object.keys(patch).length) return content;
+      prior = content;
+      return this.patchedNote(file.path, content, patch, {});
+    });
+    return prior;
   }
 
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {
@@ -2345,8 +2372,7 @@ export class Repository {
         rebuildDerivedData: scope => this.rebuildDerivedData(scope),
         noteRestoredMap: (path, text) => this.noteRestoredMap(path, text),
         markedFiles: key => this.markedFiles(key),
-        readNoteIfManaged: file => this.readNoteIfManaged(file),
-        updateNote: (path, patch) => this.updateNote(path, patch),
+        rebaseNoteLists: (file, rebase) => this.rebaseNoteLists(file, rebase),
         readableMaps: () => this.readableMaps(),
         saveMap: (path, map) => this.saveMap(path, map)
       },

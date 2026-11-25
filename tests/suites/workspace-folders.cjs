@@ -268,6 +268,37 @@ integrationTest('Organize journals a citation hidden by stale metadata and resto
   await assertResolves(vault);
 });
 
+integrationTest('Organize keeps a citation the owner adds to a note between its read and its rewrite', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const extra = 'Agent Workspace/Unfiled/Owner Added.md';
+  let injected = false,
+    armed = false;
+  // The owner's edit lands the first time Organize touches the citing note once the cited folder has moved: right after a read of it, or right before its atomic write.
+  const inject = () => {
+    if (injected || !armed) return;
+    injected = true;
+    contents.set(vault.cites, contents.get(vault.cites).replace(/(source-notes:\n(?:  - .*\n)+)/, `$1  - ${extra}\n`));
+  };
+  const read = app.vault.read, process = app.vault.process;
+  app.vault.read = async file => { const text = await read(file); if (file.path === vault.cites) inject(); return text; };
+  app.vault.process = async (file, change) => { if (file.path === vault.cites) inject(); return process(file, change); };
+  const rename = app.fileManager.renameFile;
+  app.fileManager.renameFile = async (item, target) => {
+    const result = await rename(item, target);
+    if (target === 'Agent Workspace/Mind Maps/Beta') armed = true;
+    return result;
+  };
+  await repo.organizeWorkspaceFolders(plan);
+  app.vault.read = read;
+  app.vault.process = process;
+  app.fileManager.renameFile = rename;
+  assert.ok(injected, 'the concurrent edit was injected');
+  const after = await repo.readNote(vault.cites);
+  assert.deepEqual(plain(after.sourcePaths), ['Agent Workspace/Mind Maps/Beta/Notes/First.md', extra], 'the moved path follows and the owner-added citation survives');
+});
+
 integrationTest('Organize keeps a clash-free name: an existing target folder gets a numeric suffix', async () => {
   const vault = await legacyVault();
   await vault.repo.createMap('Alpha');

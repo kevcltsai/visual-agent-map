@@ -1,7 +1,6 @@
 import { TFile, TFolder, type App } from "obsidian";
 import type { TranslationKey } from "../i18n";
 import type { MapDocument } from "../map-model";
-import type { Note, NotePatch } from "./repository-note-types";
 import { rebaseMapNotePaths } from "./repository-map-content";
 import { parentPath } from "./repository-paths";
 
@@ -34,8 +33,11 @@ interface WorkspaceMovePorts {
   rebuildDerivedData(scope: { roots: string[]; paths: string[] }): Promise<void>;
   noteRestoredMap(path: string, text: string): void;
   markedFiles(key: "agent-map-node"): Promise<TFile[]>;
-  readNoteIfManaged(file: TFile): Promise<Note | null>;
-  updateNote(path: string, patch: NotePatch): Promise<void>;
+  /**
+   * Rewrites a managed note's `source-notes` / `reference-materials` through `rebase`, from the current frontmatter inside
+   * one atomic write. Returns the content the write replaced, or null when the note was left untouched.
+   */
+  rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null>;
   readableMaps(): Promise<{ file: TFile; map: MapDocument }[]>;
   saveMap(path: string, map: MapDocument): Promise<void>;
 }
@@ -120,17 +122,9 @@ async function rebasePathPrefix(
   const rebase = (path: string): string =>
     path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
   for (const file of await ports.markedFiles("agent-map-node")) {
-    // MetadataCache can lag behind a note edit or the preceding move in this batch.
-    // A negative cached match is not proof that the current note has no reference to the old prefix.
-    const note = await ports.readNoteIfManaged(file);
-    if (!note) continue;
-    const patch: NotePatch = {};
-    const references = note.referencePaths ?? [];
-    if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
-    if (note.sourcePaths.some(path => rebase(path) !== path)) patch.sourcePaths = note.sourcePaths.map(rebase);
-    if (!Object.keys(patch).length) continue;
-    journal.push({ path: file.path, content: await ports.app.vault.read(file) });
-    await ports.updateNote(file.path, patch);
+    // The lists are read and rewritten inside one atomic write, so a citation the owner adds meanwhile is kept.
+    const prior = await ports.rebaseNoteLists(file, rebase);
+    if (prior !== null) journal.push({ path: file.path, content: prior });
   }
   for (const { file, map } of await ports.readableMaps()) {
     if (!rebaseMapNotePaths(map, rebase)) continue;

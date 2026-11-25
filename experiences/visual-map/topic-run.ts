@@ -1590,6 +1590,9 @@ export class TopicRuns {
           const guard = options.pipeline;
           // A refusal by the pipeline's own `finalize` (no chapter text, unsafe body) is not a stale topic: it is logged as what it is.
           let refused = false;
+          const markDiscarded = (message: string) => {
+            if (exchangeId) exchanges()?.failed(exchangeId, message);
+          };
           if (guard) {
             // The pipeline's write: the file must still be the text the run left, the run must still be current, and the text
             // is cleaned inside the write. Without the guarded write nothing is saved (never the unguarded path).
@@ -1609,11 +1612,7 @@ export class TopicRuns {
               : "discarded";
             if (outcome === "discarded") {
               await this.settleRunning(repo, path, { status: note.status });
-              if (exchangeId)
-                exchanges()?.failed(
-                  exchangeId,
-                  t(refused ? "log.result_refused_not_written" : "log.stale_result_not_written")
-                );
+              markDiscarded(t(refused ? "log.result_refused_not_written" : "log.stale_result_not_written"));
               options.pipeline?.onDiscarded?.();
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
               return;
@@ -1629,11 +1628,7 @@ export class TopicRuns {
               if (outcome === "discarded") {
                 await this.settleRunning(repo, path, { status: note.status });
                 const stopped = controller.signal.aborted;
-                if (exchangeId)
-                  exchanges()?.failed(
-                    exchangeId,
-                    t(stopped ? "log.stopped_result_not_written" : "log.stale_result_not_written")
-                  );
+                markDiscarded(t(stopped ? "log.stopped_result_not_written" : "log.stale_result_not_written"));
                 fail(
                   t(
                     stopped

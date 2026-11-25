@@ -1171,7 +1171,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     );
   }
   private paintWindow(): Window | undefined {
-    return this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
+    return (
+      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined)
+    );
   }
   private startWaitTimer(): void {
     if (!this.built) return;

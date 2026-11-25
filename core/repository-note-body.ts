@@ -11,7 +11,7 @@ import {
 } from "../i18n";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "../ai/detail-templates";
 import { fencedLines } from "../ai/markdown-blocks";
-import { contentHash } from "./map-chat-context";
+import { contentHash } from "./content-hash";
 import { managedSectionValue } from "../note-values";
 import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./image-keys";
 import { readCoverBlock, stripCoverBlock } from "./book-pipeline/cover-block";

@@ -75,9 +75,11 @@ test('app quit (window beforeunload, no onunload) stops every running AI call so
   assert.equal(typeof registered[0].target.setTimeout, 'function', 'registered on the plugin window');
   const running = new AbortController();
   plugin.activeTasks.set('Maps/A/Map.md', running);
-  let reset = 0;
+  let reset = 0, terminated = 0;
   plugin.aiRuntime.reset = () => { reset++; };
+  plugin.aiRuntime.terminateOwnedProcesses = () => { terminated++; };
   registered[0].callback();
   assert.ok(running.signal.aborted, 'the running call was aborted');
   assert.equal(reset, 1, 'runtime processes (warm Claude, Codex) were stopped');
+  assert.equal(terminated, 1, 'quit sends the final signal before the renderer disappears');
 });

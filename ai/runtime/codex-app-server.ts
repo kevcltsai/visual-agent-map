@@ -25,7 +25,7 @@ interface ChildProcessHandle {
   stderr: ReadableProcessStream;
   on(event: "error", listener: (error: Error) => void): this;
   on(event: "close", listener: (code: number | null) => void): this;
-  kill(): boolean;
+  kill(signal?: NodeJS.Signals): boolean;
 }
 type SpawnProcess = (
   executable: string,
@@ -56,6 +56,7 @@ export interface CodexAppServerOptions {
   env: ProcessEnvironment;
   clientVersion: string;
   webSearchDisabled?: boolean;
+  onSpawn?: (child: ChildProcessHandle) => void;
   /** Reads a file outside the vault (Obsidian's FileSystemAdapter.readLocalFile); needed only for generated images saved to disk. */
   readLocalFile?: ReadLocalFile;
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
@@ -492,6 +493,7 @@ export class CodexAppServerRuntime {
       }
     );
     this.child = child;
+    this.options.onSpawn?.(child);
     const stdoutDecoder = createUtf8StreamDecoder();
     const stderrDecoder = createUtf8StreamDecoder();
     child.stdout.on("data", chunk => this.consume(child, stdoutDecoder.write(chunk)));

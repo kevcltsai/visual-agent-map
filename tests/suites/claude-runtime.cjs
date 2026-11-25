@@ -809,6 +809,21 @@ test('S6 pool: AiRuntimeService.reset() (plugin unload and runtime reset) kills 
   assert.equal(h.children[2].signals[0], 'SIGTERM', 'the service pool uses the same 180 s idle limit');
 });
 
+test('app exit escalates a stubborn warm process even after reset without advancing the window clock', () => {
+  const h = warmHarness();
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: h.spawn } });
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => '/bin/claude', clientVersion: () => '1', onLog: () => {}, warmClock: h.clock, claudeSpawn: h.spawn });
+  service.claude('/plugin').prewarm('sonnet', 'low', h.schema, true);
+  const stubborn = h.children[0];
+  stubborn.ignoreTerm = true;
+  service.reset();
+  assert.deepEqual(stubborn.signals, ['SIGTERM']);
+  service.terminateOwnedProcesses();
+  assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL']);
+  service.terminateOwnedProcesses();
+  assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL'], 'closed handles are not signalled again');
+});
+
 test('S6 pool: a runtime without a pool, or a call that is not an observed schema call, never touches the pool', async () => {
   const h = warmHarness();
   const bare = new h.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: h.spawn });

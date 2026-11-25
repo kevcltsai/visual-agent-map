@@ -1,6 +1,5 @@
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
-export { linkAlias, safeName } from "./core/repository-names";
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isPlaceholder } from "./core/note-placeholder";
 import { resolveMapOutputLanguage } from "./core/content-language";
@@ -92,6 +91,7 @@ import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./core/image-keys";
 import { readCoverBlock, stripCoverBlock } from "./core/book-pipeline/cover-block";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
+export { linkAlias, safeName } from "./core/repository-names";
 
 /** Saved width of the map chat's side window: a whole number from 280 to 560; anything else is the default. */
 export function normalizeMapChatWidth(value: unknown): number {

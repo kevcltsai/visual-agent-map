@@ -490,3 +490,28 @@ test('relocate: a vault.rename that reports success without moving a note throws
     assert.deepEqual([...contents.entries()].sort(), [...before.entries()].sort(), `${language}: nothing was written`);
   }
 });
+
+test('relocate: a topic rename keeps a coordinate edit arriving at the map write', async () => {
+  const { repo, app, contents, mapPath, a } = await scenario();
+  const target = repo.topicRoot(mapPath) + ' renamed/Map.md';
+  const process = app.vault.process;
+  let injected = false;
+  app.vault.process = async (file, change) => {
+    if (file.path === target && !injected) {
+      injected = true;
+      const current = contents.get(target);
+      contents.set(target, current.replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+        const edited = JSON.parse(json);
+        edited.nodes.find(node => node.id === a.id).x = 987;
+        return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
+      }));
+    }
+    return process(file, change);
+  };
+  assert.equal(await repo.renameTopic(mapPath, 'M renamed'), target);
+  assert.ok(injected);
+  const saved = await repo.readMap(target);
+  assert.equal(saved.title, 'M renamed');
+  assert.equal(saved.nodes.find(node => node.id === a.id).x, 987);
+  assert.ok(saved.nodes.every(node => node.path.startsWith(repo.topicRoot(target) + '/')));
+});

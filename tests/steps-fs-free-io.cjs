@@ -110,6 +110,23 @@ test('probe: an explicit path is probed alone; nothing found falls back to the c
   assert.deepEqual({ ...present.diagnostic('claude') }, { executable: '/h/.local/bin/claude', installed: true });
 });
 
+test('diagnostic reuses the candidate search result, but still checks a bare-name fallback', () => {
+  const calls = [];
+  const probe = { listDirectory: () => [], firstExisting: c => { calls.push(Array.from(c)); return c[0]; } };
+  const s = service(probe, { HOME: '/h', PATH: '/bin' });
+  assert.deepEqual({ ...s.diagnostic('claude') }, { executable: '/h/.local/bin/claude', installed: true });
+  assert.equal(calls.length, 1, 'a successful search does not probe the same executable again');
+  calls.length = 0;
+  probe.firstExisting = c => { calls.push(Array.from(c)); return null; };
+  assert.deepEqual({ ...s.diagnostic('/opt/x/claude') }, { executable: '/opt/x/claude', installed: false });
+  assert.deepEqual(calls, [['/opt/x/claude']], 'an explicit missing path was already checked');
+  calls.length = 0;
+  probe.firstExisting = c => { calls.push(Array.from(c)); return c.length === 1 && c[0] === 'claude' ? 'claude' : null; };
+  assert.deepEqual({ ...s.diagnostic('claude') }, { executable: 'claude', installed: true });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], ['claude']);
+});
+
 test('shell probe: finds the first existing path, lists nvm-style directories, and treats failure as nothing', () => {
   const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-probe-'));

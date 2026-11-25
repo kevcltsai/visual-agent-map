@@ -220,7 +220,7 @@ export class MapSourcesControl {
         },
         externals: this.externalSources,
         externalStatus: label => this.externalStatuses.get(label),
-        addExternal: input => isActive() ? this.addExternalFolder(mapPath, input) : Promise.resolve("stale"),
+        addExternal: input => isActive() ? this.addExternalFolder(mapPath, input) : Promise.resolve("stale" as const),
         removeExternal: source => {
           if (isActive()) this.removeExternalFolder(mapPath, source);
         },
@@ -278,13 +278,13 @@ export class MapSourcesControl {
     panel.style.width = `${width}px`;
     panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
   }
+  private isCurrentMap(mapPath: string, epoch: number): boolean {
+    return !this.ports.closed() && this.ports.path() === mapPath && this.ports.epoch() === epoch;
+  }
   /**
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
-  private isCurrentMap(mapPath: string, epoch: number): boolean {
-    return !this.ports.closed() && this.ports.path() === mapPath && this.ports.epoch() === epoch;
-  }
   private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource, quiet = false): void {
     const epoch = this.ports.epoch();
     const currentSession = (): boolean => this.isCurrentMap(mapPath, epoch);

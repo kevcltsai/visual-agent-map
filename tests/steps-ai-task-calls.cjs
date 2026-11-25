@@ -828,11 +828,10 @@ test('reference extraction failure stops sibling requests and preserves the orig
 
 test('research stopped during async Mermaid validation does not return a parsed result', async () => {
   const controller = new AbortController();
-  let release, entered;
-  const checking = new Promise(resolve => { entered = resolve; });
-  const h = rig({ extra: { mermaidSyntax: async () => { entered(); await new Promise(resolve => { release = resolve; }); return true; } }, handler: call => answer(call, JSON.stringify({ summary: 'S', detail: 'D\n\n```mermaid\ngraph TD; A --> B\n```', suggestions: [], visualReferences: [] })) });
+  let release;
+  const h = rig({ extra: { mermaidSyntax: async () => { await new Promise(resolve => { release = resolve; }); return true; } }, handler: call => answer(call, JSON.stringify({ summary: 'S', detail: 'D\n\n```mermaid\ngraph TD\n  A --> B\n```', suggestions: [], visualReferences: [] })) });
   const done = h.service.askModel(context(), 'gpt-6-luna', 'low', controller.signal, h.mark);
-  await checking;
+  await waitFor(() => !!release);
   controller.abort(); release();
   await assert.rejects(done, error => error.name === 'AbortError');
   assert.equal(h.names().includes('parsed'), false);

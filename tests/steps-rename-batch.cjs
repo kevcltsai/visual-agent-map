@@ -145,8 +145,8 @@ test('rename events that arrive before the batch starts join it; a later one ope
   // A rename while the batch already runs starts the next batch, and a chain A→B→A within it ends where it started.
   h.reset();
   let during = false;
-  const save = h.repo.saveMap.bind(h.repo);
-  h.repo.saveMap = async (...args) => {
+  const save = h.repo.updateMap.bind(h.repo);
+  h.repo.updateMap = async (...args) => {
     await save(...args);
     if (!during) { during = true; move(moved[0], cards[0]); }
   };
@@ -230,8 +230,8 @@ test('an open Map.md renamed outside while the batch runs stays open at its new 
   const folderA = folderOf(a), movedA = `${folderA} renamed`;
   const folderB = folderOf(b), movedB = `${folderB} renamed`;
   let during = false;
-  const save = h.repo.saveMap.bind(h.repo);
-  h.repo.saveMap = async (...args) => {
+  const save = h.repo.updateMap.bind(h.repo);
+  h.repo.updateMap = async (...args) => {
     await save(...args);
     if (!during) { during = true; await h.app.fileManager.renameFile(h.files.get(folderB), movedB); }
   };
@@ -314,4 +314,28 @@ test('rename-batch index agrees with the ordered scan for repeated paths and rol
   const pairs = Array.from({ length: 5000 }, (_, i) => ['old/' + i, 'new/' + i]);
   const rebase = batch.chainRebase(pairs);
   for (const [from, to] of pairs) assert.equal(rebase(from), to);
+});
+
+test('rename rebase preserves a concurrent Map.md title and coordinate edit inside the write boundary', async () => {
+  const h = harness();
+  const mapPath = await h.map('Alpha', 2);
+  const before = await h.repo.readMap(mapPath);
+  const old = before.nodes[0].path, next = old.replace(/\.md$/, ' moved.md');
+  h.moveSilently(old, next);
+  const process = h.app.vault.process;
+  let injected = false;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === mapPath && !injected) {
+      injected = true;
+      await h.repo.updateMap(mapPath, map => { map.title = 'Owner edit'; map.nodes[1].x = 987; });
+    }
+    return process(file, change);
+  };
+  const result = await h.plugin.rebaseMaps([[old, next]]);
+  const after = await h.repo.readMap(mapPath);
+  assert.equal(injected, true);
+  assert.equal(result.changed, true);
+  assert.equal(after.nodes[0].path, next);
+  assert.equal(after.title, 'Owner edit');
+  assert.equal(after.nodes[1].x, 987);
 });

@@ -898,3 +898,35 @@ integrationTest('renaming an open map folder in the file explorer keeps the map 
   assert.deepEqual(plain(view.map.nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
   assert.deepEqual(plain((await repo.readMap(`${moved}/Map.md`)).nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
 });
+
+integrationTest('Organize still restores the topic folders and maps when one journal restore fails', async () => {
+  const vault = await legacyVault();
+  const { repo, app } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const before = snapshot(vault);
+  const rename = app.fileManager.renameFile;
+  const modify = app.vault.modify;
+  let rollingBack = false, refused = 0;
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') {
+      rollingBack = true;
+      throw new Error('injected later move failure');
+    }
+    return rename(item, target);
+  };
+  app.vault.modify = async (file, content) => {
+    if (rollingBack && file.path === vault.cites) {
+      refused++;
+      throw new Error('injected journal restore failure');
+    }
+    return modify(file, content);
+  };
+  await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure[\s\S]*rollback also failed[\s\S]*injected journal restore failure/);
+  assert.ok(refused > 0, 'the journal restore really failed');
+  for (const path of Object.values(vault.paths)) {
+    assert.ok(app.vault.getAbstractFileByPath(path), path);
+    assert.equal(vault.contents.get(path), before.contents.get(path), path);
+    const map = await repo.readMap(path);
+    for (const node of map.nodes) assert.ok(app.vault.getAbstractFileByPath(node.path), node.path);
+  }
+});

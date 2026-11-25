@@ -632,6 +632,12 @@ export class Repository {
     return this.parseNote(path, raw, map, ctx);
   }
 
+  /** The parsed note and the exact same bytes, for a later guarded commit. */
+  async readNoteSnapshot(path: string, map?: MapDocument): Promise<{ note: Note; content: string }> {
+    const content = await this.app.vault.read(this.file(path));
+    return { note: await this.parseNote(path, content, map), content };
+  }
+
   /** Parses already-read note content; `readNote` reads the file once and calls this. */
   private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
@@ -794,6 +800,17 @@ export class Repository {
       return transform(content);
     });
     return outcome;
+  }
+
+  /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */
+  async settleRunningNote(path: string, patch: Pick<NotePatch, "status" | "lastError">): Promise<void> {
+    await this.updateNoteGuarded(path, patch, {
+      authorize: current => {
+        if (current === undefined) return false;
+        const fm = frontmatter(current);
+        return marker(fm["agent-map-node"]) && fm.status === "running";
+      }
+    });
   }
 
   /**
@@ -1783,21 +1800,48 @@ export class Repository {
    */
   async replaceSourcePaths(pairs: readonly RenamePair[]): Promise<void> {
     if (!pairs.some(([from, to]) => from !== to)) return;
+    const failures: unknown[] = [];
     for (const file of await this.markedFiles("agent-map-node")) {
-      // Skip notes whose indexed frontmatter names none of the old paths.
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (cached && ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)))
-        continue;
-      const note = await this.readNoteIfManaged(file);
-      if (!note) continue;
-      const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
-      const sourcePaths = rebasePathList(note.sourcePaths, pairs);
-      if (referencePaths || sourcePaths)
-        await this.updateNote(file.path, {
-          ...(referencePaths ? { referencePaths } : {}),
-          ...(sourcePaths ? { sourcePaths } : {})
+      try {
+        // Keep the indexed candidate filter. The actual rewrite uses the current file, not the earlier note snapshot.
+        const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        if (cached && ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)))
+          continue;
+        const note = await this.readNoteIfManaged(file);
+        if (!note) continue;
+        const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
+        const sourcePaths = rebasePathList(note.sourcePaths, pairs);
+        if (!referencePaths && !sourcePaths) continue;
+        await this.app.vault.process(file, content => {
+          const fm = frontmatter(content);
+          if (!marker(fm["agent-map-node"])) return content;
+          const paths = (key: string): string[] => {
+            const list = fm[key];
+            return Array.isArray(list)
+              ? list.filter((value): value is string => typeof value === "string" && Boolean(value))
+              : [];
+          };
+          const references = rebasePathList(paths("reference-materials"), pairs);
+          const sources = rebasePathList(paths("source-notes"), pairs);
+          if (!references && !sources) return content;
+          return this.patchedNote(
+            file.path,
+            content,
+            { ...(references ? { referencePaths: references } : {}), ...(sources ? { sourcePaths: sources } : {}) },
+            {}
+          );
         });
+      } catch (error) {
+        // One unreadable or unwritable note must not prevent later candidates from following the rename.
+        failures.push(error);
+      }
     }
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1)
+      throw new AggregateError(
+        failures,
+        failures.map(error => (error instanceof Error ? error.message : String(error))).join("; ")
+      );
   }
 
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {

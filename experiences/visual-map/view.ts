@@ -24670,7 +24670,8 @@ export class VisualAgentMapView extends ItemView {
     const textsById = new Map<string, TextItem>();
     if (this.textEls.size)
       for (const item of this.map.canvasItems ?? [])
-        if (item.kind === "text" && !textsById.has(item.id)) textsById.set(item.id, item);
+        if (item.kind === "text" && !textsById.has((item as TextItem).id))
+          textsById.set((item as TextItem).id, item as TextItem);
     // A text node hangs from its topic by the same kind of line.
     for (const [textId, textEl] of this.textEls) {
       const text = textsById.get(textId);

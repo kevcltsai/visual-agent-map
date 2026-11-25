@@ -418,3 +418,51 @@ test('sync scope: a read-back is needed only for the map file, its notes or a fu
   assert.equal(scope.needsReadBack(snap(['M/a.md']), 'M/Map.md', ['M/a.md']), true);
   assert.equal(scope.needsReadBack({ paths: new Map(), full: 3 }, 'M/Map.md', []), true);
 });
+
+
+test('hydrate discards metadata from a superseded map session', async () => {
+  const h = harness();
+  const a = await h.map('Alpha');
+  const b = await h.map('Beta');
+  const va = await h.open(a.mapPath);
+  const vb = await h.open(b.mapPath);
+  const repo = va.plugin.repo;
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const paths = [];
+  repo.readRelevanceSetup = async () => pending;
+  repo.readMapSources = async path => { paths.push(path); return []; };
+  const loading = va.hydrate();
+  va.path = b.mapPath;
+  va.map = vb.map;
+  va.mapOpenEpoch++;
+  va.notes = vb.notes;
+  va.relevanceGoal = 'current';
+  release({ goal: 'old', context: undefined });
+  await loading;
+  assert.equal(va.relevanceGoal, 'current');
+  assert.equal(va.notes, vb.notes);
+  assert.deepEqual(paths, []);
+});
+
+test('synchronize cannot install disk metadata into a superseding map session', async () => {
+  const h = harness();
+  const a = await h.map('Alpha');
+  const b = await h.map('Beta');
+  const va = await h.open(a.mapPath);
+  const vb = await h.open(b.mapPath);
+  const repo = va.plugin.repo;
+  const oldMeta = await repo.readMapMeta(a.mapPath);
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  repo.readMapMeta = () => pending;
+  const loading = va.synchronize();
+  va.path = b.mapPath;
+  va.map = vb.map;
+  va.notes = vb.notes;
+  va.mapOpenEpoch++;
+  release(oldMeta);
+  await loading;
+  assert.equal(va.map, vb.map);
+  assert.equal(va.notes, vb.notes);
+});

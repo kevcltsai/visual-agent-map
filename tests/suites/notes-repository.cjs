@@ -2733,3 +2733,41 @@ test('social video cards: a Facebook or Instagram video link or image in rendere
     for (const [key, descriptor] of saved) { if (descriptor) Object.defineProperty(El.prototype, key, descriptor); else delete El.prototype[key]; }
   }
 });
+
+integrationTest('rename reference rewrite preserves owner edits made after candidate read', async () => {
+  const { repo, app } = fixture();
+  const note = await topicNote(repo, 'Concurrent references');
+  const old = 'Personal/old.md', next = 'Personal/new.md', added = 'Personal/added.md';
+  await repo.updateNote(note.path, { sourcePaths: [old], referencePaths: [old] });
+  const process = app.vault.process;
+  let injected = false;
+  app.vault.process = async (file, change) => {
+    if (file.path === note.path && !injected) {
+      injected = true;
+      await repo.updateNote(note.path, { sourcePaths: [old, added], referencePaths: [added], detail: 'Owner text' });
+    }
+    return process(file, change);
+  };
+  await repo.replaceSourcePath(old, next);
+  const after = await repo.readNote(note.path);
+  assert.equal(injected, true);
+  assert.deepEqual(Array.from(after.sourcePaths), [next, added]);
+  assert.deepEqual(Array.from(after.referencePaths), [added]);
+  assert.match(after.detail, /Owner text/);
+});
+
+integrationTest('a reference rewrite failure does not block the later affected notes', async () => {
+  const { repo, app } = fixture();
+  const a = await topicNote(repo, 'First'), b = await topicNote(repo, 'Second');
+  const old = 'Personal/old.md', next = 'Personal/new.md';
+  for (const note of [a, b]) await repo.updateNote(note.path, { sourcePaths: [old] });
+  const process = app.vault.process;
+  const failure = new Error('first note not writable');
+  app.vault.process = async (file, change) => {
+    if (file.path === a.path) throw failure;
+    return process(file, change);
+  };
+  await assert.rejects(repo.replaceSourcePath(old, next), error => error === failure);
+  assert.deepEqual(Array.from((await repo.readNote(a.path)).sourcePaths), [old]);
+  assert.deepEqual(Array.from((await repo.readNote(b.path)).sourcePaths), [next]);
+});

@@ -1305,7 +1305,7 @@ test('toolbar plan review: the title and one hint; the only buttons are "directi
   assert.ok(!texts(bar).some(x => x.includes('都企劃好了')), 'the counts sentence is gone');
   assert.ok(texts(bar).includes('想改就直接跟左邊的總編輯說。'), JSON.stringify(texts(bar)));
   assert.equal(dom.find(bar, i => (i.cls ?? '').includes('vam-book-plan-hint')).children[0].tag, 'b', 'the hint is one bold line');
-  assert.deepEqual(g.labels(bar), ['方向對，開始寫', '停止']);
+  assert.deepEqual(g.labels(bar), ['方向對，開始寫', '書本設定', '停止']);
   assert.equal(track(bar), undefined, 'no progress track at the plan review');
   g.click(bar, '停止'); await dom.tick();
   g.click(g.drawBar(), '方向對，開始寫'); await dom.tick();
@@ -1322,7 +1322,7 @@ test('toolbar plan review: there is no "open summary" or "back to the plan" butt
   assert.ok(!g.labels(bar).some(x => x === '打開全書摘要' || x === '回去改企劃'));
   for (const name of ['openPlan', 'editPlan', 'openBookNote']) assert.ok(!view_ts.includes(name), name);
   assert.equal(g.entries.length, 0);
-  assert.deepEqual(g.labels(g.drawBar()), ['方向對，開始寫', '停止'], 'still waiting at the gate');
+  assert.deepEqual(g.labels(g.drawBar()), ['方向對，開始寫', '書本設定', '停止'], 'still waiting at the gate');
 });
 
 test('toolbar plan review with notes not applied: "direction is right" confirms at once, there is no ask card', async () => {
@@ -1389,7 +1389,7 @@ test('toolbar gate 2 now reads as writing: a driven run shows only stop and the 
   g.view.map.bookPipeline.aiProof = { [g.ids.a]: aiSlot(false, 0, 1) };
   g.plugin.getBookPipelineProgress = () => progress({ phase: 'gate2', active: true, total: 3, counts: { pending: 0, planned: 0, written: 0, checked: 1, 'needs-review': 2 } });
   const bar = g.drawBar();
-  assert.deepEqual(g.labels(bar), ['停止']);
+  assert.deepEqual(g.labels(bar), ['書本設定', '停止']);
   assert.ok(texts(bar).includes('AI 修正中 1・仍有問題 2'), JSON.stringify(texts(bar)));
   assert.equal(dom.find(bar, i => i.cls.includes('vam-book-finish') || i.cls.includes('vam-book-finish-ask')), undefined);
   g.click(bar, '停止'); await dom.tick();

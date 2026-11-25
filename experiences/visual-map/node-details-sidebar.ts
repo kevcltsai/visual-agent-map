@@ -27,7 +27,6 @@ export class NodeDetailsSidebar {
       );
   }
 
-
   async openDetails(file: TFile): Promise<void> {
     const markdownLeaves = this.app().workspace.getLeavesOfType("markdown");
     if (
@@ -58,7 +57,6 @@ export class NodeDetailsSidebar {
     await this.app().workspace.revealLeaf(this.detailsLeaf);
   }
 
-
   closeStaleDetails(): void {
     const closed =
       this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath;
@@ -70,5 +68,4 @@ export class NodeDetailsSidebar {
     this.detailsLeaf = null;
     this.detailsPath = null;
   }
-
 }

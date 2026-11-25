@@ -1023,7 +1023,7 @@ const p5Exporter = (files, extra = {}) => {
   const binaryReads = [];
   const byPath = Object.fromEntries(Object.values(files).map(file => [file.path, file]));
   const app = {
-    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => file.text, readBinary: async file => { binaryReads.push(file.path); return new TextEncoder().encode('ABC').buffer; }, getFileByPath: path => byPath[path] ?? null },
+    vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => file.text, readBinary: async file => { binaryReads.push(file.path); return extra.readBinary ? extra.readBinary(file) : new TextEncoder().encode('ABC').buffer; }, getFileByPath: path => byPath[path] ?? null },
     metadataCache: { getFirstLinkpathDest: (ref, from) => byPath[ref] ?? files[ref] ?? byPath[`${ref}.md`] ?? null }
   };
   const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
@@ -1056,6 +1056,31 @@ test('share exporter attachments: cards carry the file name only; a file over 10
   const plainMap = p5Exporter({}).exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
   assert.equal('attachments' in plainMap, false, 'a map without files has no new field');
   assert.equal(on.nodes.length, 1);
+});
+
+test('share exporter attachments: actual bytes must match the registered size and stay within the limit', async () => {
+  const files = {
+    'Docs/grown.pdf': mk('Docs/grown.pdf', 3),
+    'Docs/empty.pdf': mk('Docs/empty.pdf', 3),
+    'Docs/changed.pdf': mk('Docs/changed.pdf', 3),
+    'Docs/stable.pdf': mk('Docs/stable.pdf', 3)
+  };
+  const { exporter, binaryReads } = p5Exporter(files, {
+    readBinary: file => new ArrayBuffer({
+      'Docs/grown.pdf': 10 * 1024 * 1024 + 1,
+      'Docs/empty.pdf': 0,
+      'Docs/changed.pdf': 4,
+      'Docs/stable.pdf': 3
+    }[file.path])
+  });
+  const names = Object.keys(files).map(ref => exporter.registerFile(ref, 'Folder/A.md'));
+  exporter.rendered.set('a', { html: '', diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: [], files: names, mermaidUndrawn: 0, mermaidBlocked: 0 });
+  await exporter.readFiles(ticket());
+  assert.deepEqual(plain(binaryReads), Object.keys(files));
+  const payload = exporter.buildPayload({ includeDetail: true, includeImages: true }).payload;
+  assert.deepEqual(plain(payload.attachments.map(item => item.asset ?? null)), [null, null, null, 'file-4']);
+  assert.deepEqual(plain(Object.keys(payload.assets)), ['file-4']);
+  assert.equal(payload.assets['file-4'], 'data:application/octet-stream;base64,AAAA');
 });
 
 test('share exporter embeds: embedded images resolve from the embedded note own folder, internal-folder pictures never enter, and a picture dropped in the check cannot return through the embed', async () => {

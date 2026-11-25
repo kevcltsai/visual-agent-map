@@ -92,7 +92,7 @@ test('horizontal layout keeps exact width offsets throughout a deep mixed-width 
   for (const direction of ['right', 'left']) {
     const arranged = byId(layout.arrangeMap(nodes, undefined, heightOf, direction));
     const root = arranged.n0.x;
-    for (let depth = 0; depth < levels; depth++) {
+    for (let depth = 1; depth < levels; depth++) {
       const shift = direction === 'right'
         ? widest.slice(0, depth).reduce((total, width) => total + width, 0)
         : widest.slice(1, depth + 1).reduce((total, width) => total + width, 0);

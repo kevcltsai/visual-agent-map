@@ -277,6 +277,25 @@ integrationTest('external rename reconciliation only follows a unique matching n
   assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
   assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
 });
+integrationTest('missing path reconciliation keeps an external map edit during citation updates', async () => {
+  const { repo, app } = fixture();
+  const mapPath = await repo.createMap('Recovery race'), doc = await repo.readMap(mapPath);
+  const n = await repo.createNote('Before', 'a', doc, mapPath, 'workspace');
+  doc.nodes.push(n);
+  await repo.saveMap(mapPath, doc);
+  const renamed = n.path.replace(/Before\.md$/, 'After.md');
+  await app.fileManager.renameFile(app.vault.getAbstractFileByPath(n.path), renamed);
+  const replace = repo.replaceSourcePath.bind(repo);
+  repo.replaceSourcePath = async (...args) => {
+    await replace(...args);
+    await repo.updateMap(mapPath, current => { current.nodes[0].x = 900; current.title = 'External edit'; });
+  };
+  assert.equal(await repo.reconcileMissingNodePaths(), 1);
+  const current = await repo.readMap(mapPath);
+  assert.equal(current.nodes[0].path, renamed);
+  assert.equal(current.nodes[0].x, 900);
+  assert.equal(current.title, 'External edit');
+});
 integrationTest('new topics contain Map, Notes, Unassigned and Archive', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Topic A');
   assert.equal(mapPath, 'Agent Workspace/Mind Maps/Topic A/Map.md');

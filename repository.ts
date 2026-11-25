@@ -90,7 +90,7 @@ import { standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { readOnce, type NoteReadContext } from "./core/note-read-context";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
-import { mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
+import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
   readRelevance,
@@ -1610,7 +1610,7 @@ export class Repository {
     let candidates: Map<string, string[]> | undefined;
     let repaired = 0;
     for (const { file, map } of await this.readableMaps()) {
-      let changed = false;
+      const repairs: { id: string; from: string; to: string }[] = [];
       for (const node of [...map.nodes]) {
         if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) continue;
         // Healthy maps need no candidate index; share one index across all missing nodes.
@@ -1626,12 +1626,24 @@ export class Repository {
         const matches = candidates.get(node.id) ?? [];
         if (matches.length !== 1) continue;
         const oldPath = node.path;
+        repairs.push({ id: node.id, from: oldPath, to: matches[0] });
         rebaseMapNotePaths(map, moveNotePath(oldPath, matches[0]));
-        changed = true;
-        repaired++;
         await this.replaceSourcePath(oldPath, matches[0]);
       }
-      if (changed) await this.saveMap(file.path, map);
+      if (repairs.length)
+        await this.updateMap(file.path, current => {
+          // The scan and citation updates may have yielded to an external editor.
+          for (const { id, from, to } of repairs) {
+            if (
+              current.nodes.some(node => node.id === id && node.path === from) &&
+              !(this.app.vault.getAbstractFileByPath(from) instanceof TFile) &&
+              this.app.vault.getAbstractFileByPath(to) instanceof TFile
+            ) {
+              rebaseMapNotePaths(current, moveNotePath(from, to));
+              repaired++;
+            }
+          }
+        });
     }
     return repaired;
   }
@@ -1917,8 +1929,8 @@ export class Repository {
     // Notes that failed in the map pass: the marked-file pass below must not count them a second time.
     const failedPaths = new Set<string>();
     for (const { file: mapFile, map } of await this.readableMaps()) {
-      let changed = false,
-        mapRenamed = 0;
+      const moves: RenamePair[] = [];
+      let mapRenamed = 0;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
         if (!(file instanceof TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
@@ -1934,14 +1946,16 @@ export class Repository {
           continue;
         }
         rebaseMapNotePaths(map, moveNotePath(oldPath, newPath));
-        changed = true;
+        moves.push([oldPath, newPath]);
         mapRenamed++;
         renamed++;
         await this.replaceSourcePath(oldPath, newPath);
       }
-      if (!changed) continue;
+      if (!moves.length) continue;
       try {
-        await this.saveMap(mapFile.path, map);
+        await this.updateMap(mapFile.path, current => {
+          rebaseMapNotePaths(current, chainRebase(moves));
+        });
       } catch {
         renamed -= mapRenamed;
         failed += mapRenamed;

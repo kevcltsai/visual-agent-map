@@ -26,6 +26,39 @@ integrationTest('repository: unload after a vault process is queued refuses the 
   assert.equal(contents.get(n.path), original);
 });
 
+integrationTest('repository write recovery wraps both existing topic notes and Map.md through Vault.process', async () => {
+  const { repo, app, contents } = fixture('en');
+  const n = await topicNote(repo, 'Protected');
+  const mapPath = await repo.createMap('Protected map');
+  const { Repository } = load('repository.ts', { obsidian });
+  const { VaultWriteRecovery } = load('core/vault-write-recovery.ts');
+  const saved = new Map(), dirs = new Set(), pending = [];
+  const adapter = {
+    exists: async p => saved.has(p) || dirs.has(p),
+    mkdir: async p => { dirs.add(p); },
+    read: async p => saved.get(p),
+    write: async (p, value) => { saved.set(p, value); },
+    rename: async (from, to) => { saved.set(to, saved.get(from)); saved.delete(from); },
+    remove: async p => { saved.delete(p); },
+    list: async () => ({ files: [...saved.keys()] })
+  };
+  const recovery = new VaultWriteRecovery(adapter, 'plugin/write-recovery', p => pending.push(p));
+  const protectedRepo = new Repository(app, repo.settings, recovery);
+  const before = new Map([[n.path, contents.get(n.path)], [mapPath, contents.get(mapPath)]]);
+  const process = app.vault.process;
+  app.vault.process = async (file, change) => process(file, current => {
+    const next = change(current);
+    assert.ok([...saved.values()].some(value => {
+      const record = JSON.parse(value);
+      return record.path === file.path && record.content === before.get(file.path);
+    }), 'a verified preimage exists at the source callback');
+    return next;
+  });
+  await protectedRepo.updateNote(n.path, { summary: 'Updated' });
+  await protectedRepo.updateMap(mapPath, current => { current.title = 'Updated map'; });
+  assert.equal(saved.size, 0);
+  assert.equal(pending.length, 0);
+});
 integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));
@@ -277,6 +310,25 @@ integrationTest('external rename reconciliation only follows a unique matching n
   assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
   assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
 });
+integrationTest('missing path reconciliation keeps an external map edit during citation updates', async () => {
+  const { repo, app } = fixture();
+  const mapPath = await repo.createMap('Recovery race'), doc = await repo.readMap(mapPath);
+  const n = await repo.createNote('Before', 'a', doc, mapPath, 'workspace');
+  doc.nodes.push(n);
+  await repo.saveMap(mapPath, doc);
+  const renamed = n.path.replace(/Before\.md$/, 'After.md');
+  await app.fileManager.renameFile(app.vault.getAbstractFileByPath(n.path), renamed);
+  const replace = repo.replaceSourcePath.bind(repo);
+  repo.replaceSourcePath = async (...args) => {
+    await replace(...args);
+    await repo.updateMap(mapPath, current => { current.nodes[0].x = 900; current.title = 'External edit'; });
+  };
+  assert.equal(await repo.reconcileMissingNodePaths(), 1);
+  const current = await repo.readMap(mapPath);
+  assert.equal(current.nodes[0].path, renamed);
+  assert.equal(current.nodes[0].x, 900);
+  assert.equal(current.title, 'External edit');
+});
 integrationTest('new topics contain Map, Notes, Unassigned and Archive', async () => {
   const { repo, app } = fixture(), mapPath = await repo.createMap('Topic A');
   assert.equal(mapPath, 'Agent Workspace/Mind Maps/Topic A/Map.md');
@@ -294,6 +346,24 @@ integrationTest('a missing Map can be rebuilt from topic Notes as root nodes', a
   const { repo } = fixture(), root = 'Agent Workspace/Topics/Broken', placeholder = { id: 'stable-topic', title: 'Broken', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await repo.ensureTopicFolders(root); await repo.createNote('Recovered', 'a', placeholder, `${root}/Map.md`, 'workspace');
   const path = await repo.rebuildMissingMap(root), rebuilt = await repo.readMap(path); assert.equal(rebuilt.id, 'stable-topic'); assert.equal(rebuilt.nodes.length, 1); assert.equal(rebuilt.nodes[0].parentId, null);
+});
+integrationTest('relinking a missing map preserves changes made while moving the source map', async () => {
+  const { repo } = fixture();
+  const source = await repo.createMap('Relink source');
+  const doc = await repo.readMap(source);
+  doc.nodes.push(await repo.createNote('Keep', 'a', doc, source, 'workspace'));
+  await repo.saveMap(source, doc);
+  const root = 'Agent Workspace/Topics/Relink target';
+  await repo.ensureTopicFolders(root);
+  const move = repo.moveExact.bind(repo);
+  repo.moveExact = async (from, to) => {
+    await move(from, to);
+    if (from === source) await repo.updateMap(to, current => { current.nodes[0].x = 900; current.title = 'External edit'; });
+  };
+  const result = await repo.relinkMissingMap(root, source);
+  const current = await repo.readMap(result);
+  assert.equal(current.title, 'External edit');
+  assert.equal(current.nodes[0].x, 900);
 });
 integrationTest('replacing AI synthesis preserves 預覽', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Synthesis');

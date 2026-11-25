@@ -2,6 +2,12 @@ import type { TranslationKey } from "./en";
 
 /** Simplified Chinese (Mainland usage) dictionary. Display strings only; notes keep zh-TW fixed text. Terms: agents-spec docs/product/I18N_GLOSSARY.md. */
 export const zhCN: Record<TranslationKey, string> = {
+  "error.recovery_write_conflict": "保存前文件已更改。请重新打开后再试一次。",
+  "error.recovery_backup_failed": "无法确认恢复副本完整，原文件未更改。",
+  "log.recovery_snapshot_retained_0": "已保留恢复副本：{0}",
+  "log.recovery_scan_failed": "无法检查尚待处理的恢复副本。",
+  "ui.recovery_snapshots_found_0":
+    "上次有一次保存没完成。VAM 已把原来的内容另存在 {0}，你的笔记没有被改动。需要找回时，照 INSTALL 的“Interrupted Markdown writes”说明操作。",
   "ui.output_language": "本次回答语言",
   "ui.output_language_more": "更多语言（仅限回答）",
   "ui.output_language_follow_input": "跟随输入语言",

@@ -140,6 +140,7 @@ import { fitImageForInput } from "./ui/fit-image-input";
 import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { AiUsageStore } from "./core/ai-usage-store";
+import { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { chooseAndImportExchange } from "./experiences/visual-map/outline-exchange-io";
@@ -1304,7 +1305,29 @@ export default class VisualAgentMapPlugin extends Plugin {
       );
       await (this.pendingSuggestions as PendingSuggestions).load();
     }
-    this.repo = new Repository(this.app, this.settings);
+    const recovery =
+      this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir
+        ? new VaultWriteRecovery(this.app.vault.adapter, normalizePath(`${this.manifest.dir}/write-recovery`), path =>
+            this.logs.appendLog("warn", t("log.recovery_snapshot_retained_0", path))
+          )
+        : undefined;
+    if (recovery) {
+      try {
+        const { notify, fingerprint } = await recovery.unreported(this.settings.reportedRecoveryFiles);
+        if (notify) {
+          this.logs.appendLog("warn", t("ui.recovery_snapshots_found_0", recovery.folder));
+          new Notice(t("ui.recovery_snapshots_found_0", recovery.folder));
+        }
+        if (fingerprint !== this.settings.reportedRecoveryFiles) {
+          if (fingerprint === undefined) delete this.settings.reportedRecoveryFiles;
+          else this.settings.reportedRecoveryFiles = fingerprint;
+          await this.saveSettings();
+        }
+      } catch {
+        this.logs.appendLog("warn", t("log.recovery_scan_failed"));
+      }
+    }
+    this.repo = new Repository(this.app, this.settings, recovery);
     this.repo.onUnreadableMaps = failures => this.reportUnreadableMaps(failures);
     const initialize = (
       this.settings.migrated
@@ -1535,7 +1558,13 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /** Quitting Obsidian does not call onunload: stop running AI calls here too, so no provider process outlives the app. */
   registerAppExitStop(): void {
-    this.registerDomEvent(window, "beforeunload", () => this.resetCodexRuntime());
+    this.registerDomEvent(window, "beforeunload", () => {
+      try {
+        this.resetCodexRuntime();
+      } finally {
+        this.aiRuntime.terminateOwnedProcesses();
+      }
+    });
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
   private async initializeFirstInstall(hasSaved: boolean): Promise<void> {

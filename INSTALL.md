@@ -73,6 +73,12 @@ The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are n
 
 The map AI chat also sends an annotated image you select (the picture itself). Research, expansion and synthesis read the items in the map's data sources. A data source can be a folder outside the vault that you add; VAM reads it only as reference for that map, and the folder list stays on this device. Saving map AI conversations is off by default; when turned on, they are stored in your vault. When the picture-book writer's picture search leaves a picture position empty, VAM itself searches Wikimedia Commons (commons.wikimedia.org), sending only a short search line for that position. When research writes a YouTube video into a note, VAM asks YouTube's oEmbed service (www.youtube.com) whether that video is public and playable, sending only the video address, and removes the video if it is private or deleted. A picture book may take a body picture from any website (the cover uses only Wikimedia Commons); VAM sends at most 3 non-Wikimedia candidate pictures per chapter to the AI to look at, downloading each once in memory (shrunk before it is sent) and never saving it, and skips a picture it cannot read. Images in a share file that link to the web are loaded by the reader's browser from the original site; whether to publish a share file is up to you. When you share, VAM lists the pictures whose licence is unknown or restricted so you can decide whether to leave them out.
 
+## Interrupted Markdown writes
+
+Before VAM changes an existing Markdown file through its repository, it saves and checks a temporary recovery copy in the plugin's `write-recovery/` folder. A successful write removes its own copy; a failure or interrupted write may leave one. A complete `.json` file contains the original vault-relative `path` and the exact previous Markdown in `content`. The `.writing` files may be incomplete. These files may contain private notes; they are not sent to AI or included in a share. They reside in your vault configuration folder and are subject to your own sync and backup settings.
+
+If VAM reports remaining recovery files, make a separate copy of them (especially before uninstalling VAM). Compare the current file with the decoded `content` from the recovery JSON. Save the recovered text to a separate Markdown file first, then manually merge or restore only after checking that no newer edits would be lost. VAM never automatically replaces your current file with a recovery copy. Obsidian's File recovery is another option. This protection covers interrupted repository writes to existing Markdown, not new files, direct edits by other applications, or sudden power-loss durability.
+
 ## Known limitations
 
 Desktop only. Windows and Linux remain unverified.
@@ -171,6 +177,12 @@ VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關
 CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
 
 地圖 AI 對話也會送出你選取的標註圖（圖片本身）。研究、展開與收斂會讀取地圖資料來源裡的項目。資料來源也可以是你加入的 Vault 外資料夾；VAM 只把它當成該地圖的參考讀取，資料夾清單只存在這台裝置。保存地圖 AI 對話預設關閉；開啟後對話會存在你的 vault。圖文書找圖後仍有空著的圖位時，VAM 會自己向 Wikimedia Commons（commons.wikimedia.org）搜尋，只送出該圖位的一行簡短搜尋文字。研究把 YouTube 影片寫進筆記時，VAM 會向 YouTube 的 oEmbed 服務（www.youtube.com）確認該影片是公開且可播放的，只送出影片網址；私人或已刪除的影片會被移除。圖文書的內文圖片可能來自任何網站（封面只用 Wikimedia Commons）；VAM 每章最多把 3 張非 Wikimedia 的候選圖片交給 AI 檢視，每張只在記憶體下載一次（送出前先縮小）、不存檔，讀不了的圖片會略過。分享檔裡連到網路的圖片，會由讀者的瀏覽器向原網站載入；要不要發佈分享檔由你決定。分享時，VAM 會列出授權不明或受限的圖片，讓你決定是否拿掉。
+
+## Markdown 寫入中斷
+
+VAM 透過 Repository 修改既有 Markdown 檔之前，會先在外掛資料夾的 `write-recovery/` 內建立並核對暫存復原副本。成功寫入後移除該次副本；寫入失敗或中斷時可能留下副本。完整的 `.json` 檔包含原本相對於 Vault 的 `path`，及上一份完整 Markdown 文字 `content`；`.writing` 檔可能不完整。這些檔案可能含有私人筆記，不會送給 AI 或放入分享檔，位於 Vault 設定資料夾，仍受你自行設定的同步與備份規則影響。
+
+若 VAM 提示有復原檔，請先將它們複製到其他位置（尤其是卸載 VAM 前）。核對目前檔案與 JSON 中解碼後的 `content`，先把復原內容另存為 Markdown，再確認不會遺失較新的編輯，才手動合併或還原。VAM 不會自動用復原副本取代目前檔案。也可使用 Obsidian 的「檔案復原」。此保護適用於 Repository 寫入既有 Markdown 時的程序中斷，不涵蓋新建檔案、其他程式的直接編輯或突然斷電的磁碟耐久性保證。
 
 ## 已知限制
 

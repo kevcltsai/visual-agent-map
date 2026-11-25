@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
-const { readStoreText, writeStoreAtomically } = load('store-adapter.ts');
+const { readStoreText, readStoreValue, writeStoreAtomically } = load('store-adapter.ts');
 const path = 'store.json';
 const temporary = path + '.tmp';
 const original = '{"revision":1}';
@@ -90,4 +90,34 @@ test('store write and successful retry publish the new complete snapshot', async
   await writeStoreAtomically(retry.adapter, path, third);
   assert.equal(await readStoreText(retry.adapter, path), third);
   assert.equal(retry.files.has(temporary), false);
+});
+
+
+test('a partial first write never becomes a recoverable temp and a retry publishes the full snapshot', async () => {
+  const f = fixture();
+  f.files.delete(path);
+  f.faults.partialWrite = true;
+  await assert.rejects(writeStoreAtomically(f.adapter, path, original), /partial write/);
+  assert.equal(f.files.has(path), false);
+  assert.equal(f.files.has(temporary), false);
+  assert.equal(await readStoreValue(f.adapter, path, JSON.parse), null);
+  f.faults.partialWrite = false;
+  await writeStoreAtomically(f.adapter, path, second);
+  assert.equal(f.files.get(path), second);
+  assert.equal(f.files.has(temporary + '.writing'), false);
+});
+
+test('legacy incomplete or schema-invalid temp is preserved and never promoted', async () => {
+  for (const invalid of ['{"re', '[]']) {
+    const f = fixture();
+    f.files.delete(path);
+    f.files.set(temporary, invalid);
+    await assert.rejects(readStoreValue(f.adapter, path, text => {
+      const value = JSON.parse(text);
+      if (!Number.isInteger(value.revision)) throw new Error('invalid store');
+      return value;
+    }));
+    assert.equal(f.files.has(path), false);
+    assert.equal(f.files.get(temporary), invalid);
+  }
 });

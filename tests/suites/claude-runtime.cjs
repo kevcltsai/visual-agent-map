@@ -809,6 +809,43 @@ test('S6 pool: AiRuntimeService.reset() (plugin unload and runtime reset) kills 
   assert.equal(h.children[2].signals[0], 'SIGTERM', 'the service pool uses the same 180 s idle limit');
 });
 
+test('app exit escalates a stubborn warm process even after reset without advancing the window clock', async () => {
+  const h = warmHarness();
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: h.spawn } });
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => '/bin/claude', clientVersion: () => '1', onLog: () => {}, warmClock: h.clock, claudeSpawn: h.spawn });
+  service.claude('/plugin').prewarm('sonnet', 'low', h.schema, true);
+  const stubborn = h.children[0];
+  stubborn.ignoreTerm = true;
+  service.reset();
+  assert.deepEqual(stubborn.signals, ['SIGTERM']);
+  service.terminateOwnedProcesses();
+  assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL']);
+  await new Promise(resolve => setImmediate(resolve));
+  service.terminateOwnedProcesses();
+  assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL'], 'closed handles are not signalled again');
+});
+
+test('app exit reaches an active Claude process and a different waiting process, without waiting for timers', async () => {
+  const h = warmHarness();
+  const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: h.spawn } });
+  const service = new AiRuntimeService({ codexPath: () => 'codex', claudePath: () => '/bin/claude', clientVersion: () => '1', onLog: () => {}, warmClock: h.clock, claudeSpawn: h.spawn });
+  const runtime = service.claude('/plugin');
+  runtime.prewarm('sonnet', 'low', h.schema, true);
+  const controller = new AbortController();
+  const call = runtime.runTask('p', 'haiku', 'low', h.schema, { stream: true, webSearch: true, signal: controller.signal });
+  const rejected = assert.rejects(call, error => error.name === 'AbortError');
+  await until(() => h.children.length === 2);
+  for (const child of h.children) child.ignoreTerm = true;
+  controller.abort();
+  service.reset();
+  service.terminateOwnedProcesses();
+  for (const child of h.children) assert.deepEqual(child.signals, ['SIGTERM', 'SIGKILL']);
+  await rejected;
+  await new Promise(resolve => setImmediate(resolve));
+  service.terminateOwnedProcesses();
+  for (const child of h.children) assert.deepEqual(child.signals, ['SIGTERM', 'SIGKILL']);
+});
+
 test('S6 pool: a runtime without a pool, or a call that is not an observed schema call, never touches the pool', async () => {
   const h = warmHarness();
   const bare = new h.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: h.spawn });

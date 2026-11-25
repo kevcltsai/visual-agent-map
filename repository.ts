@@ -88,9 +88,10 @@ import { normalizeReasoningLevel } from "./ai/task-policy";
 import { resolveTaskModel } from "./ai/model-resolution";
 import { standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { readOnce, type NoteReadContext } from "./core/note-read-context";
+import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
-import { mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
+import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
   readRelevance,
@@ -274,7 +275,9 @@ function guardWrites<T extends object>(
   target: T,
   writes: Set<string>,
   disposed: () => boolean,
-  message: () => string
+  message: () => string,
+  recovery?: VaultWriteRecovery,
+  recoveryErrors?: { conflict: () => Error; backup: () => Error }
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -284,6 +287,29 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            if (
+              property === "process" &&
+              recovery &&
+              recoveryErrors &&
+              args[0] instanceof TFile &&
+              args[0].extension === "md" &&
+              typeof args[1] === "function"
+            ) {
+              const file = args[0];
+              const change = args[1] as (content: string) => string;
+              const vault = object as unknown as App["vault"];
+              return recovery.process({
+                path: () => file.path,
+                read: () => vault.read(file),
+                process: transform =>
+                  Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
+                change,
+                stopped: disposed,
+                stoppedError: () => new Error(message()),
+                conflictError: recoveryErrors.conflict,
+                backupError: recoveryErrors.backup
+              });
+            }
             // A process callback can run later, after the vault's own file queue releases it.
             if ((property === "process" || property === "processFrontMatter") && typeof args[1] === "function") {
               const change = args[1] as (...values: unknown[]) => unknown;
@@ -310,14 +336,20 @@ export class Repository {
 
   constructor(
     app: App,
-    readonly settings: Settings
+    readonly settings: Settings,
+    recovery?: VaultWriteRecovery
   ) {
     const stopped = (): boolean => this.disposed;
     const message = (): string => this.message("error.unloaded_write_not_performed");
+    const recoveryErrors = {
+      conflict: () => new Error(this.message("error.recovery_write_conflict")),
+      backup: () => new Error(this.message("error.recovery_backup_failed"))
+    };
     this.app = new Proxy(app, {
       get(object, property) {
         const value = Reflect.get(object, property, object) as unknown;
-        if (property === "vault") return guardWrites(value as object, VAULT_WRITES, stopped, message);
+        if (property === "vault")
+          return guardWrites(value as object, VAULT_WRITES, stopped, message, recovery, recoveryErrors);
         if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
         return value;
       }
@@ -1418,11 +1450,23 @@ export class Repository {
     );
   }
 
-  async saveMap(path: string, map: MapDocument): Promise<void> {
+  async saveMap(
+    path: string,
+    map: MapDocument,
+    options?: {
+      authorize?: (current: MapDocument) => void;
+      preserveViewport?: boolean;
+      recordWrite?: (before: MapDocument, after: MapDocument) => void;
+    }
+  ): Promise<void> {
     let print = "";
     await this.app.vault.process(this.file(path), content => {
-      const text = writeMapContent(content, map);
-      print = this.printAfterWrite(path, coordinatePrint(parseMap(content)), coordinatePrint(map));
+      const current = parseMap(content);
+      options?.authorize?.(current);
+      const next = options?.preserveViewport ? { ...map, viewport: current.viewport } : map;
+      const text = writeMapContent(content, next);
+      print = this.printAfterWrite(path, coordinatePrint(current), coordinatePrint(next));
+      options?.recordWrite?.(current, next);
       return text;
     });
     this.writtenCoordinates.set(path, print);
@@ -1610,7 +1654,7 @@ export class Repository {
     let candidates: Map<string, string[]> | undefined;
     let repaired = 0;
     for (const { file, map } of await this.readableMaps()) {
-      let changed = false;
+      const repairs: { id: string; from: string; to: string }[] = [];
       for (const node of [...map.nodes]) {
         if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) continue;
         // Healthy maps need no candidate index; share one index across all missing nodes.
@@ -1626,12 +1670,24 @@ export class Repository {
         const matches = candidates.get(node.id) ?? [];
         if (matches.length !== 1) continue;
         const oldPath = node.path;
+        repairs.push({ id: node.id, from: oldPath, to: matches[0] });
         rebaseMapNotePaths(map, moveNotePath(oldPath, matches[0]));
-        changed = true;
-        repaired++;
         await this.replaceSourcePath(oldPath, matches[0]);
       }
-      if (changed) await this.saveMap(file.path, map);
+      if (repairs.length)
+        await this.updateMap(file.path, current => {
+          // The scan and citation updates may have yielded to an external editor.
+          for (const { id, from, to } of repairs) {
+            if (
+              current.nodes.some(node => node.id === id && node.path === from) &&
+              !(this.app.vault.getAbstractFileByPath(from) instanceof TFile) &&
+              this.app.vault.getAbstractFileByPath(to) instanceof TFile
+            ) {
+              rebaseMapNotePaths(current, moveNotePath(from, to));
+              repaired++;
+            }
+          }
+        });
     }
     return repaired;
   }
@@ -1713,19 +1769,27 @@ export class Repository {
   async relinkMissingMap(root: string, sourcePath: string): Promise<string> {
     const target = `${root}/Map.md`;
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.map_already_exists"));
-    const map = await this.readMap(sourcePath),
-      candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
-    const byId = new Map<string, string>();
+    // Validate the selected source before moving it, then rebase the actual document after the move.
+    await this.readMap(sourcePath);
+    const candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
+    const byId = new Map<string, string[]>();
     for (const file of candidates) {
       const fm = frontmatter(await this.app.vault.read(file));
       const id = text(fm["node-id"]);
-      if (id) byId.set(id, file.path);
+      if (id) byId.set(id, [...(byId.get(id) ?? []), file.path]);
     }
-    for (const node of [...map.nodes])
-      if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) && byId.has(node.id))
-        rebaseMapNotePaths(map, moveNotePath(node.path, byId.get(node.id)!));
     await this.moveExact(sourcePath, target);
-    await this.saveMap(target, map);
+    const map = await this.updateMap(target, current => {
+      for (const node of [...current.nodes]) {
+        const matches = byId.get(node.id) ?? [];
+        if (
+          matches.length === 1 &&
+          !(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) &&
+          this.app.vault.getAbstractFileByPath(matches[0]) instanceof TFile
+        )
+          rebaseMapNotePaths(current, moveNotePath(node.path, matches[0]));
+      }
+    });
     for (const node of map.nodes)
       if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile)
         await this.setLifecycle(node.path, map.id, map.id, "active");
@@ -1917,8 +1981,8 @@ export class Repository {
     // Notes that failed in the map pass: the marked-file pass below must not count them a second time.
     const failedPaths = new Set<string>();
     for (const { file: mapFile, map } of await this.readableMaps()) {
-      let changed = false,
-        mapRenamed = 0;
+      const moves: RenamePair[] = [];
+      let mapRenamed = 0;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
         if (!(file instanceof TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
@@ -1934,14 +1998,16 @@ export class Repository {
           continue;
         }
         rebaseMapNotePaths(map, moveNotePath(oldPath, newPath));
-        changed = true;
+        moves.push([oldPath, newPath]);
         mapRenamed++;
         renamed++;
         await this.replaceSourcePath(oldPath, newPath);
       }
-      if (!changed) continue;
+      if (!moves.length) continue;
       try {
-        await this.saveMap(mapFile.path, map);
+        await this.updateMap(mapFile.path, current => {
+          rebaseMapNotePaths(current, chainRebase(moves));
+        });
       } catch {
         renamed -= mapRenamed;
         failed += mapRenamed;

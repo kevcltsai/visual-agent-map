@@ -1,4 +1,4 @@
-import { readStoreText, writeStoreAtomically, type StoreAdapter } from "../store-adapter";
+import { readStoreValue, writeStoreAtomically, type StoreAdapter } from "../store-adapter";
 import { promptMetrics, type AiExchange } from "../ai-exchange-log";
 import { isRecord } from "./is-record";
 
@@ -156,16 +156,18 @@ export class AiUsageStore {
 
   async load(): Promise<void> {
     try {
-      const text = await readStoreText(this.adapter, this.path);
-      if (text === null) return;
-      const parsed: unknown = JSON.parse(text);
-      if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.entries) || !isRecord(parsed.monthly))
-        throw new Error("ai-usage.json has an unexpected shape.");
-      if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
-        throw new Error("ai-usage.json has invalid fields.");
+      const loaded = await readStoreValue(this.adapter, this.path, text => {
+        const parsed: unknown = JSON.parse(text);
+        if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.entries) || !isRecord(parsed.monthly))
+          throw new Error("ai-usage.json has an unexpected shape.");
+        if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
+          throw new Error("ai-usage.json has invalid fields.");
+        return { entries: parsed.entries.map(normalized), monthly: parsed.monthly as Record<string, MonthlyBucket> };
+      });
+      if (loaded === null) return;
       // Normalised in memory only: the user's file is not rewritten by a load.
-      this.entries = parsed.entries.map(normalized);
-      this.monthly = parsed.monthly as Record<string, MonthlyBucket>;
+      this.entries = loaded.entries;
+      this.monthly = loaded.monthly;
       this.loadError = null;
       this.compact();
     } catch (error: unknown) {

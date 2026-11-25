@@ -467,6 +467,7 @@ export async function createOutlineMap(
     // The map folder exists already; callers must not offer a retry that would create a second map.
     throw Object.assign(new Error(errorText(error)), { mapCreated: true });
   }
+  const snapshot = JSON.stringify({ ...map, viewport: null });
   const rootDetail = outlineRootDetail(language, detailTemplate, source, now);
   const { created, failure } = await createOutlineNotes(
     repository,
@@ -480,7 +481,13 @@ export async function createOutlineMap(
   );
   map.nodes = arrangeMap(created);
   try {
-    await repository.saveMap(mapPath, map);
+    await repository.saveMap(mapPath, map, {
+      authorize: current => {
+        if (JSON.stringify({ ...current, viewport: null }) !== snapshot)
+          throw new Error(translate(language, "error.map_transaction_stale"));
+      },
+      preserveViewport: true
+    });
   } catch (error) {
     const message = errorText(error);
     // The map folder and notes exist now; callers must not offer a retry that would create a second map.

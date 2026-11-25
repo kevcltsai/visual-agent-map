@@ -182,6 +182,14 @@ export interface AiRuntimeServiceOptions {
   checks?: AiRuntimeChecks;
 }
 
+/** Only handles returned by the configured provider spawns are tracked; never look up or signal a raw PID. */
+interface OwnedProviderProcess {
+  readonly exitCode?: number | null;
+  readonly signalCode?: NodeJS.Signals | null;
+  kill(signal?: NodeJS.Signals): boolean;
+  on(event: "close", listener: (code: number | null, signal?: string | null) => void): unknown;
+}
+
 export class AiRuntimeService {
   private codexRuntime: CodexAppServerRuntime | null = null;
   private localCodexRuntime: CodexAppServerRuntime | null = null;
@@ -190,6 +198,7 @@ export class AiRuntimeService {
 
   /** One idle Claude process at most, started when the research dialog opens (see ClaudeWarmPool). */
   private readonly warmPool: ClaudeWarmPool<ClaudeProcess>;
+  private readonly ownedProcesses = new Set<OwnedProviderProcess>();
 
   private get probe(): ExecutableProbe {
     return this.options.probe ?? shellExecutableProbe;
@@ -197,6 +206,23 @@ export class AiRuntimeService {
 
   constructor(private readonly options: AiRuntimeServiceOptions) {
     this.warmPool = new ClaudeWarmPool({ clock: options.warmClock });
+  }
+
+  private trackProcess(child: OwnedProviderProcess): void {
+    this.ownedProcesses.add(child);
+    child.on("close", () => this.ownedProcesses.delete(child));
+  }
+
+  /** App quit only: the renderer will not stay alive to run the normal delayed SIGKILL escalation. */
+  terminateOwnedProcesses(): void {
+    for (const child of this.ownedProcesses) {
+      if (child.exitCode != null || child.signalCode != null) continue;
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // The process may have exited between the check and the signal. No PID-based fallback.
+      }
+    }
   }
 
   /** Kills the pre-started Claude process, if any (unused dialog, Stop). */
@@ -244,6 +270,7 @@ export class AiRuntimeService {
       env: this.cliEnvironment(executable),
       clientVersion: this.options.clientVersion(),
       webSearchDisabled: local,
+      onSpawn: child => this.trackProcess(child),
       ...(this.options.readLocalFile ? { readLocalFile: this.options.readLocalFile } : {}),
       onLog: (level, message) => this.options.onLog(level, message)
     });
@@ -261,6 +288,7 @@ export class AiRuntimeService {
       cwd: pluginDirectory,
       env: this.cliEnvironment(executable),
       warmPool: this.warmPool,
+      onSpawn: child => this.trackProcess(child),
       ...(this.options.claudeSpawn ? { spawn: this.options.claudeSpawn } : {}),
       onLog: (level, message) => this.options.onLog(level, message)
     });

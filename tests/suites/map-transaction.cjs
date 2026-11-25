@@ -74,6 +74,35 @@ integrationTest('map transaction: a failure on the 2nd or the 3rd of three moves
   assert.deepEqual(h.snapshot(), before, 'a failing move restores the one before it');
 });
 
+integrationTest('map transaction: an external map edit after preflight survives and the write refuses', async () => {
+  const h = await harness();
+  const original = h.deps.repo.saveMap.bind(h.deps.repo);
+  let raced = false;
+  h.deps.repo.saveMap = async (path, next, options) => {
+    if (!raced) {
+      raced = true;
+      await h.repo.updateMap(path, current => { current.title = 'Outside edit'; });
+    }
+    return original(path, next, options);
+  };
+  const error = await rejected(begin(h.deps).editMap(MAP, map => { map.nodes[0].collapsed = true; }).commit());
+  assert.equal(isStaleError(error), true);
+  const current = await h.repo.readMap(MAP);
+  assert.equal(current.title, 'Outside edit');
+  assert.equal(current.nodes[0].collapsed, false);
+});
+
+integrationTest('map transaction: rollback refuses to overwrite a later external map edit', async () => {
+  const h = await harness();
+  h.deps.rebuildDerivedData = async () => {
+    await h.repo.updateMap(MAP, current => { current.title = 'Outside edit'; });
+    throw new Error('rebuild failed after external edit');
+  };
+  const error = await rejected(park(h, [h.notes[0]]).editMap(MAP, map => { map.title = 'Step title'; }).commit());
+  assert.equal(isTransactionError(error, 'rollback-failed'), true);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Outside edit');
+});
+
 integrationTest('map transaction: a failing restore still restores the rest and throws an AggregateError with the original error first', async () => {
   const h = await harness();
   h.fail.setLifecycle = n => n === 3;

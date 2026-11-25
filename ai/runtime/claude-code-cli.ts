@@ -34,6 +34,7 @@ export interface ClaudeCodeCliOptions {
   env: NodeJS.ProcessEnv;
   onLog?: (level: "info" | "warn" | "error", message: string) => void;
   spawn?: ClaudeSpawn;
+  onSpawn?: (child: ClaudeProcess) => void;
   timeoutMs?: number;
   timeoutMessage?: string;
   /** Shared idle-process pool (see {@link ClaudeCodeCliRuntime.prewarm}); without it every call starts its own process. */
@@ -268,7 +269,12 @@ export class ClaudeCodeCliRuntime {
   /** Set when this CLI rejected the stream flags at start-up; later observed calls use json mode straight away. */
   private streamUnsupported = false;
   constructor(private readonly options: ClaudeCodeCliOptions) {
-    this.spawn = options.spawn ?? nodeSpawn;
+    const spawn = options.spawn ?? nodeSpawn;
+    this.spawn = (...args) => {
+      const child = spawn(...args);
+      options.onSpawn?.(child);
+      return child;
+    };
   }
 
   private warmKey(args: string[]): string {

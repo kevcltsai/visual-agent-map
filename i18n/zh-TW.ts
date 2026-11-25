@@ -2,6 +2,12 @@ import type { TranslationKey } from "./en";
 
 /** Traditional Chinese (Taiwan) dictionary. */
 export const zhTW: Record<TranslationKey, string> = {
+  "error.recovery_write_conflict": "存檔前檔案已變更。請重新開啟後再試一次。",
+  "error.recovery_backup_failed": "無法確認復原副本完整，原檔未改動。",
+  "log.recovery_snapshot_retained_0": "已保留復原副本：{0}",
+  "log.recovery_scan_failed": "無法檢查尚待處理的復原副本。",
+  "ui.recovery_snapshots_found_0":
+    "上次有一次存檔沒完成。VAM 已把原本的內容另存在 {0}，你的筆記沒有被改動。需要找回時，照 INSTALL 的「Markdown 寫入中斷」說明操作。",
   "ui.output_language": "本次回答語言",
   "ui.output_language_more": "更多語言（僅限回答）",
   "ui.output_language_follow_input": "跟隨輸入語言",

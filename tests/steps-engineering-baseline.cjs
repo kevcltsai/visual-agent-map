@@ -139,7 +139,7 @@ test('engineering baseline: simulated store I/O and hydrate cache scope', async 
   for (const [id, initial] of [
     ['create', []],
     ['replace', [[path, 'old']]],
-    ['recover-before-replace', [[path + '.tmp', 'recoverable']]]
+    ['recover-before-replace', [[path + '.tmp', '{"revision":1}']]]
   ]) {
     const { adapter, files, calls } = adapterFor(initial);
     await writeStoreAtomically(adapter, path, text);

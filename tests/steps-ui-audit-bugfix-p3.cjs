@@ -68,13 +68,27 @@ test('P3 filenames counter-example: a legal rename of every note reports all ren
 
 test('P3 filenames: a map that cannot be saved does not count its renames as done', async () => {
   const { repo } = await renameHarness(['Alpha']);
-  const realSave = repo.saveMap.bind(repo);
-  repo.saveMap = async (...args) => {
+  const realSave = repo.updateMap.bind(repo);
+  repo.updateMap = async (...args) => {
     throw new Error('EACCES: permission denied, open Map.md');
   };
   const result = await repo.normalizeGeneratedNoteFilenames();
-  repo.saveMap = realSave;
+  repo.updateMap = realSave;
   assert.deepEqual(plain(result), { renamed: 0, failed: 1 }, 'the map did not take the new path, so the rename is a failure');
+});
+
+test('P3 filenames: an external coordinate and title edit survives the rename batch', async () => {
+  const { repo, mapPath } = await renameHarness(['Alpha']);
+  const replace = repo.replaceSourcePath.bind(repo);
+  repo.replaceSourcePath = async (...args) => {
+    await replace(...args);
+    await repo.updateMap(mapPath, current => { current.nodes[0].x = 900; current.title = 'External edit'; });
+  };
+  assert.deepEqual(plain(await repo.normalizeGeneratedNoteFilenames()), { renamed: 1, failed: 0 });
+  const current = await repo.readMap(mapPath);
+  assert.match(current.nodes[0].path, /Alpha\.md$/);
+  assert.equal(current.nodes[0].x, 900);
+  assert.equal(current.title, 'External edit');
 });
 
 test('P3 filenames: the failure notice says how many synced and how many failed, in every interface language', () => {

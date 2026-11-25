@@ -102,10 +102,10 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
     // A single failed restore must not strand the moved file or skip other independent restores.
     try {
       const moved = ports.app.vault.getAbstractFileByPath(target);
-      if (!moved || ports.app.vault.getAbstractFileByPath(origin))
+      if (moved !== item || ports.app.vault.getAbstractFileByPath(origin))
         throw new Error(ports.message("error.move_not_applied"));
       await ports.app.vault.rename(moved, origin);
-      if (!ports.app.vault.getAbstractFileByPath(origin) || ports.app.vault.getAbstractFileByPath(target))
+      if (ports.app.vault.getAbstractFileByPath(origin) !== item || ports.app.vault.getAbstractFileByPath(target))
         throw new Error(ports.message("error.move_not_applied"));
     } catch (rollbackError) {
       rollbackErrors.push(describe(rollbackError));

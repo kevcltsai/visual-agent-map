@@ -38,7 +38,11 @@ interface WorkspaceMovePorts {
   folder(path: string): Promise<void>;
   renameTopic(mapPath: string, title: string, targetRoot?: string, options?: TopicRenameOptions): Promise<string>;
   undoTopicRename(mapPath: string, originalRoot: string, write: TopicMapWrite | undefined): Promise<void>;
-  rebuildDerivedData(scope: { roots: string[]; paths: string[] }): Promise<void>;
+  rebuildDerivedData(scope: {
+    roots: string[];
+    paths: string[];
+    onWrite?: (path: string, before: string, after: string) => void;
+  }): Promise<void>;
   markedFiles(key: "agent-map-node"): Promise<TFile[]>;
   /**
    * Rewrites a managed note's `source-notes` / `reference-materials` through `rebase`, from the current frontmatter inside
@@ -93,7 +97,18 @@ export async function moveTopicsWithRollback(
       mapping.set(move.mapPath, newMapPath);
       await rebasePathPrefix(ports, move.fromRoot, move.toRoot, journal);
     }
-    await ports.rebuildDerivedData(scope());
+    await ports.rebuildDerivedData({
+      ...scope(),
+      // The plugin's own rebuild is not an owner edit: extend the journaled chain so a later rollback still restores.
+      onWrite: (path, before, after) => {
+        for (const { journal } of [...done].reverse())
+          for (const prior of [...journal].reverse())
+            if (prior.path === path && prior.after === before) {
+              prior.after = after;
+              return;
+            }
+      }
+    });
     return mapping;
   } catch (error) {
     const rollbackErrors: string[] = [];

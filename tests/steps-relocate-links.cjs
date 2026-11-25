@@ -573,3 +573,24 @@ for (const delegated of [true, false]) {
     }
   });
 }
+
+test('relocate: link rollback does not rename a different object that appeared at the target path', async () => {
+  const { repo, app, contents, files, mapPath, a, b } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const process = app.vault.process;
+  const target = `${repo.topicFolder(mapPath, 'Unassigned')}/${a.path.split('/').pop()}`;
+  const impostor = new support.TFile(target);
+  let writes = 0;
+  app.vault.process = async (file, change) => {
+    if (++writes === 2) {
+      // Something else takes the moved note's place at the target before the rollback runs.
+      contents.set(target, contents.get(target));
+      files.set(target, impostor);
+      throw new Error('injected later write failure');
+    }
+    return process(file, change);
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')), /injected later write failure/);
+  assert.equal(files.get(target), impostor, 'the object at the target was left where it is');
+  assert.ok(!files.has(a.path), 'nothing was renamed onto the original path');
+});

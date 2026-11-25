@@ -1975,7 +1975,15 @@ export class Repository {
    * Rebuilds derived note fields. `scope` limits which notes are rewritten (maps are always read in full): a folder
    * prefix, or several roots plus individual note paths (a move rebuilds only the moved topics and their citing notes).
    */
-  async rebuildDerivedData(scope?: string | { roots: string[]; paths?: Iterable<string> }): Promise<void> {
+  async rebuildDerivedData(
+    scope?:
+      | {
+          roots: string[];
+          paths?: Iterable<string>;
+          onWrite?: (path: string, before: string, after: string) => void;
+        }
+      | string
+  ): Promise<void> {
     const roots = typeof scope === "string" ? [scope] : (scope?.roots ?? []),
       extra = new Set(typeof scope === "string" ? [] : (scope?.paths ?? []));
     const inScope = (path: string): boolean =>
@@ -2008,10 +2016,11 @@ export class Repository {
       const cached = await this.app.vault.cachedRead(file),
         derived = this.derivedNoteContent(file, cached, ownership, topics);
       if (derived === null || derived === cached) continue;
-      await this.app.vault.process(
-        file,
-        content => this.derivedNoteContent(file, content, ownership, topics) ?? content
-      );
+      await this.app.vault.process(file, content => {
+        const next = this.derivedNoteContent(file, content, ownership, topics) ?? content;
+        if (next !== content && typeof scope === "object") scope.onWrite?.(file.path, content, next);
+        return next;
+      });
     }
   }
 

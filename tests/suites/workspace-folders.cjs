@@ -1072,3 +1072,31 @@ integrationTest('Organize rollback preserves an edit before a moved topic map wr
   assert.ok(restored.nodes.every(node => node.path.startsWith(LEGACY + '/Beta/')));
   await assertResolves(vault);
 });
+
+integrationTest('Organize restores a citing note whose derived fields its own final rebuild rewrote, when that rebuild fails later', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  // A map owns the citing note, so the final rebuild adds agent-map-id and topic-state after the rebase journaled it.
+  const stay = await repo.createMap('Stay');
+  const doc = await repo.readMap(stay);
+  doc.nodes.push({ id: 'cites', parentId: null, path: vault.cites, x: 0, y: 0, collapsed: false });
+  await repo.saveMap(stay, doc);
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const process = app.vault.process;
+  let writes = 0, failed = false;
+  app.vault.process = async (file, change) => {
+    if (file.path !== vault.cites) return process(file, change);
+    const result = await process(file, change);
+    writes++;
+    if (!failed && /^topic-state: active$/m.test(contents.get(file.path))) { failed = true; throw new Error('injected rebuild failure'); }
+    return result;
+  };
+  try {
+    await assert.rejects(repo.organizeWorkspaceFolders(plan), error => /injected rebuild failure/.test(error.message) && !/Journaled file changed/.test(error.message));
+  } finally {
+    app.vault.process = process;
+  }
+  assert.ok(failed, 'the final rebuild rewrote the journaled citing note');
+  assert.deepEqual(plain((await repo.readNote(vault.cites)).sourcePaths), [vault.betaFirst], 'the citation points where Beta is again');
+  for (const path of Object.values(vault.paths)) assert.ok(app.vault.getAbstractFileByPath(path), path);
+});

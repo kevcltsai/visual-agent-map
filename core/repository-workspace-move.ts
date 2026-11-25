@@ -38,10 +38,18 @@ interface WorkspaceMovePorts {
    * Rewrites a managed note's `source-notes` / `reference-materials` through `rebase`, from the current frontmatter inside
    * one atomic write. Journals both versions before publication, including a write that later rejects.
    */
-  rebaseNoteLists(file: TFile, rebase: (path: string) => string, recordPrior: (before: string, after: string) => void): Promise<void>;
+  rebaseNoteLists(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void>;
   readableMaps(): Promise<{ file: TFile; map: MapDocument }[]>;
-  /** Rebase the current map and journal its exact pre-write bytes inside the atomic write boundary. */
-  rebaseMapPaths(file: TFile, rebase: (path: string) => string, recordPrior: (before: string, after: string) => void): Promise<void>;
+  /** Rebase the current map and journal its exact before/after bytes inside the atomic write boundary. */
+  rebaseMapPaths(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void>;
 }
 
 export async function moveTopicsWithRollback(
@@ -86,7 +94,8 @@ export async function moveTopicsWithRollback(
           if (!(file instanceof TFile)) throw new Error("Journaled file not found during rollback.");
           await ports.app.vault.process(file, current => {
             if (current === prior.before) return current;
-            if (current !== prior.after) throw new Error("Journaled file changed after the workspace write; rollback would overwrite edits.");
+            if (current !== prior.after)
+              throw new Error("Journaled file changed after the workspace write; rollback would overwrite edits.");
             return prior.before;
           });
         } catch (rollbackError) {

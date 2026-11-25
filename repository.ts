@@ -1,5 +1,10 @@
 import { parentPath, baseName } from "./core/repository-paths";
-import { moveTopicsWithRollback, type OrganizeMove, type OrganizePlan, type MoveProgress } from "./core/repository-workspace-move";
+import {
+  moveTopicsWithRollback,
+  type OrganizeMove,
+  type OrganizePlan,
+  type MoveProgress
+} from "./core/repository-workspace-move";
 import type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
 import { relocateFile } from "./core/repository-relocation";
 import { managedMapContainers, isManagedMapPath, type Settings } from "./core/repository-settings";

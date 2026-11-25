@@ -2748,9 +2748,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The node-details sidebar counts as open only while its pane is actually visible. */
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();
-  }  openDetails(file: TFile): Promise<void> {
+  }
+  openDetails(file: TFile): Promise<void> {
     return this.nodeDetailsSidebar.openDetails(file);
-  }  /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
+  } /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
   isNoteTaskBusy(path: string): boolean {
     if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;
     if (this.expansionCoordinator.isRunning(path)) return true;
@@ -2761,7 +2762,8 @@ export default class VisualAgentMapPlugin extends Plugin {
 
   closeStaleDetails(): void {
     this.nodeDetailsSidebar.closeStaleDetails();
-  }  private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
+  }
+  private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
     if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));
     // Use the already loaded pixels first. Cross-origin images can taint the canvas.
     try {

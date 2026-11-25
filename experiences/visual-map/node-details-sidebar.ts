@@ -15,8 +15,8 @@ export class NodeDetailsSidebar {
   detailsShown(): boolean {
     const split = this.app().workspace.rightSplit;
     if (split.collapsed) return false;
-    return this.app().workspace
-      .getLeavesOfType("markdown")
+    return this.app()
+      .workspace.getLeavesOfType("markdown")
       .some(
         leaf =>
           leaf.getRoot() === split &&

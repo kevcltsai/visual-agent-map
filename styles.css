@@ -2004,6 +2004,24 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-settings-view dt { color: var(--text-muted); }
 .vam-book-settings-view dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .vam-book-settings-view dd.is-empty { color: var(--text-faint); font-style: italic; }
+.vam-book-start-split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; margin-top: 6px; }
+@media (max-width: 640px) { .vam-book-start-split { grid-template-columns: 1fr; } }
+.vam-book-start-chat { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
+.vam-book-start-chat label { margin-top: 0; font-weight: 600; }
+.vam-book-start-fields { min-width: 0; }
+.vam-book-chat-log { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.vam-book-chat-log:empty { display: none; }
+.vam-book-chat-me, .vam-book-chat-ed, .vam-book-chat-failed { max-width: 92%; padding: 6px 10px; border-radius: var(--radius-m); font-size: var(--font-ui-small); overflow-wrap: anywhere; }
+.vam-book-chat-me { justify-self: end; background: var(--interactive-accent); color: var(--text-on-accent); }
+.vam-book-chat-ed { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }
+.vam-book-chat-ed b { margin-right: 6px; }
+.vam-book-chat-failed { border: 1px solid var(--background-modifier-border); color: var(--text-warning, var(--text-muted)); }
+.vam-book-chat-undo { margin-left: 6px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--interactive-accent); text-decoration: underline; cursor: pointer; }
+.vam-book-chat-busy { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); }
+.vam-book-chat-busy.is-empty { display: none; }
+.vam-book-chat-row { display: flex; gap: 6px; align-items: stretch; }
+.vam-book-chat-input { flex: 1 1 auto; min-width: 0; resize: vertical; }
+.vam-book-start-edited { margin-left: 6px; font-size: var(--font-ui-smaller); font-weight: 600; color: var(--interactive-accent); }
 .vam-book-plan-hint { padding: 6px 10px; border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--text-accent); font-size: var(--font-ui-small); }
 .vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }

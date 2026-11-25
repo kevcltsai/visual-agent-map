@@ -18080,6 +18080,22 @@ export class VisualAgentMapView extends ItemView {
         chapterTitles
       ),
       chapterTitles: [...chapterTitles.values()],
+      // The chat beside the fields: one call per sentence, on the plan model the card shows now (the card owns the abort and the timeout).
+      ...(typeof this.plugin.editBookSettings === "function"
+        ? {
+            editSettings: (request, signal) =>
+              this.plugin.editBookSettings(
+                {
+                  mapPath: path,
+                  model: request.model,
+                  message: request.message,
+                  settings: request.settings,
+                  turns: request.turns
+                },
+                signal
+              )
+          }
+        : {}),
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();

@@ -67,6 +67,7 @@ import { COMMONS_API } from "./core/book-pipeline/commons-search";
 import { downloadCover, saveCover } from "./core/book-pipeline/cover-download";
 import { withCover } from "./experiences/visual-map/card-cover";
 import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
+import { runEditSettings, type EditSettingsResult } from "./core/steps/book-pipeline/edit-settings";
 import type { BookSettings } from "./core/book-pipeline/model";
 import {
   t,
@@ -2263,6 +2264,31 @@ export default class VisualAgentMapPlugin extends Plugin {
         bookTitle: input.title,
         summary: input.summary,
         chapters: input.chapters
+      },
+      { signal }
+    );
+  }
+  /** One turn of the start card's talk with the chief editor: one text-only call on the plan model the card shows now. The caller owns the timeout and the abort. */
+  editBookSettings(
+    input: {
+      mapPath: string;
+      model: string;
+      message: string;
+      settings: BookSettings;
+      turns: { owner: string; editor: string }[];
+    },
+    signal: AbortSignal
+  ): Promise<EditSettingsResult> {
+    return runEditSettings(
+      this.aiCalls,
+      {
+        usageMapPath: input.mapPath,
+        language: selectionOutputLanguage(this.settings.language, input.message),
+        model: input.model,
+        reasoning: this.currentModelChoice().reasoning,
+        message: input.message,
+        settings: input.settings,
+        turns: input.turns
       },
       { signal }
     );

@@ -272,8 +272,7 @@ export function begin(deps: TransactionDeps): Transaction {
   let committed = false;
   const exists = (path: string): boolean => !!repo.app.vault.getAbstractFileByPath(path);
   const requireMapSnapshot = (current: MapDocument, expected: MapDocument): void => {
-    if (written(current) !== written(expected))
-      throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+    if (written(current) !== written(expected)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
   };
 
   /** Writes `files` then `maps`; on failure reverts everything written and throws (AggregateError when reverting also failed). */

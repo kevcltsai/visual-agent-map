@@ -1307,10 +1307,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     const recovery =
       this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir
-        ? new VaultWriteRecovery(
-            this.app.vault.adapter,
-            normalizePath(`${this.manifest.dir}/write-recovery`),
-            path => this.logs.appendLog("warn", t("log.recovery_snapshot_retained_0", path))
+        ? new VaultWriteRecovery(this.app.vault.adapter, normalizePath(`${this.manifest.dir}/write-recovery`), path =>
+            this.logs.appendLog("warn", t("log.recovery_snapshot_retained_0", path))
           )
         : undefined;
     if (recovery) {

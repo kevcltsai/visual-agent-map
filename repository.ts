@@ -301,7 +301,8 @@ function guardWrites<T extends object>(
               return recovery.process({
                 path: () => file.path,
                 read: () => vault.read(file),
-                process: transform => Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
+                process: transform =>
+                  Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
                 change,
                 stopped: disposed,
                 stoppedError: () => new Error(message()),

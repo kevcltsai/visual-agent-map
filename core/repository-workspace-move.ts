@@ -39,7 +39,8 @@ interface WorkspaceMovePorts {
    */
   rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null>;
   readableMaps(): Promise<{ file: TFile; map: MapDocument }[]>;
-  saveMap(path: string, map: MapDocument): Promise<void>;
+  /** Rebase the current map and journal its exact pre-write bytes inside the atomic write boundary. */
+  rebaseMapPaths(file: TFile, rebase: (path: string) => string, recordPrior: (content: string) => void): Promise<void>;
 }
 
 export async function moveTopicsWithRollback(
@@ -128,7 +129,7 @@ async function rebasePathPrefix(
   }
   for (const { file, map } of await ports.readableMaps()) {
     if (!rebaseMapNotePaths(map, rebase)) continue;
-    journal.push({ path: file.path, content: await ports.app.vault.read(file) });
-    await ports.saveMap(file.path, map);
+    // The scanned map only selects candidates. The write must use the current map, not that snapshot.
+    await ports.rebaseMapPaths(file, rebase, content => journal.push({ path: file.path, content }));
   }
 }

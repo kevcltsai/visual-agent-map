@@ -3469,7 +3469,8 @@ export class VisualAgentMapView extends ItemView {
     const path = this.path;
     const viewEpoch = this.viewEpoch;
     const mapOpenEpoch = this.mapOpenEpoch;
-    return () => !this.closed && this.path === path && this.viewEpoch === viewEpoch && this.mapOpenEpoch === mapOpenEpoch;
+    return () =>
+      !this.closed && this.path === path && this.viewEpoch === viewEpoch && this.mapOpenEpoch === mapOpenEpoch;
   }
 
   private async hydrate(
@@ -11677,8 +11678,7 @@ export class VisualAgentMapView extends ItemView {
     // Map.md is read once here; its goal and sources go to hydrate instead of being read again.
     const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(path);
     if (!current() || this.map !== map) return;
-    const structureChanged =
-      JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...map, viewport: null });
+    const structureChanged = JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...map, viewport: null });
     if (structureChanged) {
       disk.viewport = map.viewport;
       this.map = disk;

@@ -329,9 +329,9 @@ test('research: an AI failure sets status error, reports through failed and rele
   assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false); assert.deepEqual(h.log.written, []);
 });
 
-test('research: every one of the 12 compared fields makes the result stale and nothing is written', async () => {
-  const changes = { thinkingOrigin: 'x', title: 'x', prompt: 'x', rules: 'x', detail: 'x', summary: 'x', model: 'x', reasoning: 'high', researchMode: 'web', visualMode: 'on', sourcePaths: ['s.md', 'z.md'], referencePaths: [{ path: 'r.md' }] };
-  assert.equal(Object.keys(changes).length, 12);
+test('research: every compared content field makes the result stale and nothing is written', async () => {
+  const changes = { thinkingOrigin: 'x', title: 'x', prompt: 'x', rules: 'x', detail: 'x', summary: 'x', model: 'x', reasoning: 'high', researchMode: 'web', visualMode: 'on', sourcePaths: ['s.md', 'z.md'], referencePaths: [{ path: 'r.md' }], newFindings: 'later', visualReferences: 'owner image' };
+  assert.equal(Object.keys(changes).length, 14);
   for (const [field, value] of Object.entries(changes)) {
     let release; const gate = new Promise(r => { release = r; });
     const h = researchRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { summary: 'NEW', detail: 'NEW', visualReferences: [], suggestions: [] }; } });
@@ -1261,7 +1261,7 @@ test('research pipeline: the write is guarded (authorize + expectedContent) and 
   const h = guardedRuns();
   const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ authorize }).pipeline }));
   await handle.finished;
-  assert.equal(h.guardedCalls.length, 1); assert.equal(h.guardedCalls[0].opt.authorize, authorize);
+  assert.equal(h.guardedCalls.length, 1); assert.equal(h.guardedCalls[0].opt.authorize('current'), authorize());
   assert.equal(h.store.get('A.md').status, 'completed'); assert.deepEqual(h.log.failed, []); assert.equal(h.log.written.length, 1);
 });
 
@@ -1325,4 +1325,56 @@ test('research pipeline: expectedContent is the file text the run started from (
   const handle2 = await h2.runs.start('A.md', 'research', h2.options({ pipeline: hooks().pipeline, readRaw, backupNote: async () => ({ ok: true, path: 'B.md' }) }));
   await handle2.finished;
   assert.equal(h2.store.get('A.md').summary, '', 'discarded: the owner text stays'); assert.equal(h2.log.failed.length, 1);
+});
+
+function commitBoundary(h, interfere) {
+  const repo = h.runs.ports.repository();
+  repo.readNoteSnapshot = async path => {
+    const note = await repo.readNote(path);
+    return { note, content: JSON.stringify(note) };
+  };
+  repo.settleRunningNote = async (path, patch) => {
+    if (h.store.get(path).status === 'running') await repo.updateNote(path, patch);
+  };
+  repo.updateNoteGuarded = async (path, patch, options) => {
+    interfere?.();
+    const current = JSON.stringify(h.store.get(path));
+    if (options.expectedContent !== current || !options.authorize(current)) return 'discarded';
+    await repo.updateNote(path, patch, options);
+    return 'written';
+  };
+}
+
+test('research: the actual commit rejects an intervening edit or stop, and never reverts a newer status', async () => {
+  for (const scenario of ['owner-edit', 'stop', 'owner-status', 'normal']) {
+    const h = researchRuns();
+    commitBoundary(h, () => {
+      if (scenario === 'owner-edit') h.store.get('A.md').detail = 'Owner edit';
+      if (scenario === 'stop') h.runs.stop('A.md');
+      if (scenario === 'owner-status') h.store.get('A.md').status = 'completed';
+    });
+    const handle = await h.runs.start('A.md', 'research', h.options());
+    await handle.finished;
+    assert.equal(h.log.written.length, scenario === 'normal' ? 1 : 0, scenario);
+    assert.equal(h.store.get('A.md').summary, scenario === 'normal' ? 'S' : '', scenario);
+    assert.equal(h.store.get('A.md').status, ['owner-status', 'normal'].includes(scenario) ? 'completed' : 'idea', scenario);
+    if (scenario === 'owner-edit') assert.equal(h.store.get('A.md').detail, 'Owner edit');
+    assert.equal(h.running.size, 0);
+  }
+});
+
+test('integrateChildren: the actual commit rejects an intervening edit, stop or replaced view', async () => {
+  for (const scenario of ['owner-edit', 'stop', 'view', 'normal']) {
+    const h = integrateRuns();
+    commitBoundary(h, () => {
+      if (scenario === 'owner-edit') h.store.get('A.md').detail = 'Owner edit';
+      if (scenario === 'stop') h.runs.stop('A.md');
+      if (scenario === 'view') h.state.viewChanged = true;
+    });
+    await h.runs.start('A.md', 'integrateChildren', h.opts());
+    assert.equal(h.log.written.length, scenario === 'normal' ? 1 : 0, scenario);
+    assert.equal(h.store.get('A.md').summary, scenario === 'normal' ? 'NS' : '', scenario);
+    if (scenario === 'owner-edit') assert.equal(h.store.get('A.md').detail, 'Owner edit');
+    assert.equal(h.running.size, 0);
+  }
 });

@@ -213,6 +213,92 @@ integrationTest('Organize moves mind maps to Mind Maps; every map opens, links a
   assert.equal(again.moves.length, 0, 'idempotent: nothing left to organize');
 });
 
+
+integrationTest('Organize rebases source and reference paths even when the indexed frontmatter is stale', async () => {
+  const vault = await legacyVault();
+  const { repo, app } = vault;
+  await repo.updateNote(vault.cites, { sourcePaths: [vault.betaFirst], referencePaths: [vault.betaFirst] });
+  const getCache = app.metadataCache.getFileCache;
+  app.metadataCache.getFileCache = file => {
+    const cache = getCache(file);
+    if (file.path !== vault.cites) return cache;
+    // Obsidian has indexed the managed-note marker, but not the latest citation edit.
+    return { ...cache, frontmatter: { ...cache.frontmatter, 'source-notes': [], 'reference-materials': [] } };
+  };
+  const before = await repo.readNote(vault.cites);
+  assert.deepEqual(plain(before.sourcePaths), [vault.betaFirst]);
+  assert.deepEqual(plain(before.referencePaths), [vault.betaFirst]);
+  await repo.organizeWorkspaceFolders(await repo.planOrganizeWorkspaceFolders());
+  app.metadataCache.getFileCache = getCache;
+  const after = await repo.readNote(vault.cites);
+  const target = 'Agent Workspace/Mind Maps/Beta/Notes/First.md';
+  assert.deepEqual(plain(after.sourcePaths), [target]);
+  assert.deepEqual(plain(after.referencePaths), [target]);
+  assert.ok(app.vault.getAbstractFileByPath(target));
+  await assertResolves(vault);
+});
+
+integrationTest('Organize journals a citation hidden by stale metadata and restores it on a later failure', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  await repo.updateNote(vault.cites, { referencePaths: [vault.betaFirst] });
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const before = snapshot(vault);
+  const getCache = app.metadataCache.getFileCache;
+  app.metadataCache.getFileCache = file => {
+    const cache = getCache(file);
+    return file.path === vault.cites
+      ? { ...cache, frontmatter: { ...cache.frontmatter, 'source-notes': [], 'reference-materials': [] } }
+      : cache;
+  };
+  const rename = app.fileManager.renameFile;
+  let citationWasRebased = false;
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') {
+      citationWasRebased = contents.get(vault.cites).includes('Agent Workspace/Mind Maps/Beta/Notes/First.md');
+      throw new Error('injected later move failure');
+    }
+    return rename(item, target);
+  };
+  await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure/);
+  app.metadataCache.getFileCache = getCache;
+  app.fileManager.renameFile = rename;
+  assert.ok(citationWasRebased, 'stale-index citation was actually written before rollback');
+  assertUnchanged(vault, before, 'after rollback of stale-index citation');
+  await assertResolves(vault);
+});
+
+integrationTest('Organize keeps a citation the owner adds to a note between its read and its rewrite', async () => {
+  const vault = await legacyVault();
+  const { repo, app, contents } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const extra = 'Agent Workspace/Unfiled/Owner Added.md';
+  let injected = false,
+    armed = false;
+  // The owner's edit lands the first time Organize touches the citing note once the cited folder has moved: right after a read of it, or right before its atomic write.
+  const inject = () => {
+    if (injected || !armed) return;
+    injected = true;
+    contents.set(vault.cites, contents.get(vault.cites).replace(/(source-notes:\n(?:  - .*\n)+)/, `$1  - ${extra}\n`));
+  };
+  const read = app.vault.read, process = app.vault.process;
+  app.vault.read = async file => { const text = await read(file); if (file.path === vault.cites) inject(); return text; };
+  app.vault.process = async (file, change) => { if (file.path === vault.cites) inject(); return process(file, change); };
+  const rename = app.fileManager.renameFile;
+  app.fileManager.renameFile = async (item, target) => {
+    const result = await rename(item, target);
+    if (target === 'Agent Workspace/Mind Maps/Beta') armed = true;
+    return result;
+  };
+  await repo.organizeWorkspaceFolders(plan);
+  app.vault.read = read;
+  app.vault.process = process;
+  app.fileManager.renameFile = rename;
+  assert.ok(injected, 'the concurrent edit was injected');
+  const after = await repo.readNote(vault.cites);
+  assert.deepEqual(plain(after.sourcePaths), ['Agent Workspace/Mind Maps/Beta/Notes/First.md', extra], 'the moved path follows and the owner-added citation survives');
+});
+
 integrationTest('Organize keeps a clash-free name: an existing target folder gets a numeric suffix', async () => {
   const vault = await legacyVault();
   await vault.repo.createMap('Alpha');
@@ -842,4 +928,36 @@ integrationTest('renaming an open map folder in the file explorer keeps the map 
   assert.ok(view.map, 'the map stays open');
   assert.deepEqual(plain(view.map.nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
   assert.deepEqual(plain((await repo.readMap(`${moved}/Map.md`)).nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
+});
+
+integrationTest('Organize still restores the topic folders and maps when one journal restore fails', async () => {
+  const vault = await legacyVault();
+  const { repo, app } = vault;
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  const before = snapshot(vault);
+  const rename = app.fileManager.renameFile;
+  const modify = app.vault.modify;
+  let rollingBack = false, refused = 0;
+  app.fileManager.renameFile = async (item, target) => {
+    if (target === 'Agent Workspace/Mind Maps/Gamma') {
+      rollingBack = true;
+      throw new Error('injected later move failure');
+    }
+    return rename(item, target);
+  };
+  app.vault.modify = async (file, content) => {
+    if (rollingBack && file.path === vault.cites) {
+      refused++;
+      throw new Error('injected journal restore failure');
+    }
+    return modify(file, content);
+  };
+  await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure[\s\S]*rollback also failed[\s\S]*injected journal restore failure/);
+  assert.ok(refused > 0, 'the journal restore really failed');
+  for (const path of Object.values(vault.paths)) {
+    assert.ok(app.vault.getAbstractFileByPath(path), path);
+    assert.equal(vault.contents.get(path), before.contents.get(path), path);
+    const map = await repo.readMap(path);
+    for (const node of map.nodes) assert.ok(app.vault.getAbstractFileByPath(node.path), node.path);
+  }
 });

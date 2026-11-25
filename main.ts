@@ -1054,15 +1054,18 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   async mutate(work: () => Promise<void>, options: { sync?: boolean | "full" } = {}): Promise<void> {
     const result = this.queue.then(async () => {
+      if (this.unloaded) throw new Error(t("error.unloaded_write_not_performed"));
       this.writing++;
       try {
         await work();
-        if (options.sync !== false) await this.readBackViews(options.sync === "full");
+        if (!this.unloaded && options.sync !== false) await this.readBackViews(options.sync === "full");
       } finally {
         this.writing--;
       }
     });
     this.queue = result.catch(error => {
+      // Unload deliberately refuses queued work; do not show a notice from an obsolete plugin instance.
+      if (this.unloaded) return;
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
@@ -1080,8 +1083,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     const views = this.views();
     if (full) for (const view of views) view.unsynced.markFull(this.syncSeq);
     const start = this.syncSeq;
-    for (const view of views) await view.synchronize({ seq: start });
-    if (this.syncSeq !== start) this.runMutation(async () => {});
+    for (const view of views) {
+      if (this.unloaded) return;
+      await view.synchronize({ seq: start });
+    }
+    if (!this.unloaded && this.syncSeq !== start) this.runMutation(async () => {});
   }
   /**
    * A setting that a note read resolves (the current model and reasoning level) changed, with no file written: the next
@@ -1755,14 +1761,26 @@ export default class VisualAgentMapPlugin extends Plugin {
     const failed: string[] = [];
     const nodePaths = new Set<string>();
     const rebase = chainRebase(pairs);
+    // The scan identifies affected maps; it is not a write snapshot. Apply only the path change to the
+    // current Map.md inside vault.process, preserving concurrent structural and coordinate edits.
+    const save = async (path: string): Promise<void> => {
+      let rebased = false;
+      const current = await this.repo.updateMap(path, map => {
+        rebased = rebaseMapNotePaths(map, rebase);
+      });
+      changed ||= rebased;
+      for (const node of current.nodes) nodePaths.add(node.path);
+    };
     for (const { file, map } of await this.repo.readableMaps()) {
       const rebased = rebaseMapNotePaths(map, rebase);
-      for (const node of map.nodes) nodePaths.add(node.path);
-      if (!rebased) continue;
+      if (!rebased) {
+        for (const node of map.nodes) nodePaths.add(node.path);
+        continue;
+      }
       try {
-        await this.repo.saveMap(file.path, map);
-        changed = true;
+        await save(file.path);
       } catch {
+        for (const node of map.nodes) nodePaths.add(node.path);
         failed.push(file.path);
       }
     }
@@ -1771,8 +1789,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       try {
         const map = await this.repo.readMap(path);
         if (!rebaseMapNotePaths(map, rebase)) continue;
-        await this.repo.saveMap(path, map);
-        changed = true;
+        await save(path);
       } catch (retryError) {
         error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
       }

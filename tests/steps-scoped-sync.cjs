@@ -466,3 +466,22 @@ test('synchronize cannot install disk metadata into a superseding map session', 
   assert.equal(va.map, vb.map);
   assert.equal(va.notes, vb.notes);
 });
+
+test('unload refuses work still queued behind an in-flight mutation and skips its read-back', async () => {
+  const h = harness();
+  const paused = gate(), reached = gate();
+  const first = h.plugin.mutate(async () => { reached.open(); await paused.promise; });
+  await reached.promise;
+  let ran = false, readBack = 0;
+  h.plugin.readBackViews = async () => { readBack++; };
+  const queued = h.plugin.mutate(async () => { ran = true; });
+  const rejected = assert.rejects(queued, /reloaded|unloaded/i);
+  h.plugin.unloaded = true;
+  paused.open();
+  await first;
+  await rejected;
+  await h.plugin.queue;
+  assert.equal(ran, false);
+  assert.equal(readBack, 0);
+  assert.equal(h.plugin.writing, 0);
+});

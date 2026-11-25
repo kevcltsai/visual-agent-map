@@ -42,7 +42,7 @@ async function layoutHarness(spec, extra = {}, layouts = {}) {
   }
   const Base = dom.makeModal();
   class Modal extends Base { open() { super.open(); this.close(); } }
-  const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
+  const createSvg = dom.createSvg;
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   let pending = Promise.resolve();
   const plugin = support.withExpansionCoordinator({

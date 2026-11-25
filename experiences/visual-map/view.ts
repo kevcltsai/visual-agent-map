@@ -3102,7 +3102,6 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   async onClose(): Promise<void> {
-    this.closeTopicLinkMenu();
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
@@ -3116,7 +3115,7 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
-    this.cancelLinking(false);
+    this.dropCanvasInteractionModes();
     for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
@@ -3574,7 +3573,10 @@ export class VisualAgentMapView extends ItemView {
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
-    if (this.path !== path) this.hiddenAnchors.clear();
+    if (this.path !== path) {
+      this.dropCanvasInteractionModes();
+      this.hiddenAnchors.clear();
+    }
     this.path = path;
     this.map = map;
     this.selection.exitMultiSelect("openMap");
@@ -7905,13 +7907,13 @@ export class VisualAgentMapView extends ItemView {
     if (was && announce) this.announcer?.setText(t("ui.anchor_pick_cancelled"));
   }
   /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelPlacing(announce: boolean): void {
+  private cancelPlacing(announce: boolean, restoreFocus = true): void {
     const placing = this.placing;
     this.endPlacingListeners?.();
     this.placing = null;
     if (!placing) return;
     if (announce) this.announcer?.setText(t("ui.anchor_place_cancelled"));
-    this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
   }
   private finishPlacing(at: { x: number; y: number }): void {
     const placing = this.placing;
@@ -8630,8 +8632,10 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
-  private liveLinks(text: TextItem): string[] {
-    const alive = new Set((this.map?.nodes ?? []).map(node => node.id));
+  private liveLinks(
+    text: TextItem,
+    alive: ReadonlySet<string> = new Set((this.map?.nodes ?? []).map(node => node.id))
+  ): string[] {
     return (text.links ?? []).filter(id => alive.has(id));
   }
   /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
@@ -8784,13 +8788,20 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Leaves link mode without writing anything; `announce` tells a screen reader it was cancelled. */
-  private cancelLinking(announce: boolean): void {
+  private cancelLinking(announce: boolean, restoreFocus = true): void {
     const id = this.linkingTextId;
     this.endLinkListeners?.();
     this.linkingTextId = null;
     if (!id) return;
     if (announce) this.announcer?.setText(t("ui.text_link_cancelled"));
-    this.textEls.get(id)?.focus?.({ preventScroll: true });
+    if (restoreFocus) this.textEls.get(id)?.focus?.({ preventScroll: true });
+  }
+  /** Ends map-owned interactions before switching maps or closing; never focus a departing element. */
+  private dropCanvasInteractionModes(): void {
+    this.cancelLinking(false, false);
+    this.cancelPicking(false);
+    this.cancelPlacing(false, false);
+    this.closeTopicLinkMenu();
   }
   /** Writes the link as one undo step, then leaves link mode; a repeat is announced and not written twice. */
   private finishLinking(cardId: string): void {
@@ -12168,6 +12179,8 @@ export class VisualAgentMapView extends ItemView {
     this.inlineSummaryInput = null;
     // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
     for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    // The link menu's document listener outlives its DOM unless it is explicitly closed.
+    this.closeTopicLinkMenu();
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
     this.removeGoalBar();
     this.contentEl.empty();
@@ -24692,11 +24705,15 @@ export class VisualAgentMapView extends ItemView {
         this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);
       }
     }
+    // Both kinds of text edge share one lookup, preserving the first matching text item in map order.
+    const textsById = new Map<string, TextItem>();
+    if (this.textEls.size)
+      for (const item of this.map.canvasItems ?? [])
+        if (item.kind === "text" && !textsById.has((item as TextItem).id))
+          textsById.set((item as TextItem).id, item as TextItem);
     // A text node hangs from its topic by the same kind of line.
     for (const [textId, textEl] of this.textEls) {
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       const parent = text?.parentId ? this.cardEls.get(text.parentId) : undefined;
       if (!text || !parent || textEl.classList.contains("is-free")) continue;
       const direction = directionOf(text.parentId as string) as LayoutKind;
@@ -24717,13 +24734,13 @@ export class VisualAgentMapView extends ItemView {
       lines.push(path);
     }
     // A free text block is joined to the cards it links to by a dashed line: no arrow, no label (canvas-text-node decision #2).
+    let alive: Set<string> | undefined;
     for (const [textId, textEl] of this.textEls) {
       if (!textEl.classList.contains("is-free")) continue;
-      const text = (this.map.canvasItems ?? []).find(
-        item => item.kind === "text" && (item as TextItem).id === textId
-      ) as TextItem | undefined;
+      const text = textsById.get(textId);
       if (!text) continue;
-      for (const cardId of this.liveLinks(text)) {
+      alive ??= new Set(allNodes.map(node => node.id));
+      for (const cardId of this.liveLinks(text, alive)) {
         const card = this.cardEls.get(cardId);
         if (!card) continue;
         const path = createSvg("path");
@@ -24793,14 +24810,34 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from: card, to: card, key, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
+    // Measure every endpoint once, before adding SVG elements; paths and labels share the same geometry.
+    const axis = relationAxisFor(layoutOf(this.map).direction);
+    const boxes = new Map<HTMLElement, CardBox>();
+    const boxFor = (card: HTMLElement): CardBox => {
+      let box = boxes.get(card);
+      if (!box) {
+        box = boxOf(card);
+        boxes.set(card, box);
+      }
+      return box;
+    };
+    const measured = links.map(link => {
+      const to = boxFor(link.to);
+      if (link.anchor)
+        return {
+          ...link,
+          d: this.anchorPathData(link.anchor, to),
+          at: this.anchorLabelPoint(link.anchor, to)
+        };
+      const from = boxFor(link.from);
+      return { ...link, d: relationPathData(from, to, axis), at: relationLabelPoint(from, to, axis) };
+    });
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
-    // In a map that grows sideways the lines lean to the left and right edges, in one that grows up or down to the ends.
-    const axis = relationAxisFor(layoutOf(this.map).direction);
-    for (const link of links) {
-      const d = this.relationLinkPath(link, axis),
+    for (const link of measured) {
+      const d = link.d,
         marker =
           link.kind === "related"
             ? null
@@ -24861,7 +24898,7 @@ export class VisualAgentMapView extends ItemView {
       this.edgesEl.appendChild(hit);
       this.relationHitEls.set(key, hit);
     }
-    for (const link of links) {
+    for (const link of measured) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
       if (link.anchor) label.setAttribute("data-anchor-relation", "");
@@ -24869,12 +24906,7 @@ export class VisualAgentMapView extends ItemView {
         label.addClass("is-ring-quiet");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(
-        link.key,
-        link.anchor
-          ? this.anchorLabelPoint(link.anchor, boxOf(link.to))
-          : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
-      );
+      this.placeRelationLabel(link.key, link.at);
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
@@ -24913,14 +24945,6 @@ export class VisualAgentMapView extends ItemView {
     return side
       ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor)
       : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
-  }
-  private relationLinkPath(
-    link: { from: HTMLElement; to: HTMLElement; anchor?: AnchorLine },
-    axis: ReturnType<typeof relationAxisFor>
-  ): string {
-    return link.anchor
-      ? this.anchorPathData(link.anchor, boxOf(link.to))
-      : relationPathData(boxOf(link.from), boxOf(link.to), axis);
   }
   /**
    * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing

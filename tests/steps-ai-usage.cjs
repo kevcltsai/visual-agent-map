@@ -442,3 +442,38 @@ test('usage store provider filter: an unreadable store stays unreadable under ev
   await broken.load();
   for (const result of [broken.totals({ provider: 'codex' }), broken.byAction('A/map.vam', undefined, 'codex'), broken.recent('A/map.vam', 10, 'codex')]) same(result, { status: 'unreadable' });
 });
+
+test('partial provider usage stays incomplete through calls, storage, reload and compaction', async () => {
+  const h = rig({ handler: call => { call.controls.onMilestones({ usage: { inputTokens: 120 } }); return GOOD; } });
+  await h.service.askModel(context({ researchMode: 'research' }), 'claude:sonnet', 'low');
+  assert.equal(h.records.length, 1);
+  assert.equal(h.records[0].estimated, false);
+  assert.equal(h.records[0].incomplete, true);
+  assert.equal(h.records[0].inputTokens, 120);
+  assert.equal(h.records[0].outputTokens, 0);
+  const file = tempFile();
+  const now = Date.parse('2026-11-25T12:00:00Z');
+  const store = newStore(file, { now: () => now });
+  await store.load();
+  store.record(row({ ...h.records[0], at: '2026-01-01T12:00:00Z' }));
+  store.record(row({ inputTokens: 10, outputTokens: 5, at: '2026-11-25T12:00:00Z' }));
+  await store.flush();
+  const reloaded = newStore(file, { now: () => now });
+  await reloaded.load();
+  same(ok(reloaded.totals({ provider: 'claude' })), { inputTokens: 130, outputTokens: 5, incomplete: true });
+  same(ok(reloaded.totals({ provider: 'codex' })), { inputTokens: 0, outputTokens: 0 });
+  same(ok(reloaded.byAction('A/map.vam')).research, { inputTokens: 130, outputTokens: 5, incomplete: true });
+  await reloaded.dispose();
+  await store.dispose();
+});
+
+test('explicit reported zero is not a missing count, and a missing side with zero is still incomplete', async () => {
+  const h = rig({ handler: call => { call.controls.onMilestones({ usage: { inputTokens: 0 } }); return GOOD; } });
+  await h.service.askModel(context(), 'claude:sonnet', 'low');
+  assert.equal(h.records.length, 1);
+  assert.equal(h.records[0].incomplete, true);
+  const full = rig({ handler: call => { call.controls.onMilestones({ usage: { inputTokens: 120, outputTokens: 0 } }); return GOOD; } });
+  await full.service.askModel(context(), 'claude:sonnet', 'low');
+  assert.equal(full.records[0].incomplete, undefined);
+  assert.equal(full.records[0].estimated, false);
+});

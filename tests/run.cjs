@@ -57,9 +57,14 @@ const directory = path.join(__dirname, 'suites');
 assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs')).sort(), suites.slice().sort(), 'tests/run.cjs must list every file in tests/suites');
 // `--shard=i/n` (1-based) registers only the suites assigned to shard i of n, so `scripts/test-integration.mjs` can run the integration layer in parallel processes.
 // Suites share no files or process state (every temp path comes from mkdtemp, and each suite passes alone in a fresh process), so any partition keeps the same tests.
-// The assignment is greedy by approximate integration seconds (default 2) and deterministic; the shards partition `suites`, so no suite is dropped or repeated.
+// The assignment is greedy by approximate seconds in the run's layer (default 2) and deterministic; the shards partition `suites`, so no suite is dropped or repeated.
+// Unit seconds are each suite run alone (2026-11-26, Apple M1): its headless-Chrome suites used to land on one shard under the integration weights.
 const shard = process.argv.find(value => value.startsWith('--shard='))?.split('=')[1];
-const weights = { 'map-chat.cjs': 60, 'relevance-grade.cjs': 18, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'reframing.cjs': 5, 'map-structure.cjs': 5 };
+const layerWeights = {
+  unit: { 'sharing-viewer.cjs': 51, 'heavy-lock.cjs': 20, 'map-chat.cjs': 13, 'test-affected.cjs': 5, 'map-view-color.cjs': 4, 'i18n.cjs': 3 },
+  integration: { 'map-chat.cjs': 60, 'relevance-grade.cjs': 18, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'reframing.cjs': 5, 'map-structure.cjs': 5 }
+};
+const weights = layerWeights[process.argv.find(value => value.startsWith('--layer='))?.split('=')[1]] ?? layerWeights.integration;
 function shardOf(index, count) {
   const loads = Array.from({ length: count }, () => ({ weight: 0, suites: [] }));
   for (const suite of suites.slice().sort((a, b) => (weights[b] ?? 2) - (weights[a] ?? 2) || a.localeCompare(b))) {

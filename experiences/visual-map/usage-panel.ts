@@ -36,6 +36,9 @@ interface TotalCell {
   input: HTMLElement;
   output: HTMLElement;
 }
+interface MountedPanel extends PanelParts {
+  doc: Document | null;
+}
 interface PanelParts {
   root: HTMLElement;
   sections: HTMLElement[];
@@ -57,8 +60,7 @@ export class UsageControl {
   private numberEl: HTMLElement | null = null;
   private overlay: HTMLElement | null = null;
   private bar: HTMLElement | null = null;
-  private parts: PanelParts | null = null;
-  private doc: Document | null = null;
+  private parts: MountedPanel | null = null;
   private isOpen = false;
   private filter: UsageFilter = "total";
 
@@ -99,6 +101,7 @@ export class UsageControl {
     this.numberEl = button.createSpan({ cls: "vam-usage-number" });
     zoomBar.createSpan({ cls: "vam-usage-sep" }).setAttr("aria-hidden", "true");
     button.addEventListener("click", event => {
+      if (this.button !== button) return;
       event.stopPropagation();
       if (this.isOpen) this.close(true);
       else this.openPanel();
@@ -120,7 +123,7 @@ export class UsageControl {
   /** Closes the panel; the focus goes back to the button when asked or when it was inside the panel. */
   close(returnFocus = false): void {
     if (!this.isOpen) return;
-    const active = (this.doc as { activeElement?: Element | null } | null)?.activeElement ?? null;
+    const active = this.parts?.doc?.activeElement ?? null;
     const insideNow = !!(active && this.parts?.root.contains(active));
     this.isOpen = false;
     this.detachPanel();
@@ -147,20 +150,21 @@ export class UsageControl {
   private attachPanel(): void {
     if (!this.overlay) return;
     const parts = this.buildPanel(this.overlay);
-    this.parts = parts;
     const doc =
       (this.overlay.ownerDocument as Document | undefined) ?? (typeof document === "undefined" ? null : document);
-    this.doc = doc;
+    this.parts = { ...parts, doc };
     doc?.addEventListener("keydown", this.onKey, true);
     doc?.addEventListener("pointerdown", this.onPointer, true);
     this.place();
   }
 
   private detachPanel(): void {
-    this.doc?.removeEventListener("keydown", this.onKey, true);
-    this.doc?.removeEventListener("pointerdown", this.onPointer, true);
-    this.parts?.root.remove();
+    const parts = this.parts;
     this.parts = null;
+    if (!parts) return;
+    parts.doc?.removeEventListener("keydown", this.onKey, true);
+    parts.doc?.removeEventListener("pointerdown", this.onPointer, true);
+    parts.root.remove();
   }
 
   private readonly onKey = (event: KeyboardEvent): void => {
@@ -168,7 +172,7 @@ export class UsageControl {
     // Only Escape pressed in the panel or on the usage button closes it; anywhere else it belongs to whoever has the focus.
     const inside = (node: Node | null | undefined): boolean =>
       !!node && !!(this.parts?.root.contains(node) || this.button?.contains(node));
-    if (!inside(event.target as Node | null) && !inside(this.doc?.activeElement)) return;
+    if (!inside(event.target as Node | null) && !inside(this.parts?.doc?.activeElement)) return;
     event.preventDefault();
     event.stopPropagation();
     this.close(true);
@@ -212,10 +216,13 @@ export class UsageControl {
       });
       radio.setAttr("type", "button");
       radio.setAttr("role", "radio");
-      radio.addEventListener("click", () => this.select(value, false));
+      radio.addEventListener("click", () => {
+        if (this.parts?.root === root) this.select(value, false);
+      });
       filters.set(value, radio);
     }
     group.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (this.parts?.root !== root) return;
       const step =
         event.key === "ArrowRight" || event.key === "ArrowDown"
           ? 1

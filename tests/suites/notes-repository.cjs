@@ -1771,6 +1771,24 @@ integrationTest('an inherited topic uses the nearest manual ancestor model, othe
   assert.equal((await nested.repo.readNote(nested.nodes[3].path)).model, 'claude:haiku');
   assert.equal((await nested.repo.readNote(nested.nodes[1].path)).model, 'claude:opus');
 });
+integrationTest('hydrate context indexes note paths and preserves model inheritance', async () => {
+  const { createNoteReadContext } = load('core/note-read-context.ts');
+  const { repo, mapDoc, nodes } = await modelTree([['manual', 'claude:opus'], ['inherited'], ['manual', 'claude:haiku'], ['inherited']]);
+  const ctx = createNoteReadContext(mapDoc);
+  assert.equal(ctx.nodesByPath.get(nodes[3].path).id, nodes[3].id);
+  let scans = 0;
+  const find = mapDoc.nodes.find.bind(mapDoc.nodes), some = mapDoc.nodes.some.bind(mapDoc.nodes);
+  mapDoc.nodes.find = (...args) => { scans++; return find(...args); };
+  mapDoc.nodes.some = (...args) => { scans++; return some(...args); };
+  assert.equal((await repo.readNote(nodes[1].path, mapDoc, ctx)).model, 'claude:opus');
+  assert.equal((await repo.readNote(nodes[3].path, mapDoc, ctx)).model, 'claude:haiku');
+  assert.equal(scans, 0, 'matching context avoids linear path searches');
+  const other = { ...mapDoc, nodes: mapDoc.nodes.map(node => ({ ...node })) };
+  other.nodes[3].parentId = nodes[0].id;
+  assert.equal((await repo.readNote(nodes[3].path, other, ctx)).model, 'claude:opus', 'a different map uses its own nodes');
+  const duplicate = { ...nodes[3], id: 'another-id' };
+  assert.equal(createNoteReadContext({ nodes: [nodes[3], duplicate] }).nodesByPath.get(nodes[3].path).id, nodes[3].id);
+});
 integrationTest('a manual topic keeps its stored model', async () => {
   const { repo, nodes } = await modelTree([['manual', 'gpt-5.6-luna']]);
   const note = await repo.readNote(nodes[0].path);

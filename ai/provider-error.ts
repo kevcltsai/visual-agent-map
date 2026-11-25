@@ -2,8 +2,8 @@ import { FALLBACK_MODEL } from "./model-resolution";
 import { claudeModelChoice } from "./providers/provider";
 
 /** Provider errors an owner can get around by using the other provider. Timeouts, network and format errors are not among them. */
-export type ProviderErrorKind = "quota" | "auth" | "model-unavailable";
-export type FailedProvider = "codex" | "claude";
+type ProviderErrorKind = "quota" | "auth" | "model-unavailable";
+type FailedProvider = "codex" | "claude";
 
 // Matched against the raw failure message (the note's `last-error`), never a new log field.
 const QUOTA = /usage limit|rate[ -]?limit|quota|額度|额度|用量上限/i;

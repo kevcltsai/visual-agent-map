@@ -1531,6 +1531,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
     });
     this.registerVaultEvents();
+    this.registerAppExitStop();
+  }
+  /** Quitting Obsidian does not call onunload: stop running AI calls here too, so no provider process outlives the app. */
+  registerAppExitStop(): void {
+    this.registerDomEvent(window, "beforeunload", () => this.resetCodexRuntime());
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
   private async initializeFirstInstall(hasSaved: boolean): Promise<void> {

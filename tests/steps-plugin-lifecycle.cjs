@@ -64,3 +64,20 @@ test('W2c plugin: prewarmClaude for a synthesis resolves auto to medium like the
   const { effectiveReasoningLevel } = S.load('ai/task-policy.ts');
   assert.equal(effectiveReasoningLevel({ mode: 'synthesize' }, 'auto'), calls[0][1]);
 });
+
+test('app quit (window beforeunload, no onunload) stops every running AI call so its child process cannot outlive Obsidian', () => {
+  const plugin = newPlugin();
+  const registered = [];
+  plugin.registerDomEvent = (target, type, callback) => registered.push({ target, type, callback });
+  plugin.registerAppExitStop();
+  assert.equal(registered.length, 1);
+  assert.equal(registered[0].type, 'beforeunload');
+  assert.equal(typeof registered[0].target.setTimeout, 'function', 'registered on the plugin window');
+  const running = new AbortController();
+  plugin.activeTasks.set('Maps/A/Map.md', running);
+  let reset = 0;
+  plugin.aiRuntime.reset = () => { reset++; };
+  registered[0].callback();
+  assert.ok(running.signal.aborted, 'the running call was aborted');
+  assert.equal(reset, 1, 'runtime processes (warm Claude, Codex) were stopped');
+});

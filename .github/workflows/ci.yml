@@ -115,7 +115,9 @@ jobs:
           npm run lint && npm run format:check && npm run check:i18n && npm run build \
             && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts
 
-  # Full only: 4 runners, each runs its share of the parts (scripts/test-integration.mjs shardParts) through `npm test`.
+  # Full only: four runners test the committed artifacts/source in parallel with checks.
+  # checks performs the one authoritative clean build and rejects any generated-byte drift.
+  # The gate requires both checks and all test shards; never rebuild on each shard.
   test:
     name: test (shard ${{ matrix.shard }}/4)
     needs: reuse
@@ -141,7 +143,7 @@ jobs:
       - env:
           VAM_CI_REPORT_DIR: ${{ runner.temp }}/ci-reports
           VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
-        run: npm test
+        run: npm run test:unit && npm run test:integration
       # A test that rewrites a committed build artifact must fail here, as it did when verify ran the diff after npm test.
       - run: git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts
       - if: ${{ !cancelled() }}

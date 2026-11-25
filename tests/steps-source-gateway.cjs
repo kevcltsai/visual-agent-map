@@ -179,3 +179,28 @@ test('a failed extract stops the other slots from sending more chunks', async ()
   await new Promise(resolve => setTimeout(resolve, 60));
   assert.equal(h.calls.length, 3, 'only the three already in flight were sent');
 });
+
+test('source delivery packs documents at most once before dispatch and skips packing prepared or empty sources', async () => {
+  let reads = 0;
+  let condensings = 0;
+  const document = { path: 'source.md', get content() { reads++; return 'x'.repeat(100_000); } };
+  const input = {
+    groups: [group([document])],
+    parts: context({ rules: 'r'.repeat(160_000) }),
+    allowDirect: true,
+    condense: async () => { condensings++; return 'findings'; },
+    overBudget: () => new Error('over budget')
+  };
+  assert.equal(await gateway.resolveSourceDelivery(input), 'findings');
+  assert.equal(reads, 1);
+  assert.equal(condensings, 1);
+  reads = 0;
+  assert.equal(await gateway.resolveSourceDelivery({ ...input, prepared: 'cached' }), 'cached');
+  assert.equal(await gateway.resolveSourceDelivery({ ...input, groups: [] }), '');
+  assert.equal(reads, 0);
+  assert.equal(condensings, 1);
+  reads = 0;
+  assert.equal(await gateway.resolveSourceDelivery({ ...input, allowDirect: false }), 'findings');
+  assert.equal(reads, 1);
+  assert.equal(condensings, 2);
+});

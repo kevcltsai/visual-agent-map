@@ -1,7 +1,7 @@
 import { sourcesHeadingKeys, type DetailTemplate } from "../../../ai/detail-templates";
 import { fencedLines } from "../../../ai/markdown-blocks";
 import { type ContentLanguage, translateNote } from "../../../i18n";
-import { linksOf } from "./merge-check";
+import { linksOf } from "../../evidence-tokens";
 
 /**
  * Deterministic carry-forward for the child synthesis write. The model rewrites the parent's Detail from the child

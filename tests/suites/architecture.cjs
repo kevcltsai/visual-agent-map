@@ -47,3 +47,23 @@ test('shared record guard preserves the non-null, non-array object check', () =>
   for (const value of [{}, { a: 1 }, Object.create(null), new Date()]) assert.equal(isRecord(value), true);
   for (const value of [null, undefined, [], [1], '', 'text', 0, 1, false, true, () => {}]) assert.equal(isRecord(value), false);
 });
+
+test('shared evidence tokens retain quantity and link comparison semantics', () => {
+  const tokens = load('core/evidence-tokens.ts');
+  assert.deepEqual([...tokens.numberTokens('A1 v2 C4 H2O quadrant-1 ７ 1,200.5')], ['7', '1200.5']);
+  assert.deepEqual([...tokens.noteNumbers('2.0 [link](target42) https://example.org/99 [^8] <!-- 7 -->\n```mermaid\n99\n```')], ['2.0']);
+  assert.equal(tokens.normalNumber('2.0'), '2');
+  assert.equal(tokens.normalNumber('1234567890123456'), '1234567890123456');
+  assert.deepEqual([...tokens.linksOf(['[[Folder/Note.md#heading|alias]] [file](Doc%20A.pdf) https://EXAMPLE.org/path/']).keys()], ['https://example.org/path', 'wiki:folder/note', 'link:doc a.pdf']);
+});
+
+test('evidence extraction has no dependency on chart insertion or task merge', () => {
+  const read = name => fs.readFileSync(path.join(root, name), 'utf8');
+  assert.doesNotMatch(read('core/evidence-tokens.ts'), /^import\s/m);
+  for (const name of ['core/steps/task/carry-sources.ts', 'core/steps/argument-map/shared.ts']) {
+    assert.doesNotMatch(read(name), /from ["'][^"']*merge-check["']/);
+  }
+  for (const name of ['core/steps/task/merge-check.ts', 'core/steps/argument-map/shared.ts', 'core/book-pipeline/figure-spec.ts', 'core/steps/book-pipeline/draw-diagrams.ts']) {
+    assert.doesNotMatch(read(name), /from ["'][^"']*chart\/insert["']/);
+  }
+});

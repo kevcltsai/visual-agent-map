@@ -490,6 +490,30 @@ test('canvas-text-node: links are drawn as dashed path lines (no marker, no labe
   assert.equal(attr('marker-end'), undefined);
 });
 
+test('canvas-text-node: drawing mixed text edges shares live node membership across free blocks', async () => {
+  const h = await harness(({ root, child }) => [
+    txt({ parentId: root.id }),
+    free({ links: [root.id, 'gone'] }),
+    free({ id: 'f2', links: [child.id, 'gone'] })
+  ]);
+  h.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
+  const liveLinks = h.view.liveLinks.bind(h.view);
+  const memberships = [];
+  h.view.liveLinks = (text, alive) => { memberships.push(alive); return liveLinks(text, alive); };
+  h.view.drawEdges();
+  assert.equal(memberships.length, 2);
+  assert.equal(memberships[0]?.has(h.root.id), true);
+  assert.equal(memberships[0], memberships[1], 'free text blocks share one live node index');
+  assert.equal(memberships[0].has('gone'), false);
+  const lines = h.view.edgesEl.children;
+  assert.equal(lines.filter(p => p.classes.includes('vam-text-edge')).length, 1);
+  assert.deepEqual(lines.filter(p => p.classes.includes('vam-text-link')).map(p => p.attrs['data-card-id']), [h.root.id, h.child.id]);
+  h.view.cardEls.delete(h.child.id);
+  h.view.drawEdges();
+  assert.notEqual(memberships[2], memberships[0], 'the next paint builds a fresh index');
+  assert.equal(h.view.edgesEl.children.filter(p => p.classes.includes('vam-text-link')).length, 1);
+});
+
 test('canvas-text-node: deleting a card removes its links in the same step, one undo brings card and link back', async () => {
   const h = await harness(({ root, child }) => [free({ links: [root.id, child.id] })]);
   const past = h.view.history.past.length;

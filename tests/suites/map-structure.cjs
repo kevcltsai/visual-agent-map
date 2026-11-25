@@ -759,3 +759,69 @@ test('outline modal: a generator that ignores abort and resolves late changes no
   assert.doesNotThrow(() => outline.parseOutlineReply('# Sleep\n> About sleep.\n## A\n> About A.\n', 'en'));
   assert.throws(() => outline.parseOutlineReply('# Sleep\n## A\n', 'en'), e => e.code === 'missing_summary', 'headings without summaries are refused');
 });
+
+integrationTest('structure review: only one window owns the usage prompt, and departure cancels before the provider starts', async () => {
+  const h = await viewHarness(fullReply, { fragments: true });
+  let release;
+  h.plugin.confirmAiUsage = (_model, run) => new Promise(resolve => {
+    release = async () => { await run(); resolve(true); };
+  });
+  const first = pending(h);
+  button(first.modalEl, 'Start review').click();
+  h.view.openStructureReview(h.ids.a);
+  assert.equal(h.opened.length, 1);
+  h.view.dropMapBackground();
+  assert.equal(first.closeCount, 1);
+  await release();
+  await tick();
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.view.structureReviewTask, null);
+  assert.equal(h.view.structureReviewWindow, null);
+});
+
+integrationTest('structure review: opening the same finished result twice cannot leave two windows or stale marks', async () => {
+  const h = await viewHarness(fullReply, { fragments: true });
+  const { task, modal } = await h.start(null);
+  h.view.reopenStructureReview(task);
+  assert.equal(h.opened.length, 2);
+  modal.close();
+  assert.equal(h.view.structureReviewTask, null);
+  assert.equal(h.view.structureReviewWindow, null);
+  assert.equal([...h.cards.values()].some(card => hasCls(card, 'vam-structure-suggested')), false);
+});
+
+integrationTest('background registration: replacing and leaving the map release only pending task owners', async () => {
+  const h = await viewHarness(fullReply, { fragments: true });
+  const node = h.view.map.nodes[0];
+  const old = h.view.backgroundHooks(node.path, node);
+  const next = h.view.backgroundHooks(node.path, node);
+  const a = new AbortController(), b = new AbortController(), late = new AbortController();
+  old.begin(a, 'research');
+  next.begin(b, 'expand');
+  assert.equal(a.signal.aborted, true);
+  old.end();
+  assert.equal(h.view.startingTasks.get(node.path), b);
+  assert.equal(h.view.startingExpand.has(node.path), true);
+  h.view.dropMapBackground();
+  assert.equal(b.signal.aborted, true);
+  next.begin(late, 'research');
+  assert.equal(late.signal.aborted, true);
+  assert.equal(h.view.startingTasks.size, 0);
+  assert.equal(h.view.startingExpand.size, 0);
+});
+
+integrationTest('background progress: an old observer cannot claim or remove a replacement progress entry', async () => {
+  const h = await viewHarness(fullReply, { fragments: true });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  const progress = h.plugin.researchProgress = new ResearchProgressStore();
+  const a = h.view.startTaskProgress('key', 'model');
+  a.observer.onAttempt('a', 1);
+  a.end();
+  const b = h.view.startTaskProgress('key', 'model');
+  b.observer.onAttempt('b', 1);
+  a.observer.onAttempt('obsolete', 2);
+  a.end();
+  assert.equal(progress.get('key').attemptId, 'b');
+  b.end();
+  assert.equal(progress.get('key'), undefined);
+});

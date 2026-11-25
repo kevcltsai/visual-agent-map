@@ -3908,10 +3908,10 @@ export class VisualAgentMapView extends ItemView {
           const run: { task?: NonNullable<VisualAgentMapView["outlineDraftTask"]> } = {};
           const ran = await this.plugin.confirmAiUsage(model, async () => {
             if (!preparing()) return;
-            // Transfer to the background task before closing the modal.
-            detach();
+            // Unlink the modal signal before hiding it, but hold the reservation until the task is registered.
+            signal.removeEventListener("abort", forward);
             const inputs = started();
-            if (!session() || controller.signal.aborted) return;
+            if (!session() || controller.signal.aborted || this.outlineStarting !== controller) return;
             const own: NonNullable<VisualAgentMapView["outlineDraftTask"]> = {
               mapPath: this.path,
               controller,
@@ -3920,18 +3920,20 @@ export class VisualAgentMapView extends ItemView {
             };
             run.task = own;
             this.outlineDraftTask = own;
-            if (!this.closed) this.render();
+            detach();
             try {
+              this.render();
+              if (!session() || controller.signal.aborted || this.outlineDraftTask !== own) return;
               const requestWithSources = await this.withOutlineSources(
                 {
-                    ...forService,
-                    ...carry,
-                    ...this.usageMapField(),
-                    language: settings.language,
-                    contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
-                    model,
-                    reasoning
-                  },
+                  ...forService,
+                  ...carry,
+                  ...this.usageMapField(),
+                  language: settings.language,
+                  contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
+                  model,
+                  reasoning
+                },
                 controller.signal
               );
               if (!session() || controller.signal.aborted || this.outlineDraftTask !== own) return;
@@ -4152,19 +4154,19 @@ export class VisualAgentMapView extends ItemView {
         check(signal);
         const requestWithSources = await this.withOutlineSources(
           {
-              ...this.usageMapField(),
-              topic: note.title,
-              presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
-              language: request.language,
-              model: used.model,
-              reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
-              limits: request.limits,
-              // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
-              noteDetail: note.detail,
-              existingChildren: (this.map?.nodes ?? [])
-                .filter(item => item.parentId === node.id)
-                .map(item => this.notes.get(item.id)?.title ?? "")
-            },
+            ...this.usageMapField(),
+            topic: note.title,
+            presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
+            language: request.language,
+            model: used.model,
+            reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
+            limits: request.limits,
+            // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
+            noteDetail: note.detail,
+            existingChildren: (this.map?.nodes ?? [])
+              .filter(item => item.parentId === node.id)
+              .map(item => this.notes.get(item.id)?.title ?? "")
+          },
           signal
         );
         check(signal);
@@ -4269,7 +4271,12 @@ export class VisualAgentMapView extends ItemView {
         }
       };
       this.structureReviewWindow = modal;
-      modal.open();
+      try {
+        modal.open();
+      } catch (error) {
+        if (this.structureReviewWindow === modal) this.structureReviewWindow = null;
+        throw error;
+      }
     };
     const reopen = (
       result: StructureReviewResult,
@@ -4308,9 +4315,10 @@ export class VisualAgentMapView extends ItemView {
               reopen: result => reopen(result, own)
             };
             this.structureReviewTask = own;
-            if (!this.closed) this.render();
-            started();
             try {
+              this.render();
+              started();
+              if (!session() || controller.signal.aborted || this.structureReviewTask !== own) return;
               const review = await this.plugin.structureReview.review(
                 {
                   rootQuestion,
@@ -4354,8 +4362,13 @@ export class VisualAgentMapView extends ItemView {
   /** Opens the window on a finished review's suggestions (no Start); closing it drops the waiting result. */
   private reopenStructureReview(task: NonNullable<VisualAgentMapView["structureReviewTask"]>): void {
     if (
-      this.structureReviewTask !== task || task.mapPath !== this.path || task.state !== "done" || !task.result || this.closed
-    ) return;
+      this.structureReviewTask !== task ||
+      task.mapPath !== this.path ||
+      task.state !== "done" ||
+      !task.result ||
+      this.closed
+    )
+      return;
     task.reopen(task.result);
   }
   /** Stop on the status bar: the run is aborted and forgotten, so its late result changes nothing. */
@@ -6184,7 +6197,10 @@ export class VisualAgentMapView extends ItemView {
     const next = moved.get(this.path);
     // The rename event may already have moved the view (followPath, while VAM was writing): the steps still clear.
     if (!next && ![...moved.values()].includes(this.path)) return;
-    if (next) this.path = next;
+    if (next && next !== this.path) {
+      this.dropMapBackground();
+      this.path = next;
+    }
     this.followedFrom = null;
     this.history.clear();
   }
@@ -6194,7 +6210,8 @@ export class VisualAgentMapView extends ItemView {
    * claimed by the end of the write (one made outside VAM) clears it in synchronize.
    */
   followPath(oldPath: string, newPath: string): void {
-    if (this.path !== oldPath) return;
+    if (this.path !== oldPath || newPath === oldPath) return;
+    this.dropMapBackground();
     this.followedFrom ??= oldPath;
     this.path = newPath;
   }
@@ -12041,13 +12058,21 @@ export class VisualAgentMapView extends ItemView {
     }
     const before = clone(this.map),
       beforeRoot = this.plugin.repo.topicRoot(this.path);
-    this.path = await this.plugin.repo.renameTopic(this.path, title);
+    const nextPath = await this.plugin.repo.renameTopic(this.path, title);
+    if (this.path !== nextPath) {
+      this.dropMapBackground();
+      this.path = nextPath;
+    }
     this.followedFrom = null;
     this.map = await this.plugin.repo.readMap(this.path);
     const after = clone(this.map),
       afterRoot = this.plugin.repo.topicRoot(this.path);
     const restore = async (map: MapDocument, root: string): Promise<void> => {
-      this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      const nextPath = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      if (this.path !== nextPath) {
+        this.dropMapBackground();
+        this.path = nextPath;
+      }
       this.followedFrom = null;
       this.map = clone(map);
       await this.plugin.repo.saveMap(this.path, this.map);
@@ -14610,9 +14635,15 @@ export class VisualAgentMapView extends ItemView {
     request: OutlineGenerateRequest,
     signal: AbortSignal
   ): Promise<OutlineGenerateRequest> {
+    const session = this.captureBackgroundSession();
+    const check = (): void => {
+      if (!session() || signal.aborted) throw new DOMException("Aborted", "AbortError");
+    };
     const groups = await this.readMapSourceGroups(signal);
-    const sourceMaterial = await outlineSourceMaterial(request, groups, () =>
-      this.plugin.aiTasks.condenseReferences(
+    check();
+    const sourceMaterial = await outlineSourceMaterial(request, groups, () => {
+      check();
+      return this.plugin.aiTasks.condenseReferences(
         {
           title: this.map?.title ?? "",
           summary: "",
@@ -14630,8 +14661,9 @@ export class VisualAgentMapView extends ItemView {
         request.model,
         request.reasoning,
         signal
-      )
-    );
+      );
+    });
+    check();
     return sourceMaterial ? { ...request, sourceMaterial } : request;
   }
   /** The map's sources for an AI request: a stop (AbortError) is rethrown so nothing is sent; any other read failure gives no sources. */

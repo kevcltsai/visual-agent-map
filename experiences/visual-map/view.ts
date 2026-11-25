@@ -3169,7 +3169,7 @@ export class VisualAgentMapView extends ItemView {
     this.viewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
-    if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.cancelPendingRefresh();
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverCard?.remove();
     this.dragCleanup?.();
@@ -3575,6 +3575,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     if (this.path !== path) {
+      this.cancelPendingRefresh();
       this.dropCanvasInteractionModes();
       this.hiddenAnchors.clear();
     }
@@ -6018,11 +6019,20 @@ export class VisualAgentMapView extends ItemView {
       .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
       .catch(error => errorNotice(error));
   }
-  changed(file: TFile): void {
-    if (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path)) return;
+  private cancelPendingRefresh(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
-    this.refreshTimer = window.setTimeout(() => {
-      if (this.closed) return;
+    this.refreshTimer = null;
+  }
+  changed(file: TFile): void {
+    if (this.closed || (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path))) return;
+    this.cancelPendingRefresh();
+    const path = this.path,
+      epoch = this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.path === path && this.mapOpenEpoch === epoch;
+    const timer = window.setTimeout(() => {
+      if (this.refreshTimer !== timer) return;
+      this.refreshTimer = null;
+      if (!isCurrent()) return;
       if (this.dragging) {
         this.changed(file);
         return;
@@ -6034,15 +6044,20 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       this.enqueue(async () => {
-        if (file.path === this.path) {
-          this.map = await this.plugin.repo.readMap(this.path);
+        if (!isCurrent()) return;
+        if (file.path === path) {
+          const map = await this.plugin.repo.readMap(path);
+          if (!isCurrent()) return;
+          this.map = map;
           this.history.clear();
           await this.plugin.rebuildDerivedData();
         }
-        await this.hydrate();
-        this.render();
+        if (!isCurrent()) return;
+        await this.hydrate(isCurrent);
+        if (isCurrent()) this.render();
       });
     }, 400);
+    this.refreshTimer = timer;
   }
   /**
    * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the

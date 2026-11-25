@@ -13,7 +13,8 @@ export interface OrganizeMove {
 }
 interface PriorContent {
   path: string;
-  content: string;
+  before: string;
+  after: string;
 }
 /** Reports "moving topic `title`, step `done` of `total`" before each topic move starts. */
 export type MoveProgress = (done: number, total: number, title: string) => void;
@@ -35,12 +36,12 @@ interface WorkspaceMovePorts {
   markedFiles(key: "agent-map-node"): Promise<TFile[]>;
   /**
    * Rewrites a managed note's `source-notes` / `reference-materials` through `rebase`, from the current frontmatter inside
-   * one atomic write. Returns the content the write replaced, or null when the note was left untouched.
+   * one atomic write. Journals both versions before publication, including a write that later rejects.
    */
-  rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null>;
+  rebaseNoteLists(file: TFile, rebase: (path: string) => string, recordPrior: (before: string, after: string) => void): Promise<void>;
   readableMaps(): Promise<{ file: TFile; map: MapDocument }[]>;
   /** Rebase the current map and journal its exact pre-write bytes inside the atomic write boundary. */
-  rebaseMapPaths(file: TFile, rebase: (path: string) => string, recordPrior: (content: string) => void): Promise<void>;
+  rebaseMapPaths(file: TFile, rebase: (path: string) => string, recordPrior: (before: string, after: string) => void): Promise<void>;
 }
 
 export async function moveTopicsWithRollback(
@@ -83,7 +84,11 @@ export async function moveTopicsWithRollback(
         try {
           const file = ports.app.vault.getAbstractFileByPath(prior.path);
           if (!(file instanceof TFile)) throw new Error("Journaled file not found during rollback.");
-          await ports.app.vault.modify(file, prior.content);
+          await ports.app.vault.process(file, current => {
+            if (current === prior.before) return current;
+            if (current !== prior.after) throw new Error("Journaled file changed after the workspace write; rollback would overwrite edits.");
+            return prior.before;
+          });
         } catch (rollbackError) {
           rollbackErrors.push(
             `${prior.path}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -124,12 +129,11 @@ async function rebasePathPrefix(
     path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
   for (const file of await ports.markedFiles("agent-map-node")) {
     // The lists are read and rewritten inside one atomic write, so a citation the owner adds meanwhile is kept.
-    const prior = await ports.rebaseNoteLists(file, rebase);
-    if (prior !== null) journal.push({ path: file.path, content: prior });
+    await ports.rebaseNoteLists(file, rebase, (before, after) => journal.push({ path: file.path, before, after }));
   }
   for (const { file, map } of await ports.readableMaps()) {
     if (!rebaseMapNotePaths(map, rebase)) continue;
     // The scanned map only selects candidates. The write must use the current map, not that snapshot.
-    await ports.rebaseMapPaths(file, rebase, content => journal.push({ path: file.path, content }));
+    await ports.rebaseMapPaths(file, rebase, (before, after) => journal.push({ path: file.path, before, after }));
   }
 }

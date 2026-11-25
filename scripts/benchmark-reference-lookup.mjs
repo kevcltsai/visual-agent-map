@@ -1,8 +1,9 @@
-// Run after installing repository dependencies: node scripts/benchmark-reference-lookup.cjs
+// Run after installing repository dependencies: node scripts/benchmark-reference-lookup.mjs
 // Synthetic source resolution only; not an Obsidian or whole-product benchmark.
-const assert = require('node:assert/strict');
-const { performance } = require('node:perf_hooks');
-const { load, obsidian } = require('../tests/support.cjs');
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { performance } from 'node:perf_hooks';
+const { load, obsidian } = createRequire(import.meta.url)('../tests/support.cjs');
 const api = load('ai/reference-materials.ts', { obsidian });
 
 function legacy(text, groups) {

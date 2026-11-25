@@ -473,10 +473,7 @@ function arrangeBalancedBranch(
     top: 0
   });
   const sides = greedySides(roots, root => freshSizes.get(root.id)!, gap, loads);
-  const below = (id: string): string[] => [
-    id,
-    ...(freshChildren.get(id) ?? []).flatMap(item => below(item.id))
-  ];
+  const below = (id: string): string[] => [id, ...(freshChildren.get(id) ?? []).flatMap(item => below(item.id))];
   let current = nodes;
   const pending = new Set(newIds);
   for (const side of ["right", "left"] as const) {

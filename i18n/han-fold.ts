@@ -19,7 +19,8 @@ export const toSimplifiedFold = (text: string): string => {
 };
 
 /** Normalizes a search string for case-insensitive, Traditional/Simplified-insensitive matching. */
-export const foldSearchText = (text: string): string => toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
+export const foldSearchText = (text: string): string =>
+  toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
 
 /**
  * Counts script evidence in text.

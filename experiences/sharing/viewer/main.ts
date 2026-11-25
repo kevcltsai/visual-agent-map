@@ -315,8 +315,7 @@ export function startViewer(doc: Document): void {
   for (const item of data.nodes) {
     const node = item && typeof item.id === "string" ? byId.get(item.id) : undefined;
     if (!node || typeof item.afterTextId !== "string" || !node.parentId) continue;
-    if (textById.get(item.afterTextId)?.parentId === node.parentId)
-      node.afterTextId = item.afterTextId;
+    if (textById.get(item.afterTextId)?.parentId === node.parentId) node.afterTextId = item.afterTextId;
   }
   // Summary brackets (summary-bracket): plain text and one SVG path per bracket; the run is the payload's member list.
   const sideOf = (value: unknown): SummarySide | null =>
@@ -1353,9 +1352,7 @@ export function startViewer(doc: Document): void {
     // Under a topic that has such followers, its other text blocks take part too, or the followers could land on them.
     const followers = new Set(nodes.map(node => node.afterTextId));
     const followed = new Set(
-      texts
-        .filter(text => text.parentId && textEls.has(text.id) && followers.has(text.id))
-        .map(text => text.parentId)
+      texts.filter(text => text.parentId && textEls.has(text.id) && followers.has(text.id)).map(text => text.parentId)
     );
     const leading = texts.filter(text => text.parentId && textEls.has(text.id) && followed.has(text.parentId));
     if (images.some(image => image.links.some(link => link.ring))) {

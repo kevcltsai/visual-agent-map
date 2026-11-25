@@ -5500,12 +5500,7 @@ export class BookPipelineRuns {
       // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
       // per chapter; its candidates are probed, deduped and chosen like the finder's.
       if (this.ports.fetchCommons) {
-        const provisional = choosePictures(
-          coverSlot ? [coverSlot, ...slots] : slots,
-          perSlot,
-          taken,
-          language
-        );
+        const provisional = choosePictures(coverSlot ? [coverSlot, ...slots] : slots, perSlot, taken, language);
         // The cover is the last one asked of Commons, so it never takes a body picture's share of the chapter's requests.
         const lacking = asked.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
         if (lacking.length) {

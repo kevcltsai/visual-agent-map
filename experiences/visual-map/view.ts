@@ -25011,9 +25011,7 @@ export class VisualAgentMapView extends ItemView {
         if (tipSkip && direction === "right" && parentId === node.parentId && !afterText && !tipSkip.has(parentId)) {
           if (!tipped.has(parentId)) {
             tipped.add(parentId);
-            lines.push(
-              argumentTipPath(a.x + a.width, a.y + a.height / 2)
-            );
+            lines.push(argumentTipPath(a.x + a.width, a.y + a.height / 2));
           }
         }
         this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);

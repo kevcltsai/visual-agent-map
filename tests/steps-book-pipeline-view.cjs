@@ -1305,7 +1305,7 @@ test('toolbar plan review: the title and one hint; the only buttons are "directi
   assert.ok(!texts(bar).some(x => x.includes('都企劃好了')), 'the counts sentence is gone');
   assert.ok(texts(bar).includes('想改就直接跟左邊的總編輯說。'), JSON.stringify(texts(bar)));
   assert.equal(dom.find(bar, i => (i.cls ?? '').includes('vam-book-plan-hint')).children[0].tag, 'b', 'the hint is one bold line');
-  assert.deepEqual(g.labels(bar), ['方向對，開始寫', '停止']);
+  assert.deepEqual(g.labels(bar), ['方向對，開始寫', '書本設定', '停止']);
   assert.equal(track(bar), undefined, 'no progress track at the plan review');
   g.click(bar, '停止'); await dom.tick();
   g.click(g.drawBar(), '方向對，開始寫'); await dom.tick();
@@ -1322,7 +1322,7 @@ test('toolbar plan review: there is no "open summary" or "back to the plan" butt
   assert.ok(!g.labels(bar).some(x => x === '打開全書摘要' || x === '回去改企劃'));
   for (const name of ['openPlan', 'editPlan', 'openBookNote']) assert.ok(!view_ts.includes(name), name);
   assert.equal(g.entries.length, 0);
-  assert.deepEqual(g.labels(g.drawBar()), ['方向對，開始寫', '停止'], 'still waiting at the gate');
+  assert.deepEqual(g.labels(g.drawBar()), ['方向對，開始寫', '書本設定', '停止'], 'still waiting at the gate');
 });
 
 test('toolbar plan review with notes not applied: "direction is right" confirms at once, there is no ask card', async () => {
@@ -1389,7 +1389,7 @@ test('toolbar gate 2 now reads as writing: a driven run shows only stop and the 
   g.view.map.bookPipeline.aiProof = { [g.ids.a]: aiSlot(false, 0, 1) };
   g.plugin.getBookPipelineProgress = () => progress({ phase: 'gate2', active: true, total: 3, counts: { pending: 0, planned: 0, written: 0, checked: 1, 'needs-review': 2 } });
   const bar = g.drawBar();
-  assert.deepEqual(g.labels(bar), ['停止']);
+  assert.deepEqual(g.labels(bar), ['書本設定', '停止']);
   assert.ok(texts(bar).includes('AI 修正中 1・仍有問題 2'), JSON.stringify(texts(bar)));
   assert.equal(dom.find(bar, i => i.cls.includes('vam-book-finish') || i.cls.includes('vam-book-finish-ask')), undefined);
   g.click(bar, '停止'); await dom.tick();
@@ -2132,4 +2132,134 @@ test('book review lifecycle: renaming the open map keeps its queued review work'
   release();
   await queued;
   assert.deepEqual(calls, [r.ids.a]);
+});
+
+// ---- the start card's chat with the chief editor (2026-11-25) ----
+const chatInput = modal => dom.findAll(modal.modalEl, i => i.tag === 'input' && i.attrs.id === 'vam-book-chat-input')[0];
+const chatSend = modal => dom.findAll(modal.modalEl, i => i.tag === 'button' && (i.cls ?? '').includes('vam-book-chat-send'))[0];
+const byCls = (modal, cls) => dom.findAll(modal.modalEl, i => (i.cls ?? '').split(/\s+/).includes(cls));
+const say = (modal, text) => { chatInput(modal).value = text; chatInput(modal).fire('input'); chatSend(modal).click(); };
+const chatHarness = async (impl, { suggest = true, existing } = {}) => {
+  const h = await harness({ book: false });
+  h.ctl.impl = async () => SUGGEST;
+  h.plugin.editBookSettings = (input, signal) => { h.edits.push({ input, signal }); return impl(input, signal); };
+  h.edits = [];
+  if (existing) await h.plugin.repo.writeBookSettings(rootPath(h), existing);
+  const modal = await openCard(h);
+  if (suggest) { await dom.tick(); await dom.tick(); await dom.tick(); }
+  return { h, modal };
+};
+const CHANGED = { goal: '新的學習目標', tone: '像說書人講懸案' };
+
+test('chat: a sentence sends the shown values (grey suggestion where empty), the plan model and the earlier turns; the changes go into the fields as plain text, marked, no longer grey; a reply with markup stays text', async () => {
+  const EVIL_REPLY = '好 <img src=x onerror=alert(1)> **粗**';
+  const { h, modal } = await chatHarness(async () => ({ reply: EVIL_REPLY, changes: CHANGED }), { existing: { reader: '手打的讀者' } });
+  h.plugin.settings.bookPlanModel = 'claude:opus';
+  say(modal, '讓人覺得很像是真的'); await dom.tick(); await dom.tick();
+  const sent = h.edits[0].input;
+  assert.equal(sent.message, '讓人覺得很像是真的');
+  assert.equal(sent.settings.reader, '手打的讀者');
+  assert.equal(sent.settings.goal, SUGGEST.goal, 'an empty field is sent as its grey suggestion');
+  assert.equal(JSON.stringify(sent.turns), '[]');
+  assert.equal(sent.model, modal.input.models.plan);
+  assert.equal(field(modal, '學習目標').value, CHANGED.goal);
+  assert.ok(!field(modal, '學習目標').hasClass('vam-book-start-suggested'));
+  assert.equal(field(modal, '讀者').value, '手打的讀者');
+  assert.equal(byCls(modal, 'vam-book-start-edited').length, 2);
+  const reply = byCls(modal, 'vam-book-chat-reply')[0];
+  assert.equal(reply.text, EVIL_REPLY);
+  assert.equal(reply.children.length, 0, 'set as text, never parsed');
+  assert.equal(byCls(modal, 'vam-book-chat-me')[0].text, '讓人覺得很像是真的');
+  say(modal, '再短一點'); await dom.tick(); await dom.tick();
+  assert.equal(JSON.stringify(h.edits[1].input.turns), JSON.stringify([{ owner: '讓人覺得很像是真的', editor: EVIL_REPLY }]));
+  assert.equal(h.edits[1].input.settings.goal, CHANGED.goal);
+  // Start writes what the fields hold now (the editor's values included).
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  const written = (await h.plugin.repo.readNote(rootPath(h))).bookSettings;
+  assert.equal(written.goal, CHANGED.goal);
+  assert.equal(written.tone, CHANGED.tone);
+});
+
+test('chat: undo puts back only the fields this turn wrote and that were not hand-edited since (the hand edit is kept); the mark goes with a hand edit', async () => {
+  const { h, modal } = await chatHarness(async () => ({ reply: '改了', changes: CHANGED }));
+  say(modal, '改'); await dom.tick(); await dom.tick();
+  const tone = field(modal, '語氣');
+  tone.value = '我自己改的語氣'; tone.fire('input');
+  assert.equal(byCls(modal, 'vam-book-start-edited').length, 1, 'a hand edit removes that field\'s mark');
+  byCls(modal, 'vam-book-chat-undo')[0].click();
+  assert.equal(field(modal, '學習目標').value, '', 'the untouched field goes back');
+  assert.ok(field(modal, '學習目標').hasClass('vam-book-start-suggested'), 'back to the grey suggestion');
+  assert.equal(tone.value, '我自己改的語氣', 'the hand edit stays');
+  assert.equal(byCls(modal, 'vam-book-start-edited').length, 0);
+  assert.equal(byCls(modal, 'vam-book-chat-undo').length, 0);
+  modal.close();
+});
+
+test('chat: one sentence at a time; the send button waits while the grey suggestions load and while a turn is in flight', async () => {
+  const slowSuggest = pending();
+  const turn = pending();
+  const h = await harness({ book: false });
+  h.ctl.impl = () => slowSuggest.promise;
+  h.plugin.editBookSettings = () => turn.promise;
+  const modal = await openCard(h);
+  chatInput(modal).value = '改'; chatInput(modal).fire('input');
+  assert.equal(chatSend(modal).disabled, true, 'suggestions still loading');
+  chatSend(modal).click(); await dom.tick();
+  assert.equal(byCls(modal, 'vam-book-chat-me').length, 0, 'nothing is sent while loading');
+  slowSuggest.resolve(SUGGEST); await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(chatSend(modal).disabled, false);
+  chatSend(modal).click(); await dom.tick();
+  assert.equal(chatSend(modal).disabled, true, 'a turn is in flight');
+  chatInput(modal).value = '又一句'; chatInput(modal).fire('input');
+  assert.equal(chatSend(modal).disabled, true);
+  chatInput(modal).keydown({ key: 'Enter', shiftKey: false, preventDefault() {} });
+  assert.equal(byCls(modal, 'vam-book-chat-me').length, 1, 'Enter does not send a second one either');
+  turn.resolve({ reply: 'ok', changes: {} }); await dom.tick(); await dom.tick();
+  assert.equal(chatSend(modal).disabled, false);
+  modal.close();
+});
+
+test('chat: closing the card or pressing Start aborts the turn and a late answer changes nothing', async () => {
+  for (const how of ['close', 'start']) {
+    const late = pending();
+    const { h, modal } = await chatHarness(() => late.promise);
+    const goal = field(modal, '學習目標');
+    say(modal, '改'); await dom.tick();
+    if (how === 'close') modal.close(); else cardButton(modal, '開始').click();
+    await dom.tick();
+    assert.equal(h.edits[0].signal.aborted, true, how);
+    late.resolve({ reply: '晚到', changes: CHANGED }); await dom.tick(); await dom.tick();
+    assert.equal(goal.value, '', `${how}: the field is unchanged`);
+    assert.equal(byCls(modal, 'vam-book-chat-reply').length, 0, `${how}: no reply line`);
+    if (how === 'start') { const written = (await h.plugin.repo.readNote(rootPath(h))).bookSettings; assert.equal(written.goal, SUGGEST.goal, 'a late change is not written'); assert.equal(written.tone, SUGGEST.tone); }
+  }
+});
+
+test('chat: a failed call (rejected) leaves every field as it was and adds one failure line; the next sentence still works', async () => {
+  let n = 0;
+  const { h, modal } = await chatHarness(async () => { if (!n++) throw new Error('boom'); return { reply: 'ok', changes: CHANGED }; });
+  say(modal, '改'); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '學習目標').value, '');
+  assert.equal(byCls(modal, 'vam-book-chat-failed')[0].text, '總編輯這次沒回應，設定沒有改。');
+  assert.equal(byCls(modal, 'vam-book-start-edited').length, 0);
+  say(modal, '再試'); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '學習目標').value, CHANGED.goal);
+  assert.equal(JSON.stringify(h.edits[1].input.turns), '[]', 'a failed turn is not remembered');
+  modal.close();
+});
+
+test('chat: a card without editSettings has no chat column (and the fields are not wrapped)', async () => {
+  const h = await harness({ book: false });
+  h.ctl.impl = async () => SUGGEST;
+  const modal = new bundleStart.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, modelChoice: { options: () => ['a'], label: x => x, onChange() {} }, settings: {}, onStart() {} });
+  modal.open();
+  assert.equal(chatInput(modal), undefined);
+  assert.equal(byCls(modal, 'vam-book-start-split').length, 0);
+  modal.close();
+  assert.match(css, /\.vam-book-start-split \{[^}]*grid-template-columns/);
+  assert.match(css, /@media \(max-width: 640px\) \{ \.vam-book-start-split \{ grid-template-columns: 1fr; \} \}/);
+});
+
+test('chat: the plugin calls the step on the plan model the card passes, with the owner\'s text only', () => {
+  assert.match(main_ts, /editBookSettings\([\s\S]{0,400}runEditSettings\(\s*this\.aiCalls,[\s\S]{0,400}model: input\.model/);
 });

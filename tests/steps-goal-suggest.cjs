@@ -17,6 +17,7 @@ function setup(options = {}) {
   const listeners = [];
   const root = element('div');
   root.ownerDocument = { addEventListener: (name, fn) => name === 'pointerdown' && listeners.push(fn), removeEventListener: (name, fn) => { const i = listeners.indexOf(fn); if (name === 'pointerdown' && i >= 0) listeners.splice(i, 1); } };
+  if (options.timerWindow) root.ownerDocument.defaultView = options.timerWindow;
   root.querySelector = () => null;
   const log = { renders: 0, tools: 0, refocus: 0, notices: [], announced: [], added: [], restores: [], historyButtons: 0 };
   const history = new History();
@@ -105,15 +106,16 @@ test('goal suggest: end aborts the task, removes the listener and the panel, rep
   assert.equal(s.log.renders, renders); assert.equal(s.log.tools, 1);
 });
 
-test('goal suggest: drop only aborts and forgets the task; the listener and the panel handle stay (detach and releaseListener do the cleanup)', () => {
+test('goal suggest: drop aborts and releases the task, listener and panel together', () => {
   const s = setup();
   s.suggest.open(MAP, [sug('a', 'One')], true); s.draw();
   const { controller } = s.suggest.task;
   const panel = find(s.bar, i => hasCls(i, 'vam-goal-suggest'));
   s.suggest.drop();
   assert.equal(controller.signal.aborted, true); assert.equal(s.suggest.task, null);
-  assert.equal(s.listeners.length, 1, 'drop does not clean up the listener');
-  assert.equal(s.suggest.holdsFocus(boxes(s.bar)[0]), true, 'nor the panel handle');
+  assert.equal(s.listeners.length, 0, 'drop releases the listener immediately');
+  assert.equal(s.suggest.holdsFocus(panel), false);
+  assert.equal(find(s.bar, i => hasCls(i, 'vam-goal-suggest')), undefined);
   s.suggest.releaseListener();
   assert.equal(s.listeners.length, 0);
   assert.ok(panel);
@@ -155,6 +157,15 @@ test('goal suggest: draw on another map aborts the task and draws nothing', () =
   s.draw();
   assert.equal(controller.signal.aborted, true); assert.equal(s.suggest.task, null);
   assert.equal(findAll(s.bar, i => hasCls(i, 'vam-goal-suggest')).length, 0);
+});
+
+test('goal suggest: dismiss while Add is applying keeps the confirmed cards and the announcement', async () => {
+  const s = setup({ mutate: async work => { s.suggest.dismiss(); await work(); } });
+  s.suggest.open(MAP, [sug('a', 'One', 'core')], true); s.draw();
+  addBtn(s.bar).click();
+  await new Promise(r => setImmediate(r));
+  assert.deepEqual(s.log.added, [['a', 'One']]);
+  assert.equal(s.suggest.task, null); assert.deepEqual(s.log.announced, ['Added 1 topics']);
 });
 
 test('goal suggest: Add adds the checked cards with the list tier, announces, closes, and writes no summary', async () => {
@@ -224,4 +235,73 @@ test('goal suggest: the sequence behind the task tokens counts on across instanc
   first.suggest.drop();
   first.suggest.open(MAP, [sug('a', 'One')], true);
   assert.ok(b > a); assert.ok(first.suggest.task.token > b);
+});
+
+test('goal suggest: replacing an open task aborts and removes the old resources immediately', () => {
+  const s = setup();
+  s.suggest.open(MAP, [sug('a', 'One')], true); s.draw();
+  const old = s.suggest.task;
+  s.suggest.open(MAP, [sug('b', 'Two')], false);
+  assert.equal(old.controller.signal.aborted, true);
+  assert.equal(s.listeners.length, 0);
+  assert.equal(find(s.bar, i => hasCls(i, 'vam-goal-suggest')), undefined);
+  assert.notEqual(s.suggest.task, old);
+  s.draw();
+  assert.equal(s.listeners.length, 1);
+});
+
+test('goal suggest: detached controls and an obsolete outside callback cannot affect the current draw', () => {
+  const s = setup();
+  s.suggest.open(MAP, [sug('a', 'One')], false); s.draw();
+  const oldBox = boxes(s.bar)[0], oldAdd = addBtn(s.bar), oldOutside = s.listeners[0];
+  s.draw();
+  oldBox.checked = false; oldBox.fire('change');
+  oldAdd.click();
+  oldOutside({ target: element('div') });
+  assert.equal(s.suggest.task.state, 'ready');
+  assert.equal(s.suggest.task.checked.size, 1);
+  assert.equal(s.log.added.length, 0);
+  assert.equal(s.listeners.length, 1);
+});
+
+test('goal suggest: delayed focus is canceled on replacement and drop, and fenced by path', () => {
+  const callbacks = [], canceled = [];
+  const s = setup({ timerWindow: {
+    setTimeout(fn) { callbacks.push(fn); return callbacks.length - 1; },
+    clearTimeout(id) { canceled.push(id); }
+  } });
+  const end = () => {
+    s.suggest.open(MAP, [sug('a', 'One')], false);
+    s.suggest.end(s.suggest.task, { refocus: false, repaint: false });
+  };
+  end();
+  s.suggest.open(MAP, [sug('b', 'Two')], false);
+  assert.deepEqual(canceled, [0]); callbacks[0]();
+  assert.equal(s.log.refocus, 0);
+  end();
+  s.suggest.drop();
+  assert.deepEqual(canceled, [0, 1]); callbacks[1]();
+  assert.equal(s.log.refocus, 0);
+  end();
+  s.state.path = 'other.md'; callbacks[2]();
+  assert.equal(s.log.refocus, 0);
+  s.state.path = MAP; end(); callbacks[3](); callbacks[3]();
+  assert.equal(s.log.refocus, 1, 'only the current callback runs once');
+});
+
+test('goal suggest: replacement during fresh note read prevents old writes and notices', async () => {
+  const s = setup();
+  s.suggest.open(MAP, [sug('a', 'One')], false); s.draw();
+  const old = s.suggest.task;
+  s.ports.freshNotesOf = async () => {
+    s.suggest.open(MAP, [sug('b', 'Two')], false);
+    return new Map();
+  };
+  addBtn(s.bar).click();
+  await new Promise(r => setImmediate(r));
+  assert.equal(old.controller.signal.aborted, true);
+  assert.deepEqual(s.log.added, []);
+  assert.deepEqual(s.log.notices, []);
+  assert.deepEqual(s.log.announced, []);
+  assert.equal(s.suggest.task.suggestions[0].title, 'Two');
 });

@@ -121,13 +121,14 @@ test('5 a hand-edited batch cannot crash the restore: titles, statuses, topic co
 
 // ---- panel row (1, 2, 3, 4, 6) ----
 const { MapChatPanel } = S.load('experiences/visual-map/map-chat.ts', { obsidian: { ...S.obsidian, Keymap: {}, setIcon() {} } });
+const { MapChatPaintScope } = S.load('experiences/visual-map/map-chat-paint-scope.ts');
 function makePanel() {
   const calls = [];
   const panel = Object.create(MapChatPanel.prototype);
   Object.assign(panel, {
     built: true, busy: false, logEl: dom.element('div'), liveEl: dom.element('div'), messages: [], openings: [], rows: new WeakMap(), messageEls: [], bodyEls: [],
     spokenLater: [], stage: null, chainWaitingState: null, chainWaitingLeft: '', host: { rerunBatch: message => calls.push(message), activeElement: () => null },
-    cancelFrame() {}, atEnd: () => true, renderGuide() {}, refreshSave() {}, scrollToEnd() {}, markUnread() {}, renderBusy() {}
+    paintScope: new MapChatPaintScope(), cancelFrame() {}, atEnd: () => true, renderGuide() {}, refreshSave() {}, scrollToEnd() {}, markUnread() {}, renderBusy() {}
   });
   Object.defineProperty(panel, 'working', { get: () => false });
   const answer = { role: 'assistant', text: 'done', lines: [] };

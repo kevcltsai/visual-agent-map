@@ -2621,6 +2621,27 @@ integrationTest('reference update reads each affected note once, and skips non-V
   assert.deepEqual((await repo.readNote(a.path)).sourcePaths, ['Personal/new.md']);
 });
 
+integrationTest('reference and source paths are rebased together in one note write', async () => {
+  const { repo, app } = fixture();
+  const both = await topicNote(repo, 'Both paths'), source = await topicNote(repo, 'Source only'), reference = await topicNote(repo, 'Reference only');
+  const old = 'Personal/old.md', next = 'Personal/new.md', keep = 'Personal/keep.md';
+  await repo.updateNote(both.path, { sourcePaths: [old, keep], referencePaths: [old, keep] });
+  await repo.updateNote(source.path, { sourcePaths: [old], referencePaths: [keep] });
+  await repo.updateNote(reference.path, { sourcePaths: [keep], referencePaths: [old] });
+  const writes = [];
+  const process = app.vault.process.bind(app.vault);
+  app.vault.process = async (file, change) => { writes.push(file.path); return process(file, change); };
+  await repo.replaceSourcePath(old, next);
+  assert.deepEqual(writes.sort(), [both.path, source.path, reference.path].sort());
+  const read = async path => { const note = await repo.readNote(path); return [Array.from(note.sourcePaths), Array.from(note.referencePaths)]; };
+  assert.deepEqual(await read(both.path), [[next, keep], [next, keep]]);
+  assert.deepEqual(await read(source.path), [[next], [keep]]);
+  assert.deepEqual(await read(reference.path), [[keep], [next]]);
+  writes.length = 0;
+  await repo.replaceSourcePath(old, next);
+  assert.deepEqual(writes, [], 'a repeated rename does not write unchanged notes');
+});
+
 test('social video cards: a Facebook or Instagram video link or image in rendered Markdown becomes a click-to-play card; other links stay', () => {
   const { parse, serialize, El } = require('../support-html-dom.cjs');
   const cards = load('experiences/markdown-context/social-video-cards.ts');

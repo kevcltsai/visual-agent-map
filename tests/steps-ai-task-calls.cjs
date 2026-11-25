@@ -107,6 +107,34 @@ test('main task controls: signal reaches the runtime and aborts with the caller,
   assert.notEqual(seen, midCall.signal);
 });
 
+test('research provider call shares the plugin registry and releases its own key on global stop', async () => {
+  const activeTasks = new Map();
+  const owner = new AbortController();
+  activeTasks.set('note.md', owner);
+  const h = rig({ extra: { activeTasks }, handler: call => {
+    const registered = [...activeTasks.entries()].filter(([key]) => key.startsWith('ai-task:'));
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0][1].signal, call.controls.signal);
+    for (const controller of activeTasks.values()) controller.abort();
+    assert.equal(call.controls.signal.aborted, true);
+    return answer(call); // Even an uncooperative runtime must not commit a stopped reply.
+  } });
+  await assert.rejects(h.service.askModel(context(), 'gpt-6-luna', 'low'), error => error.name === 'AbortError');
+  assert.equal(owner.signal.aborted, true);
+  assert.deepEqual([...activeTasks.keys()], ['note.md']);
+});
+
+test('research success removes its own registry key without deleting another owner', async () => {
+  const owner = new AbortController(), activeTasks = new Map([['note.md', owner]]);
+  const h = rig({ extra: { activeTasks }, handler: call => {
+    assert.equal([...activeTasks.values()].some(controller => controller.signal === call.controls.signal), true);
+    return answer(call);
+  } });
+  assert.equal((await h.service.askModel(context(), 'gpt-6-luna', 'low')).summary, 'S');
+  assert.deepEqual([...activeTasks.entries()], [['note.md', owner]]);
+  assert.equal(owner.signal.aborted, false);
+});
+
 // ---- 2. failures ----
 test('parse failure: begin, ox, sent, received, milestones, failed(stage parsing)', async () => {
   const h = rig({ handler: call => answer(call, 'this is not json') });
@@ -432,6 +460,19 @@ test('chart abort while the runtime runs: one failed with the error message, no 
   assert.deepEqual(h.names(), ['begin', 'ox', 'sent', 'failed']);
   assert.equal(count(h, 'failed'), 1); assert.equal(count(h, 'completed'), 0);
   assert.match(h.order.at(-1)[2], /^(AbortError: )?Aborted$/);
+});
+
+test('chart provider call shares the registry and releases the key even when stopped globally', async () => {
+  const activeTasks = new Map();
+  const h = rig({ extra: { activeTasks, mermaidParses: async () => true }, handler: call => {
+    const registered = [...activeTasks.entries()].filter(([key]) => key.startsWith('chart:'));
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0][1].signal, call.controls.signal);
+    registered[0][1].abort();
+    return answer(call, chartReply());
+  } });
+  await assert.rejects(h.service.chartDetail({ input: chartBase(), detail: NOTE, model: 'gpt-6-luna' }), error => error.name === 'AbortError');
+  assert.equal(activeTasks.size, 0);
 });
 
 test('chart: an already aborted signal throws before anything is logged or called', async () => {

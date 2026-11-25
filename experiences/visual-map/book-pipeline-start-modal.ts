@@ -248,7 +248,7 @@ export class BookSettingsViewModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     this.titleEl.setText(t("ui.book_settings_view"));
-    const list = contentEl.createEl("dl", { cls: "vam-book-settings-view" });
+    const list = contentEl.createEl("dl", { cls: "vam-book-settings-list" });
     for (const field of BOOK_SETTING_FIELDS) {
       list.createEl("dt", { text: t(FIELD_LABEL[field]) });
       const value = this.values[field]?.trim();

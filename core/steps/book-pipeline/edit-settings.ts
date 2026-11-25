@@ -74,7 +74,7 @@ export const editSettingsStep: StepDefinition<EditSettingsRequest, EditSettingsR
   version: 1,
   render: request =>
     renderTemplate(template, {
-      languageInstruction: languageInstruction(request.language, request.message),
+      languageInstruction: languageInstruction(request.language, ""),
       message: JSON.stringify(cap(request.message, EDIT_MESSAGE_CHARS)),
       settings: JSON.stringify(
         Object.fromEntries(

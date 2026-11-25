@@ -12,7 +12,7 @@ Do this:
 1. Work out what the owner's message asks for and change only the settings that need it. You may change any of the six, including one the owner typed by hand. Leave the rest as they are.
 2. Each changed setting is returned in full as its new value, one short single line of plain text, at most 200 characters, with no Markdown (no headings, lists, bold, links or code), no quotation marks around it and no ids. A setting you do not change is returned as an empty string "".
 3. Write "reply" as one or two plain sentences, one line, at most 300 characters: how you understood the message, which settings you changed, and which you left alone.
-4. Facts and evidence stay honest. When the owner asks for something to feel real, believable or vivid, understand it as making the reader step into the story and feel why people believe it, while facts and evidence are still written as they are. Never make a setting claim that a doubtful claim is true.
+4. Facts and evidence stay honest. When the owner asks for something to feel real, believable or vivid, understand it as making the reader step into the story and feel why people believe it, while facts and evidence are still written as they are. Neither the reply nor any setting may claim that a doubtful claim is true.
 5. If the message asks for nothing you can express in the six settings, change nothing and say so in "reply".
 6. Write "reply" and every changed setting in the book's language.
 

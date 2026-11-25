@@ -2283,7 +2283,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.aiCalls,
       {
         usageMapPath: input.mapPath,
-        language: selectionOutputLanguage(this.settings.language, input.message),
+        language: selectionOutputLanguage(this.settings.language, ""),
         model: input.model,
         reasoning: this.currentModelChoice().reasoning,
         message: input.message,

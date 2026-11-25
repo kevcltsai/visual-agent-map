@@ -2902,9 +2902,12 @@ export class Repository {
       const note = await this.readNoteIfManaged(file);
       if (!note) continue;
       const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
-      if (referencePaths) await this.updateNote(file.path, { referencePaths });
       const sourcePaths = rebasePathList(note.sourcePaths, pairs);
-      if (sourcePaths) await this.updateNote(file.path, { sourcePaths });
+      if (referencePaths || sourcePaths)
+        await this.updateNote(file.path, {
+          ...(referencePaths ? { referencePaths } : {}),
+          ...(sourcePaths ? { sourcePaths } : {})
+        });
     }
   }
 

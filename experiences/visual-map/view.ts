@@ -2032,12 +2032,13 @@ export class VisualAgentMapView extends ItemView {
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
     try {
+      const cut = this.cutIds();
       for (const id of ids) {
         const node = shown.get(id),
           old = this.cardEls.get(id);
         if (!node || !old?.isConnected) continue;
         const hadFocus = activeDocument.activeElement === old;
-        this.renderNode(node);
+        this.renderNode(node, cut);
         const fresh = this.cardEls.get(id);
         if (fresh && fresh !== old) {
           old.replaceWith(fresh);
@@ -12433,7 +12434,8 @@ export class VisualAgentMapView extends ItemView {
     const fits: Array<() => void> = [];
     this.pendingCardFits = fits;
     try {
-      for (const node of shown) this.renderNode(node);
+      const cut = this.cutIds();
+      for (const node of shown) this.renderNode(node, cut);
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
@@ -12586,7 +12588,7 @@ export class VisualAgentMapView extends ItemView {
     this.fillEmptyMap(box);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
-  private renderNode(shownNode: MapNode): void {
+  private renderNode(shownNode: MapNode, cut: ReadonlySet<string> = this.cutIds()): void {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
     const index = this.paintCardIndex ?? cardIndex(this.map?.nodes ?? []);
@@ -12602,7 +12604,7 @@ export class VisualAgentMapView extends ItemView {
       card.addClass("vam-node-loading");
       card.setAttr("aria-busy", "true");
     }
-    this.paintCut(card, node.id);
+    this.paintCut(card, node.id, cut.has(node.id));
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(index.depth(node)));

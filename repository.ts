@@ -1497,13 +1497,15 @@ export class Repository {
         reasoning: storedReasoning || undefined
       };
     if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
-    let owner = map?.nodes.some(node => node.path === path) ? map : undefined;
+    let node = this.nodeAtPath(path, map, ctx);
+    let owner = node ? map : undefined;
     if (!owner) {
       for (const file of await this.mapFiles()) {
         if (!path.startsWith(`${this.topicRoot(file.path)}/`)) continue;
         try {
           const candidate = await this.readMap(file.path);
-          if (candidate.nodes.some(node => node.path === path)) {
+          node = candidate.nodes.find(item => item.path === path);
+          if (node) {
             owner = candidate;
             break;
           }
@@ -1514,7 +1516,6 @@ export class Repository {
     }
     const seen = new Set<string>();
     const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : undefined;
-    let node = owner?.nodes.find(item => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
       const parentId = node.parentId;
@@ -1526,6 +1527,11 @@ export class Repository {
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+
+  /** Reuse the hydrate's path index only for the map it was built from. */
+  private nodeAtPath(path: string, map?: MapDocument, ctx?: NoteReadContext): MapNode | undefined {
+    return map && ctx?.map === map ? ctx.nodesByPath.get(path) : map?.nodes.find(item => item.path === path);
   }
 
   /**
@@ -1684,7 +1690,7 @@ export class Repository {
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(contentLanguage ? { contentLanguage } : {}),
       ...(relevance ? { relevance } : {}),
-      ...(readAiLocked(fm) || managedNodeIds(map).has(map?.nodes.find(item => item.path === path)?.id ?? "")
+      ...(readAiLocked(fm) || managedNodeIds(map).has(this.nodeAtPath(path, map, ctx)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
       ...readPipelineFields(fm),

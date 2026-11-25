@@ -314,6 +314,24 @@ integrationTest('a missing Map can be rebuilt from topic Notes as root nodes', a
   await repo.ensureTopicFolders(root); await repo.createNote('Recovered', 'a', placeholder, `${root}/Map.md`, 'workspace');
   const path = await repo.rebuildMissingMap(root), rebuilt = await repo.readMap(path); assert.equal(rebuilt.id, 'stable-topic'); assert.equal(rebuilt.nodes.length, 1); assert.equal(rebuilt.nodes[0].parentId, null);
 });
+integrationTest('relinking a missing map preserves changes made while moving the source map', async () => {
+  const { repo } = fixture();
+  const source = await repo.createMap('Relink source');
+  const doc = await repo.readMap(source);
+  doc.nodes.push(await repo.createNote('Keep', 'a', doc, source, 'workspace'));
+  await repo.saveMap(source, doc);
+  const root = 'Agent Workspace/Topics/Relink target';
+  await repo.ensureTopicFolders(root);
+  const move = repo.moveExact.bind(repo);
+  repo.moveExact = async (from, to) => {
+    await move(from, to);
+    if (from === source) await repo.updateMap(to, current => { current.nodes[0].x = 900; current.title = 'External edit'; });
+  };
+  const result = await repo.relinkMissingMap(root, source);
+  const current = await repo.readMap(result);
+  assert.equal(current.title, 'External edit');
+  assert.equal(current.nodes[0].x, 900);
+});
 integrationTest('replacing AI synthesis preserves 預覽', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Synthesis');
   await repo.updateNote(n.path, { detail: 'Old synthesis', preview: 'Keep this manually written note' });

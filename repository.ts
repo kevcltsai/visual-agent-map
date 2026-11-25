@@ -1725,19 +1725,27 @@ export class Repository {
   async relinkMissingMap(root: string, sourcePath: string): Promise<string> {
     const target = `${root}/Map.md`;
     if (this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.map_already_exists"));
-    const map = await this.readMap(sourcePath),
-      candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
-    const byId = new Map<string, string>();
+    // Validate the selected source before moving it, then rebase the actual document after the move.
+    await this.readMap(sourcePath);
+    const candidates = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/Notes/`));
+    const byId = new Map<string, string[]>();
     for (const file of candidates) {
       const fm = frontmatter(await this.app.vault.read(file));
       const id = text(fm["node-id"]);
-      if (id) byId.set(id, file.path);
+      if (id) byId.set(id, [...(byId.get(id) ?? []), file.path]);
     }
-    for (const node of [...map.nodes])
-      if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) && byId.has(node.id))
-        rebaseMapNotePaths(map, moveNotePath(node.path, byId.get(node.id)!));
     await this.moveExact(sourcePath, target);
-    await this.saveMap(target, map);
+    const map = await this.updateMap(target, current => {
+      for (const node of [...current.nodes]) {
+        const matches = byId.get(node.id) ?? [];
+        if (
+          matches.length === 1 &&
+          !(this.app.vault.getAbstractFileByPath(node.path) instanceof TFile) &&
+          this.app.vault.getAbstractFileByPath(matches[0]) instanceof TFile
+        )
+          rebaseMapNotePaths(current, moveNotePath(node.path, matches[0]));
+      }
+    });
     for (const node of map.nodes)
       if (this.app.vault.getAbstractFileByPath(node.path) instanceof TFile)
         await this.setLifecycle(node.path, map.id, map.id, "active");

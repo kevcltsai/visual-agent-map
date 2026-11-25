@@ -36,7 +36,11 @@ export async function writeStoreAtomically(adapter: StoreAdapter, path: string, 
   const temporary = `${path}.tmp`;
   // A previous write may have removed the old file but failed to publish its complete temp file.
   // Recover that snapshot before a retry can truncate it. The primary still wins when both exist.
-  if (!(await adapter.exists(path)) && (await adapter.exists(temporary))) await adapter.rename(temporary, path);
+  if (!(await adapter.exists(path)) && (await adapter.exists(temporary))) {
+    // The production callers also validate their schema on load. Never promote a torn legacy JSON temp on a retry.
+    JSON.parse(await adapter.read(temporary));
+    await adapter.rename(temporary, path);
+  }
   if (await adapter.exists(path)) {
     await adapter.write(temporary, text);
     await adapter.remove(path);

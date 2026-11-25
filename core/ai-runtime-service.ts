@@ -183,7 +183,7 @@ export interface AiRuntimeServiceOptions {
 }
 
 /** Only handles returned by the configured provider spawns are tracked; never look up or signal a raw PID. */
-export interface OwnedProviderProcess {
+interface OwnedProviderProcess {
   readonly exitCode?: number | null;
   readonly signalCode?: NodeJS.Signals | null;
   kill(signal?: NodeJS.Signals): boolean;

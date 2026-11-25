@@ -1,3 +1,5 @@
+import { parentPath, baseName } from "./core/repository-paths";
+import { moveTopicsWithRollback, type OrganizeMove, type OrganizePlan, type MoveProgress } from "./core/repository-workspace-move";
 import type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
 import { relocateFile } from "./core/repository-relocation";
 import { managedMapContainers, isManagedMapPath, type Settings } from "./core/repository-settings";
@@ -124,6 +126,7 @@ export { noteHeadingLanguage, localizeHeadings } from "./core/repository-note-bo
 export { setFrontmatterKeys } from "./core/repository-frontmatter";
 export { rebaseMapNotePaths, moveNotePath, coordinatePrint } from "./core/repository-map-content";
 export { isPlaceholder };
+export type { OrganizeMove, OrganizePlan, MoveProgress } from "./core/repository-workspace-move";
 export type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
 export {
   DEFAULT_SETTINGS,
@@ -160,25 +163,6 @@ export interface BrokenTopic {
   root: string;
   noteCount: number;
 }
-export interface OrganizeMove {
-  mapPath: string;
-  title: string;
-  kind: "mind" | "aim";
-  fromRoot: string;
-  toRoot: string;
-}
-interface PriorContent {
-  path: string;
-  content: string;
-}
-/** Reports "moving topic `title`, step `done` of `total`" before each topic move starts. */
-export type MoveProgress = (done: number, total: number, title: string) => void;
-export interface OrganizePlan {
-  moves: OrganizeMove[];
-  /** Maps that could not be read: left exactly where they are. */
-  skipped: { mapPath: string; error: string }[];
-}
-
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 /** Longest `last-error` stored in a note. */
 export const LAST_ERROR_LIMIT = 300;
@@ -192,13 +176,6 @@ export function failureReason(error: unknown): string {
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
-function parentPath(path: string): string {
-  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-}
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
-
 function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
   const current = Array.isArray(fm.cssclasses)
     ? fm.cssclasses.map(String)
@@ -2300,88 +2277,25 @@ export class Repository {
   }
 
   private async moveTopicsWithRollback(moves: OrganizeMove[], onProgress?: MoveProgress): Promise<Map<string, string>> {
-    const done: { move: OrganizeMove; newMapPath: string; originalMap: string; journal: PriorContent[] }[] = [],
-      mapping = new Map<string, string>();
-    // Only the moved topics and the notes that cite them can change: rebuild just those, once.
-    const scope = (): { roots: string[]; paths: string[] } => ({
-      roots: moves.flatMap(move => [move.fromRoot, move.toRoot]),
-      paths: done.flatMap(item => item.journal.map(prior => prior.path))
-    });
-    try {
-      for (const [index, move] of moves.entries()) {
-        if (this.disposed) throw new Error(this.message("error.plugin_unloaded"));
-        onProgress?.(index + 1, moves.length, move.title);
-        await this.folder(parentPath(move.toRoot));
-        const originalMap = await this.app.vault.read(this.file(move.mapPath));
-        const newMapPath = await this.renameTopic(move.mapPath, move.title, move.toRoot, { rebuild: false });
-        const journal: PriorContent[] = [];
-        // Trust the disk, not the order of awaits: the topic must really be at its new place before going on.
-        if (
-          !(this.app.vault.getAbstractFileByPath(move.toRoot) instanceof TFolder) ||
-          !(this.app.vault.getAbstractFileByPath(newMapPath) instanceof TFile)
-        )
-          throw new Error(this.message("error.move_not_applied"));
-        done.push({ move, newMapPath, originalMap, journal });
-        mapping.set(move.mapPath, newMapPath);
-        await this.rebasePathPrefix(move.fromRoot, move.toRoot, journal);
-      }
-      await this.rebuildDerivedData(scope());
-      return mapping;
-    } catch (error) {
-      const rollbackErrors: string[] = [];
-      for (const { move, newMapPath, originalMap, journal } of [...done].reverse()) {
-        try {
-          // Put back the exact text of every note and map the path rebase rewrote, then undo the folder move.
-          for (const prior of [...journal].reverse()) {
-            const file = this.app.vault.getAbstractFileByPath(prior.path);
-            if (file instanceof TFile) await this.app.vault.modify(file, prior.content);
-          }
-          await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
-          await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
-          this.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
-        } catch (rollbackError) {
-          rollbackErrors.push(
-            `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
-          );
-        }
-      }
-      try {
-        await this.rebuildDerivedData(scope());
-      } catch (rebuildError) {
-        rollbackErrors.push(rebuildError instanceof Error ? rebuildError.message : String(rebuildError));
-      }
-      if (rollbackErrors.length)
-        throw new Error(
-          `Organize failed (${error instanceof Error ? error.message : String(error)}); rollback also failed (${rollbackErrors.join("; ")}).`
-        );
-      throw error;
-    }
-  }
-
-  /** After a folder move: point note `source-notes`/`reference-materials` and other maps' references at the new prefix. */
-  private async rebasePathPrefix(from: string, to: string, journal: PriorContent[]): Promise<void> {
-    const rebase = (path: string): string =>
-      path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
-    for (const file of await this.markedFiles("agent-map-node")) {
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      const mentions = (list: unknown): boolean =>
-        Array.isArray(list) && list.some(item => typeof item === "string" && item.startsWith(`${from}/`));
-      if (cached && !mentions(cached["source-notes"]) && !mentions(cached["reference-materials"])) continue;
-      const note = await this.readNoteIfManaged(file);
-      if (!note) continue;
-      const patch: NotePatch = {};
-      const references = note.referencePaths ?? [];
-      if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
-      if (note.sourcePaths.some(path => rebase(path) !== path)) patch.sourcePaths = note.sourcePaths.map(rebase);
-      if (!Object.keys(patch).length) continue;
-      journal.push({ path: file.path, content: await this.app.vault.read(file) });
-      await this.updateNote(file.path, patch);
-    }
-    for (const { file, map } of await this.readableMaps()) {
-      if (!rebaseMapNotePaths(map, rebase)) continue;
-      journal.push({ path: file.path, content: await this.app.vault.read(file) });
-      await this.saveMap(file.path, map);
-    }
+    return moveTopicsWithRollback(
+      {
+        app: this.app,
+        isDisposed: () => this.disposed,
+        message: key => this.message(key),
+        folder: path => this.folder(path),
+        file: path => this.file(path),
+        renameTopic: (path, title, target, options) => this.renameTopic(path, title, target, options),
+        rebuildDerivedData: scope => this.rebuildDerivedData(scope),
+        noteRestoredMap: (path, text) => this.noteRestoredMap(path, text),
+        markedFiles: key => this.markedFiles(key),
+        readNoteIfManaged: file => this.readNoteIfManaged(file),
+        updateNote: (path, patch) => this.updateNote(path, patch),
+        readableMaps: () => this.readableMaps(),
+        saveMap: (path, map) => this.saveMap(path, map)
+      },
+      moves,
+      onProgress
+    );
   }
 
   async renameTopic(

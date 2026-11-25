@@ -232,7 +232,6 @@ import {
   applyCollapseLevel,
   canParent,
   clone,
-  branchSizeResolver,
   childIndex,
   descendants,
   History,
@@ -258,6 +257,7 @@ import {
   CARD_WIDTH_MAX,
   CARD_WIDTH_MIN,
   CARD_WIDTH_STEP,
+  branchSizeResolver,
   clampCardHeight,
   clampCardWidth
 } from "../../map-graph";
@@ -12644,7 +12644,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
-    // Every card shows its branch size: one child index per paint keeps that linear in the map size.
+    // Every card shows its branch size: count all branches once for this paint.
     this.paintBranchSize = this.map ? branchSizeResolver(childIndex(this.map.nodes)) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     this.paintBookStructure = { value: this.bookStructureNow() };

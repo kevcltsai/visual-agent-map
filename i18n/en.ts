@@ -1,5 +1,10 @@
 /** English dictionary: the source of every `TranslationKey` and the fallback for any language missing a key. */
 export const en = {
+  "error.recovery_write_conflict": "The file changed before it could be saved. Reopen it and try again.",
+  "error.recovery_backup_failed": "Could not verify the recovery copy. The original file was not changed.",
+  "log.recovery_snapshot_retained_0": "Recovery copy retained: {0}",
+  "log.recovery_scan_failed": "Could not check for pending recovery copies.",
+  "ui.recovery_snapshots_found_0": "Recovery files remain in {0}. Keep them and review the recovery instructions in INSTALL before replacing any note.",
   "ui.output_language": "Answer language for this task",
   "ui.output_language_more": "More languages (answers only)",
   "ui.output_language_follow_input": "Same language as my text",

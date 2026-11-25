@@ -26,6 +26,39 @@ integrationTest('repository: unload after a vault process is queued refuses the 
   assert.equal(contents.get(n.path), original);
 });
 
+integrationTest('repository write recovery wraps both existing topic notes and Map.md through Vault.process', async () => {
+  const { repo, app, contents } = fixture('en');
+  const n = await topicNote(repo, 'Protected');
+  const mapPath = await repo.createMap('Protected map');
+  const { Repository } = load('repository.ts', { obsidian });
+  const { VaultWriteRecovery } = load('core/vault-write-recovery.ts');
+  const saved = new Map(), dirs = new Set(), pending = [];
+  const adapter = {
+    exists: async p => saved.has(p) || dirs.has(p),
+    mkdir: async p => { dirs.add(p); },
+    read: async p => saved.get(p),
+    write: async (p, value) => { saved.set(p, value); },
+    rename: async (from, to) => { saved.set(to, saved.get(from)); saved.delete(from); },
+    remove: async p => { saved.delete(p); },
+    list: async () => ({ files: [...saved.keys()] })
+  };
+  const recovery = new VaultWriteRecovery(adapter, 'plugin/write-recovery', p => pending.push(p));
+  const protectedRepo = new Repository(app, repo.settings, recovery);
+  const before = new Map([[n.path, contents.get(n.path)], [mapPath, contents.get(mapPath)]]);
+  const process = app.vault.process;
+  app.vault.process = async (file, change) => process(file, current => {
+    const next = change(current);
+    assert.ok([...saved.values()].some(value => {
+      const record = JSON.parse(value);
+      return record.path === file.path && record.content === before.get(file.path);
+    }), 'a verified preimage exists at the source callback');
+    return next;
+  });
+  await protectedRepo.updateNote(n.path, { summary: 'Updated' });
+  await protectedRepo.updateMap(mapPath, current => { current.title = 'Updated map'; });
+  assert.equal(saved.size, 0);
+  assert.equal(pending.length, 0);
+});
 integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));

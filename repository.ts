@@ -88,6 +88,7 @@ import { normalizeReasoningLevel } from "./ai/task-policy";
 import { resolveTaskModel } from "./ai/model-resolution";
 import { standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { readOnce, type NoteReadContext } from "./core/note-read-context";
+import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
@@ -274,7 +275,9 @@ function guardWrites<T extends object>(
   target: T,
   writes: Set<string>,
   disposed: () => boolean,
-  message: () => string
+  message: () => string,
+  recovery?: VaultWriteRecovery,
+  recoveryErrors?: { conflict: () => Error; backup: () => Error }
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -284,6 +287,28 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            if (
+              property === "process" &&
+              recovery &&
+              recoveryErrors &&
+              args[0] instanceof TFile &&
+              args[0].extension === "md" &&
+              typeof args[1] === "function"
+            ) {
+              const file = args[0];
+              const change = args[1] as (content: string) => string;
+              const vault = object as unknown as App["vault"];
+              return recovery.process({
+                path: () => file.path,
+                read: () => vault.read(file),
+                process: transform => Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
+                change,
+                stopped: disposed,
+                stoppedError: () => new Error(message()),
+                conflictError: recoveryErrors.conflict,
+                backupError: recoveryErrors.backup
+              });
+            }
             // A process callback can run later, after the vault's own file queue releases it.
             if ((property === "process" || property === "processFrontMatter") && typeof args[1] === "function") {
               const change = args[1] as (...values: unknown[]) => unknown;
@@ -310,14 +335,20 @@ export class Repository {
 
   constructor(
     app: App,
-    readonly settings: Settings
+    readonly settings: Settings,
+    recovery?: VaultWriteRecovery
   ) {
     const stopped = (): boolean => this.disposed;
     const message = (): string => this.message("error.unloaded_write_not_performed");
+    const recoveryErrors = {
+      conflict: () => new Error(this.message("error.recovery_write_conflict")),
+      backup: () => new Error(this.message("error.recovery_backup_failed"))
+    };
     this.app = new Proxy(app, {
       get(object, property) {
         const value = Reflect.get(object, property, object) as unknown;
-        if (property === "vault") return guardWrites(value as object, VAULT_WRITES, stopped, message);
+        if (property === "vault")
+          return guardWrites(value as object, VAULT_WRITES, stopped, message, recovery, recoveryErrors);
         if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
         return value;
       }

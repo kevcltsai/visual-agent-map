@@ -847,7 +847,7 @@ test('image slot markers: grammar, one count per index, bad/duplicate/inline cla
 
 test('pickForSlot seam: deterministic, https only, same-chapter address never placed twice; none carries a reason code', () => {
   const cand = (url, extra = {}) => ({ imageUrl: url, sourceUrl: 'https://example.org/p', title: 't', caption: 'c', ...extra });
-  const ctx = (picked = []) => ({ chapter: { id: 'n1', title: 'T' }, slot: slot(1), allSlots: [slot(1), slot(2)], alreadyPicked: new Set(picked) });
+  const ctx = (picked = []) => new Set(picked);
   const a = cand('https://x.example/a.jpg'), b = cand('https://x.example/b.jpg');
   assert.deepEqual(plain(slots.pickForSlot(ctx(), [a, b])), { candidate: a });
   assert.deepEqual(plain(slots.pickForSlot(ctx([a.imageUrl]), [a, b])), { candidate: b });

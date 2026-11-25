@@ -126,11 +126,11 @@ try {
 
   await evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","zh-TW"); return true})()`);
   const chinese = await evaluate(blankMap);
-  check("Language change updates the command label but not the map title", chinese.language === "zh-TW" && chinese.command === "Visual Agent Map (VAM): 開啟心智圖" && chinese.mapTitle === english.mapTitle && chinese.views === 1, JSON.stringify({ english, chinese }));
+  check("Language change updates the command label but not the map title", chinese.language === "zh-TW" && chinese.command === "Visual Agent Map: 開啟心智圖" && chinese.mapTitle === english.mapTitle && chinese.views === 1, JSON.stringify({ english, chinese }));
 
   await evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","en"); return true})()`);
   const afterSwitch = await evaluate(blankMap);
-  check("Switching back restores the English label and keeps the map title", afterSwitch.language === "en" && afterSwitch.command === "Visual Agent Map (VAM): Open mind map" && afterSwitch.mapTitle === english.mapTitle, JSON.stringify(afterSwitch));
+  check("Switching back restores the English label and keeps the map title", afterSwitch.language === "en" && afterSwitch.command === "Visual Agent Map: Open mind map" && afterSwitch.mapTitle === english.mapTitle, JSON.stringify(afterSwitch));
 
   const errors = await driver.errors();
   const pluginLogs = await evaluate(`JSON.stringify(app.plugins.plugins["visual-agent-map"].logs.entries.filter(e=>e.level==="error"||e.message.includes("初始化未完成")))`);

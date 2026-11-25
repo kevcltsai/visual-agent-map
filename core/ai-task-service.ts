@@ -57,6 +57,10 @@ function cancelled(): Error {
   error.name = "AbortError";
   return error;
 }
+
+function isAbortError(error: unknown): boolean {
+  return !!error && typeof error === "object" && (error as { name?: unknown }).name === "AbortError";
+}
 /** What one attempt of the observed main call needs on top of the shared controls. */
 interface AttemptSetup {
   signal: AbortSignal;
@@ -375,6 +379,7 @@ export class AiTaskService {
             );
         }
       }
+      if (signal?.aborted) throw cancelled();
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
@@ -413,6 +418,7 @@ export class AiTaskService {
         result.detail = resolveDetailReferences(result.detail, referenceGroups, input.detail, input.detailTemplate);
       // Every reply of execute passes here (task run, AIM steps, the count repair's own run), before anything is written.
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
+      if (signal?.aborted) throw cancelled();
       if (this.options.exchangeLoggingEnabled()) exchanges?.parsed(exchangeId);
       // "AI suggested", first research: the sections the AI wrote become the note's template (one call; no repair follows).
       const aiDecides = input.aiSections === "decide";
@@ -473,7 +479,7 @@ export class AiTaskService {
             };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
-            if (signal?.aborted || (error instanceof Error && error.name === "AbortError") || isBudgetExhausted(error))
+            if (signal?.aborted || isAbortError(error) || isBudgetExhausted(error))
               throw error;
           } finally {
             // The repair has its own entry, which the caller finishes; close the first one that it supersedes.
@@ -500,6 +506,7 @@ export class AiTaskService {
           requested
         );
       }
+      if (signal?.aborted) throw cancelled();
       console.debug("Visual Agent Map AI metrics", {
         ...prepared.metrics,
         providerMs: Date.now() - providerStarted,
@@ -745,7 +752,7 @@ export class AiTaskService {
       provider
     });
     const aborted = (error: unknown): boolean =>
-      !!signal?.aborted || (error instanceof Error && error.name === "AbortError");
+      !!signal?.aborted || isAbortError(error);
     const codeOf = (error: unknown): ChartCode => (error instanceof ChartRejected ? error.code : "runtime_error");
     const notAdded = (code: ChartCode): string => translate(this.options.language(), "log.chart_not_added_0", code);
     const warn = (code: ChartCode): void => console.warn("Visual Agent Map chart step", code);

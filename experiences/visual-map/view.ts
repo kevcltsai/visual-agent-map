@@ -1929,6 +1929,8 @@ export class VisualAgentMapView extends ItemView {
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
+  private coverGeneration = 0;
+  private coverPending = new WeakSet<HTMLImageElement>();
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
   private statusBarObserver: ResizeObserver | null = null;
@@ -2041,6 +2043,7 @@ export class VisualAgentMapView extends ItemView {
         this.renderNode(node, cut);
         const fresh = this.cardEls.get(id);
         if (fresh && fresh !== old) {
+          this.releaseCardCover(old);
           old.replaceWith(fresh);
           if (hadFocus) fresh.focus({ preventScroll: true });
         }
@@ -13835,8 +13838,17 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
+    this.coverGeneration++;
     this.coverObserver?.disconnect();
     this.coverObserver = null;
+    this.coverPending = new WeakSet();
+  }
+  private releaseCardCover(card: HTMLElement): void {
+    const cover = cardCovers.get(card);
+    if (!cover) return;
+    this.coverPending.delete(cover.img);
+    this.coverObserver?.unobserve(cover.img);
+    cardCovers.delete(card);
   }
   /**
    * Puts a fixed-height cover frame before the card's title when the note's metadata names a local image (frontmatter
@@ -13846,9 +13858,8 @@ export class VisualAgentMapView extends ItemView {
   private paintCover(card: HTMLElement, notePath: string): void {
     const old = cardCovers.get(card);
     if (old) {
-      this.coverObserver?.unobserve(old.img);
+      this.releaseCardCover(card);
       old.frame.remove();
-      cardCovers.delete(card);
     }
     const placed = this.paintCoverFrame(card, notePath);
     // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
@@ -13890,15 +13901,19 @@ export class VisualAgentMapView extends ItemView {
     // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
     const known = coverShapes.get(imagePath);
     if (known) placeCoverFrame(parts, known, mask);
+    const generation = this.coverGeneration;
+    const current = (): boolean =>
+      !this.closed && generation === this.coverGeneration && cardCovers.get(card)?.img === img;
     // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
     img.addEventListener("error", () => {
-      this.coverObserver?.unobserve(img);
+      if (!current()) return;
+      this.releaseCardCover(card);
       frame.remove();
-      cardCovers.delete(card);
       arrangeCover(card, null, "top");
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
+      if (!current()) return;
       const shape = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
       if (!shape || frame.hasClass("is-sized")) return;
       coverShapes.set(imagePath, shape);
@@ -13911,14 +13926,17 @@ export class VisualAgentMapView extends ItemView {
       return { frame, position };
     }
     this.coverObserver ??= new IntersectionObserver(entries => {
+      if (this.closed || generation !== this.coverGeneration) return;
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const target = entry.target as HTMLImageElement;
+        if (!this.coverPending.delete(target)) continue;
         const real = target.getAttribute("data-src");
         if (real) target.setAttr("src", real);
         this.coverObserver?.unobserve(target);
       }
     });
+    this.coverPending.add(img);
     this.coverObserver.observe(img);
     return { frame, position };
   }
@@ -14124,11 +14142,13 @@ export class VisualAgentMapView extends ItemView {
   async prepareShare(timeoutMs = 3000): Promise<void> {
     if (!this.map || this.notesLoading()) return;
     const waits: Promise<void>[] = [];
+    const finish: Array<() => void> = [];
     for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
       const card = this.cardEls.get(id);
       const cover = card ? cardCovers.get(card) : undefined;
       if (!cover || cover.frame.classList.contains("is-sized")) continue;
       const img = cover.img;
+      this.coverPending.delete(img);
       this.coverObserver?.unobserve(img);
       waits.push(
         new Promise<void>(resolve => {
@@ -14137,6 +14157,7 @@ export class VisualAgentMapView extends ItemView {
             img.removeEventListener("error", done);
             resolve();
           };
+          finish.push(done);
           img.addEventListener("load", done);
           img.addEventListener("error", done);
           // A lazy image off screen never loads, whatever its src: without this the wait always runs out.
@@ -14156,6 +14177,8 @@ export class VisualAgentMapView extends ItemView {
         })
       ]);
       window.clearTimeout(timer);
+      // A timed-out image may never emit another event. Release every wait listener even then.
+      for (const done of finish) done();
     }
     try {
       await this.plugin.mutate(async () => undefined, { sync: false });

@@ -5,7 +5,7 @@ import { MAX_IMAGE_SLOTS } from "../../book-pipeline/image-slots";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { checkFigure, parseFigure, type FigureCode } from "../../book-pipeline/figure-spec";
-import { noteNumbers, numberTokens } from "../chart/insert";
+import { noteNumbers, numberTokens } from "../../evidence-tokens";
 import { arrayOf, languageInstruction, parseJson, recordOf, type BookStepBase } from "./base";
 import type { FindImagesSlot } from "./find-images";
 import template from "./draw-diagrams.md";

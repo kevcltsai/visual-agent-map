@@ -5,7 +5,7 @@ export const en = {
   "log.recovery_snapshot_retained_0": "Recovery copy retained: {0}",
   "log.recovery_scan_failed": "Could not check for pending recovery copies.",
   "ui.recovery_snapshots_found_0":
-    "Recovery files remain in {0}. Keep them and review the recovery instructions in INSTALL before replacing any note.",
+    'A save did not finish last time. VAM kept a copy of the original content in {0}; your notes were not changed. To recover it, follow "Interrupted Markdown writes" in INSTALL.',
   "ui.output_language": "Answer language for this task",
   "ui.output_language_more": "More languages (answers only)",
   "ui.output_language_follow_input": "Same language as my text",

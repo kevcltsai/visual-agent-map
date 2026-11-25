@@ -6,7 +6,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.recovery_backup_failed": "无法确认恢复副本完整，原文件未更改。",
   "log.recovery_snapshot_retained_0": "已保留恢复副本：{0}",
   "log.recovery_scan_failed": "无法检查尚待处理的恢复副本。",
-  "ui.recovery_snapshots_found_0": "{0} 仍有恢复文件。请保留这些文件，按 INSTALL 的恢复说明检查后再决定是否替换笔记。",
+  "ui.recovery_snapshots_found_0":
+    "上次有一次保存没完成。VAM 已把原来的内容另存在 {0}，你的笔记没有被改动。需要找回时，照 INSTALL 的“Markdown 写入中断”说明操作。",
   "ui.output_language": "本次回答语言",
   "ui.output_language_more": "更多语言（仅限回答）",
   "ui.output_language_follow_input": "跟随输入语言",

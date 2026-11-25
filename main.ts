@@ -1313,9 +1313,15 @@ export default class VisualAgentMapPlugin extends Plugin {
         : undefined;
     if (recovery) {
       try {
-        if (await recovery.pendingCount()) {
+        const { notify, fingerprint } = await recovery.unreported(this.settings.reportedRecoveryFiles);
+        if (notify) {
           this.logs.appendLog("warn", t("ui.recovery_snapshots_found_0", recovery.folder));
           new Notice(t("ui.recovery_snapshots_found_0", recovery.folder));
+        }
+        if (fingerprint !== this.settings.reportedRecoveryFiles) {
+          if (fingerprint === undefined) delete this.settings.reportedRecoveryFiles;
+          else this.settings.reportedRecoveryFiles = fingerprint;
+          await this.saveSettings();
         }
       } catch {
         this.logs.appendLog("warn", t("log.recovery_scan_failed"));

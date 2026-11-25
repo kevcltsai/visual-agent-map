@@ -152,6 +152,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-    canvasHintSeen: saved?.canvasHintSeen === true
+    canvasHintSeen: saved?.canvasHintSeen === true,
+    ...(typeof saved?.reportedRecoveryFiles === "string" && saved.reportedRecoveryFiles
+      ? { reportedRecoveryFiles: saved.reportedRecoveryFiles }
+      : {})
   };
 }

@@ -69,6 +69,8 @@ export interface Settings {
   addDiagramsAfterResearch: boolean;
   workspaceInitialized: boolean;
   canvasHintSeen: boolean;
+  /** Fingerprint of the recovery files the startup notice already reported; absent when none were left. */
+  reportedRecoveryFiles?: string;
 }
 const BOOK_PLAN_MODEL = "claude:sonnet";
 const BOOK_WRITE_MODEL = "claude:opus";

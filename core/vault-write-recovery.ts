@@ -34,10 +34,28 @@ export class VaultWriteRecovery {
     private readonly newId: () => string = () => crypto.randomUUID()
   ) {}
 
-  async pendingCount(): Promise<number> {
-    if (!(await this.adapter.exists(this.folder))) return 0;
+  /** The retained recovery files, as sorted file names inside the folder. */
+  async pendingFiles(): Promise<string[]> {
+    if (!(await this.adapter.exists(this.folder))) return [];
     const { files } = await this.adapter.list(this.folder);
-    return files.filter(path => /\/[0-9a-f-]+\.(?:json|writing)$/i.test(path)).length;
+    return files
+      .filter(path => /\/[0-9a-f-]+\.(?:json|writing)$/i.test(path))
+      .map(path => path.slice(path.lastIndexOf("/") + 1))
+      .sort();
+  }
+
+  async pendingCount(): Promise<number> {
+    return (await this.pendingFiles()).length;
+  }
+
+  /**
+   * Whether the startup notice is due: only when the set of retained files differs from the set already reported.
+   * `fingerprint` is the new value to remember (undefined when the folder is empty, so a later new file is reported again).
+   */
+  async unreported(reported: string | undefined): Promise<{ notify: boolean; fingerprint: string | undefined }> {
+    const names = await this.pendingFiles();
+    const fingerprint = names.length ? names.join("\n") : undefined;
+    return { notify: fingerprint !== undefined && fingerprint !== reported, fingerprint };
   }
 
   async process(write: RecoveryWrite): Promise<string> {

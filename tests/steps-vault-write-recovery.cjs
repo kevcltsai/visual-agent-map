@@ -123,3 +123,39 @@ test('cleanup failure leaves a recovery copy without falsely reporting the commi
   assert.equal(JSON.parse(f.files.get(snapshot)).content, original);
   assert.deepEqual(f.retained, [snapshot]);
 });
+
+test('startup notice: shown once for a new set of recovery files, not again for the same set, and again for a new file', async () => {
+  const f = fixture();
+  f.files.set(folder, '');
+  f.files.set(folder + '/b0000000-0000-0000-0000-000000000001.json', '{}');
+  let reported;
+  let first = await f.journal.unreported(reported);
+  assert.equal(first.notify, true);
+  reported = first.fingerprint;
+  assert.equal((await f.journal.unreported(reported)).notify, false, 'same set on the next startup');
+  f.files.set(folder + '/c0000000-0000-0000-0000-000000000002.writing', '{}');
+  const added = await f.journal.unreported(reported);
+  assert.equal(added.notify, true, 'a new file is reported');
+  assert.notEqual(added.fingerprint, reported);
+});
+
+test('startup notice: an empty folder clears the fingerprint so a later new file is reported again', async () => {
+  const f = fixture();
+  f.files.set(folder, '');
+  f.files.set(folder + '/b0000000-0000-0000-0000-000000000001.json', '{}');
+  const reported = (await f.journal.unreported(undefined)).fingerprint;
+  f.files.clear(); f.files.set(folder, '');
+  const empty = await f.journal.unreported(reported);
+  assert.equal(empty.notify, false);
+  assert.equal(empty.fingerprint, undefined);
+  f.files.set(folder + '/b0000000-0000-0000-0000-000000000001.json', '{}');
+  assert.equal((await f.journal.unreported(empty.fingerprint)).notify, true);
+});
+
+test('startup notice: saved data without the fingerprint key loads, and a saved fingerprint round-trips', () => {
+  const { settingsFromSaved } = load('settings-from-saved.ts');
+  const old = settingsFromSaved({ migrated: true });
+  assert.equal('reportedRecoveryFiles' in old, false);
+  assert.equal(settingsFromSaved({ reportedRecoveryFiles: 'a.json' }).reportedRecoveryFiles, 'a.json');
+  assert.equal('reportedRecoveryFiles' in settingsFromSaved({ reportedRecoveryFiles: 5 }), false);
+});

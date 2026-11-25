@@ -104,7 +104,12 @@ export async function moveTopicsWithRollback(
 }
 
 /** After a folder move: point note `source-notes`/`reference-materials` and other maps' references at the new prefix. */
-async function rebasePathPrefix(ports: WorkspaceMovePorts, from: string, to: string, journal: PriorContent[]): Promise<void> {
+async function rebasePathPrefix(
+  ports: WorkspaceMovePorts,
+  from: string,
+  to: string,
+  journal: PriorContent[]
+): Promise<void> {
   const rebase = (path: string): string =>
     path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
   for (const file of await ports.markedFiles("agent-map-node")) {

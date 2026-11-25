@@ -89,12 +89,14 @@ test('main task routing: Codex local and web, Claude without the prefix; the sch
 });
 
 test('main task controls: signal reaches the runtime and aborts with the caller, timeout, search flags, accepted and web callbacks', async () => {
-  const h = rig({ handler: call => answer(call) });
+  const event = { method: 'item/started', params: {} };
+  const h = rig({ handler: call => { call.controls.onWebSearchEvent?.(event); return answer(call); } });
   const controller = new AbortController(), accepted = () => {}, webEvents = [], web = event => webEvents.push(event);
   await h.service.askModel(context({ researchMode: 'research', timeoutMs: 240_000 }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
   const controls = h.state.calls[0].controls;
   assert.equal(controls.onAccepted, accepted);
-  controls.onWebSearchEvent?.({ method: 'item/started', params: {} }); assert.deepEqual(webEvents, [{ method: 'item/started', params: {} }], 'web events reach the caller (a standard research counts them on the way)');
+  assert.deepEqual(webEvents, [event], 'web events reach the caller while the request runs');
+  controls.onWebSearchEvent?.(event); assert.deepEqual(webEvents, [event], 'late web events are ignored');
   assert.equal(controls.timeoutMs, 240_000); assert.equal(controls.timeoutMessage, translate('en', 'ui.aim_task_timeout', 4));
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, undefined);
   assert.ok(controls.signal instanceof AbortSignal);
@@ -803,4 +805,23 @@ test('noContentLog redacts provider failures while returning the original error 
   assert.equal(h.order.filter(event => event[0] === 'failed').length, 1);
   assert.equal(h.order.find(event => event[0] === 'failed')[2], 'failed');
   assert.ok(!JSON.stringify(h.order).includes(secret));
+});
+
+test('reference extraction failure stops sibling requests and preserves the original error', async () => {
+  const boom = new Error('extract failure'); let rejectFirst;
+  const h = rig({ handler: call => {
+    call.controls.onRequest({ n: call.n });
+    if (call.n === 1) return new Promise((_resolve, reject) => { rejectFirst = reject; });
+    return new Promise((_resolve, reject) => {
+      call.controls.signal.addEventListener('abort', () => reject(abortError('sibling stopped')), { once: true });
+    });
+  } });
+  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(90_001) }));
+  const done = h.service.condenseReferences(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }] }), 'gpt-6-luna', 'low');
+  await waitFor(() => h.state.calls.length === 3);
+  rejectFirst(boom);
+  await assert.rejects(done, error => error === boom);
+  await flush();
+  assert.equal(h.state.calls.length, 3, 'no fourth extract starts after a sibling fails');
+  assert.ok(h.state.calls.slice(1).every(call => call.controls.signal.aborted));
 });

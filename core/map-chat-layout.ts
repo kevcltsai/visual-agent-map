@@ -58,15 +58,18 @@ export function splitChatLines<T extends ChatLineLike>(
   notes?: string | readonly string[]
 ): { results: T[]; notes: T[] } {
   const texts = noteSet(notes);
-  return {
-    results: lines.filter(line => !texts.includes(line.text)),
-    notes: lines.filter(line => texts.includes(line.text))
-  };
+  const results: T[] = [];
+  const noteLines: T[] = [];
+  lines.forEach(line => (texts.includes(line.text) ? noteLines : results).push(line));
+  return { results, notes: noteLines };
 }
 /** Counts result lines by status. `ignore` lines (the closing "cannot be undone" note, the auto-layout note) are not results. */
 export function countChatLines(lines: readonly ChatLineLike[], ignore?: string | readonly string[]): ChatLineCounts {
   const counts: ChatLineCounts = { done: 0, skipped: 0, failed: 0 };
-  for (const line of splitChatLines(lines, ignore).results) counts[line.status]++;
+  const texts = noteSet(ignore);
+  lines.forEach(line => {
+    if (!texts.includes(line.text)) counts[line.status]++;
+  });
   return counts;
 }
 

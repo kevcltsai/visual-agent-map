@@ -197,9 +197,10 @@ export class AiCalls {
     options.signal.addEventListener("abort", abort, { once: true });
     if (options.signal.aborted) controller.abort();
     this.activeTasks.set(key, controller);
-    // Log only when logging was on at the start, and re-check before every later write.
-    const started = this.options.exchanges();
-    const log = (): AiCallExchangeSink | null | undefined => (started ? this.options.exchanges() : undefined);
+    // Log only to the entry's original sink, while that sink remains enabled.
+    let started: AiCallExchangeSink | null = null;
+    const log = (): AiCallExchangeSink | undefined =>
+      started && this.options.exchanges() === started ? started : undefined;
     const id = options.exchangeId ?? randomUUID();
     const milestones: AiMilestones = {};
     const startedMs = Date.now();
@@ -222,7 +223,9 @@ export class AiCalls {
     let finished = false;
     let parsedWritten = false;
     const exchange: AiCallExchange = {
-      id: started ? id : undefined,
+      get id() {
+        return started ? id : undefined;
+      },
       signal: controller.signal,
       parsed: () => {
         if (finished || parsedWritten) return;
@@ -236,6 +239,7 @@ export class AiCalls {
       }
     };
     try {
+      started = this.options.exchanges();
       started?.begin({
         id,
         startedAt: new Date().toISOString(),
@@ -246,6 +250,7 @@ export class AiCalls {
         step: call.step
       });
       if (started) options.onBegin?.(id);
+      if (controller.signal.aborted) throw stopped();
       const runtime = imageRuntime ?? this.options.runtimeFor(options.model);
       provider = runtime.capabilities.id;
       options.validate?.(runtime);
@@ -280,10 +285,10 @@ export class AiCalls {
             );
         }
       };
-      if (options.admission) {
-        if (controller.signal.aborted) throw stopped();
-        await options.admission.reserve();
-      }
+      if (controller.signal.aborted) throw stopped();
+      if (options.admission) await options.admission.reserve();
+      // Reservation is durable; a stop during it must not start a provider request.
+      if (controller.signal.aborted) throw stopped();
       const raw = await runtime.run({
         prompt: call.prompt,
         model: options.model,
@@ -299,6 +304,7 @@ export class AiCalls {
       log()?.received(id, options.noContentLog ? "[omitted]" : raw);
       writeMilestones();
       const value = await finish(raw, exchange);
+      if (controller.signal.aborted) throw stopped();
       if (!finished) {
         finished = true;
         if (options.entryEnd !== "caller") log()?.completed(id);

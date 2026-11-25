@@ -16,7 +16,7 @@ import { decidedTemplateFromDetail, demoteUnknownHeadings } from "../ai/detail-s
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
-import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
+import { claudeModelChoice } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
@@ -174,7 +174,7 @@ export class AiTaskService {
     )
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
-    if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === model)) {
+    if (provider === "claude" && !claudeModelChoice(model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
 
@@ -326,7 +326,11 @@ export class AiTaskService {
             stopped: cancelled,
             task: {
               ...controls,
-              onWebSearchEvent: webHook,
+              onWebSearchEvent: setup && webHook
+                ? event => {
+                    if (!setup.signal.aborted && !signal?.aborted) webHook(event);
+                  }
+                : webHook,
               ...(setup ? setup.hooks : {})
             },
             ...(setup
@@ -355,7 +359,7 @@ export class AiTaskService {
           // No retrieval at all: asked once more; a second time is a failure and nothing is written from it.
           if (!requiresWeb || attempt >= 2 || signal?.aborted || !isSearchNotPerformed(error)) throw error;
           if (this.options.exchangeLoggingEnabled())
-            exchanges?.failed(exchangeId, error instanceof Error ? error.message : String(error));
+            exchanges?.failed(exchangeId, input.noContentLog ? "failed" : error instanceof Error ? error.message : String(error));
         }
       }
       stage = t("log.stage_parsing_reply");
@@ -493,7 +497,7 @@ export class AiTaskService {
       if (this.options.exchangeLoggingEnabled() && !supersededClosed)
         exchanges?.failed(
           exchangeId,
-          t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
+          input.noContentLog ? "failed" : t("log.stage_failure_0_1", stage, error instanceof Error ? error.message : String(error))
         );
       throw error;
     }
@@ -546,8 +550,8 @@ export class AiTaskService {
         hooks: {
           stream: true,
           onAccepted: (): void => {
-            accepted?.();
             if (!attempt.live()) return;
+            accepted?.();
             if (!mine.acceptedAt) {
               mine.acceptedAt = iso();
               // The card shows "waiting for the model" from acceptance, so the stage list starts there (KPI T1).
@@ -765,6 +769,7 @@ export class AiTaskService {
           if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
           const charts = step.parse(raw);
           const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
+          if (exchange.signal.aborted) throw new DOMException("Aborted", "AbortError");
           if (!applied.ok) return refuse(applied.code, exchange);
           const template = input.detailTemplate;
           if (countIssues && template && input.detailFormat !== "adaptive") {

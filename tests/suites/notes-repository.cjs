@@ -2773,7 +2773,7 @@ integrationTest('a reference rewrite failure does not block the later affected n
 });
 
 integrationTest('a note snapshot carries the exact parsed content and settlement does not overwrite a later status', async () => {
-  const { repo, app, contents } = fixture();
+  const { repo, contents } = fixture();
   const note = await topicNote(repo, 'Settling');
   await repo.updateNote(note.path, { status: 'running', detail: 'Original' });
   const snapshot = await repo.readNoteSnapshot(note.path);

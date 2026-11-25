@@ -719,3 +719,38 @@ test('y (P1): the research progress in the header is not drawn while reading', a
   assert.ok(call > 0);
   assert.match(source.slice(call - 160, call), /!this\.notesLoading\(\)/);
 });
+
+test('AI highlight: old callbacks cannot clear a newer highlight or its timer', () => {
+  resetClock();
+  const view = Object.create(VisualAgentMapView.prototype);
+  let fades = 0;
+  Object.assign(view, {
+    closed: false, map: { id: 'a' }, highlightFadeTimer: null, aiTargets: ['a'],
+    selection: { state: { multiSelectMode: false, multiSelected: new Set(['a']) }, isPureHighlight: () => true, clearMulti() {} },
+    plugin: {}, applySelectionChange: () => { fades++; }
+  });
+  const arm = () => view.armHighlightFade(Date.now() - 6000);
+  arm();
+  const old = clock.timers[0].fn;
+  arm();
+  const next = view.highlightFadeTimer;
+  old();
+  assert.equal(view.highlightFadeTimer, next);
+  assert.equal(fades, 0);
+  const late = clock.timers[0].fn;
+  view.clearChatHighlight();
+  assert.equal(view.aiTargets, null);
+  assert.equal(view.highlightFadeTimer, null);
+  assert.equal(clock.timers.length, 0);
+  view.map = { id: 'b' }; view.aiTargets = ['b'];
+  late();
+  assert.equal(fades, 0);
+  assert.deepEqual(view.aiTargets, ['b']);
+  arm();
+  const due = clock.timers.shift();
+  due.fn();
+  assert.equal(fades, 1);
+  view.closed = true;
+  view.armHighlightFade();
+  assert.equal(clock.timers.length, 0);
+});

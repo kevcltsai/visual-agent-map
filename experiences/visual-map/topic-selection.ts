@@ -231,6 +231,7 @@ export class TopicSelection {
     if (variant === "backgroundRun" && !wasMode) return NO_CHANGE;
     this.mode = false;
     this.multi.clear();
+    this.highlight = null;
     if (variant === "openMap") this.selected = null;
     return change([...(variant === "openMap" ? [before] : []), ...multi], wasMode);
   }

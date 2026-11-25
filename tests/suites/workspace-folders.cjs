@@ -60,7 +60,16 @@ integrationTest('maps in all three containers are discovered and a broken topic 
   await repo.createMap('M');
   await repo.folder('Agent Workspace/Topics/Legacy');
   await repo.folder('Agent Workspace/AIM/Broken AIM');
-  assert.deepEqual(Array.from((await repo.brokenTopics()).map(item => item.root)).sort(), ['Agent Workspace/AIM/Broken AIM', 'Agent Workspace/Topics/Legacy']);
+  await repo.folder('Agent Workspace/Topics/Legacy/Notes/Nested');
+  await app.vault.create('Agent Workspace/Topics/Legacy/Notes/A.md', 'plain markdown');
+  await app.vault.create('Agent Workspace/Topics/Legacy/Notes/Nested/B.md', 'nested markdown');
+  await app.vault.create('Agent Workspace/Topics/Legacy/Outside.md', 'not counted');
+  const getMarkdownFiles = app.vault.getMarkdownFiles.bind(app.vault);
+  let scans = 0;
+  app.vault.getMarkdownFiles = () => { scans++; return getMarkdownFiles(); };
+  const broken = await repo.brokenTopics();
+  assert.equal(scans, 1, 'all missing maps share one vault scan');
+  assert.deepEqual(Array.from(broken, item => [item.root, item.noteCount]).sort(), [['Agent Workspace/AIM/Broken AIM', 0], ['Agent Workspace/Topics/Legacy', 2]]);
   assert.deepEqual(Array.from(await repo.workspaceCandidates()), ['Agent Workspace']);
 });
 

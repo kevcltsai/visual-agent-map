@@ -961,3 +961,50 @@ integrationTest('Organize still restores the topic folders and maps when one jou
     for (const node of map.nodes) assert.ok(app.vault.getAbstractFileByPath(node.path), node.path);
   }
 });
+
+for (const failLater of [false, true]) {
+  integrationTest(`Organize keeps a concurrent Map.md edit ${failLater ? 'after rollback' : 'when rebasing a cross-map path'}`, async () => {
+    const vault = await legacyVault();
+    const { repo, app, contents } = vault;
+    const stay = await repo.createMap('Stay');
+    const doc = await repo.readMap(stay);
+    doc.nodes.push({ id: 'cross-map', path: vault.betaFirst, parentId: null, x: 10, y: 20, collapsed: false });
+    await repo.saveMap(stay, doc);
+    const plan = await repo.planOrganizeWorkspaceFolders();
+    const rename = app.fileManager.renameFile;
+    const process = app.vault.process;
+    let armed = false, injected = false;
+    app.fileManager.renameFile = async (item, target) => {
+      if (failLater && target === 'Agent Workspace/Mind Maps/Gamma') throw new Error('injected later move failure');
+      const result = await rename(item, target);
+      if (target === 'Agent Workspace/Mind Maps/Beta') armed = true;
+      return result;
+    };
+    app.vault.process = async (file, change) => {
+      if (armed && !injected && file.path === stay) {
+        injected = true;
+        contents.set(stay, contents.get(stay).replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+          const edited = JSON.parse(json);
+          edited.title = 'Owner title';
+          edited.nodes.find(node => node.id === 'cross-map').x = 777;
+          return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
+        }));
+      }
+      return process(file, change);
+    };
+    try {
+      if (failLater) await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected later move failure/);
+      else await repo.organizeWorkspaceFolders(plan);
+    } finally {
+      app.fileManager.renameFile = rename;
+      app.vault.process = process;
+    }
+    assert.ok(injected, 'the owner edit landed inside the candidate write boundary');
+    const saved = await repo.readMap(stay);
+    assert.equal(saved.title, 'Owner title');
+    assert.equal(saved.nodes.find(node => node.id === 'cross-map').x, 777);
+    assert.equal(saved.nodes.find(node => node.id === 'cross-map').path,
+      failLater ? vault.betaFirst : 'Agent Workspace/Mind Maps/Beta/Notes/First.md');
+    await assertResolves(vault);
+  });
+}

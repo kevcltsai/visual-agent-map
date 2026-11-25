@@ -11,6 +11,7 @@
 ### Fixes
 
 - The stylesheet no longer uses `:has` or `all`, which the Obsidian plugin review flagged; pictures, the book page, the goal bar icons, the usage filter, the picture-book loading shimmer and the empty proofread box look the same.
+- Renaming a map whose notes show a picture with a relative link (such as `../Attachments/route.webp`) no longer stops at Obsidian's "Update links" question: the picture moves with the map, so the link still works and the rename finishes at once. Until that question was answered the map kept its old title.
 
 ## [0.35.1] - 2026-11-25
 

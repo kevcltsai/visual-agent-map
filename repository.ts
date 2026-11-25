@@ -2880,7 +2880,7 @@ export class Repository {
           key !== "agent-map-references" &&
           findWikilinks(JSON.stringify(value)).some(link => moves.has(resolve(linkPathOf(link.target)) ?? ""))
       );
-      const result = rewriteLinkTargets(body, resolve, moves);
+      const result = rewriteLinkTargets(body, resolve, moves, path);
       if (userKeyLink || result.unsupported.length) {
         foreign.add(path);
         continue;

@@ -36,7 +36,7 @@ export class ResearchProgressStore {
   private entries = new Map<string, ResearchProgress>();
   private listeners = new Set<(path: string) => void>();
   private lastNotified = new Map<string, number>();
-  private pending = new Map<string, unknown>();
+  private pending = new Map<string, { handle: unknown }>();
   constructor(private clock: ResearchProgressClock = realClock) {}
 
   begin(path: string, attemptId: string, now: number, model?: string, style?: string): void {
@@ -116,7 +116,10 @@ export class ResearchProgressStore {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
-      if (!this.listeners.size) this.clearAllTimers();
+      if (!this.listeners.size) {
+        this.clearAllTimers();
+        this.lastNotified.clear();
+      }
     };
   }
 
@@ -125,32 +128,33 @@ export class ResearchProgressStore {
     return entry && entry.attemptId === attemptId ? entry : undefined;
   }
   private cancelPending(path: string) {
-    const handle = this.pending.get(path);
-    if (handle === undefined) return;
-    this.clock.clearTimeout(handle);
+    const pending = this.pending.get(path);
+    if (!pending) return;
     this.pending.delete(path);
+    this.clock.clearTimeout(pending.handle);
   }
   private clearAllTimers() {
     for (const path of [...this.pending.keys()]) this.cancelPending(path);
   }
   private notify(path: string) {
     this.cancelPending(path);
+    if (!this.listeners.size) return;
     this.lastNotified.set(path, this.clock.now());
     for (const listener of [...this.listeners]) listener(path);
   }
   private notifyThrottled(path: string) {
-    if (this.pending.has(path)) return;
+    if (!this.listeners.size || this.pending.has(path)) return;
     const wait = (this.lastNotified.get(path) ?? -Infinity) + PREVIEW_THROTTLE_MS - this.clock.now();
     if (wait <= 0) {
       this.notify(path);
       return;
     }
-    this.pending.set(
-      path,
-      this.clock.setTimeout(() => {
-        this.pending.delete(path);
-        if (this.entries.has(path)) this.notify(path);
-      }, wait)
-    );
+    const pending: { handle: unknown } = { handle: undefined };
+    this.pending.set(path, pending);
+    pending.handle = this.clock.setTimeout(() => {
+      if (this.pending.get(path) !== pending) return;
+      this.pending.delete(path);
+      if (this.entries.has(path)) this.notify(path);
+    }, wait);
   }
 }

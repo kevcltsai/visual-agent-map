@@ -41,9 +41,9 @@ function rig(extra = {}) {
   const count = type => listeners.filter(l => l.type === type && l.capture === true).length;
   const ports = {
     app: () => app, closed: () => state.closed, path: () => state.path, mapId: () => state.mapId, epoch: () => state.epoch,
-    repo: () => ({ readMapSources: async () => { state.reads++; return state.stored.map(s => ({ ...s })); },
+    repo: () => ({ readMapSources: async () => { state.reads++; if (state.onRead) await state.onRead(); return state.stored.map(s => ({ ...s })); },
       writeMapSources: async (p, next) => { if (state.writeFails) throw new Error('disk full'); state.writes.push([p, plain(next)]); state.stored = plain(next); state.onWrite?.(); },
-      mapSwitcherItems: async () => [] }),
+      mapSwitcherItems: async () => state.mapItems ? state.mapItems() : [] }),
     announce: text => state.spoken.push(text), doc: () => doc, enqueue: work => state.queue.push(work),
     button: (parent, action) => { const b = parent.createEl('button', { text: '' }); b.focusCalls = 0; const focus = b.focus.bind(b); b.focus = () => { b.focusCalls++; focus(); }; b.addEventListener('click', e => { e.stopPropagation?.(); action(); }); state.buttons.push(b); return b; },
     placeTools: () => { state.placed++; }, scope: () => w.scope
@@ -262,3 +262,57 @@ test('19 source scan: no activeTasks, FileSystemAdapter or view import', () => {
   for (const word of ['activeTasks', 'FileSystemAdapter', 'from "./view"']) assert.equal(source.includes(word), false, word);
   assert.match(source, /export class MapSourcesControl/); assert.match(source, /export interface MapSourcesControlPorts/);
 });
+
+test('20 queued source mutation is fenced by epoch before read, after read and after write', withRig(async r => {
+  open(r);
+  r.control.changeMapSources(r.state.path, 'add', FILE('a'));
+  r.state.epoch++;
+  await r.drain();
+  assert.equal(r.state.reads, 0, 'same path reopened before the queue starts');
+  r.state.onRead = async () => { r.state.epoch++; };
+  r.control.changeMapSources(r.state.path, 'add', FILE('a'));
+  await r.drain();
+  assert.equal(r.state.writes.length, 0, 'stale read cannot start a write');
+  r.state.onRead = null;
+  r.state.onWrite = () => { r.state.epoch++; r.control.loadForMap([FILE('b')]); };
+  r.control.changeMapSources(r.state.path, 'add', FILE('a'));
+  await r.drain();
+  assert.equal(r.state.writes.length, 1, 'in-flight write may complete');
+  assert.deepEqual(r.control.mapSources, [FILE('b')], 'late write cannot replace the new map cache');
+  assert.equal(r.state.spoken.length, 0);
+}));
+
+test('21 delayed source search is single-flight and cannot reopen a closed session', withRig(async r => {
+  open(r);
+  let release;
+  let calls = 0;
+  r.state.mapItems = () => { calls++; return new Promise(resolve => { release = resolve; }); };
+  const search = dom.find(r.panel(), c => c.cls === 'vam-map-sources-search');
+  search.click(); search.click();
+  assert.equal(calls, 1);
+  assert.equal(r.control.mapSourcesPickerOpen, true);
+  r.button().click();
+  assert.equal(r.control.mapSourcesPickerOpen, false);
+  r.button().click();
+  release([]);
+  await nap(0);
+  assert.ok(r.panel());
+  assert.equal(r.control.mapSourcesPickerOpen, false, 'old search cannot claim the new panel');
+}));
+
+test('22 disposal and reset cancel the owned picker without affecting the next session', withRig(r => {
+  open(r);
+  let closes = 0;
+  r.control.closePicker = () => { closes++; };
+  r.control.mapSourcesPickerOpen = true;
+  r.control.reset();
+  assert.equal(closes, 1);
+  assert.equal(r.control.mapSourcesPickerOpen, false);
+  r.control.closePicker = () => { closes++; };
+  r.control.mapSourcesPickerOpen = true;
+  r.control.dispose();
+  assert.equal(closes, 2);
+  assert.equal(r.control.mapSourcesOpen, false);
+  assert.equal(r.control.mapSourcesPickerOpen, false);
+  assert.equal(r.control.mapSourcesPanelEl, null);
+}));

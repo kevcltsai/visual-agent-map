@@ -431,6 +431,8 @@ function countStages(stages: (PipelineStage | undefined)[]): Record<PipelineStag
 
 export interface BookBarActions {
   stop: () => void;
+  /** "Book settings": a read-only view of the book's six settings, drawn before the stop button (one per bar); a bar drawn without it shows none. */
+  showSettings?: () => void;
   resume: () => void;
   /** "Reconfigure and start over" (a run stopped in any phase before done); a bar drawn without it shows no such button. */
   restart?: () => void;
@@ -554,6 +556,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
+  // Wherever a stop button is drawn, "book settings" sits right before the first one.
+  const firstStop = buttons.querySelector(".vam-book-stop");
+  if (actions.showSettings && firstStop) {
+    const settings = makeButton(buttons, t("ui.book_settings_view"), "vam-book-settings-view", actions.showSettings);
+    buttons.insertBefore(settings, firstStop);
+  }
   if (
     actions.abandon &&
     !state.again &&

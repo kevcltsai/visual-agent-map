@@ -9,7 +9,7 @@ const TOPICS = 'Agent Workspace/Topics';
 const MAP = `${TOPICS}/map-t/Map.md`;
 const txt = (over = {}) => ({ id: 't1', kind: 'text', text: 'Hello', parentId: undefined, x: 400, y: 80, ...over });
 
-const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+const createSvg = dom.createSvg;
 
 async function harness(build) {
   const { repo, app, contents } = fixture('en', { linkIndex: true });

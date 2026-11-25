@@ -9,7 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const TOPICS = 'Agent Workspace/Topics';
 const MAP = `${TOPICS}/map-t/Map.md`;
 const txt = (over = {}) => ({ id: 't1', kind: 'text', text: 'Hello', parentId: undefined, x: 400, y: 80, ...over });
-const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+const createSvg = dom.createSvg;
 
 // The text double: width is the inline width, else the text fitted (7px a character plus padding, 32..300); height is 7px plus 20px a line.
 // The real text width is fractional (Chromium: 'hello~~' is 59.188 wide and offsetWidth says 59), so a block measured at its own

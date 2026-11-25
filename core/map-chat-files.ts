@@ -12,12 +12,10 @@ export interface MapChatFilesPorts {
 export type MapChatFileMark = { kind: "file_written" | "file_attached"; path: string; hash: string };
 
 export class MapChatFiles {
-  /** Markdown files this conversation created or edited -> the content hash of each version it wrote. Only the program writes it. */
-  private ownFiles = new Map<string, Set<string>>();
+  /** Own files: all written versions and the order of the latest write. Restored files belong to round 0. */
+  private ownFiles = new Map<string, { hashes: Set<string>; seq: number; round: number }>();
   /** Markdown files the user dragged into this conversation -> the content hash each held then. Readable (and, inside the map folder, editable) only while the file still holds one of these or a version the chat wrote after. */
   private attached = new Map<string, Set<string>>();
-  /** Order of the writes to {@link ownFiles}: a counter per write and the reply (apply call) it belonged to; restored paths are round 0. */
-  private ownOrder = new Map<string, { seq: number; round: number }>();
   private writeSeq = 0;
   private applyRound = 0;
   /** Own files the chat asked to read with `read_md_file`; the next context carries them first and empties this. */
@@ -38,10 +36,9 @@ export class MapChatFiles {
     if (key === null) return false;
     // An attached file the chat edits inside the map folder becomes one of its own versions (carried like the rest).
     if (!created && !this.ownFiles.has(key) && !(this.attached.has(key) && this.insideMapFolder(key))) return false;
-    const hashes = this.ownFiles.get(key) ?? new Set<string>();
+    const hashes = this.ownFiles.get(key)?.hashes ?? new Set<string>();
     hashes.add(contentHash(text));
-    this.ownFiles.set(key, hashes);
-    this.ownOrder.set(key, { seq: ++this.writeSeq, round: this.applyRound });
+    this.ownFiles.set(key, { hashes, seq: ++this.writeSeq, round: this.applyRound });
     return true;
   }
 
@@ -109,14 +106,13 @@ export class MapChatFiles {
       const hashes = this.readableHashes(path);
       if (skip.has(path) || !hashes) continue;
       const source = await this.ports.read(path);
-      if (source && hashes.has(contentHash(source.text)))
-        found.push({
-          path: source.path,
-          content: source.text,
-          ...(this.ownOrder.get(path) ?? { seq: 0, round: 0 })
-        });
+      if (source && hashes.has(contentHash(source.text))) {
+        const own = this.ownFiles.get(path);
+        found.push({ path: source.path, content: source.text, seq: own?.seq ?? 0, round: own?.round ?? 0 });
+      }
     }
-    const latest = Math.max(0, ...[...this.ownOrder.values()].map(item => item.round));
+    let latest = 0;
+    for (const file of this.ownFiles.values()) latest = Math.max(latest, file.round);
     const first = (file: { path: string; round: number }): boolean =>
       (file.path.split("/").at(-1) ?? "").includes("進度") || (latest > 0 && file.round === latest);
     const requested = queue.flatMap(path => found.filter(file => normalizeVaultPath(file.path) === path));
@@ -136,7 +132,7 @@ export class MapChatFiles {
   marksFor(conversationId: string): MapChatFileMark[] {
     if (this.recorded.id !== conversationId) this.recorded = { id: conversationId, keys: new Set() };
     const marks: MapChatFileMark[] = [];
-    for (const [path, hashes] of this.ownFiles)
+    for (const [path, { hashes }] of this.ownFiles)
       for (const hash of hashes) {
         const key = `${path}\0${hash}`;
         if (this.recorded.keys.has(key)) continue;
@@ -160,10 +156,9 @@ export class MapChatFiles {
     attached: { path: string; hash: string }[]
   ): void {
     for (const item of own) {
-      const hashes = this.ownFiles.get(item.path) ?? new Set<string>();
+      const hashes = this.ownFiles.get(item.path)?.hashes ?? new Set<string>();
       hashes.add(item.hash);
-      this.ownFiles.set(item.path, hashes);
-      this.ownOrder.set(item.path, { seq: ++this.writeSeq, round: 0 });
+      this.ownFiles.set(item.path, { hashes, seq: ++this.writeSeq, round: 0 });
       this.recorded.keys.add(`${item.path}\0${item.hash}`);
     }
     for (const item of attached) {
@@ -179,7 +174,6 @@ export class MapChatFiles {
   reset(): void {
     this.ownFiles.clear();
     this.attached.clear();
-    this.ownOrder.clear();
     this.readQueue = [];
     this.lastReads.clear();
     this.recorded = { id: null, keys: new Set() };
@@ -192,7 +186,7 @@ export class MapChatFiles {
 
   /** The versions of a file the chat may read now: what it wrote (inside this map's folder only) and what the user attached (anywhere). */
   private readableHashes(key: string): Set<string> | undefined {
-    const own = this.insideMapFolder(key) ? this.ownFiles.get(key) : undefined;
+    const own = this.insideMapFolder(key) ? this.ownFiles.get(key)?.hashes : undefined;
     const attached = this.attached.get(key);
     return own || attached ? new Set([...(own ?? []), ...(attached ?? [])]) : undefined;
   }

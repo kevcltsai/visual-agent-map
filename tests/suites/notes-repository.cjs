@@ -225,6 +225,18 @@ integrationTest('large vaults: map discovery, unrelated renames and rebuilds rea
   assert.equal(repo.renameAffectsVam(app.vault.getAbstractFileByPath('Personal/note-3.md'), 'Personal/old-3.md'), true, 'a note cited by a VAM note is relevant');
   assert.deepEqual(reads, [], 'relevance checks read no file');
 });
+integrationTest('healthy map paths do not trigger a vault-wide node candidate scan', async () => {
+  const { repo } = fixture();
+  const mapPath = await repo.createMap('Healthy paths'), map = await repo.readMap(mapPath);
+  map.nodes.push(await repo.createNote('Existing', 'a', map, mapPath, 'workspace'));
+  await repo.saveMap(mapPath, map);
+  const markedFiles = repo.markedFiles.bind(repo);
+  let nodeScans = 0;
+  repo.markedFiles = async key => { if (key === 'agent-map-node') nodeScans++; return markedFiles(key); };
+  assert.equal(await repo.reconcileMissingNodePaths(), 0);
+  assert.equal(nodeScans, 0, 'no candidate scan when every map node has an existing file');
+});
+
 integrationTest('external rename reconciliation only follows a unique matching node-id', async () => {
   const { repo, app, contents } = fixture(); const n = await topicNote(repo, 'External rename');
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md', doc = { id: 'map-a', title: 'Map A', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };

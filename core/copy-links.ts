@@ -9,7 +9,7 @@ import { codeRanges, findWikilinks, linkPathOf } from "./link-rewrite";
 /** The vault path a link path names when read from the note at `fromPath`, undefined when it names none. */
 export type ResolveLink = (linkPath: string, fromPath: string) => string | undefined;
 
-export interface CopiedLinkResult {
+interface CopiedLinkResult {
   /** The body with every link that needed it rewritten. */
   text: string;
   /** How many links were rewritten. */

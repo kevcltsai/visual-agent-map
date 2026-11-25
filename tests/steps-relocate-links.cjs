@@ -150,6 +150,49 @@ test('relocate: a note edited between planning and writing throws, undoes the mo
   for (const path of [a.path, b.path, g.path]) assert.ok(!contents.get(path)?.includes('Unassigned'), `${path} has no half-written link`);
 });
 
+
+test('relocate: rollback still restores other notes and the moved file when one restore fails', async () => {
+  const { repo, app, contents, files, mapPath, a, b, g } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const original = snapshot(contents);
+  const process = app.vault.process;
+  const written = [];
+  let failed = false;
+  app.vault.process = async (file, change) => {
+    if (failed && file.path === written[1]) throw new Error('injected restore failure');
+    const result = await process(file, change);
+    if (!failed) {
+      written.push(file.path);
+      if (written.length === 2) { failed = true; throw new Error('injected after-write failure'); }
+    }
+    return result;
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+    /injected after-write failure.*injected restore failure/);
+  assert.equal(written.length, 2);
+  assert.ok(files.has(a.path), 'move reversed despite failed restore');
+  assert.equal(contents.get(written[0]), original.get(written[0]), 'other written note restored');
+});
+
+test('relocate: rollback refuses to overwrite a concurrent edit and reports that recovery was incomplete', async () => {
+  const { repo, app, contents, files, mapPath, a, b, g } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const process = app.vault.process;
+  let first;
+  app.vault.process = async (file, change) => {
+    if (!first) { first = file.path; return process(file, change); }
+    if (file.path !== first) {
+      contents.set(first, `${contents.get(first)}\nowner edit after rewrite`);
+      throw new Error('injected later write failure');
+    }
+    return process(file, change);
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+    /injected later write failure.*undoing it also failed.*changed/);
+  assert.ok(files.has(a.path));
+  assert.ok(contents.get(first).endsWith('owner edit after rewrite'));
+});
+
 test('relocate: renaming a topic folder rewrites full-path links to the notes inside, from inside and outside the folder', async () => {
   const { repo, contents, calls, notices, mapPath, a, b, g } = await scenario();
   const otherPath = await repo.createMap('Other');
@@ -446,4 +489,108 @@ test('relocate: a vault.rename that reports success without moving a note throws
     await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')), pattern, language);
     assert.deepEqual([...contents.entries()].sort(), [...before.entries()].sort(), `${language}: nothing was written`);
   }
+});
+
+test('relocate: a topic rename keeps a coordinate edit arriving at the map write', async () => {
+  const { repo, app, contents, mapPath, a } = await scenario();
+  const target = repo.topicRoot(mapPath) + ' renamed/Map.md';
+  const process = app.vault.process;
+  let injected = false;
+  app.vault.process = async (file, change) => {
+    if (file.path === target && !injected) {
+      injected = true;
+      const current = contents.get(target);
+      contents.set(target, current.replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+        const edited = JSON.parse(json);
+        edited.nodes.find(node => node.id === a.id).x = 987;
+        return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
+      }));
+    }
+    return process(file, change);
+  };
+  assert.equal(await repo.renameTopic(mapPath, 'M renamed'), target);
+  assert.ok(injected);
+  const saved = await repo.readMap(target);
+  assert.equal(saved.title, 'M renamed');
+  assert.equal(saved.nodes.find(node => node.id === a.id).x, 987);
+  assert.ok(saved.nodes.every(node => node.path.startsWith(repo.topicRoot(target) + '/')));
+});
+
+for (const sameFolder of [false, true]) {
+  test(`relocate: failed topic rename restores its actual preimage (same folder: ${sameFolder})`, async () => {
+    const { repo, app, contents, mapPath, a } = await scenario();
+    const target = sameFolder ? mapPath : repo.topicRoot(mapPath) + ' renamed/Map.md';
+    const process = app.vault.process;
+    let injected = false;
+    app.vault.process = async (file, change) => {
+      if (file.path !== target || injected) return process(file, change);
+      injected = true;
+      contents.set(target, contents.get(target).replace(/```agent-map\s*\n([\s\S]*?)\n```/, (_block, json) => {
+        const edited = JSON.parse(json);
+        edited.nodes.find(node => node.id === a.id).x = 543;
+        return '```agent-map\n' + JSON.stringify(edited, null, 2) + '\n```';
+      }));
+      await process(file, change);
+      throw new Error('injected after-apply map write failure');
+    };
+    try {
+      await assert.rejects(repo.renameTopic(mapPath, 'M renamed', sameFolder ? repo.topicRoot(mapPath) : undefined), /injected after-apply map write failure/);
+    } finally {
+      app.vault.process = process;
+    }
+    assert.ok(injected);
+    const restored = await repo.readMap(mapPath);
+    assert.equal(restored.title, 'M');
+    assert.equal(restored.nodes.find(node => node.id === a.id).x, 543);
+    assert.ok(restored.nodes.every(node => node.path.startsWith(repo.topicRoot(mapPath) + '/')));
+    if (!sameFolder) assert.ok(!app.vault.getAbstractFileByPath(target));
+  });
+}
+
+for (const delegated of [true, false]) {
+  test(`relocate: rejects a silent or after-apply rename failure and preserves the original path (delegated: ${delegated})`, async () => {
+    for (const afterApply of [false, true]) {
+      const { repo, app, files, contents, mapPath, a } = await scenario();
+      if (delegated) Object.defineProperty(app.metadataCache, 'resolvedLinks', { value: undefined, configurable: true });
+      const adapter = delegated ? app.fileManager : app.vault;
+      const method = delegated ? 'renameFile' : 'rename';
+      const rename = adapter[method];
+      const before = snapshot(contents);
+      let calls = 0;
+      adapter[method] = async (item, target) => {
+        if (++calls === 1) {
+          if (!afterApply) return;
+          await rename(item, target);
+          throw new Error('injected after-apply rename failure');
+        }
+        return rename(item, target);
+      };
+      await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')),
+        afterApply ? /injected after-apply rename failure/ : /did not take effect on disk/);
+      assert.equal(calls, afterApply ? 2 : 1);
+      assert.ok(files.has(a.path));
+      assert.deepEqual([...contents.entries()].sort(), [...before.entries()].sort());
+    }
+  });
+}
+
+test('relocate: link rollback does not rename a different object that appeared at the target path', async () => {
+  const { repo, app, contents, files, mapPath, a, b } = await scenario();
+  contents.set(b.path, `${contents.get(b.path)}\nAlso [[${stem(a.path)}]].\n`);
+  const process = app.vault.process;
+  const target = `${repo.topicFolder(mapPath, 'Unassigned')}/${a.path.split('/').pop()}`;
+  const impostor = new support.TFile(target);
+  let writes = 0;
+  app.vault.process = async (file, change) => {
+    if (++writes === 2) {
+      // Something else takes the moved note's place at the target before the rollback runs.
+      contents.set(target, contents.get(target));
+      files.set(target, impostor);
+      throw new Error('injected later write failure');
+    }
+    return process(file, change);
+  };
+  await assert.rejects(repo.moveUnique(a.path, repo.topicFolder(mapPath, 'Unassigned')), /injected later write failure/);
+  assert.equal(files.get(target), impostor, 'the object at the target was left where it is');
+  assert.ok(!files.has(a.path), 'nothing was renamed onto the original path');
 });

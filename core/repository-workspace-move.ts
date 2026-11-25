@@ -11,9 +11,17 @@ export interface OrganizeMove {
   fromRoot: string;
   toRoot: string;
 }
-interface PriorContent {
+/** Exact bytes at the Map.md write boundary, not a snapshot from before folder relocation. */
+export interface TopicMapWrite {
+  before: string;
+  after: string;
+}
+export interface TopicRenameOptions {
+  rebuild?: boolean;
+  recordWrite?: (write: TopicMapWrite) => void;
+}
+interface PriorContent extends TopicMapWrite {
   path: string;
-  content: string;
 }
 /** Reports "moving topic `title`, step `done` of `total`" before each topic move starts. */
 export type MoveProgress = (done: number, total: number, title: string) => void;
@@ -28,18 +36,30 @@ interface WorkspaceMovePorts {
   isDisposed(): boolean;
   message(key: TranslationKey): string;
   folder(path: string): Promise<void>;
-  file(path: string): TFile;
-  renameTopic(mapPath: string, title: string, targetRoot?: string, options?: { rebuild?: boolean }): Promise<string>;
-  rebuildDerivedData(scope: { roots: string[]; paths: string[] }): Promise<void>;
-  noteRestoredMap(path: string, text: string): void;
+  renameTopic(mapPath: string, title: string, targetRoot?: string, options?: TopicRenameOptions): Promise<string>;
+  undoTopicRename(mapPath: string, originalRoot: string, write: TopicMapWrite | undefined): Promise<void>;
+  rebuildDerivedData(scope: {
+    roots: string[];
+    paths: string[];
+    onWrite?: (path: string, before: string, after: string) => void;
+  }): Promise<void>;
   markedFiles(key: "agent-map-node"): Promise<TFile[]>;
   /**
    * Rewrites a managed note's `source-notes` / `reference-materials` through `rebase`, from the current frontmatter inside
-   * one atomic write. Returns the content the write replaced, or null when the note was left untouched.
+   * one atomic write. Journals both versions before publication, including a write that later rejects.
    */
-  rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null>;
+  rebaseNoteLists(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void>;
   readableMaps(): Promise<{ file: TFile; map: MapDocument }[]>;
-  saveMap(path: string, map: MapDocument): Promise<void>;
+  /** Rebase the current map and journal its exact before/after bytes inside the atomic write boundary. */
+  rebaseMapPaths(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void>;
 }
 
 export async function moveTopicsWithRollback(
@@ -47,7 +67,7 @@ export async function moveTopicsWithRollback(
   moves: OrganizeMove[],
   onProgress?: MoveProgress
 ): Promise<Map<string, string>> {
-  const done: { move: OrganizeMove; newMapPath: string; originalMap: string; journal: PriorContent[] }[] = [],
+  const done: { move: OrganizeMove; newMapPath: string; write?: TopicMapWrite; journal: PriorContent[] }[] = [],
     mapping = new Map<string, string>();
   // Only the moved topics and the notes that cite them can change: rebuild just those, once.
   const scope = (): { roots: string[]; paths: string[] } => ({
@@ -59,8 +79,13 @@ export async function moveTopicsWithRollback(
       if (ports.isDisposed()) throw new Error(ports.message("error.plugin_unloaded"));
       onProgress?.(index + 1, moves.length, move.title);
       await ports.folder(parentPath(move.toRoot));
-      const originalMap = await ports.app.vault.read(ports.file(move.mapPath));
-      const newMapPath = await ports.renameTopic(move.mapPath, move.title, move.toRoot, { rebuild: false });
+      let write: TopicMapWrite | undefined;
+      const newMapPath = await ports.renameTopic(move.mapPath, move.title, move.toRoot, {
+        rebuild: false,
+        recordWrite: entry => {
+          write = entry;
+        }
+      });
       const journal: PriorContent[] = [];
       // Trust the disk, not the order of awaits: the topic must really be at its new place before going on.
       if (
@@ -68,21 +93,37 @@ export async function moveTopicsWithRollback(
         !(ports.app.vault.getAbstractFileByPath(newMapPath) instanceof TFile)
       )
         throw new Error(ports.message("error.move_not_applied"));
-      done.push({ move, newMapPath, originalMap, journal });
+      done.push({ move, newMapPath, ...(write ? { write } : {}), journal });
       mapping.set(move.mapPath, newMapPath);
       await rebasePathPrefix(ports, move.fromRoot, move.toRoot, journal);
     }
-    await ports.rebuildDerivedData(scope());
+    await ports.rebuildDerivedData({
+      ...scope(),
+      // The plugin's own rebuild is not an owner edit: extend the journaled chain so a later rollback still restores.
+      onWrite: (path, before, after) => {
+        for (const { journal } of [...done].reverse())
+          for (const prior of [...journal].reverse())
+            if (prior.path === path && prior.after === before) {
+              prior.after = after;
+              return;
+            }
+      }
+    });
     return mapping;
   } catch (error) {
     const rollbackErrors: string[] = [];
-    for (const { move, newMapPath, originalMap, journal } of [...done].reverse()) {
+    for (const { move, newMapPath, write, journal } of [...done].reverse()) {
       // A failed journal restore must not suppress restoration of other files or the folder itself.
       for (const prior of [...journal].reverse()) {
         try {
           const file = ports.app.vault.getAbstractFileByPath(prior.path);
           if (!(file instanceof TFile)) throw new Error("Journaled file not found during rollback.");
-          await ports.app.vault.modify(file, prior.content);
+          await ports.app.vault.process(file, current => {
+            if (current === prior.before) return current;
+            if (current !== prior.after)
+              throw new Error("Journaled file changed after the workspace write; rollback would overwrite edits.");
+            return prior.before;
+          });
         } catch (rollbackError) {
           rollbackErrors.push(
             `${prior.path}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -90,9 +131,7 @@ export async function moveTopicsWithRollback(
         }
       }
       try {
-        await ports.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
-        await ports.app.vault.modify(ports.file(`${move.fromRoot}/Map.md`), originalMap);
-        ports.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
+        await ports.undoTopicRename(newMapPath, move.fromRoot, write);
       } catch (rollbackError) {
         rollbackErrors.push(
           `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -123,12 +162,11 @@ async function rebasePathPrefix(
     path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
   for (const file of await ports.markedFiles("agent-map-node")) {
     // The lists are read and rewritten inside one atomic write, so a citation the owner adds meanwhile is kept.
-    const prior = await ports.rebaseNoteLists(file, rebase);
-    if (prior !== null) journal.push({ path: file.path, content: prior });
+    await ports.rebaseNoteLists(file, rebase, (before, after) => journal.push({ path: file.path, before, after }));
   }
   for (const { file, map } of await ports.readableMaps()) {
     if (!rebaseMapNotePaths(map, rebase)) continue;
-    journal.push({ path: file.path, content: await ports.app.vault.read(file) });
-    await ports.saveMap(file.path, map);
+    // The scanned map only selects candidates. The write must use the current map, not that snapshot.
+    await ports.rebaseMapPaths(file, rebase, (before, after) => journal.push({ path: file.path, before, after }));
   }
 }

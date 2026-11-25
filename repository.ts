@@ -3,7 +3,9 @@ import {
   moveTopicsWithRollback,
   type OrganizeMove,
   type OrganizePlan,
-  type MoveProgress
+  type MoveProgress,
+  type TopicMapWrite,
+  type TopicRenameOptions
 } from "./core/repository-workspace-move";
 import type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
 import { relocateFile } from "./core/repository-relocation";
@@ -1459,7 +1461,11 @@ export class Repository {
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
    * the map cannot overwrite fields it did not change (for example, research state saved meanwhile).
    */
-  async updateMap(path: string, change: (map: MapDocument) => void): Promise<MapDocument> {
+  async updateMap(
+    path: string,
+    change: (map: MapDocument) => void,
+    recordWrite?: (write: TopicMapWrite) => void
+  ): Promise<MapDocument> {
     let updated: MapDocument | undefined;
     let print = "";
     await this.app.vault.process(this.file(path), content => {
@@ -1469,6 +1475,7 @@ export class Repository {
       updated = map;
       const text = writeMapContent(content, map);
       print = this.printAfterWrite(path, before, coordinatePrint(map));
+      recordWrite?.({ before: content, after: text });
       return text;
     });
     this.writtenCoordinates.set(path, print);
@@ -1847,9 +1854,12 @@ export class Repository {
       );
   }
 
-  /** Rebases one managed note's citation lists from its current frontmatter inside `vault.process`; returns the replaced content, or null if unchanged. */
-  private async rebaseNoteLists(file: TFile, rebase: (path: string) => string): Promise<string | null> {
-    let prior: string | null = null;
+  /** Rebases one managed note's current citation lists and records the exact before/after bytes inside the write. */
+  private async rebaseNoteLists(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void> {
     await this.app.vault.process(file, content => {
       const fm = frontmatter(content);
       if (!marker(fm["agent-map-node"])) return content;
@@ -1865,10 +1875,29 @@ export class Repository {
       if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
       if (sources.some(path => rebase(path) !== path)) patch.sourcePaths = sources.map(rebase);
       if (!Object.keys(patch).length) return content;
-      prior = content;
-      return this.patchedNote(file.path, content, patch, {});
+      const text = this.patchedNote(file.path, content, patch, {});
+      recordPrior(content, text);
+      return text;
     });
-    return prior;
+  }
+
+  /** Rebase a candidate map without overwriting intervening edits; journal the actual replaced bytes before publishing. */
+  private async rebaseMapPaths(
+    file: TFile,
+    rebase: (path: string) => string,
+    recordPrior: (before: string, after: string) => void
+  ): Promise<void> {
+    let print: string | undefined;
+    await this.app.vault.process(file, content => {
+      const map = parseMap(content);
+      const before = coordinatePrint(map);
+      if (!rebaseMapNotePaths(map, rebase)) return content;
+      const text = writeMapContent(content, map);
+      print = this.printAfterWrite(file.path, before, coordinatePrint(map));
+      recordPrior(content, text);
+      return text;
+    });
+    if (print !== undefined) this.writtenCoordinates.set(file.path, print);
   }
 
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {
@@ -1946,7 +1975,15 @@ export class Repository {
    * Rebuilds derived note fields. `scope` limits which notes are rewritten (maps are always read in full): a folder
    * prefix, or several roots plus individual note paths (a move rebuilds only the moved topics and their citing notes).
    */
-  async rebuildDerivedData(scope?: string | { roots: string[]; paths?: Iterable<string> }): Promise<void> {
+  async rebuildDerivedData(
+    scope?:
+      | {
+          roots: string[];
+          paths?: Iterable<string>;
+          onWrite?: (path: string, before: string, after: string) => void;
+        }
+      | string
+  ): Promise<void> {
     const roots = typeof scope === "string" ? [scope] : (scope?.roots ?? []),
       extra = new Set(typeof scope === "string" ? [] : (scope?.paths ?? []));
     const inScope = (path: string): boolean =>
@@ -1979,10 +2016,11 @@ export class Repository {
       const cached = await this.app.vault.cachedRead(file),
         derived = this.derivedNoteContent(file, cached, ownership, topics);
       if (derived === null || derived === cached) continue;
-      await this.app.vault.process(
-        file,
-        content => this.derivedNoteContent(file, content, ownership, topics) ?? content
-      );
+      await this.app.vault.process(file, content => {
+        const next = this.derivedNoteContent(file, content, ownership, topics) ?? content;
+        if (next !== content && typeof scope === "object") scope.onWrite?.(file.path, content, next);
+        return next;
+      });
     }
   }
 
@@ -2367,14 +2405,13 @@ export class Repository {
         isDisposed: () => this.disposed,
         message: key => this.message(key),
         folder: path => this.folder(path),
-        file: path => this.file(path),
         renameTopic: (path, title, target, options) => this.renameTopic(path, title, target, options),
         rebuildDerivedData: scope => this.rebuildDerivedData(scope),
-        noteRestoredMap: (path, text) => this.noteRestoredMap(path, text),
+        undoTopicRename: (path, root, write) => this.undoTopicRename(path, root, write),
         markedFiles: key => this.markedFiles(key),
-        rebaseNoteLists: (file, rebase) => this.rebaseNoteLists(file, rebase),
+        rebaseNoteLists: (file, rebase, recordPrior) => this.rebaseNoteLists(file, rebase, recordPrior),
         readableMaps: () => this.readableMaps(),
-        saveMap: (path, map) => this.saveMap(path, map)
+        rebaseMapPaths: (file, rebase, recordPrior) => this.rebaseMapPaths(file, rebase, recordPrior)
       },
       moves,
       onProgress
@@ -2385,7 +2422,7 @@ export class Repository {
     mapPath: string,
     title: string,
     targetRoot?: string,
-    options: { rebuild?: boolean } = {}
+    options: TopicRenameOptions = {}
   ): Promise<string> {
     const file = this.file(mapPath),
       root = file.parent;
@@ -2413,6 +2450,7 @@ export class Repository {
     };
     const next = `${desired}/Map.md`;
     let moved = false;
+    let write: TopicMapWrite | undefined;
     try {
       if (desired !== originalRoot) {
         await this.relocate(root, desired);
@@ -2420,40 +2458,86 @@ export class Repository {
         if (!(this.app.vault.getAbstractFileByPath(desired) instanceof TFolder))
           throw new Error(this.message("error.move_not_applied"));
       }
-      const map = await this.readMap(next);
-      map.title = title;
       const rebasePath = (path: string): string =>
         path.startsWith(`${originalRoot}/`) ? `${desired}/${path.slice(originalRoot.length + 1)}` : path;
-      rebaseMapNotePaths(map, rebasePath);
-      await this.saveMap(next, map);
+      await this.updateMap(
+        next,
+        map => {
+          map.title = title;
+          rebaseMapNotePaths(map, rebasePath);
+        },
+        entry => {
+          write = entry;
+          options.recordWrite?.(entry);
+        }
+      );
       await rebuild();
       return next;
     } catch (error) {
-      if (moved) {
+      const rollbackErrors: unknown[] = [];
+      if (moved || write) {
         try {
-          const movedRoot = this.app.vault.getAbstractFileByPath(desired);
-          if (!(movedRoot instanceof TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
-          await this.relocate(movedRoot, originalRoot);
-          const restoredMap = this.app.vault.getAbstractFileByPath(originalMapPath);
-          if (!(restoredMap instanceof TFile))
-            throw new Error("Original Map.md was not found after restoring the topic folder.");
-          await this.app.vault.modify(restoredMap, originalContent);
-          this.noteRestoredMap(originalMapPath, originalContent);
+          await this.undoTopicRename(moved ? next : originalMapPath, originalRoot, write);
+        } catch (rollbackError) {
+          rollbackErrors.push(rollbackError);
+        }
+        try {
           await rebuild();
         } catch (rollbackError) {
-          const originalMessage = error instanceof Error ? error.message : String(error);
-          throw new Error(
-            `Topic rename failed (${originalMessage}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`
-          );
+          rollbackErrors.push(rollbackError);
         }
-      } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof TFile) {
-        // A same-folder rename can still fail after the Map.md update; restore its exact source.
-        await this.app.vault.modify(this.file(originalMapPath), originalContent);
-        this.noteRestoredMap(originalMapPath, originalContent);
-        await rebuild();
+      }
+      if (rollbackErrors.length) {
+        const describe = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
+        throw new Error(
+          `Topic rename failed (${describe(error)}); rollback also failed (${rollbackErrors.map(describe).join("; ")}).`
+        );
       }
       throw error;
     }
+  }
+
+  /** Undo only bytes this rename wrote. A later edit is preserved and reported; folder recovery is still attempted. */
+  private async undoTopicRename(
+    mapPath: string,
+    originalRoot: string,
+    write: TopicMapWrite | undefined
+  ): Promise<void> {
+    const currentRoot = parentPath(mapPath);
+    const failures: unknown[] = [];
+    if (write) {
+      try {
+        await this.app.vault.process(this.file(mapPath), current => {
+          if (current === write.before) return current;
+          if (current !== write.after)
+            throw new Error("Topic map changed after rename; rollback would overwrite edits.");
+          return write.before;
+        });
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (currentRoot !== originalRoot) {
+      try {
+        const folder = this.app.vault.getAbstractFileByPath(currentRoot);
+        if (!(folder instanceof TFolder) || this.app.vault.getAbstractFileByPath(originalRoot))
+          throw new Error("Renamed topic folder could not be restored safely.");
+        await this.relocate(folder, originalRoot);
+        if (
+          !(this.app.vault.getAbstractFileByPath(originalRoot) instanceof TFolder) ||
+          this.app.vault.getAbstractFileByPath(currentRoot)
+        )
+          throw new Error(this.message("error.move_not_applied"));
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(
+        failures,
+        failures.map(error => (error instanceof Error ? error.message : String(error))).join("; ")
+      );
+    if (write) this.noteRestoredMap(`${originalRoot}/Map.md`, write.before);
   }
 
   async migrate(): Promise<void> {

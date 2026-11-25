@@ -24119,7 +24119,9 @@ export class VisualAgentMapView extends ItemView {
     const heightOf = (): number => setHeight() ?? clampCardHeight(card.offsetHeight) ?? CARD_HEIGHT_MIN;
     const sync = (height: number): void => handle.setAttr("aria-valuenow", String(height));
     handle.tabIndex = -1;
-    const known = setHeight() ?? (card.offsetHeight ? heightOf() : undefined);
+    // An unset height is written by refreshCardHeightState once the paint's batched fit has laid the card out: reading
+    // offsetHeight here would lay out the whole stage once per card (1024 cards: about 2.3 s of a 3.1 s open).
+    const known = setHeight();
     if (known !== undefined) sync(known);
     handle.addEventListener("focus", () => sync(heightOf()));
     const commit = (height: number | undefined): void => {

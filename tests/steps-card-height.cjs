@@ -168,10 +168,13 @@ test('A5 the bottom handle is a horizontal separator with range and value; an un
   plain.card.offsetHeight = 123.4;
   plain.y.handlers.get('focus')();
   assert.equal(plain.y.attrs['aria-valuenow'], '123');
-  const small = harness({ offset: 40 });
-  assert.equal(small.y.attrs['aria-valuenow'], '80', 'clamped into the range');
-  const tall = harness({ offset: 2000 });
-  assert.equal(tall.y.attrs['aria-valuenow'], '720');
+  // Attaching never reads layout (one forced layout per card at render); the fit pass writes the laid-out height.
+  const laidOut = harness({ offset: 300 });
+  assert.equal('aria-valuenow' in laidOut.y.attrs, false, 'attach does not measure an unset height');
+  const fitted = offset => { const h = harness({ offset }); h.card.querySelector = () => h.y; h.view.refreshCardHeightState(h.card); return h.y.attrs['aria-valuenow']; };
+  assert.equal(fitted(300), '300');
+  assert.equal(fitted(40), '80', 'clamped into the range');
+  assert.equal(fitted(2000), '720');
 });
 
 test('A5 a vertical drag writes once on release, respects zoom, and one change carries only the height', () => {

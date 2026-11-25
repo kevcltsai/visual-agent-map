@@ -1,5 +1,58 @@
+import { parentPath, baseName } from "./core/repository-paths";
+import {
+  moveTopicsWithRollback,
+  type OrganizeMove,
+  type OrganizePlan,
+  type MoveProgress
+} from "./core/repository-workspace-move";
+import type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
+import { relocateFile } from "./core/repository-relocation";
+import { managedMapContainers, isManagedMapPath, type Settings } from "./core/repository-settings";
+import {
+  DETAIL_START,
+  splitOpenItems,
+  noteContentLanguage,
+  placeholder,
+  previewHeading,
+  CANONICAL_HEADINGS,
+  isCanonical,
+  noteHeadingSet,
+  writtenHeadingSet,
+  canonicalHeadings,
+  isBookCardFrontmatter,
+  decodeCalloutSections,
+  previewSection,
+  detailWithOpenItems,
+  section,
+  replaceSection,
+  originMarkdown,
+  readThinkingOrigin,
+  replaceSummarySection,
+  removeSection,
+  ensurePreview,
+  withoutReference,
+  detailWithVisualReferences,
+  initialPreview,
+  PREVIEW_MANUAL,
+  readPreviewAutoHash,
+  followedPreview,
+  noteBody,
+  normalizeBodyOrder,
+  localizeHeadings
+} from "./core/repository-note-body";
+import {
+  REFERENCE_TEXT,
+  relationReferences,
+  derivedLabelLanguage,
+  withReferenceLinks,
+  noteLink,
+  localizeReference
+} from "./core/repository-note-references";
+import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
+import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
-import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
+import { App, TAbstractFile, TFile, TFolder, normalizePath, stringifyYaml } from "obsidian";
 import { isPlaceholder } from "./core/note-placeholder";
 import { resolveMapOutputLanguage } from "./core/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
@@ -14,42 +67,30 @@ import {
 } from "./topic-colors";
 import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult } from "./topic-links";
 import { changeTopicMarkers, readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
-import { rebaseLegacyAimNotePaths } from "./core/legacy-aim-paths";
 import {
   contentLocale,
-  isNoteLanguage,
-  NOTE_HEADING_SETS,
   noteHeadingsOf,
   noteLanguageOf,
-  tNote,
   translate,
   translateNote,
   uiLanguageOfHeadings,
   uiLocale,
-  type NoteHeadingName,
   type NoteHeadings,
   type NoteLanguage,
-  type TranslationKey,
-  type UiLanguage
+  type TranslationKey
 } from "./i18n";
 import type { CanvasItem } from "./experiences/visual-map/canvas-items";
-import { MapDocument, MapNode, serializeMap, parseMap, type TopicRelationKind } from "./map-model";
-import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
+import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
+import type { ReasoningLevel } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
-import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
-import type { PromptPreset } from "./ai/prompt-presets";
-import type { StyleKind } from "./ai/note-style-recipe";
-import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
-import { fencedLines } from "./ai/markdown-blocks";
-import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
+import { resolveTaskModel } from "./ai/model-resolution";
+import { standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { readOnce, type NoteReadContext } from "./core/note-read-context";
-import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
+import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
-import { contentHash } from "./core/map-chat-context";
 import { mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
-  managedSectionValue,
   readRelevance,
   readAiLocked,
   readTopicKind,
@@ -80,167 +121,31 @@ import {
   readBookSettings,
   readPipelineFields,
   type BookRole,
-  type BookRoleBy,
-  type BookSettings,
   type BookSettingsPatch,
-  type PipelineFieldsPatch,
-  type PipelineStage
+  type PipelineFieldsPatch
 } from "./core/book-pipeline/model";
-import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./core/image-keys";
-import { readCoverBlock, stripCoverBlock } from "./core/book-pipeline/cover-block";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
+export { linkAlias, safeName } from "./core/repository-names";
+export { noteHeadingLanguage, localizeHeadings } from "./core/repository-note-body";
+export { setFrontmatterKeys } from "./core/repository-frontmatter";
+export { rebaseMapNotePaths, moveNotePath, coordinatePrint } from "./core/repository-map-content";
+export { isPlaceholder };
+export type { OrganizeMove, OrganizePlan, MoveProgress } from "./core/repository-workspace-move";
+export type { Status, ModelSource, TopicState, TopicCollection, Note, NotePatch } from "./core/repository-note-types";
+export {
+  DEFAULT_SETTINGS,
+  defaultProofModel,
+  resolveMapFolders,
+  managedMapContainers,
+  managedMapContainer,
+  isManagedMapPath,
+  normalizeMapChatWidth,
+  normalizeMapChatOpen,
+  normalizeMapChatImageMode,
+  type Settings
+} from "./core/repository-settings";
 
-/** Saved width of the map chat's side window: a whole number from 280 to 560; anything else is the default. */
-export function normalizeMapChatWidth(value: unknown): number {
-  return clampMapChatWidth(value);
-}
-/** Saved open state of the map chat's side window; open unless it was saved as closed. */
-export function normalizeMapChatOpen(value: unknown): boolean {
-  return value !== false;
-}
-
-/** Saved choice of the map chat for AI changes to a picture: "preview" (show me first) unless saved as "direct". */
-export function normalizeMapChatImageMode(value: unknown): "preview" | "direct" {
-  return value === "direct" ? "direct" : "preview";
-}
-
-export type Status = "idea" | "running" | "completed" | "error";
-export type ModelSource = "workspace" | "inherited" | "manual";
-export type TopicState = "active" | "unassigned" | "archived" | "inbox";
-export type TopicCollection = "Notes" | "Unassigned" | "Archive";
-export interface Note {
-  /** The note's stored `content-language` frontmatter, when present. */
-  contentLanguage?: NoteLanguage;
-  title: string;
-  summary: string;
-  prompt: string;
-  rules: string;
-  detail: string;
-  thinkingOrigin?: string;
-  visualReferences: string;
-  newFindings: string;
-  preview: string;
-  previewSection?: string;
-  previewInitialized?: boolean;
-  /** `""` = no `preview-auto-hash` key; `"manual"` = the user owns the preview; `"v1:<hex>"` = hash of the last auto-written text. */
-  previewAutoHash: string;
-  model: string;
-  modelSource: ModelSource;
-  /** True when the topic runs on its own model: a manual choice, or one inherited from a manual ancestor (the card shows a tag). */
-  modelOverride?: boolean;
-  reasoning?: ReasoningLevel;
-  researchMode: ResearchMode;
-  visualMode: VisualMode;
-  detailTemplateId?: string;
-  /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
-  toneId?: string;
-  /** From `note-style` frontmatter (a style ref, `builtin:<id>` or `file:<name>`); absent = none or empty. */
-  noteStyle?: string;
-  detailFormatIssues: string[];
-  /** Why the last AI task on this note failed (frontmatter `last-error`); empty when none. */
-  lastError: string;
-  status: Status;
-  mapId: string;
-  topicId: string;
-  topicState: TopicState;
-  sourcePaths: string[];
-  referencePaths?: string[];
-  /** Read-only grading from frontmatter (see readRelevance); absent when missing or invalid. */
-  relevance?: NoteRelevance;
-  /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
-  aiLocked?: true;
-  /** Picture-book pipeline fields (frontmatter `pipeline-stage`, `book-role`, `pipeline-issue`, `pipeline-seam`); each absent when the note has none. */
-  pipelineStage?: PipelineStage;
-  bookRole?: BookRole;
-  /** Frontmatter `pipeline-role`: the role the pipeline wrote (a different `book-role` is the owner's). */
-  pipelineRole?: BookRole;
-  /** Frontmatter `book-role-by`: `owner` keeps `book-role` across runs, `ai` lets the plan change it. */
-  bookRoleBy?: BookRoleBy;
-  pipelineIssue?: string;
-  pipelineSeam?: string;
-  /** The root topic's `book-*` settings; absent when none is set. */
-  bookSettings?: BookSettings;
-  /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */
-  topicKind?: Exclude<TopicKind, "topic">;
-  /** From `hypothesis-leaning`; set only for a hypothesis (missing or invalid reads as undecided). */
-  hypothesisLeaning?: HypothesisLeaning;
-  /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as none; weak when the leaning is supported or refuted and the stored strength is none). */
-  hypothesisStrength?: HypothesisStrength;
-  /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
-  markers?: TopicMarker[];
-  /** From `topic-links` frontmatter, valid http(s) hrefs only; absent when there are none. */
-  links?: string[];
-  /** From `topic-color` frontmatter, a whitelisted id only; absent when there is none. */
-  color?: TopicColor;
-  /** From `topic-style` frontmatter, whitelisted tokens only (one text size at most); absent when there are none. */
-  style?: TopicStyle[];
-}
-export type NotePatch = Partial<Note>;
-export interface Settings {
-  /** Hidden developer switch (edit data.json only, no settings UI): off hides every way to start or resume hypothesis research. Old argument maps still open. */
-  experimentalArgumentMap: boolean;
-  /** Models of the picture-book pipeline's three roles (model ids as in `cliModel`). */
-  bookPlanModel: string;
-  bookWriteModel: string;
-  bookImageModel: string;
-  bookProofModel: string;
-  /** Save every map AI conversation as a record file in the map folder (off by default). */
-  mapChatRecords: boolean;
-  detailTemplates: DetailTemplate[];
-  defaultDetailTemplateId?: string;
-  /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
-  defaultNoteStyleId?: string;
-  /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
-  noteStyleByKind?: Partial<Record<StyleKind, string>>;
-  /** The global voice and format (part refs); a missing key is the built-in default (academic, standard). */
-  noteStyleDefaults?: { voice?: string; format?: string };
-  /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */
-  noteStyleRecipe?: {
-    migrated: 1;
-    mapsNotified?: true;
-    legacy?: { templates: Record<string, string>; tones: Record<string, string> };
-  };
-  /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
-  noteStylesFolder?: string;
-  /** Old custom template id -> the style file it was exported to (with ".md"). */
-  noteStyleFiles?: Record<string, string>;
-  /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
-  promptPresets?: PromptPreset[];
-  language: UiLanguage;
-  workspaceFolder: string;
-  /** Legacy container (pre-0.19): maps here stay openable; new maps go to mindMapsFolder / aimFolder. */
-  topicsFolder: string;
-  mindMapsFolder: string;
-  aimFolder: string;
-  notesFolder: string;
-  mapsFolder: string;
-  mapId: string;
-  codexPath: string;
-  claudePath: string;
-  cliModel: string;
-  /** Width in pixels of the map AI chat's side window (280 to 560); remembered between sessions. */
-  mapChatWidth: number;
-  /** Whether the side window was open when the map was last used; remembered between sessions. */
-  mapChatOpen: boolean;
-  /** The chat's switch "AI changes to a picture": show a preview first, or apply at once. Remembered between sessions. */
-  mapChatImageMode: "preview" | "direct";
-  cliReasoning: ReasoningLevel;
-  previewSize?: "small" | "medium" | "large";
-  previewScale: number;
-  models: string;
-  migrated: boolean;
-  structureVersion: number;
-  firstUseNoticeSeen: boolean;
-  codexUsageNoticeSeen: boolean;
-  claudeUsageNoticeSeen: boolean;
-  aiExchangeLoggingEnabled: boolean;
-  markdownSelectionAiAutoOpen: boolean;
-  /** Add diagrams after research (default on): the chart step after a note or an AIM conclusion is written. */
-  addDiagramsAfterResearch: boolean;
-  workspaceInitialized: boolean;
-  canvasHintSeen: boolean;
-}
 export interface TopicInfo {
   id: string;
   title: string;
@@ -263,148 +168,7 @@ export interface BrokenTopic {
   root: string;
   noteCount: number;
 }
-/**
- * Map container folders for loaded settings: a saved value wins (never rewritten for upgraded users);
- * otherwise they derive from the saved workspace folder, so a custom workspace gets sibling folders.
- */
-export function resolveMapFolders(
-  saved: Partial<Pick<Settings, "workspaceFolder" | "mindMapsFolder" | "aimFolder">> | null | undefined
-): Pick<Settings, "mindMapsFolder" | "aimFolder"> {
-  const workspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
-  return {
-    mindMapsFolder: saved?.mindMapsFolder || `${workspace}/Mind Maps`,
-    aimFolder: saved?.aimFolder || `${workspace}/AIM`
-  };
-}
-
-/** Folders that hold managed topic folders: the two current containers plus the legacy Topics container. */
-export function managedMapContainers(
-  settings: Pick<Settings, "topicsFolder" | "mindMapsFolder" | "aimFolder">
-): string[] {
-  return [settings.mindMapsFolder, settings.aimFolder, settings.topicsFolder];
-}
-/** The container (from managedMapContainers) that holds `path`, or undefined for maps outside all of them. */
-export function managedMapContainer(
-  settings: Pick<Settings, "topicsFolder" | "mindMapsFolder" | "aimFolder">,
-  path: string
-): string | undefined {
-  return managedMapContainers(settings).find(folder => path.startsWith(`${folder}/`));
-}
-export function isManagedMapPath(
-  settings: Pick<Settings, "topicsFolder" | "mindMapsFolder" | "aimFolder">,
-  path: string
-): boolean {
-  return managedMapContainer(settings, path) !== undefined;
-}
-
-export interface OrganizeMove {
-  mapPath: string;
-  title: string;
-  kind: "mind" | "aim";
-  fromRoot: string;
-  toRoot: string;
-}
-interface PriorContent {
-  path: string;
-  content: string;
-}
-/** Reports "moving topic `title`, step `done` of `total`" before each topic move starts. */
-export type MoveProgress = (done: number, total: number, title: string) => void;
-export interface OrganizePlan {
-  moves: OrganizeMove[];
-  /** Maps that could not be read: left exactly where they are. */
-  skipped: { mapPath: string; error: string }[];
-}
-
-const BOOK_PLAN_MODEL = "claude:sonnet";
-const BOOK_WRITE_MODEL = "claude:opus";
-const BOOK_IMAGE_MODEL = "claude:haiku";
-/** The AI proofread model when none is set: not the author's own model and not weaker (opus: sonnet, sonnet: opus, haiku or unknown: sonnet). */
-export function defaultProofModel(authorModel: string): string {
-  return authorModel.includes("sonnet") ? "claude:opus" : "claude:sonnet";
-}
-const BOOK_PROOF_MODEL = defaultProofModel(BOOK_WRITE_MODEL);
-export const DEFAULT_SETTINGS: Settings = {
-  detailTemplates: [],
-  promptPresets: [],
-  language: "en",
-  workspaceFolder: "Agent Workspace",
-  topicsFolder: "Agent Workspace/Topics",
-  mindMapsFolder: "Agent Workspace/Mind Maps",
-  aimFolder: "Agent Workspace/AIM",
-  notesFolder: "Agent Workspace/Nodes",
-  mapsFolder: "Agent Workspace/Maps",
-  mapId: "default",
-  codexPath: "codex",
-  claudePath: "claude",
-  cliModel: FALLBACK_MODEL,
-  mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
-  mapChatOpen: true,
-  mapChatImageMode: "preview",
-  mapChatRecords: false,
-  experimentalArgumentMap: false,
-  bookPlanModel: BOOK_PLAN_MODEL,
-  bookWriteModel: BOOK_WRITE_MODEL,
-  bookImageModel: BOOK_IMAGE_MODEL,
-  bookProofModel: BOOK_PROOF_MODEL,
-  cliReasoning: "low",
-  previewScale: 120,
-  models: "",
-  migrated: false,
-  structureVersion: 2,
-  firstUseNoticeSeen: false,
-  codexUsageNoticeSeen: false,
-  claudeUsageNoticeSeen: false,
-  aiExchangeLoggingEnabled: false,
-  markdownSelectionAiAutoOpen: true,
-  addDiagramsAfterResearch: true,
-  workspaceInitialized: false,
-  canvasHintSeen: false
-};
-
-const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
-const REFERENCE_END = "<!-- visual-agent-map:references:end -->";
-const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
-const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
-/**
- * The AIM open-items marker of a conclusion note. It is saved right after the Detail block, so Detail holds only what
- * the reader reads; `readNote` hands it back at the end of `detail`, where the AIM code and older notes keep it.
- */
-const OPEN_ITEMS_MARKER = /\n*^<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->[ \t]*$/m;
-function splitOpenItems(value: string): { text: string; marker: string } {
-  const match = OPEN_ITEMS_MARKER.exec(value);
-  return match
-    ? {
-        text: (value.slice(0, match.index) + value.slice(match.index + match[0].length)).trim(),
-        marker: match[0].trim()
-      }
-    : { text: value, marker: "" };
-}
 const NOTE_CSS_CLASS = "visual-agent-map-node";
-/** Point node paths and retained legacy AIM references at moved notes. Returns whether anything changed. */
-export function rebaseMapNotePaths(map: MapDocument, rebase: (path: string) => string): boolean {
-  let changed = false;
-  const move = (path: string): string => {
-    const next = rebase(path);
-    if (next !== path) changed = true;
-    return next;
-  };
-  for (const node of map.nodes) node.path = move(node.path);
-  if (map.aim) rebaseLegacyAimNotePaths(map.aim, move);
-  return changed;
-}
-/** A rebase function that moves exactly one note path. */
-export function moveNotePath(oldPath: string, newPath: string): (path: string) => string {
-  return path => (path === oldPath ? newPath : path);
-}
-function writeMapContent(content: string, map: MapDocument): string {
-  return content
-    .replace(/^# .*$/m, () => `# ${map.title.replace(/\n/g, " ")}`)
-    .replace(/```agent-map\s*\n[\s\S]*?\n```/, () => `\`\`\`agent-map\n${JSON.stringify(map, null, 2)}\n\`\`\``);
-}
-function marker(value: unknown): boolean {
-  return value === true || value === "true";
-}
 /** Longest `last-error` stored in a note. */
 export const LAST_ERROR_LIMIT = 300;
 /** The failure reason kept on a note: the raw error message, whitespace collapsed, cut to {@link LAST_ERROR_LIMIT}. */
@@ -417,13 +181,6 @@ export function failureReason(error: unknown): string {
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
-function parentPath(path: string): string {
-  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-}
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
-
 function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
   const current = Array.isArray(fm.cssclasses)
     ? fm.cssclasses.map(String)
@@ -435,79 +192,11 @@ function ensureNoteCssClass(fm: Record<string, unknown>): boolean {
   return true;
 }
 
-const SAFE_NAME_LIMIT = 80;
-
-type GraphemeSegmenter = new (
-  locale?: string,
-  options?: { granularity: "grapheme" }
-) => { segment(input: string): Iterable<{ segment: string }> };
-
-/** Splits text into grapheme clusters (code points when `Intl.Segmenter` is unavailable). */
-function graphemes(value: string): string[] {
-  const Segmenter = (Intl as { Segmenter?: GraphemeSegmenter }).Segmenter;
-  if (Segmenter)
-    return Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(value), part => part.segment);
-  return Array.from(value);
-}
-
-/**
- * A file or folder name for a NEW note or map. Never applied to existing paths (a stored path is never renamed).
- * Cuts at 80 UTF-16 units on a grapheme boundary, and never leaves a leading dot (hidden file) or a trailing dot or space.
- */
-export function safeName(title: string): string {
-  const cleaned = title
-    .replace(/[\\/:*?"<>|#^[\]]/g, " ")
-    .replace(/\s+/g, " ")
-    .replace(/^[\s.]+/, "");
-  let cut = cleaned;
-  if (cleaned.length > SAFE_NAME_LIMIT) {
-    cut = "";
-    for (const part of graphemes(cleaned)) {
-      if (cut.length + part.length > SAFE_NAME_LIMIT) break;
-      cut += part;
-    }
-  }
-  return cut.replace(/[\s.]+$/, "") || tNote("note.untitled_topic");
-}
-
-/** Case- and form-insensitive name used to detect a collision on a case-insensitive file system. */
-function foldName(value: string): string {
-  return value.normalize("NFC").toLowerCase().replace(/ς/g, "σ");
-}
-
-/** Folds a file name without its extension, so a final sigma before ".md" folds as it does inside the name. */
-function foldEntryName(name: string, isFile: boolean): string {
-  const dot = isFile ? name.lastIndexOf(".") : -1;
-  return dot > 0 ? `${foldName(name.slice(0, dot))}.${name.slice(dot + 1).toLowerCase()}` : foldName(name);
-}
-
-/** A link alias safe inside `[[path|alias]]` and a YAML list item: no brackets, pipe, backtick or line breaks. */
-export function linkAlias(title: string, fallback: string): string {
-  const alias = title
-    .replace(/[[\]|`\r\n]/g, " ")
-    .replace(/%{2,}/g, "%")
-    .replace(/\s+/g, " ")
-    .trim();
-  return alias || fallback;
-}
-
 /** Folder name of a map, used as the link alias when the map title has nothing usable in it. */
 function aliasFallback(mapPath: string): string {
   return parentPath(mapPath).split("/").at(-1) || mapPath;
 }
 
-function frontmatter(content: string): Record<string, unknown> {
-  const yaml = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
-  return yaml ? ((parseYaml(yaml) ?? {}) as Record<string, unknown>) : {};
-}
-
-/** A frontmatter value the relevance writers set: a string, a list of strings, true, or null to remove the key. */
-type FrontmatterValue = string | string[] | boolean | null;
-/**
- * Sets or removes top-level frontmatter keys and leaves every other line, and the body, exactly as it was. A key that
- * is already there keeps its place; new keys go at the end. Strings are written as JSON strings, which are valid YAML
- * double-quoted scalars.
- */
 /** What a map chat reply changes in a topic's appearance; see {@link Repository.writeTopicAppearance}. */
 export interface TopicAppearanceChange {
   /** A colour, null to remove it; absent keeps it. */
@@ -537,38 +226,6 @@ export function topicAppearanceValues(
   return values;
 }
 
-export function setFrontmatterKeys(content: string, values: Record<string, FrontmatterValue>): string {
-  const eol = content.includes("\r\n") ? "\r\n" : "\n";
-  const render = (key: string, value: string | string[] | boolean): string[] =>
-    typeof value === "boolean"
-      ? [`${key}: ${value}`]
-      : Array.isArray(value)
-        ? [`${key}:`, ...value.map(item => `  - ${JSON.stringify(item)}`)]
-        : [`${key}: ${JSON.stringify(value)}`];
-  const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(content);
-  if (!match) {
-    const lines = Object.entries(values).flatMap(([key, value]) => (value === null ? [] : render(key, value)));
-    return lines.length ? `---${eol}${lines.join(eol)}${eol}---${eol}${content}` : content;
-  }
-  const kept: string[] = [];
-  const written = new Set<string>();
-  let skipping = false;
-  for (const line of match[1].split(/\r?\n/)) {
-    const key = /^([A-Za-z][\w-]*):/.exec(line)?.[1];
-    if (key) {
-      skipping = Object.keys(values).includes(key);
-      if (skipping && !written.has(key)) {
-        written.add(key);
-        const value = values[key];
-        if (value !== null) kept.push(...render(key, value));
-      }
-    } else if (skipping && !/^\s+|^-(\s|$)/.test(line) && line !== "") skipping = false;
-    if (!skipping) kept.push(line);
-  }
-  for (const [key, value] of Object.entries(values))
-    if (!written.has(key) && value !== null) kept.push(...render(key, value));
-  return `---${eol}${kept.join(eol)}${eol}---${content.slice(match[0].length)}`;
-}
 const localDate = (date = new Date()): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 /** What the map file's frontmatter said about the goal before a write; handed back to restore it exactly. */
@@ -592,667 +249,6 @@ export interface MapMeta extends RelevanceSetup {
 function noteTitle(content: string, fm: Record<string, unknown>, fallback: string): string {
   const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
   return /^# (.+)$/m.exec(body)?.[1]?.trim() || text(fm.title, fallback);
-}
-
-type NoteSection =
-  | "Thinking Origin"
-  | "Current Summary"
-  | "Prompt"
-  | "Rules"
-  | "Detail"
-  | "Visual References"
-  | "Working Findings"
-  | "New Findings"
-  | "預覽"
-  | "Preview"
-  | "User Notes";
-const noteContentLanguage = (fm: Record<string, unknown>): NoteLanguage | undefined =>
-  isNoteLanguage(fm["content-language"]) ? fm["content-language"] : undefined;
-const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
-export { isPlaceholder };
-const previewHeading = (language: NoteLanguage): NoteSection => translate(language, "detail.preview") as NoteSection;
-
-/**
- * Managed section headings in the note's own language (C8). Every function of this module works with the English
- * names; `decodeCalloutSections` turns a localized heading back into its English name when it reads a note, and
- * `localizeHeadings` writes it in the note's heading set again. The sets live in the language registry
- * (`noteHeadings`), not in the dictionaries: they are note format, and every registered set is always read.
- */
-const CANONICAL_HEADINGS: NoteHeadings = Object.freeze(
-  Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map(name => [name, name])) as Record<NoteHeadingName, string>
-);
-const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEADINGS.Detail;
-/**
- * The heading set a note is already written with, read from its managed Detail heading (the `## ` heading right
- * before the Detail start marker) alone; undefined when it has no marker, unless the user (or a tool) removed the
- * markers of a localized note: then a localized set whose Detail and Current Summary headings are both there (outside
- * fenced code) and no English managed heading is adopted, so such a note keeps decoding and does not gain a second pair. Any other heading there reads as English, so
- * a user's own heading that happens to read like a localized one is never taken for a managed section in older notes.
- */
-function markerlessHeadingSet(content: string): NoteHeadings | undefined {
-  const lines = content.split("\n");
-  const code = fencedLines(lines);
-  const headings = new Set<string>();
-  lines.forEach((line, index) => {
-    const text = code[index] ? undefined : /^## (.+?)[ \t]*\r?$/.exec(line)?.[1];
-    if (text !== undefined) headings.add(text);
-  });
-  if (headings.has("Current Summary") || headings.has("Detail")) return undefined;
-  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(
-    set => headings.has(set.Detail) && headings.has(set["Current Summary"])
-  );
-}
-function noteHeadingSet(content: string): NoteHeadings | undefined {
-  const start = content.indexOf(DETAIL_START);
-  if (start < 0) return markerlessHeadingSet(content);
-  const before = content.slice(0, start);
-  const heading = [...before.matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)?.[1];
-  const localized = NOTE_HEADING_SETS.filter(set => !isCanonical(set));
-  // A Detail heading the user renamed: the summary heading (written right under the title) still names the set.
-  const summary = (set: NoteHeadings): boolean =>
-    new RegExp(`^## ${set["Current Summary"]}[ \\t]*\\r?$`, "m").test(before) &&
-    !/^## Current Summary[ \t]*\r?$/m.test(before);
-  return (
-    localized.find(set => set.Detail === heading) ??
-    (heading === CANONICAL_HEADINGS.Detail ? undefined : localized.find(summary)) ??
-    CANONICAL_HEADINGS
-  );
-}
-/**
- * Fenced-code lines of a note body, the Detail block left out: a fence the Detail text opens and never closes must not
- * turn every section after the block into code (it would hide their headings from decoding and encoding).
- */
-function fencedOutsideDetail(lines: string[]): boolean[] {
-  let inDetail = false;
-  const masked = lines.map(line => {
-    if (line.trim() === DETAIL_START) inDetail = true;
-    const value = inDetail ? "" : line;
-    if (line.trim() === DETAIL_END) inDetail = false;
-    return value;
-  });
-  return fencedLines(masked);
-}
-/** The interface language whose headings a note is written with (for tests and diagnostics); English without a marker. */
-export function noteHeadingLanguage(content: string): UiLanguage {
-  return uiLanguageOfHeadings(noteHeadingSet(content) ?? CANONICAL_HEADINGS);
-}
-/**
- * The heading set a write gives a note: the one it is written with; a note with no managed section yet (no Detail
- * marker and no English managed heading, such as a bare stub) gets `fallback`, the set of a new note.
- */
-function writtenHeadingSet(content: string, fallback: NoteHeadings): NoteHeadings {
-  const set = noteHeadingSet(content);
-  if (set) return set;
-  return /^## (?:Current Summary|Detail|Prompt|Rules|Working Findings|Thinking Origin)[ \t]*\r?$/m.test(content)
-    ? CANONICAL_HEADINGS
-    : fallback;
-}
-const CALLOUT_TITLE = /^(> \[!(?:info|vam-book)\][+-]? )(.+?)([ \t]*\r?)$/;
-/**
- * Walks a note body's lines outside fenced code, the Detail block and the quoted Thinking Origin text (the places
- * where a heading-like line is content), and lets `rename` replace a `## ` heading text or a callout title.
- */
-function renameManagedHeadings(
-  content: string,
-  rename: (text: string, kind: "heading" | "callout") => string | undefined
-): string {
-  const lines = content.split("\n");
-  const code = fencedOutsideDetail(lines);
-  let inDetail = false;
-  let origin: "none" | "heading" | "quote" = "none";
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    if (line.trim() === DETAIL_START) inDetail = true;
-    if (line.trim() === DETAIL_END) inDetail = false;
-    if (inDetail || code[index]) continue;
-    if (origin === "heading" && line.startsWith(">")) origin = "quote";
-    else if (origin === "heading" && line.trim()) origin = "none";
-    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
-    if (origin === "quote") continue;
-    const heading = /^## (.+?)([ \t]*\r?)$/.exec(line);
-    const callout = heading ? null : CALLOUT_TITLE.exec(line);
-    const current = heading?.[1] ?? callout?.[2];
-    const next = current === undefined ? undefined : rename(current, heading ? "heading" : "callout");
-    if (next !== undefined && next !== current)
-      lines[index] = heading ? `## ${next}${heading[2]}` : `${callout![1]}${next}${callout![3]}`;
-    // The English name on either side of the rename: decoding meets it after, encoding before.
-    if (heading && (current === "Thinking Origin" || next === "Thinking Origin")) origin = "heading";
-  }
-  return lines.join("\n");
-}
-/** Localized managed headings back to their English names (the inverse of localizeHeadings). */
-function canonicalHeadings(content: string, set: NoteHeadings): string {
-  if (isCanonical(set)) return content;
-  const back = new Map(Object.entries(set).map(([english, local]) => [local, english]));
-  // Prompt is written as a callout only (a "## 提示" heading is the user's own); every other name is a "## " heading.
-  return renameManagedHeadings(content, (text, kind) => {
-    const english = back.get(text);
-    return (kind === "callout") === (english === "Prompt") ? english : undefined;
-  });
-}
-/** English managed headings to the names of `set`; the English set leaves the text as it is. */
-export function localizeHeadings(content: string, set: NoteHeadings): string {
-  if (isCanonical(set)) return content;
-  const names = set as Readonly<Record<string, string>>;
-  return renameManagedHeadings(content, (text, kind) =>
-    Object.hasOwn(names, text) && (kind === "callout") === (text === "Prompt") ? names[text] : undefined
-  );
-}
-
-/**
- * Preview (right after the summary) and Prompt (after Detail) are written as collapsed callouts (`> [!info]- 預覽`,
- * `> [!info]- Prompt`) so the note opens on the answer. Every read and write first turns these callouts back into the `## ` sections the rest
- * of this module works with; `noteBody` writes them as callouts again. Older notes keep their `## ` sections.
- * A picture-book card (see {@link isBookCardFrontmatter}) writes them as `> [!vam-book]-` callouts, which the stylesheet hides; both types are read.
- */
-const CALLOUT_SECTION = /^> \[!(?:info|vam-book)\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
-/** A picture-book card: its frontmatter has `pipeline-stage` or `book-role`. */
-const isBookCardFrontmatter = (fm: Record<string, unknown>): boolean =>
-  fm["pipeline-stage"] !== undefined || fm["book-role"] !== undefined;
-function decodeCalloutSections(content: string): string {
-  const lines = canonicalHeadings(content, noteHeadingSet(content) ?? CANONICAL_HEADINGS).split("\n");
-  const code = fencedOutsideDetail(lines);
-  const out: string[] = [];
-  let inDetail = false;
-  // Thinking Origin is quoted source text: a line there that looks like a callout title is still source text.
-  let origin: "none" | "heading" | "quote" = "none";
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    if (line.trim() === DETAIL_START) inDetail = true;
-    if (line.trim() === DETAIL_END) inDetail = false;
-    if (/^## Thinking Origin\s*$/.test(line)) origin = "heading";
-    else if (origin === "heading" && line.startsWith(">")) origin = "quote";
-    else if (origin === "heading" && line.trim()) origin = "none";
-    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
-    const callout = inDetail || code[index] || origin !== "none" ? null : CALLOUT_SECTION.exec(line);
-    if (!callout) {
-      out.push(line);
-      continue;
-    }
-    // A callout ends at the first line without ">" or at the next Preview/Prompt callout title.
-    let end = index + 1;
-    while (end < lines.length && lines[end].startsWith(">") && !CALLOUT_SECTION.test(lines[end])) end++;
-    out.push(
-      `## ${callout[1]}`,
-      "",
-      ...lines.slice(index + 1, end).map(item => item.replace(/^> ?/, "").replace(/\r$/, "")),
-      ""
-    );
-    index = end - 1;
-  }
-  return out.join("\n");
-}
-function calloutSection(title: string, value: string, type = "info"): string {
-  const lines = value.trim().split("\n");
-  return [`> [!${type}]- ${title}`, ...lines.map(line => (line ? `> ${line}` : ">"))].join("\n");
-}
-const previewSection = (content: string): string =>
-  [...new Set([section(content, "Preview"), section(content, "預覽")].filter(Boolean))].join("\n\n");
-
-// Only the sections a book card writes as a callout (Prompt, Preview) end at its hidden callout, and only in the exact `vam-book` spelling: a note
-// that is no book card keeps every other section whole (the section text here has no frontmatter, so the card type is not known).
-const HIDDEN_AFTER: ReadonlySet<NoteSection> = new Set<NoteSection>(["Prompt", "Preview", "預覽"]);
-function sectionBounds(content: string, heading: NoteSection): { start: number; end: number } | null {
-  if (heading === "Detail") {
-    const managedStart = content.indexOf(DETAIL_START),
-      managedEnd = content.indexOf(DETAIL_END);
-    if (managedStart >= 0 && managedEnd > managedStart)
-      return { start: managedStart + DETAIL_START.length, end: managedEnd };
-  }
-  const match = new RegExp(`^## ${heading.replace(" ", "\\s+")}\\s*$`, "m").exec(content);
-  if (!match) return null;
-  const start = match.index + match[0].length;
-  const next = /^## .+$/m.exec(content.slice(start));
-  const reference = content.indexOf(REFERENCE_START, start);
-  // A hidden work-record callout (`> [!vam-book]- ...`, the proofread result) after a section is no part of it: Preview and Prompt callouts were turned into `## ` sections before.
-  const hidden = HIDDEN_AFTER.has(heading) ? /^> \[!vam-book\]/m.exec(content.slice(start)) : null;
-  const candidates = [
-    next ? start + next.index : content.length,
-    reference >= 0 ? reference : content.length,
-    hidden ? start + hidden.index : content.length
-  ];
-  return { start, end: Math.min(...candidates) };
-}
-
-/** Detail as the app uses it: the Detail block, plus the open-items marker saved after it. */
-function detailWithOpenItems(content: string): string {
-  const detail = section(content, "Detail");
-  if (splitOpenItems(detail).marker) return detail;
-  const end = content.indexOf(DETAIL_END);
-  const after = end >= 0 ? content.slice(end + DETAIL_END.length) : "";
-  const next = after.search(/^## /m);
-  const { marker } = splitOpenItems(next >= 0 ? after.slice(0, next) : after);
-  return marker ? `${detail}\n\n${marker}` : detail;
-}
-
-function section(content: string, heading: NoteSection): string {
-  const bounds = sectionBounds(content, heading);
-  return bounds ? content.slice(bounds.start, bounds.end).trim() : "";
-}
-
-function replaceSection(content: string, heading: NoteSection, value: string): string {
-  const bounds = sectionBounds(content, heading);
-  if (bounds) {
-    if (heading === "Detail" && !content.slice(0, bounds.start).includes(DETAIL_START)) {
-      return `${content.slice(0, bounds.start)}\n\n${DETAIL_START}\n${managedSectionValue(value)}\n${DETAIL_END}\n\n${content.slice(bounds.end).replace(/^\s*/, "")}`;
-    }
-    return `${content.slice(0, bounds.start)}\n${managedSectionValue(value)}\n${content.slice(bounds.end)}`;
-  }
-  const reference = content.indexOf(REFERENCE_START);
-  const at = reference >= 0 ? reference : content.length;
-  const managed =
-    heading === "Detail" ? `${DETAIL_START}\n${managedSectionValue(value)}\n${DETAIL_END}` : managedSectionValue(value);
-  return `${content.slice(0, at).trimEnd()}\n\n## ${heading}\n\n${managed}\n\n${content.slice(at).trimStart()}`;
-}
-
-// Blockquoted, escaped source text cannot impersonate managed sections or markers.
-function originMarkdown(value: string): string {
-  return value
-    .split(/\r?\n/)
-    .map(line => `> ${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`)
-    .join("\n");
-}
-function readThinkingOrigin(content: string): string | undefined {
-  const value = section(content, "Thinking Origin");
-  if (!value) return undefined;
-  return value
-    .split("\n")
-    .map(line => line.replace(/^> ?/, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"))
-    .join("\n");
-}
-
-function replaceSummarySection(content: string, value: string): string {
-  if (sectionBounds(content, "Current Summary")) return replaceSection(content, "Current Summary", value);
-  const title = /^# .*$/m.exec(content);
-  if (!title) return replaceSection(content, "Current Summary", value);
-  const at = title.index + title[0].length;
-  return `${content.slice(0, at)}\n\n## Current Summary\n\n${managedSectionValue(value)}\n\n${content.slice(at).trimStart()}`;
-}
-
-function removeSection(content: string, heading: NoteSection): string {
-  if (heading === "Detail") {
-    const managedStart = content.indexOf(DETAIL_START),
-      managedEnd = content.indexOf(DETAIL_END);
-    if (managedStart >= 0 && managedEnd > managedStart) {
-      const headingMatch = /^## Detail\s*$/m.exec(content.slice(0, managedStart));
-      const start = headingMatch ? headingMatch.index : managedStart;
-      return `${content.slice(0, start).trimEnd()}\n\n${content.slice(managedEnd + DETAIL_END.length).trimStart()}`;
-    }
-  }
-  const bounds = sectionBounds(content, heading);
-  if (!bounds) return content;
-  const headingMatch = new RegExp(`^## ${heading.replace(" ", "\\s+")}\\s*$`, "m").exec(content.slice(0, bounds.start));
-  if (!headingMatch) return content;
-  return `${content.slice(0, headingMatch.index).trimEnd()}\n\n${content.slice(bounds.end).trimStart()}`;
-}
-
-function ensurePreview(content: string, language: NoteLanguage, textLanguage: NoteLanguage = language): string {
-  const legacy = section(content, "User Notes");
-  const preview = previewSection(content);
-  const merged = [isPlaceholder(preview) ? placeholder(textLanguage) : preview, legacy].filter(Boolean).join("\n\n");
-  const clean = removeSection(removeSection(removeSection(content, "User Notes"), "預覽"), "Preview");
-  return replaceSection(clean, previewHeading(language), merged);
-}
-
-function withoutReference(content: string): string {
-  const managed = new RegExp(`\\n?${REFERENCE_START}[\\s\\S]*?${REFERENCE_END}\\n?`, "m");
-  if (managed.test(content)) return content.replace(managed, "\n");
-  const legacy = /\n?^## 關聯議題\s*\n+(?:母議題：[^\n]*\n+)?(?:子議題：[^\n]*\n*)?$/m;
-  return legacy.test(content) ? content.replace(legacy, "\n") : content;
-}
-
-/**
- * Puts each visual reference block into the Detail. By default a block whose exact image link the Detail already has is left
- * out. With `keepText` (new AI content): a block whose image the Detail already has (same image key, see imageKey) keeps its
- * title and source text and drops only the image line.
- */
-function detailWithVisualReferences(
-  detail: string,
-  visualReferences: string,
-  template: DetailTemplate,
-  keepText = false
-): string {
-  let current = detail.trim();
-  const references = visualReferences
-    .trim()
-    .split(/\n(?=\*\*[^\n]+\*\*\n|### )/)
-    .filter(Boolean);
-  for (const reference of references) {
-    const image = reference.match(/!\[[^\]]*\]\(([^)]+)\)/);
-    if (!image) continue;
-    const repeated = keepText ? imageKeysIn(current).has(imageKey(image[1])) : current.includes(`](${image[1]})`);
-    if (repeated && !keepText) continue;
-    const written = repeated ? dedupeImageEmbeds(reference, { seen: [imageKey(image[1])] }) : reference;
-    const block = written.replace(/^### (.+)$/gm, "**$1**").trim();
-    const title = block.match(/^\*\*(.+)\*\*/)?.[1];
-    const paragraphs = current.split("\n\n");
-    const related = title ? paragraphs.findIndex(text => !/^#{1,6} /.test(text) && text.includes(title)) : -1;
-    if (related >= 0) {
-      paragraphs.splice(related + 1, 0, block);
-      current = paragraphs.join("\n\n");
-    } else {
-      const keys = sourcesHeadingKeys(template);
-      const lines = current.split("\n");
-      const code = fencedLines(lines);
-      const at = lines.findIndex((line, index) => {
-        const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-        return !!heading && keys.has(heading[1].toLocaleLowerCase());
-      });
-      current =
-        at < 0
-          ? [current.trimEnd(), block].filter(Boolean).join("\n\n")
-          : [lines.slice(0, at).join("\n").trimEnd(), block, lines.slice(at).join("\n").trimStart()]
-              .filter(Boolean)
-              .join("\n\n");
-    }
-  }
-  return current;
-}
-
-function initialPreview(summary: string, detail: string): string {
-  const image = detail.match(/!\[[^\]]*\]\((?:https?:\/\/[^)\s]+)\)/)?.[0];
-  return [summary.trim(), image].filter(Boolean).join("\n\n");
-}
-
-const PREVIEW_MANUAL = "manual";
-const normalizePreviewText = (value: string): string =>
-  value
-    .normalize("NFC")
-    .replace(/\r\n/g, "\n")
-    .replace(/[ \t]+$/gm, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-const previewHash = (value: string): string => `v1:${contentHash(normalizePreviewText(value))}`;
-const readPreviewAutoHash = (value: unknown): string =>
-  typeof value === "string" && (value === PREVIEW_MANUAL || /^v1:[0-9a-f]{14}$/.test(value)) ? value : "";
-const LEGACY_PREVIEW_BLOCK_START = /^(?:#|>|-|\*|\+|\||<|!|```|\d+[.)])/;
-const LEGACY_PREVIEW_IMAGE = /^!\[[^\]]*\]\(https?:\/\/[^)\s]+\)$/;
-
-/** What a new summary does to the preview: the new preview text (null = leave it) and the hash to store. */
-function followedPreview(
-  current: string,
-  auto: string,
-  hash: string,
-  initialized: boolean
-): { preview: string | null; hash: string } {
-  if (hash === PREVIEW_MANUAL) return { preview: null, hash };
-  const text = isPlaceholder(current) ? "" : normalizePreviewText(current);
-  const paragraphs = text ? text.split("\n\n") : [];
-  const replaceFirst = (count: number): { preview: string; hash: string } => ({
-    preview: [auto, ...paragraphs.slice(count)].join("\n\n"),
-    hash: previewHash(auto)
-  });
-  if (hash) {
-    for (let k = 1; k <= paragraphs.length; k++)
-      if (previewHash(paragraphs.slice(0, k).join("\n\n")) === hash) return replaceFirst(k);
-    return { preview: null, hash };
-  }
-  if (!initialized) return text ? { preview: null, hash: PREVIEW_MANUAL } : replaceFirst(0);
-  const [first, second] = paragraphs;
-  if (!first || first.includes("\n") || LEGACY_PREVIEW_BLOCK_START.test(first))
-    return { preview: null, hash: PREVIEW_MANUAL };
-  return replaceFirst(second !== undefined && LEGACY_PREVIEW_IMAGE.test(second) ? 2 : 1);
-}
-
-function noteBody(
-  title: string,
-  summary: string,
-  language: NoteLanguage,
-  prompt = "",
-  rules = "",
-  preview = "",
-  detail = "",
-  visualReferences = "",
-  newFindings = "",
-  leftover = "",
-  layout: "answer-first" | "legacy" = "answer-first",
-  calloutType = "info",
-  coverBlock = ""
-): string {
-  if (layout === "legacy") {
-    const legacyBlock = `${DETAIL_START}\n${detailWithVisualReferences(detail, visualReferences, standardTemplate(language))}\n${DETAIL_END}`;
-    return (
-      [
-        `# ${title}`,
-        coverBlock,
-        `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
-        `## Prompt\n\n${prompt.trim()}`,
-        rules.trim() ? `## Rules\n\n${rules.trim()}` : "",
-        `## ${previewHeading(language)}\n\n${preview.trim()}`,
-        `## Detail\n\n${legacyBlock}`,
-        newFindings.trim() ? `## Working Findings\n\n${newFindings.trim()}` : "",
-        leftover.trim()
-      ]
-        .filter(Boolean)
-        .join("\n\n") + "\n"
-    );
-  }
-  const { text: readerDetail, marker } = splitOpenItems(detail);
-  const detailBlock = `${DETAIL_START}\n${detailWithVisualReferences(readerDetail, visualReferences, standardTemplate(language))}\n${DETAIL_END}${marker ? `\n\n${marker}` : ""}`;
-  // The answer comes first: summary, the Preview callout (it feeds the hover card), then Detail; the task text follows
-  // as a collapsed callout, and an empty (or placeholder) Preview and an empty Prompt are left out. Whether Preview was initialized stays in frontmatter.
-  return (
-    [
-      `# ${title}`,
-      coverBlock,
-      `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
-      preview.trim() && !isPlaceholder(preview.trim())
-        ? calloutSection(previewHeading(language), preview, calloutType)
-        : "",
-      `## Detail\n\n${detailBlock}`,
-      prompt.trim() ? calloutSection("Prompt", prompt, calloutType) : "",
-      rules.trim() ? `## Rules\n\n${rules.trim()}` : "",
-      newFindings.trim() ? `## Working Findings\n\n${newFindings.trim()}` : "",
-      leftover.trim()
-    ]
-      .filter(Boolean)
-      .join("\n\n") + "\n"
-  );
-}
-
-function normalizeBodyOrder(
-  content: string,
-  title: string,
-  summaryFallback: string,
-  language: NoteLanguage,
-  textLanguage: NoteLanguage = language,
-  book = false
-): string {
-  // The cover block of a picture-book note (see core/book-pipeline/cover-block.ts) stays directly under the title wherever it was found;
-  // it is taken out first so its embed never feeds the Preview.
-  const cover = readCoverBlock(content);
-  const coverBlock = cover ? content.slice(cover.from, cover.to) : "";
-  const clean = ensurePreview(withoutReference(cover ? stripCoverBlock(content) : content), language, textLanguage);
-  const currentSummary = section(clean, "Current Summary") || summaryFallback;
-  const summary = isPlaceholder(currentSummary) ? placeholder(textLanguage) : currentSummary;
-  const prompt = section(clean, "Prompt");
-  const rules = section(clean, "Rules");
-  const preview = previewSection(clean);
-  const detail = detailWithVisualReferences(
-    section(clean, "Detail"),
-    section(clean, "Visual References"),
-    standardTemplate(language)
-  );
-  const newFindings = section(clean, "Working Findings") || section(clean, "New Findings");
-  let leftover = clean.replace(/^# .*$(?:\r?\n)*/m, "");
-  // An open-items marker saved after the Detail block is left over once Detail is removed; it goes back beside Detail.
-  const openItems = splitOpenItems(leftover);
-  leftover = openItems.text;
-  for (const heading of [
-    "Current Summary",
-    "Prompt",
-    "Rules",
-    "預覽",
-    "Preview",
-    "Detail",
-    "Visual References",
-    "Working Findings",
-    "New Findings"
-  ] as NoteSection[])
-    leftover = removeSection(leftover, heading);
-  const withMarker = openItems.marker && !splitOpenItems(detail).marker ? `${detail}\n\n${openItems.marker}` : detail;
-  // A note written before the answer-first layout (its Prompt sits above Detail) keeps its layout, so a write that
-  // does not change its content leaves it byte-identical; new notes use the answer-first layout.
-  const detailAt = clean.search(/^## Detail\s*$/m);
-  const legacy = /^## Prompt\s*$/m.test(detailAt >= 0 ? clean.slice(0, detailAt) : clean);
-  return noteBody(
-    title,
-    summary,
-    language,
-    prompt,
-    rules,
-    preview,
-    withMarker,
-    "",
-    newFindings,
-    leftover,
-    legacy && !book ? "legacy" : "answer-first",
-    book ? "vam-book" : "info",
-    coverBlock
-  );
-}
-
-const REFERENCE_LABELS = ["所屬主題", "所屬心智圖", "母議題", "子議題", "來源議題", "狀態"];
-const ENGLISH_REFERENCE_LABELS = ["Topic", "Mind map", "Parent topic", "Child topics", "Source topic", "Status"];
-/** The fixed text of a note's relationship lines, by note language (the labels are in the order of {@link REFERENCE_LABELS}). */
-interface ReferenceText {
-  readonly labels: readonly string[];
-  readonly none: string;
-  readonly archived: string;
-  readonly unassigned: string;
-  readonly colon: string;
-  readonly listSeparator: string;
-  /**
-   * The wording of a topic relation at each end, `[kind, start, finish]` in the order the lines are written. Start is
-   * the relation's `from` end (A supports B: A reads "Supports: [[B]]", B reads "Supported by: [[A]]"); `related` has
-   * no direction, so both ends read the same.
-   */
-  readonly relations: ReadonlyArray<readonly [TopicRelationKind, string, string]>;
-}
-const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>> = {
-  "zh-TW": {
-    labels: REFERENCE_LABELS,
-    none: "無",
-    archived: "已封存",
-    unassigned: "未歸類",
-    colon: "：",
-    listSeparator: "、",
-    relations: [
-      ["supports", "支持", "被支持"],
-      ["contradicts", "反駁", "被反駁"],
-      ["verifies", "驗證", "被驗證"],
-      ["derives_from", "推導自", "推導出"],
-      ["prerequisite", "是前置知識於", "前置知識"],
-      ["related", "相關", "相關"]
-    ]
-  },
-  en: {
-    labels: ENGLISH_REFERENCE_LABELS,
-    none: "None",
-    archived: "Archived",
-    unassigned: "Unassigned",
-    colon: ": ",
-    listSeparator: ", ",
-    relations: [
-      ["supports", "Supports", "Supported by"],
-      ["contradicts", "Contradicts", "Contradicted by"],
-      ["verifies", "Verifies", "Verified by"],
-      ["derives_from", "Derived from", "Derives"],
-      ["prerequisite", "Prerequisite for", "Prerequisites"],
-      ["related", "Related", "Related"]
-    ]
-  }
-};
-/**
- * The relation lines of the topic `nodeId` in `map`: one line per wording that has any relation, in kind order with the
- * start wording first, the other ends joined like Child topics. A relation is skipped when either end is not a topic
- * of the map with a Markdown note (`hasNote`). Descriptions are never written.
- */
-function relationReferences(
-  map: MapDocument,
-  nodeId: string,
-  language: NoteLanguage,
-  hasNote: (path: string) => boolean
-): string[] {
-  const ref = REFERENCE_TEXT[language];
-  const notes = new Map(map.nodes.filter(node => hasNote(node.path)).map(node => [node.id, node.path]));
-  if (!notes.has(nodeId)) return [];
-  const lines: string[] = [];
-  for (const [kind, start, finish] of ref.relations) {
-    const ends = (side: "from" | "to"): string[] =>
-      (map.topicRelations ?? [])
-        .filter(r => r.kind === kind && r[side] === nodeId)
-        .map(r => notes.get(side === "from" ? r.to : r.from))
-        .filter((path): path is string => path !== undefined);
-    const groups =
-      start === finish
-        ? [[start, [...ends("from"), ...ends("to")]] as const]
-        : [[start, ends("from")] as const, [finish, ends("to")] as const];
-    for (const [label, paths] of groups)
-      if (paths.length)
-        lines.push(
-          `${label}${ref.colon}${[...new Set(paths)].map(path => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
-        );
-  }
-  return lines;
-}
-
-function localizeReference(value: string, language: NoteLanguage): string {
-  const match =
-    /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
-      value
-    );
-  if (!match) return value;
-  const index = (REFERENCE_LABELS.includes(match[1]) ? REFERENCE_LABELS : ENGLISH_REFERENCE_LABELS).indexOf(match[1]);
-  const target = REFERENCE_TEXT[language];
-  const plain =
-    match[2] === "無" || match[2] === "None"
-      ? target.none
-      : match[2] === "已封存" || match[2] === "Archived"
-        ? target.archived
-        : match[2] === "未歸類" || match[2] === "Unassigned"
-          ? target.unassigned
-          : match[2];
-  return `${target.labels[index]}${target.colon}${plain}`;
-}
-
-/**
- * The language a note's derived scaffolding (Preview heading, summary placeholder, relationship labels) is already
- * written in, or undefined when it has none. A rebuild keeps it, so changing the UI language never relabels notes.
- */
-function derivedLabelLanguage(content: string, fm: Record<string, unknown>): NoteLanguage | undefined {
-  if (Array.isArray(fm["agent-map-references"]))
-    for (const entry of fm["agent-map-references"]) {
-      const label = /^([^：:]+)[：:]/.exec(String(entry))?.[1];
-      if (label && REFERENCE_LABELS.includes(label)) return "zh-TW";
-      if (label && ENGLISH_REFERENCE_LABELS.includes(label)) return "en";
-    }
-  if (/^(?:## |> \[!info\][+-]? )預覽[ \t]*$/m.test(content)) return "zh-TW";
-  if (/^(?:## |> \[!info\][+-]? )Preview[ \t]*$/m.test(content)) return "en";
-  const summary = section(content, "Current Summary");
-  if (summary === placeholder("zh-TW")) return "zh-TW";
-  if (summary === placeholder("en")) return "en";
-  return undefined;
-}
-
-function withReferenceLinks(body: string, fm: Record<string, unknown>, language: NoteLanguage): string {
-  const sources = Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : [];
-  const relationships = Array.isArray(fm["agent-map-references"])
-    ? fm["agent-map-references"].map(String).filter(text => text.includes("[["))
-    : [];
-  const label = translate(language, "note.source_topic_label");
-  const links = [
-    ...relationships.map(value => localizeReference(value, language)),
-    ...sources.map(path => `${label}[[${noteLink(path)}]]`)
-  ];
-  const clean = withoutReference(body).trimEnd();
-  return links.length
-    ? `${clean}\n\n${REFERENCE_START}\n## Reference Links\n\n${[...new Set(links)].map(link => `- ${link}`).join("\n")}\n${REFERENCE_END}\n`
-    : `${clean}\n`;
-}
-
-function noteLink(path: string): string {
-  return path.replace(/\.md$/, "").replace(/\|/g, "\\|");
 }
 
 /** Files an OS leaves in a folder; they do not make it non-empty. */
@@ -1286,17 +282,19 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            // A process callback can run later, after the vault's own file queue releases it.
+            if ((property === "process" || property === "processFrontMatter") && typeof args[1] === "function") {
+              const change = args[1] as (...values: unknown[]) => unknown;
+              args[1] = (...values: unknown[]): unknown => {
+                if (disposed()) throw new Error(message());
+                return change(...values);
+              };
+            }
             return Reflect.apply(call, object, args);
           }
         : (...args: unknown[]): unknown => Reflect.apply(call, object, args);
     }
   });
-}
-
-/** Node id, x and y of every node, sorted by id: the part of a Map.md that a drag or a layout changes (viewport left out). */
-export function coordinatePrint(map: MapDocument): string {
-  const nodes = [...map.nodes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return JSON.stringify(nodes.map(node => [node.id, node.x, node.y]));
 }
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -2762,132 +1760,17 @@ export class Repository {
     return target;
   }
 
-  /**
-   * Moves or renames a note or folder. When every note that links to it is a VAM note, the move is made with
-   * `vault.rename` (no "Update links" dialog) and the links in those VAM notes are rewritten here. When any other
-   * note links to it, Obsidian's own `renameFile` runs so the user's link preference is honoured, after one Notice.
-   * The link rewrite reads the notes' current text, not the metadata cache, so a note rewritten a moment ago by the
-   * previous move of the same operation is handled correctly. If a rewrite cannot be applied (the note changed in the
-   * meantime) this undoes its own writes and the move, then throws, so the caller's rollback sees an unmoved note.
-   */
   private async relocate(item: TFile | TFolder, target: string): Promise<void> {
-    const resolvedLinks = this.app.metadataCache.resolvedLinks as Record<string, Record<string, number>> | undefined;
-    if (!resolvedLinks) {
-      await this.app.fileManager.renameFile(item, target);
-      return;
-    }
-    const moves = new Map<string, string>();
-    const collect = (entry: TFile | TFolder): void => {
-      if (entry instanceof TFile) moves.set(entry.path, `${target}${entry.path.slice(item.path.length)}`);
-      else for (const child of entry.children) if (child instanceof TFile || child instanceof TFolder) collect(child);
-    };
-    collect(item);
-    const plan = await this.planLinkRewrites(item, moves, resolvedLinks);
-    if (plan.foreign > 0) {
-      new Notice(translate(this.settings.language, "ui.move_links_dialog_notice_0", plan.foreign));
-      await this.app.fileManager.renameFile(item, target);
-      return;
-    }
-    const origin = item.path;
-    await this.app.vault.rename(item, target);
-    // Trust the disk, not the await: the note must really be at its new place before its links are rewritten.
-    if (!this.app.vault.getAbstractFileByPath(target)) throw new Error(this.message("error.move_not_applied"));
-    const written: Array<{ path: string; before: string; after: string }> = [];
-    try {
-      for (const edit of plan.edits) {
-        const path = moves.get(edit.path) ?? edit.path,
-          file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
-        await this.app.vault.process(file, current => {
-          if (current !== edit.before)
-            throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
-          return edit.after;
-        });
-        written.push({ path, before: edit.before, after: edit.after });
-      }
-    } catch (error) {
-      try {
-        for (const entry of written.reverse()) {
-          const file = this.app.vault.getAbstractFileByPath(entry.path);
-          if (file instanceof TFile)
-            await this.app.vault.process(file, current => (current === entry.after ? entry.before : current));
-        }
-        const moved = this.app.vault.getAbstractFileByPath(target);
-        if (moved) await this.app.vault.rename(moved, origin);
-      } catch (rollbackError) {
-        const original = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          translate(
-            this.settings.language,
-            "error.move_undo_failed_0",
-            original,
-            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-          )
-        );
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Which notes would have to change for `moves` (old path to new path): `foreign` counts notes Obsidian must update
-   * (any non-VAM note, or a VAM note whose link cannot be rewritten here); `edits` holds the complete new text of each
-   * VAM note whose links change. Computed before anything is moved, so a failure writes nothing.
-   */
-  private async planLinkRewrites(
-    item: TFile | TFolder,
-    moves: ReadonlyMap<string, string>,
-    resolvedLinks: Record<string, Record<string, number>>
-  ): Promise<{ foreign: number; edits: Array<{ path: string; before: string; after: string }> }> {
-    // The metadata cache drops or lags a note's frontmatter right after VAM created or rewrote it (an earlier move of
-    // the same operation), so a miss there is not proof of a foreign note: the note's own text decides.
-    const owned = async (file: TFile): Promise<boolean> => {
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (marker(cached?.["agent-map-node"]) || marker(cached?.["visual-agent-map"])) return true;
-      const fm = frontmatter(await this.app.vault.read(file));
-      return marker(fm["agent-map-node"]) || marker(fm["visual-agent-map"]);
-    };
-    const foreign = new Set<string>(),
-      candidates = new Map<string, TFile>();
-    for (const [linkerPath, targets] of Object.entries(resolvedLinks)) {
-      if (!Object.keys(targets).some(path => moves.has(path))) continue;
-      const linker = this.app.vault.getAbstractFileByPath(linkerPath);
-      // A path that no longer exists is a cache entry that lags behind a move VAM just made; the note is found at its new path below.
-      if (!linker) continue;
-      if (linker instanceof TFile && linker.extension === "md" && (await owned(linker)))
-        candidates.set(linkerPath, linker);
-      else foreign.add(linkerPath);
-    }
-    // The cache can lag behind VAM's own recent writes, so VAM notes are also found by their current text.
-    // Moving a folder keeps every file name, so only full-path links (which contain the folder path) can change.
-    const needles = item instanceof TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];
-    for (const file of await this.markedFiles("agent-map-node")) {
-      if (candidates.has(file.path) || foreign.has(file.path)) continue;
-      const text = await this.app.vault.cachedRead(file);
-      if (needles.some(needle => text.includes(needle))) candidates.set(file.path, file);
-    }
-    const edits: Array<{ path: string; before: string; after: string }> = [];
-    for (const [path, file] of candidates) {
-      const before = await this.app.vault.read(file),
-        resolve = (linkPath: string): string | undefined =>
-          linkPath ? this.app.metadataCache.getFirstLinkpathDest(linkPath, path)?.path : undefined;
-      const { head, body } = splitFrontmatter(before);
-      // Frontmatter links are VAM's own `agent-map-references`, regenerated by rebuildDerivedData; any other key is the user's.
-      // `source-notes` and `reference-materials` hold plain vault paths, not wikilinks, and are repaired by replaceSourcePath.
-      const fm = frontmatter(before);
-      const userKeyLink = Object.entries(fm).some(
-        ([key, value]) =>
-          key !== "agent-map-references" &&
-          findWikilinks(JSON.stringify(value)).some(link => moves.has(resolve(linkPathOf(link.target)) ?? ""))
-      );
-      const result = rewriteLinkTargets(body, resolve, moves, path);
-      if (userKeyLink || result.unsupported.length) {
-        foreign.add(path);
-        continue;
-      }
-      if (result.text !== body) edits.push({ path, before, after: head + result.text });
-    }
-    return { foreign: foreign.size, edits };
+    return relocateFile(
+      {
+        app: this.app,
+        language: () => this.settings.language,
+        message: key => this.message(key),
+        markedNotes: () => this.markedFiles("agent-map-node")
+      },
+      item,
+      target
+    );
   }
 
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
@@ -3407,88 +2290,25 @@ export class Repository {
   }
 
   private async moveTopicsWithRollback(moves: OrganizeMove[], onProgress?: MoveProgress): Promise<Map<string, string>> {
-    const done: { move: OrganizeMove; newMapPath: string; originalMap: string; journal: PriorContent[] }[] = [],
-      mapping = new Map<string, string>();
-    // Only the moved topics and the notes that cite them can change: rebuild just those, once.
-    const scope = (): { roots: string[]; paths: string[] } => ({
-      roots: moves.flatMap(move => [move.fromRoot, move.toRoot]),
-      paths: done.flatMap(item => item.journal.map(prior => prior.path))
-    });
-    try {
-      for (const [index, move] of moves.entries()) {
-        if (this.disposed) throw new Error(this.message("error.plugin_unloaded"));
-        onProgress?.(index + 1, moves.length, move.title);
-        await this.folder(parentPath(move.toRoot));
-        const originalMap = await this.app.vault.read(this.file(move.mapPath));
-        const newMapPath = await this.renameTopic(move.mapPath, move.title, move.toRoot, { rebuild: false });
-        const journal: PriorContent[] = [];
-        // Trust the disk, not the order of awaits: the topic must really be at its new place before going on.
-        if (
-          !(this.app.vault.getAbstractFileByPath(move.toRoot) instanceof TFolder) ||
-          !(this.app.vault.getAbstractFileByPath(newMapPath) instanceof TFile)
-        )
-          throw new Error(this.message("error.move_not_applied"));
-        done.push({ move, newMapPath, originalMap, journal });
-        mapping.set(move.mapPath, newMapPath);
-        await this.rebasePathPrefix(move.fromRoot, move.toRoot, journal);
-      }
-      await this.rebuildDerivedData(scope());
-      return mapping;
-    } catch (error) {
-      const rollbackErrors: string[] = [];
-      for (const { move, newMapPath, originalMap, journal } of [...done].reverse()) {
-        try {
-          // Put back the exact text of every note and map the path rebase rewrote, then undo the folder move.
-          for (const prior of [...journal].reverse()) {
-            const file = this.app.vault.getAbstractFileByPath(prior.path);
-            if (file instanceof TFile) await this.app.vault.modify(file, prior.content);
-          }
-          await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
-          await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
-          this.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
-        } catch (rollbackError) {
-          rollbackErrors.push(
-            `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
-          );
-        }
-      }
-      try {
-        await this.rebuildDerivedData(scope());
-      } catch (rebuildError) {
-        rollbackErrors.push(rebuildError instanceof Error ? rebuildError.message : String(rebuildError));
-      }
-      if (rollbackErrors.length)
-        throw new Error(
-          `Organize failed (${error instanceof Error ? error.message : String(error)}); rollback also failed (${rollbackErrors.join("; ")}).`
-        );
-      throw error;
-    }
-  }
-
-  /** After a folder move: point note `source-notes`/`reference-materials` and other maps' references at the new prefix. */
-  private async rebasePathPrefix(from: string, to: string, journal: PriorContent[]): Promise<void> {
-    const rebase = (path: string): string =>
-      path.startsWith(`${from}/`) ? `${to}/${path.slice(from.length + 1)}` : path;
-    for (const file of await this.markedFiles("agent-map-node")) {
-      const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      const mentions = (list: unknown): boolean =>
-        Array.isArray(list) && list.some(item => typeof item === "string" && item.startsWith(`${from}/`));
-      if (cached && !mentions(cached["source-notes"]) && !mentions(cached["reference-materials"])) continue;
-      const note = await this.readNoteIfManaged(file);
-      if (!note) continue;
-      const patch: NotePatch = {};
-      const references = note.referencePaths ?? [];
-      if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
-      if (note.sourcePaths.some(path => rebase(path) !== path)) patch.sourcePaths = note.sourcePaths.map(rebase);
-      if (!Object.keys(patch).length) continue;
-      journal.push({ path: file.path, content: await this.app.vault.read(file) });
-      await this.updateNote(file.path, patch);
-    }
-    for (const { file, map } of await this.readableMaps()) {
-      if (!rebaseMapNotePaths(map, rebase)) continue;
-      journal.push({ path: file.path, content: await this.app.vault.read(file) });
-      await this.saveMap(file.path, map);
-    }
+    return moveTopicsWithRollback(
+      {
+        app: this.app,
+        isDisposed: () => this.disposed,
+        message: key => this.message(key),
+        folder: path => this.folder(path),
+        file: path => this.file(path),
+        renameTopic: (path, title, target, options) => this.renameTopic(path, title, target, options),
+        rebuildDerivedData: scope => this.rebuildDerivedData(scope),
+        noteRestoredMap: (path, text) => this.noteRestoredMap(path, text),
+        markedFiles: key => this.markedFiles(key),
+        readNoteIfManaged: file => this.readNoteIfManaged(file),
+        updateNote: (path, patch) => this.updateNote(path, patch),
+        readableMaps: () => this.readableMaps(),
+        saveMap: (path, map) => this.saveMap(path, map)
+      },
+      moves,
+      onProgress
+    );
   }
 
   async renameTopic(

@@ -6,6 +6,19 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, obsidian, fixture, TFile, TFolder } = require('./support.cjs');
 const { safeName, linkAlias } = load('repository.ts', { obsidian });
+const names = load('core/repository-names.ts');
+
+test('repository name policy preserves public helpers and folds entries without changing extensions', () => {
+  for (const title of ['...hidden.', '𠝹'.repeat(50), 'a | b', 'λόγος']) {
+    assert.equal(names.safeName(title), safeName(title));
+    assert.equal(names.linkAlias(title, 'fallback'), linkAlias(title, 'fallback'));
+  }
+  assert.equal(names.foldEntryName('ΛΌΓΟΣ.MD', true), names.foldEntryName('λόγοσ.md', true));
+  assert.equal(names.foldEntryName('Cafe\u0301.md', true), names.foldEntryName('Café.md', true));
+  assert.notEqual(names.foldEntryName('Straße.md', true), names.foldEntryName('Strasse.md', true));
+  assert.equal(names.foldEntryName('ABC.txt', true), 'abc.txt');
+  assert.equal(names.foldEntryName('folder.name', false), 'folder.name');
+});
 
 const noLoneSurrogate = value => !/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(value) && !value.includes('\ufffd');
 const fold = name => name.normalize('NFC').toLowerCase().replace(/ς/g, 'σ'); // like APFS: case and sigma only, not ß

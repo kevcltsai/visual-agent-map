@@ -221,14 +221,18 @@ export class CodexAppServerRuntime {
   }
 
   async listModels(): Promise<CodexModel[]> {
-    await this.start();
+    const starting = this.start();
+    const child = this.child;
+    await starting;
     const models: CodexModel[] = [];
     let cursor: string | null = null;
     do {
+      this.requireProcess(child);
       const response = (await this.request("model/list", { cursor, limit: 100, includeHidden: false })) as {
         data?: unknown[];
         nextCursor?: unknown;
       };
+      this.requireProcess(child);
       for (const value of response.data ?? []) {
         if (!value || typeof value !== "object") continue;
         const item = value as Partial<CodexModel>;
@@ -281,8 +285,11 @@ export class CodexAppServerRuntime {
     }
   ): Promise<string> {
     if (controls?.signal?.aborted) throw cancelledError();
-    await this.start();
+    const starting = this.start();
+    const child = this.child;
+    await starting;
     if (controls?.signal?.aborted) throw cancelledError();
+    this.requireProcess(child);
     let textConfig: Record<string, unknown> | undefined;
     if (controls?.textOnly || controls?.webSearchOnly || controls?.generateImage) {
       const effective = (await this.request("config/read", { includeLayers: false, cwd: this.options.cwd })) as {
@@ -321,6 +328,7 @@ export class CodexAppServerRuntime {
       }
       if (controls.signal?.aborted) throw cancelledError();
     }
+    this.requireProcess(child);
     const started = (await this.request("thread/start", {
       model: model || null,
       cwd: this.options.cwd,
@@ -340,6 +348,7 @@ export class CodexAppServerRuntime {
     })) as { thread?: { id?: unknown } };
     const threadId = typeof started.thread?.id === "string" ? started.thread.id : "";
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
+    this.requireProcess(child);
 
     let timedOut = false,
       interruptRequested = false;
@@ -381,7 +390,7 @@ export class CodexAppServerRuntime {
     const state = this.turns.get(threadId)!;
     void completed.catch(() => undefined);
     const interrupt = (timeoutMs = CONTROL_TIMEOUT_MS, failure = t("error.ai_task_cancel_failed")): void => {
-      if (!state.turnId || interruptRequested) return;
+      if (this.child !== child || !state.turnId || interruptRequested) return;
       interruptRequested = true;
       void this.request("turn/interrupt", { threadId, turnId: state.turnId }, timeoutMs).catch(error =>
         this.options.onLog?.("warn", `${failure}：${error instanceof Error ? error.message : String(error)}`)
@@ -418,7 +427,10 @@ export class CodexAppServerRuntime {
             : item
         )
       });
+      if (controls?.signal?.aborted) throw cancelledError();
+      this.requireProcess(child);
       const startedTurn = (await this.request("turn/start", turnRequest)) as { turn?: { id?: unknown } };
+      this.requireProcess(child);
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
       if (!state.turnId) throw new Error("Codex App Server accepted no turn id.");
       if (!timedOut && !controls?.signal?.aborted && this.turns.get(threadId) === state) controls?.onAccepted?.();
@@ -426,6 +438,8 @@ export class CodexAppServerRuntime {
         if (controls.signal?.aborted || this.turns.get(threadId) !== state || !state.turnId) throw cancelledError();
         const steerRequest = { threadId, expectedTurnId: state.turnId, input: [{ type: "text", text }] };
         controls?.onRequest?.(steerRequest);
+        if (controls.signal?.aborted || this.turns.get(threadId) !== state) throw cancelledError();
+        this.requireProcess(child);
         await this.request("turn/steer", steerRequest);
       });
       if (timedOut) interrupt(5_000, t("error.ai_task_stop_after_timeout_failed"));
@@ -433,10 +447,10 @@ export class CodexAppServerRuntime {
       this.steerIfNeeded(threadId, state);
       const answer = await completed;
       if (controls?.signal?.aborted) throw cancelledError();
+      this.requireProcess(child);
       return outputSchema ? replyWithoutAddedNulls(answer, outputSchema) : answer;
     } catch (error) {
-      const state = this.turns.get(threadId);
-      if (state) {
+      if (this.turns.get(threadId) === state) {
         window.clearTimeout(state.timeout);
         this.turns.delete(threadId);
         state.reject(error instanceof Error ? error : new Error(String(error)));
@@ -453,7 +467,7 @@ export class CodexAppServerRuntime {
         /* Diagnostics are best effort. */
       }
       try {
-        await this.request("thread/unsubscribe", { threadId }, 5_000);
+        if (this.child === child) await this.request("thread/unsubscribe", { threadId }, 5_000);
       } catch (error) {
         this.options.onLog?.(
           "warn",
@@ -500,6 +514,7 @@ export class CodexAppServerRuntime {
       clientInfo: { name: "visual-agent-map", title: "Visual Agent Map", version: this.options.clientVersion },
       capabilities: { experimentalApi: false, requestAttestation: false }
     });
+    this.requireProcess(child);
     this.send({ method: "initialized" });
     this.options.onLog?.("info", t("log.codex_ready"));
   }
@@ -507,7 +522,7 @@ export class CodexAppServerRuntime {
   private consume(child: ChildProcessHandle, chunk: string): void {
     if (this.child !== child) return;
     this.buffer += chunk;
-    while (true) {
+    while (this.child === child) {
       const newline = this.buffer.indexOf("\n");
       if (newline < 0) return;
       const line = this.buffer.slice(0, newline).trim();
@@ -689,6 +704,7 @@ export class CodexAppServerRuntime {
       input: [{ type: "text", text: searchBudgetExhaustedMessage() }]
     };
     state.onRequest?.(steerRequest);
+    if (this.turns.get(threadId) !== state) return;
     void this.request("turn/steer", steerRequest).catch(error =>
       this.options.onLog?.(
         "warn",
@@ -731,6 +747,11 @@ export class CodexAppServerRuntime {
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
+  }
+
+  /** A continuation from a stopped process must never send requests to its replacement. */
+  private requireProcess(child: ChildProcessHandle | null): void {
+    if (!child || this.child !== child) throw new Error(t("ui.codex_app_server_has_stopped"));
   }
 
   private send(message: object): void {

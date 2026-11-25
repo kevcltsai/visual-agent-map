@@ -220,6 +220,12 @@ integrationTest('prelaunch AI failures release task ownership and preserve start
     if (enteredRunning && patch.status === 'idea') throw new Error('status restore failed');
     return originalUpdate(path, patch);
   };
+  // The status restore now goes through settleRunningNote (guarded settle); inject the same failure there.
+  const originalSettle = abortRepo.settleRunningNote.bind(abortRepo);
+  abortRepo.settleRunningNote = async (path, patch) => {
+    if (enteredRunning && patch.status === 'idea') throw new Error('status restore failed');
+    return originalSettle(path, patch);
+  };
   const abortPlugin = { repo: abortRepo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(), askModel: async () => { assert.fail('provider must not start'); }, mutate: async work => work(), views: () => [abortView] }; let abortView;
   abortView = new VisualAgentMapView({ app: abortApp }, attachTopicRuns(abortPlugin)); abortView.path = 'Map.md'; abortView.map = map([abortNode]); abortView.render = () => {};
   await assert.rejects(startResearch(abortPlugin, abortNode, { map: abortView.map, onStarted: async () => { abortPlugin.activeTasks.get(abortNode.path).abort(); } }), /status restore failed/);

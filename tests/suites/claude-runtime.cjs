@@ -735,6 +735,66 @@ test('S6 pool: Stop after the process was taken kills it; Stop before the run re
   assert.equal(h2.children[0].signals[0], 'SIGTERM'); assert.equal(h2.pool.size, 0);
 });
 
+
+test('Claude preflight: cancellation inside onRequest neither spawns a cold process nor sends a prompt', async () => {
+  const h = warmHarness();
+  const controller = new AbortController();
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, {
+    stream: true, webSearch: true, signal: controller.signal, onRequest: () => controller.abort()
+  });
+  const spawned = h.children.length;
+  // Settle a regressed implementation too, rather than leaving its timeout running.
+  for (const child of h.children) h.finish(child);
+  await assert.rejects(run, error => error.name === 'AbortError');
+  assert.equal(spawned, 0);
+});
+
+test('Claude preflight: a stop from any preparation hook releases the claimed warm process without writing', async () => {
+  for (const hook of ['onRequest', 'onStreamMode', 'onMilestones']) {
+    const h = warmHarness();
+    assert.equal(h.runtime.prewarm('sonnet', 'low', h.schema, true), true);
+    const warm = h.children[0];
+    const controller = new AbortController();
+    const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, {
+      stream: true, webSearch: true, signal: controller.signal, [hook]: () => controller.abort()
+    });
+    const writes = warm.writes.length;
+    if (writes) h.finish(warm);
+    await assert.rejects(run, error => error.name === 'AbortError');
+    assert.equal(writes, 0, hook);
+    assert.deepEqual(warm.signals, ['SIGTERM'], hook);
+    assert.equal(h.pool.size, 0);
+    assert.equal(h.children.length, 1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.clock.pending(), 0);
+  }
+});
+
+test('Claude preflight: a throwing request hook kills only the claimed warm process, including escalation', async () => {
+  const h = warmHarness();
+  h.runtime.prewarm('sonnet', 'low', h.schema, true);
+  const claimed = h.children[0];
+  claimed.ignoreTerm = true;
+  const error = new Error('request hook failure');
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, {
+    stream: true, webSearch: true, onRequest: () => {
+      h.runtime.prewarm('haiku', 'low', h.schema, true);
+      throw error;
+    }
+  });
+  await assert.rejects(run, actual => actual === error);
+  assert.equal(claimed.writes.length, 0);
+  assert.deepEqual(claimed.signals, ['SIGTERM']);
+  assert.equal(h.children.length, 2);
+  const other = h.children[1];
+  assert.equal(h.pool.size, 1);
+  h.clock.advance(1500);
+  assert.deepEqual(claimed.signals, ['SIGTERM', 'SIGKILL']);
+  assert.deepEqual(other.signals, []);
+  assert.equal(h.pool.size, 1);
+  h.pool.release();
+});
+
 test('S6 pool: AiRuntimeService.reset() (plugin unload and runtime reset) kills the waiting process; releaseWarm kills it too', () => {
   const h = warmHarness();
   const { AiRuntimeService } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawn: h.spawn } });

@@ -2733,3 +2733,76 @@ test('social video cards: a Facebook or Instagram video link or image in rendere
     for (const [key, descriptor] of saved) { if (descriptor) Object.defineProperty(El.prototype, key, descriptor); else delete El.prototype[key]; }
   }
 });
+
+integrationTest('rename reference rewrite preserves owner edits made after candidate read', async () => {
+  const { repo, app } = fixture();
+  const note = await topicNote(repo, 'Concurrent references');
+  const old = 'Personal/old.md', next = 'Personal/new.md', added = 'Personal/added.md';
+  await repo.updateNote(note.path, { sourcePaths: [old], referencePaths: [old] });
+  const process = app.vault.process;
+  let injected = false;
+  app.vault.process = async (file, change) => {
+    if (file.path === note.path && !injected) {
+      injected = true;
+      await repo.updateNote(note.path, { sourcePaths: [old, added], referencePaths: [added], detail: 'Owner text' });
+    }
+    return process(file, change);
+  };
+  await repo.replaceSourcePath(old, next);
+  const after = await repo.readNote(note.path);
+  assert.equal(injected, true);
+  assert.deepEqual(Array.from(after.sourcePaths), [next, added]);
+  assert.deepEqual(Array.from(after.referencePaths), [added]);
+  assert.match(after.detail, /Owner text/);
+});
+
+integrationTest('a reference rewrite failure does not block the later affected notes', async () => {
+  const { repo, app } = fixture();
+  const a = await topicNote(repo, 'First'), b = await topicNote(repo, 'Second');
+  const old = 'Personal/old.md', next = 'Personal/new.md';
+  for (const note of [a, b]) await repo.updateNote(note.path, { sourcePaths: [old] });
+  const process = app.vault.process;
+  const failure = new Error('first note not writable');
+  app.vault.process = async (file, change) => {
+    if (file.path === a.path) throw failure;
+    return process(file, change);
+  };
+  await assert.rejects(repo.replaceSourcePath(old, next), error => error === failure);
+  assert.deepEqual(Array.from((await repo.readNote(a.path)).sourcePaths), [old]);
+  assert.deepEqual(Array.from((await repo.readNote(b.path)).sourcePaths), [next]);
+});
+
+integrationTest('a note snapshot carries the exact parsed content and settlement does not overwrite a later status', async () => {
+  const { repo, contents } = fixture();
+  const note = await topicNote(repo, 'Settling');
+  await repo.updateNote(note.path, { status: 'running', detail: 'Original' });
+  const snapshot = await repo.readNoteSnapshot(note.path);
+  assert.equal(snapshot.content, contents.get(note.path));
+  assert.match(snapshot.note.detail, /Original/);
+  await repo.updateNote(note.path, { status: 'completed', detail: 'Owner edit' });
+  const current = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { detail: 'AI edit' }, { expectedContent: snapshot.content }), 'discarded');
+  await repo.settleRunningNote(note.path, { status: 'idea' });
+  assert.equal(contents.get(note.path), current);
+  await repo.updateNote(note.path, { status: 'running' });
+  await repo.settleRunningNote(note.path, { status: 'idea' });
+  assert.equal((await repo.readNote(note.path)).status, 'idea');
+});
+
+integrationTest('a note whose managed marker is removed before a rename commit is left alone', async () => {
+  const { repo, app, contents } = fixture();
+  const note = await topicNote(repo, 'Detached');
+  await repo.updateNote(note.path, { sourcePaths: ['Personal/old.md'] });
+  const process = app.vault.process;
+  let detached;
+  app.vault.process = async (file, change) => {
+    if (file.path === note.path && detached === undefined) {
+      detached = contents.get(note.path).replace(/^agent-map-node:.*$/m, 'agent-map-node: false');
+      contents.set(note.path, detached);
+    }
+    return process(file, change);
+  };
+  await repo.replaceSourcePath('Personal/old.md', 'Personal/new.md');
+  assert.ok(detached);
+  assert.equal(contents.get(note.path), detached);
+});

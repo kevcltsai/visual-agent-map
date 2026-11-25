@@ -382,7 +382,7 @@ test('Claude usage counts cache_creation and cache_read tokens as input, in stre
   const usage = { input_tokens: 2, cache_creation_input_tokens: 1000, cache_read_input_tokens: 40000, output_tokens: 300 };
   const h = streamHarness();
   const out = await h.run([h.sys, ...h.structuredCall('so1'), h.result({ usage })]);
-  assert.deepEqual(out.milestones[0].usage, { inputTokens: 41002, outputTokens: 300 });
+  assert.deepEqual(out.milestones[0].usage, { inputTokens: 41002, outputTokens: 300, cacheReadInputTokens: 40000, cacheWriteInputTokens: 1000 });
   const { EventEmitter } = require('node:events');
   const spawn = () => {
     const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
@@ -395,7 +395,7 @@ test('Claude usage counts cache_creation and cache_read tokens as input, in stre
   const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
   const seen = [];
   await new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn }).runTask('p', 'sonnet', 'low', { type: 'object' }, { onMilestones: data => seen.push(JSON.parse(JSON.stringify(data))) });
-  assert.deepEqual(seen[0].usage, { inputTokens: 41002, outputTokens: 300 });
+  assert.deepEqual(seen[0].usage, { inputTokens: 41002, outputTokens: 300, cacheReadInputTokens: 40000, cacheWriteInputTokens: 1000 });
 });
 
 test('Claude stream-json: a line that cannot be read stops stage and preview updates but the result is still taken', async () => {

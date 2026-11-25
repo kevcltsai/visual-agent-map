@@ -2,6 +2,7 @@ import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-
 import { t } from "./i18n";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { isRecord } from "./core/is-record";
+import type { ReportedAiUsage } from "./core/ai-usage-measurement";
 
 function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value);
@@ -60,7 +61,7 @@ export interface AiMilestones {
   slowShownAt?: string;
   resendOf?: string;
   resentAs?: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: ReportedAiUsage;
 }
 
 export interface AiExchange {

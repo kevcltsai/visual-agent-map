@@ -14,7 +14,7 @@ export interface UsageTokens {
 export type UsageProvider = "claude" | "codex";
 
 /** Query sums: `estimated` is present (true) only when at least one summed row was counted from text, not reported. */
-export type UsageSum = UsageTokens & { estimated?: true };
+export type UsageSum = UsageTokens & { estimated?: true; incomplete?: true };
 
 /** One provider call. `at` is an ISO instant; `estimated` is true when the tokens were counted from text, not reported. */
 export interface UsageEntry extends UsageTokens {
@@ -25,6 +25,8 @@ export interface UsageEntry extends UsageTokens {
   provider: UsageProvider;
   model: string;
   estimated: boolean;
+  /** At least one provider-reported side is unavailable; numeric fields are known subtotals. */
+  incomplete?: true;
   durationMs?: number;
 }
 
@@ -35,7 +37,7 @@ export type UsageQuery<T> = { status: "ready"; value: T } | { status: "unreadabl
 export const USAGE_DETAIL_DAYS = 90;
 
 /** Folded tokens; `estimated` is set when any folded row was an estimate. */
-type FoldedTokens = UsageTokens & { estimated?: true };
+type FoldedTokens = UsageSum;
 type ActionTokens = Partial<Record<UsageAction, FoldedTokens>>;
 /**
  * One month of folded-away details: per map path ("" = no map) and action, for both providers together in `maps`
@@ -70,13 +72,17 @@ function isEntry(value: unknown): value is UsageEntry {
     typeof value.model === "string" &&
     isTokens(value) &&
     typeof value.estimated === "boolean" &&
+    (value.incomplete === undefined || value.incomplete === true) &&
     (value.durationMs === undefined || isCount(value.durationMs))
   );
 }
 
 const isFolded = (value: unknown): boolean =>
   isTokens(value) &&
-  ((value as { estimated?: unknown }).estimated === undefined || (value as { estimated?: unknown }).estimated === true);
+  ((value as { estimated?: unknown }).estimated === undefined ||
+    (value as { estimated?: unknown }).estimated === true) &&
+  ((value as { incomplete?: unknown }).incomplete === undefined ||
+    (value as { incomplete?: unknown }).incomplete === true);
 const isMaps = (value: unknown): boolean =>
   isRecord(value) &&
   Object.values(value).every(
@@ -208,6 +214,7 @@ export class AiUsageStore {
       sum.inputTokens += tokens.inputTokens;
       sum.outputTokens += tokens.outputTokens;
       if (estimated) sum.estimated = true;
+      if (tokens.incomplete) sum.incomplete = true;
     });
     return { status: "ready", value: sum };
   }
@@ -220,6 +227,7 @@ export class AiUsageStore {
       result[action].inputTokens += tokens.inputTokens;
       result[action].outputTokens += tokens.outputTokens;
       if (estimated) result[action].estimated = true;
+      if (tokens.incomplete) result[action].incomplete = true;
     });
     return { status: "ready", value: result };
   }
@@ -258,7 +266,7 @@ export class AiUsageStore {
 
   private each(
     query: { mapPath?: string; since?: number; provider?: UsageProvider },
-    visit: (action: UsageAction, tokens: UsageTokens, estimated: boolean) => void
+    visit: (action: UsageAction, tokens: UsageTokens & { incomplete?: true }, estimated: boolean) => void
   ): void {
     const { mapPath, since, provider } = query;
     for (const entry of this.entries) {
@@ -299,6 +307,7 @@ export class AiUsageStore {
         tokens.inputTokens += entry.inputTokens;
         tokens.outputTokens += entry.outputTokens;
         if (entry.estimated) tokens.estimated = true;
+        if (entry.incomplete) tokens.incomplete = true;
       }
     }
     this.entries = keep;

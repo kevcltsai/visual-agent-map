@@ -1,6 +1,7 @@
 import type { WebSearchEvent } from "../types";
 import { outputSchemaFor, replyWithoutAddedNulls } from "./output-schema";
 import type { AiMilestones } from "../../ai-exchange-log";
+import { codexReportedUsage, type ReportedAiUsage } from "../../core/ai-usage-measurement";
 import { spawn as nodeSpawn } from "node:child_process";
 import { createUtf8StreamDecoder } from "./utf8-stream";
 import { t } from "../../i18n";
@@ -107,7 +108,7 @@ interface TurnState {
   generateImage?: boolean;
   generatedImage?: { result?: string; savedPath?: string; failure?: string };
   /** The thread's cumulative token usage from the latest `thread/tokenUsage/updated` (each call uses a fresh thread, so this is the call's own). */
-  usage?: { inputTokens: number; outputTokens: number };
+  usage?: ReportedAiUsage;
 }
 
 const CONTROL_TIMEOUT_MS = 30_000;
@@ -589,11 +590,8 @@ export class CodexAppServerRuntime {
     }
     if (message.method === "thread/tokenUsage/updated") {
       // Protocol: ThreadTokenUsageUpdatedNotification { threadId, turnId, tokenUsage: { total, last, modelContextWindow } }.
-      const total = (
-        params as { tokenUsage?: { total?: { inputTokens?: unknown; outputTokens?: unknown } } } | undefined
-      )?.tokenUsage?.total;
-      if (typeof total?.inputTokens === "number" && typeof total.outputTokens === "number")
-        state.usage = { inputTokens: total.inputTokens, outputTokens: total.outputTokens };
+      const total = (params as { tokenUsage?: { total?: unknown } } | undefined)?.tokenUsage?.total;
+      state.usage = codexReportedUsage(total) ?? state.usage;
       return;
     }
     if (message.method === "item/started") {

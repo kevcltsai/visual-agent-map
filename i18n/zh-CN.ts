@@ -961,7 +961,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.usage_empty": "这张心智图还没有 AI 请求记录。",
   "ui.usage_unreadable": "无法读取用量数据，所以不显示数字。插件文件夹里的 ai-usage.json 已原样保留。",
   "ui.usage_footer_scope": "只计算 VAM 发出的 AI 请求。",
-  "ui.usage_footer_estimates": "标“约”的是估算值。",
+  "ui.usage_footer_estimates": "标“约”的是估算值或不完整小计；未报告的 token 未计入。",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智图或父议题在 AI 运行期间已变更，未创建子议题。",
   "ui.creating_subtopics": "正在创建子议题…",

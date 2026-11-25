@@ -962,7 +962,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.usage_empty": "這張心智圖還沒有 AI 請求紀錄。",
   "ui.usage_unreadable": "無法讀取用量資料，所以不顯示數字。外掛資料夾裡的 ai-usage.json 已原樣保留。",
   "ui.usage_footer_scope": "只計算 VAM 發出的 AI 請求。",
-  "ui.usage_footer_estimates": "標「約」的是估算值。",
+  "ui.usage_footer_estimates": "標「約」的是估算值或不完整小計；未回報的 token 未計入。",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智圖或母議題在 AI 執行期間已變更，未建立子議題。",
   "ui.creating_subtopics": "正在建立子議題…",

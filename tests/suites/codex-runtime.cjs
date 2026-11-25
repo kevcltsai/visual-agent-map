@@ -743,7 +743,7 @@ integrationTest('Codex reports the thread token usage of a call through onMilest
     try {
       const running = runtime.runTask('prompt', 'model', 'low', undefined, { onMilestones: data => reported.push(plain(data)) });
       if (status === 'completed') assert.equal(await running, 'ok'); else await assert.rejects(running, /boom/);
-      assert.deepEqual(reported, [{ usage: { inputTokens: 900, outputTokens: 120 } }], status);
+      assert.deepEqual(reported, [{ usage: { inputTokens: 900, outputTokens: 120, cacheReadInputTokens: 0, cacheWriteInputTokens: 0 } }], status);
     } finally { runtime.stop(); }
   }
 });

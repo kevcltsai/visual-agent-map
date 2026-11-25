@@ -3465,49 +3465,63 @@ export class VisualAgentMapView extends ItemView {
   private async persist(): Promise<void> {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
+  private captureViewSession(): () => boolean {
+    const path = this.path;
+    const viewEpoch = this.viewEpoch;
+    const mapOpenEpoch = this.mapOpenEpoch;
+    return () => !this.closed && this.path === path && this.viewEpoch === viewEpoch && this.mapOpenEpoch === mapOpenEpoch;
+  }
+
   private async hydrate(
     isCurrent: () => boolean = () => true,
     onRead?: (index: number, note: Note | undefined) => void,
     meta?: { goal: string | undefined; context: string | undefined; sources: MapSource[] }
   ): Promise<{ failedPaths: string[] }> {
+    const current = this.captureViewSession();
+    const map = this.map;
+    const path = this.path;
+    const alive = () => current() && this.map === map && isCurrent();
+    if (!alive()) return { failedPaths: [] };
     let goal: string | undefined;
     let context: string | undefined;
     let sources: MapSource[] = [];
     // One context per hydrate: each ancestor note is read once however many notes inherit from it.
-    const ctx = createNoteReadContext(this.map ?? undefined);
+    const ctx = createNoteReadContext(map ?? undefined);
     if (meta) {
       // The caller already read Map.md once (synchronize); the goal and sources are not read again.
-      if (this.path && !this.map?.aim) ({ goal, context, sources } = meta);
-    } else if (this.path && !this.map?.aim) {
+      if (path && !map?.aim) ({ goal, context, sources } = meta);
+    } else if (path && !map?.aim) {
       try {
-        ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
+        ({ goal, context } = await this.plugin.repo.readRelevanceSetup(path));
       } catch {
         /* An unreadable goal is simply not shown. */
       }
+      if (!alive()) return { failedPaths: [] };
       try {
-        sources = await this.plugin.repo.readMapSources(this.path);
+        sources = await this.plugin.repo.readMapSources(path);
       } catch {
         /* Unreadable sources are simply not shown. */
       }
     }
     // A first read of each file can take about a second on a slow disk or iCloud vault, and the map stays blank until
     // every note is read, so notes are read a few at a time. Results keep the map's node order.
-    const nodes = this.map?.nodes ?? [];
+    if (!alive()) return { failedPaths: [] };
+    const nodes = map?.nodes ?? [];
     const read = new Array<Note | undefined>(nodes.length);
     let next = 0;
     const worker = async () => {
-      while (next < nodes.length && isCurrent()) {
+      while (next < nodes.length && alive()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, this.map ?? undefined, ctx);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, map ?? undefined, ctx);
         } catch {
           /* A missing note remains visible and removable on the map. */
         }
-        onRead?.(index, read[index]);
+        if (alive()) onRead?.(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return { failedPaths: [] };
+    if (!alive()) return { failedPaths: [] };
     const loaded = new Map<string, Note>();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -11636,6 +11650,9 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!this.path || !this.map || this.closed) return;
+    const current = this.captureViewSession();
+    const map = this.map;
+    const path = this.path;
     const snapshot = this.unsynced.snapshot(),
       seq = scope?.seq ?? 0;
     if (
@@ -11658,17 +11675,20 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     // Map.md is read once here; its goal and sources go to hydrate instead of being read again.
-    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(path);
+    if (!current() || this.map !== map) return;
     const structureChanged =
-      JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
+      JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...map, viewport: null });
     if (structureChanged) {
-      disk.viewport = this.map.viewport;
+      disk.viewport = map.viewport;
       this.map = disk;
       this.history.clear();
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    const read = await this.hydrate(undefined, undefined, meta);
+    const hydrationMap = this.map;
+    const read = await this.hydrate(current, undefined, meta);
+    if (!current() || this.map !== hydrationMap) return;
     // A note or ancestor whose read threw stays collected and is read again at the end of the next write. (Tests that
     // replace hydrate return nothing: nothing failed.)
     this.unsynced.settle(snapshot, (read as typeof read | undefined)?.failedPaths ?? [], seq);

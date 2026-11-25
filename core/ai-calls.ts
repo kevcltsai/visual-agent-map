@@ -273,9 +273,12 @@ export class AiCalls {
               }
             }),
         onRequest: (data: unknown): void => {
-          task.onRequest?.(data);
-          // Only Codex's fallback usage estimate needs the sent text. Keep logging and caller hooks independent.
+          if (finished) return;
+          // Count actual requests even if the runtime reports one while unwinding after a stop.
           if (this.options.usage && provider === "codex") sentText += promptTextOf(data);
+          if (controller.signal.aborted) return;
+          task.onRequest?.(data);
+          if (controller.signal.aborted) return;
           if (options.noContentLog) log()?.sent(id, JSON.stringify({ content: "omitted" }));
           else
             log()?.sent(

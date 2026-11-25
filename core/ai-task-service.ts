@@ -858,9 +858,11 @@ export class AiTaskService {
             reasoning,
             roundController.signal,
             undefined,
-            () => {
-              if (!roundController.signal.aborted) onRequestAccepted?.();
-            },
+            onRequestAccepted
+              ? () => {
+                  if (!roundController.signal.aborted) onRequestAccepted();
+                }
+              : undefined,
             undefined,
             undefined,
             round === 1 ? "reference-extract" : "reference-reduce"

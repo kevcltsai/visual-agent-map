@@ -182,6 +182,18 @@ test('a replacement exchange sink never receives events for the original sink en
   assert.deepEqual(events, ['begin', 'sent']); assert.deepEqual(replacementEvents, []);
 });
 
+test('a stopped or finished request cannot publish a late sent event or caller request hook', async () => {
+  const hold = deferred(); let controls, hooks = 0;
+  const h = harness({ run: request => { controls = request.controls; return hold.promise; } });
+  const pending = h.calls.run(prepared(), options({ task: { onRequest: () => { hooks++; } } }), raw => raw);
+  await flush();
+  h.calls.stopAll(); controls.onRequest({ via: 'late fallback' }); hold.resolve('late');
+  await assert.rejects(pending);
+  controls.onRequest({ via: 'after finish' });
+  assert.equal(hooks, 1);
+  assert.deepEqual(h.names(), ['begin', 'sent', 'failed']);
+});
+
 // ---- logging gate ----
 test('logging off at the start stays off even if switched on mid-call; switched off mid-call writes nothing after begin', async () => {
   const off = harness({ logging: false, run: (_request, state) => { state.logging = true; return 'x'; } });

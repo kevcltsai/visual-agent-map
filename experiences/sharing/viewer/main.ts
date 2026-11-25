@@ -838,10 +838,7 @@ export function startViewer(doc: Document): void {
       const child = textEls.get(text.id);
       if (!parent || !child || !text.parentId) continue;
       const path = doc.createElementNS(SVG_NS, "path");
-      path.setAttribute(
-        "d",
-        treeLine(parent, child, directionOf(text.parentId), edgeDepth(text.parentId) + 1)
-      );
+      path.setAttribute("d", treeLine(parent, child, directionOf(text.parentId), edgeDepth(text.parentId) + 1));
       path.setAttribute("class", "vam-edge vam-text-edge");
       edges.append(path);
     }

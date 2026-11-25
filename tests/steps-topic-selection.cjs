@@ -342,6 +342,16 @@ test('isPureHighlight stays true when some AI-picked cards are pruned (collapsed
   s.prune(new Set(['b', 'c']));
   assert.equal(s.isPureHighlight(), true);
 });
+test('leaving a map or an empty map forgets AI highlight provenance even when a later selection reuses the same IDs', () => {
+  for (const variant of ['openMap', 'emptyMap']) {
+    const s = fresh();
+    s.chatSelect(['a', 'b']);
+    s.exitMultiSelect(variant);
+    s.replaceMulti(['a']);
+    assert.equal(s.isPureHighlight(), false, variant);
+  }
+});
+
 test('exitMultiSelect backgroundRun keeps the AI highlight when no selection mode is on', () => {
   const s = seeded({ multi: ['b', 'c'] });
   assert.equal(s.exitMultiSelect('backgroundRun').touched.length, 0);

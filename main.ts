@@ -7,6 +7,7 @@ import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
+import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
@@ -92,7 +93,6 @@ import {
   Plugin,
   TFile,
   TFolder,
-  View,
   WorkspaceLeaf,
   type Command,
   type TAbstractFile
@@ -1170,8 +1170,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   );
   private outlineSourceView: VisualAgentMapView | null = null;
   private settingTab!: VisualAgentMapSettingTab;
-  private detailsLeaf: WorkspaceLeaf | null = null;
-  private detailsPath: string | null = null;
+  private readonly nodeDetailsSidebar = new NodeDetailsSidebar(
+    () => this.app,
+    leaf => this.styleNodeLeaf(leaf)
+  );
   private ribbonIcon: HTMLElement | null = null;
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
@@ -2745,49 +2747,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /** The node-details sidebar counts as open only while its pane is actually visible. */
   detailsShown(): boolean {
-    const split = this.app.workspace.rightSplit;
-    if (split.collapsed) return false;
-    return this.app.workspace
-      .getLeavesOfType("markdown")
-      .some(
-        leaf =>
-          leaf.getRoot() === split &&
-          leaf.view instanceof MarkdownView &&
-          !!leaf.view.file &&
-          this.app.metadataCache.getFileCache(leaf.view.file)?.frontmatter?.["agent-map-node"] === true &&
-          leaf.view.containerEl.isShown()
-      );
-  }
-  async openDetails(file: TFile): Promise<void> {
-    const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
-    if (
-      this.detailsLeaf &&
-      (!markdownLeaves.includes(this.detailsLeaf) || this.detailsLeaf.getRoot() !== this.app.workspace.rightSplit)
-    )
-      this.detailsLeaf = null;
-    if (!this.detailsLeaf) {
-      this.detailsLeaf =
-        markdownLeaves
-          .filter(
-            leaf =>
-              leaf.getRoot() === this.app.workspace.rightSplit &&
-              leaf.view instanceof MarkdownView &&
-              !!leaf.view.file &&
-              this.app.metadataCache.getFileCache(leaf.view.file)?.frontmatter?.["agent-map-node"] === true
-          )
-          .sort(
-            (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
-          )[0] ??
-        this.app.workspace.getRightLeaf(false) ??
-        this.app.workspace.getRightLeaf(true);
-    }
-    if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-    await this.detailsLeaf.openFile(file);
-    this.detailsPath = file.path;
-    this.styleNodeLeaf(this.detailsLeaf);
-    await this.app.workspace.revealLeaf(this.detailsLeaf);
-  }
-  /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
+    return this.nodeDetailsSidebar.detailsShown();
+  }  openDetails(file: TFile): Promise<void> {
+    return this.nodeDetailsSidebar.openDetails(file);
+  }  /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
   isNoteTaskBusy(path: string): boolean {
     if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;
     if (this.expansionCoordinator.isRunning(path)) return true;
@@ -2797,17 +2760,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
 
   closeStaleDetails(): void {
-    const closed =
-      this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath;
-    if (closed) {
-      this.detailsLeaf!.detach();
-      this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", this.app.workspace.getActiveViewOfType(View)?.leaf ?? null);
-    }
-    this.detailsLeaf = null;
-    this.detailsPath = null;
-  }
-  private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
+    this.nodeDetailsSidebar.closeStaleDetails();
+  }  private async markdownContextImage(image: HTMLImageElement, signal: AbortSignal): Promise<string> {
     if (signal.aborted || !image.complete || !image.naturalWidth) throw new Error(t("ui.context_ai_image_unavailable"));
     // Use the already loaded pixels first. Cross-origin images can taint the canvas.
     try {

@@ -63,7 +63,6 @@ export function providerMapChatRunner(aiCalls: AiCalls): MapChatRunner {
   return providerStepRunner<MapChatRequest, MapChatResult>(aiCalls, {
     name: "map-chat",
     topic: request => `Map chat · ${request.message.trim().slice(0, 80)}`,
-    mapPath: request => request.usageMapPath,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
     stream: true,
     lastMessageOnly: true

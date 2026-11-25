@@ -1,8 +1,10 @@
 import { sectionLookup, type DetailTemplate } from "../../../ai/detail-templates";
 import { fencedLines } from "../../../ai/markdown-blocks";
 import { translateNote, type ContentLanguage } from "../../../i18n";
-import { noteNumbers } from "../chart/insert";
+import { linksOf, normalNumber, noteNumbers } from "../../evidence-tokens";
 import { carryForwardSources } from "./carry-sources";
+
+export { linksOf } from "../../evidence-tokens";
 
 /**
  * Deterministic preservation check of an AI merge. The merge prompt says to keep every number, link and embed and to
@@ -69,45 +71,11 @@ function withoutListMarkers(text: string): string {
   return text.replace(/^([ \t]*(?:>[ \t]*)*(?:#{1,6}[ \t]+)?(?:[-*+][ \t]+)?)\d+[.)、．][ \t]+/gm, "$1");
 }
 
-/** The comparable form of a number: 2.0 and 2 are the same quantity; very long digit strings stay as written. */
-function normalNumber(token: string): string {
-  const value = Number(token);
-  return Number.isFinite(value) && token.length < 16 ? String(value) : token;
-}
-
 function numbersOf(texts: string[], logHeadings: string[]): Set<string> {
   const out = new Set<string>();
   for (const text of texts) {
     const body = withoutListMarkers(withoutUpdateLog(text, logHeadings)).replace(/!?\[\[[^\]]*\]\]/g, "");
     for (const token of noteNumbers(body)) out.add(normalNumber(token));
-  }
-  return out;
-}
-
-function decoded(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-/** URLs, wikilink targets (alias and heading dropped) and local link or image targets, in a comparable form. */
-export function linksOf(texts: string[]): Map<string, string> {
-  const out = new Map<string, string>();
-  const add = (kind: string, raw: string): void => {
-    const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");
-    const key = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
-    if (key) out.set(`${kind}${key}`, shown);
-  };
-  for (const text of texts) {
-    for (const match of text.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) add("", match[0]);
-    for (const match of text.matchAll(/!?\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g)) add("wiki:", match[1]);
-    for (const match of text.matchAll(/\]\(\s*<?([^)\s>]+)/g)) {
-      const target = match[1];
-      if (/^(?:https?:|mailto:|#)/i.test(target)) continue;
-      add("link:", target);
-    }
   }
   return out;
 }

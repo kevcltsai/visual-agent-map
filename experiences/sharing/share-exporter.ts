@@ -893,7 +893,10 @@ export class ShareExporter {
       let data: string | null = null;
       if (file && entry && entry.size > 0 && entry.size <= SHARE_ATTACHMENT_MAX_BYTES) {
         try {
-          data = SHARE_ATTACHMENT_DATA_PREFIX + bytesToBase64(await this.app.vault.readBinary(file));
+          const bytes = await this.app.vault.readBinary(file);
+          // The registered stat is a snapshot: the file may have changed before or during the read.
+          if (bytes.byteLength === entry.size && bytes.byteLength <= SHARE_ATTACHMENT_MAX_BYTES)
+            data = SHARE_ATTACHMENT_DATA_PREFIX + bytesToBase64(bytes);
         } catch {
           data = null;
         }

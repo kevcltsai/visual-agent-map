@@ -34,7 +34,8 @@ import {
 } from "../../note-values";
 import type { MapChatImages } from "./map-chat";
 import type { MapChatBasis } from "../../core/map-chat-basis";
-import { contentHash, isMdStale, type MapChatContext, type MapChatTopicHash } from "../../core/map-chat-context";
+import { contentHash } from "../../core/content-hash";
+import { isMdStale, type MapChatContext, type MapChatTopicHash } from "../../core/map-chat-context";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { AiLockOp, AiLockReason } from "../../core/ai-lock";
 import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";

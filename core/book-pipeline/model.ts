@@ -75,14 +75,7 @@ export function readPipelineFields(fm: Record<string, unknown>): PipelineFields 
   };
 }
 /** `undefined` leaves a key alone; `null` removes it. */
-export interface PipelineFieldsPatch {
-  pipelineStage?: PipelineStage | null;
-  bookRole?: BookRole | null;
-  pipelineRole?: BookRole | null;
-  bookRoleBy?: BookRoleBy | null;
-  pipelineIssue?: string | null;
-  pipelineSeam?: string | null;
-}
+export type PipelineFieldsPatch = { [K in keyof PipelineFields]?: PipelineFields[K] | null };
 const FIELD_KEYS = {
   pipelineStage: "pipeline-stage",
   bookRole: "book-role",
@@ -90,7 +83,7 @@ const FIELD_KEYS = {
   bookRoleBy: "book-role-by",
   pipelineIssue: "pipeline-issue",
   pipelineSeam: "pipeline-seam"
-} as const;
+} as const satisfies Record<keyof PipelineFields, string>;
 /** The `setFrontmatterKeys` values for a patch; an invalid value removes the key (nothing unreadable is written). */
 export function pipelineFrontmatter(patch: PipelineFieldsPatch): Record<string, string | null> {
   const values: Record<string, string | null> = {};
@@ -137,11 +130,7 @@ export function bookSettingsFrontmatter(patch: BookSettingsPatch): Record<string
   return values;
 }
 
-export interface StepAttempts {
-  plan: number;
-  write: number;
-  proof: number;
-}
+export type StepAttempts = Record<PipelineStep, number>;
 export interface PipelineBudget {
   used: number;
   limit: number;
@@ -553,7 +542,7 @@ export function emptyAttempts(): StepAttempts {
 /** A card's attempt counts; zeros when it has none yet. */
 export function attemptsOf(data: BookPipelineData, nodeId: string): StepAttempts {
   const entry = nodeId === "global" ? undefined : data.attempts[nodeId];
-  return isObject(entry) ? { ...emptyAttempts(), ...(entry as unknown as StepAttempts) } : emptyAttempts();
+  return isObject(entry) ? { ...emptyAttempts(), ...entry } : emptyAttempts();
 }
 
 /** Takes one call from the budget, or null when none is left. */

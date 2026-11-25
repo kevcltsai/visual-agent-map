@@ -237,3 +237,19 @@ test('path normalization: ./ and double-slash forms reach the same key', async (
   assert.equal(await chat.readableNow(`${IN}/a.md`), true);
   assert.equal((await chat.acceptRead(`${IN}//a.md`))?.path, `${IN}/a.md`);
 });
+
+test('restoring another version keeps all own hashes while resetting its write order', async () => {
+  const { chat, files } = world();
+  const a = `${IN}/a.md`, b = `${IN}/b.md`;
+  chat.startRound();
+  chat.noteWrite(a, 'first', true);
+  chat.noteWrite(a, 'second', false);
+  chat.noteWrite(b, 'other', true);
+  chat.restore('c1', [{ path: a, hash: contentHash('restored') }], []);
+  files.set(a, 'first'); files.set(b, 'other');
+  assert.equal(await chat.readableNow(a), true);
+  eq((await chat.carry(new Set())).map(file => file.path), [b, a]);
+  files.set(a, 'restored');
+  assert.equal(await chat.readableNow(a), true);
+  eq(chat.marksFor('c1').filter(mark => mark.path === a).map(mark => mark.hash), [contentHash('first'), contentHash('second')]);
+});

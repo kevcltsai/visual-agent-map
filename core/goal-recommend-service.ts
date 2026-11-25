@@ -138,7 +138,6 @@ export function providerGoalRecommendRunner(aiCalls: AiCalls): GoalRecommendRunn
   return providerStepRunner<GoalRecommendRequest, GoalRecommendResult>(aiCalls, {
     name: "goal-recommend",
     topic: request => `Goal recommend · ${request.goal.trim().slice(0, 80)}`,
-    mapPath: request => request.usageMapPath,
     stopped: () => new GoalRecommendError("stopped", "Goal recommend stopped"),
     stream: true
   });

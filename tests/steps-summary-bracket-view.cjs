@@ -9,7 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const TOPICS = 'Agent Workspace/Topics';
 const MAP = `${TOPICS}/map-s/Map.md`;
 const BOX = { w: 280, h: 100 };
-const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+const createSvg = dom.createSvg;
 const geometry = load('experiences/visual-map/summary-bracket-geometry.ts');
 
 const rect = (x, y) => ({ x, y, w: BOX.w, h: BOX.h });

@@ -101,4 +101,6 @@ function makeNotice(log = []) {
     get actions() { return typeof this.message === 'string' ? [] : findAll(this.message, i => i.tag === 'button'); }
   };
 }
-module.exports = { focusedNow, hasCls, element, find, findAll, byLabel, button, buttons, texts, makeModal, tick, createFragment, makeNotice };
+/** Minimal SVG test double used by view geometry tests; no browser or layout engine. */
+const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+module.exports = { createSvg, focusedNow, hasCls, element, find, findAll, byLabel, button, buttons, texts, makeModal, tick, createFragment, makeNotice };

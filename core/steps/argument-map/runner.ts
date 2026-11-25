@@ -69,7 +69,6 @@ export function providerArgumentRunner<Request extends ArgumentStepBase, Output>
   return providerStepRunner<Request, Output>(aiCalls, {
     name: "argument-map",
     topic: () => "Argument map",
-    mapPath: request => request.usageMapPath,
     stopped
   });
 }

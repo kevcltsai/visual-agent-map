@@ -653,7 +653,8 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       aimQuestionRequests.add(question.requestId);
     }
   }
-  if (!validParentGraph(map.nodes)) throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
+  if (!validParentGraph(map.nodes))
+    throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
   cleanBranchLayouts(map.nodes, map.layout?.direction ?? "right", map.aim !== undefined);
   if (
     !map.viewport ||

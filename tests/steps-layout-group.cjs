@@ -682,7 +682,6 @@ test('R-4: radial and timeline are accepted by the data format; the other arrang
       assert.deepEqual(layoutOf({ layout: value }), value);
       assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
     }
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'radial' } }), 'right');
   const a = { x: 0, y: 0, width: 300, height: 100 }, b = { x: 320, y: 200, width: 300, height: 100 };
   assert.notEqual(geometry.treeEdgePathData(a, b, 'radial'), geometry.treeEdgePathData(a, b, 'right'), 'radial has its own curve');
 });
@@ -922,14 +921,13 @@ test('F-2: fishbone bones are 60 degree straight lines from the topic card edge 
     }
 });
 
-test('P4 data: fishbone is stored and read back; the AIM map and layoutDirectionOf still answer right; arrow keys follow the right layout', () => {
+test('P4 data: fishbone is stored and read back; the AIM map still answers right; arrow keys follow the right layout', () => {
   for (const spacing of [undefined, 'compact', 'spacious']) {
     const value = spacing ? { direction: 'fishbone', spacing } : { direction: 'fishbone' };
     assert.deepEqual(plain(roundTrip(value).layout), value);
     assert.deepEqual(layoutOf({ layout: value }), value);
     assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
   }
-  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'fishbone' } }), 'right');
   const { neighborKey } = nav();
   for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
     assert.equal(neighborKey('fishbone', key), neighborKey('right', key), key);

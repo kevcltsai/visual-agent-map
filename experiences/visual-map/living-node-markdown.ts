@@ -363,7 +363,8 @@ function validateNoteIdentity(content: string, candidate: LivingCandidateIdentit
   if (
     !readAiCard(fm) ||
     readAiLocked(fm) ||
-    fm["topic-id"] !== candidate.cardId ||
+    fm["node-id"] !== candidate.cardId ||
+    fm["topic-id"] !== candidate.mapId ||
     fm["agent-map-id"] !== candidate.mapId
   )
     throw new Error("target-unavailable");

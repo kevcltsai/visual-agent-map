@@ -126,3 +126,27 @@ test('draft source edits preserve persisted identity rather than rebinding an un
   assert.deepEqual(plain(reconcileLivingDraftReferences(['A', 'Alias'], [card('old')], ['A', 'Alias'], resolveNew)), [card('old')]);
   assert.throws(() => reconcileLivingDraftReferences(['A', 'Alias'], [card('old')], ['A', 'C'], resolveNew), /ambiguous-saved-references/);
 });
+
+
+test('canonical source references request exact path resolution, never legacy alias fallback', () => {
+  const refs = readLivingReferences(['note-path:folder/source.md'], []);
+  assert.deepEqual(plain(refs), [{ kind: 'note', link: 'folder/source.md', exact: true }]);
+  const calls = [];
+  const result = resolveLivingSources(nodes, 'root', refs, [], {
+    resolveAuthorized(link, from, role, exact) {
+      calls.push([link, from, role, exact]);
+      return exact ? undefined : { identity: 'other/source.md', path: 'other/source.md' };
+    }
+  });
+  assert.deepEqual(calls, [['folder/source.md', 'root.md', 'explicit', true]]);
+  assert.equal(result.failures[0].reason, 'missing-or-unauthorized');
+});
+
+test('canonical source rename changes exact paths, retains card IDs, legacy aliases and invalid lists', () => {
+  const { rebaseLivingNoteReferences } = require('./support.cjs').load('core/living-node-region.ts');
+  const change = path => path === 'A.md' ? 'B.md' : path;
+  assert.deepEqual(plain(rebaseLivingNoteReferences(['note-path:A.md', 'card:A.md', 'note:A.md'], change)),
+    ['note-path:B.md', 'card:A.md', 'note:A.md']);
+  assert.equal(rebaseLivingNoteReferences(['note-path:Other.md'], change), null);
+  assert.equal(rebaseLivingNoteReferences([42, 'note-path:A.md'], change), null);
+});

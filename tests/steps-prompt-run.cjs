@@ -528,7 +528,7 @@ test('menu 2: card items only on Prompt topics, in order, reuse is a checked tog
 
 test('the card menu wiring and the closing abort are in the view source', () => {
   const src = fs.readFileSync(path.join(S.root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(src, /menu\.addSeparator\(\);\s*this\.addPromptRunMenu\(menu, node\);/);
+  assert.match(src, /menu\.addSeparator\(\);\s*if \(!bookLock\.ai\) add\(t\(\"ui\.card_menu_research\"\)[^;]*;\s*this\.addPromptRunMenu\(menu, node\);/, 'the Prompt run items follow Research in the card menu');
   assert.match(src, /async onClose\(\)[^]*?this\.promptBatch\?\.controller\.abort\(\)/);
 });
 

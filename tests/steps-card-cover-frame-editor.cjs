@@ -600,7 +600,7 @@ test('card: when the dialog cannot open (cover off, not editable) a double-click
   assert.deepEqual(d.calls.rename, []);
 });
 
-test('card: the right-click menu has "Edit card" only for an editable topic with a cover picture', async () => {
+test('card: the right-click menu no longer has "Edit card" in any state (the picture double-click and the panel button open it)', async () => {
   const items = h => {
     const titles = [];
     const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
@@ -610,7 +610,7 @@ test('card: the right-click menu has "Edit card" only for an editable topic with
     h.view.addCardMenuActions(menu, h.view.map.nodes[0]);
     return titles;
   };
-  assert.ok(items(await harness(TEXT)).includes('Edit card'));
+  assert.equal(items(await harness(TEXT)).includes('Edit card'), false, 'editable topic with a cover picture: not in the menu any more');
   for (const cache of [{ frontmatter: {}, embeds: [] }, { frontmatter: { 'topic-cover': 'none' }, embeds: [{ link: 'img/a.png' }] }])
     assert.equal(items(await harness(TEXT, { cache })).includes('Edit card'), false);
   const locked = await harness(TEXT);

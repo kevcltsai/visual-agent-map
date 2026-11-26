@@ -350,9 +350,9 @@ test('legacy-aim-map: E1 the card of an AIM node has the generic tools and none 
   view.stageEl = element('stage', buttons);
   view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
   view.renderNode(conclusion);
-  // The card tools are icon-only buttons named by aria-label (no More menu).
-  const labels = buttons.map(button => button['aria-label'] ?? button.text);
-  for (const label of ['Details', 'AI explore', 'This card', 'Add subtopic manually']) assert.ok(labels.includes(label), label);
+  // The selected card's toolbar: four labelled buttons (the More button is named by aria-label).
+  const labels = buttons.flatMap(button => [button['aria-label'], button.text]);
+  for (const label of ['Research', 'Add', 'Note', 'More card actions']) assert.ok(labels.includes(label), label);
   assert.equal(labels.includes('Continue exploring'), false);
   assert.equal(labels.some(label => /Steer|Correct|new question|Answer|Retry|Start|Continue|Resume|direction/i.test(label ?? '')), false, 'no AIM action');
 });

@@ -98,6 +98,12 @@ const press = (h, key, at, { moveTo = null, mods = {} } = {}) => {
   card.handlers.get('pointerup')({ type: 'pointerup', target: card, clientX: end.x, clientY: end.y, metaKey: false, ctrlKey: false, ...mods });
   return end;
 };
+// A press on the title only selects the card; the double-click that follows opens the title field.
+const editTitle = (h, key) => {
+  const end = press(h, key, centre(TITLE));
+  h.card(key).handlers.get('dblclick')({ target: h.card(key), clientX: end.x, clientY: end.y, preventDefault() {} });
+  return end;
+};
 const titleField = (h, key) => findAll(h.card(key), i => i.classes.has('vam-card-title-input'))[0];
 const summaryField = (h, key) => findAll(h.card(key), i => i.classes.has('vam-card-summary-input'))[0];
 const keys = (field, key, init = {}) => { const event = { key, isComposing: false, shiftKey: false, stopPropagation() {}, preventDefault() { this.prevented = true; }, ...init }; field.handlers.get('keydown')(event); return event; };
@@ -105,10 +111,10 @@ const noteOf = (h, key) => h.repo.readNote(h.view.map.nodes.find(n => n.id === h
 const spyWrites = h => { const calls = []; const real = h.repo.updateNote.bind(h.repo); h.repo.updateNote = (...args) => { calls.push(args); return real(...args); }; return calls; };
 const nothingOpen = (h, key) => !titleField(h, key) && !summaryField(h, key) && !h.view.inlineName && !h.view.inlineSummary;
 
-test('click on the title opens the title field in place with the caret at the end; Enter saves a changed title (one undo step) and reads back from the note', async () => {
+test('double-click on the title opens the title field in place with the caret at the end; Enter saves a changed title (one undo step) and reads back from the note', async () => {
   const h = await harness(); place(h, 'leaf');
   const past = h.view.history.past.length;
-  press(h, 'leaf', centre(TITLE));
+  editTitle(h, 'leaf');
   const field = titleField(h, 'leaf');
   assert.ok(field, 'the title became a field'); assert.equal(field.value, 'Leaf'); assert.equal(make.last, field, 'DOM focus is on the field');
   assert.equal(h.view.inlineName.fresh, false, 'not select-all'); assert.equal(field.selectionStart, 4, 'caret at the end'); assert.equal(field.selectionEnd, 4);
@@ -121,7 +127,7 @@ test('click on the title opens the title field in place with the caret at the en
 
 test('no key hint line under either field: the card holds only the field, and the hint strings are gone from every language', async () => {
   const h = await harness(); place(h, 'leaf');
-  press(h, 'leaf', centre(TITLE));
+  editTitle(h, 'leaf');
   assert.ok(titleField(h, 'leaf'), 'title field open');
   assert.equal(part(h, 'leaf', 'vam-card-edit-hint'), undefined, 'no hint under the title field');
   keys(titleField(h, 'leaf'), 'Escape'); await tick(); await tick();
@@ -131,6 +137,18 @@ test('no key hint line under either field: the card holds only the field, and th
   assert.equal(part(h, 'leaf', 'vam-card-edit-hint'), undefined, 'no hint under the summary field');
   const { translate } = load('i18n.ts');
   for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_edit_title_keys', 'ui.card_edit_summary_keys']) assert.equal(translate(lang, key), key, `${lang} ${key} no longer defined`);
+});
+
+test('a single click on the title selects the card and opens no field; Enter on the focused card opens the title field', async () => {
+  const h = await harness(); place(h, 'leaf');
+  press(h, 'leaf', centre(TITLE));
+  assert.equal(nothingOpen(h, 'leaf'), true, 'a click only selects');
+  assert.equal(h.view.selection.state.selected, h.ids.leaf, 'the card is selected');
+  h.card('leaf').handlers.get('click')({ target: h.card('leaf'), clientX: centre(TITLE).x, clientY: centre(TITLE).y, metaKey: false, ctrlKey: false });
+  assert.equal(nothingOpen(h, 'leaf'), true, 'the click event that follows opens nothing either');
+  const event = { key: 'Enter', target: h.card('leaf'), isComposing: false, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, preventDefault() { this.prevented = true; } };
+  h.card('leaf').handlers.get('keydown')(event);
+  assert.ok(titleField(h, 'leaf'), 'Enter opens the title field'); assert.equal(event.prevented, true);
 });
 
 test('click on the summary opens a textarea with the whole summary; Enter saves it to the note; Shift+Enter is a new line and saves nothing', async () => {
@@ -151,7 +169,7 @@ test('click on the summary opens a textarea with the whole summary; Enter saves 
 
 test('leaving the field (blur) saves like Enter', async () => {
   const h = await harness(); place(h, 'leaf');
-  press(h, 'leaf', centre(TITLE)); const field = titleField(h, 'leaf'); field.value = 'By blur'; field.handlers.get('blur')();
+  editTitle(h, 'leaf'); const field = titleField(h, 'leaf'); field.value = 'By blur'; field.handlers.get('blur')();
   await until(() => h.view.notes.get(h.ids.leaf).title === 'By blur');
   await withSummary(h, 'leaf', 'old'); place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY));
   const area = summaryField(h, 'leaf'); area.value = 'new by blur'; area.handlers.get('blur')();
@@ -194,7 +212,7 @@ test('negative: presentation and selection mode never open a field from a click,
 
 test('negative: Enter while an input method is composing saves nothing, in the title and in the summary', async () => {
   const h = await harness(); await withSummary(h, 'leaf', 'abc'); place(h, 'leaf'); const writes = spyWrites(h);
-  press(h, 'leaf', centre(TITLE)); const field = titleField(h, 'leaf'); field.value = 'ㄕㄡˇ'; keys(field, 'Enter', { isComposing: true }); await tick(); await tick();
+  editTitle(h, 'leaf'); const field = titleField(h, 'leaf'); field.value = 'ㄕㄡˇ'; keys(field, 'Enter', { isComposing: true }); await tick(); await tick();
   assert.equal(writes.length, 0); assert.equal(titleField(h, 'leaf'), field, 'the same field stays');
   keys(field, 'Escape'); await tick(); place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY));
   const area = summaryField(h, 'leaf'); area.value = 'ㄕㄡˇ'; keys(area, 'Enter', { isComposing: true }); await tick(); await tick();
@@ -203,9 +221,9 @@ test('negative: Enter while an input method is composing saves nothing, in the t
 
 test('negative: Enter or blur with an unchanged (or blank) value writes nothing and adds no history entry', async () => {
   const h = await harness(); await withSummary(h, 'leaf', 'keep me'); place(h, 'leaf'); const writes = spyWrites(h); const past = h.view.history.past.length;
-  press(h, 'leaf', centre(TITLE)); keys(titleField(h, 'leaf'), 'Enter'); await tick(); await tick();
+  editTitle(h, 'leaf'); keys(titleField(h, 'leaf'), 'Enter'); await tick(); await tick();
   assert.equal(nothingOpen(h, 'leaf'), true); place(h, 'leaf');
-  press(h, 'leaf', centre(TITLE)); const blank = titleField(h, 'leaf'); blank.value = '   '; blank.handlers.get('blur')(); await tick(); await tick();
+  editTitle(h, 'leaf'); const blank = titleField(h, 'leaf'); blank.value = '   '; blank.handlers.get('blur')(); await tick(); await tick();
   place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); summaryField(h, 'leaf').handlers.get('blur')(); await tick(); await tick();
   place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); keys(summaryField(h, 'leaf'), 'Enter'); await tick(); await tick();
   assert.equal(writes.length, 0, 'no updateNote call'); assert.equal(h.view.history.past.length, past, 'no undo step'); assert.equal(nothingOpen(h, 'leaf'), true);
@@ -213,7 +231,7 @@ test('negative: Enter or blur with an unchanged (or blank) value writes nothing 
 
 test('negative: Esc drops what was typed; the note is unchanged', async () => {
   const h = await harness(); await withSummary(h, 'leaf', 'keep me'); place(h, 'leaf'); const before = h.contents.get((await noteOf(h, 'leaf')).path ?? ''); const writes = spyWrites(h);
-  press(h, 'leaf', centre(TITLE)); const field = titleField(h, 'leaf'); field.value = 'typed'; keys(field, 'Escape'); await tick(); await tick();
+  editTitle(h, 'leaf'); const field = titleField(h, 'leaf'); field.value = 'typed'; keys(field, 'Escape'); await tick(); await tick();
   place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); const area = summaryField(h, 'leaf'); area.value = 'typed too'; keys(area, 'Escape'); await tick(); await tick();
   assert.equal(writes.length, 0); assert.equal((await noteOf(h, 'leaf')).title, 'Leaf'); assert.equal((await noteOf(h, 'leaf')).summary, 'keep me');
   assert.equal(nothingOpen(h, 'leaf'), true); void before;
@@ -243,15 +261,19 @@ test('F2, the title double-click and the rename command all open the inline titl
   assert.deepEqual(modalNames(h), [], 'no rename dialog at all');
 });
 
-test('the card right-click menu and the floating card tools no longer list Rename (the tools have no More menu)', async () => {
+test('the card right-click menu, the selected card toolbar and its More list never list Rename', async () => {
   const h = await harness(); const items = [];
   const menu = { addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick() { return this; }, setDisabled() { return this; }, setSection() { return this; } }; cb(it); items.push(it.title); return menu; }, addSeparator() { return menu; } };
   h.view.addCardMenuActions(menu, h.view.map.nodes.find(n => n.id === h.ids.leaf));
   assert.ok(items.length > 3 && !items.includes('Rename'), `right-click items: ${items.join(', ')}`);
-  const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-node-tool'));
-  const labels = tools.map(i => i.attrs['aria-label']);
-  assert.ok(labels.length > 0 && !labels.includes('Rename'), `floating tools have no Rename: ${labels.join(', ')}`);
-  assert.equal(tools.some(i => i.classes.has('vam-more-tool') || i.attrs['aria-haspopup']), false, 'no More button or menu on the card');
+  const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-card-tool'));
+  const labels = tools.map(i => i.attrs['aria-label'] ?? i.text);
+  assert.ok(labels.length > 0 && !labels.includes('Rename'), `card toolbar has no Rename: ${labels.join(', ')}`);
+  const more = [];
+  const real = h.view.newMenu.bind(h.view);
+  h.view.newMenu = () => { const m = real(); const add = m.addItem.bind(m); m.addItem = cb => add(item => { const title = item.setTitle.bind(item); item.setTitle = t => { more.push(t); return title(t); }; cb(item); }); m.showAtPosition ??= () => {}; return m; };
+  h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, h.view.map.nodes.find(n => n.id === h.ids.leaf));
+  assert.ok(more.length > 0 && !more.includes('Rename'), `More list has no Rename: ${more.join(', ')}`);
 });
 
 // Accessible name of an edit field: aria-label, or the text of the element aria-labelledby points to.
@@ -295,11 +317,11 @@ test('F1 regression: opening and closing the title or summary field (Esc, Enter,
     // The control: the user selecting this card pans the canvas (twice here) until the tool row fits; then it is stable.
     for (let i = 0; i < 4; i++) card.handlers.get('focusin')({ target: card });
     const before = at(); assert.notEqual(before, start, 'the jammed card pans when the user selects it'); card.handlers.get('focusin')({ target: card }); assert.equal(at(), before, 'and then it is settled');
-    press(h, 'leaf', centre(TITLE)); assert.ok(titleField(h, 'leaf'), 'title field open'); assert.equal(at(), before, 'opening the title field');
+    editTitle(h, 'leaf'); assert.ok(titleField(h, 'leaf'), 'title field open'); assert.equal(at(), before, 'opening the title field');
     keys(titleField(h, 'leaf'), 'Escape'); assert.equal(at(), before, 'Esc on the title');
     place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); assert.ok(summaryField(h, 'leaf'), 'summary field open'); assert.equal(at(), before, 'opening the summary field');
     keys(summaryField(h, 'leaf'), 'Escape'); assert.equal(at(), before, 'Esc on the summary');
-    place(h, 'leaf'); press(h, 'leaf', centre(TITLE)); const input = titleField(h, 'leaf'); input.value = 'Leaf 2'; keys(input, 'Enter'); await tick(); await tick();
+    place(h, 'leaf'); editTitle(h, 'leaf'); const input = titleField(h, 'leaf'); input.value = 'Leaf 2'; keys(input, 'Enter'); await tick(); await tick();
     assert.equal(at(), before, 'Enter on the title (saved)');
     place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); const area = summaryField(h, 'leaf'); area.value = 'changed'; keys(area, 'Enter'); await tick(); await tick();
     assert.equal(at(), before, 'Enter on the summary (saved)');
@@ -315,7 +337,7 @@ test('negative (F1 consumers): a plain focus restore that is not a field open/cl
     h.view.restoringFocus = true; try { card.handlers.get('focusin')({ target: card }); } finally { h.view.restoringFocus = false; }
     assert.notEqual(at(), start, 'the restored focus on a jammed card pans');
     // The field open/close repaint keeps the canvas still, and clears its flag afterwards.
-    for (let i = 0; i < 4; i++) card.handlers.get('focusin')({ target: card }); const settled = at(); press(h, 'leaf', centre(TITLE)); keys(titleField(h, 'leaf'), 'Escape'); assert.equal(at(), settled, 'field open and close do not pan');
+    for (let i = 0; i < 4; i++) card.handlers.get('focusin')({ target: card }); const settled = at(); editTitle(h, 'leaf'); keys(titleField(h, 'leaf'), 'Escape'); assert.equal(at(), settled, 'field open and close do not pan');
     assert.equal(h.view.keepCanvasOnFieldRestore, false, 'the flag is cleared');
   } finally { make.onFocus = null; }
 });
@@ -327,7 +349,7 @@ test('a fixed-height card is not clipped while its summary is being typed: no he
   place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); assert.ok(summaryField(h, 'leaf'), 'editing');
   assert.equal(h.card('leaf').style.height, undefined, 'the card grows with the field'); assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-card-fade')).length, 0, 'no fade over the text');
   keys(summaryField(h, 'leaf'), 'Escape'); assert.equal(h.card('leaf').style.height, '120px', 'height is back after Esc');
-  place(h, 'leaf'); press(h, 'leaf', centre(TITLE)); assert.equal(h.card('leaf').style.height, '120px', 'a title edit leaves the height alone');
+  place(h, 'leaf'); editTitle(h, 'leaf'); assert.equal(h.card('leaf').style.height, '120px', 'a title edit leaves the height alone');
 });
 
 test('while a card is being edited its hover preview is not shown (it would float over the neighbours)', async () => {
@@ -361,7 +383,7 @@ test('the summary field reads like the summary text: same font size and line hei
 // UI audit bugfix-2 P2: a card title with [[ ]] or a fence is refused with its reason (never rewritten), and a map that is open in another pane is brought forward.
 test('P2: a card title with [[ ]] or a fence is refused with a reason; the field stays open with the typed text and nothing is saved', async () => {
   const h = await harness(); place(h, 'leaf');
-  press(h, 'leaf', centre(TITLE));
+  editTitle(h, 'leaf');
   const field = titleField(h, 'leaf');
   assert.ok(field, 'the title became a field');
   const before = (await noteOf(h, 'leaf')).title, past = h.view.history.past.length;
@@ -385,4 +407,54 @@ test('P2: switching to a map open in another pane brings that pane forward once 
   // The show is deferred with setTimeout(0), which is not ordered against setImmediate (tick): wait for it.
   await new Promise(resolve => setTimeout(resolve, 5));
   assert.deepEqual(shown, [leaf]);
+});
+
+// The selected card's toolbar and the slim right-click menu (mind-map simplification, 2026-11-27).
+const menuTitles = (h, fill) => {
+  const items = [];
+  const entry = () => { const it = { sub: null }; const chain = { setTitle(t) { it.title = t; return this; }, setIcon() { return this; }, onClick(fn) { it.run = fn; return this; }, setDisabled(d) { it.disabled = d; return this; }, setWarning() { return this; }, setChecked() { return this; }, setSection() { return this; }, setSubmenu() { it.sub = menu(); return it.sub; } }; return { it, chain }; };
+  const menu = () => { const list = []; const m = { list, addItem(cb) { const e = entry(); cb(e.chain); list.push(e.it); return m; }, addSeparator() { list.push({ title: '—' }); return m; }, showAtPosition() {}, showAtMouseEvent() {} }; return m; };
+  const root = menu(); fill(root); items.push(...root.list); return items;
+};
+test('a selected card shows four labelled buttons: Research, Add, Note, More; Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
+  const h = await harness();
+  const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-card-tool'));
+  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', '⋯']);
+  assert.ok(tools.every(i => (i.text && i.text !== '⋯') || i.attrs['aria-label']), 'every button has a name');
+  assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-add-child') || i.classes.has('vam-node-tool')).length, 0, 'no hover icons and no + circle');
+  h.view.whenEditing = run => run();
+  const run = (cls, init = {}) => tools.find(i => i.classes.has(cls)).handlers.get('click')({ metaKey: false, ctrlKey: false, stopPropagation() {}, ...init });
+  run('vam-add-child-tool'); await until(() => h.added.length === 1); assert.deepEqual(h.added, [h.ids.leaf], 'Add puts a subtopic under the card');
+  const opened = []; h.view.openDetails = () => opened.push('details'); h.view.openNoteInTab = () => opened.push('tab');
+  run('vam-detail-button'); run('vam-detail-button', { metaKey: true }); run('vam-detail-button', { ctrlKey: true });
+  assert.deepEqual(opened, ['details', 'tab', 'tab']);
+  setSelection(h.view, true, [h.ids.leaf]); h.build();
+  assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-card-tool')).length, 0, 'no card toolbar in selection mode');
+});
+test('More lists card settings, the summary bracket, note style and the other topic types; Select subtopics only for a card with open subtopics', async () => {
+  const h = await harness();
+  const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
+  const more = key => menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, node(key)); });
+  const leaf = more('leaf');
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', '—', 'Add another type']);
+  assert.ok(leaf.at(-1).sub.list.length >= 6, 'the topic types are in the submenu');
+  assert.deepEqual(more('branch').map(i => i.title).slice(0, 2), ['Card settings…', 'Select subtopics']);
+});
+test('right-click on one card: the eight-item menu; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
+  const h = await harness();
+  const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
+  const contextMenu = key => menuTitles(h, m => {
+    h.view.newMenu = () => m; h.view.canEditSummary = () => true;
+    const card = h.card(key); card.closest = () => card;
+    h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
+  }).map(i => i.title);
+  const leaf = contextMenu('leaf');
+  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Open note', 'Card settings…', 'Remove from map']);
+  for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Add summary bracket', 'Note style…', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
+  assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
+  node('branch').collapsed = true;
+  assert.ok(contextMenu('branch').includes('Expand subtopics'), 'a folded card offers Expand');
+  let tab = 0; h.view.openNoteInTab = () => tab++;
+  const open = menuTitles(h, m => h.view.addCardMenuActions(m, node('leaf'))).find(i => i.title === 'Open note');
+  open.run({ metaKey: true }); assert.equal(tab, 1, 'Cmd-click on Open note opens a new tab');
 });

@@ -660,3 +660,16 @@ test('Living Node cross-map cut moves original IDs and files, preserving knowled
   assert.equal(h.app.vault.getAbstractFileByPath(moved.path), pFile);
   assert.ok(original.includes('P detail'));
 });
+
+
+test('Living Node cross-map cut into an AI parent retains ordinary source IDs', async () => {
+  const h = await harness();
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(h.paths.anchor),
+    text => text.replace(/^---\n/, '---\nai-card: true\n'));
+  await h.viewB.hydrate();
+  await cutAndPaste(h);
+  assert.deepEqual(h.errors, []);
+  assert.equal(await idsOn(h, MAP_B), [h.ids.anchor, h.ids.p, h.ids.q].sort().join());
+  assert.equal(h.viewB.map.nodes.find(node => node.id === h.ids.p).parentId, h.ids.anchor);
+  assert.equal([...h.contents.keys()].filter(path => path.startsWith(A_PREFIX + 'Unassigned/')).length, 0);
+});

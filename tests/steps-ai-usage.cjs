@@ -477,3 +477,31 @@ test('explicit reported zero is not a missing count, and a missing side with zer
   assert.equal(full.records[0].incomplete, undefined);
   assert.equal(full.records[0].estimated, false);
 });
+
+
+test('usage store: a burst during an in-flight write coalesces snapshots without dropping any usage rows', async () => {
+  const file = tempFile();
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const barrier = new Promise(resolve => { release = resolve; });
+  let writes = 0;
+  const adapter = { ...nodeFsAdapter, write: async (...args) => {
+    writes++;
+    if (writes === 1) { entered(); await barrier; }
+    return nodeFsAdapter.write(...args);
+  } };
+  const store = new AiUsageStore(adapter, file, error => { throw error; });
+  await store.load();
+  store.record(row());
+  await ready;
+  for (let i = 0; i < 100; i++) store.record(row());
+  release();
+  await store.flush();
+  assert.equal(writes, 2);
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(saved.entries.length, 101);
+  const reloaded = newStore(file);
+  await reloaded.load();
+  same(ok(reloaded.totals()), { inputTokens: 1010, outputTokens: 505 });
+  await store.dispose();
+});

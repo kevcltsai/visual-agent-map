@@ -121,3 +121,46 @@ test('legacy incomplete or schema-invalid temp is preserved and never promoted',
     assert.equal(f.files.get(temporary), invalid);
   }
 });
+
+
+test('latest snapshot writer: burst while a write is blocked persists only the in-flight and final snapshots', async () => {
+  const { LatestSnapshotWriter } = load('store-adapter.ts');
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const barrier = new Promise(resolve => { release = resolve; });
+  const writes = [];
+  const errors = [];
+  let revision = 0;
+  const writer = new LatestSnapshotWriter(async () => {
+    writes.push(revision);
+    if (writes.length === 1) { entered(); await barrier; }
+  }, error => errors.push(error));
+  writer.request();
+  await ready;
+  for (let i = 1; i <= 100; i++) { revision = i; writer.request(); }
+  assert.deepEqual(writes, [0]);
+  release();
+  await writer.flush();
+  assert.deepEqual(writes, [0, 100]);
+  assert.deepEqual(errors, []);
+});
+
+test('latest snapshot writer: a failing in-flight write and diagnostic cannot strand a newer request', async () => {
+  const { LatestSnapshotWriter } = load('store-adapter.ts');
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const barrier = new Promise(resolve => { release = resolve; });
+  const writes = [];
+  let revision = 0;
+  const writer = new LatestSnapshotWriter(async () => {
+    writes.push(revision);
+    if (writes.length === 1) { entered(); await barrier; throw new Error('write failed'); }
+  }, () => { throw new Error('diagnostic failed'); });
+  writer.request();
+  await ready;
+  revision = 1;
+  writer.request();
+  release();
+  await writer.flush();
+  assert.deepEqual(writes, [0, 1]);
+});

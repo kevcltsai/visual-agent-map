@@ -189,3 +189,28 @@ test('shell probe: reports unavailable when the shell cannot be spawned', () => 
   const { shellExecutableProbe: probe } = load('core/ai-runtime-service.ts', { 'node:child_process': { spawnSync: () => ({ error: new Error('ENOENT'), status: null }) } });
   assert.equal(probe.available(), false);
 });
+
+
+test('exchange store: clearing during an in-flight write cannot resurrect queued private log content', async () => {
+  const adapter = memoryAdapter({ 'x.json': '[]' });
+  const write = adapter.write;
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const barrier = new Promise(resolve => { release = resolve; });
+  let writes = 0;
+  adapter.write = async (...args) => {
+    writes++;
+    if (writes === 1) { entered(); await barrier; }
+    return write(...args);
+  };
+  const log = new AiExchangeLog(adapter, 'x.json', error => { throw error; });
+  log.begin(exchange);
+  await ready;
+  for (let i = 0; i < 100; i++) log.received('1', `private reply ${i}`);
+  log.clear();
+  release();
+  await log.flush();
+  assert.equal(writes, 2);
+  assert.equal(adapter.files['x.json'], '[]');
+  assert.equal('x.json.tmp' in adapter.files, false);
+});

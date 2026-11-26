@@ -1,4 +1,4 @@
-import { readStoreValue, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
+import { LatestSnapshotWriter, readStoreValue, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import { t } from "./i18n";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { isRecord } from "./core/is-record";
@@ -18,7 +18,8 @@ function formatElapsed(durationMs: number): string {
 
 /**
  * Optional timing and shape facts of one model call, written once when the call ends. Every field is optional so an
- * older entry (or a provider that cannot report a fact) simply lacks it. Times are ISO strings; no prompt or secret text.
+ * older entry (or a provider that cannot report a fact) simply lacks it. Times are ISO strings.
+ * Search queries and provider error text may contain private content; treat the complete log as private.
  */
 export interface AiMilestones {
   stream?: "stream-json" | "json" | "json-fallback";
@@ -148,7 +149,10 @@ export class AiExchangeLog {
   private entries: AiExchange[] = [];
   private loadError: unknown = null;
   private listeners = new Set<() => void>();
-  private writes: Promise<void> = Promise.resolve();
+  private readonly writer = new LatestSnapshotWriter(
+    () => writeStoreAtomically(this.adapter, this.path, JSON.stringify(this.entries)),
+    error => this.onError(error)
+  );
   constructor(
     private readonly adapter: StoreAdapter,
     private readonly path: string,
@@ -254,7 +258,7 @@ export class AiExchangeLog {
     this.changed();
   }
   async flush(): Promise<void> {
-    await this.writes;
+    await this.writer.flush();
   }
 
   private update(id: string, patch: Partial<AiExchange>): void {
@@ -280,7 +284,6 @@ export class AiExchangeLog {
       this.onError(this.loadError);
       return;
     }
-    const snapshot = JSON.stringify(this.entries);
-    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
+    this.writer.request();
   }
 }

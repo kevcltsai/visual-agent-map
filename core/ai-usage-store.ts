@@ -1,4 +1,4 @@
-import { readStoreValue, writeStoreAtomically, type StoreAdapter } from "../store-adapter";
+import { LatestSnapshotWriter, readStoreValue, writeStoreAtomically, type StoreAdapter } from "../store-adapter";
 import { promptMetrics, type AiExchange } from "../ai-exchange-log";
 import { isRecord } from "./is-record";
 
@@ -143,8 +143,18 @@ export class AiUsageStore {
   private monthly: Record<string, MonthlyBucket> = {};
   private loadError: unknown = null;
   private disposed = false;
-  private writes: Promise<void> = Promise.resolve();
   private writeError: unknown = null;
+  private readonly writer = new LatestSnapshotWriter(
+    async () => {
+      const file: UsageFile = { version: 1, entries: this.entries, monthly: this.monthly };
+      await writeStoreAtomically(this.adapter, this.path, JSON.stringify(file));
+      this.writeError = null;
+    },
+    error => {
+      this.writeError = error;
+      this.onError(error);
+    }
+  );
   private readonly listeners = new Set<() => void>();
 
   constructor(
@@ -254,7 +264,7 @@ export class AiUsageStore {
 
   /** Waits for the pending writes; rejects with the last write error. */
   async flush(): Promise<void> {
-    await this.writes;
+    await this.writer.flush();
     if (this.writeError)
       throw this.writeError instanceof Error ? this.writeError : new Error("ai-usage.json was not saved.");
   }
@@ -263,7 +273,7 @@ export class AiUsageStore {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.listeners.clear();
-    await this.writes;
+    await this.writer.flush().catch(() => undefined);
   }
 
   private each(
@@ -316,19 +326,7 @@ export class AiUsageStore {
   }
 
   private save(): void {
-    const file: UsageFile = { version: 1, entries: this.entries, monthly: this.monthly };
-    const snapshot = JSON.stringify(file);
-    this.writes = this.writes
-      .then(() => writeStoreAtomically(this.adapter, this.path, snapshot))
-      .then(
-        () => {
-          this.writeError = null;
-        },
-        (error: unknown) => {
-          this.writeError = error;
-          this.onError(error);
-        }
-      );
+    this.writer.request();
   }
 
   private emit(): void {

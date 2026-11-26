@@ -52,3 +52,57 @@ export async function writeStoreAtomically(adapter: StoreAdapter, path: string, 
   }
   await adapter.rename(temporary, path);
 }
+
+
+/**
+ * A serial writer with at most one in-flight snapshot and one pending request.
+ * The snapshot is encoded when the write begins, not for every queued state
+ * change. The caller still owns all data and the existing atomic-write policy.
+ */
+export class LatestSnapshotWriter {
+  private dirty = false;
+  private running = false;
+  private writes: Promise<void> = Promise.resolve();
+  private notificationError: { error: unknown } | null = null;
+
+  constructor(
+    private readonly writeLatest: () => Promise<void>,
+    private readonly report: (error: unknown) => void
+  ) {}
+
+  request(): void {
+    this.dirty = true;
+    if (this.running) return;
+    this.running = true;
+    this.writes = Promise.resolve().then(async () => {
+      try {
+        while (this.dirty) {
+          this.dirty = false;
+          try {
+            await this.writeLatest();
+            this.notificationError = null;
+          } catch (error) {
+            try {
+              this.report(error);
+            } catch (reportError) {
+              // A failing diagnostic must not strand a newer pending snapshot.
+              this.notificationError = { error: reportError };
+            }
+          }
+        }
+      } finally {
+        this.running = false;
+      }
+    });
+  }
+
+  async flush(): Promise<void> {
+    // A request made as the previous drain settles may start a new drain.
+    for (;;) {
+      const writes = this.writes;
+      await writes;
+      if (writes === this.writes) break;
+    }
+    if (this.notificationError) throw this.notificationError.error;
+  }
+}

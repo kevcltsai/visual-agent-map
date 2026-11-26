@@ -549,6 +549,7 @@ export async function saveLivingConfig(
       configRevision: livingConfigurationStamp(prompt, fm)
     };
   let saved = "";
+  let savedRevision = "";
   const outcome = await repo.updateNoteGuarded(
     target.path,
     { prompt },
@@ -557,6 +558,11 @@ export async function saveLivingConfig(
       authorize: authorized,
       finalize: content => {
         saved = setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded });
+        const savedMetadata = frontmatter(saved);
+        if (savedMetadata["ai-card"] !== true ||
+            JSON.stringify(savedMetadata["living-node-refs"]) !== JSON.stringify(encoded))
+          return null;
+        savedRevision = livingConfigurationStamp(prompt, savedMetadata);
         return saved;
       }
     }
@@ -566,7 +572,7 @@ export async function saveLivingConfig(
     outcome,
     before: snapshot.content,
     after: saved,
-    configRevision: livingConfigurationStamp(prompt, frontmatter(saved))
+    configRevision: savedRevision
   };
 }
 

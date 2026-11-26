@@ -460,3 +460,44 @@ S.integrationTest('Living Node trial: a readable locked dependency is a disclose
   assert.deepEqual(JSON.parse(JSON.stringify(prepared.warnings)), ['frozen-source']);
   assert.equal((await prepared.adoption.inspect()).dependenciesReady, true);
 });
+
+S.integrationTest('Living Node copy: copied formal knowledge keeps ownership and resets the new card diagnostics', async () => {
+  const f = await setup();
+  const withLinks = { ...proposal, operations: [{ kind: 'output', text: 'Findings from [[Source]]', evidence: ['e1'] }] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: withLinks })), 'written');
+  const source = f.contents.get(path);
+  const mapPath = 'Agent Workspace/Topics/map/Map.md';
+  const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const copy = await f.repo.duplicateNote(path, map, mapPath, { keepTitle: true });
+  await f.repo.rewriteCopiedNoteLinks([{ from: path, to: copy.path }]);
+  const copied = f.contents.get(copy.path);
+  const fm = S.obsidian.parseYaml(copied.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+  assert.equal(fm['node-id'], copy.id);
+  assert.notEqual(copy.id, 'card');
+  assert.equal(fm['topic-id'], 'map');
+  for (const key of ['living-node-last-execution', 'living-node-last-successful-check', 'living-node-last-attempt',
+    'living-node-last-content-change', 'living-node-outcome', 'living-node-input-revision', 'living-node-success-knowledge'])
+    assert.equal(fm[key], undefined, key);
+  assert.equal(readLivingMarkdown(copied).output.text, 'Findings from [[Source]]');
+  assert.equal(readLivingMarkdown(copied).output.owner, 'ai');
+  assert.equal(readLivingMarkdown(copied).revision, readLivingMarkdown(source).revision);
+  assert.equal(f.contents.get(path), source);
+});
+
+S.integrationTest('Living Node copy: internal card IDs follow copies, same-map external IDs survive, foreign IDs stay missing', async () => {
+  for (const destination of ['map', 'other-map']) {
+    const f = await setup();
+    const source = initial.replace('custom-key: keep', 'living-node-refs:\n  - "card:up"\n  - "card:external"\ncustom-key: keep');
+    await f.app.vault.process(f.files.get(path), () => source);
+    const upPath = 'up.md';
+    await f.app.vault.create(upPath, initial.replace('node-id: card', 'node-id: up').replace('# Existing title', '# Up'));
+    const map = { id: destination, title: destination, version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+    const mapPath = 'Agent Workspace/Topics/' + destination + '/Map.md';
+    const rootCopy = await f.repo.duplicateNote(path, map, mapPath);
+    const upCopy = await f.repo.duplicateNote(upPath, map, mapPath);
+    await f.repo.rewriteCopiedNoteLinks([{ from: path, to: rootCopy.path }, { from: upPath, to: upCopy.path }]);
+    const fm = S.obsidian.parseYaml(f.contents.get(rootCopy.path).match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+    assert.deepEqual(fm['living-node-refs'], ['card:' + upCopy.id, destination === 'map' ? 'card:external' : 'card:foreign:' + JSON.stringify(['map', 'external'])]);
+    assert.equal(f.contents.get(path), source);
+  }
+});

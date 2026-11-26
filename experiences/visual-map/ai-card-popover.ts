@@ -53,14 +53,22 @@ export class AiCardPopover {
     if (host.cardTitle === null) {
       this.titleEl = this.el.createEl("input", {
         cls: "vam-ai-card-pop-name",
-        attr: { type: "text", placeholder: t("ui.ai_card_name_placeholder"), "aria-label": t("ui.ai_card_name_placeholder") }
+        attr: {
+          type: "text",
+          placeholder: t("ui.ai_card_name_placeholder"),
+          "aria-label": t("ui.ai_card_name_placeholder")
+        }
       });
     } else {
       this.el.createDiv({ cls: "vam-ai-card-pop-title", text: host.cardTitle, attr: { dir: "auto" } });
     }
     this.questionEl = this.el.createEl("textarea", {
       cls: "vam-topic-chat-input vam-ai-card-pop-question",
-      attr: { rows: "4", placeholder: t("ui.ai_card_question_placeholder"), "aria-label": t("ui.ai_card_question_placeholder") }
+      attr: {
+        rows: "4",
+        placeholder: t("ui.ai_card_question_placeholder"),
+        "aria-label": t("ui.ai_card_question_placeholder")
+      }
     });
     this.questionEl.value = host.initial.question;
     this.on(this.questionEl, "input", () => this.refresh());
@@ -117,7 +125,11 @@ export class AiCardPopover {
     if (!(areaWidth > 0)) return;
     if (areaWidth < NARROW_AREA) {
       this.el.addClass("is-bottom");
-      this.el.setCssProps({ left: "0px", top: "", "--vam-topic-chat-max": areaHeight > 16 ? `${areaHeight - 16}px` : "" });
+      this.el.setCssProps({
+        left: "0px",
+        top: "",
+        "--vam-topic-chat-max": areaHeight > 16 ? `${areaHeight - 16}px` : ""
+      });
       return;
     }
     this.el.removeClass("is-bottom");

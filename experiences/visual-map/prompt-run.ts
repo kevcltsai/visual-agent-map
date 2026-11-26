@@ -260,7 +260,9 @@ export interface PromptInput {
  * its source notes. The "keep old data" switch is not part of it.
  */
 export function promptInputKey(input: PromptInput): string {
-  const children = [...input.children].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(c => [c.id, c.summary]);
+  const children = [...input.children]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map(c => [c.id, c.summary]);
   const sources = input.sources.map(s => [s.path, s.mtime]);
   return fnv1a(JSON.stringify([input.prompt.trim(), children, sources]));
 }
@@ -316,5 +318,8 @@ export function joinPrompt(question: string, sources: readonly string[], languag
 /** The name of a new AI card when the user left it blank: the question's first line, 20 characters at most, without trailing punctuation. */
 export function aiCardTitle(question: string): string {
   const first = question.split(/\r?\n/).find(line => line.trim()) ?? "";
-  return Array.from(first.trim()).slice(0, 20).join("").replace(/[\s\p{P}]+$/u, "");
+  return Array.from(first.trim())
+    .slice(0, 20)
+    .join("")
+    .replace(/[\s\p{P}]+$/u, "");
 }

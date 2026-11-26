@@ -1215,7 +1215,7 @@ export const en = {
   "ui.ai_card_status_failed": "Not finished",
   "ui.ai_card_status_done": "Done",
   "ui.ai_card_failed_0": "Failed: {0}",
-  "ui.ai_card_blocked_0": "Card \"{0}\" did not finish; not run",
+  "ui.ai_card_blocked_0": 'Card "{0}" did not finish; not run',
   "ui.ai_lock_card": "Lock this AI card",
   "ui.ai_run_all": "Run all",
   "ui.ai_run_all_empty": "Add an AI card first",

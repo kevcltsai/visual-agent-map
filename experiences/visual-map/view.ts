@@ -6689,7 +6689,8 @@ export class VisualAgentMapView extends ItemView {
   /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   /** The toolbar's ghost 「▶ 全部執行」: disabled without an AI card; while it runs a progress ring and "n / N", a press stops it. */
   private renderRunAllButton(parent: HTMLElement): void {
-    const state = this.promptBatch && !this.promptBatch.outcome && this.promptBatch.mapPath === this.path ? this.promptBatch : null;
+    const state =
+      this.promptBatch && !this.promptBatch.outcome && this.promptBatch.mapPath === this.path ? this.promptBatch : null;
     const button = parent.createEl("button", { cls: "vam-run-all", attr: { type: "button" } });
     if (state) {
       const done = Math.min(state.finished + 1, state.total);
@@ -19523,8 +19524,7 @@ export class VisualAgentMapView extends ItemView {
         );
         const detailTemplate = run.template;
         synthesisRun = run;
-        updateMode =
-          options?.updateMode ?? (options?.subtreeIntegration ? integrationUpdateMode(run) : run.updateMode);
+        updateMode = options?.updateMode ?? (options?.subtreeIntegration ? integrationUpdateMode(run) : run.updateMode);
         return {
           detailTemplate,
           updateMode,
@@ -19697,11 +19697,7 @@ export class VisualAgentMapView extends ItemView {
     return files;
   }
   /** The fingerprint of an AI card's inputs: its Prompt, its direct children's summaries and the modified time of its source notes. */
-  private aiCardInputKey(
-    node: MapNode,
-    prompt: string,
-    summaryOf: (child: MapNode) => string | undefined
-  ): string {
+  private aiCardInputKey(node: MapNode, prompt: string, summaryOf: (child: MapNode) => string | undefined): string {
     return promptInputKey({
       prompt,
       children: (this.map?.nodes ?? [])
@@ -19859,7 +19855,11 @@ export class VisualAgentMapView extends ItemView {
       if (!node || controller.signal.aborted || !here()) return;
       stamps.push(
         this.plugin.repo
-          .writeAiRunStamp(node.path, { at: new Date().toISOString(), result, ...(input !== undefined ? { input } : {}) })
+          .writeAiRunStamp(node.path, {
+            at: new Date().toISOString(),
+            result,
+            ...(input !== undefined ? { input } : {})
+          })
           .catch(() => undefined)
       );
     };
@@ -19972,10 +19972,7 @@ export class VisualAgentMapView extends ItemView {
     );
     const blocked = entry ? blockers.length > 0 : note.aiRun?.result === "blocked";
     if (blocked)
-      return t(
-        "ui.ai_card_blocked_0",
-        blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001") || ""
-      );
+      return t("ui.ai_card_blocked_0", blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001") || "");
     return t("ui.ai_card_failed_0", (entry ? entry.reason : undefined) ?? note.lastError ?? "");
   }
   /**
@@ -20003,7 +20000,10 @@ export class VisualAgentMapView extends ItemView {
         title.appendChild(glyph);
         parts.push(glyph);
       }
-      const question = splitPrompt(note.prompt).question.split(/\r?\n/).find(line => line.trim()) ?? "";
+      const question =
+        splitPrompt(note.prompt)
+          .question.split(/\r?\n/)
+          .find(line => line.trim()) ?? "";
       if (question) {
         const line = createEl("p", { cls: "vam-ai-question is-clickable", text: question.trim() });
         line.setAttr("title", question.trim());

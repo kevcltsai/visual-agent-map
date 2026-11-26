@@ -29,7 +29,9 @@ export function readAiCard(fm: Record<string, unknown>): boolean {
   return fm["ai-card"] === true;
 }
 /** The last "run all" record of an AI card: `ai-run-at` (text), `ai-run-result` (ok, failed or blocked) and `ai-run-input` (text); absent unless the first two are valid. */
-export function readAiRun(fm: Record<string, unknown>): { at: string; result: "ok" | "failed" | "blocked"; input?: string } | undefined {
+export function readAiRun(
+  fm: Record<string, unknown>
+): { at: string; result: "ok" | "failed" | "blocked"; input?: string } | undefined {
   const at = fm["ai-run-at"];
   const result = fm["ai-run-result"];
   if (typeof at !== "string" || !at) return undefined;

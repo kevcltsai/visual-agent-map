@@ -316,3 +316,20 @@ S.integrationTest('Living Node ownership: protect an edited output and append an
   assert.deepEqual(S.plain(recovered.suppressed), ['r1']);
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: recovered, candidate: { executionId: 'e3' }, proposal: { baseRevision: recovered.revision, operations: [{ ...append, id: 'r1' }] } })), /suppressed-record/);
 });
+
+S.integrationTest('Living Node trial: rejected adoption lease consumes the candidate without cancelling the competing operation', async () => {
+  const f = await setup();
+  const coordinator = new LivingCoordinator();
+  const trial = new LivingTrial(coordinator);
+  const r = trialRequest(f, async () => proposal);
+  assert.equal(await trial.run(r), true);
+  const competing = coordinator.acquire('map', 'v2', [path], true);
+  assert.ok(competing);
+  assert.equal(await trial.adopt(f.repo, r), 'discarded');
+  assert.equal(trial.state, 'invalid');
+  assert.equal(trial.result.output.text, 'Current findings');
+  assert.equal(competing.current(), true);
+  competing.release();
+  assert.equal(await trial.adopt(f.repo, r), 'discarded');
+  assert.equal(f.contents.get(path), initial);
+});

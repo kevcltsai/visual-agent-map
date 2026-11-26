@@ -150,3 +150,17 @@ test('view menu: no map, no export items', async () => {
   const { view } = await viewHarness({ aim: false }); view.map = null;
   assert.deepEqual(paneMenu(view), []);
 });
+
+
+test('Living Node export carries committed knowledge but never executable configuration', async () => {
+  const { app, contents } = fixture('en');
+  await app.vault.createFolder('Agent Workspace'); await app.vault.createFolder('Agent Workspace/Topics'); await app.vault.createFolder('Agent Workspace/Topics/map-x');
+  const notes = notesOf();
+  notes.set('r', { title: 'Root', detail: 'Manual notes', prompt: 'Private prompt',
+    aiCard: true, livingNode: { shareMarkdown: '> Committed findings', outcome: 'ok', configRevision: 'secret-revision' } });
+  const path = await io.exportMapExchange(app.vault, { mapPath: MAP_PATH, map: mapOf(), notes, format: 'opml' });
+  const xml = contents.get(path);
+  assert.match(xml, /Manual notes/);
+  assert.match(xml, /Committed findings/);
+  assert.doesNotMatch(xml, /Private prompt|secret-revision|ai-card|living-node-/);
+});

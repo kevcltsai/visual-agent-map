@@ -15347,6 +15347,7 @@ export class VisualAgentMapView extends ItemView {
     if (node && !note) return;
     const split = note?.prompt.trim() ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
     let expectedPrompt = note?.prompt;
+    let expectedConfigRevision = note?.livingNode?.configRevision;
     const mapId = this.map.id;
     const mapPath = this.path;
     const mapSession = this.captureMapSession();
@@ -15375,10 +15376,11 @@ export class VisualAgentMapView extends ItemView {
         },
         pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
         save: async values => {
-          const saved = await this.saveAiCard(node, parent, afterTextId, values, expectedPrompt);
+          const saved = await this.saveAiCard(node, parent, afterTextId, values, expectedPrompt, expectedConfigRevision, current);
           if (!saved) return false;
           if (node) {
             expectedPrompt = promptOf(values);
+            expectedConfigRevision = saved.configRevision;
             trial.acceptSave(saved.before, saved.after);
           }
           return true;
@@ -15523,10 +15525,13 @@ export class VisualAgentMapView extends ItemView {
     parent: MapNode | null,
     afterTextId: string | undefined,
     values: AiCardPopoverValues,
-    expectedPrompt?: string
+    expectedPrompt: string | undefined,
+    expectedConfigRevision: string | undefined,
+    editorCurrent: () => boolean
   ): Promise<LivingConfigSave | undefined> {
-    if (!this.map || !values.question.trim()) return undefined;
-    const current = this.captureMapSession();
+    if (!this.map || !values.question.trim() || !editorCurrent()) return undefined;
+    const mapCurrent = this.captureMapSession();
+    const current = (): boolean => mapCurrent() && editorCurrent();
     let saved: LivingConfigSave | undefined;
     try {
       await this.plugin.mutate(async () => {
@@ -15535,12 +15540,13 @@ export class VisualAgentMapView extends ItemView {
         if (!node) {
           const name = values.title || aiCardTitle(values.question);
           const found = parent ? this.mapNodeById(parent.id) : null;
+          if (parent && !found) throw new Error("changed-target-identity");
           target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
         }
-        if (!target) return;
-        saved = await this.writeAiCard(target, values, expectedPrompt);
+        if (!target || !current()) return;
+        saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
       });
-      if (saved && !node) this.closeAiCardPopover();
+      if (saved && !node && current()) this.closeAiCardPopover();
       return saved;
     } catch (error) {
       if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
@@ -15551,31 +15557,53 @@ export class VisualAgentMapView extends ItemView {
   private async writeAiCard(
     node: MapNode,
     values: AiCardPopoverValues,
-    expectedPrompt?: string
+    expectedPrompt: string | undefined,
+    expectedConfigRevision: string | undefined,
+    current: () => boolean
   ): Promise<LivingConfigSave | undefined> {
-    if (!this.map) return undefined;
+    if (!this.map || !current()) return undefined;
     const repo = this.plugin.repo;
     const viewport = clone(this.map.viewport);
+    const mapPath = this.path;
+    const mapId = this.map.id;
+    const nodeId = node.id;
+    const nodePath = node.path;
+    const parentId = node.parentId;
+    let firstCommit = true;
+    const stillCurrent = (): boolean => {
+      if (!firstCommit) return true; // redo has its own transaction preimage guard
+      const live = this.map?.nodes.find(item => item.id === nodeId);
+      return current() && this.path === mapPath && this.map?.id === mapId &&
+        live?.path === nodePath && live?.parentId === parentId;
+    };
     let saved: LivingConfigSave | undefined;
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, async path => {
-        const liveMap = await repo.readMap(this.path);
-        if (liveMap.nodes.find(item => item.id === node.id)?.path !== path) throw new Error("changed-target-identity");
+      .rewriteNote(nodePath, async path => {
+        if (!stillCurrent()) throw new Error("changed-target");
+        const liveMap = await repo.readMap(mapPath);
+        const live = liveMap.nodes.find(item => item.id === nodeId);
+        if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
+          throw new Error("changed-target-identity");
         saved = await saveLivingConfig(
           this.app,
           repo,
           liveMap,
-          node.id,
+          nodeId,
           joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
-          expectedPrompt
+          expectedPrompt,
+          expectedConfigRevision,
+          stillCurrent
         );
       })
-      .editMap(this.path, map => {
+      .editMap(mapPath, map => {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.ai_card") });
-    this.history.push(entry);
-    await this.refreshAfterSavedChange();
+    firstCommit = false;
+    if (this.path === mapPath && this.map?.id === mapId && !this.closed) {
+      this.history.push(entry);
+      await this.refreshAfterSavedChange();
+    }
     return saved;
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */

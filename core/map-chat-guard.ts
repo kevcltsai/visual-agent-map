@@ -1,4 +1,5 @@
 import { parseMap } from "../map-model";
+import { frontmatter } from "./repository-frontmatter";
 
 /**
  * "Do not break VAM" guard for the writes a map chat reply asks for. Pure: it looks only at the target path and the old and
@@ -16,7 +17,8 @@ export type MapChatGuardCode =
   | "hypothesis_frontmatter_changed"
   | "exists"
   | "no_baseline"
-  | "map_source";
+  | "map_source"
+  | "living_node_protected";
 export type MapChatGuardResult = { ok: true } | { ok: false; code: MapChatGuardCode };
 
 export interface MapChatWriteCheck {
@@ -115,6 +117,24 @@ function hasDuplicateIdentityKey(block: string | null): boolean {
   return false;
 }
 
+/** Raw Markdown actions never grant executable configuration or edit protected
+ * Living Node knowledge. Parse YAML as the Repository does (including quoted
+ * keys and flow mappings), rather than relying on a line-pattern allowlist. */
+function protectedLivingMarkdown(content: string): boolean {
+  if (!content) return false;
+  if (content.includes("<!-- vam-living-node:")) return true;
+  try {
+    const fm = frontmatter(content);
+    return Object.keys(fm).some(key =>
+      key === "ai-card" || key === "ai-locked" || key === "ai-update-mode" ||
+      key.startsWith("ai-run-") || key.startsWith("living-node-")
+    );
+  } catch {
+    // An unparseable frontmatter cannot establish that a raw write is safe.
+    return true;
+  }
+}
+
 const hasMapMarker = (content: string): boolean =>
   /```agent-map\s*\n/.test(content) ||
   topLevelValues(frontmatterBlock(content), ["visual-agent-map"]).has("visual-agent-map");
@@ -131,6 +151,7 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
     if (check.exists) return { ok: false, code: "exists" };
+    if (protectedLivingMarkdown(check.newContent)) return { ok: false, code: "living_node_protected" };
     if (
       hasMapMarker(check.newContent) ||
       topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0
@@ -141,6 +162,8 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
   const baseline = check.knownHashes ?? {};
   if (!Object.prototype.hasOwnProperty.call(baseline, path)) return { ok: false, code: "no_baseline" };
   const before = check.oldContent ?? "";
+  if (protectedLivingMarkdown(before) || protectedLivingMarkdown(check.newContent))
+    return { ok: false, code: "living_node_protected" };
   if (hasMapMarker(before) || hasMapMarker(check.newContent)) {
     // A map file is the plugin's own data: the chat never edits it (map changes go through the topic actions).
     try {

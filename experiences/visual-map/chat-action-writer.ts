@@ -320,12 +320,26 @@ export class ChatActionWriter {
               !baseline.mapSourcePaths?.includes(dest.path)))
             return skipped("ui.living_node_chat_source_refused");
         }
+        const mapPath = this.path;
+        const mapId = this.map.id;
+        const nodeId = node.id;
+        const parentId = node.parentId;
+        let firstCommit = true;
+        const stillCurrent = (): boolean => {
+          if (!firstCommit) return true; // redo is guarded by the transaction's own preimage checks
+          const live = this.map?.nodes.find(item => item.id === nodeId);
+          return same() && this.path === mapPath && this.map?.id === mapId &&
+            live?.path === node.path && live?.parentId === parentId;
+        };
         const entry = await this.ports.beginMapTransaction().rewriteNote(node.path, async path => {
-          if (!same()) throw new Error("changed-target");
-          const liveMap = await repo.readMap(this.path);
-          if (liveMap.nodes.find(item => item.id === node.id)?.path !== path) throw new Error("changed-target-identity");
-          await saveLivingConfig(this.app, repo, liveMap, node.id, action.content, current.note.prompt, stamp);
+          if (!stillCurrent()) throw new Error("changed-target");
+          const liveMap = await repo.readMap(mapPath);
+          const live = liveMap.nodes.find(item => item.id === nodeId);
+          if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
+            throw new Error("changed-target-identity");
+          await saveLivingConfig(this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp, stillCurrent);
         }).commit({ deferRebuild: true, label: t("ui.ai_card") });
+        firstCommit = false;
         this.history.push(entry);
         run.notes?.add(node.id);
         const saved = await repo.readNote(node.path, this.map ?? undefined);

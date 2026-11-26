@@ -81,7 +81,13 @@ export class NodeDetailsSidebar {
     await this.app().workspace.revealLeaf(leaf);
   }
 
-  showLivingTrial(file: TFile, markdown: string, owner: string, isCurrent: () => boolean): Promise<boolean> {
+  showLivingTrial(
+    file: TFile,
+    markdown: string,
+    owner: string,
+    isCurrent: () => boolean,
+    warnings: readonly string[] = []
+  ): Promise<boolean> {
     const revision = this.revision;
     const current = (): boolean => revision === this.revision && this.trialOwner === owner && isCurrent();
     return this.enqueue(async () => {
@@ -99,7 +105,7 @@ export class NodeDetailsSidebar {
         return false;
       }
       if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-      await leaf.view.show(file, markdown, owner);
+      await leaf.view.show(file, markdown, owner, warnings);
       if (!current()) return false;
       await this.app().workspace.revealLeaf(leaf);
       return current();

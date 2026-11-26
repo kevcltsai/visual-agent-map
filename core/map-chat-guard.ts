@@ -151,19 +151,17 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
     if (check.exists) return { ok: false, code: "exists" };
-    if (protectedLivingMarkdown(check.newContent)) return { ok: false, code: "living_node_protected" };
     if (
       hasMapMarker(check.newContent) ||
       topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0
     )
       return { ok: false, code: "reserved_frontmatter" };
+    if (protectedLivingMarkdown(check.newContent)) return { ok: false, code: "living_node_protected" };
     return { ok: true };
   }
   const baseline = check.knownHashes ?? {};
   if (!Object.prototype.hasOwnProperty.call(baseline, path)) return { ok: false, code: "no_baseline" };
   const before = check.oldContent ?? "";
-  if (protectedLivingMarkdown(before) || protectedLivingMarkdown(check.newContent))
-    return { ok: false, code: "living_node_protected" };
   if (hasMapMarker(before) || hasMapMarker(check.newContent)) {
     // A map file is the plugin's own data: the chat never edits it (map changes go through the topic actions).
     try {
@@ -187,6 +185,8 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
     hypothesisLines(frontmatterBlock(check.newContent)).join("\n")
   )
     return { ok: false, code: "hypothesis_frontmatter_changed" };
+  if (protectedLivingMarkdown(before) || protectedLivingMarkdown(check.newContent))
+    return { ok: false, code: "living_node_protected" };
   return { ok: true };
 }
 

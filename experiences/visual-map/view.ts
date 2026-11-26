@@ -69,7 +69,7 @@ import {
   type BracketRect,
   type BracketResult
 } from "./summary-bracket-geometry";
-import { attachmentPath } from "./attachment-store";
+import { attachmentPath, isLinked } from "./attachment-store";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
 import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
@@ -17939,6 +17939,7 @@ export class VisualAgentMapView extends ItemView {
     let provisionalText: string | undefined;
     let configured: LivingConfigSave | undefined;
     let configurationGraph: string | undefined;
+    const previousSelection = this.selection.state.selected;
     const graph = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(item => [item.id, item.path, item.parentId]));
     try {
@@ -17960,10 +17961,9 @@ export class VisualAgentMapView extends ItemView {
         if (!livingConfig.current()) throw new Error("changed-target");
       }
       if (!this.map) throw new Error("changed-target");
-      this.notes.set(
-        node.id,
-        await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
-      );
+      const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
+      if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
+      this.notes.set(node.id, preparedNote);
       this.selection.setSelected(node.id);
       // Set before the repaint that shows the card, so the card is drawn with its title field.
       if (interactive && focus && !this.inlineName)
@@ -18035,9 +18035,14 @@ export class VisualAgentMapView extends ItemView {
           if (disk.id === creationMapId && !disk.nodes.some(item => item.id === node.id || item.path === node.path) &&
               this.app.vault.getAbstractFileByPath(node.path) === provisionalFile &&
               await this.app.vault.read(provisionalFile) === provisionalText &&
-              provisionalFile.path === node.path) {
+              provisionalFile.path === node.path && !isLinked(this.app, node.path)) {
             await this.app.fileManager.trashFile(provisionalFile);
+          }
+          if (this.path === creationMapPath && this.map?.id === creationMapId &&
+              !disk.nodes.some(item => item.id === node.id)) {
             this.notes.delete(node.id);
+            if (this.selection.state.selected === node.id) this.selection.setSelected(previousSelection);
+            this.render();
           }
         } catch (cleanupError) {
           throw new AggregateError([error, cleanupError], "Living Node creation rollback failed");

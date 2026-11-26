@@ -255,7 +255,7 @@ async function roundFixture() {
   const map = S.map([S.node('parent'), S.node('child', 'parent'), S.node('ordinary')]);
   for (const node of map.nodes) {
     const flag = node.id === 'ordinary' ? '' : 'ai-card: true\n';
-    const raw = '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: ' + node.id + '\n' + flag +
+    const raw = '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: map\nnode-id: ' + node.id + '\n' + flag +
       '---\n# ' + node.id + '\n\n## Prompt\n\nResearch ' + node.id + '\n\n## Detail\n\nManual ' + node.id + '\n';
     await f.app.vault.create(node.path, raw);
   }

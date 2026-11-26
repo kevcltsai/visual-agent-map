@@ -162,6 +162,14 @@ export interface ChatWriterPorts {
     keyboardFocus?: boolean,
     hypothesisStart?: { leaning?: HypothesisLeaning; strength?: HypothesisStrength }
   ): Promise<void>;
+  /** Same prepublication configuration and creation path as the central editor. */
+  createLivingNode?(
+    parent: MapNode | null,
+    action: Extract<MapChatAction, { kind: "add_child" }>,
+    rebuildDerivedData: boolean,
+    current: () => boolean,
+    allowSource: (path: string) => boolean
+  ): Promise<MapNode | undefined>;
   noteChange(node: MapNode, patch: NotePatch): Promise<void>;
   moveTopic(node: MapNode, parent: MapNode): Promise<void>;
   removeToUnassignedEntry(node: MapNode, branch: boolean, adopterId?: string): Promise<TransactionEntry | undefined>;
@@ -259,6 +267,15 @@ export class ChatActionWriter {
       });
       return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
     };
+    // Authorize the actual resolved path, not just a preliminary display alias.
+    const allowedLivingSource = (path: string): boolean => {
+      const key = normalizeVaultPath(path);
+      if (!key || key !== path || key.toLowerCase() === configDir.toLowerCase() ||
+          key.toLowerCase().startsWith(configDir.toLowerCase() + "/")) return false;
+      return !!this.map?.nodes.some(item => item.path === key) ||
+        Object.prototype.hasOwnProperty.call(hashes, key) ||
+        !!baseline.mapSourcePaths?.includes(key);
+    };
     // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
     const locked = await this.chatLockSkip(action, real);
     if (locked) return locked;
@@ -272,6 +289,17 @@ export class ChatActionWriter {
           parent = nodeOf(parentId) ?? null;
           if (!parent) return gone;
           if (this.ports.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        }
+        if (!same()) return skipped("ui.map_chat_skip_map_changed");
+        if (action.livingPrompt) {
+          if (!this.ports.createLivingNode || action.summary) return skipped("ui.map_chat_skip_unavailable");
+          if (run.deferRebuild) run.ownershipDirty = true;
+          const made = await this.ports.createLivingNode(parent, action, !run.deferRebuild, same, allowedLivingSource);
+          if (!made) return skipped("ui.map_chat_skip_unavailable");
+          run.created.push(made.id);
+          run.notes?.add(made.id);
+          if (action.ref) run.refs.set(action.ref, made.id);
+          return done;
         }
         const before = new Set(this.map.nodes.map(item => item.id));
         // The derived data (every map is read for it) is rebuilt once, when the reply ends, not after each card; marked first so
@@ -304,7 +332,7 @@ export class ChatActionWriter {
         if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
         if (current.note.aiLocked) return skipped("ui.ai_locked_notice");
         // Existing ordinary cards cannot be implicitly converted by chat.
-        if (!createdHere && current.note.aiCard !== true) return skipped("ui.living_node_chat_existing_only");
+        if (current.note.aiCard !== true) return skipped("ui.living_node_chat_existing_only");
         const stamp = baseline.topicHashes[node.id]?.livingConfigRevision;
         if (!createdHere && (!stamp || stamp !== current.note.livingNode?.configRevision))
           return skipped("ui.map_chat_skip_topic_changed");
@@ -315,9 +343,7 @@ export class ChatActionWriter {
         for (const link of promptSourceLinks(action.content)) {
           if (previous.has(link)) continue;
           const dest = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-          if (!dest || (!this.map.nodes.some(item => item.path === dest.path) &&
-              !Object.prototype.hasOwnProperty.call(hashes, normalizeVaultPath(dest.path) ?? dest.path) &&
-              !baseline.mapSourcePaths?.includes(dest.path)))
+          if (!dest || !allowedLivingSource(dest.path))
             return skipped("ui.living_node_chat_source_refused");
         }
         const mapPath = this.path;
@@ -338,7 +364,11 @@ export class ChatActionWriter {
           const live = liveMap.nodes.find(item => item.id === nodeId);
           if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
             throw new Error("changed-target-identity");
-          await saveLivingConfig(this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp, stillCurrent);
+          await saveLivingConfig(this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp, stillCurrent, path => {
+            // On redo, the original authorized paths are still required even if the
+            // chat's view changed; the current map's membership comes from disk.
+            return liveMap.nodes.some(item => item.path === path) || allowedLivingSource(path);
+          });
         }).commit({ deferRebuild: true, label: t("ui.ai_card") });
         firstCommit = false;
         this.history.push(entry);

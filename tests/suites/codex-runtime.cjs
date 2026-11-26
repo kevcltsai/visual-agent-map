@@ -141,6 +141,30 @@ test('app exit sends SIGKILL to an owned Codex process even after reset dropped 
   assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
 });
 
+test('Codex stop escalates to SIGKILL after 1.5 s when the app-server ignores SIGTERM, and not after it closed', async () => {
+  const { EventEmitter } = require('node:events');
+  for (const closes of [false, true]) {
+    const timers = [];
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    const signals = [];
+    child.kill = (signal = 'SIGTERM') => { signals.push(signal); if (closes) process.nextTick(() => child.emit('close', null, signal)); return true; };
+    child.stdin = { write: line => {
+      const message = JSON.parse(line.trim());
+      if (message.method === 'initialize') process.nextTick(() => child.stdout.emit('data', Buffer.from(JSON.stringify({ id: message.id, result: {} }) + '\n')));
+      return true;
+    } };
+    const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } }, { setTimeout: (fn, ms) => { if (ms === 1_500) { timers.push(fn); return 0; } return setTimeout(fn, ms); } });
+    const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/', env: {}, clientVersion: '1' });
+    await runtime.start();
+    runtime.stop();
+    assert.deepEqual(signals, ['SIGTERM']);
+    assert.equal(timers.length, 1);
+    await new Promise(resolve => setImmediate(resolve));
+    timers[0]();
+    assert.deepEqual(signals, closes ? ['SIGTERM'] : ['SIGTERM', 'SIGKILL']);
+  }
+});
+
 integrationTest('Codex late turn acknowledgement after abort is never reported accepted', async () => {
   const { EventEmitter } = require('node:events'); const sent = []; let turnRequest;
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};

@@ -6,6 +6,16 @@ import { LIVING_READER_VIEW, LivingReaderView } from "./living-node-reader";
 export class NodeDetailsSidebar {
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
+  private trialOwner?: string;
+  private revision = 0;
+  private pending: Promise<void> = Promise.resolve();
+
+  /** Serialize transitions of the single shared right pane; the newest selection wins. */
+  private enqueue<T>(run: () => Promise<T>): Promise<T> {
+    const next = this.pending.then(run);
+    this.pending = next.then(() => {}, () => {});
+    return next;
+  }
 
   constructor(
     private readonly app: () => App,
@@ -29,7 +39,16 @@ export class NodeDetailsSidebar {
       );
   }
 
-  async openDetails(file: TFile): Promise<void> {
+  openDetails(file: TFile, owner?: string): Promise<void> {
+    this.trialOwner = owner;
+    const revision = ++this.revision;
+    return this.enqueue(async () => {
+      if (revision !== this.revision) return;
+      await this.openOfficial(file, revision);
+    });
+  }
+
+  private async openOfficial(file: TFile, revision: number): Promise<void> {
     const markdownLeaves = this.app().workspace.getLeavesOfType("markdown");
     if (
       this.detailsLeaf &&
@@ -54,31 +73,46 @@ export class NodeDetailsSidebar {
         this.app().workspace.getRightLeaf(true);
     }
     if (!this.detailsLeaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-    await this.detailsLeaf.openFile(file);
-    this.detailsPath = file.path;
-    this.styleLeaf(this.detailsLeaf);
-    await this.app().workspace.revealLeaf(this.detailsLeaf);
-  }
-
-  async showLivingTrial(file: TFile, markdown: string): Promise<void> {
-    if (!(this.detailsLeaf?.view instanceof LivingReaderView)) await this.openDetails(file);
     const leaf = this.detailsLeaf;
-    if (!leaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-    if (!(leaf.view instanceof LivingReaderView)) await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
-    if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-    await leaf.view.show(file, markdown);
+    await leaf.openFile(file);
+    if (revision !== this.revision || this.detailsLeaf !== leaf) return;
+    this.detailsPath = file.path;
+    this.styleLeaf(leaf);
     await this.app().workspace.revealLeaf(leaf);
   }
 
-  invalidateLivingTrial(): void {
-    if (this.detailsLeaf?.view instanceof LivingReaderView) this.detailsLeaf.view.markInvalid();
+  showLivingTrial(file: TFile, markdown: string, owner: string, isCurrent: () => boolean): Promise<boolean> {
+    const revision = this.revision;
+    const current = (): boolean => revision === this.revision && this.trialOwner === owner && isCurrent();
+    return this.enqueue(async () => {
+      if (!current()) return false;
+      if (!this.detailsLeaf || this.detailsPath !== file.path) await this.openOfficial(file, revision);
+      if (!current()) return false;
+      const leaf = this.detailsLeaf;
+      if (!leaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
+      if (!(leaf.view instanceof LivingReaderView)) await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
+      if (!current() || this.detailsLeaf !== leaf) return false;
+      if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
+      await leaf.view.show(file, markdown, owner);
+      if (!current()) return false;
+      await this.app().workspace.revealLeaf(leaf);
+      return current();
+    });
   }
 
-  async restoreLivingOfficial(file: TFile): Promise<void> {
-    if (this.detailsLeaf?.view instanceof LivingReaderView) await this.openDetails(file);
+  invalidateLivingTrial(owner: string): void {
+    if (this.trialOwner === owner && this.detailsLeaf?.view instanceof LivingReaderView)
+      this.detailsLeaf.view.markInvalid(owner);
+  }
+
+  restoreLivingOfficial(file: TFile, owner: string, release = false): Promise<void> {
+    if (this.trialOwner !== owner) return Promise.resolve();
+    return this.openDetails(file, release ? undefined : owner);
   }
 
   closeStaleDetails(): void {
+    this.revision++;
+    this.trialOwner = undefined;
     const closed =
       this.detailsLeaf?.view instanceof LivingReaderView ||
       (this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath);

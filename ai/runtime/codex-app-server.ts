@@ -266,6 +266,8 @@ export class CodexAppServerRuntime {
     controls?: {
       imageDataUrl?: string;
       webSearchOnly?: boolean;
+      /** Keep the web-only tool sandbox, but allow a local answer when research is not required. */
+      optionalWebSearch?: boolean;
       textOnly?: boolean;
       /** Only Codex's image generation tool is enabled; the turn resolves to the generated image as a data URL. */
       generateImage?: boolean;
@@ -378,7 +380,7 @@ export class CodexAppServerRuntime {
         searches: 0,
         countedSearchIds: new Set(),
         webRetrievals: new Set(),
-        requireSearch: controls?.webSearchOnly === true,
+        requireSearch: controls?.webSearchOnly === true && controls.optionalWebSearch !== true,
         searchBudget: controls?.searchBudget ?? 0,
         steered: false,
         onRequest: controls?.onRequest,

@@ -1,12 +1,11 @@
 import type { AiCalls } from "../../core/ai-calls";
 import { allowedUrl, openedUrlsFromEvents } from "../../core/argument-map/source-proof";
 import { stepEffort } from "../../core/provider-step-runner";
-import { prepareStep, type StepDefinition } from "../../core/step-runner";
+import { prepareStep, renderTemplate, type StepDefinition } from "../../core/step-runner";
 import type { ModelChoice } from "../../ai/model-resolution";
 import { applyLivingChanges, type LivingEvidence, type LivingKnowledge } from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
 import promptTemplate from "./steps/living-node-change-set.md";
-import { renderTemplate } from "../../core/step-runner";
 
 export interface LivingProviderInput extends ModelChoice {
   prompt: string;
@@ -91,6 +90,7 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
       task: {
         webSearch: true,
         webSearchOnly: true,
+        optionalWebSearch: true,
         searchBudget: 8,
         timeoutMs: 300_000,
         onWebSearchEvent: event => events.push(event)

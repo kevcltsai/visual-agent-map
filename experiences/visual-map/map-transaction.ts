@@ -491,6 +491,9 @@ export function begin(deps: TransactionDeps): Transaction {
         }
         for (const step of notes.after) await step.apply();
         for (const item of maps) {
+          // The dependencies may have changed since this history entry was
+          // recorded. A replay must not publish a newly cyclic structure.
+          await deps.validateStructure?.(item.restore, item.write);
           await repo.saveMap(item.mapPath, clone(item.write), {
             authorize: current => requireMapSnapshot(current, item.restore),
             preserveViewport: item.preserveViewport,

@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import { readAiCard, readAiLocked } from "../../note-values";
-import { applyLivingChanges, type LivingChangeContext, type LivingKnowledge } from "./living-node-changes";
+import {
+  applyLivingChanges,
+  type LivingChangeContext,
+  type LivingEvidence,
+  type LivingKnowledge,
+  type LivingRecord
+} from "./living-node-changes";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
 const BEGIN = "<!-- vam-living-node:begin v1 -->";
@@ -37,53 +43,202 @@ function readRegion(content: string, hash: unknown): Region | undefined {
 
 function quote(value: string): string {
   return value
-    .replace(/<!--/g, "&lt;!--")
-    .replace(/-->/g, "--&gt;")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map(line => "> " + line)
     .join("\n");
 }
 
-/** Render only validated domain values, never the raw model response or arbitrary replacement Markdown. */
+function unquote(value: string): string {
+  return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
+const field = (name: string, value: string | null): string => `- ${name}: ${JSON.stringify(value)}`;
+
+function sourceLines(entries: readonly LivingEvidence[]): string[] {
+  return entries.map(entry => `- Source: ${JSON.stringify([entry.id, entry.source, entry.retrievedAt])}`);
+}
+
+/** A single readable, reversible Markdown representation. No second copy of claims in a hidden index. */
 function renderRegion(knowledge: LivingKnowledge): string {
-  const lines = [BEGIN, "", "## Living Node", ""];
-  if (knowledge.output.text) {
-    lines.push("### Current output", "", quote(`Ownership: ${knowledge.output.owner}`), quote(knowledge.output.text), "");
-  }
-  const sourceLines = (entries: LivingKnowledge["output"]["evidence"]): string[] =>
-    entries.map(entry => quote(`Source ${entry.id}: ${entry.source} (retrieved ${entry.retrievedAt})`));
-  lines.push(...sourceLines(knowledge.output.evidence));
+  const lines = [
+    BEGIN,
+    "",
+    "## Living Node",
+    "",
+    "### Current output",
+    field("Ownership", knowledge.output.owner),
+    "",
+    quote(knowledge.output.text),
+    "",
+    "#### Evidence",
+    ...sourceLines(knowledge.output.evidence)
+  ];
   for (const record of knowledge.records) {
     lines.push(
       "",
       "### Observation",
-      "",
-      quote(`ID: ${record.id}`),
-      quote(`Subject: ${record.subject}`),
-      quote(`Scope: ${record.scope}`),
-      quote(`Granularity: ${record.granularity}`),
-      quote(`Event time: ${record.eventTime ?? "unknown"}`),
-      quote(`Validity: ${record.validity}`),
-      quote(`Ownership: ${record.owner}`),
+      field("ID", record.id),
+      field("Subject", record.subject),
+      field("Scope", record.scope),
+      field("Granularity", record.granularity),
+      field("Event time", record.eventTime),
+      field("Validity", record.validity),
+      field("Ownership", record.owner),
       "",
       quote(record.claim),
+      "",
+      "#### Evidence",
       ...sourceLines(record.evidence)
     );
     for (const history of record.history) {
       lines.push(
         "",
-        quote(`History: ${history.at}`),
+        "#### History",
+        field("Time", history.at),
+        field("Reason", history.reason),
+        "",
         quote(history.claim),
-        quote(history.reason),
+        "",
+        "##### Previous evidence",
         ...sourceLines(history.previousEvidence),
+        "##### Evidence",
         ...sourceLines(history.evidence)
       );
     }
   }
-  for (const id of knowledge.suppressed) lines.push("", quote(`Suppressed record ID: ${id}`));
+  lines.push("", "### Suppression");
+  for (const id of knowledge.suppressed) lines.push(field("ID", id));
   lines.push("", END);
   return lines.join("\n");
+}
+
+/** Decode only the exact format emitted by this version; unknown/corrupt data remains user-owned. */
+function decodeRegion(region: Region, revision: string): LivingKnowledge {
+  const lines = region.text.split("\n");
+  let at = 0;
+  const fail = (): never => {
+    throw new Error("invalid-managed-region");
+  };
+  const expect = (line: string): void => {
+    if (lines[at++] !== line) fail();
+  };
+  const readField = (name: string): unknown => {
+    const prefix = `- ${name}: `;
+    const line = lines[at++];
+    if (!line?.startsWith(prefix)) return fail();
+    const value: unknown = JSON.parse(line.slice(prefix.length));
+    return value;
+  };
+  const text = (value: unknown): string => (typeof value === "string" ? value : fail());
+  const owner = (): "ai" | "user" => {
+    const value = readField("Ownership");
+    return value === "ai" || value === "user" ? value : fail();
+  };
+  const prose = (): string => {
+    const result: string[] = [];
+    while (lines[at]?.startsWith("> ")) result.push(unquote(lines[at++].slice(2)));
+    if (!result.length) fail();
+    return result.join("\n");
+  };
+  const evidence = (): LivingEvidence[] => {
+    const result: LivingEvidence[] = [];
+    const ids = new Set<string>();
+    while (lines[at]?.startsWith("- Source: ")) {
+      const raw = readField("Source");
+      if (!Array.isArray(raw) || raw.length !== 3) return fail();
+      const entry = { id: text(raw[0]), source: text(raw[1]), retrievedAt: text(raw[2]) };
+      if (!entry.id || ids.has(entry.id)) fail();
+      ids.add(entry.id);
+      result.push(entry);
+    }
+    return result;
+  };
+  expect(BEGIN);
+  expect("");
+  expect("## Living Node");
+  expect("");
+  expect("### Current output");
+  const outputOwner = owner();
+  expect("");
+  const outputText = prose();
+  expect("");
+  expect("#### Evidence");
+  const output = { text: outputText, owner: outputOwner, evidence: evidence() };
+  const records: LivingRecord[] = [];
+  const ids = new Set<string>();
+  while (lines[at] === "" && lines[at + 1] === "### Observation") {
+    expect("");
+    expect("### Observation");
+    const id = text(readField("ID"));
+    if (!id || ids.has(id)) fail();
+    ids.add(id);
+    const subject = text(readField("Subject"));
+    const scope = text(readField("Scope"));
+    const granularity = text(readField("Granularity"));
+    const time = readField("Event time");
+    const eventTime = time === null ? null : text(time);
+    const validity = readField("Validity");
+    if (validity !== "active" && validity !== "disputed" && validity !== "invalidated") return fail();
+    const recordOwner = owner();
+    expect("");
+    const claim = prose();
+    expect("");
+    expect("#### Evidence");
+    const sources = evidence();
+    const history: LivingRecord["history"][number][] = [];
+    while (lines[at] === "" && lines[at + 1] === "#### History") {
+      expect("");
+      expect("#### History");
+      const time = text(readField("Time"));
+      const reason = text(readField("Reason"));
+      expect("");
+      const oldClaim = prose();
+      expect("");
+      expect("##### Previous evidence");
+      const previousEvidence = evidence();
+      expect("##### Evidence");
+      history.push({ at: time, reason, claim: oldClaim, previousEvidence, evidence: evidence() });
+    }
+    records.push({
+      id,
+      subject,
+      scope,
+      granularity,
+      eventTime,
+      validity,
+      owner: recordOwner,
+      claim,
+      evidence: sources,
+      history
+    });
+  }
+  expect("");
+  expect("### Suppression");
+  const suppressed: string[] = [];
+  while (lines[at]?.startsWith("- ID: ")) {
+    const id = text(readField("ID"));
+    if (!id || ids.has(id)) fail();
+    ids.add(id);
+    suppressed.push(id);
+  }
+  expect("");
+  expect(END);
+  const result = { revision, records, output, suppressed };
+  if (at !== lines.length || renderRegion(result) !== region.text) fail();
+  return result;
+}
+
+/** Reading never migrates or rewrites the legacy body. An edited region is not silently reclaimed by AI. */
+export function readLivingMarkdown(content: string): LivingKnowledge {
+  const fm = frontmatter(content);
+  const region = readRegion(content, fm[HASH_KEY]);
+  return region
+    ? decodeRegion(region, livingSnapshotRevision(region.text))
+    : { revision: "empty", records: [], suppressed: [], output: { text: "", owner: "ai", evidence: [] } };
 }
 
 export interface LivingMarkdownPort {
@@ -133,7 +288,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   if (fm[COMMIT_KEY] === candidate.executionId) return "discarded";
   const region = readRegion(expectedContent, fm[HASH_KEY]);
   if (region) {
-    if (request.base.revision !== fm[HASH_KEY] || renderRegion(request.base) !== region.text)
+    const stored = decodeRegion(region, livingSnapshotRevision(region.text));
+    if (request.base.revision !== stored.revision || renderRegion(request.base) !== region.text)
       throw new Error("base-mismatch");
   } else if (
     request.base.revision !== "empty" ||

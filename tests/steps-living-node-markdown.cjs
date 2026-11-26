@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { commitLivingMarkdown, livingSnapshotRevision } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
-const { applyLivingChanges } = S.load('experiences/visual-map/living-node-changes.ts');
+const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
 const initial = '---\nagent-map-id: map\ntopic-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
 const empty = () => ({ revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } });
 const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
@@ -36,9 +35,8 @@ S.integrationTest('Living Node: repeat no-change writes diagnostics only and doe
   const first = request(f);
   assert.equal(await commitLivingMarkdown(f.repo, first), 'written');
   const before = f.contents.get(path);
-  const result = applyLivingChanges(first.base, first.proposal, first.context);
-  const revision = before.match(/living-node-region-hash: "([a-f0-9]+)"/)[1];
-  const base = { ...first.base, records: result.records, output: result.output, revision };
+  const base = readLivingMarkdown(before);
+  const revision = base.revision;
   const second = request(f, { base, proposal: { baseRevision: revision, operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
   assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
   const after = f.contents.get(path);
@@ -86,4 +84,35 @@ S.integrationTest('Living Node: an empty first proposal is not evidence of a suc
   const f = await setup();
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [] } })), /missing-formal-result/);
   assert.equal(f.contents.get(path), initial);
+});
+
+S.integrationTest('Living Node: reconstructs persisted knowledge after reload, including corrections and multiline markup', async () => {
+  const f = await setup();
+  assert.equal(readLivingMarkdown(initial).revision, 'empty');
+  const r = request(f, { proposal: { baseRevision: 'empty', operations: [
+    { kind: 'output', text: 'Line one\n### heading\n<!-- marker --> & literal &lt;', evidence: ['e1'] },
+    { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: '100\n**raw**', evidence: ['e1'] }
+  ] } });
+  assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
+  const base = readLivingMarkdown(f.contents.get(path));
+  assert.equal(base.output.text, 'Line one\n### heading\n<!-- marker --> & literal &lt;');
+  assert.equal(base.records[0].claim, '100\n**raw**');
+  const second = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [
+    { kind: 'correct', id: 'r1', claim: '105', reason: 'corrected close', evidence: ['e2'] }
+  ] }, context: { ...context, evidence: [...context.evidence, { id: 'e2', source: 'https://example.org', retrievedAt: 't2' }] } });
+  assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
+  const recovered = readLivingMarkdown(f.contents.get(path));
+  assert.equal(recovered.records[0].claim, '105');
+  assert.equal(recovered.records[0].history[0].claim, '100\n**raw**');
+  assert.equal(recovered.records[0].history[0].previousEvidence[0].id, 'e1');
+  assert.equal(recovered.records[0].history[0].evidence[0].id, 'e2');
+  assert.notEqual(recovered.revision, base.revision);
+});
+
+S.integrationTest('Living Node: readback refuses tampered Markdown or ownership instead of silently migrating', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const saved = f.contents.get(path);
+  assert.throws(() => readLivingMarkdown(saved.replace('> Current findings', '> Manual changes')), /edited-or-deleted-knowledge/);
+  assert.throws(() => readLivingMarkdown(saved.replace('<!-- vam-living-node:end v1 -->', '')), /unknown-ownership/);
 });

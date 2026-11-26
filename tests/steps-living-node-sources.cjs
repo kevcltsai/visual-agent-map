@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveLivingSources } = require('./support.cjs').load('experiences/visual-map/living-node-sources.ts');
+const { resolveLivingSources, readLivingReferences, sameLivingTarget } = require('./support.cjs').load('experiences/visual-map/living-node-sources.ts');
 const nodes = [
   { id: 'root', path: 'root.md' }, { id: 'a', path: 'a.md', parentId: 'root' },
   { id: 'grandchild', path: 'grandchild.md', parentId: 'a' }, { id: 'b', path: 'b.md' }
@@ -68,4 +68,23 @@ test('map planning: same-map Markdown alias participates in cycle detection', ()
   assert.equal(result.plan.blocked.get('root'), 'cycle');
   assert.equal(result.plan.blocked.get('b'), 'cycle');
   assert.deepEqual(plain(result.plan.order.map(x => x.id)), ['grandchild', 'a']);
+});
+
+test('source metadata: only absent persisted references permit legacy fallback; corrupt values fail closed', () => {
+  assert.deepEqual(plain(readLivingReferences(undefined, ['B'])), [note('B')]);
+  assert.deepEqual(plain(readLivingReferences([], ['B'])), []);
+  assert.deepEqual(plain(readLivingReferences(['card:b', 'note:external'], ['A'])), [card('b'), note('external')]);
+  for (const malformed of [null, 'card:b', {}, [42], ['card:'], ['note:  '], ['unknown:b']])
+    assert.throws(() => readLivingReferences(malformed, ['B']), /invalid-source-reference/);
+});
+
+test('target snapshot: parent, path, identity and existence must remain stable; root null and omitted are equivalent', () => {
+  const before = { id: 'a', path: 'a.md', parentId: 'root' };
+  assert.equal(sameLivingTarget(before, { ...before }), true);
+  assert.equal(sameLivingTarget(before, { ...before, parentId: 'b' }), false);
+  assert.equal(sameLivingTarget(before, { ...before, parentId: null }), false);
+  assert.equal(sameLivingTarget(before, { ...before, path: 'new.md' }), false);
+  assert.equal(sameLivingTarget(before, { ...before, id: 'b' }), false);
+  assert.equal(sameLivingTarget(before, undefined), false);
+  assert.equal(sameLivingTarget({ id: 'a', path: 'a.md' }, { id: 'a', path: 'a.md', parentId: null }), true);
 });

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { allowedUrl } from "../../core/argument-map/source-proof";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
@@ -237,13 +238,22 @@ export function renderLivingPreview(knowledge: LivingKnowledge): string {
   return renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
 }
 
-/** Share only committed readable knowledge; never export internal evidence paths, IDs, or suppression metadata. */
+/** Share committed knowledge and verified public evidence only. No internal IDs,
+ * local source paths, signed/query-bearing URLs, ownership or suppression data. */
 export function renderLivingShareKnowledge(knowledge: LivingKnowledge): string {
   const sections: string[] = [];
-  if (knowledge.output.text.trim()) sections.push(quote(knowledge.output.text));
+  const publicEvidence = (evidence: readonly LivingEvidence[]): string[] => [...new Set(evidence.flatMap(entry => {
+    const url = allowedUrl(entry.source);
+    if (!url || url.search || url.hash || entry.id !== "web:" + livingSnapshotRevision(url.toString())) return [];
+    return [url.toString()];
+  }))];
+  const append = (text: string, evidence: readonly LivingEvidence[]): void => {
+    if (text.trim()) sections.push(quote([text, ...publicEvidence(evidence)].join("\n")));
+  };
+  append(knowledge.output.text, knowledge.output.evidence);
   for (const record of knowledge.records) {
-    sections.push(quote([record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n")));
-    for (const item of record.history) sections.push(quote([item.at, item.claim, item.reason].join("\n")));
+    append([record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n"), record.evidence);
+    for (const item of record.history) append([item.at, item.claim, item.reason].join("\n"), [...item.previousEvidence, ...item.evidence]);
   }
   return sections.join("\n\n");
 }

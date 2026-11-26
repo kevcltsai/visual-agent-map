@@ -3186,26 +3186,24 @@ integrationTest('UX B10: "Create an empty mind map" clears the draft typed on th
   assert.doesNotMatch(source, /\.vam-map-tools \.mod-cta/, 'the toolbar no longer has a primary add button to focus');
 });
 
-integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its chevron; the collapsed icon is a named, Tab-reachable button that opens into "Select several topics" and stays open while selecting', async () => {
+integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; starting a selection is in the header ⋯ menu, so the canvas shows the icon only while selecting, as the named "Done selecting" button', async () => {
   const draw = (h, method) => { const box = element('div'); h.view[method](box); return box; };
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
-    const box = draw(h, method); const bs = findAll(box, i => i.tag === 'button');
-    // The ordinary toolbar also carries the always-visible 「Data sources」 button right after the select icon; the hidden-AIM one does not.
-    assert.equal(bs.length, method === 'renderMapTools' ? 2 : 1, `${method}: the select icon${method === 'renderMapTools' ? ' and the data sources button' : ' only'}`); const b = bs[0];
-    if (method === 'renderMapTools') assert.ok(bs[1].cls.includes('vam-sources-button'), 'the data sources button follows the select icon');
-    assert.equal(findAll(box, i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
-    assert.equal(b.attrs['aria-label'], 'Select several topics', `${method}: the icon button has an accessible name`);
-    assert.equal(b.attrs.tabindex, undefined, `${method}: reachable with Tab`); assert.equal(b.attrs['aria-pressed'], 'false');
-    assert.ok(findAll(b, i => i.tag === 'span' && i.attrs['aria-hidden'] === 'true').length >= 1, `${method}: the icon is decorative`);
-    assert.equal(findAll(b, i => (i.cls ?? '').includes('vam-tools-select-label')).length, 0, `${method}: icon only, no text label node`); assert.equal(b.children.length, 1, `${method}: the icon is the only child`);
-    assert.ok(box.classes.includes('vam-tools-mini')); assert.equal(box.classes.includes('is-open'), false, `${method}: collapsed while idle`);
-    b.click();
+    const idle = findAll(draw(h, method), i => i.tag === 'button');
+    // The ordinary toolbar keeps the always-visible 「Data sources」 button; the hidden-AIM one has nothing while idle.
+    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), method === 'renderMapTools' ? [true] : [], `${method}: no select icon while idle`);
+    assert.equal(findAll(draw(h, method), i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
+    h.view.selection.toggleMultiSelect();
     assert.equal(h.view.selection.state.multiSelectMode, true);
     const again = draw(h, method); const done = findAll(again, i => i.tag === 'button')[0];
-    assert.ok(again.classes.includes('is-open'), `${method}: stays open while selecting`);
+    assert.ok(again.classes.includes('vam-tools-mini') && again.classes.includes('is-open'), `${method}: open while selecting`);
     assert.equal(done.attrs['aria-label'], 'Done selecting'); assert.equal(done.attrs['aria-pressed'], 'true'); assert.ok(done.classes.includes('is-active'));
-    assert.equal(findAll(done, i => (i.cls ?? '').includes('vam-tools-select-label')).length, 0, 'still icon only while selecting'); assert.equal(done.children.length, 1);
+    assert.equal(done.attrs.tabindex, undefined, `${method}: reachable with Tab`);
+    assert.ok(findAll(done, i => i.tag === 'span' && i.attrs['aria-hidden'] === 'true').length >= 1, `${method}: the icon is decorative`);
+    assert.equal(findAll(done, i => (i.cls ?? '').includes('vam-tools-select-label')).length, 0, 'icon only'); assert.equal(done.children.length, 1);
+    done.click();
+    assert.equal(h.view.selection.state.multiSelectMode, false, `${method}: the button finishes the selection`);
   }
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) assert.equal(findAll(draw(empty, method), i => i.tag === 'button').length, 0, `${method}: an empty map has no toolbar control`);
@@ -3283,7 +3281,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Select several topics', 'Data sources']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.mountGoalBar\(\);/, 'no goal bar on an empty or AIM map');

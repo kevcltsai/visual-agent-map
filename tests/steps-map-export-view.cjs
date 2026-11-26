@@ -63,8 +63,8 @@ async function harness({ aim = false, attachmentSetting = MEDIA } = {}) {
   const clicks = [];
   const menuTitles = [];
   class Menu {
-    addItem(cb) { const item = { setTitle(t) { menuTitles.push(t); this.title = t; return this; }, setIcon() { return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items = [...(this.items ?? []), item]; Menu.last = this; return this; }
-    addSeparator() { return this; } showAtMouseEvent() { this.mouse = true; return this; } showAtPosition(at) { this.at = at; return this; }
+    addItem(cb) { const item = { setTitle(t) { menuTitles.push(t); this.title = t; return this; }, setIcon() { return this; }, setChecked(v) { this.checked = v; return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items = [...(this.items ?? []), item]; Menu.last = this; return this; }
+    addSeparator() { this.separators = [...(this.separators ?? []), (this.items ?? []).length]; return this; } showAtMouseEvent() { this.mouse = true; return this; } showAtPosition(at) { this.at = at; return this; }
   }
   const globals = {
     createFragment: dom.createFragment,
@@ -393,25 +393,41 @@ test('AIM and integration mode can all export', async () => {
   assert.equal(h.counts.createBinary, 1, 'integration');
 });
 
-test('C6: the header has one export and share button; its menu holds the six exports and, set apart, Share as HTML page (an old AIM map too), which opens the share dialog', async () => {
+test('C6: Share is one labelled header button; its menu lists four formats, then the one remembered destination (vault or download) for Markdown, PNG and SVG', async () => {
   const h = await harness();
-  const bar = element('div');
-  const button = h.view.addExportButton(bar);
-  assert.equal(button.dataset.icon, 'share');
-  assert.equal(button.attrs['aria-label'], 'Export or share map');
-  button.click();
-  const exports = ['Save PNG image in the Vault', 'Download PNG image', 'Save SVG image in the Vault', 'Download SVG image', 'Save Markdown outline in the Vault', 'Download Markdown outline'];
-  assert.deepEqual(h.menuTitles, [...exports, 'Share as HTML page…']);
+  const stored = new Map();
+  h.view.app.loadLocalStorage = key => stored.get(key) ?? null;
+  h.view.app.saveLocalStorage = (key, value) => stored.set(key, value);
+  const ran = [];
+  h.view.exportMap = async (format, target) => { ran.push([format, target]); };
   const shared = [];
   h.view.plugin.openShare = view => shared.push(view);
-  h.Menu.last.items.at(-1).fn();
-  assert.deepEqual(shared, [h.view], 'the same dialog as the share command');
-  h.menuTitles.length = 0;
+  const open = () => { h.menuTitles.length = 0; Menu.last = null; h.view.addExportButton(element('div')).click(); return h.Menu.last; };
+  const { Menu } = h;
+  const button = h.view.addExportButton(element('div'));
+  assert.equal(button.text ?? button.textContent, 'Share');
+  assert.equal(button.attrs['aria-label'], 'Export or share map');
+  let menu = open();
+  const formats = ['Markdown', 'Image (PNG)', 'Vector (SVG)', 'Web page (HTML)'];
+  assert.deepEqual(h.menuTitles, [...formats, 'Save to vault', 'Download']);
+  assert.deepEqual(menu.separators, [4], 'the destination is set apart from the formats');
+  assert.deepEqual(menu.items.slice(4).map(item => item.checked), [true, false], 'vault is the first-time default');
+  menu.items[1].fn();
+  assert.deepEqual(ran, [['png', 'vault']]);
+  menu.items[5].fn(); // choose Download
+  assert.equal(stored.get('vam-export-target'), 'download', 'remembered on this device');
+  menu = open();
+  assert.deepEqual(menu.items.slice(4).map(item => item.checked), [false, true], 'the menu shows the remembered choice');
+  menu.items[0].fn(); menu.items[2].fn();
+  assert.deepEqual(ran.slice(1), [['md', 'download'], ['svg', 'download']], 'every file format follows the remembered destination');
+  menu.items[3].fn();
+  assert.deepEqual(shared, [h.view], 'HTML opens the same dialog as the share command');
   h.view.map.aim = { branches: [] };
-  h.view.addExportButton(element('div')).click();
-  assert.deepEqual(h.menuTitles, [...exports, 'Share as HTML page…'], 'an old AIM map shares like any map, so the entry is offered');
-  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.doesNotMatch(source, /iconButton\(headerActions, "share-2"/, 'no second share button in the header');
+  open();
+  assert.deepEqual(h.menuTitles, [...formats, 'Save to vault', 'Download'], 'an old AIM map shares like any map, so HTML is offered');
+  h.view.app.loadLocalStorage = () => { throw new Error('no storage'); };
+  menu = open();
+  assert.deepEqual(menu.items.slice(4).map(item => item.checked), [true, false], 'unreadable storage falls back to vault');
 });
 
 test('helpers: colour normalising, data URI, file stem', () => {

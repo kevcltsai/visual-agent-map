@@ -1273,47 +1273,85 @@ integrationTest('status pill: researched topics show "Researched", unresearched 
   const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
   assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
 });
-integrationTest('the more-actions menu holds Organize notes and folders; toolbar keeps Select several topics; the zoom cluster Layout menu holds Auto layout', () => {
+integrationTest('header ⋯ menu: presentation, layout, select several, topic outline and focus mode, then the maintenance entries; map management is not here', () => {
   const menus = [];
-  const { view } = selectionView(load, {}, { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
+  const { view } = selectionView(load, { activateOutline: async () => ran.push('outline') }, { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, setChecked(v) { this.checked = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
+  const ran = [];
+  view.canPresent = () => true;
+  view.startPresentation = () => ran.push('present');
+  view.openLayoutMenu = () => ran.push('layout');
+  view.applySelectionChange = () => ran.push('select');
+  view.setFocusMode = on => ran.push(`focus ${on}`);
+  view.openKeyboardShortcuts = () => ran.push('keys');
+  view.enqueue = () => ran.push('queued');
+  const button = { getBoundingClientRect: () => ({ left: 40, bottom: 30, top: 10, right: 60 }) };
+  view.openMapActions({ currentTarget: button, clientX: 0, clientY: 0 });
+  const menu = menus.at(-1);
+  assert.deepEqual(plain(menu.at), { x: 40, y: 30 }, 'the menu sits under the button, also for a keyboard click');
+  assert.deepEqual(menu.items.map(item => item.title), ['Start presentation', 'Layout', 'Select several topics', 'Topic outline', 'Focus mode', 'Organize notes and folders', 'Repair missing mind map', 'Keyboard shortcuts']);
+  assert.deepEqual(menu.separators, [5, 7]);
+  for (const item of menu.items) item.click?.();
+  assert.deepEqual(ran, ['present', 'layout', 'select', 'outline', 'focus true', 'queued', 'queued', 'keys']);
+  view.canPresent = () => false;
+  view.selection.state.multiSelectMode = true;
   view.openMapActions();
-  const labels = menus[0].items.map(item => item.title);
-  assert.ok(labels.includes('Organize notes and folders'));
-  const organize = menus[0].items.find(item => item.title === 'Organize notes and folders'); assert.equal(typeof organize.click, 'function');
+  assert.deepEqual(menus.at(-1).items.map(item => item.title).slice(0, 3), ['Layout', 'Topic outline', 'Focus mode'], 'no presentation when it cannot start, no select entry while selecting');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  const toolsBlock = source.slice(source.indexOf('const tools = createDiv("vam-map-tools")'), source.indexOf('const workspace = this.contentEl.createDiv("vam-workspace")'));
-  assert.ok(!/ui\.organize|ui\.auto_layout/.test(toolsBlock), 'neither control stays in the floating tools');
-  assert.match(source, /zoom\.createEl\("button", \{ text: t\("ui\.layout"\), cls: "vam-layout-button" \}\)/, 'the zoom cluster has one labelled Layout button');
+  const zoomBlock = source.slice(source.indexOf('const zoom = controls.createDiv("vam-zoom-controls")'), source.indexOf('this.stageEl = this.viewportEl.createDiv("vam-stage")'));
+  assert.doesNotMatch(zoomBlock, /presentation|ui\.layout|select_topics/, 'the floating controls keep only zoom, show all and AI chat');
   assert.ok(!/iconButton\(zoom, "(workflow|chevrons-down-up)"/.test(source), 'no icon-only layout controls remain');
   const { translate } = load('i18n.ts');
   assert.equal(translate('en', 'ui.select_topics'), 'Select several topics'); assert.equal(translate('zh-TW', 'ui.select_topics'), '選取多個議題');
   assert.equal(translate('en', 'ui.finish_topic_selection'), 'Done selecting'); assert.equal(translate('zh-TW', 'ui.finish_topic_selection'), '完成選取');
-  assert.equal(translate('zh-TW', 'ui.organize'), '整理筆記與資料夾'); assert.equal(translate('zh-TW', 'ui.rename_topic'), '重新命名'); assert.equal(translate('zh-TW', 'ui.ai_explore'), 'AI 探索');
-  assert.equal(translate('zh-TW', 'ui.new_map'), '＋ 新增心智圖');
+  assert.equal(translate('zh-TW', 'ui.organize'), '整理筆記與資料夾'); assert.equal(translate('zh-TW', 'ui.focus_mode'), '專注模式');
+  assert.equal(translate('zh-TW', 'ui.new_map'), '新增心智圖');
 });
-integrationTest('C2: More mind map actions is an Obsidian menu under its button (no dialog), every entry a verb, Delete set apart as a warning; each entry runs its action', () => {
+integrationTest('header title ▾ menu: switch, new, then rename and duplicate, then delete set apart as a warning; each entry runs its action', () => {
   const menus = [], dialogs = [];
   class Modal { open() { dialogs.push(this); } close() {} }
-  const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
+  const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, setChecked(v) { this.checked = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
   const ran = [];
-  view.renameCurrentMap = () => ran.push('rename');
+  view.openMapSwitcher = () => ran.push('switch');
+  view.openNewMindMapModal = () => ran.push('new');
+  view.startMapTitleEdit = () => ran.push('rename');
+  view.duplicateCurrentMap = () => ran.push('duplicate');
   view.deleteCurrentMap = () => ran.push('delete');
-  view.openKeyboardShortcuts = () => ran.push('keys');
-  view.enqueue = work => { ran.push('queued'); };
-  const button = { getBoundingClientRect: () => ({ left: 40, bottom: 30, top: 10, right: 60 }) };
-  view.openMapActions({ currentTarget: button, clientX: 0, clientY: 0 });
+  view.path = 'Agent Workspace/Mind Maps/Trip/Map.md';
+  const button = { getBoundingClientRect: () => ({ left: 4, bottom: 40, top: 10, right: 90 }) };
+  view.openMapTitleMenu({ currentTarget: button, clientX: 0, clientY: 0 });
   assert.equal(dialogs.length, 0, 'no dialog opens');
   const menu = menus.at(-1);
-  assert.deepEqual(plain(menu.at), { x: 40, y: 30 }, 'the menu sits under the button, also for a keyboard click');
-  assert.deepEqual(menu.items.map(item => item.title), ['Rename current mind map', 'Organize notes and folders', 'Repair missing mind map', 'Keyboard shortcuts', 'Delete current mind map']);
-  assert.deepEqual(menu.separators, [3, 4]);
+  assert.deepEqual(plain(menu.at), { x: 4, y: 40 }, 'the menu sits under the title');
+  assert.deepEqual(menu.items.map(item => item.title), ['Switch mind map', 'New mind map', 'Rename', 'Duplicate', 'Delete']);
+  assert.deepEqual(menu.separators, [2, 4]);
   assert.equal(menu.items.at(-1).warning, true);
   for (const item of menu.items) item.click();
-  assert.deepEqual(ran, ['rename', 'queued', 'queued', 'keys', 'delete']);
+  assert.deepEqual(ran, ['switch', 'new', 'rename', 'duplicate', 'delete']);
   const { translate } = load('i18n.ts');
   for (const language of ['zh-TW', 'zh-CN'])
-    for (const key of ['ui.rename_current_mind_map', 'ui.organize', 'ui.repair_missing_mind_map', 'ui.delete_current_mind_map'])
-      assert.match(translate(language, key), /^(重新命名|重命名|整理|修復|修复|刪除|删除)/, `${language} ${key} starts with a verb`);
+    for (const key of ['ui.rename_current_mind_map', 'ui.duplicate_current_mind_map', 'ui.organize', 'ui.repair_missing_mind_map', 'ui.delete_current_mind_map'])
+      assert.match(translate(language, key), /^(重新命名|重命名|複製|复制|整理|修復|修复|刪除|删除)/, `${language} ${key} starts with a verb`);
+});
+integrationTest('focus mode: the view marks itself, the canvas shows one exit button, and Esc ends it before it clears anything', () => {
+  const { view } = selectionView(load);
+  let renders = 0; view.render = () => { renders++; };
+  view.setFocusMode(true);
+  assert.equal(view.focusMode, true); assert.equal(renders, 1);
+  view.setFocusMode(true);
+  assert.equal(renders, 1, 'no repaint when nothing changes');
+  view.selection.setSelected('a');
+  let prevented = 0;
+  const esc = { key: 'Escape', target: { closest: () => null }, defaultPrevented: false, preventDefault() { prevented++; }, stopPropagation() {} };
+  view.contentEl = { ownerDocument: { querySelector: () => null } };
+  view.onMapKeydown(esc);
+  assert.equal(view.focusMode, false, 'Esc leaves focus mode');
+  assert.equal(view.selection.state.selected, 'a', 'that Esc does not also clear the selection');
+  assert.equal(prevented, 1);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.contentEl\.toggleClass\("is-focus-mode", this\.focusMode && !!this\.map\)/);
+  assert.match(source, /if \(this\.focusMode\)\s*this\.iconButton\(canvas, "minimize-2", t\("ui\.exit_focus_mode"\), \(\) => this\.setFocusMode\(false\)\)/);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.is-focus-mode \.vam-toolbar > :not\(\.vam-book-bar\), \.is-focus-mode \.vam-canvas-controls, \.is-focus-mode \.vam-map-chat-toggle \{ display: none; \}/, 'header and floating controls hide; a running book keeps its bar and Stop');
 });
 integrationTest('UI wording: short research (subtopic research), not shallow research; the synthesis draft is reviewed (檢閱) everywhere', () => {
   const { translate } = load('i18n.ts');
@@ -1338,15 +1376,17 @@ test('applyCollapseLevel: collapse all, expand all and expand to level N set the
   const cyclic = [node('x', 'y'), node('y', 'x')]; core.applyCollapseLevel(cyclic, 1);
   assert.equal(cyclic.length, 2, 'a corrupt parent cycle does not hang');
 });
-integrationTest('the New map button no longer imports outlines; the toolbar has no topic menu; the palette command adds to the open map only', () => {
+integrationTest('New mind map (title ▾ menu) makes a map at once and imports no outline; the toolbar has no topic menu; the palette command adds to the open map only', () => {
   const opened = [], menus = [];
   class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
-  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } showAtMouseEvent() { return this; } }
+  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu });
   let made = 0; view.openNewMindMapModal = () => { made++; };
-  view.openNewMapMenu({});
-  assert.equal(made, 1, 'the New map button makes a mind map at once');
-  assert.equal(menus.length, 0, 'it opens no menu, so it has no outline import');
+  view.openMapTitleMenu({});
+  menus[0].items.find(item => item.title === 'New mind map').click();
+  assert.equal(made, 1, 'New mind map makes a mind map at once');
+  assert.equal(menus.length, 1, 'no second menu opens, so it has no outline import');
+  menus.length = 0;
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`;
   assert.equal(menus.length, 0, 'the toolbar has no topic menu any more; the palette command is the way to paste an outline');
   const placement = modal => modal.placementRequest();
@@ -1406,7 +1446,6 @@ integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a s
   assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.layout'), '排版'); assert.equal(translate('en', 'ui.layout'), 'Layout');
-  assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-layout-button::after \{ content: "▾" \/ "";/, 'the menu caret is decoration, not part of the name');
 });
 integrationTest('map stylesheet: no :has() on the map surface, reduced motion beats the scan animation, buttons keep a focus ring, dead rules are gone', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -4929,11 +4968,11 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
 const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
 const msLabel = tools => msButton(tools).attrs['aria-label'];
 const msBadge = tools => dom.find(msButton(tools), c => (c.cls ?? '').split(' ').includes('vam-sources-button-badge'));
-integrationTest('map sources toolbar: the button follows the select icon (the goal now lives in the goal bar), reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
+integrationTest('map sources toolbar: the button stands alone while idle (the goal now lives in the goal bar), reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
   const none = msViewFixture(); none.draw();
   const buttons = none.tools.children.filter(c => c.tag === 'button');
-  assert.equal(buttons.at(-1), msButton(none.tools), 'right after the select icon');
-  assert.ok(buttons.at(-2).cls.includes('vam-tools-select'));
+  assert.equal(buttons.at(-1), msButton(none.tools), 'the data sources button is there');
+  assert.equal(buttons.length, 1, 'no select icon while idle: select several is in the header ⋯ menu');
   assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
   assert.equal(msLabel(none.tools), 'Data sources'); assert.equal(msBadge(none.tools), undefined, 'no sources: no badge');
   assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-label'), undefined, 'no text label node');

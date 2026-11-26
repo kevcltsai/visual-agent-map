@@ -744,6 +744,8 @@ const DOC_DRAG_ENDS = ["pointerup", "pointercancel", "lostpointercapture"] as co
 /** Zoom below which a card's tool row is hidden (its counter-scaled size would cover the neighbouring cards). */
 const TOOLS_MIN_ZOOM = 0.6;
 const TASK_PROGRESS_PREFIX = "vam-task:";
+/** This device's last Share destination for Markdown, PNG and SVG (Obsidian local storage, per vault). */
+const EXPORT_TARGET_SLOT = "vam-export-target";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
 /**
@@ -1959,6 +1961,8 @@ export class VisualAgentMapView extends ItemView {
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
   private presentation: PresentationState | null = null;
+  /** Focus mode: the header and the canvas controls are hidden, one exit button stays; Esc or that button ends it. */
+  private focusMode = false;
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
@@ -2357,6 +2361,12 @@ export class VisualAgentMapView extends ItemView {
       // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (event.key === "Escape" && this.focusMode) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setFocusMode(false);
       return;
     }
     if (event.key === "Escape") {
@@ -2945,6 +2955,11 @@ export class VisualAgentMapView extends ItemView {
   private growSummaryInput(area: HTMLTextAreaElement): void {
     area.setCssProps({ "--vam-summary-height": "auto" });
     area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
+  }
+  private setFocusMode(on: boolean): void {
+    if (this.focusMode === on) return;
+    this.focusMode = on;
+    this.render();
   }
   /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
   private startMapTitleEdit(): void {
@@ -5797,8 +5812,13 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
-  private openLayoutMenu(event: MouseEvent): void {
+  private openLayoutMenu(event?: MouseEvent): void {
     const menu = this.newMenu();
+    this.fillLayoutMenu(menu);
+    this.showMenuUnder(menu, event);
+  }
+  /** Layout: collapse levels, direction, spacing and auto layout (a submenu of the header ⋯ menu). */
+  private fillLayoutMenu(menu: Menu): void {
     const choices: { title: string; icon: string; levels: number | null }[] = [
       { title: t("ui.collapse_all"), icon: "chevrons-down-up", levels: 0 },
       { title: t("ui.expand_all"), icon: "chevrons-up-down", levels: null },
@@ -5854,7 +5874,6 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("workflow")
         .onClick(() => this.autoLayout())
     );
-    menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
   override onPaneMenu(menu: Menu, source: string): void {
@@ -6327,9 +6346,26 @@ export class VisualAgentMapView extends ItemView {
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
   }
-  /** The New map button: one way to start a map, so the button makes it at once (no one-row menu). */
-  private openNewMapMenu(_event: MouseEvent): void {
-    this.openNewMindMapModal();
+  /** The title ▾ menu: switch, add, rename, duplicate and delete maps, all in one place. */
+  private openMapTitleMenu(event?: MouseEvent): void {
+    const menu = this.newMenu();
+    const add = (title: string, icon: string, action: () => void, warning = false): void => {
+      menu.addItem(item => {
+        item.setTitle(title).setIcon(icon).onClick(action);
+        if (warning) item.setWarning(true);
+      });
+    };
+    add(t("ui.switch_mind_map"), "chevrons-up-down", () => this.openMapSwitcher());
+    add(t("ui.new_map"), "plus", () => this.openNewMindMapModal());
+    if (this.map) {
+      menu.addSeparator();
+      add(t("ui.rename_current_mind_map"), "pencil", () => this.startMapTitleEdit());
+      if (!this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+        add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
+      menu.addSeparator();
+      add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);
+    }
+    this.showMenuUnder(menu, event);
   }
   /** True while the user is typing in a text field of the view. The chat field counts only during IME composition (as in changed()). */
   private typingInField(): boolean {
@@ -11920,34 +11956,72 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The header's export and share button (AIM and integration mode included, decision D11; sharing is not offered for AIM). */
   private addExportButton(parent: HTMLElement): HTMLButtonElement {
-    return this.iconButton(parent, "share", t("ui.export_or_share_map"), event => this.openExportMenu(event));
+    const button = parent.createEl("button", { cls: "vam-share-button", text: t("ui.share") });
+    button.setAttr("aria-label", t("ui.export_or_share_map"));
+    button.setAttr("aria-haspopup", "menu");
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      this.openExportMenu(event);
+    });
+    return button;
   }
+  /** Where Markdown, PNG and SVG go: the last choice on this device (vault by default). */
+  private exportTarget(): "vault" | "download" {
+    try {
+      return (this.app as { loadLocalStorage?(key: string): unknown }).loadLocalStorage?.(EXPORT_TARGET_SLOT) ===
+        "download"
+        ? "download"
+        : "vault";
+    } catch {
+      return "vault";
+    }
+  }
+  private setExportTarget(target: "vault" | "download"): void {
+    try {
+      (this.app as { saveLocalStorage?(key: string, data: unknown): void }).saveLocalStorage?.(
+        EXPORT_TARGET_SLOT,
+        target
+      );
+    } catch {
+      // Not saved on this device: the menu just shows the default again next time.
+    }
+  }
+  /** Share: four formats, then the one remembered destination (vault or download) for the file formats. */
   private openExportMenu(event: MouseEvent): void {
     const menu = this.newMenu();
-    const add = (title: string, icon: string, format: "png" | "svg" | "md", target: "vault" | "download"): void => {
+    const target = this.exportTarget();
+    const add = (title: string, icon: string, format: "png" | "svg" | "md"): void => {
       menu.addItem(item =>
         item
           .setTitle(title)
           .setIcon(icon)
-          .onClick(() => void this.exportMap(format, target))
+          .onClick(() => void this.exportMap(format, this.exportTarget()))
       );
     };
-    add(t("ui.export_png_vault"), "image-down", "png", "vault");
-    add(t("ui.export_png_download"), "download", "png", "download");
-    add(t("ui.export_svg_vault"), "image-down", "svg", "vault");
-    add(t("ui.export_svg_download"), "download", "svg", "download");
-    add(t("ui.export_md_vault"), "file-down", "md", "vault");
-    add(t("ui.export_md_download"), "download", "md", "download");
+    add(t("ui.share_markdown"), "file-text", "md");
+    add(t("ui.share_png"), "image", "png");
+    add(t("ui.share_svg"), "pen-tool", "svg");
     // The one place for export and sharing (the command palette's "Share map as HTML" opens the same dialog).
-    if (this.map) {
-      menu.addSeparator();
+    if (this.map)
       menu.addItem(item =>
         item
-          .setTitle(t("ui.export_share_html"))
+          .setTitle(t("ui.share_html"))
           .setIcon("globe")
           .onClick(() => void this.plugin.openShare(this))
       );
-    }
+    menu.addSeparator();
+    for (const [choice, label, icon] of [
+      ["vault", t("ui.share_to_vault"), "vault"],
+      ["download", t("ui.share_to_download"), "download"]
+    ] as const)
+      menu.addItem(item => {
+        item
+          .setTitle(label)
+          .setIcon(icon)
+          .onClick(() => this.setExportTarget(choice));
+        item.setChecked(target === choice);
+        (item as unknown as { dom?: HTMLElement }).dom?.addClass?.("vam-share-target");
+      });
     this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
@@ -12069,10 +12143,24 @@ export class VisualAgentMapView extends ItemView {
         if (warning) item.setWarning(true);
       });
     };
-    if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
-    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
-      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
-    if (this.map) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    // The canvas views and modes that used to float over the map (map management lives in the title ▾ menu).
+    if (this.map) {
+      if (this.canPresent()) add(t("ui.presentation_start"), "presentation", () => this.startPresentation());
+      menu.addItem(item => {
+        item.setTitle(t("ui.layout")).setIcon("list-tree");
+        const sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+        if (sub) this.fillLayoutMenu(sub);
+        else item.onClick(() => this.openLayoutMenu(event));
+      });
+      if (this.map.nodes.length && !this.selection.state.multiSelectMode)
+        add(t("ui.select_topics"), "square-check", () => this.applySelectionChange(this.selection.toggleMultiSelect()));
+      add(t("ui.open_topic_outline"), "list-tree", () => {
+        void this.plugin.activateOutline(this).catch(error => new Notice(String(error)));
+      });
+      add(t("ui.focus_mode"), "maximize-2", () => this.setFocusMode(true));
+      menu.addSeparator();
+      add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    }
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     // Hand every hand-set tier back to the AI: only for a gradable map that has pins, and not while it is being graded.
     const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
@@ -12080,10 +12168,6 @@ export class VisualAgentMapView extends ItemView {
       add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
-    if (this.map) {
-      menu.addSeparator();
-      add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);
-    }
     this.showMenuUnder(menu, event);
   }
   /** A header button's menu opens under the button (also from the keyboard, whose click has no pointer position). */
@@ -12096,12 +12180,6 @@ export class VisualAgentMapView extends ItemView {
       const rect = this.contentEl?.getBoundingClientRect?.();
       menu.showAtPosition({ x: rect?.right ?? 0, y: rect?.top ?? 0 });
     }
-  }
-  private renameCurrentMap(): void {
-    if (!this.map) return;
-    new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
-      this.enqueue(() => this.renameMapTo(title))
-    ).open();
   }
   /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
   private duplicateCurrentMap(): void {
@@ -12431,8 +12509,9 @@ export class VisualAgentMapView extends ItemView {
     this.removeGoalBar();
     this.contentEl.empty();
     this.contentEl.removeClass?.("is-notes-loading");
+    this.contentEl.toggleClass("is-focus-mode", this.focusMode && !!this.map);
     const toolbar = this.contentEl.createDiv("vam-toolbar");
-    // The title text renames the map in place; the arrows beside it switch maps.
+    // The title ▾ opens the map menu (switch, add, rename, duplicate, delete); a rename edits the title in place.
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
     const mapName = this.map?.title ?? "Visual Agent Map";
     if (this.map && this.inlineName?.target === "map") {
@@ -12451,36 +12530,22 @@ export class VisualAgentMapView extends ItemView {
       });
       field.setAttr("size", String(Math.max(8, Math.min(40, [...field.value].length + 2))));
     } else {
-      const rename = switcher.createEl("button", { cls: "vam-map-title-button" });
-      rename.setAttr("aria-label", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
-      rename.setAttr("title", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
-      rename.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
-      rename.addEventListener("click", () => (this.map ? this.startMapTitleEdit() : this.openMapSwitcher()));
+      // The title ▾ is the one place to switch, add, rename, duplicate and delete maps.
+      const title = switcher.createEl("button", { cls: "vam-map-title-button" });
+      title.setAttr("aria-label", this.map ? t("ui.map_menu") : t("ui.switch_mind_map"));
+      title.setAttr("aria-haspopup", this.map ? "menu" : "dialog");
+      title.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
+      setIcon(title.createSpan("vam-map-switcher-icon"), "chevron-down");
+      title.addEventListener("click", event => {
+        event.stopPropagation();
+        if (this.map) this.openMapTitleMenu(event);
+        else this.openMapSwitcher();
+      });
     }
-    const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
-    switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
-    switchMap.setAttr("title", t("ui.switch_mind_map"));
-    setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
-    switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
-      const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
-      newMap.createSpan({ text: t("ui.new_map") });
-      setIcon(newMap.createSpan("vam-new-map-icon"), "chevron-down");
-      newMap.addEventListener("click", event => {
-        event.stopPropagation();
-        this.openNewMapMenu(event);
-      });
-      const bookButton = headerActions.createEl("button", {
-        cls: "mod-cta vam-book-button",
-        text: t("ui.book_button")
-      });
-      bookButton.setAttr("title", t("ui.book_button_title"));
-      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
-      this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
-        void this.plugin.activateOutline(this).catch(error => new Notice(String(error)));
-      });
+      // Header: title ▾, undo, redo, book, share, more. Undo and redo stay visible (they are how a mistake is taken back).
       const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
       undo.disabled = !this.history.canUndo;
       undo.dataset.history = "undo";
@@ -12488,12 +12553,20 @@ export class VisualAgentMapView extends ItemView {
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
+      const bookButton = headerActions.createEl("button", {
+        cls: "mod-cta vam-book-button",
+        text: t("ui.book_button")
+      });
+      bookButton.setAttr("title", t("ui.book_button_title"));
+      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
         this.openMapActions(event)
       ).addClass("vam-map-actions-button");
     }
     this.renderBookPipelineBar(toolbar);
+    // Focus mode hides the header; a running book's bar (with its Stop) is the one thing it keeps.
+    toolbar.toggleClass("is-focus-empty", this.focusMode && !toolbar.querySelector(".vam-book-bar"));
     // The one line an old AIM map shows: AIM was removed, the map is an ordinary map now (no button, nothing to resume).
     if (this.map?.aim)
       this.contentEl.createDiv({
@@ -12660,14 +12733,11 @@ export class VisualAgentMapView extends ItemView {
       this.markCanvasHintSeen();
       this.fit();
     });
-    const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
-    present.disabled = !this.canPresent();
-    const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
-    layout.setAttr("aria-haspopup", "menu");
-    layout.addEventListener("click", event => {
-      event.stopPropagation();
-      this.openLayoutMenu(event);
-    });
+    // Presentation, layout and select-several moved to the header ⋯ menu; focus mode leaves only this way back.
+    if (this.focusMode)
+      this.iconButton(canvas, "minimize-2", t("ui.exit_focus_mode"), () => this.setFocusMode(false)).addClass(
+        "vam-exit-focus"
+      );
     this.stageEl = this.viewportEl.createDiv("vam-stage");
     // Before any card exists: focus handed back below measures the selected card's tool row, and a card on an untransformed stage
     // reads at scale 1 with no pan, which would throw the map off the canvas.
@@ -12826,8 +12896,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The one toolbar control: an icon-only button; the name shows as the aria-label tooltip. */
   private renderSelectTool(tools: HTMLElement): void {
-    if (!this.map?.nodes.length) return;
     const selecting = this.selection.state.multiSelectMode;
+    // Starting a selection is in the header ⋯ menu; the canvas keeps only the way to finish it.
+    if (!this.map?.nodes.length || !selecting) return;
     tools.addClass("vam-tools-mini");
     tools.toggleClass("is-open", selecting);
     const label = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");

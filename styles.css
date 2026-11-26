@@ -40,9 +40,11 @@
 .vam-research-progress-track { width: 88px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--background-modifier-border); }
 .vam-research-progress-fill { height: 100%; border-radius: inherit; background: var(--interactive-accent); }
 .vam-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 2px; max-width: 100%; margin-left: auto; }
-.vam-toolbar-actions .vam-new-map { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
-.vam-new-map-icon { display: inline-flex; color: var(--text-muted); }
-.vam-new-map-icon svg { width: 14px; height: 14px; }
+.vam-toolbar-actions .vam-share-button { margin-left: 4px; white-space: nowrap; }
+/* Focus mode: only the map (and a running book's bar, which keeps its Stop) stays; one button leads back. */
+.is-focus-mode .vam-toolbar > :not(.vam-book-bar), .is-focus-mode .vam-canvas-controls, .is-focus-mode .vam-map-chat-toggle { display: none; }
+.is-focus-mode .vam-toolbar.is-focus-empty { display: none; }
+.vam-exit-focus { position: absolute; z-index: 5; top: 12px; right: 12px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-icon-button:disabled { opacity: 0.4; cursor: default; }
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
@@ -65,8 +67,6 @@
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
-.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
-.vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 /* Token usage: the button at the left end of the zoom controls and the popover above them. */
 .vam-zoom-controls > .vam-usage-button { width: auto; gap: 4px; padding: 0 6px; font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; color: var(--text-muted); }

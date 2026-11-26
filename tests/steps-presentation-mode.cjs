@@ -340,8 +340,9 @@ test('42: wiring in view.ts: capture keydown, toolbar button, hover guard, paint
   assert.match(open, /registerDomEvent\(\s*this\.contentEl,\s*"keydown",\s*event => this\.presentationKey\(event\),\s*\{\s*capture: true\s*\}/);
   const paint = source.slice(source.indexOf('private paint(): void'), source.indexOf('/** What the empty canvas says'));
   assert.match(paint, /this\.applyPresentationMarks\(\);\s*restoreSearch\(\);/);
-  assert.match(paint, /disabled = !this\.canPresent\(\)/);
-  assert.match(paint, /"presentation", t\("ui\.presentation_start"\)/);
+  // Start presentation lives in the header ⋯ menu, offered only when the map can present.
+  const more = source.slice(source.indexOf('private openMapActions('), source.indexOf('private showMenuUnder('));
+  assert.match(more, /if \(this\.canPresent\(\)\) add\(t\("ui\.presentation_start"\), "presentation", \(\) => this\.startPresentation\(\)\)/);
   const hover = source.slice(source.indexOf('private showHoverCard('), source.indexOf('private showHoverCard(') + 300);
   assert.match(hover, /if \(this\.presentation\) return;/);
   assert.match(source.slice(source.indexOf('async onClose()'), source.indexOf('async onClose()') + 600), /exitPresentation\(false\)/);

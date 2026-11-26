@@ -68,3 +68,25 @@ test('change set: a rejected late operation leaves the entire base unchanged', (
   assert.throws(() => applyLivingChanges(original, { ...proposal(), baseRevision: 'old' }, context), /stale-base/);
   assert.throws(() => applyLivingChanges(original, null, context), /invalid-change/);
 });
+
+test('change set: same event with another ID merges new evidence instead of appending', () => {
+  const op = { kind: 'append', id: 'different-id', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: ['e2'] };
+  const result = apply(base(), op);
+  assert.equal(result.records.length, 1);
+  assert.equal(result.records[0].id, 'r1');
+  assert.equal(result.records[0].evidence.length, 2);
+  assert.equal(apply(base(), { ...op, evidence: ['e1'] }).changed, false);
+  assert.throws(() => apply(base(), { ...op, claim: '101' }), /period-conflict-requires-correction/);
+});
+
+test('change set: repeated change observations are no-op but hourly samples and a return to an old value stay distinct', () => {
+  const op = (id, time, claim, granularity) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity, eventTime: time, claim, evidence: ['e1'] });
+  const emptyBase = base({ records: [] });
+  const observations = ['09:00', '10:00', '11:00', '12:00', '13:30'].map((time, i) => [time, ['100', '100', '105', '103', '108'][i]]);
+  const changes = apply(emptyBase, ...observations.map(([time, claim], i) => op('c' + i, '2026-11-26T' + time + ':00+08:00', claim, 'change')));
+  const hourly = apply(emptyBase, ...observations.map(([time, claim], i) => op('h' + i, '2026-11-26T' + time + ':00+08:00', claim, 'hourly')));
+  assert.equal(changes.records.length, 4);
+  assert.equal(hourly.records.length, 5);
+  const returnValue = apply({ ...emptyBase, records: changes.records }, op('c5', '2026-11-26T14:00:00+08:00', '100', 'change'));
+  assert.equal(returnValue.records.length, 5);
+});

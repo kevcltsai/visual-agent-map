@@ -77,6 +77,65 @@ function mergeEvidence(old: readonly LivingEvidence[], next: readonly LivingEvid
   return [...entries.values()];
 }
 
+/** Conservative deterministic equality; the model still has to resolve semantic paraphrases and event identities. */
+const normalized = (value: string): string => value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+
+function sameScope(a: LivingRecord, b: LivingRecord): boolean {
+  return (
+    normalized(a.subject) === normalized(b.subject) &&
+    normalized(a.scope) === normalized(b.scope) &&
+    normalized(a.granularity) === normalized(b.granularity)
+  );
+}
+
+function sameClaim(a: LivingRecord, b: LivingRecord): boolean {
+  return normalized(a.claim) === normalized(b.claim);
+}
+
+function timeKey(value: string | null): string | null {
+  if (!value) return null;
+  // A precise timestamp may be written with different offsets; a day/month label is intentionally not shifted.
+  if (/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/i.test(value)) {
+    const instant = Date.parse(value);
+    if (Number.isFinite(instant)) return new Date(instant).toISOString();
+  }
+  return value;
+}
+
+function isPeriod(granularity: string): boolean {
+  return /^(?:daily|day|daily close|hourly|hour|weekly|week|monthly|month|quarterly|quarter|yearly|year|每日|每小時|每小时|日|小時|小时|每週|每周|每月|每季|每年)$/.test(normalized(granularity));
+}
+
+function isChange(granularity: string): boolean {
+  return /^(?:change|change only|on change|price change|變動|变化|變化|每次變動|每次变化)$/.test(normalized(granularity));
+}
+
+function duplicateRecord(records: ReadonlyMap<string, LivingRecord>, candidate: LivingRecord): LivingRecord | undefined {
+  const existing = records.get(candidate.id);
+  if (existing) {
+    if (!sameScope(existing, candidate) || timeKey(existing.eventTime) !== timeKey(candidate.eventTime) || !sameClaim(existing, candidate))
+      throw new Error("existing-record-conflict");
+    return existing;
+  }
+  const related = [...records.values()].filter(item => sameScope(item, candidate));
+  const time = timeKey(candidate.eventTime);
+  for (const item of related) {
+    const sameTime = time !== null && timeKey(item.eventTime) === time;
+    const sharedEvidence = item.evidence.some(evidence => candidate.evidence.some(next => next.id === evidence.id));
+    if (sameClaim(item, candidate) && (sameTime || (time === null && item.eventTime === null && sharedEvidence)))
+      return item;
+    if (sameTime && isPeriod(candidate.granularity)) throw new Error("period-conflict-requires-correction");
+  }
+  if (isChange(candidate.granularity)) {
+    const latest = related.at(-1);
+    if (latest && latest.validity === "active" && sameClaim(latest, candidate)) {
+      const previousTime = timeKey(latest.eventTime);
+      if (time !== null && previousTime !== null && time >= previousTime) return latest;
+    }
+  }
+  return undefined;
+}
+
 /** No file I/O and no arbitrary Markdown rewriting: a bad operation rejects the entire proposal. */
 export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context: LivingChangeContext) {
   const proposal = object(raw);
@@ -108,10 +167,9 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     const old = records.get(recordId);
     if (kind === "append") {
       exactKeys(operation, ["kind", "id", "subject", "scope", "granularity", "eventTime", "claim", "evidence"]);
-      if (old) throw new Error("existing-record");
       const evidence = evidenceFor(operation.evidence, allowed);
       if (!evidence.length) throw new Error("missing-evidence");
-      records.set(recordId, {
+      const candidate: LivingRecord = {
         id: recordId,
         subject: string(operation.subject, 500),
         scope: string(operation.scope, 500),
@@ -122,8 +180,19 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         validity: "active",
         owner: "ai",
         history: []
-      });
-      changed = true;
+      };
+      const duplicate = duplicateRecord(records, candidate);
+      if (duplicate) {
+        if (duplicate.owner !== "ai") throw new Error("protected-record");
+        const merged = mergeEvidence(duplicate.evidence, evidence);
+        if (merged.length !== duplicate.evidence.length) {
+          records.set(duplicate.id, { ...duplicate, evidence: merged });
+          changed = true;
+        }
+      } else {
+        records.set(recordId, candidate);
+        changed = true;
+      }
       continue;
     }
     if (!old) throw new Error("unknown-record");

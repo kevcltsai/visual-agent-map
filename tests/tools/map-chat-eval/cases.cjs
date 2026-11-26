@@ -241,6 +241,22 @@ const CASES = [
     [C.noRejected(), C.hasKind("edit_book_structure", 1, 1), C.noKinds(["reorder_topics"])])
 ];
 
+// Living Node uses the same chat parser and confirmation path; these are semantic
+// fixtures, not evidence that a live provider has passed them.
+CASES.push(
+  kase("LN1", "研究", "新建 AI 卡但不執行", "Living Node V1 A02", ["add_child", "configure_ai_card"],
+    { message: "新增一張 AI 卡片追蹤每日新聞，不要執行", outline: [] },
+    [C.noRejected(), C.hasKind("add_child", 1, 1), C.hasKind("configure_ai_card", 1, 1),
+      C.hasAction("configure_ai_card", a => a.nodeId.startsWith("new:") && /新聞/.test(a.content), "configuration refers to newly created card"),
+      C.noKinds(["run_map_action"])]),
+  kase("LN2", "研究", "正式執行指定 AI 卡", "Living Node V1 A02", ["run_map_action"],
+    { message: "執行 AI 卡『新聞』，不要改 Prompt", outline: tree([["n", "新聞", null, "", { aiCard: true }]]) },
+    [C.noRejected(), C.runAction("run_living_card"), C.hasAction("run_map_action", a => a.nodeIds.length === 1 && a.nodeIds[0] === "n", "exact target"), C.noKinds(["configure_ai_card", "edit_topic_note", "update_summary"])]),
+  kase("LN3", "研究", "執行全部 AI 卡", "Living Node V1 A02", ["run_map_action"],
+    { message: "執行全部 AI 卡", outline: tree([["n", "新聞", null, "", { aiCard: true }], ["p", "價格", null, "", { aiCard: true }], ["o", "普通卡", null]]) },
+    [C.noRejected(), C.runAction("run_living_all"), C.hasAction("run_map_action", a => a.nodeIds.length === 0, "all eligible cards"), C.noKinds(["configure_ai_card", "edit_topic_note"])])
+);
+
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";
 for (const id of ["A1", "A2", "A3", "A4"]) CASES.find(k => k.id === id).weak = WEAK;
 const { NEG } = require("./negative.cjs");

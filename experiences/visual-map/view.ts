@@ -206,7 +206,7 @@ import {
   setTooltip
 } from "obsidian";
 import type { ReferenceGroup } from "../../ai/reference-materials";
-import { livingCoordinator, runLivingRound } from "./living-node-runtime";
+import { livingCoordinator, runLivingRound, saveLivingConfig } from "./living-node-runtime";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -15349,17 +15349,16 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
-        if (!values.question.trim()) {
-          await repo.clearPrompt(path);
-          await repo.writeAiCard(path, false);
-          return;
-        }
-        await repo.updateNote(path, {
-          prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
-          researchMode: "research"
-        });
-        await repo.writeAiCard(path, true);
-        await repo.writeAiUpdateMode(path, values.keepOld ? "top" : "fresh");
+        if (!values.question.trim()) throw new Error("empty-prompt");
+        const liveMap = await repo.readMap(this.path);
+        if (liveMap.nodes.find(item => item.id === node.id)?.path !== path) throw new Error("changed-target-identity");
+        await saveLivingConfig(
+          this.app,
+          repo,
+          liveMap,
+          node.id,
+          joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"))
+        );
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);

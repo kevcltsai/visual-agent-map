@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { TFile, type App } from "obsidian";
 import { isPlaceholder } from "../../core/note-placeholder";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
-import { frontmatter } from "../../core/repository-frontmatter";
+import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import type { AiCalls } from "../../core/ai-calls";
 import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
@@ -116,7 +116,7 @@ function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Livin
   );
 }
 
-async function prepareMap(port: LivingRoundPort, map: MapDocument) {
+async function prepareMap(port: Pick<LivingRoundPort, "repo">, map: MapDocument) {
   const snapshots = new Map<string, Snapshot>();
   const cards: LivingMapCard[] = [];
   for (const node of map.nodes) {
@@ -380,4 +380,53 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     port.signal.removeEventListener("abort", stop);
     lease.release();
   }
+}
+
+/** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
+export async function saveLivingConfig(
+  app: App,
+  repo: Repository,
+  map: MapDocument,
+  id: string,
+  prompt: string,
+  expectedPrompt?: string
+): Promise<"written" | "unchanged"> {
+  if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
+  const { snapshots, cards } = await prepareMap({ repo }, map);
+  const snapshot = snapshots.get(id);
+  const target = cards.find(card => card.id === id);
+  if (!snapshot || !target) throw new Error("missing-target");
+  if (snapshot.note.aiLocked) throw new Error("locked-target");
+  if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
+  const resolver = sourceResolver(app);
+  const explicit: LivingSourceRef[] = [];
+  for (const link of promptSourceLinks(prompt)) {
+    const note = resolver.resolveAuthorized(link, target.path);
+    if (!note) throw new Error("missing-source");
+    if (note.path === target.path) throw new Error("self-reference");
+    const matches = cards.filter(card => card.path === note.path);
+    if (matches.length > 1) throw new Error("ambiguous-source");
+    explicit.push(matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link });
+  }
+  const encoded = [...new Set(explicit.map(ref => ref.kind === "card" ? "card:" + ref.id : "note:" + ref.link))];
+  const proposed = cards.map(card =>
+    card.id === id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
+  );
+  const oldPlan = planLivingMap(cards, [], resolver).plan;
+  const next = planLivingMap(proposed, [], resolver);
+  if (next.sources.get(id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
+  for (const [affected, reason] of next.plan.blocked) {
+    if (reason === "cycle" && (affected === id || oldPlan.blocked.get(affected) !== "cycle"))
+      throw new Error("living-node-cycle");
+  }
+  const fm = frontmatter(snapshot.content);
+  if (snapshot.note.aiCard && snapshot.note.prompt === prompt && JSON.stringify(fm["living-node-refs"]) === JSON.stringify(encoded))
+    return "unchanged";
+  const outcome = await repo.updateNoteGuarded(target.path, { prompt }, {
+    expectedContent: snapshot.content,
+    authorize: () => !repo.isDisposed(),
+    finalize: content => setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded })
+  });
+  if (outcome !== "written") throw new Error("changed-configuration");
+  return "written";
 }

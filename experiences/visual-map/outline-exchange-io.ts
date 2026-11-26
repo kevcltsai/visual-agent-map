@@ -112,12 +112,14 @@ export async function exportMapExchange(
   request: {
     mapPath: string;
     map: Pick<MapDocument, "title" | "nodes">;
-    notes: ReadonlyMap<string, { title: string; detail: string }>;
+    notes: ReadonlyMap<string, { title: string; detail: string; livingNode?: { shareMarkdown?: string } }>;
     format: ExchangeFormat;
   }
 ): Promise<string> {
   const notes = new Map<string, ExchangeNoteInput>();
-  for (const [id, note] of request.notes) notes.set(id, { title: note.title, body: note.detail });
+  for (const [id, note] of request.notes) notes.set(id, {
+    title: note.title, body: [note.detail, note.livingNode?.shareMarkdown].filter(value => value?.trim()).join("\n\n")
+  });
   const input = { title: request.map.title, nodes: request.map.nodes };
   const text = request.format === "opml" ? toOpml(input, notes) : toFreeMind(input, notes);
   const slash = request.mapPath.lastIndexOf("/");

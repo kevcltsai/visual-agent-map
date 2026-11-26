@@ -46,7 +46,17 @@ export const INTERNAL_FIELD_NAMES = [
   "relevance-level",
   "relevance-context",
   "map-sources",
-  "content-language"
+  "content-language",
+  "living-node-refs",
+  "living-node-region-hash",
+  "living-node-ownership",
+  "living-node-last-execution",
+  "living-node-input-revision",
+  "living-node-success-knowledge",
+  "living-node-last-attempt",
+  "living-node-last-successful-check",
+  "living-node-last-content-change",
+  "living-node-outcome"
 ] as const;
 
 const NAMED_ENTITIES: Record<string, string> = {

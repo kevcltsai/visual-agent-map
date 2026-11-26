@@ -313,10 +313,16 @@ export function replaceSummarySection(content: string, value: string): string {
 function removePromptCallout(content: string): string {
   const lines = content.split("\n");
   let inDetail = false;
+  let origin: "none" | "heading" | "quote" = "none";
   for (let index = 0; index < lines.length; index++) {
     if (lines[index].trim() === DETAIL_START) inDetail = true;
     if (lines[index].trim() === DETAIL_END) inDetail = false;
-    const callout = inDetail ? null : CALLOUT_SECTION.exec(lines[index]);
+    // Quoted Thinking Origin text is source text: a line there that looks like a callout title is not one.
+    if (/^## Thinking Origin\s*$/.test(lines[index])) origin = "heading";
+    else if (origin === "heading" && lines[index].startsWith(">")) origin = "quote";
+    else if (origin === "heading" && lines[index].trim()) origin = "none";
+    else if (origin === "quote" && !lines[index].startsWith(">")) origin = "none";
+    const callout = inDetail || origin !== "none" ? null : CALLOUT_SECTION.exec(lines[index]);
     if (callout?.[1] !== "Prompt") continue;
     let end = index + 1;
     while (end < lines.length && lines[end].startsWith(">") && !CALLOUT_SECTION.test(lines[end])) end++;

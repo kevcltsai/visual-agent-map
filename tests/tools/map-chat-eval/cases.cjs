@@ -244,11 +244,11 @@ const CASES = [
 // Living Node uses the same chat parser and confirmation path; these are semantic
 // fixtures, not evidence that a live provider has passed them.
 CASES.push(
-  kase("LN1", "研究", "新建 AI 卡但不執行", "Living Node V1 A02", ["add_child", "configure_ai_card"],
+  kase("LN1", "研究", "新建 AI 卡但不執行", "Living Node V1 A02", ["add_child"],
     { message: "新增一張 AI 卡片追蹤每日新聞，不要執行", outline: [] },
-    [C.noRejected(), C.hasKind("add_child", 1, 1), C.hasKind("configure_ai_card", 1, 1),
-      C.hasAction("configure_ai_card", a => a.nodeId.startsWith("new:") && /新聞/.test(a.content), "configuration refers to newly created card"),
-      C.noKinds(["run_map_action"])]),
+    [C.noRejected(), C.hasKind("add_child", 1, 1),
+      C.hasAction("add_child", a => /新聞/.test(a.livingPrompt ?? ""), "atomic creation carries the saved prompt"),
+      C.noKinds(["configure_ai_card", "run_map_action"])]),
   kase("LN2", "研究", "正式執行指定 AI 卡", "Living Node V1 A02", ["run_map_action"],
     { message: "執行 AI 卡『新聞』，不要改 Prompt", outline: tree([["n", "新聞", null, "", { aiCard: true }]]) },
     [C.noRejected(), C.runAction("run_living_card"), C.hasAction("run_map_action", a => a.nodeIds.length === 1 && a.nodeIds[0] === "n", "exact target"), C.noKinds(["configure_ai_card", "edit_topic_note", "update_summary"])]),

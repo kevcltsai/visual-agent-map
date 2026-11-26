@@ -872,10 +872,12 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?style\.transform = `translate\(\$\{x\}px, \$\{y\}px\) scale\(\$\{zoom\}\)`/);
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?--vam-zoom/, 'the tool row counter-scale is measured right too');
 });
-test('card tools: AI explore, Details, fold, this card, select subtopics and remove float as icon-only buttons; there is no More menu on the card', () => {
+test('card tools: four labelled buttons (Research, Add, Note, More) in the selected card toolbar; the icon-only hover tools and the + circle are gone', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.doesNotMatch(view, /openCardMoreMenu|vam-more-tool|ui\.card_more_hint/, 'the card More menu is gone');
-  for (const icon of ['panel-right', 'chevrons-down-up', 'git-fork', 'list-checks', 'trash']) assert.match(view, new RegExp(`"${icon}"`), `${icon} tool`);
+  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\)/);
+  assert.match(view, /private openCardMoreMenu\(button: HTMLElement, node: MapNode\)/, 'the toolbar More menu');
+  for (const cls of ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']) assert.match(view, new RegExp(`"${cls}"`), `${cls} button`);
+  assert.doesNotMatch(view, /"vam-node-tool"|"vam-fold-tool"|"vam-structure-tool"|"vam-select-subtopics-tool"|"vam-add-child"/, 'no icon-only hover tools, no + circle');
   assert.match(view, /private openSelectionMoreMenu\(/, 'the selection bar keeps its More');
   assert.match(view, /alignCardTools\(card: HTMLElement\)[\s\S]*placeCardTools\(card, tools/);
   const { translate } = load('i18n.ts');
@@ -891,7 +893,8 @@ test('card tools: AI explore, Details, fold, this card, select subtopics and rem
   // Leaving the card hides the row only after a moment, and it stays clickable meanwhile (visibility, not pointer-events, hides it).
   assert.match(css, /\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*opacity: 0; visibility: hidden;[^}]*visibility 0s linear 300ms/);
   assert.doesNotMatch(css, /\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*pointer-events: none/);
-  assert.match(css, /\.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible; transform: none; transition-delay: 0s; \}/);
+  assert.match(css, /\.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible; transform: none; transition-delay: 0s; \}/);
+  assert.doesNotMatch(css, /\.vam-node:hover > \.vam-node-tools/, 'hover alone no longer shows the toolbar');
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-right::after \{ right: 100%; \}/);
   assert.match(css, /is-side-right::after \{ content: ""; position: absolute;[^}]*width: calc\(var\(--vam-tools-gap, 4px\) \+ 6px\)/);
 });
@@ -982,16 +985,12 @@ test('M3: fitCards on ring cards frames the picture as well, not only the cards 
   assert.ok(Math.abs(o.zoom - 1) < 1e-9 || o.zoom > v.zoom, 'the picture is not part of this frame');
 });
 
-test('F5: a tool row beside the card never covers the + button: the + sits above the row and its hover bridge', () => {
-  const number = rule => Number((rule && rule[1]) || NaN);
-  const row = css.match(/\.vam-node > \.vam-node-tools \{[^}]*z-index: (\d+)/);
-  const plus = css.match(/\.vam-node > \.vam-node-tools\.is-side-right ~ \.vam-add-child \{[^}]*z-index: (\d+)/);
-  assert.ok(row, 'the row has a stacking order');
-  assert.ok(plus, 'a row on the right lifts the + button');
-  assert.ok(number(plus) > number(row), 'the + is above the row');
+test('F5: with the + circle gone, no CSS rule is left for it and the row keeps its stacking order', () => {
+  assert.ok(css.match(/\.vam-node > \.vam-node-tools \{[^}]*z-index: (\d+)/), 'the row has a stacking order');
+  assert.doesNotMatch(css, /\.vam-add-child/, 'no rule for the removed + button');
 });
 
-test('card tool rows: stay clickable below 60% zoom, and with several cards selected only hover/focus shows one', () => {
+test('card tool rows: stay clickable below 60% zoom, and with several cards selected only focus shows one', () => {
   const view = bareView({});
   const toggles = [];
   view.viewportEl = { toggleClass: (name, on) => toggles.push([name, on]) };
@@ -1009,7 +1008,7 @@ test('card tool rows: stay clickable below 60% zoom, and with several cards sele
   view.syncToolsVisibility();
   assert.deepEqual(toggles, [['is-multi-selected', false], ['is-multi-selected', true]]);
   assert.doesNotMatch(css, /is-zoomed-out \.vam-node > \.vam-node-tools/, 'a zoomed-out row is never shown-but-dead: no rule hides or disables it');
-  assert.match(css, /\.vam-viewport\.is-multi-selected:not\(\.is-selecting\) \.vam-node\.is-selected:not\(:hover\):not\(:focus-within\) > \.vam-node-tools \{[^}]*visibility: hidden/);
+  assert.match(css, /\.vam-viewport\.is-multi-selected:not\(\.is-selecting\) \.vam-node\.is-selected:not\(:focus-within\) > \.vam-node-tools \{[^}]*visibility: hidden/);
 });
 
 test('card tool rows: a full repaint keeps the several-selected class on the new viewport', () => {

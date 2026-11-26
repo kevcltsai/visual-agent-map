@@ -382,13 +382,13 @@ test('V4: in a left map new, moved and copied topics and a fold re-layout go to 
   h.view.selection.replaceMulti([h.named('Src').id]);
   await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
   assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveBranches');
-  const stage = stub('div');
-  h.view.stageEl = stage;
-  h.view.renderNode(h.named('Target'));
-  // The fold action is its own icon button on the card (no More menu).
-  const fold = findAll(stage, item => item.tag === 'button' && item.attrs['aria-label'] === 'Collapse' && item.classes.has('vam-node-tool'))[0];
-  assert.ok(fold, 'the card has a Collapse tool');
-  fold.handlers.get('click')({ stopPropagation() {} }); await h.settled(); await h.settled();
+  // The fold action is the card right-click menu's "Collapse subtopics" row (the card has no fold tool any more).
+  const rows = [];
+  const menu = { addItem(build) { const row = {}; const chain = { setTitle(v) { row.title = v; return chain; }, setIcon() { return chain; }, setDisabled() { return chain; }, setWarning() { return chain; }, setSubmenu: undefined, onClick(fn) { row.fn = fn; return chain; } }; build(chain); rows.push(row); return menu; }, addSeparator() { return menu; } };
+  h.view.addCardMenuActions(menu, h.named('Target'));
+  const fold = rows.find(row => row.title === 'Collapse subtopics');
+  assert.ok(fold, 'the card menu has a Collapse subtopics row');
+  fold.fn({ metaKey: false, ctrlKey: false }); await h.settled(); await h.settled();
   assert.equal(h.named('Target').collapsed, true);
   for (const child of h.view.map.nodes.filter(n => n.parentId === h.named('Root').id)) assert.ok(child.x < h.named('Root').x, `${child.id} after the fold`);
 });

@@ -700,7 +700,7 @@ test('F-b F2 (counter-example): pressing the title of a card that is already sel
   h.view.enableDrag(card, node, (point, wasSelected) => h.view.openCardTextEditor(point, card, node, wasSelected));
   events.get('pointerdown')({ target: titleEl, button: 0, pointerId: 1, clientX: 5, clientY: 5 });
   events.get('pointerup')({ type: 'pointerup', target: titleEl, clientX: 5, clientY: 5 });
-  assert.equal(edits.length, 1, 'the title opened for typing');
+  assert.equal(edits.length, 0, 'a single click on the title no longer opens the title field (double-click, Enter or F2 do)');
   assert.equal(h.view.chatImage(), null, 'the press on the selected card cleared the picture');
 });
 

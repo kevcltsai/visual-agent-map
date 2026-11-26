@@ -206,7 +206,14 @@ import {
   setTooltip
 } from "obsidian";
 import type { ReferenceGroup } from "../../ai/reference-materials";
-import { livingCoordinator, prepareLivingTrial, runLivingRound, saveLivingConfig, type LivingConfigSave } from "./living-node-runtime";
+import {
+  inspectLivingValidity,
+  livingCoordinator,
+  prepareLivingTrial,
+  runLivingRound,
+  saveLivingConfig,
+  type LivingConfigSave
+} from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import { renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
@@ -588,16 +595,12 @@ import {
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import {
-  aiCardStatus,
   aiCardTitle,
-  blockingChildren,
   hasAiCard,
   isPromptEdge,
   isAiCard,
   joinPrompt,
   splitPrompt,
-  promptInputKey,
-  promptSourceLinks,
   type AiCardStatus,
   type PromptBatchState,
   type PromptNoteRef,
@@ -3637,6 +3640,25 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceGoal = goal;
     this.relevanceContext = context;
     this.mapSourcesControl?.loadForMap(sources);
+    this.livingValidity.clear();
+    if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
+      try {
+        const validity = await inspectLivingValidity({
+          app: this.app,
+          repo: this.plugin.repo,
+          calls: this.plugin.aiCalls,
+          mapPath: path,
+          viewSession: "validity",
+          signal: new AbortController().signal,
+          current: alive,
+          language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+          mapSources: signal => this.readMapSourceGroups(signal)
+        });
+        if (alive()) this.livingValidity = validity;
+      } catch {
+        // Unknown validity never pretends to be a fresh result.
+      }
+    }
     return { failedPaths: Array.from(ctx.failedPaths) };
   }
   /** Logical background session; a reload of the same map does not replace it. */
@@ -13561,11 +13583,11 @@ export class VisualAgentMapView extends ItemView {
       // A planned card shows its content headings instead of the summary (the note keeps both).
       const list = card.createEl("ul", { cls: "vam-card-summary vam-book-points" });
       for (const point of bookCard.points) list.createEl("li", { text: point });
-    } else if (!note || !isPlaceholder(note.summary)) {
+    } else if (!note || !isPlaceholder(note.livingNode?.summary || note.summary)) {
       const summaryText = card.createEl("p", {
         cls: "vam-card-summary",
-        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: note?.livingNode?.summary || note?.summary || t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: note?.livingNode?.summary || note?.summary || t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText.addClass("is-inline-editable");
       // Screen-only prefix ("this chapter will cover" / "what it covers"); the note's summary is not changed.
@@ -14856,7 +14878,7 @@ export class VisualAgentMapView extends ItemView {
     if (argumentView) {
       summary?.remove();
       addLine?.remove();
-    } else if (isPlaceholder(note.summary)) {
+    } else if (isPlaceholder(note.livingNode?.summary || note.summary)) {
       summary?.remove();
       // The faint "add a summary" line takes the summary's place (and goes again once a summary exists).
       if (!addLine && !typing && editable && title) {
@@ -14870,8 +14892,8 @@ export class VisualAgentMapView extends ItemView {
         title.after(summary);
         this.arrangeCardCover(card);
       }
-      summary?.setText(note.summary);
-      summary?.setAttr("title", note.summary);
+      summary?.setText(note.livingNode?.summary || note.summary);
+      summary?.setAttr("title", note.livingNode?.summary || note.summary);
       summary?.removeClass("is-preview");
       if (editable) summary?.addClass("is-inline-editable");
     }
@@ -19956,28 +19978,6 @@ export class VisualAgentMapView extends ItemView {
     }
     void this.runLivingBatch(requested);
   }
-  /** The Markdown notes a card's 資料來源 line resolves to, as the run would read them (at most 10). */
-  private promptSourceFiles(id: string, prompt: string): TFile[] {
-    const node = this.map?.nodes.find(candidate => candidate.id === id);
-    if (!node || !prompt) return [];
-    const files: TFile[] = [];
-    for (const link of promptSourceLinks(prompt)) {
-      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-      if (file instanceof TFile && file.extension.toLowerCase() === "md") files.push(file);
-      if (files.length >= 10) break;
-    }
-    return files;
-  }
-  /** The fingerprint of an AI card's inputs: its Prompt, its direct children's summaries and the modified time of its source notes. */
-  private aiCardInputKey(node: MapNode, prompt: string, summaryOf: (child: MapNode) => string | undefined): string {
-    return promptInputKey({
-      prompt,
-      children: (this.map?.nodes ?? [])
-        .filter(item => item.parentId === node.id)
-        .map(child => ({ id: child.id, summary: summaryOf(child) ?? "" })),
-      sources: this.promptSourceFiles(node.id, prompt).map(file => ({ path: file.path, mtime: file.stat.mtime }))
-    });
-  }
   private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
     let entries = this.promptRuns.get(mapPath);
     if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
@@ -20099,54 +20099,41 @@ export class VisualAgentMapView extends ItemView {
       !!this.plugin.researchProgress?.get(node.path)
     );
   }
-  /** The status of an AI card, memoised for one render; undefined for a card that is not an AI card. */
-  private aiStatusOf(id: string, seen: Set<string> = new Set()): AiCardStatus | undefined {
+  private livingValidity = new Map<string, "none" | "valid" | "stale">();
+
+  /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
+  private aiStatusOf(id: string): AiCardStatus | undefined {
     const note = this.notes.get(id);
     const node = this.mapNodeById(id);
     if (!node || !note || !isAiCard(note)) return undefined;
     const known = this.aiStatusMemo.get(id);
     if (known) return known;
-    if (seen.has(id)) return "done";
-    seen.add(id);
     const entry = this.promptRunning() ? this.promptEntryOf(id) : undefined;
     let status: AiCardStatus;
     if (this.aiWorkingOn(node)) status = "running";
     else if (entry?.status === "blocked") status = "failed";
     else if (entry?.status === "done") status = "done";
+    else if (note.livingNode?.outcome === "failed" || note.livingNode?.outcome === "blocked") status = "failed";
     else {
-      const children = (this.map?.nodes ?? []).filter(child => child.parentId === id);
-      status = aiCardStatus({
-        running: false,
-        run: note.aiRun,
-        inputKey: this.aiCardInputKey(node, note.prompt, child => this.notes.get(child.id)?.summary),
-        childStatuses: children
-          .filter(child => isAiCard(this.notes.get(child.id)) && this.notes.get(child.id)?.aiLocked !== true)
-          .map(child => this.aiStatusOf(child.id, seen) ?? "done")
-      });
+      const validity = this.livingValidity.get(id);
+      status = validity === "valid" ? "done" : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
     }
     this.aiStatusMemo.set(id, status);
     return status;
   }
-  /** The words of the glyph's tooltip: the stage while it runs, why it did not finish, or the plain state name. */
+
   private aiStatusTip(node: MapNode, note: Note, status: AiCardStatus): string {
     if (status === "running") {
       const progress = this.plugin.researchProgress?.get(node.path);
       return progress ? this.researchStageText(progress) : t("ui.ai_running");
     }
-    if (status !== "failed") return t(`ui.ai_card_status_${status}`);
-    const entry = this.promptRunning() ? this.promptEntryOf(node.id) : undefined;
-    const blockers = blockingChildren(
-      this.map?.nodes ?? [],
-      id => this.promptNoteOf(id),
-      node.id,
-      id => this.aiStatusOf(id) === "failed"
-    );
-    const blocked = entry ? blockers.length > 0 : note.aiRun?.result === "blocked";
-    if (blocked) {
-      const names = blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001");
-      return names ? t("ui.ai_card_blocked_0", names) : t("ui.ai_card_blocked_unnamed");
-    }
-    return t("ui.ai_card_failed_0", (entry ? entry.reason : undefined) ?? note.lastError ?? "");
+    const lines = [t(`ui.ai_card_status_${status}`)];
+    if (note.livingNode?.lastSuccessfulCheck)
+      lines.push(t("ui.living_node_last_success") + ": " + note.livingNode.lastSuccessfulCheck);
+    if (note.livingNode?.lastAttempt)
+      lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
+    if (status === "failed" && this.promptEntryOf(node.id)?.reason) lines.push(this.promptEntryOf(node.id)!.reason!);
+    return lines.join("\n");
   }
   /**
    * What an AI card shows: a grey star before its name, its question (first line) under the name, and one state glyph after the

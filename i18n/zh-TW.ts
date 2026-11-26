@@ -1173,6 +1173,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_sources_separator": "、",
   "ui.ai_run_all": "全部執行",
   "ui.living_node_run_card": "執行卡片",
+  "ui.living_node_last_success": "最後成功檢查",
+  "ui.living_node_last_attempt": "最近嘗試",
   "ui.living_node_trial": "試跑",
   "ui.living_node_official": "正式內容",
   "ui.living_node_trial_unsaved": "試跑・尚未儲存",

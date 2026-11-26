@@ -1235,6 +1235,8 @@ export const en = {
   "ui.ai_sources_separator": ", ",
   "ui.ai_run_all": "Run all",
   "ui.living_node_run_card": "Run card",
+  "ui.living_node_last_success": "Last successful check",
+  "ui.living_node_last_attempt": "Last attempt",
   "ui.living_node_trial": "Trial",
   "ui.living_node_official": "Official",
   "ui.living_node_trial_unsaved": "Trial · not saved",

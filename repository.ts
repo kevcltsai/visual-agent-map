@@ -53,6 +53,7 @@ import {
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import { splitLivingNodeRegion } from "./core/living-node-region";
+import { readLivingMarkdown } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
@@ -758,7 +759,35 @@ export class Repository {
       links = readTopicLinks(fm),
       color = readTopicColor(fm),
       style = readTopicStyle(fm);
+    let livingNode: Note["livingNode"];
+    if (readAiCard(fm) || fm["living-node-region-hash"] !== undefined) {
+      let knowledgeRevision = "empty";
+      let summary = "";
+      let damaged = false;
+      try {
+        const knowledge = readLivingMarkdown(raw);
+        knowledgeRevision = knowledge.revision;
+        summary = knowledge.output.text.split(/\r?\n/).find(line => line.trim())?.trim().slice(0, 180) ?? "";
+      } catch {
+        damaged = true;
+      }
+      const value = fm["living-node-outcome"];
+      const outcome = value === "ok" || value === "failed" || value === "blocked" || value === "cancelled"
+        ? value
+        : "never";
+      livingNode = {
+        summary,
+        knowledgeRevision,
+        successfulKnowledgeRevision: text(fm["living-node-success-knowledge"]) || undefined,
+        lastAttempt: text(fm["living-node-last-attempt"]) || undefined,
+        lastSuccessfulCheck: text(fm["living-node-last-successful-check"]) || undefined,
+        lastContentChange: text(fm["living-node-last-content-change"]) || undefined,
+        outcome,
+        damaged
+      };
+    }
     return {
+      ...(livingNode ? { livingNode } : {}),
       title: noteTitle(content, fm, file.basename),
       summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
       prompt: section(content, "Prompt"),

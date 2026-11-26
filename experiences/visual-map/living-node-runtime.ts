@@ -590,3 +590,42 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
   };
   return { request, adoption, model: original.note.model };
 }
+
+/** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */
+export async function inspectLivingValidity(port: LivingTrialPort) {
+  const map = await port.repo.readMap(port.mapPath);
+  const { snapshots, cards } = await prepareMap(port, map);
+  const planned = planLivingMap(cards, [], sourceResolver(port.app));
+  const validity = new Map<string, "none" | "valid" | "stale">();
+  for (const card of cards) {
+    if (!isAiCard(card)) continue;
+    if (card.aiLocked) validity.set(card.id, card.hasKnowledge ? "valid" : "none");
+    else if (planned.plan.blocked.has(card.id)) validity.set(card.id, card.hasKnowledge ? "stale" : "none");
+  }
+  // Read the optional map context once, not once per card.
+  let groups: Promise<ReferenceGroup[]> | undefined;
+  const readPort: LivingTrialPort = { ...port, mapSources: signal => (groups ??= port.mapSources(signal)) };
+  for (const item of planned.plan.order) {
+    if (!port.current() || port.signal.aborted) break;
+    const snapshot = snapshots.get(item.id);
+    const resolved = planned.sources.get(item.id);
+    if (!snapshot || !resolved) continue;
+    try {
+      const data = await readInputs(readPort, map, item.id, snapshot, resolved);
+      const fm = frontmatter(snapshot.content);
+      if (data.base.revision === "empty") {
+        validity.set(item.id, usableKnowledge(snapshot) ? "stale" : "none");
+        continue;
+      }
+      const pending = (planned.plan.dependencies.get(item.id) ?? []).some(id => validity.get(id) !== "valid");
+      validity.set(
+        item.id,
+        !pending && fm["living-node-input-revision"] === data.inputRevision &&
+        fm["living-node-success-knowledge"] === data.base.revision ? "valid" : "stale"
+      );
+    } catch {
+      validity.set(item.id, cards.find(card => card.id === item.id)?.hasKnowledge ? "stale" : "none");
+    }
+  }
+  return validity;
+}

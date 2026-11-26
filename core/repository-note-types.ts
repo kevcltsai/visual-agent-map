@@ -52,6 +52,17 @@ export interface Note extends PipelineFields {
   aiLocked?: true;
   /** From `ai-card: true` (see readAiCard): with a non-empty Prompt the topic is an AI card. Absent = an ordinary card. */
   aiCard?: true;
+  /** Read-only Living Node knowledge and attempt diagnostics derived from the authoritative note. */
+  livingNode?: {
+    summary: string;
+    knowledgeRevision: string;
+    successfulKnowledgeRevision?: string;
+    lastAttempt?: string;
+    lastSuccessfulCheck?: string;
+    lastContentChange?: string;
+    outcome: "never" | "ok" | "failed" | "blocked" | "cancelled";
+    damaged: boolean;
+  };
   /** From `ai-run-at` / `ai-run-result` / `ai-run-input` (see readAiRun): what the last "run all" did to this card. Absent = never run. */
   aiRun?: { at: string; result: "ok" | "failed" | "blocked"; input?: string };
   /** From `ai-update-mode: fresh` (see readAiUpdateMode): an AI card that rewrites its note instead of keeping the old text. Absent = keeps it (new on top). */

@@ -1172,6 +1172,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_sources_separator": "、",
   "ui.ai_run_all": "全部执行",
   "ui.living_node_run_card": "运行卡片",
+  "ui.living_node_last_success": "最后成功检查",
+  "ui.living_node_last_attempt": "最近尝试",
   "ui.living_node_trial": "试跑",
   "ui.living_node_official": "正式内容",
   "ui.living_node_trial_unsaved": "试跑・尚未保存",

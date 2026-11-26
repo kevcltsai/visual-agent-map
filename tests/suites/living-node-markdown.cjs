@@ -620,3 +620,21 @@ S.integrationTest('Living Node configuration redo refuses a display alias that r
   assert.equal(f.contents.get('parent.md'), original);
   assert.deepEqual(f.calls, []);
 });
+
+S.integrationTest('Living Node share projection exposes only committed readable knowledge', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const { renderLivingShareKnowledge } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+  const { shareNoteMarkdown, isManagedShareEmbed } = S.load('experiences/sharing/share-embeds.ts');
+  const knowledge = readLivingMarkdown(f.contents.get(path));
+  const projected = renderLivingShareKnowledge(knowledge);
+  assert.equal(projected, '> Current findings');
+  const shared = shareNoteMarkdown({ detail: 'Manual detail', prompt: 'Private prompt', livingNode: { shareMarkdown: projected } });
+  assert.equal(shared, 'Manual detail\n\n> Current findings');
+  assert.ok(!shared.includes('Private prompt'));
+  assert.ok(!shared.includes('https://example.com'));
+  assert.ok(isManagedShareEmbed(f.contents.get(path)));
+  assert.ok(isManagedShareEmbed('---\n"ai-card": true\n---\n## Prompt\nPrivate'));
+  assert.ok(isManagedShareEmbed('<!-- vam-living-node:begin -->'));
+  assert.ok(!isManagedShareEmbed('---\ntags: public\n---\n# Ordinary note'));
+});

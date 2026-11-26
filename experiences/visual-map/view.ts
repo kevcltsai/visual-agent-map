@@ -206,7 +206,9 @@ import {
   setTooltip
 } from "obsidian";
 import type { ReferenceGroup } from "../../ai/reference-materials";
-import { livingCoordinator, runLivingRound, saveLivingConfig } from "./living-node-runtime";
+import { livingCoordinator, prepareLivingTrial, runLivingRound, saveLivingConfig, type LivingConfigSave } from "./living-node-runtime";
+import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
+import { renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -1544,6 +1546,9 @@ export class VisualAgentMapView extends ItemView {
     afterTextId?: string;
     mapId: string;
     win: AiCardPopover;
+    trial: LivingTrial;
+    controller: AbortController;
+    adoption?: LivingAdoptionCheck;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -3679,6 +3684,7 @@ export class VisualAgentMapView extends ItemView {
     const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
+      this.closeAiCardPopover();
       this.stopPromptBatch();
       // Another map on this screen ends the old map's picture-book run, as closing the view does.
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
@@ -15266,7 +15272,7 @@ export class VisualAgentMapView extends ItemView {
     this.topicChatOpen = { entry, win };
     win.mount(overlay);
   }
-  /** Opens the AI card setup window for an existing card (prefilled), or for a new card under `parent` (blank; nothing is made until 「存好」). */
+  /** Keep editing in the center; the right-hand leaf is for reading only. */
   private openAiCardPopover(node: MapNode | null, parent: MapNode | null = null, afterTextId?: string): void {
     if (this.closed || !this.map || this.notesLoading() || this.presentation || this.bookLock().ai) return;
     if (node ? this.aiLockReason("write", [node.id]) : false) {
@@ -15275,38 +15281,139 @@ export class VisualAgentMapView extends ItemView {
     }
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
-    this.closeAiCardPopover();
+    if (this.aiCardOpen) {
+      this.aiCardOpen.win.requestClose();
+      if (this.aiCardOpen) return;
+    }
     const note = node ? this.notes.get(node.id) : undefined;
     if (node && !note) return;
     const split = note?.prompt.trim() ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
+    let expectedPrompt = note?.prompt;
     const mapId = this.map.id;
-    const anchorId = node?.id ?? parent?.id ?? null;
+    const mapPath = this.path;
+    const mapSession = this.captureMapSession();
+    const controller = new AbortController();
+    const trial = new LivingTrial(livingCoordinator(this.plugin));
+    const viewSession = randomUUID();
+    const current = (): boolean =>
+      !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
+    const promptOf = (values: AiCardPopoverValues): string =>
+      joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"));
     const win = new AiCardPopover(
       {
         cardTitle: node ? (note?.title ?? node.path) : null,
-        initial: { question: split.question, sources: split.sources, keepOld: note?.aiUpdateMode !== "fresh" },
+        initial: { question: split.question, sources: split.sources, keepOld: true },
         anchor: () => {
-          const area = overlay.getBoundingClientRect?.();
-          if (!area) return null;
-          const card = anchorId ? this.cardEls.get(anchorId)?.getBoundingClientRect?.() : undefined;
-          const controls =
-            this.contentEl?.querySelector?.<HTMLElement>(".vam-zoom-controls")?.getBoundingClientRect?.() ?? null;
-          const at = card ?? new DOMRect(area.left + 16, area.top + 16, 0, 0);
-          return { card: at, area, controls };
+          const area = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay")?.getBoundingClientRect();
+          return area ? { card: area, area, controls: null } : null;
         },
         pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
-        save: values => this.saveAiCard(node, parent, afterTextId, values),
+        save: async values => {
+          const saved = await this.saveAiCard(node, parent, afterTextId, values, expectedPrompt);
+          if (!saved) return false;
+          if (node) {
+            expectedPrompt = promptOf(values);
+            trial.acceptSave(saved.before, saved.after);
+          }
+          return true;
+        },
+        trial: node
+          ? async values => {
+              try {
+                const prepared = await prepareLivingTrial({
+                  app: this.app,
+                  repo: this.plugin.repo,
+                  calls: this.plugin.aiCalls,
+                  mapPath,
+                  viewSession,
+                  signal: controller.signal,
+                  current,
+                  language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
+                  mapSources: signal => this.readMapSourceGroups(signal)
+                }, node.id, promptOf(values));
+                let ready = false;
+                await this.plugin.confirmAiUsage(prepared.model, async () => {
+                  if (current()) ready = await trial.run(prepared.request);
+                });
+                if (!current() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
+                  if (current()) new Notice(t("ui.living_node_trial_invalid"));
+                  return false;
+                }
+                this.aiCardOpen.adoption = prepared.adoption;
+                await this.plugin.showLivingTrial(this.plugin.repo.file(node.path), renderLivingPreview(trial.result));
+                return true;
+              } catch (error) {
+                if (current()) new Notice(this.plugin.recordFailure(t("ui.living_node_trial"), error));
+                return false;
+              }
+            }
+          : undefined,
+        adopt: node
+          ? async () => {
+              const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
+              if (!check || !current()) return false;
+              const outcome = await trial.adopt(this.plugin.repo, check);
+              if (outcome !== "written") {
+                new Notice(t("ui.living_node_trial_invalid"));
+                this.plugin.invalidateLivingTrial();
+                return false;
+              }
+              if (current()) {
+                await this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path));
+                await this.refreshAfterSavedChange();
+              }
+              return true;
+            }
+          : undefined,
+        convert: node && note?.aiCard
+          ? async () => {
+              try {
+                await this.plugin.mutate(async () => {
+                  if (!current()) return;
+                  const entry = await this.beginMapTransaction()
+                    .rewriteNote(node.path, path => this.plugin.repo.writeAiCard(path, false))
+                    .commit({ deferRebuild: true, label: t("ui.living_node_convert") });
+                  this.history.push(entry);
+                  await this.refreshAfterSavedChange();
+                });
+                this.closeAiCardPopover();
+                return true;
+              } catch (error) {
+                new Notice(this.plugin.recordFailure(t("ui.living_node_convert"), error));
+                return false;
+              }
+            }
+          : undefined,
+        changed: () => {
+          trial.invalidate();
+          this.plugin.invalidateLivingTrial();
+        },
         cancel: () => this.closeAiCardPopover()
       },
       overlay
     );
-    this.aiCardOpen = { nodeId: node?.id ?? null, parentId: parent?.id ?? null, afterTextId, mapId, win };
+    this.aiCardOpen = {
+      nodeId: node?.id ?? null,
+      parentId: parent?.id ?? null,
+      afterTextId,
+      mapId,
+      win,
+      trial,
+      controller
+    };
     win.mount(overlay);
+    if (node) this.openDetails(node);
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
     this.aiCardOpen = null;
-    open?.win.destroy();
+    if (!open) return;
+    open.controller.abort();
+    open.trial.close();
+    open.win.destroy();
+    const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
+    if (node && !this.closed && !this.plugin.repo.isDisposed())
+      void this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path)).catch(() => {});
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
@@ -15319,45 +15426,57 @@ export class VisualAgentMapView extends ItemView {
     );
     modal.open();
   }
-  /** 「存好」: a new card is made (named, no title field), then the question, notes, mode and flag are written in one undoable step. */
-  private saveAiCard(
+  /** Configuration saves do not execute AI. An existing editor remains open for adoption. */
+  private async saveAiCard(
     node: MapNode | null,
     parent: MapNode | null,
     afterTextId: string | undefined,
-    values: AiCardPopoverValues
-  ): void {
-    this.closeAiCardPopover();
-    const map = this.map;
-    if (!map) return;
-    const isCurrent = this.captureMapSession();
-    this.enqueue(async () => {
-      if (!isCurrent()) return;
-      let target = node ? this.mapNodeById(node.id) : undefined;
-      if (!node) {
-        const name = values.title || aiCardTitle(values.question);
-        const found = parent ? this.mapNodeById(parent.id) : null;
-        target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
-      }
-      if (!target) return;
-      await this.writeAiCard(target, values);
-    });
+    values: AiCardPopoverValues,
+    expectedPrompt?: string
+  ): Promise<LivingConfigSave | undefined> {
+    if (!this.map || !values.question.trim()) return undefined;
+    const current = this.captureMapSession();
+    let saved: LivingConfigSave | undefined;
+    try {
+      await this.plugin.mutate(async () => {
+        if (!current()) return;
+        let target = node ? this.mapNodeById(node.id) : undefined;
+        if (!node) {
+          const name = values.title || aiCardTitle(values.question);
+          const found = parent ? this.mapNodeById(parent.id) : null;
+          target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
+        }
+        if (!target) return;
+        saved = await this.writeAiCard(target, values, expectedPrompt);
+      });
+      if (saved && !node) this.closeAiCardPopover();
+      return saved;
+    } catch (error) {
+      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
+      return undefined;
+    }
   }
-  /** Writes the AI card's Prompt (question and 資料來源 line), flag, web mode and keep-old choice; an emptied question removes the Prompt and the flag. */
-  private async writeAiCard(node: MapNode, values: AiCardPopoverValues): Promise<void> {
-    if (!this.map) return;
+
+  private async writeAiCard(
+    node: MapNode,
+    values: AiCardPopoverValues,
+    expectedPrompt?: string
+  ): Promise<LivingConfigSave | undefined> {
+    if (!this.map) return undefined;
     const repo = this.plugin.repo;
     const viewport = clone(this.map.viewport);
+    let saved: LivingConfigSave | undefined;
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
-        if (!values.question.trim()) throw new Error("empty-prompt");
         const liveMap = await repo.readMap(this.path);
         if (liveMap.nodes.find(item => item.id === node.id)?.path !== path) throw new Error("changed-target-identity");
-        await saveLivingConfig(
+        saved = await saveLivingConfig(
           this.app,
           repo,
           liveMap,
           node.id,
-          joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"))
+          joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
+          expectedPrompt
         );
       })
       .editMap(this.path, map => {
@@ -15366,6 +15485,7 @@ export class VisualAgentMapView extends ItemView {
       .commit({ deferRebuild: true, label: t("ui.ai_card") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+    return saved;
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {

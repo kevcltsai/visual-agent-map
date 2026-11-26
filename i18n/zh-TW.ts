@@ -883,6 +883,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.merge_target_changed": "合併後的議題已被修改，復原或重做未執行。",
   "ui.merge_busy": "有議題正在執行 AI 任務，完成後才能合併",
   "ui.merge_missing_note": "有議題的筆記找不到，無法合併",
+  "ui.merge_living_node_convert": "請先將 AI 卡片轉為普通卡，再進行合併；既有正式知識會保留。",
   "ui.merge_title_label": "合併後的議題名稱",
   "ui.merge_ai_untitled": "（由 AI 替合併後的議題命名）",
   "ui.merge_confirm_desc":

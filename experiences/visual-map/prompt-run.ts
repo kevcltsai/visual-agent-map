@@ -95,9 +95,8 @@ export function blockingChildren(
   });
 }
 
-/** An edge is drawn with an arrow when both ends are AI cards. */
-export const isPromptEdge = (noteOf: PromptNoteOf, parentId: string, childId: string): boolean =>
-  isAiCard(noteOf(parentId)) && isAiCard(noteOf(childId));
+/** An edge is drawn with an arrow at the parent's end when the parent is an AI card (it reads its children's summaries). */
+export const isPromptEdge = (noteOf: PromptNoteOf, parentId: string): boolean => isAiCard(noteOf(parentId));
 
 const SOURCE_LINE = /^[\s>]*(?:資料來源|资料来源|数据来源|sources?)\s*[:：]\s*(.*)$/i;
 /**

@@ -1352,6 +1352,11 @@ export class Repository {
     );
   }
 
+  /** Removes the Prompt section (an AI card whose question was cleared); other sections and `updated` are left as they are. */
+  async clearPrompt(path: string): Promise<void> {
+    await this.app.vault.process(this.file(path), content => removeSection(content, "Prompt"));
+  }
+
   /**
    * Sets `ai-update-mode: fresh` (the AI card rewrites its note) or removes the key (keeps the old text, new on top). No other
    * key changes and `updated` is not bumped.

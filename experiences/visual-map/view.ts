@@ -198,6 +198,7 @@ import {
   Notice,
   Scope,
   TFile,
+  type App,
   WorkspaceLeaf,
   requestUrl,
   setIcon,
@@ -584,14 +585,20 @@ import {
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import {
+  aiCardStatus,
+  aiCardTitle,
+  blockingChildren,
   hasAiCard,
   isPromptEdge,
   isAiCard,
+  joinPrompt,
+  splitPrompt,
   planPromptRun,
   promptInputKey,
   readPromptSources,
   promptSourceLinks,
   runPromptItems,
+  type AiCardStatus,
   type AiRunRecord,
   type PromptBatchState,
   type PromptNoteRef,
@@ -632,6 +639,8 @@ import {
   researchModeOf,
   type MapAiMode
 } from "./ai-mode";
+import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
+import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
   type TopicChatHost,
@@ -1126,6 +1135,22 @@ function requestArgumentResume(
 /** The Prompt chips painted into each card header, so a repaint can remove exactly them. */
 const promptChips = new WeakMap<HTMLElement, HTMLElement[]>();
 
+/** The note list of the AI card window: Markdown notes only; `closed` runs after the choice has been handed over. */
+class AiCardNotePicker extends MapSourcePickerModal<TFile> {
+  constructor(
+    app: App,
+    files: TFile[],
+    choose: (file: TFile) => void,
+    private readonly closed: () => void
+  ) {
+    super(app, files, file => file.path, t("ui.ai_card_pick_placeholder"), t("ui.ai_card_pick_empty"), choose);
+  }
+  onClose(): void {
+    super.onClose();
+    window.setTimeout(this.closed, 0);
+  }
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -1515,6 +1540,14 @@ export class VisualAgentMapView extends ItemView {
   private topicChatSessions = new Map<string, TopicChatEntry>();
   /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
+  /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
+  private aiCardOpen: {
+    nodeId: string | null;
+    parentId: string | null;
+    afterTextId?: string;
+    mapId: string;
+    win: AiCardPopover;
+  } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   private backgroundEpoch = 0;
@@ -3166,6 +3199,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
+    this.closeAiCardPopover();
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
     else this.topicChatRecords?.close();
@@ -5522,6 +5556,18 @@ export class VisualAgentMapView extends ItemView {
             )
           )
       );
+    menu.addSeparator();
+    if (!this.bookLock().ai)
+      menu.addItem(item => {
+        item
+          .setTitle(t("ui.ai_card"))
+          .setIcon("star")
+          .onClick(() => this.whenEditing(() => this.openAiCardPopover(null, parent, afterTextId)));
+        (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({
+          cls: "vam-menu-hint",
+          text: t("ui.ai_card_hint")
+        });
+      });
     // Text after a text block is not offered: only topics follow a block.
     if (this.canEditText() && !afterTextId)
       menu.addItem(item =>
@@ -6584,7 +6630,7 @@ export class VisualAgentMapView extends ItemView {
     if (text) {
       if (!summary && title) {
         summary = card.createEl("p", { cls: "vam-card-summary" });
-        title.after(summary);
+        (card.querySelector(".vam-ai-question") ?? title).after(summary);
         this.arrangeCardCover(card);
       }
       if (!summary) return;
@@ -6641,6 +6687,52 @@ export class VisualAgentMapView extends ItemView {
       progress.createSpan({ cls: "vam-research-progress-marked", text: t("ui.marked_progress_0", marked) });
   }
   /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
+  /** The toolbar's ghost 「▶ 全部執行」: disabled without an AI card; while it runs a progress ring and "n / N", a press stops it. */
+  private renderRunAllButton(parent: HTMLElement): void {
+    const state = this.promptBatch && !this.promptBatch.outcome && this.promptBatch.mapPath === this.path ? this.promptBatch : null;
+    const button = parent.createEl("button", { cls: "vam-run-all", attr: { type: "button" } });
+    if (state) {
+      const done = Math.min(state.finished + 1, state.total);
+      const ring = createSvg("svg");
+      ring.setAttribute("viewBox", "0 0 20 20");
+      ring.addClass("vam-run-all-ring");
+      const track = createSvg("circle");
+      track.setAttribute("cx", "10");
+      track.setAttribute("cy", "10");
+      track.setAttribute("r", "8");
+      track.addClass("vam-run-all-track");
+      const arc = createSvg("circle");
+      arc.setAttribute("cx", "10");
+      arc.setAttribute("cy", "10");
+      arc.setAttribute("r", "8");
+      arc.setAttribute("pathLength", "100");
+      arc.setAttribute("stroke-dasharray", `${Math.round((state.finished / Math.max(1, state.total)) * 100)} 100`);
+      arc.addClass("vam-run-all-arc");
+      ring.appendChild(track);
+      ring.appendChild(arc);
+      button.appendChild(ring);
+      button.createSpan({ cls: "vam-run-all-count", text: `${done} / ${state.total}` });
+      button.addClass("is-running");
+      button.setAttr("aria-label", t("ui.ai_run_all_stop"));
+      button.setAttr("title", t("ui.ai_run_all_stop"));
+      button.addEventListener("click", () => this.stopPromptBatch());
+      return;
+    }
+    setIcon(button.createSpan("vam-run-all-icon"), "play");
+    button.createSpan({ text: t("ui.ai_run_all") });
+    const hasCard = !!this.map && !this.notesLoading() && hasAiCard(this.map.nodes, id => this.promptNoteOf(id));
+    if (!this.canRunPrompts()) {
+      button.disabled = true;
+      button.setAttr("aria-disabled", "true");
+      if (!hasCard && !this.notesLoading()) {
+        button.setAttr("title", t("ui.ai_run_all_empty"));
+        button.setAttr("aria-label", t("ui.ai_run_all_empty"));
+      }
+      return;
+    }
+    button.setAttr("aria-label", t("ui.ai_run_all"));
+    button.addEventListener("click", () => this.whenEditing(() => this.startPromptRun()));
+  }
   private whenEditing(action: () => void): void {
     if (this.presentation || this.notesLoading()) return;
     action();
@@ -10240,6 +10332,10 @@ export class VisualAgentMapView extends ItemView {
     };
     const bookLock = this.bookLock();
     if (!bookLock.ai) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
+    if (!bookLock.ai && !this.isArgumentCard(node.id) && this.notes.has(node.id))
+      add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
+        this.openAiCardPopover(node)
+      );
     if (!bookLock.structure) {
       add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
       add(t("ui.card_menu_add_sibling"), "list-plus", () =>
@@ -10607,19 +10703,6 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("sticky-note")
           .onClick(() => this.enqueue(() => this.addFreeText(point)))
       );
-    if (this.canRunPrompts()) {
-      menu.addSeparator();
-      menu.addItem(item => {
-        item
-          .setTitle(t("ui.prompt_run_all"))
-          .setIcon("play")
-          .onClick(() => this.whenEditing(() => this.startPromptRun()));
-        (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({
-          cls: "vam-menu-hint",
-          text: t("ui.prompt_run_all_hint")
-        });
-      });
-    }
     menu.showAtMouseEvent(event);
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
@@ -12355,6 +12438,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderAfterDrag = false;
     }
     this.anchorDragCancel?.(false);
+    this.aiStatusMemo.clear();
     this.paintCount++;
     this.emptyMapEl = null;
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
@@ -12394,6 +12478,7 @@ export class VisualAgentMapView extends ItemView {
     const restoreArgumentFocus = this.keepArgumentBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const topicChatHeld = this.detachTopicChat();
+    const aiCardHeld = this.detachAiCardPopover();
     const restoreSearch = this.holdMapSearch();
     // The goal editor's fields go with the repaint: their draft, caret and keyboard are kept in the edit state, which draws them again.
     this.captureGoalEdit();
@@ -12487,6 +12572,7 @@ export class VisualAgentMapView extends ItemView {
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
       this.addExportButton(headerActions);
+      this.renderRunAllButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
         this.openMapActions(event)
       ).addClass("vam-map-actions-button");
@@ -12585,7 +12671,6 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.renderMultiResearchStatus(this.contentEl);
-    this.renderPromptRunStatus(this.contentEl);
     // Goal grading stays off for an old AIM map (a source-text test pins this condition).
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     this.renderBackgroundBars(this.contentEl);
@@ -12744,6 +12829,7 @@ export class VisualAgentMapView extends ItemView {
     restoreArgumentFocus();
     restoreChatFocus();
     this.remountTopicChat(topicChatHeld);
+    this.remountAiCardPopover(aiCardHeld);
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
@@ -13000,7 +13086,10 @@ export class VisualAgentMapView extends ItemView {
                   : t("ui.note_missing");
       // An unresearched topic (idea, not running or queued) has nothing to say, so it earns no pill; researched, running,
       // queued, error and the rest do. Screen readers hear the status through the card label either way.
-      if (research) {
+      // An AI card says its state with one glyph by its name (paintPromptState), never a pill.
+      if (isAiCard(note)) {
+        /* nothing here */
+      } else if (research) {
         const chip = header.createSpan({ cls: "vam-status vam-status-running" });
         // Not a live region: this card is rebuilt on every render. Stage changes go through the view's announcer.
         const stageEl = chip.createSpan({ cls: "vam-research-stage", text: statusText });
@@ -13120,7 +13209,7 @@ export class VisualAgentMapView extends ItemView {
       errorDetails.push(...note.detailFormatIssues);
     }
     const technicalDetails: string[] = [];
-    if (note?.status === "error" && note.lastError) {
+    if (note?.status === "error" && note.lastError && !isAiCard(note)) {
       const failure = cardFailure(note.lastError);
       errorDetails.push(failure.text);
       if (failure.technical) technicalDetails.push(failure.technical);
@@ -14656,7 +14745,7 @@ export class VisualAgentMapView extends ItemView {
       if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
         this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
       else this.labelCard(card, note.title);
-      if (note.status === "idea") status?.remove();
+      if (note.status === "idea" || isAiCard(note)) status?.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
         status.setText(label);
@@ -14681,6 +14770,7 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardMarkers(card, header, node.id);
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
+      this.aiStatusMemo.clear();
       this.paintPromptState(card, header, node, note);
     }
     this.paintCardColor(card, note);
@@ -15036,6 +15126,131 @@ export class VisualAgentMapView extends ItemView {
     const win = new TopicChatWindow(this.topicChatHost(entry), focusBack, overlay);
     this.topicChatOpen = { entry, win };
     win.mount(overlay);
+  }
+  /** Opens the AI card setup window for an existing card (prefilled), or for a new card under `parent` (blank; nothing is made until 「存好」). */
+  private openAiCardPopover(node: MapNode | null, parent: MapNode | null = null, afterTextId?: string): void {
+    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.bookLock().ai) return;
+    if (node ? this.aiLockReason("write", [node.id]) : false) {
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (!overlay) return;
+    this.closeAiCardPopover();
+    const note = node ? this.notes.get(node.id) : undefined;
+    if (node && !note) return;
+    const split = note && isAiCard(note) ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
+    const mapId = this.map.id;
+    const anchorId = node?.id ?? parent?.id ?? null;
+    const win = new AiCardPopover(
+      {
+        cardTitle: node ? (note?.title ?? node.path) : null,
+        initial: { question: split.question, sources: split.sources, keepOld: note?.aiUpdateMode !== "fresh" },
+        anchor: () => {
+          const area = overlay.getBoundingClientRect?.();
+          if (!area) return null;
+          const card = anchorId ? this.cardEls.get(anchorId)?.getBoundingClientRect?.() : undefined;
+          const controls =
+            this.contentEl?.querySelector?.<HTMLElement>(".vam-zoom-controls")?.getBoundingClientRect?.() ?? null;
+          const at = card ?? new DOMRect(area.left + 16, area.top + 16, 0, 0);
+          return { card: at, area, controls };
+        },
+        pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
+        save: values => this.saveAiCard(node, parent, afterTextId, values),
+        cancel: () => this.closeAiCardPopover()
+      },
+      overlay
+    );
+    this.aiCardOpen = { nodeId: node?.id ?? null, parentId: parent?.id ?? null, afterTextId, mapId, win };
+    win.mount(overlay);
+  }
+  private closeAiCardPopover(): void {
+    const open = this.aiCardOpen;
+    this.aiCardOpen = null;
+    open?.win.destroy();
+  }
+  /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
+  private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
+    const files = this.app.vault.getMarkdownFiles();
+    const modal = new AiCardNotePicker(
+      this.app,
+      files,
+      file => done(this.app.metadataCache.fileToLinktext(file, fromPath, true)),
+      closed
+    );
+    modal.open();
+  }
+  /** 「存好」: a new card is made (named, no title field), then the question, notes, mode and flag are written in one undoable step. */
+  private saveAiCard(
+    node: MapNode | null,
+    parent: MapNode | null,
+    afterTextId: string | undefined,
+    values: AiCardPopoverValues
+  ): void {
+    this.closeAiCardPopover();
+    const map = this.map;
+    if (!map) return;
+    const isCurrent = this.captureMapSession();
+    this.enqueue(async () => {
+      if (!isCurrent()) return;
+      let target = node ? this.mapNodeById(node.id) : undefined;
+      if (!node) {
+        const name = values.title || aiCardTitle(values.question);
+        const found = parent ? this.mapNodeById(parent.id) : null;
+        target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
+      }
+      if (!target) return;
+      await this.writeAiCard(target, values);
+    });
+  }
+  /** Writes the AI card's Prompt (question and 資料來源 line), flag, web mode and keep-old choice; an emptied question removes the Prompt and the flag. */
+  private async writeAiCard(node: MapNode, values: AiCardPopoverValues): Promise<void> {
+    if (!this.map) return;
+    const repo = this.plugin.repo;
+    const language = this.plugin.settings.language;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        if (!values.question.trim()) {
+          await repo.clearPrompt(path);
+          await repo.writeAiCard(path, false);
+          return;
+        }
+        await repo.updateNote(path, {
+          prompt: joinPrompt(values.question, values.sources, language),
+          researchMode: "research"
+        });
+        await repo.writeAiCard(path, true);
+        await repo.writeAiUpdateMode(path, values.keepOld ? "top" : "fresh");
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.ai_card") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
+  private detachAiCardPopover(): boolean {
+    const open = this.aiCardOpen;
+    if (!open) return false;
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    const held = !!active && !!open.win.el.contains?.(active);
+    open.win.el.remove();
+    return held;
+  }
+  /** After a repaint: puts the setup window back next to its card, or closes it when its card or map is gone. */
+  private remountAiCardPopover(held: boolean): void {
+    const open = this.aiCardOpen;
+    if (!open) return;
+    const map = this.map;
+    const anchor = open.nodeId ?? open.parentId;
+    if (!map || map.id !== open.mapId || (anchor && !map.nodes.some(n => n.id === anchor))) {
+      this.closeAiCardPopover();
+      return;
+    }
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (overlay) open.win.mount(overlay, held);
   }
   private closeTopicChatWindow(): void {
     const open = this.topicChatOpen;
@@ -16876,9 +17091,12 @@ export class VisualAgentMapView extends ItemView {
       delete card.dataset.aiLocked;
     }
     const managed = this.isArgumentCard(node.id);
-    if (!this.map || (!managed && this.notes.get(node.id)?.aiLocked !== true)) return;
-    card.dataset.aiLocked = "true";
-    const button = header.createEl("button", { cls: "vam-card-ai-lock" });
+    const locked = managed || this.notes.get(node.id)?.aiLocked === true;
+    // An AI card carries the lock button always (shown on hover or focus); any other card only while it is locked.
+    const aiCard = !managed && isAiCard(this.notes.get(node.id));
+    if (!this.map || (!locked && !aiCard)) return;
+    if (locked) card.dataset.aiLocked = "true";
+    const button = header.createEl("button", { cls: `vam-card-ai-lock${locked ? "" : " is-hover-only"}` });
     cardAiLockButtons.set(card, button);
     button.type = "button";
     setIcon(button, "lock");
@@ -16891,18 +17109,20 @@ export class VisualAgentMapView extends ItemView {
       button.setAttr("aria-label", t("ui.ai_lock_state_managed"));
       button.setAttr("title", t("ui.ai_lock_state_managed"));
     } else {
-      button.setAttr("aria-label", t("ui.ai_unlock_card"));
-      button.setAttr("title", t("ui.ai_unlock_card"));
+      const name = t(locked ? "ui.ai_unlock_card" : "ui.ai_lock_card");
+      button.setAttr("aria-label", name);
+      button.setAttr("title", name);
+      button.setAttr("aria-pressed", String(locked));
     }
     button.addEventListener("pointerdown", event => event.stopPropagation());
     button.addEventListener("dblclick", event => event.stopPropagation());
     button.addEventListener("click", event => {
       event.stopPropagation();
       event.preventDefault();
-      this.enqueue(() => this.setAiLock([node], false));
+      this.enqueue(() => this.setAiLock([node], !locked));
     });
     const named = cardLabels.get(card)?.textContent;
-    if (named && !named.includes(t("ui.ai_locked_state")))
+    if (locked && named && !named.includes(t("ui.ai_locked_state")))
       this.labelCard(card, t("ui.topic_card_label_0_1", named, t("ui.ai_locked_state")));
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
@@ -17243,7 +17463,11 @@ export class VisualAgentMapView extends ItemView {
    * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
    * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
    */
-  private async addNode(
+  private async addNode(...args: Parameters<VisualAgentMapView["createNode"]>): Promise<void> {
+    await this.createNode(...args);
+  }
+  /** Makes a topic card (see `addNode`); returns it as placed, or undefined when none was made. */
+  private async createNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
@@ -17253,8 +17477,8 @@ export class VisualAgentMapView extends ItemView {
     hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {},
     /** The text block (on `parentNode`) the new topic follows: it is laid out after the block and drawn with its line from it. */
     afterTextId?: string
-  ): Promise<void> {
-    if (!this.map) return;
+  ): Promise<MapNode | undefined> {
+    if (!this.map) return undefined;
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
@@ -17266,7 +17490,7 @@ export class VisualAgentMapView extends ItemView {
       : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
-      return;
+      return undefined;
     }
     const defaultName = uniqueDefaultName(
       t("ui.new_topic"),
@@ -17351,13 +17575,14 @@ export class VisualAgentMapView extends ItemView {
       if (this.inlineName?.id === node.id) this.inlineName = null;
       throw error;
     }
-    if (!focus) return;
+    if (!focus) return this.map?.nodes.find(n => n.id === node.id) ?? node;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
     this.focusNode(placed);
     // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();
+    return placed;
   }
   /** No production caller since the topic chat (expand there goes through `chatExpand`); kept public for the proposal engine's tests and prompt snapshots. */
   async proposeChildren(
@@ -19652,7 +19877,7 @@ export class VisualAgentMapView extends ItemView {
           else if (status === "blocked" && !started.has(id)) stamp(id, "blocked");
         },
         titleOf: id => notes.get(id)?.title ?? id,
-        blockedReason: titles => t("ui.prompt_run_blocked_by_0", titles),
+        blockedReason: titles => t("ui.ai_card_blocked_0", titles),
         onStart: (id, finished) => {
           state.finished = finished;
           state.current = notes.get(id)?.title ?? id;
@@ -19675,6 +19900,10 @@ export class VisualAgentMapView extends ItemView {
       });
       state.outcome = outcome;
       state.finished = outcome.done + outcome.failed + outcome.blocked;
+      // Silent when everything ran; only a failure, a held-back card or a Stop is told.
+      if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
+      else if (outcome.failed || outcome.blocked)
+        new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
     } finally {
       state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
       await Promise.all(stamps);
@@ -19687,55 +19916,112 @@ export class VisualAgentMapView extends ItemView {
   stopPromptBatch(): void {
     this.promptBatch?.controller.abort();
   }
-  /** The run-all bar: "Run all a / b · name" with Stop while it runs; the result and × after. */
-  private renderPromptRunStatus(parent: HTMLElement): void {
-    const state = this.promptBatch;
-    if (!state || state.mapPath !== this.path) return;
-    const bar = parent.createDiv(`vam-aim-statusbar vam-prompt-run-statusbar${state.outcome ? "" : " is-active"}`);
-    bar.setAttr("aria-live", "polite");
-    bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.prompt_run_all") });
-    const outcome = state.outcome;
-    bar.createSpan({
-      cls: `vam-aim-status-value ${outcome ? (outcome.failed || outcome.blocked ? "vam-status-error" : "") : "vam-status-running"}`,
-      text: !outcome
-        ? t("ui.prompt_run_progress_0_1_2", Math.min(state.finished + 1, state.total), state.total, state.current ?? "")
-        : outcome.stopped
-          ? t("ui.prompt_run_stopped_0_1", outcome.done, state.total)
-          : t("ui.prompt_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
-    });
-    if (!outcome) this.button(bar, t("ui.prompt_run_stop"), () => this.stopPromptBatch());
-    else {
-      const dismiss = this.button(bar, "×", () => {
-        if (this.promptBatch === state) this.promptBatch = null;
-        if (!this.closed) this.render();
-      });
-      dismiss.setAttr("aria-label", t("ui.dismiss"));
-    }
+  private aiStatusMemo = new Map<string, AiCardStatus>();
+  /** True while this view's AI works on the card: the batch, a single run, a merge or a synthesis. */
+  private aiWorkingOn(node: MapNode): boolean {
+    return (
+      this.promptEntryOf(node.id)?.status === "running" ||
+      this.isMerging(node.id) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
+      !!this.plugin.quickExpandPending?.has(node.path) ||
+      this.startingTasks.has(node.path) ||
+      !!this.plugin.researchProgress?.get(node.path)
+    );
   }
-  /** The Prompt state of a card: its run status (only when run or queued here) and the reuse pill; the card's name says both. */
+  /** The status of an AI card, memoised for one render; undefined for a card that is not an AI card. */
+  private aiStatusOf(id: string, seen: Set<string> = new Set()): AiCardStatus | undefined {
+    const note = this.notes.get(id);
+    const node = this.mapNodeById(id);
+    if (!node || !note || !isAiCard(note)) return undefined;
+    const known = this.aiStatusMemo.get(id);
+    if (known) return known;
+    if (seen.has(id)) return "done";
+    seen.add(id);
+    const entry = this.promptRunning() ? this.promptEntryOf(id) : undefined;
+    let status: AiCardStatus;
+    if (this.aiWorkingOn(node)) status = "running";
+    else if (entry?.status === "blocked") status = "failed";
+    else if (entry?.status === "done") status = "done";
+    else {
+      const children = (this.map?.nodes ?? []).filter(child => child.parentId === id);
+      status = aiCardStatus({
+        running: false,
+        run: note.aiRun,
+        inputKey: this.aiCardInputKey(node, note.prompt, child => this.notes.get(child.id)?.summary),
+        childStatuses: children
+          .filter(child => isAiCard(this.notes.get(child.id)) && this.notes.get(child.id)?.aiLocked !== true)
+          .map(child => this.aiStatusOf(child.id, seen) ?? "done")
+      });
+    }
+    this.aiStatusMemo.set(id, status);
+    return status;
+  }
+  /** The words of the glyph's tooltip: the stage while it runs, why it did not finish, or the plain state name. */
+  private aiStatusTip(node: MapNode, note: Note, status: AiCardStatus): string {
+    if (status === "running") {
+      const progress = this.plugin.researchProgress?.get(node.path);
+      return progress ? this.researchStageText(progress) : t("ui.ai_running");
+    }
+    if (status !== "failed") return t(`ui.ai_card_status_${status}`);
+    const entry = this.promptRunning() ? this.promptEntryOf(node.id) : undefined;
+    const blockers = blockingChildren(
+      this.map?.nodes ?? [],
+      id => this.promptNoteOf(id),
+      node.id,
+      id => this.aiStatusOf(id) === "failed"
+    );
+    const blocked = entry ? blockers.length > 0 : note.aiRun?.result === "blocked";
+    if (blocked)
+      return t(
+        "ui.ai_card_blocked_0",
+        blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001") || ""
+      );
+    return t("ui.ai_card_failed_0", (entry ? entry.reason : undefined) ?? note.lastError ?? "");
+  }
+  /**
+   * What an AI card shows: a grey star before its name, its question (first line) under the name, and one state glyph after the
+   * name (none when it is up to date; the lock button takes the place when locked). Safe to call again on the same card.
+   */
   private paintPromptState(card: HTMLElement, header: HTMLElement, node: MapNode, note: Note | undefined): void {
     promptChips.get(header)?.forEach(chip => chip.remove());
     promptChips.delete(header);
+    delete card.dataset.aiCard;
     if (!note || !isAiCard(note)) return;
-    const entry = this.promptEntryOf(node.id);
-    const parts: string[] = [];
-    const chips: HTMLElement[] = [];
-    if (entry) {
-      const label = t(`ui.prompt_run_status_${entry.status}`);
-      const chip = header.createSpan({
-        cls: `vam-prompt-chip vam-prompt-status vam-prompt-status-${entry.status}`,
-        text: label
-      });
-      if (entry.reason) chip.setAttr("title", entry.reason);
-      chips.push(chip);
-      parts.push(label);
+    card.dataset.aiCard = "true";
+    const title = card.querySelector<HTMLElement>(".vam-card-title");
+    const parts: HTMLElement[] = [];
+    const status = this.aiStatusOf(node.id) ?? "pending";
+    const names: string[] = [t("ui.ai_card"), t(`ui.ai_card_status_${status}`)];
+    if (title) {
+      const star = createSpan({ cls: "vam-ai-star", attr: { role: "img", "aria-label": t("ui.ai_card") } });
+      setIcon(star, "sparkles");
+      title.prepend(star);
+      parts.push(star);
+      if (status !== "done" && note.aiLocked !== true) {
+        const glyph = createSpan({ cls: `vam-ai-glyph vam-ai-glyph-${status}` });
+        glyph.setAttr("title", this.aiStatusTip(node, note, status));
+        title.appendChild(glyph);
+        parts.push(glyph);
+      }
+      const question = splitPrompt(note.prompt).question.split(/\r?\n/).find(line => line.trim()) ?? "";
+      if (question) {
+        const line = createEl("p", { cls: "vam-ai-question is-clickable", text: question.trim() });
+        line.setAttr("title", question.trim());
+        line.setAttr("dir", "auto");
+        line.addEventListener("pointerdown", event => event.stopPropagation());
+        line.addEventListener("dblclick", event => event.stopPropagation());
+        line.addEventListener("click", event => {
+          event.stopPropagation();
+          this.whenEditing(() => this.openAiCardPopover(node));
+        });
+        title.after(line);
+        parts.push(line);
+      }
     }
-    if (chips.length) promptChips.set(header, chips);
+    promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;
-    if (named && parts.length) {
-      const extra = parts.filter(part => !named.includes(part));
-      if (extra.length) this.labelCard(card, t("ui.topic_card_label_0_1", named, extra.join(", ")));
-    }
+    const state = names.join(", ");
+    if (named && !named.endsWith(state)) this.labelCard(card, t("ui.topic_card_label_0_1", named, state));
   }
   private async startSynthesis(
     node: MapNode,
@@ -25379,7 +25665,7 @@ export class VisualAgentMapView extends ItemView {
           )
         : null;
     const tipped = new Set<string>();
-    const promptArrowStatuses = new Set<string>();
+    let promptArrow = false;
     for (const node of shown) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -25410,17 +25696,16 @@ export class VisualAgentMapView extends ItemView {
         if (!this.map.aim && this.notes.get(node.id)?.relevance?.tier === "side") path.addClass("vam-edge-side");
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
-        // A line between two Prompt topics carries data upward: an arrow at the parent's end, coloured by the child's run state.
+        // A line from an AI card to a child carries data upward: a thin grey line with an arrow at the parent's end.
         if (
           !this.map.aim &&
           !afterText &&
           parentId === node.parentId &&
-          isPromptEdge(id => this.promptNoteOf(id), parentId, node.id)
+          isPromptEdge(id => this.promptNoteOf(id), parentId)
         ) {
-          const status = this.promptEntryOf(node.id)?.status ?? "none";
-          path.addClass("vam-edge-prompt", `vam-edge-prompt-${status}`);
-          path.setAttribute("marker-start", `url(#${this.relationMarkerId}-prompt-${status})`);
-          promptArrowStatuses.add(status);
+          path.addClass("vam-edge-prompt");
+          path.setAttribute("marker-start", `url(#${this.relationMarkerId}-prompt)`);
+          promptArrow = true;
         }
         lines.push(path);
         if (tipSkip && direction === "right" && parentId === node.parentId && !afterText && !tipSkip.has(parentId)) {
@@ -25490,9 +25775,9 @@ export class VisualAgentMapView extends ItemView {
         else this.spineEls.delete(node.id);
       }
     }
-    if (promptArrowStatuses.size) {
+    if (promptArrow) {
       const defs = createSvg("defs");
-      for (const status of promptArrowStatuses) defs.appendChild(this.promptArrowMarker(status));
+      defs.appendChild(this.promptArrowMarker());
       this.edgesEl.appendChild(defs);
     }
     for (const line of lines) this.edgesEl.appendChild(line);
@@ -25701,11 +25986,11 @@ export class VisualAgentMapView extends ItemView {
     }
     return out;
   }
-  /** The arrowhead of a Prompt line, drawn at the line's start (the parent's end) and turned to point at the parent; its colour follows the child's state. */
-  private promptArrowMarker(status: string): SVGMarkerElement {
+  /** The arrowhead of a Prompt line, drawn at the line's start (the parent's end) and turned to point at the parent, in neutral grey. */
+  private promptArrowMarker(): SVGMarkerElement {
     const marker = createSvg("marker"),
       arrow = createSvg("path");
-    marker.setAttribute("id", `${this.relationMarkerId}-prompt-${status}`);
+    marker.setAttribute("id", `${this.relationMarkerId}-prompt`);
     marker.setAttribute("viewBox", "0 0 10 10");
     marker.setAttribute("refX", "10");
     marker.setAttribute("refY", "5");
@@ -25714,7 +25999,7 @@ export class VisualAgentMapView extends ItemView {
     marker.setAttribute("markerUnits", "userSpaceOnUse");
     marker.setAttribute("orient", "auto-start-reverse");
     arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-    arrow.addClass("vam-prompt-arrow", `vam-prompt-arrow-${status}`);
+    arrow.addClass("vam-prompt-arrow");
     marker.appendChild(arrow);
     return marker;
   }

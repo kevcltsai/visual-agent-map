@@ -2054,6 +2054,7 @@ export class Repository {
    */
   async replaceSourcePaths(pairs: readonly RenamePair[]): Promise<void> {
     if (!pairs.some(([from, to]) => from !== to)) return;
+    const rebase = chainRebase(pairs);
     const failures: unknown[] = [];
     for (const file of await this.markedFiles("agent-map-node")) {
       try {
@@ -2062,17 +2063,17 @@ export class Repository {
         if (
           cached &&
           ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)) &&
-          !rebaseLivingNoteReferences(cached["living-node-refs"], chainRebase(pairs))
+          !rebaseLivingNoteReferences(cached["living-node-refs"], rebase)
         )
           continue;
-        const note = await this.readNoteIfManaged(file);
-        if (!note) continue;
+        const raw = await this.app.vault.read(file);
+        const metadata = frontmatter(raw);
+        if (!marker(metadata["agent-map-node"])) continue;
+        const note = this.parseNote(file.path, raw);
         const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
         const sourcePaths = rebasePathList(note.sourcePaths, pairs);
         // The Living Node reference list is separate from the legacy citation lists.
-        const livingRefs = rebaseLivingNoteReferences(
-          frontmatter(await this.app.vault.read(file))["living-node-refs"], chainRebase(pairs)
-        );
+        const livingRefs = rebaseLivingNoteReferences(metadata["living-node-refs"], rebase);
         if (!referencePaths && !sourcePaths && !livingRefs) continue;
         await this.app.vault.process(file, content => {
           const fm = frontmatter(content);
@@ -2085,7 +2086,7 @@ export class Repository {
           };
           const references = rebasePathList(paths("reference-materials"), pairs);
           const sources = rebasePathList(paths("source-notes"), pairs);
-          const living = rebaseLivingNoteReferences(fm["living-node-refs"], chainRebase(pairs));
+          const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
           if (!references && !sources && !living) return content;
           const next = references || sources ? this.patchedNote(
             file.path,

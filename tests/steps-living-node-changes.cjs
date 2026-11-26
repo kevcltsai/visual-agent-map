@@ -90,3 +90,22 @@ test('change set: repeated change observations are no-op but hourly samples and 
   const returnValue = apply({ ...emptyBase, records: changes.records }, op('c5', '2026-11-26T14:00:00+08:00', '100', 'change'));
   assert.equal(returnValue.records.length, 5);
 });
+
+test('change set: late historical observations do not become the latest change', () => {
+  const op = (id, time, claim) => ({
+    kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'change',
+    eventTime: '2026-11-26T' + time + ':00+08:00', claim, evidence: ['e1']
+  });
+  const original = base({ records: [] });
+  const first = apply(original, op('r09', '09:00', '100'), op('r13', '13:00', '108'), op('r11', '11:00', '105'));
+  assert.equal(first.records.length, 3);
+  const withBackfill = { ...original, records: first.records };
+  const unchanged = apply(withBackfill, op('r14', '14:00', '108'));
+  assert.equal(unchanged.changed, false);
+  assert.deepEqual(plain(unchanged.records), plain(first.records));
+  const changed = apply(withBackfill, op('r14', '14:00', '105'));
+  assert.equal(changed.changed, true);
+  assert.equal(changed.records.length, 4);
+  const intermediate = apply(withBackfill, op('r12', '12:00', '105'));
+  assert.equal(intermediate.changed, false);
+});

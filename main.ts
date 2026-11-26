@@ -8,6 +8,7 @@ import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
+import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
@@ -1359,6 +1360,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.ready = initialize;
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
+    this.registerView(LIVING_READER_VIEW, leaf => new LivingReaderView(leaf));
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>
@@ -2649,6 +2651,15 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The node-details sidebar counts as open only while its pane is actually visible. */
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();
+  }
+  showLivingTrial(file: TFile, markdown: string): Promise<void> {
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown);
+  }
+  invalidateLivingTrial(): void {
+    this.nodeDetailsSidebar.invalidateLivingTrial();
+  }
+  restoreLivingOfficial(file: TFile): Promise<void> {
+    return this.nodeDetailsSidebar.restoreLivingOfficial(file);
   }
   openDetails(file: TFile): Promise<void> {
     return this.nodeDetailsSidebar.openDetails(file);

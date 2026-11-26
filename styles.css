@@ -2189,3 +2189,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
 .vam-prompt-arrow { fill: var(--text-faint); stroke: none; }
 .vam-menu-hint { margin-inline-start: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+
+.vam-living-reader { display: flex; flex-direction: column; min-height: 0; gap: 8px; padding: 12px; }
+.vam-living-reader-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.vam-living-reader-tabs button[aria-selected="true"] { font-weight: var(--font-semibold); color: var(--text-accent); }
+.vam-living-reader-banner { color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-living-reader-outline { display: flex; flex-direction: column; max-height: 24%; overflow-y: auto; }
+.vam-living-reader-outline button { text-align: start; white-space: normal; height: auto; }
+.vam-living-reader-content { flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }

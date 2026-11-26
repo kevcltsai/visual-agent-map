@@ -1,5 +1,6 @@
 import { MarkdownView, View, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { t } from "../../i18n";
+import { LIVING_READER_VIEW, LivingReaderView } from "./living-node-reader";
 
 /** Owns the right-hand topic details pane. The plugin shell only forwards requests to this controller. */
 export class NodeDetailsSidebar {
@@ -15,6 +16,7 @@ export class NodeDetailsSidebar {
   detailsShown(): boolean {
     const split = this.app().workspace.rightSplit;
     if (split.collapsed) return false;
+    if (this.detailsLeaf?.view instanceof LivingReaderView && this.detailsLeaf.view.containerEl.isShown()) return true;
     return this.app()
       .workspace.getLeavesOfType("markdown")
       .some(
@@ -31,7 +33,8 @@ export class NodeDetailsSidebar {
     const markdownLeaves = this.app().workspace.getLeavesOfType("markdown");
     if (
       this.detailsLeaf &&
-      (!markdownLeaves.includes(this.detailsLeaf) || this.detailsLeaf.getRoot() !== this.app().workspace.rightSplit)
+      ((!markdownLeaves.includes(this.detailsLeaf) && !(this.detailsLeaf.view instanceof LivingReaderView)) ||
+        this.detailsLeaf.getRoot() !== this.app().workspace.rightSplit)
     )
       this.detailsLeaf = null;
     if (!this.detailsLeaf) {
@@ -57,9 +60,28 @@ export class NodeDetailsSidebar {
     await this.app().workspace.revealLeaf(this.detailsLeaf);
   }
 
+  async showLivingTrial(file: TFile, markdown: string): Promise<void> {
+    if (!(this.detailsLeaf?.view instanceof LivingReaderView)) await this.openDetails(file);
+    const leaf = this.detailsLeaf;
+    if (!leaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
+    if (!(leaf.view instanceof LivingReaderView)) await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
+    if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
+    await leaf.view.show(file, markdown);
+    await this.app().workspace.revealLeaf(leaf);
+  }
+
+  invalidateLivingTrial(): void {
+    if (this.detailsLeaf?.view instanceof LivingReaderView) this.detailsLeaf.view.markInvalid();
+  }
+
+  async restoreLivingOfficial(file: TFile): Promise<void> {
+    if (this.detailsLeaf?.view instanceof LivingReaderView) await this.openDetails(file);
+  }
+
   closeStaleDetails(): void {
     const closed =
-      this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath;
+      this.detailsLeaf?.view instanceof LivingReaderView ||
+      (this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath);
     if (closed) {
       this.detailsLeaf!.detach();
       this.app().workspace.trigger("file-open", null);

@@ -436,7 +436,7 @@ S.integrationTest('Living Node reader: stopping during reader creation restores 
   assert.deepEqual(calls.at(-1), ['detach']);
 });
 
-function livingTrialRuntimeFixture({ locked = false, usable = true } = {}) {
+function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources = async () => [] } = {}) {
   const { prepareLivingTrial } = S.load('experiences/visual-map/living-node-runtime.ts',
     { obsidian: S.obsidian, './living-node-provider': { generateLivingProposal() { throw new Error('unexpected AI call'); } } },
     {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
@@ -454,8 +454,8 @@ function livingTrialRuntimeFixture({ locked = false, usable = true } = {}) {
   const port = { repo: { readMap: async () => map, readNoteSnapshot: async path => snapshots.get(path) },
     app: { metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
     viewSession: 'editor', signal: new AbortController().signal, current: () => true, language: () => 'en',
-    mapSources: async () => [] };
-  return { prepare: () => prepareLivingTrial(port, 'root', 'Research root'), snapshots };
+    mapSources };
+  return { prepare: () => prepareLivingTrial(port, 'root', 'Research root'), snapshots, map, port };
 }
 
 S.integrationTest('Living Node trial: stale readable upstream may preview but cannot adopt until formal dependencies are ready', async () => {
@@ -517,4 +517,42 @@ S.integrationTest('Living Node copy: internal card IDs follow copies, same-map e
     assert.deepEqual(fm['living-node-refs'], ['card:' + upCopy.id, destination === 'map' ? 'card:external' : 'card:foreign:' + JSON.stringify(['map', 'external'])]);
     assert.equal(f.contents.get(path), source);
   }
+});
+
+S.integrationTest('Living Node trial: optional map source failure is disclosed, unlike a genuinely empty map context', async () => {
+  for (const mapSources of [
+    async () => ({ groups: [], unavailable: 1 }),
+    async () => { throw new Error('optional folder unavailable'); }
+  ]) {
+    const { prepare } = livingTrialRuntimeFixture({ locked: true, mapSources });
+    const prepared = await prepare();
+    assert.deepEqual(JSON.parse(JSON.stringify(prepared.warnings)), ['frozen-source', 'map-source-unavailable']);
+    assert.equal((await prepared.adoption.inspect()).dependenciesReady, true);
+  }
+  const { prepare } = livingTrialRuntimeFixture({ locked: true });
+  assert.deepEqual(JSON.parse(JSON.stringify((await prepare()).warnings)), ['frozen-source']);
+});
+
+S.integrationTest('Living Node structure: a new parent edge is rejected before Map.md publication', async () => {
+  const { map, port, snapshots } = livingTrialRuntimeFixture();
+  snapshots.get('root.md').note.prompt = 'Root';
+  snapshots.get('up.md').note.prompt = 'Up';
+  snapshots.get('up.md').content = snapshots.get('up.md').content.replace('note:missing', 'card:root');
+  const before = { ...map, nodes: map.nodes.map(n => ({ ...n, parentId: null })) };
+  const { validateLivingStructure } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  await assert.rejects(() => validateLivingStructure(port.app, port.repo, before, map), /living-node-cycle/);
+  await validateLivingStructure(port.app, port.repo, map, before);
+});
+
+S.integrationTest('Living Node removal: surviving explicit consumers are identified without removing persisted references', async () => {
+  const { map, port, snapshots } = livingTrialRuntimeFixture();
+  const raw = snapshots.get('root.md').content.replace('living-node-refs: []', 'living-node-refs:\n  - "card:up"');
+  snapshots.get('root.md').content = raw;
+  const { livingRemovalConsumers } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  const affected = await livingRemovalConsumers(port.app, port.repo, map, new Set(['up']));
+  assert.deepEqual(JSON.parse(JSON.stringify(affected)), ['root']);
+  assert.equal(snapshots.get('root.md').content, raw);
+  assert.equal((await livingRemovalConsumers(port.app, port.repo, map, new Set(['root', 'up']))).length, 0);
 });

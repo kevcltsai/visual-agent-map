@@ -333,3 +333,74 @@ S.integrationTest('Living Node trial: rejected adoption lease consumes the candi
   assert.equal(await trial.adopt(f.repo, r), 'discarded');
   assert.equal(f.contents.get(path), initial);
 });
+
+function livingReaderFixture() {
+  class MarkdownView { constructor(file) { this.file = file; this.containerEl = { isShown: () => true }; } }
+  class Reader {
+    constructor() { this.containerEl = { isShown: () => true }; }
+    owns(owner) { return this.owner === owner; }
+    async show(file, preview, owner) { this.file = file; this.preview = preview; this.owner = owner; }
+    markInvalid(owner) { if (this.owns(owner)) this.invalid = true; }
+  }
+  const { NodeDetailsSidebar } = S.load('experiences/visual-map/node-details-sidebar.ts',
+    { obsidian: { ...S.obsidian, MarkdownView, View: class {} }, './living-node-reader': { LivingReaderView: Reader, LIVING_READER_VIEW: 'reader' } },
+    {}, { external: ['obsidian', 'node:*', './living-node-reader'] });
+  const split = { collapsed: false };
+  const calls = [];
+  const leaf = {
+    view: new MarkdownView(null), getRoot: () => split,
+    async openFile(file) { calls.push(['official', file.path]); this.view = new MarkdownView(file); },
+    async setViewState() { calls.push(['reader']); if (this.waitForReader) await this.waitForReader; this.view = new Reader(); },
+    detach() { calls.push(['detach']); }
+  };
+  const workspace = {
+    rightSplit: split, getLeavesOfType: () => leaf.view instanceof MarkdownView ? [leaf] : [],
+    getRightLeaf: () => leaf, async revealLeaf() {}, trigger() {}, getActiveViewOfType: () => null
+  };
+  const app = { workspace, metadataCache: { getFileCache: () => ({ frontmatter: { 'agent-map-node': true } }) } };
+  return { sidebar: new NodeDetailsSidebar(() => app, () => {}), leaf, calls, Reader, MarkdownView };
+}
+
+S.integrationTest('Living Node reader: a late preview and close from an older editor cannot replace a newer selection', async () => {
+  const { sidebar, leaf, calls, MarkdownView } = livingReaderFixture();
+  const a = new S.TFile('a.md'), b = new S.TFile('b.md');
+  await sidebar.openDetails(a, 'editor-a');
+  const gate = S.deferred();
+  leaf.waitForReader = gate.promise;
+  const preview = sidebar.showLivingTrial(a, 'old preview', 'editor-a', () => true);
+  await S.until(() => calls.some(call => call[0] === 'reader'));
+  const next = sidebar.openDetails(b, 'editor-b');
+  gate.resolve();
+  assert.equal(await preview, false);
+  await next;
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'b.md');
+  await sidebar.restoreLivingOfficial(a, 'editor-a', true);
+  sidebar.invalidateLivingTrial('editor-a');
+  assert.equal(leaf.view.file.path, 'b.md');
+});
+
+S.integrationTest('Living Node reader: stopping during reader creation restores official content and does not poison another trial', async () => {
+  const { sidebar, leaf, calls, MarkdownView, Reader } = livingReaderFixture();
+  const a = new S.TFile('a.md');
+  await sidebar.openDetails(a, 'editor-a');
+  const gate = S.deferred();
+  leaf.waitForReader = gate.promise;
+  let current = true;
+  const preview = sidebar.showLivingTrial(a, 'cancelled preview', 'editor-a', () => current);
+  await S.until(() => calls.some(call => call[0] === 'reader'));
+  current = false;
+  gate.resolve();
+  assert.equal(await preview, false);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'a.md');
+  assert.equal(await sidebar.showLivingTrial(a, 'fresh preview', 'editor-a', () => true), true);
+  assert.ok(leaf.view instanceof Reader);
+  assert.equal(leaf.view.preview, 'fresh preview');
+  sidebar.invalidateLivingTrial('unrelated-editor');
+  assert.equal(leaf.view.invalid, undefined);
+  sidebar.invalidateLivingTrial('editor-a');
+  assert.equal(leaf.view.invalid, true);
+  await sidebar.restoreLivingOfficial(undefined, 'editor-a', true);
+  assert.deepEqual(calls.at(-1), ['detach']);
+});

@@ -107,6 +107,12 @@ export interface LivingCommitCheck extends LivingCandidateIdentity {
 /** Compare at the write boundary, not only before the AI call. The storage port must serialize this with the write. */
 export function canCommitLivingCandidate(candidate: LivingCandidateIdentity, current: LivingCommitCheck): boolean {
   return (
+    !!candidate.executionId &&
+    !!candidate.cardId &&
+    !!candidate.mapId &&
+    !!candidate.baseRevision &&
+    !!candidate.inputRevision &&
+    !!candidate.viewSession &&
     !current.locked &&
     !current.aborted &&
     current.dependenciesReady &&

@@ -23,6 +23,7 @@ test('change set: new evidence supplements a record; correction preserves previo
   assert.equal(result.changed, true);
   assert.equal(result.records[0].claim, '105');
   assert.equal(result.records[0].history[0].claim, '100');
+  assert.deepEqual(plain(result.records[0].history[0].previousEvidence), [e('e1')]);
   assert.deepEqual(plain(result.records[0].evidence), [e('e1'), e('e2')]);
   assert.equal(original.records[0].claim, '100');
   assert.equal(apply(original, { kind: 'supplement', id: 'r1', evidence: ['e2'] }).records[0].evidence.length, 2);
@@ -55,6 +56,7 @@ test('change set: rejects protected records, protected summaries, unknown fields
   assert.throws(() => apply(base(), { ...correct, targetCard: 'other' }), /unknown-field/);
   assert.throws(() => apply(base(), { ...correct, id: 'missing' }), /unknown-record/);
   assert.throws(() => apply(base(), { ...correct, evidence: [] }), /missing-evidence/);
+  assert.throws(() => apply(base(), { ...correct, evidence: ['e1'] }), /missing-new-evidence/);
   assert.throws(() => apply(base(), { kind: 'delete', id: 'r1' }), /unknown-operation/);
 });
 

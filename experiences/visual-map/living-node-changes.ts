@@ -15,7 +15,13 @@ export interface LivingRecord {
   evidence: readonly LivingEvidence[];
   validity: "active" | "disputed" | "invalidated";
   owner: "ai" | "user";
-  history: readonly { claim: string; reason: string; at: string; evidence: readonly LivingEvidence[] }[];
+  history: readonly {
+    claim: string;
+    reason: string;
+    at: string;
+    evidence: readonly LivingEvidence[];
+    previousEvidence: readonly LivingEvidence[];
+  }[];
 }
 
 export interface LivingKnowledge {
@@ -65,10 +71,7 @@ function evidenceFor(value: unknown, allowed: ReadonlyMap<string, LivingEvidence
   return [...entries.values()];
 }
 
-function mergeEvidence(
-  old: readonly LivingEvidence[],
-  next: readonly LivingEvidence[]
-): LivingEvidence[] {
+function mergeEvidence(old: readonly LivingEvidence[], next: readonly LivingEvidence[]): LivingEvidence[] {
   const entries = new Map(old.map(item => [item.id, item]));
   for (const item of next) if (!entries.has(item.id)) entries.set(item.id, item);
   return [...entries.values()];
@@ -135,7 +138,10 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
       continue;
     }
     if (kind !== "correct" && kind !== "dispute" && kind !== "invalidate") throw new Error("unknown-operation");
-    exactKeys(operation, kind === "invalidate" ? ["kind", "id", "reason", "evidence"] : ["kind", "id", "claim", "reason", "evidence"]);
+    exactKeys(
+      operation,
+      kind === "invalidate" ? ["kind", "id", "reason", "evidence"] : ["kind", "id", "claim", "reason", "evidence"]
+    );
     const evidence = evidenceFor(operation.evidence, allowed);
     if (!evidence.length) throw new Error("missing-evidence");
     const reason = string(operation.reason);
@@ -145,12 +151,14 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     const merged = mergeEvidence(old.evidence, evidence);
     // Disputes preserve the original claim and record the conflicting one separately.
     const historyClaim = kind === "dispute" ? claim : old.claim;
-    const history = { claim: historyClaim, reason, at: context.at, evidence };
-    const duplicate = old.history.some(item =>
-      item.claim === historyClaim &&
-      item.reason === reason &&
-      evidence.every(entry => item.evidence.some(previous => previous.id === entry.id))
+    const history = { claim: historyClaim, reason, at: context.at, evidence, previousEvidence: old.evidence };
+    const duplicate = old.history.some(
+      item =>
+        item.claim === historyClaim &&
+        item.reason === reason &&
+        evidence.every(entry => item.evidence.some(previous => previous.id === entry.id))
     );
+    if (kind === "correct" && merged.length === old.evidence.length) throw new Error("missing-new-evidence");
     if (duplicate && validity === old.validity && merged.length === old.evidence.length) continue;
     records.set(recordId, {
       ...old,

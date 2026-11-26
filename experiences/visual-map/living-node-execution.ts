@@ -28,7 +28,11 @@ export async function executeLivingPlan(plan: LivingNodePlan, port: LivingExecut
   const results = new Map<string, LivingSettlement>();
   const settle = (id: string, result: LivingSettlement): void => {
     results.set(id, result);
-    port.onSettled?.(id, result);
+    try {
+      port.onSettled?.(id, result);
+    } catch {
+      // A repaint failure cannot turn a committed result into a failed AI run.
+    }
   };
   for (const id of plan.blocked.keys()) settle(id, "blocked");
   for (const id of plan.lockedTargets) settle(id, "not-run");

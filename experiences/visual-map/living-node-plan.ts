@@ -152,7 +152,9 @@ export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?
     lockedTargets,
     frozen: [...frozen],
     dependencies: new Map(
-      sorted.order.filter(id => required.has(id)).map(id => [id, [...(edges.get(id) ?? []), ...(frozenByCard.get(id) ?? [])]])
+      sorted.order
+        .filter(id => required.has(id))
+        .map(id => [id, [...(edges.get(id) ?? []), ...(frozenByCard.get(id) ?? [])]])
     )
   };
 }

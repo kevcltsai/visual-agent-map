@@ -100,3 +100,14 @@ test('execution: frozen dependency changed or lost blocks its consumer', async (
     assert.deepEqual(called, ['other']);
   }
 });
+
+test('execution: a progress observer failure does not turn a committed result into a failure', async () => {
+  const plan = planLivingNodes([ai('root'), ai('child', { parentId: 'root' })]);
+  const results = await executeLivingPlan(plan, {
+    signal: new AbortController().signal, inspect: async () => ready(),
+    execute: async () => 'changed',
+    onSettled: () => { throw new Error('paint'); }
+  });
+  assert.equal(results.get('child'), 'changed');
+  assert.equal(results.get('root'), 'changed');
+});

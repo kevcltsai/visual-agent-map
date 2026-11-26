@@ -2652,17 +2652,17 @@ export default class VisualAgentMapPlugin extends Plugin {
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();
   }
-  showLivingTrial(file: TFile, markdown: string): Promise<void> {
-    return this.nodeDetailsSidebar.showLivingTrial(file, markdown);
+  showLivingTrial(file: TFile, markdown: string, owner: string, isCurrent: () => boolean): Promise<boolean> {
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent);
   }
-  invalidateLivingTrial(): void {
-    this.nodeDetailsSidebar.invalidateLivingTrial();
+  invalidateLivingTrial(owner: string): void {
+    this.nodeDetailsSidebar.invalidateLivingTrial(owner);
   }
-  restoreLivingOfficial(file: TFile): Promise<void> {
-    return this.nodeDetailsSidebar.restoreLivingOfficial(file);
+  restoreLivingOfficial(file: TFile, owner: string, release = false): Promise<void> {
+    return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release);
   }
-  openDetails(file: TFile): Promise<void> {
-    return this.nodeDetailsSidebar.openDetails(file);
+  openDetails(file: TFile, owner?: string): Promise<void> {
+    return this.nodeDetailsSidebar.openDetails(file, owner);
   } /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
   isNoteTaskBusy(path: string): boolean {
     if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;

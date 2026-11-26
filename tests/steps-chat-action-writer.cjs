@@ -668,3 +668,26 @@ test('bookStructureCard: refusals the rules already predict (locked, has childre
   assert.equal(bookStructureCard(structure([]), { bookPlan: { ...tree().bookPlan, nodes: [] } }), undefined);
   assert.equal(bookStructureCard(structure([]), undefined), undefined);
 });
+
+test('Living Node chat: configured creation never falls back to ordinary addNode on a refusal', async () => {
+  const w = world();
+  const action = { kind: 'add_child', parentId: 'a', title: 'Tracker', summary: '', ref: 'tracker', livingPrompt: 'Track news' };
+  w.ports.createLivingNode = async (parent, request, rebuild, current, allowSource) => {
+    assert.equal(parent.id, 'a');
+    assert.equal(request.livingPrompt, 'Track news');
+    assert.equal(current(), true);
+    assert.equal(allowSource('b.md'), true);
+    assert.equal(allowSource('.obsidian/private.md'), false);
+    assert.equal(allowSource('private.md'), false);
+    return undefined;
+  };
+  const refused = await apply(w, action);
+  assert.equal(refused.outcome.status, 'skipped');
+  assert.deepEqual(w.only('addNode'), []);
+  assert.deepEqual(refused.run.created, []);
+  w.ports.createLivingNode = async () => node('configured', 'a');
+  const done = await apply(w, action);
+  assert.equal(done.outcome.status, 'done');
+  assert.equal(done.run.refs.get('tracker'), 'configured');
+  assert.deepEqual(w.only('addNode'), []);
+});

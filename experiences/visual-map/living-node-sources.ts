@@ -96,7 +96,10 @@ export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], p
     for (const child of children.get(targetId) ?? []) addCard(child, { kind: "card", id: child.id }, "child");
     const addRef = (ref: LivingSourceRef, role: "explicit" | "map"): void => {
       if (ref.kind === "card") {
-        const node = byId.get(ref.id);
+        // Copies can retain a missing reference from another map for explicit
+        // repair. It must never become executable even if a malformed map
+        // happens to contain an identical string as a node ID.
+        const node = ref.id.startsWith("foreign:") ? undefined : byId.get(ref.id);
         if (!node) fail(ref, "missing-or-unauthorized", role);
         else addCard(node, ref, role);
         return;

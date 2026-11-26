@@ -934,6 +934,7 @@ export const en = {
   "ui.merge_target_changed": "The merged topic was edited after the merge, so Undo or Redo was not applied.",
   "ui.merge_busy": "An AI task is running on a selected topic; merge after it finishes",
   "ui.merge_missing_note": "A selected topic's note is missing, so it cannot be merged",
+  "ui.merge_living_node_convert": "Convert the AI cards to ordinary cards before merging them; their saved knowledge is kept.",
   "ui.merge_title_label": "Name of the merged topic",
   "ui.merge_ai_untitled": "(AI names the merged topic)",
   "ui.merge_confirm_desc":

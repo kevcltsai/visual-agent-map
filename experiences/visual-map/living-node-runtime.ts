@@ -78,7 +78,8 @@ function ownKnowledge(note: Note): string {
 
 function usableKnowledge(snapshot: Snapshot): boolean {
   const base = readLivingMarkdown(snapshot.content);
-  return base.revision !== "empty" || (snapshot.note.aiRun?.result === "ok" && !!ownKnowledge(snapshot.note));
+  return !!base.output.text || base.records.length > 0 ||
+    (base.revision === "empty" && snapshot.note.aiRun?.result === "ok" && !!ownKnowledge(snapshot.note));
 }
 
 function refs(snapshot: Snapshot): LivingSourceRef[] {

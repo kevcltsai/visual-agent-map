@@ -76,7 +76,7 @@ S.integrationTest('Living Node: manually edited or removed owned region fails cl
   assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
   const edited = f.contents.get(path).replace('> Current findings', '> Owner revised it');
   await f.app.vault.process(f.files.get(path), () => edited);
-  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { candidate: { executionId: 'e2' } })), /edited-or-deleted-knowledge/);
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { candidate: { executionId: 'e2' } })), /base-mismatch/);
   assert.equal(f.contents.get(path), edited);
 });
 
@@ -113,7 +113,9 @@ S.integrationTest('Living Node: readback refuses tampered Markdown or ownership 
   const f = await setup();
   assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
   const saved = f.contents.get(path);
-  assert.throws(() => readLivingMarkdown(saved.replace('> Current findings', '> Manual changes')), /edited-or-deleted-knowledge/);
+  const edited = readLivingMarkdown(saved.replace('> Current findings', '> Manual changes'));
+  assert.equal(edited.output.owner, 'user');
+  assert.equal(edited.output.text, 'Manual changes');
   assert.throws(() => readLivingMarkdown(saved.replace('<!-- vam-living-node:end v1 -->', '')), /unknown-ownership/);
 });
 
@@ -286,4 +288,31 @@ S.integrationTest('Living Node config command: stable same-map source ID, self a
   await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'child', 'Self\n\nSources: [[child]]'), /self-reference/);
   assert.equal(f.contents.get('child.md'), before);
   assert.deepEqual(f.calls, []);
+});
+
+S.integrationTest('Living Node ownership: protect an edited output and append an unrelated observation without restoring deleted text', async () => {
+  const f = await setup();
+  const first = request(f, { proposal: { baseRevision: 'empty', operations: [
+    { kind: 'output', text: 'Current findings', evidence: ['e1'] },
+    { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'Old deleted text', evidence: ['e1'] }
+  ] } });
+  assert.equal(await commitLivingMarkdown(f.repo, first), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.replace('> Current findings', '> User-owned output').replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base = readLivingMarkdown(edited);
+  assert.equal(base.output.owner, 'user');
+  assert.equal(base.records.length, 0);
+  assert.deepEqual(S.plain(base.suppressed), ['r1']);
+  const append = { kind: 'append', id: 'r2', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-27', claim: 'New information', evidence: ['e1'] };
+  const req = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [append] } });
+  assert.equal(await commitLivingMarkdown(f.repo, req), 'written');
+  const after = f.contents.get(path);
+  assert.ok(after.includes('User-owned output'));
+  assert.ok(after.includes('New information'));
+  assert.equal(after.includes('Old deleted text'), false);
+  const recovered = readLivingMarkdown(after);
+  assert.equal(recovered.output.owner, 'user');
+  assert.deepEqual(S.plain(recovered.suppressed), ['r1']);
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: recovered, candidate: { executionId: 'e3' }, proposal: { baseRevision: recovered.revision, operations: [{ ...append, id: 'r1' }] } })), /suppressed-record/);
 });

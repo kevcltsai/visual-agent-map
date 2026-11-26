@@ -3160,8 +3160,6 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
-    // A run-all batch stops with its view: nothing it has in flight is written afterwards.
-    this.promptBatch?.controller.abort();
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.dropBookReviewSession();
@@ -3173,6 +3171,8 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
+    // A run-all batch stops with its view: nothing it has in flight is written afterwards.
+    this.promptBatch?.controller.abort();
     this.dropCanvasInteractionModes();
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;

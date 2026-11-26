@@ -56,12 +56,13 @@ test('plan: a note that is not loaded is skipped; a parent cycle is walked once'
   assert.doesNotThrow(() => pr.planPromptRun(loop, noteMap({ x: P(), y: P() })));
 });
 
-test('hasAiCard / isPromptEdge', () => {
+test('hasAiCard / isPromptEdge: a line carries data when its parent is an AI card, whatever the child is', () => {
   assert.equal(pr.hasAiCard(nodes, noteMap({ a: P({ prompt: '' }) })), false);
   assert.equal(pr.hasAiCard(nodes, noteMap({ a: { prompt: 'p' } })), false);
   assert.equal(pr.hasAiCard(nodes, noteMap({ a: P() })), true);
-  assert.equal(pr.isPromptEdge(all(), 'root', 'a'), true);
-  assert.equal(pr.isPromptEdge(noteMap({ root: P(), a: P({ prompt: '' }) }), 'root', 'a'), false);
+  assert.equal(pr.isPromptEdge(all(), 'root'), true);
+  assert.equal(pr.isPromptEdge(noteMap({ root: P({ prompt: '' }), a: P() }), 'root'), false, 'an AI child under an ordinary parent is not a data line');
+  assert.equal(pr.isPromptEdge(noteMap({ root: P(), a: { prompt: 'p' } }), 'root'), true, 'an ordinary child under an AI parent is');
 });
 
 test('promptSourceLinks: only the source line; alias and heading forms; URL and plain names are skipped; duplicates dropped', () => {
@@ -206,7 +207,7 @@ async function harness(spec, { confirm = true } = {}) {
     addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; }
   }
   const Modal = dom.makeModal();
-  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value), requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   view.armHighlightFade = () => {};
   const hydrate = async () => { view.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
@@ -479,45 +480,61 @@ test('a second run is refused while a batch runs', async () => {
   h.view.stopPromptBatch(); await h.done();
 });
 
-test('the status bar shows progress with Stop while running, the result with a dismiss after', async () => {
+test('toolbar Run all: disabled with a hint without an AI card; progress "n / N" with a stop label while running; a press stops', async () => {
+  const none = await harness([['a', null, { prompt: '' }]]);
+  const off = element('div');
+  none.view.renderRunAllButton(off);
+  const dead = find(off, i => i.tag === 'button' && i.cls?.includes('vam-run-all'));
+  assert.equal(dead.disabled, true);
+  assert.equal(dead.attrs.title, 'Add an AI card first');
   const h = await harness(TREE);
+  const idle = element('div');
+  h.view.renderRunAllButton(idle);
+  assert.equal(find(idle, i => i.tag === 'button').disabled ?? false, false);
   h.plan.hang.add('leaf1');
   await h.runAll();
   await until(() => h.calls.length === 1);
   const bar = element('div');
-  h.view.renderPromptRunStatus(bar);
-  assert.ok(find(bar, i => i.cls?.includes('vam-prompt-run-statusbar')));
-  assert.match(findAll(bar, i => i.cls?.includes('vam-aim-status-value'))[0].text, /1 \/ 5.*leaf1/);
-  assert.ok(find(bar, i => i.tag === 'button' && i.text === 'Stop'));
-  h.view.stopPromptBatch(); await h.done();
-  const after = element('div');
-  h.view.renderPromptRunStatus(after);
-  assert.match(findAll(after, i => i.cls?.includes('vam-aim-status-value'))[0].text, /stopped/i);
-  find(after, i => i.tag === 'button' && i.text === '×').click();
-  assert.equal(h.view.promptBatch, null);
+  h.view.renderRunAllButton(bar);
+  const button = find(bar, i => i.tag === 'button' && i.cls?.includes('is-running'));
+  assert.ok(button);
+  assert.match(find(button, i => i.cls?.includes('vam-run-all-count')).text, /^1 \/ 5$/);
+  assert.equal(button.attrs['aria-label'], 'Stop running all');
+  button.click();
+  await h.done();
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
 // ---- menus ------------------------------------------------------------------------------------------------------------
 const canvasEvent = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
 const titles = menu => menu.items.map(i => i.title ?? '|');
 
-test('canvas menu: "Run all" only when an AI card exists, after a separator', async () => {
-  const h = await harness([['a', null, { prompt: '' }], ['b', 'a', { noAi: true }]]);
-  h.view.onCanvasContextMenu(canvasEvent);
-  assert.equal(h.menus.length, 1);
-  assert.equal(titles(h.menus[0]).includes('Run all'), false, 'a Prompt alone is not an AI card');
-  const g = await harness([['a', null, { prompt: '' }], ['b', 'a']]);
-  g.view.onCanvasContextMenu(canvasEvent);
-  const list = titles(g.menus[0]);
-  assert.ok(list.includes('Run all'));
-  assert.equal(list[list.indexOf('Run all') - 1], '|', 'a separator before it');
-  g.menus[0].items.find(i => i.title === 'Run all').click();
-  assert.equal(g.modals.length, 0, 'no confirmation card');
-  await until(() => g.view.promptBatch?.outcome);
-  const l = await harness([['a', null]]);
-  l.view.notes = new Map();
-  l.view.onCanvasContextMenu(canvasEvent);
-  assert.equal(titles(l.menus[0]).includes('Run all'), false, 'notes loading');
+test('add menu: "AI card" comes before "Add text", after a separator; picking it opens the popover', async () => {
+  const h = await harness([['a', null]]);
+  let opened = null;
+  h.view.openAiCardPopover = (...args) => { opened = args; };
+  h.view.openAddMenu({ clientX: 1, clientY: 1, preventDefault() {} }, null);
+  const list = titles(h.menus[0]);
+  const ai = list.indexOf('AI card'), text = list.indexOf('Add text');
+  assert.ok(ai > 0 && text > ai, `AI card before Add text: ${list}`);
+  assert.equal(list[ai - 1], '|', 'a separator before it');
+  h.menus[0].items.find(i => i.title === 'AI card').click();
+  assert.ok(opened && opened[0] === null, 'the popover opens for a new card');
+  assert.equal(titles(h.menus[0]).includes('Run all'), false, 'Run all lives on the toolbar now');
+});
+
+test('card menu: "Make it an AI card" on an ordinary card, "Edit AI card" on an AI card; both open the popover', async () => {
+  const h = await harness([['a', null, { prompt: '' }], ['b', 'a']]);
+  const opened = [];
+  h.view.openAiCardPopover = node => opened.push(node.id);
+  for (const [key, label] of [['a', 'Make it an AI card'], ['b', 'Edit AI card']]) {
+    const menu = h.view.newMenu();
+    h.view.addCardMenuActions(menu, h.node(key));
+    const item = menu.items.find(i => i.title === label);
+    assert.ok(item, label);
+    item.click();
+  }
+  eq(opened, [h.node('a').id, h.node('b').id]);
 });
 
 test('the closing abort is in the view source', () => {
@@ -526,8 +543,8 @@ test('the closing abort is in the view source', () => {
 });
 
 // ---- arrows -----------------------------------------------------------------------------------------------------------
-test('arrows: a line between two AI cards gets a marker-start arrow and a status class; other lines are unchanged', async () => {
-  const h = await harness([['root', null], ['pa', 'root'], ['plain', 'root', { prompt: '' }], ['deep', 'plain']]);
+test('arrows: a line whose parent is an AI card gets a marker-start arrow and a thin line, no status class; other lines are unchanged', async () => {
+  const h = await harness([['root', null, { prompt: '' }], ['pa', 'root'], ['ordinary', 'pa', { prompt: '' }], ['deep', 'ordinary']]);
   const { view } = h;
   view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
   view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
@@ -535,25 +552,50 @@ test('arrows: a line between two AI cards gets a marker-start arrow and a status
   view.promptRuns.set(MAP, new Map([[h.node('pa').id, { status: 'running' }]]));
   view.drawEdges();
   const edge = (p, c) => view.edgeEls.get(`${h.node(p).id}\u0000${h.node(c).id}`);
-  const arrow = edge('root', 'pa');
-  assert.ok(arrow.classes.includes('vam-edge-prompt') && arrow.classes.includes('vam-edge-prompt-running'));
-  assert.equal(arrow.getAttribute('marker-start'), `url(#${view.relationMarkerId}-prompt-running)`);
+  const arrow = edge('pa', 'ordinary');
+  assert.ok(arrow.classes.includes('vam-edge-prompt'));
+  assert.equal(arrow.classes.some(n => n.startsWith('vam-edge-prompt-')), false, 'no status class');
+  assert.equal(arrow.getAttribute('marker-start'), `url(#${view.relationMarkerId}-prompt)`);
   const defs = view.edgesEl.children.find(c => c.tag === 'defs');
   const marker = defs.children[0];
-  assert.equal(marker.getAttribute('id'), `${view.relationMarkerId}-prompt-running`);
+  assert.equal(marker.getAttribute('id'), `${view.relationMarkerId}-prompt`);
   assert.equal(marker.getAttribute('orient'), 'auto-start-reverse');
-  for (const [p, c] of [['root', 'plain'], ['plain', 'deep']]) {
+  for (const [p, c] of [['root', 'pa'], ['ordinary', 'deep']]) {
     const line = edge(p, c);
     assert.equal(line.classes.some(n => n.startsWith('vam-edge-prompt')), false, `${p}->${c}`);
     assert.equal(line.getAttribute('marker-start'), undefined);
   }
-  assert.equal(edge('root', 'pa').classes.includes('vam-edge'), true);
-  view.promptRuns.clear(); view.drawEdges();
-  assert.ok(edge('root', 'pa').classes.includes('vam-edge-prompt-none'));
+  assert.equal(edge('pa', 'ordinary').classes.includes('vam-edge'), true);
   const g = await harness([['root', null, { prompt: '' }], ['k', 'root', { prompt: '' }]]);
   g.view.cardEls = new Map(g.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
   g.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
   g.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
   g.view.drawEdges();
   assert.equal(g.view.edgesEl.children.some(c => c.tag === 'defs' && c.children.length), false);
+});
+
+test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {
+  const h = await harness([['a', null, { prompt: 'Why is the sky blue?\nsecond line' }]]);
+  const node = h.node('a');
+  const face = () => {
+    const card = element('div'), header = element('div'), title = element('h3', { cls: 'vam-card-title' });
+    header.appendChild?.(title); card.appendChild?.(header); card.appendChild?.(title);
+    return { card, header, title };
+  };
+  const { card, header, title } = face();
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  assert.equal(card.dataset.aiCard, 'true');
+  assert.ok(find(title, i => i.cls?.includes('vam-ai-star')), 'star');
+  assert.equal(findAll(title, i => i.cls?.includes('vam-ai-glyph')).length, 1, 'one glyph');
+  assert.ok(find(title, i => i.cls?.includes('vam-ai-glyph-pending')));
+  const q = findAll(card, i => i.cls?.includes('vam-ai-question'));
+  assert.equal(q.length, 1); assert.equal(q[0].text, 'Why is the sky blue?');
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  assert.equal(findAll(card, i => i.cls?.includes('vam-ai-question')).length, 1, 'repainting does not stack chips');
+  const locked = face();
+  h.view.paintPromptState(locked.card, locked.header, node, { ...h.view.notes.get(node.id), aiLocked: true });
+  assert.equal(findAll(locked.title, i => i.cls?.includes('vam-ai-glyph')).length, 0, 'locked: no glyph');
+  const ordinary = face();
+  h.view.paintPromptState(ordinary.card, ordinary.header, node, { prompt: 'p' });
+  assert.equal(ordinary.card.dataset.aiCard, undefined);
 });

@@ -404,3 +404,45 @@ S.integrationTest('Living Node reader: stopping during reader creation restores 
   await sidebar.restoreLivingOfficial(undefined, 'editor-a', true);
   assert.deepEqual(calls.at(-1), ['detach']);
 });
+
+function livingTrialRuntimeFixture({ locked = false, usable = true } = {}) {
+  const { prepareLivingTrial } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': { generateLivingProposal() { throw new Error('unexpected AI call'); } } },
+    {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  const map = { id: 'map', nodes: [
+    { id: 'root', path: 'root.md', parentId: null },
+    { id: 'up', path: 'up.md', parentId: 'root' }
+  ] };
+  const snapshots = new Map([
+    ['root.md', { note: { title: 'Root', prompt: 'Research root', aiCard: true, model: 'model-a' },
+      content: '---\nagent-map-id: map\ntopic-id: root\nai-card: true\nliving-node-refs: []\n---\n# Root\n' }],
+    ['up.md', { note: { title: 'Up', prompt: 'Research up\nSources: [[missing]]', aiCard: true,
+      aiLocked: locked, model: 'model-a', summary: usable ? 'Existing findings' : '', aiRun: usable ? { result: 'ok' } : undefined },
+      content: '---\nagent-map-id: map\ntopic-id: up\nai-card: true\nliving-node-refs:\n  - "note:missing"\n---\n# Up\n' }]
+  ]);
+  const port = { repo: { readMap: async () => map, readNoteSnapshot: async path => snapshots.get(path) },
+    app: { metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
+    viewSession: 'editor', signal: new AbortController().signal, current: () => true, language: () => 'en',
+    mapSources: async () => [] };
+  return { prepare: () => prepareLivingTrial(port, 'root', 'Research root'), snapshots };
+}
+
+S.integrationTest('Living Node trial: stale readable upstream may preview but cannot adopt until formal dependencies are ready', async () => {
+  const { prepare } = livingTrialRuntimeFixture();
+  const prepared = await prepare();
+  assert.deepEqual(JSON.parse(JSON.stringify(prepared.warnings)), ['upstream-stale']);
+  assert.equal(await prepared.request.stillCurrent(), true);
+  await assert.rejects(() => prepared.adoption.inspect(), /required-dependency-blocked/);
+});
+
+S.integrationTest('Living Node trial: unreadable upstream blocks even read-only preview', async () => {
+  const { prepare } = livingTrialRuntimeFixture({ usable: false });
+  await assert.rejects(prepare, /missing-ai-knowledge/);
+});
+
+S.integrationTest('Living Node trial: a readable locked dependency is a disclosed frozen boundary and does not block adoption', async () => {
+  const { prepare } = livingTrialRuntimeFixture({ locked: true });
+  const prepared = await prepare();
+  assert.deepEqual(JSON.parse(JSON.stringify(prepared.warnings)), ['frozen-source']);
+  assert.equal((await prepared.adoption.inspect()).dependenciesReady, true);
+});

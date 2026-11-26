@@ -237,6 +237,17 @@ export function renderLivingPreview(knowledge: LivingKnowledge): string {
   return renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
 }
 
+/** Share only committed readable knowledge; never export internal evidence paths, IDs, or suppression metadata. */
+export function renderLivingShareKnowledge(knowledge: LivingKnowledge): string {
+  const sections: string[] = [];
+  if (knowledge.output.text.trim()) sections.push(quote(knowledge.output.text));
+  for (const record of knowledge.records) {
+    sections.push(quote([record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n")));
+    for (const item of record.history) sections.push(quote([item.at, item.claim, item.reason].join("\n")));
+  }
+  return sections.join("\n\n");
+}
+
 const emptyKnowledge = (): LivingKnowledge => ({
   revision: "empty",
   records: [],

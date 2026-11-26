@@ -1123,6 +1123,9 @@ function requestArgumentResume(
   });
 }
 
+/** The Prompt chips painted into each card header, so a repaint can remove exactly them. */
+const promptChips = new WeakMap<HTMLElement, HTMLElement[]>();
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -19394,7 +19397,7 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   // ---- Prompt topics and "run all" -------------------------------------------------------------------------------------
-  private promptNoteOf = (id: string): PromptNoteRef | undefined => {
+  private promptNoteOf(id: string): PromptNoteRef | undefined {
     const note = this.notes.get(id);
     return note
       ? {
@@ -19404,7 +19407,7 @@ export class VisualAgentMapView extends ItemView {
           ...(note.aiLocked ? { aiLocked: true } : {})
         }
       : undefined;
-  };
+  }
   /** The run state of a Prompt topic as this view knows it; undefined for a topic not run or queued here. */
   private promptEntryOf(id: string): PromptRunEntry | undefined {
     return this.promptRuns.get(this.path)?.get(id);
@@ -19412,7 +19415,7 @@ export class VisualAgentMapView extends ItemView {
   /** True when the map has a Prompt topic and the entry points may show "Run all". */
   private canRunPrompts(): boolean {
     return (
-      !!this.map && !this.notesLoading() && !this.bookLock().ai && hasPromptTopic(this.map.nodes, this.promptNoteOf)
+      !!this.map && !this.notesLoading() && !this.bookLock().ai && hasPromptTopic(this.map.nodes, id => this.promptNoteOf(id))
     );
   }
   /** Why the AI is busy on any topic the plan would run (or a multi-select research runs): then nothing starts. */
@@ -19439,7 +19442,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.prompt_run_already"));
       return;
     }
-    const plan = planPromptRun(map.nodes, this.promptNoteOf, scopeId);
+    const plan = planPromptRun(map.nodes, id => this.promptNoteOf(id), scopeId);
     if (!plan.run.length) {
       new Notice(t("ui.prompt_run_nothing"));
       return;
@@ -19718,10 +19721,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The Prompt state of a card: its run status (only when run or queued here) and the reuse pill; the card's name says both. */
   private paintPromptState(card: HTMLElement, header: HTMLElement, node: MapNode, note: Note | undefined): void {
-    header.querySelectorAll(".vam-prompt-chip").forEach(chip => chip.remove());
-    if (!note || !isPromptTopic(this.promptNoteOf(node.id))) return;
+    promptChips.get(header)?.forEach(chip => chip.remove());
+    promptChips.delete(header);
+    if (!note || !isPromptTopic(note)) return;
     const entry = this.promptEntryOf(node.id);
     const parts: string[] = [];
+    const chips: HTMLElement[] = [];
     if (entry) {
       const label = t(`ui.prompt_run_status_${entry.status}`);
       const chip = header.createSpan({
@@ -19729,12 +19734,14 @@ export class VisualAgentMapView extends ItemView {
         text: label
       });
       if (entry.reason) chip.setAttr("title", entry.reason);
+      chips.push(chip);
       parts.push(label);
     }
     if (note.reuseLastResult) {
-      header.createSpan({ cls: "vam-prompt-chip vam-prompt-reuse", text: t("ui.prompt_run_reuse") });
+      chips.push(header.createSpan({ cls: "vam-prompt-chip vam-prompt-reuse", text: t("ui.prompt_run_reuse") }));
       parts.push(t("ui.prompt_run_reuse"));
     }
+    if (chips.length) promptChips.set(header, chips);
     const named = cardLabels.get(card)?.textContent;
     if (named && parts.length) {
       const extra = parts.filter(part => !named.includes(part));
@@ -19743,7 +19750,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private addPromptRunMenu(menu: Menu, node: MapNode): void {
     const note = this.notes.get(node.id);
-    if (!note || !isPromptTopic(this.promptNoteOf(node.id)) || this.notesLoading() || this.bookLock().ai) return;
+    if (!note || !isPromptTopic(note) || this.notesLoading() || this.bookLock().ai) return;
     const hint = (item: MenuItem, text: string): void => {
       (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({ cls: "vam-menu-hint", text });
     };
@@ -25448,7 +25455,7 @@ export class VisualAgentMapView extends ItemView {
           !this.map.aim &&
           !afterText &&
           parentId === node.parentId &&
-          isPromptEdge(this.promptNoteOf, parentId, node.id)
+          isPromptEdge(id => this.promptNoteOf(id), parentId, node.id)
         ) {
           const status = this.promptEntryOf(node.id)?.status ?? "none";
           path.addClass("vam-edge-prompt", `vam-edge-prompt-${status}`);

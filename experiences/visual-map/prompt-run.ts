@@ -40,7 +40,7 @@ export interface PromptPlan {
   counts: { run: number; web: number; reuse: number };
 }
 
-export const isPromptTopic = (note: PromptNoteRef | undefined): boolean => !!note && note.prompt.trim() !== "";
+export const isPromptTopic = (note: PromptNoteRef | undefined): boolean => !!note && (note.prompt ?? "").trim() !== "";
 
 const childrenOf = (nodes: readonly PromptNodeRef[]): Map<string, string[]> => {
   const out = new Map<string, string[]>();

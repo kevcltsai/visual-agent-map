@@ -306,11 +306,11 @@ export function splitPrompt(prompt: string): { question: string; sources: string
   }
   return { question: keep.join("\n").trim(), sources };
 }
-/** The Prompt text of an AI card: the question, then the 資料來源 line (its label and list separator come from the interface language) when there are notes. */
+/** The Prompt text of an AI card: the question, then the 資料來源 line (its label and list separator come from the interface language; a Latin label takes the half-width colon) when there are notes. */
 export function joinPrompt(question: string, sources: readonly string[], label: string, separator: string): string {
   const text = question.trim();
   if (!sources.length) return text;
-  const line = `${label}：${sources.map(name => `[[${name}]]`).join(separator)}`;
+  const line = `${label}${/^[ -~]*$/.test(label) ? ": " : "："}${sources.map(name => `[[${name}]]`).join(separator)}`;
   return text ? `${text}\n${line}` : line;
 }
 /** The name of a new AI card when the user left it blank: the question's first line, 20 characters at most, without trailing punctuation. */

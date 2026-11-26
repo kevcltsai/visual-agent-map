@@ -6686,7 +6686,6 @@ export class VisualAgentMapView extends ItemView {
     if (marked !== null)
       progress.createSpan({ cls: "vam-research-progress-marked", text: t("ui.marked_progress_0", marked) });
   }
-  /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   /** The toolbar's ghost 「▶ 全部執行」: disabled without an AI card; while it runs a progress ring and "n / N", a press stops it. */
   private renderRunAllButton(parent: HTMLElement): void {
     const state =
@@ -6734,6 +6733,7 @@ export class VisualAgentMapView extends ItemView {
     button.setAttr("aria-label", t("ui.ai_run_all"));
     button.addEventListener("click", () => this.whenEditing(() => this.startPromptRun()));
   }
+  /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   private whenEditing(action: () => void): void {
     if (this.presentation || this.notesLoading()) return;
     action();
@@ -11994,7 +11994,8 @@ export class VisualAgentMapView extends ItemView {
       if ((!editing || structureChanged) && !this.dragging) this.render();
       else {
         // Cards are refreshed without redrawing the edges each time (a redraw reads every card's layout); once at the end.
-        for (const node of this.map.nodes) this.refreshCard(node, false);
+        this.aiStatusMemo.clear();
+        for (const node of this.map.nodes) this.refreshCard(node, false, false);
         this.drawEdges();
       }
     }
@@ -14694,7 +14695,7 @@ export class VisualAgentMapView extends ItemView {
     preview.style.left = `${fitted.left}px`;
     preview.style.top = `${fitted.top}px`;
   }
-  private refreshCard(node: MapNode, redrawEdges = true): void {
+  private refreshCard(node: MapNode, redrawEdges = true, clearStatus = true): void {
     const card = this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`),
       note = this.notes.get(node.id);
     if (!card || !note) return;
@@ -14771,7 +14772,7 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardMarkers(card, header, node.id);
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
-      this.aiStatusMemo.clear();
+      if (clearStatus) this.aiStatusMemo.clear();
       this.paintPromptState(card, header, node, note);
     }
     this.paintCardColor(card, note);
@@ -15140,7 +15141,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeAiCardPopover();
     const note = node ? this.notes.get(node.id) : undefined;
     if (node && !note) return;
-    const split = note && isAiCard(note) ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
+    const split = note?.prompt.trim() ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
     const mapId = this.map.id;
     const anchorId = node?.id ?? parent?.id ?? null;
     const win = new AiCardPopover(
@@ -19833,6 +19834,8 @@ export class VisualAgentMapView extends ItemView {
     const controller = new AbortController();
     const state: PromptBatchState = { mapPath, controller, total: plan.order.length, finished: 0 };
     this.promptBatch = state;
+    // The last batch's marks end here: a card this batch has not reached yet shows its own state, not the old done/blocked.
+    this.promptRuns.delete(mapPath);
     const notes = new Map(this.notes);
     const noteOf = (id: string): PromptNoteRef | undefined => {
       const note = notes.get(id);

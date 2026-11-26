@@ -309,7 +309,25 @@ export function replaceSummarySection(content: string, value: string): string {
   return `${content.slice(0, at)}\n\n## Current Summary\n\n${managedSectionValue(value)}\n\n${content.slice(at).trimStart()}`;
 }
 
+/** Takes the Prompt callout (`> [!info]- Prompt` and its quoted lines) out of a note; outside the Detail only. */
+function removePromptCallout(content: string): string {
+  const lines = content.split("\n");
+  let inDetail = false;
+  for (let index = 0; index < lines.length; index++) {
+    if (lines[index].trim() === DETAIL_START) inDetail = true;
+    if (lines[index].trim() === DETAIL_END) inDetail = false;
+    const callout = inDetail ? null : CALLOUT_SECTION.exec(lines[index]);
+    if (callout?.[1] !== "Prompt") continue;
+    let end = index + 1;
+    while (end < lines.length && lines[end].startsWith(">") && !CALLOUT_SECTION.test(lines[end])) end++;
+    while (end < lines.length && !lines[end].trim()) end++;
+    return `${lines.slice(0, index).join("\n").trimEnd()}\n\n${lines.slice(end).join("\n")}`;
+  }
+  return content;
+}
+
 export function removeSection(content: string, heading: NoteSection): string {
+  if (heading === "Prompt") content = removePromptCallout(content);
   if (heading === "Detail") {
     const managedStart = content.indexOf(DETAIL_START),
       managedEnd = content.indexOf(DETAIL_END);

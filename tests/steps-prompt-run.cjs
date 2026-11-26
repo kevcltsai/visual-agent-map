@@ -155,7 +155,8 @@ test('splitPrompt / joinPrompt: the question and the source notes round trip; ot
   const langs = { 'zh-TW': ['資料來源', '、'], 'zh-CN': ['资料来源', '、'], en: ['Sources', ', '] };
   assert.equal(pr.joinPrompt(' Why? ', ['A', 'B'], ...langs['zh-TW']), 'Why?\n資料來源：[[A]]、[[B]]');
   assert.equal(pr.joinPrompt('Why?', ['A', 'B'], ...langs['zh-CN']), 'Why?\n资料来源：[[A]]、[[B]]');
-  assert.equal(pr.joinPrompt('Why?', ['A'], ...langs.en), 'Why?\nSources：[[A]]');
+  assert.equal(pr.joinPrompt('Why?', ['A'], ...langs.en), 'Why?\nSources: [[A]]', 'English uses the half-width colon');
+  eq(pr.splitPrompt('Why?\nSources：[[A]]'), { question: 'Why?', sources: ['A'] }, 'both colons are read');
   assert.equal(pr.joinPrompt('Why?', [], ...langs.en), 'Why?');
   for (const lang of Object.keys(langs)) eq(pr.splitPrompt(pr.joinPrompt('Q\nOther: x', ['A', 'B'], ...langs[lang])), { question: 'Q\nOther: x', sources: ['A', 'B'] }, lang);
 });
@@ -599,4 +600,93 @@ test('card face: a star and one state glyph by the name, the question line under
   const ordinary = face();
   h.view.paintPromptState(ordinary.card, ordinary.header, node, { prompt: 'p' });
   assert.equal(ordinary.card.dataset.aiCard, undefined);
+});
+
+// ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
+test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
+  const h = await harness([['Y', null], ['X', null]]);
+  await h.runAll(); await h.done();
+  assert.equal(h.status('X'), 'done');
+  await h.repo.updateNote(h.node('X').path, { prompt: 'Prompt X edited' });
+  await h.hydrate();
+  h.view.aiStatusMemo.clear();
+  h.view.promptBatch = null;
+  h.plan.hang.add('Y');
+  await h.runAll();
+  await until(() => h.calls.filter(c => c.key === 'Y').length === 2);
+  assert.equal(h.status('X'), undefined, 'batch 1 left nothing for X');
+  h.view.aiStatusMemo.clear();
+  assert.equal(h.view.aiStatusOf(h.node('X').id), 'stale');
+  h.view.stopPromptBatch(); await h.done();
+});
+
+const popoverHarness = async spec => {
+  const h = await harness(spec);
+  const overlay = element('div', { cls: 'vam-canvas-overlay' });
+  overlay.ownerDocument = element('div');
+  h.view.contentEl.appendChild(overlay);
+  const pop = () => h.view.aiCardOpen?.win.el;
+  const question = () => find(pop(), i => i.tag === 'textarea');
+  const saveButton = () => find(pop(), i => i.tag === 'button' && i.cls?.includes('mod-cta'));
+  return { ...h, overlay, pop, question, saveButton };
+};
+
+test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its question and notes; an ordinary card with no Prompt opens blank', async () => {
+  const h = await popoverHarness([['A', null, { noAi: true, prompt: 'Why?\nSources: [[N]]' }], ['B', null, { noAi: true, prompt: '' }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  assert.equal(h.question().value, 'Why?');
+  eq(findAll(h.pop(), i => i.cls?.includes('vam-ai-card-pop-chip-name')).map(i => i.text), ['N']);
+  h.view.openAiCardPopover(h.node('B'));
+  assert.equal(h.question().value, '');
+});
+
+test('save path: an existing card is one undo step and undo restores the note byte for byte; keys follow the tick', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const before = h.raw('A');
+  const past = h.view.history.past.length;
+  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: ['N', 'M'], keepOld: true });
+  assert.equal(h.view.history.past.length, past + 1, 'one undo step');
+  assert.match(h.raw('A'), /^ai-card: true$/m);
+  assert.match(h.raw('A'), /^research-mode: "?research"?$/m);
+  assert.match(h.raw('A'), /> New Q\n> Sources: \[\[N\]\], \[\[M\]\]/);
+  assert.equal(/^ai-update-mode: /m.test(h.raw('A')), false, 'ticked: no ai-update-mode written');
+  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: [], keepOld: false });
+  assert.match(h.raw('A'), /^ai-update-mode: "?fresh"?$/m);
+  await h.view.history.undo().undo();
+  await h.view.history.undo().undo();
+  assert.equal(h.raw('A'), before, 'byte for byte');
+});
+
+test('save path: an emptied question removes the Prompt and `ai-card`', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old question' }]]);
+  await h.view.writeAiCard(h.node('A'), { title: '', question: '', sources: [], keepOld: true });
+  assert.equal(h.raw('A').includes('Old question'), false);
+  assert.equal(/^ai-card:/m.test(h.raw('A')), false);
+  assert.equal(/^prompt:/m.test(h.raw('A')), false);
+});
+
+test('save path: a new card is made only on save; the popover blocks an empty question, Cmd/Ctrl+Enter saves, Esc writes nothing', async () => {
+  const h = await popoverHarness([['A', null]]);
+  const count = h.mapDoc.nodes.length;
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(null, null);
+  assert.equal(h.saveButton().disabled, true, 'empty question: cannot save');
+  h.pop().keydown({ key: 'Enter', metaKey: true });
+  await dom.tick(); await dom.tick();
+  assert.equal(h.mapDoc.nodes.length, count, 'an empty question does not save');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null, 'Esc closes');
+  await dom.tick(); await dom.tick();
+  assert.equal(h.mapDoc.nodes.length, count, 'cancel makes no card');
+  assert.equal(h.view.history.past.length, past, 'cancel writes nothing');
+  h.view.openAiCardPopover(null, null);
+  h.question().value = 'Brand new?';
+  h.question().input();
+  assert.equal(h.saveButton().disabled, false);
+  h.pop().keydown({ key: 'Enter', ctrlKey: true });
+  await until(() => h.mapDoc.nodes.length === count + 1);
+  await until(() => h.view.history.past.length > past);
+  const made = h.mapDoc.nodes.at(-1);
+  assert.match(h.contents.get(made.path), /^ai-card: true$/m);
+  assert.match(h.contents.get(made.path), /Brand new\?/);
 });

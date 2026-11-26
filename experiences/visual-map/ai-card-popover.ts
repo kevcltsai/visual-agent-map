@@ -16,6 +16,7 @@ export interface AiCardPopoverHost {
   pickNote(done: (name: string) => void, closed: () => void): void;
   save(values: AiCardPopoverValues): void | Promise<boolean>;
   trial?(values: AiCardPopoverValues): Promise<boolean>;
+  stopTrial?(): void;
   adopt?(): Promise<boolean>;
   convert?(): Promise<boolean>;
   changed?(): void;
@@ -32,6 +33,7 @@ export class AiCardPopover {
   private readonly chipsEl: HTMLElement;
   private readonly saveEl: HTMLButtonElement;
   private readonly trialEl: HTMLButtonElement;
+  private readonly stopTrialEl: HTMLButtonElement;
   private readonly adoptEl: HTMLButtonElement;
   private readonly statusEl: HTMLElement;
   private readonly closeChoices: HTMLElement;
@@ -39,6 +41,7 @@ export class AiCardPopover {
   private baseline: string;
   private preview = false;
   private busy = false;
+  private trialRunning = false;
   private readonly cleanups: Array<() => void> = [];
   private parentEl: HTMLElement | null = null;
   private destroyed = false;
@@ -85,6 +88,12 @@ export class AiCardPopover {
     this.statusEl = this.el.createDiv({ cls: "vam-living-editor-status", attr: { role: "status", "aria-live": "polite" } });
     const foot = this.el.createDiv("vam-ai-card-pop-foot");
     this.trialEl = foot.createEl("button", { text: t("ui.living_node_try_prompt"), attr: { type: "button" } });
+    this.stopTrialEl = foot.createEl("button", { text: t("ui.topic_chat_stop"), attr: { type: "button" } });
+    this.on(this.stopTrialEl, "click", () => {
+      if (!this.trialRunning) return;
+      this.host.stopTrial?.();
+      this.stopTrialEl.disabled = true;
+    });
     this.adoptEl = foot.createEl("button", { text: t("ui.living_node_adopt"), attr: { type: "button" } });
     this.saveEl = foot.createEl("button", { cls: "mod-cta", text: t("ui.ai_card_save"), attr: { type: "button" } });
     if (host.convert) {
@@ -178,6 +187,8 @@ export class AiCardPopover {
     const empty = !this.questionEl.value.trim();
     this.saveEl.disabled = empty || this.busy;
     this.trialEl.disabled = empty || this.busy || !this.host.trial;
+    this.stopTrialEl.hidden = !this.trialRunning || !this.host.stopTrial;
+    this.stopTrialEl.disabled = !this.trialRunning;
     this.adoptEl.disabled = !this.preview || this.busy || this.dirty() || !this.host.adopt;
     this.questionEl.disabled = this.busy;
     this.statusEl.setText(
@@ -205,11 +216,13 @@ export class AiCardPopover {
   private async trial(): Promise<void> {
     if (this.trialEl.disabled || !this.host.trial || this.destroyed) return;
     this.busy = true;
+    this.trialRunning = true;
     this.preview = false;
     this.refresh();
     try {
       this.preview = await this.host.trial(this.values());
     } finally {
+      this.trialRunning = false;
       this.busy = false;
       if (!this.destroyed) this.refresh();
     }

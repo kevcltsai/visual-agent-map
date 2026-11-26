@@ -56,10 +56,11 @@ function unquote(value: string): string {
   return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
-const field = (name: string, value: string | null): string => `- ${name}: ${JSON.stringify(value)}`;
+const encoded = (value: unknown): string => JSON.stringify(value).replace(/</g, "\\u003c");
+const field = (name: string, value: string | null): string => `- ${name}: ${encoded(value)}`;
 
 function sourceLines(entries: readonly LivingEvidence[]): string[] {
-  return entries.map(entry => `- Source: ${JSON.stringify([entry.id, entry.source, entry.retrievedAt])}`);
+  return entries.map(entry => `- Source: ${encoded([entry.id, entry.source, entry.retrievedAt])}`);
 }
 
 /** A single readable, reversible Markdown representation. No second copy of claims in a hidden index. */
@@ -289,8 +290,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   const region = readRegion(expectedContent, fm[HASH_KEY]);
   if (region) {
     const stored = decodeRegion(region, livingSnapshotRevision(region.text));
-    if (request.base.revision !== stored.revision || renderRegion(request.base) !== region.text)
-      throw new Error("base-mismatch");
+    const matches = request.base.revision === stored.revision && renderRegion(request.base) === region.text;
+    if (!matches) throw new Error("base-mismatch");
   } else if (
     request.base.revision !== "empty" ||
     request.base.output.owner !== "ai" ||
@@ -303,8 +304,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   const next = applyLivingChanges(request.base, request.proposal, context);
   if (!region && !next.records.length && !next.output.text) throw new Error("missing-formal-result");
   const changed = !region || next.changed;
-  const managed =
-    region && !changed ? region.text : renderRegion({ ...request.base, records: next.records, output: next.output });
+  const nextKnowledge = { ...request.base, records: next.records, output: next.output };
+  const managed = region && !changed ? region.text : renderRegion(nextKnowledge);
   const checked = await request.inspect();
   if (signal.aborted || !request.isCurrent() || !canCommitLivingCandidate(candidate, checked)) return "discarded";
   return port.updateNoteRawGuarded(

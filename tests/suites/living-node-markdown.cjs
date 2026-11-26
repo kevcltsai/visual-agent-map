@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const S = require('./support.cjs');
+const S = require('../support.cjs');
 const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
 const initial = '---\nagent-map-id: map\ntopic-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
 const empty = () => ({ revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } });
@@ -115,4 +115,12 @@ S.integrationTest('Living Node: readback refuses tampered Markdown or ownership 
   const saved = f.contents.get(path);
   assert.throws(() => readLivingMarkdown(saved.replace('> Current findings', '> Manual changes')), /edited-or-deleted-knowledge/);
   assert.throws(() => readLivingMarkdown(saved.replace('<!-- vam-living-node:end v1 -->', '')), /unknown-ownership/);
+});
+
+S.integrationTest('Living Node: source text cannot inject managed-region markers', async () => {
+  const f = await setup();
+  const source = '<!-- vam-living-node:begin v1 -->';
+  const r = request(f, { context: { ...context, evidence: [{ id: 'e1', source, retrievedAt: 't1' }] } });
+  assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.evidence[0].source, source);
 });

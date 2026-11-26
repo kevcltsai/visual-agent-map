@@ -1234,6 +1234,7 @@ export const en = {
   "ui.ai_sources_label": "Sources",
   "ui.ai_sources_separator": ", ",
   "ui.ai_run_all": "Run all",
+  "ui.living_node_run_card": "Run card",
   "ui.ai_run_all_empty": "Add an AI card first",
   "ui.ai_run_all_stop": "Stop running all",
   "ui.ai_run_finished_0_1_2": "Run all finished: {0} done, {1} failed, {2} not run",

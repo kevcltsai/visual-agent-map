@@ -205,7 +205,8 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import type { ReferenceGroup } from "../../ai/reference-materials";
+import { livingCoordinator, runLivingRound } from "./living-node-runtime";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -312,7 +313,6 @@ import {
   researchTopicTask,
   synthesisDirectionsTask,
   synthesisGoalTask,
-  promptIntegrationTask,
   thinkingOriginDocumentBlock
 } from "./steps/fragments";
 import {
@@ -594,17 +594,11 @@ import {
   isAiCard,
   joinPrompt,
   splitPrompt,
-  planPromptRun,
   promptInputKey,
-  readPromptSources,
   promptSourceLinks,
-  runPromptItems,
   type AiCardStatus,
-  type AiRunRecord,
   type PromptBatchState,
   type PromptNoteRef,
-  type PromptPlan,
-  type PromptPlanItem,
   type PromptRunEntry
 } from "./prompt-run";
 import {
@@ -3685,6 +3679,7 @@ export class VisualAgentMapView extends ItemView {
     const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
+      this.stopPromptBatch();
       // Another map on this screen ends the old map's picture-book run, as closing the view does.
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
@@ -10396,6 +10391,13 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("settings-2")
           .onClick(() => this.whenEditing(() => this.openNodePanel(node, "structure")))
       );
+    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.living_node_run_card"))
+          .setIcon("play")
+          .onClick(() => this.whenEditing(() => this.startPromptRun([node.id])))
+      );
     if (this.canSetAiCard(node))
       menu.addItem(item =>
         item
@@ -10488,6 +10490,8 @@ export class VisualAgentMapView extends ItemView {
       this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
     });
     if (!bookLock.structure) add(t("ui.card_settings_menu"), "settings-2", () => this.openNodePanel(node, "structure"));
+    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
+      add(t("ui.living_node_run_card"), "play", () => this.startPromptRun([node.id]));
     if (this.canSetAiCard(node))
       add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
         this.openAiCardPopover(node)
@@ -19806,43 +19810,29 @@ export class VisualAgentMapView extends ItemView {
       !!this.map &&
       !this.notesLoading() &&
       !this.bookLock().ai &&
-      hasAiCard(this.map.nodes, id => this.promptNoteOf(id))
+      this.map.nodes.some(node => isAiCard(this.promptNoteOf(node.id)) && !this.promptNoteOf(node.id)?.aiLocked)
     );
-  }
-  /** Why the AI is busy on any card the plan would run (or a multi-select research runs): then nothing starts. */
-  private promptScopeBusy(plan: PromptPlan): boolean {
-    if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey())) return true;
-    return plan.order.some(item => {
-      const node = this.map?.nodes.find(candidate => candidate.id === item.id);
-      return (
-        !!node &&
-        (this.plugin.topicRuns.isBusy(node.path) ||
-          this.plugin.quickExpandPending.has(node.path) ||
-          this.plugin.topicRuns.hasTask(node.path))
-      );
-    });
   }
   private promptRunning(): boolean {
     return !!this.promptBatch && !this.promptBatch.outcome;
   }
-  /** "Run all": the whole map, straight to the usage notice (no confirmation card); nothing is written before it. */
-  startPromptRun(): void {
+  /** Both explicit commands share the same round, dependency plan and write fence. */
+  startPromptRun(requested?: readonly string[]): void {
     const map = this.map;
-    if (!map || !this.path || this.notesLoading() || this.bookLock().ai) return;
+    if (!map || !this.path || this.notesLoading() || this.bookLock().ai || this.presentation) return;
     if (this.promptRunning()) {
       new Notice(t("ui.prompt_run_already"));
       return;
     }
-    const plan = planPromptRun(map.nodes, id => this.promptNoteOf(id));
-    if (!plan.order.length) {
+    if (requested?.some(id => this.notes.get(id)?.aiLocked)) {
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
+    if (!this.canRunPrompts()) {
       new Notice(t("ui.prompt_run_nothing"));
       return;
     }
-    if (this.promptScopeBusy(plan)) {
-      new Notice(t("ui.prompt_run_busy"));
-      return;
-    }
-    void this.confirmPromptRun(plan);
+    void this.runLivingBatch(requested);
   }
   /** The Markdown notes a card's 資料來源 line resolves to, as the run would read them (at most 10). */
   private promptSourceFiles(id: string, prompt: string): TFile[] {
@@ -19866,39 +19856,6 @@ export class VisualAgentMapView extends ItemView {
       sources: this.promptSourceFiles(node.id, prompt).map(file => ({ path: file.path, mtime: file.stat.mtime }))
     });
   }
-  /** The usage notice of every model the batch will use (a refusal starts nothing and leaves no state), then the batch. */
-  private async confirmPromptRun(plan: PromptPlan): Promise<void> {
-    const map = this.map;
-    if (!map) return;
-    const models = [
-      ...new Set(
-        await Promise.all(
-          plan.order.map(async item => {
-            const node = map.nodes.find(candidate => candidate.id === item.id);
-            return node ? (await this.plugin.repo.resolveTopicModel(node.path, map)).model : this.currentModelId();
-          })
-        )
-      )
-    ];
-    const confirmEach = async (index: number, run: () => Promise<void>): Promise<boolean> =>
-      index >= models.length
-        ? (await run(), true)
-        : this.plugin.confirmAiUsage(models[index], async () => {
-            await confirmEach(index + 1, run);
-          });
-    await confirmEach(0, async () => {
-      if (this.closed || this.map !== map) return;
-      if (this.promptRunning()) {
-        new Notice(t("ui.prompt_run_already"));
-        return;
-      }
-      if (this.promptScopeBusy(plan)) {
-        new Notice(t("ui.prompt_run_busy"));
-        return;
-      }
-      await this.runPromptBatch(plan);
-    });
-  }
   private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
     let entries = this.promptRuns.get(mapPath);
     if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
@@ -19912,164 +19869,75 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   private promptRenderQueued = false;
-  /**
-   * One AI card of a batch: the research (a leaf, on the web) or the integration (its children's summaries, the Prompt as the
-   * direction). Returns the fingerprint of the inputs it read, for the record.
-   */
-  private async runPromptItem(
-    item: PromptPlanItem,
-    signal: AbortSignal,
-    languageSource: Pick<MapDocument, "title" | "outputLanguage"> | undefined,
-    gate: { shown: boolean }
-  ): Promise<string> {
-    const node = this.map?.nodes.find(candidate => candidate.id === item.id);
-    if (!node || !this.map) throw new Error(t("ui.note_missing"));
+  private async runLivingBatch(requested?: readonly string[]): Promise<void> {
     const map = this.map;
-    const note = await this.plugin.repo.readNote(node.path, map);
-    if (!note.prompt.trim()) throw new Error(t("ui.prompt_run_not_written"));
-    if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) throw new Error(t("ui.ai_locked_notice"));
-    // The children as they are now (an earlier card of this batch has just written its summary).
-    const childNotes = new Map<string, Note>();
-    for (const child of map.nodes.filter(candidate => candidate.parentId === node.id))
-      childNotes.set(child.id, await this.plugin.repo.readNote(child.path, map));
-    const inputKey = this.aiCardInputKey(node, note.prompt, child => childNotes.get(child.id)?.summary);
-    // Only the Markdown notes on the "資料來源：" line go in; a link that does not resolve, or a URL, is skipped.
-    const documents = await readPromptSources(note.prompt, async link => {
-      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-      return file instanceof TFile && file.extension.toLowerCase() === "md"
-        ? await readMarkdownFile(this.app, file)
-        : null;
-    });
-    const referenceGroups: ReferenceGroup[] = documents.length
-      ? [{ id: "prompt-sources", name: t("ui.prompt_run_sources_group"), location: "", documents }]
-      : [];
-    // "Keep old data" (the default) puts the new text on top of the old; unticked rewrites the note.
-    const updateMode: UpdateMode = note.aiUpdateMode === "fresh" ? "fresh" : "top";
-    if (item.kind === "research") {
-      await this.researchChild(
-        node,
-        signal,
-        () => {},
-        { ...aiModeOptions(noteAiMode("research"), "research"), referenceGroups, requirements: "", updateMode },
-        false,
-        undefined,
-        gate,
-        languageSource
-      );
-      return inputKey;
-    }
-    const outputLanguage = cardOutputLanguage(languageSource ?? map, this.plugin.settings.language, note.title);
-    let written = false;
-    let failure: string | undefined;
-    await this.integrateChildren(
-      node,
-      {
-        researchMode: "local",
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        synthesisContent: "summary",
-        skipCharts: true,
-        referenceGroups,
-        signal,
-        outputLanguage,
-        updateMode
-      },
-      promptIntegrationTask(outputLanguage, note.prompt),
-      async (_result, write, summary, detail) => {
-        await write(summary, detail);
-        written = true;
-      },
-      message => {
-        failure = message;
-      }
-    );
-    if (!written) throw new Error(failure ?? t("ui.prompt_run_not_written"));
-    return inputKey;
-  }
-  private async runPromptBatch(plan: PromptPlan): Promise<void> {
-    const map = this.map;
+    if (!map || !this.path) return;
     const mapPath = this.path;
-    if (!map || !mapPath) return;
-    const mapId = map.id;
+    const session = this.captureMapSession();
     const controller = new AbortController();
-    const state: PromptBatchState = { mapPath, controller, total: plan.order.length, finished: 0 };
+    const state: PromptBatchState = { mapPath, controller, total: 0, finished: 0 };
     this.promptBatch = state;
-    // The last batch's marks end here: a card this batch has not reached yet shows its own state, not the old done/blocked.
-    this.promptRuns.delete(mapPath);
-    const notes = new Map(this.notes);
-    const noteOf = (id: string): PromptNoteRef | undefined => {
-      const note = notes.get(id);
-      return note
-        ? {
-            prompt: note.prompt,
-            ...(note.aiCard ? { aiCard: true } : {}),
-            ...(note.aiLocked ? { aiLocked: true } : {})
-          }
-        : undefined;
-    };
-    const languageSource = this.batchLanguageSource();
-    const gate = { shown: false };
-    const here = (): boolean => !this.closed && this.path === mapPath && this.map?.id === mapId;
-    // The record goes in the note only while the batch still stands: Stop or a closed view writes nothing.
-    const stamps: Promise<void>[] = [];
-    const stamp = (id: string, result: AiRunRecord["result"], input?: string): void => {
-      const node = map.nodes.find(candidate => candidate.id === id);
-      if (!node || controller.signal.aborted || !here()) return;
-      stamps.push(
-        this.plugin.repo
-          .writeAiRunStamp(node.path, {
-            at: new Date().toISOString(),
-            result,
-            ...(input !== undefined ? { input } : {})
-          })
-          .catch(() => undefined)
-      );
-    };
-    const started = new Set<string>();
+    const failureReasons = new Map<string, string>();
+    const current = (): boolean => session() && !this.plugin.repo.isDisposed() && !controller.signal.aborted;
     try {
-      const outcome = await runPromptItems(plan.order, {
-        nodes: map.nodes,
-        noteOf,
+      const result = await runLivingRound({
+        app: this.app,
+        repo: this.plugin.repo,
+        calls: this.plugin.aiCalls,
+        coordinator: livingCoordinator(this.plugin),
+        mapPath,
+        viewSession: randomUUID(),
         signal: controller.signal,
-        isBad: id => this.promptRuns.get(mapPath)?.get(id)?.status === "blocked",
-        setStatus: (id, status, reason) => {
-          this.setPromptStatus(mapPath, id, status, reason);
-          if (status === "running") started.add(id);
-          // Held back by a child (never started): the record says so; a card that ran and failed is recorded by its own run.
-          else if (status === "blocked" && !started.has(id)) stamp(id, "blocked");
+        current,
+        busy: path =>
+          this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
+          this.plugin.topicRuns.isBusy(path) ||
+          this.plugin.quickExpandPending.has(path) ||
+          this.plugin.topicRuns.hasTask(path),
+        language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+        mapSources: signal => this.readMapSourceGroups(signal),
+        confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
+        onStart: total => {
+          state.total = total;
+          this.promptRuns.delete(mapPath);
+          if (current()) this.render();
         },
-        titleOf: id => notes.get(id)?.title ?? id,
-        blockedReason: titles => t("ui.ai_card_blocked_0", titles),
-        onStart: (id, finished) => {
-          state.finished = finished;
-          state.current = notes.get(id)?.title ?? id;
+        onRunning: id => {
+          state.current = this.notes.get(id)?.title ?? id;
+          this.setPromptStatus(mapPath, id, "running");
         },
-        runItem: async item => {
-          // The view closed or the map changed under the batch: stop before any further call.
-          if (!here()) {
-            controller.abort();
-            return;
-          }
-          let input: string;
-          try {
-            input = await this.runPromptItem(item, controller.signal, languageSource, gate);
-          } catch (error) {
-            stamp(item.id, "failed");
-            throw error;
-          }
-          stamp(item.id, "ok", input);
+        onSettled: (id, result) => {
+          state.finished = Math.min(state.total, state.finished + 1);
+          const status =
+            result === "changed" || result === "no-change" || result === "reused"
+              ? "done"
+              : result === "failed" || result === "blocked"
+                ? "blocked"
+                : "idle";
+          this.setPromptStatus(mapPath, id, status, failureReasons.get(id));
+        },
+        onFailure: (id, error) => {
+          failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
         }
-      });
+      }, requested);
+      const values = [...(result?.values() ?? [])];
+      const outcome = {
+        done: values.filter(value => value === "changed" || value === "no-change" || value === "reused").length,
+        failed: values.filter(value => value === "failed").length,
+        blocked: values.filter(value => value === "blocked").length,
+        stopped: controller.signal.aborted
+      };
       state.outcome = outcome;
-      state.finished = outcome.done + outcome.failed + outcome.blocked;
-      // Silent when everything ran; only a failure, a held-back card or a Stop is told.
-      if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
-      else if (outcome.failed || outcome.blocked)
-        new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
+      if (session()) {
+        if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
+        else if (outcome.failed || outcome.blocked)
+          new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
+      }
+    } catch (error) {
+      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
     } finally {
       state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
-      await Promise.all(stamps);
-      if (!this.closed) {
+      if (session()) {
         await this.hydrate();
         this.render();
       }

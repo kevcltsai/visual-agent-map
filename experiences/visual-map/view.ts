@@ -22087,6 +22087,7 @@ export class VisualAgentMapView extends ItemView {
         markers: this.notes.get(node.id)?.markers,
         styles: this.notes.get(node.id)?.style,
         ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
+        ...(this.notes.get(node.id)?.aiCard ? { aiCard: true } : {}),
         ...failureOf(node.id)
       };
     });
@@ -22121,6 +22122,10 @@ export class VisualAgentMapView extends ItemView {
             title: titleOf(node),
             summary: summaryOf(id),
             detail: freshDetail.get(id) ?? this.notes.get(id)?.detail ?? "",
+            ...(this.notes.get(id)?.aiCard ? {
+              livingPrompt: this.notes.get(id)?.prompt,
+              livingConfigRevision: this.notes.get(id)?.livingNode?.configRevision
+            } : {}),
             path: node.path,
             ...failureOf(id)
           }
@@ -22682,6 +22687,8 @@ export class VisualAgentMapView extends ItemView {
         return action.parentId
           ? t("ui.map_chat_do_add_child_0", action.title)
           : t("ui.map_chat_do_add_root_0", action.title);
+      case "configure_ai_card":
+        return t("ui.living_node_chat_configure_0", title(action.nodeId));
       case "rename_topic":
         return t("ui.map_chat_do_rename_0", action.title);
       case "update_summary":
@@ -22765,6 +22772,10 @@ export class VisualAgentMapView extends ItemView {
           : t("ui.map_chat_do_appearance_many_0", action.nodeIds.length);
       case "run_map_action":
         switch (action.action) {
+          case "run_living_card":
+            return t("ui.living_node_run_card") + ": " + action.nodeIds.map(title).join(", ");
+          case "run_living_all":
+            return t("ui.ai_run_all");
           case "research_standard":
             return (
               t(
@@ -23689,6 +23700,7 @@ export class VisualAgentMapView extends ItemView {
       if (node) paths.push(node.path);
     };
     switch (action.kind) {
+      case "configure_ai_card":
       case "rename_topic":
       case "update_summary":
       case "edit_topic_note":
@@ -24072,6 +24084,25 @@ export class VisualAgentMapView extends ItemView {
     if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
       return skipped("ui.ai_locked_notice");
     switch (action.action) {
+      case "run_living_card":
+      case "run_living_all": {
+        if (work?.controller.signal.aborted) return skipped("ui.map_chat_skip_stopped");
+        if (this.promptRunning()) return skipped("ui.prompt_run_already");
+        if (this.notesLoading() || this.bookLock().ai || this.presentation) return skipped("ui.map_chat_skip_unavailable");
+        const fresh = await this.freshNotesOf(action.action === "run_living_all" ? map.nodes.map(node => node.id) : targets);
+        if (this.map?.id !== map.id || work?.controller.signal.aborted) return skipped("ui.map_chat_skip_map_changed");
+        const ids = action.action === "run_living_all" ? [...fresh.keys()] : targets;
+        if (action.action === "run_living_card" && (ids.length !== action.nodeIds.length || ids.some(id => !isAiCard(fresh.get(id)))))
+          return skipped("ui.map_chat_skip_unavailable");
+        if (action.action === "run_living_card" && ids.some(id => fresh.get(id)?.aiLocked))
+          return skipped("ui.ai_locked_notice");
+        if (!ids.some(id => isAiCard(fresh.get(id)) && !fresh.get(id)?.aiLocked))
+          return skipped("ui.prompt_run_nothing");
+        // Formal Run Card / Run All use the identical planner and per-model usage confirmation.
+        if (this.promptRunning()) return skipped("ui.prompt_run_already");
+        await this.runLivingBatch(action.action === "run_living_all" ? undefined : ids);
+        return { status: "done" };
+      }
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
         else if (!this.selection.state.multiSelectMode && this.aiTargets?.length) this.chatSelect(this.chatTargetIds());

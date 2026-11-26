@@ -3655,7 +3655,7 @@ export class VisualAgentMapView extends ItemView {
           signal: new AbortController().signal,
           current: alive,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readMapSourceGroups(signal)
+          mapSources: signal => this.readLivingMapSourceReport(signal)
         });
         if (alive()) this.livingValidity = validity;
       } catch {
@@ -14979,20 +14979,29 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     const mapId = this.map?.id;
     return {
-      mapSources: async signal => {
-        const sources = await this.plugin.repo.readMapSources(mapPath);
-        const external = { sources: loadExternalSources(this.app, mapId), scope: this.externalScope() };
-        if (!sources.length && !external.sources.length) return [];
-        const { groups } = await resolveMapSources(
-          { app: this.app, readMap: path => this.plugin.repo.readMap(path), external },
-          sources,
-          mapPath,
-          signal
-        );
-        // Every group, vault notes included, may quote a registered external root: none leaves this exit with it.
-        const roots = await externalScrubRoots(external.sources);
-        return roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups;
-      }
+      mapSources: async signal => (await this.readLivingMapSourceReport(signal, mapPath, mapId)).groups
+    };
+  }
+  /** Same authorization and scrubbing as the existing task-source exit, with
+   * optional failures retained for Living Node rather than hidden from users. */
+  private async readLivingMapSourceReport(
+    signal: AbortSignal,
+    mapPath = this.path,
+    mapId = this.map?.id
+  ): Promise<{ groups: ReferenceGroup[]; unavailable: number }> {
+    const sources = await this.plugin.repo.readMapSources(mapPath);
+    const external = { sources: loadExternalSources(this.app, mapId), scope: this.externalScope() };
+    if (!sources.length && !external.sources.length) return { groups: [], unavailable: 0 };
+    const { groups, unreadable, externalUnreadable } = await resolveMapSources(
+      { app: this.app, readMap: path => this.plugin.repo.readMap(path), external },
+      sources,
+      mapPath,
+      signal
+    );
+    const roots = await externalScrubRoots(external.sources);
+    return {
+      groups: roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups,
+      unavailable: unreadable.length + externalUnreadable.length
     };
   }
   /**
@@ -15391,7 +15400,7 @@ export class VisualAgentMapView extends ItemView {
                   signal: attempt.signal,
                   current: currentTrial,
                   language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
-                  mapSources: signal => this.readMapSourceGroups(signal)
+                  mapSources: signal => this.readLivingMapSourceReport(signal)
                 }, node.id, promptOf(values));
                 let ready = false;
                 await this.plugin.confirmAiUsage(prepared.model, async () => {
@@ -15406,7 +15415,9 @@ export class VisualAgentMapView extends ItemView {
                 }
                 this.aiCardOpen.adoption = prepared.adoption;
                 const warnings = prepared.warnings.map(warning => t(
-                  warning === "upstream-stale" ? "ui.living_node_trial_stale_sources" : "ui.living_node_trial_frozen_sources"
+                  warning === "upstream-stale" ? "ui.living_node_trial_stale_sources" :
+                  warning === "frozen-source" ? "ui.living_node_trial_frozen_sources" :
+                  "ui.living_node_optional_source_unavailable"
                 ));
                 const shown = await this.plugin.showLivingTrial(
                   this.plugin.repo.file(node.path), renderLivingPreview(trial.result), viewSession, currentTrial, warnings
@@ -20055,6 +20066,7 @@ export class VisualAgentMapView extends ItemView {
     const state: PromptBatchState = { mapPath, controller, total: 0, finished: 0 };
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
+    let warnedOptionalSources = false;
     const current = (): boolean => session() && !this.plugin.repo.isDisposed() && !controller.signal.aborted;
     try {
       const result = await runLivingRound({
@@ -20072,7 +20084,12 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.quickExpandPending.has(path) ||
           this.plugin.topicRuns.hasTask(path),
         language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-        mapSources: signal => this.readMapSourceGroups(signal),
+        mapSources: signal => this.readLivingMapSourceReport(signal),
+        onOptionalSourcesUnavailable: () => {
+          if (!current() || warnedOptionalSources) return;
+          warnedOptionalSources = true;
+          new Notice(t("ui.living_node_optional_source_unavailable"));
+        },
         confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
         onStart: total => {
           state.total = total;

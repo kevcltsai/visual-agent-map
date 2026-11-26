@@ -20057,12 +20057,14 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   private promptRenderQueued = false;
-  private async runLivingBatch(requested?: readonly string[]): Promise<void> {
+  private async runLivingBatch(requested?: readonly string[], stop?: AbortSignal): Promise<PromptBatchState["outcome"]> {
     const map = this.map;
-    if (!map || !this.path) return;
+    if (!map || !this.path || stop?.aborted || this.promptRunning()) return undefined;
     const mapPath = this.path;
     const session = this.captureMapSession();
     const controller = new AbortController();
+    const stopRound = (): void => controller.abort();
+    stop?.addEventListener("abort", stopRound, { once: true });
     const state: PromptBatchState = { mapPath, controller, total: 0, finished: 0 };
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
@@ -20131,12 +20133,14 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
     } finally {
+      stop?.removeEventListener("abort", stopRound);
       state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
       if (session()) {
         await this.hydrate();
         this.render();
       }
     }
+    return state.outcome;
   }
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;
@@ -22688,7 +22692,7 @@ export class VisualAgentMapView extends ItemView {
           ? t("ui.map_chat_do_add_child_0", action.title)
           : t("ui.map_chat_do_add_root_0", action.title);
       case "configure_ai_card":
-        return t("ui.living_node_chat_configure_0", title(action.nodeId));
+        return t("ui.living_node_chat_configure_0", title(action.nodeId)) + "\n" + action.content;
       case "rename_topic":
         return t("ui.map_chat_do_rename_0", action.title);
       case "update_summary":
@@ -24100,8 +24104,11 @@ export class VisualAgentMapView extends ItemView {
           return skipped("ui.prompt_run_nothing");
         // Formal Run Card / Run All use the identical planner and per-model usage confirmation.
         if (this.promptRunning()) return skipped("ui.prompt_run_already");
-        await this.runLivingBatch(action.action === "run_living_all" ? undefined : ids);
-        return { status: "done" };
+        const outcome = await this.runLivingBatch(action.action === "run_living_all" ? undefined : ids, work?.controller.signal);
+        if (!outcome || outcome.stopped) return skipped("ui.map_chat_skip_stopped");
+        if (outcome.failed || outcome.blocked)
+          return { status: "failed", reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked) };
+        return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
       }
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);

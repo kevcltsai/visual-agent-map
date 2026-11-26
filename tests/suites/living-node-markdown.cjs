@@ -338,6 +338,19 @@ S.integrationTest('Living Node config: invalidated editor or chat lease refuses 
   assert.deepEqual(f.calls, []);
 });
 
+S.integrationTest('Living Node config: revision includes persisted references even if prompt text is unchanged', async () => {
+  const f = await roundFixture();
+  const saved = await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read child\n\nSources: [[child]]');
+  await f.app.vault.process(f.files.get('parent.md'), text => text.replace('card:child', 'card:ordinary'));
+  const edited = f.contents.get('parent.md');
+  await assert.rejects(
+    () => saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Updated prompt', 'Read child\n\nSources: [[child]]', saved.configRevision),
+    /changed-configuration/
+  );
+  assert.equal(f.contents.get('parent.md'), edited);
+  assert.deepEqual(f.calls, []);
+});
+
 S.integrationTest('Living Node ownership: protect an edited output and append an unrelated observation without restoring deleted text', async () => {
   const f = await setup();
   const first = request(f, { proposal: { baseRevision: 'empty', operations: [

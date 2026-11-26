@@ -23508,6 +23508,8 @@ export class VisualAgentMapView extends ItemView {
       .filter((id): id is string => !!id);
     // A target list that lost all its entries must not turn into "the current selection".
     if (action.nodeIds.length && !ids.length) return null;
+    if (action.kind === "run_map_action" && action.action === "run_living_card" && ids.length !== action.nodeIds.length)
+      return null;
     return { action: { ...action, nodeIds: ids } };
   }
   /** create_map: makes the map, opens it (the conversation goes along) and moves the anchor to it. */

@@ -4,6 +4,13 @@
 
 ## [0.36.0] - 2026-11-26
 
+### Adjust a picture book by talking
+
+On a picture book's start card, tell the chief editor "make it shorter and for kids": it rewrites the suggested settings and marks what it changed.
+
+- Undo one turn at a time; your own edits stay.
+- A Book settings button on the progress bar shows the settings while the book is being made.
+
 ### Removed
 
 - Coffee Tables (talking an unfinished idea through with AI guests) is gone, so the plugin file is smaller (about 3.8 MB instead of 4.3 MB). Its button, its command and its side outline no longer exist.
@@ -17,7 +24,7 @@
 
 ### Fixes
 
-- Renaming a map with relative picture links no longer stops at the "Update links" question, the stylesheet passes the Obsidian plugin review, and the usage panel marks incomplete token counts as not exact.
+- Renaming a map with relative picture links no longer stops at the "Update links" question, a rerun chapter card keeps its written look, the stylesheet drops two rules the Obsidian review flagged, and the usage panel marks incomplete token counts.
 
 ## [0.35.1] - 2026-11-25
 

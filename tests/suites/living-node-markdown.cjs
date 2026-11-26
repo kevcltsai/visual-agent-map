@@ -600,3 +600,23 @@ S.integrationTest('Living Node configuration authorizes the actual resolved sour
   assert.equal(f.contents.get('parent.md'), before);
   assert.deepEqual(f.calls, []);
 });
+
+S.integrationTest('Living Node configuration redo refuses a display alias that resolves to a different source', async () => {
+  const f = await roundFixture();
+  const prompt = 'Read a source\n\nSources: [[alias]]';
+  const original = f.contents.get('parent.md');
+  let target = 'child.md';
+  const lookup = f.app.metadataCache.getFirstLinkpathDest;
+  f.app.metadataCache.getFirstLinkpathDest = (link, from) =>
+    link === 'alias' ? f.files.get(target) : lookup(link, from);
+  const saved = await saveLivingConfig(f.app, f.repo, f.map, 'parent', prompt);
+  await f.app.vault.process(f.files.get('parent.md'), () => original);
+  target = 'ordinary.md';
+  await assert.rejects(
+    () => saveLivingConfig(f.app, f.repo, f.map, 'parent', prompt, undefined, undefined,
+      () => true, undefined, saved.sourceRevision),
+    /changed-source-identity/
+  );
+  assert.equal(f.contents.get('parent.md'), original);
+  assert.deepEqual(f.calls, []);
+});

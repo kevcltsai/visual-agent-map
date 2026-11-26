@@ -103,7 +103,8 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline",
-  map_source: "ui.map_chat_guard_map_source"
+  map_source: "ui.map_chat_guard_map_source",
+  living_node_protected: "ui.living_node_use_run_card"
 };
 export const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
@@ -345,6 +346,8 @@ export class ChatActionWriter {
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
+        if (action.kind !== "rename_topic" && this.notes.get(node.id)?.aiCard === true)
+          return skipped("ui.living_node_use_run_card");
         run.notes?.add(node.id);
         await this.ports.noteChange(
           node,

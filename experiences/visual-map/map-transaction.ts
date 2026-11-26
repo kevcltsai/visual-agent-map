@@ -54,6 +54,8 @@ export interface TransactionDeps {
    * throwing refuses the step with nothing written. The one place a caller can keep a set of notes read-only.
    */
   guardPath?: (path: string) => void;
+  /** Validate the final dependency graph before the first publication of an edit. A refusal uses normal transaction rollback. */
+  validateStructure?: (before: MapDocument, after: MapDocument) => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
   onApplied: (mapPath: string, map: MapDocument) => void | Promise<void>;
   /** Called for each edited map before anything is written; throwing cancels the whole transaction. */
@@ -889,6 +891,7 @@ export function begin(deps: TransactionDeps): Transaction {
             for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
             // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
             pruneAfterText(after);
+            await deps.validateStructure?.(before, after);
             records.push({ mapPath, before, after });
             for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
             if (ownership(before) !== ownership(after)) rebuildNeeded = true;

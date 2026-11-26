@@ -1237,6 +1237,7 @@ export const en = {
   "ui.ai_run_all": "Run all",
   "ui.living_node_run_card": "Run card",
   "ui.living_node_chat_configure_0": "Configure AI card: {0}",
+  "ui.living_node_chat_plan_confirm": "Review the saved AI-card configuration and execution targets before applying.",
   "ui.living_node_chat_existing_only": "Chat may configure a newly created card or an existing AI card only; convert ordinary cards yourself.",
   "ui.living_node_chat_source_refused": "This source was not authorized for the chat configuration.",
   "ui.living_node_last_success": "Last successful check",

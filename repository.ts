@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { parentPath, baseName } from "./core/repository-paths";
 import {
   moveTopicsWithRollback,
@@ -270,6 +271,9 @@ const VAULT_WRITES = new Set([
 ]);
 const FILE_MANAGER_WRITES = new Set(["renameFile", "trashFile", "processFrontMatter"]);
 
+/** Transaction-local guard, evaluated on the actual preimage inside Vault.process. */
+export type NoteWriteGuard = (file: TFile, current: string, change: (content: string) => string) => string;
+
 /** A view of `target` whose write methods throw once `disposed()` is true; reads and everything else pass through. */
 function guardWrites<T extends object>(
   target: T,
@@ -277,7 +281,8 @@ function guardWrites<T extends object>(
   disposed: () => boolean,
   message: () => string,
   recovery?: VaultWriteRecovery,
-  recoveryErrors?: { conflict: () => Error; backup: () => Error }
+  recoveryErrors?: { conflict: () => Error; backup: () => Error },
+  noteGuard?: () => NoteWriteGuard | undefined
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -287,6 +292,14 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            if (property === "process" && args[0] instanceof TFile && typeof args[1] === "function") {
+              const guard = noteGuard?.();
+              if (guard) {
+                const file = args[0];
+                const change = args[1] as (content: string) => string;
+                args[1] = (current: string) => guard(file, current, change);
+              }
+            }
             if (
               property === "process" &&
               recovery &&
@@ -331,6 +344,7 @@ export class Repository {
   readonly app: App;
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
   private disposed = false;
+  private readonly noteWriteScope = new AsyncLocalStorage<NoteWriteGuard>();
   /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
   private readonly writtenCoordinates = new Map<string, string>();
 
@@ -345,15 +359,21 @@ export class Repository {
       conflict: () => new Error(this.message("error.recovery_write_conflict")),
       backup: () => new Error(this.message("error.recovery_backup_failed"))
     };
+    const noteGuard = (): NoteWriteGuard | undefined => this.noteWriteScope.getStore();
     this.app = new Proxy(app, {
       get(object, property) {
         const value = Reflect.get(object, property, object) as unknown;
         if (property === "vault")
-          return guardWrites(value as object, VAULT_WRITES, stopped, message, recovery, recoveryErrors);
+          return guardWrites(value as object, VAULT_WRITES, stopped, message, recovery, recoveryErrors, noteGuard);
         if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
         return value;
       }
     });
+  }
+
+  /** Restrict the guard to this async operation; unrelated concurrent writers do not inherit it. */
+  withNoteWriteGuard<T>(guard: NoteWriteGuard, action: () => Promise<T>): Promise<T> {
+    return this.noteWriteScope.run(guard, action);
   }
 
   /**

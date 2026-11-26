@@ -1,7 +1,8 @@
 import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
 import { pruneAfterText } from "./canvas-items";
-import type { Note, Repository, TopicState } from "../../repository";
+import type { NoteWriteGuard, Repository, TopicState } from "../../repository";
+import type { TFile } from "obsidian";
 import {
   attachmentPath,
   claim,
@@ -37,6 +38,7 @@ export interface TransactionDeps {
     | "exactFreePath"
     | "app"
     | "file"
+    | "withNoteWriteGuard"
   >;
   rebuildDerivedData: () => Promise<void>;
   /**
@@ -105,7 +107,7 @@ export interface Transaction {
   /**
    * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
    * before any move; undo writes the original text back after the moves; redo runs `write` again before the moves.
-   * Undo and redo refuse (`guard`) when title, summary, detail or status differ from what this step left or found.
+   * Undo and redo refuse (`guard`) when the note differs from what this step left or found, including user-owned fields.
    * `settle` runs on the note once the moves are done (their link rewrites are in it): at commit before what this step left
    * is recorded, and again at redo, so a redone note is the text undo expects.
    */
@@ -158,8 +160,7 @@ interface Journal {
   /** `lost`: the file left `from` but its new path is unknown, so it cannot be put back. */
   files: Array<FileStep & { moved: boolean; lifecycleSet: boolean; lost?: boolean }>;
   maps: Array<{ mapPath: string; restore: MapDocument; after: MapDocument }>;
-  /** `restore`: the whole note text read before the write in that direction. */
-  notes: Array<{ path: string; restore: string; written: boolean }>;
+  notes: NoteWriteJournal;
   /** Files this step stored (created or reused); the created ones are trashed last when the step fails. */
   attachments?: AttachmentRecord[];
 }
@@ -215,17 +216,18 @@ const baseNameOf = (path: string): string => path.slice(path.lastIndexOf("/") + 
 const tagged = (error: Error, kind: TransactionErrorKind): TransactionError => Object.assign(error, { kind });
 
 // Note rewrite (ticket 04)
-const GUARD_FIELDS = ["title", "summary", "detail", "status"] as const;
-type NoteGuard = Pick<Note, (typeof GUARD_FIELDS)[number]>;
+const noteConflict = (): TransactionError => tagged(new Error(t("error.map_transaction_stale")), "guard");
+// Vault.read may omit a leading BOM, whereas Vault.process may supply it.
+const sameText = (a: string, b: string): boolean => a.replace(/^\uFEFF/, "") === b.replace(/^\uFEFF/, "");
 interface NoteOp {
   path: string;
   write: (path: string, attachment: AttachmentPath) => Promise<void>;
   settle?: (path: string) => Promise<void>;
 }
 interface NoteRecord extends NoteOp {
-  guardBefore: NoteGuard;
-  guardAfter: NoteGuard;
   beforeText: string;
+  beforeExpected: string;
+  afterExpected: string;
 }
 /** One note write inside `run`: `apply` does it, `restore` is the text to put back if the step fails. */
 interface NoteStep {
@@ -233,19 +235,95 @@ interface NoteStep {
   restore: string;
   apply: () => Promise<void>;
 }
-const guardOf = (note: Note): NoteGuard => ({
-  title: note.title,
-  summary: note.summary,
-  detail: note.detail,
-  status: note.status
-});
-const sameGuard = (a: NoteGuard, b: NoteGuard): boolean =>
-  GUARD_FIELDS.every(field => JSON.stringify(a[field]) === JSON.stringify(b[field]));
-const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
+ const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
   repo.app.vault.read(repo.file(path));
 const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, text: string): Promise<void> => {
-  await repo.app.vault.process(repo.file(path), () => text);
+  await repo.app.vault.process(repo.file(path), current =>
+    current.startsWith("\uFEFF") && !text.startsWith("\uFEFF") ? "\uFEFF" + text : text
+  );
 };
+
+interface NoteWriteEntry {
+  path: string;
+  file: TFile;
+  before: string;
+  expected: string;
+  changed: boolean;
+  conflict: boolean;
+}
+
+/** Track the transaction's own writes, including link rewrites caused by its moves, not a later read of their effects. */
+class NoteWriteJournal {
+  private readonly entries = new Map<TFile, NoteWriteEntry>();
+  private reverting = false;
+  private active = true;
+
+  constructor(
+    private readonly repo: TransactionDeps["repo"],
+    snapshots: readonly { path: string; restore: string }[]
+  ) {
+    for (const { path, restore } of snapshots) {
+      const file = repo.file(path);
+      if (!this.entries.has(file))
+        this.entries.set(file, { path, file, before: restore, expected: restore, changed: false, conflict: false });
+    }
+  }
+
+  private readonly guard: NoteWriteGuard = (file, current, change) => {
+    const entry = this.entries.get(file);
+    if (!entry || !this.active) return change(current);
+    if (!sameText(current, entry.expected)) {
+      entry.conflict = true;
+      if (!this.reverting) throw noteConflict();
+    }
+    // During rollback, independent link rewrites can still proceed. Never restore the whole note after a conflict.
+    if (!entry.changed && !entry.conflict) entry.before = current;
+    const next = change(current);
+    entry.changed ||= next !== current;
+    entry.expected = next;
+    return next;
+  };
+
+  async run<T>(action: () => Promise<T>): Promise<T> {
+    try {
+      return this.entries.size ? await this.repo.withNoteWriteGuard(this.guard, action) : await action();
+    } finally {
+      this.active = false;
+    }
+  }
+
+  /** Verify the tracked postimage rather than adopting any external changes that happened after the last write. */
+  async snapshots(): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    for (const entry of this.entries.values()) {
+      const current = await this.repo.app.vault.read(entry.file);
+      if (this.repo.app.vault.getAbstractFileByPath(entry.file.path) !== entry.file || !sameText(current, entry.expected))
+        throw noteConflict();
+      result.set(entry.path, entry.expected);
+    }
+    return result;
+  }
+
+  startRollback(): void {
+    this.reverting = true;
+  }
+
+  async restore(problems: unknown[]): Promise<void> {
+    for (const entry of [...this.entries.values()].reverse()) {
+      if (!entry.changed) continue;
+      try {
+        if (this.repo.app.vault.getAbstractFileByPath(entry.path) !== entry.file) throw noteConflict();
+        await this.repo.app.vault.process(entry.file, current => {
+          if (sameText(current, entry.before)) return current;
+          if (entry.conflict || !sameText(current, entry.expected)) throw noteConflict();
+          return entry.before;
+        });
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
+  }
+}
 
 export function begin(deps: TransactionDeps): Transaction {
   const { repo } = deps;
@@ -282,43 +360,43 @@ export function begin(deps: TransactionDeps): Transaction {
     rebuild: boolean,
     notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] },
     refresh: string[] = []
-  ): Promise<void> {
-    const journal: Journal = { files: [], maps: [], notes: [] };
-    const rewrite = async (step: NoteStep): Promise<void> => {
-      journal.notes.push({ path: step.path, restore: step.restore, written: true });
-      await step.apply();
-    };
-    try {
-      for (const step of notes.before) await rewrite(step);
-      for (const step of files) {
-        const entry = { ...step, moved: false, lifecycleSet: false };
-        journal.files.push(entry);
-        try {
-          await repo.moveExact(step.from, step.to);
-        } catch (problem) {
-          // The move relocates first and rewrites links after; a throw in between leaves the file at `to` (known empty before).
-          if (!exists(step.from) && exists(step.to)) entry.moved = true;
-          throw problem;
+  ): Promise<Map<string, string>> {
+    const journal: Journal = { files: [], maps: [], notes: new NoteWriteJournal(repo, [...notes.before, ...notes.after]) };
+    return journal.notes.run(async () => {
+      try {
+        for (const step of notes.before) await step.apply();
+        for (const step of files) {
+          const entry = { ...step, moved: false, lifecycleSet: false };
+          journal.files.push(entry);
+          try {
+            await repo.moveExact(step.from, step.to);
+          } catch (problem) {
+            // The move relocates first and rewrites links after; a throw in between leaves the file at `to` (known empty before).
+            if (!exists(step.from) && exists(step.to)) entry.moved = true;
+            throw problem;
+          }
+          entry.moved = true;
+          if (step.lifecycle) {
+            entry.lifecycleSet = true;
+            await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
+          }
         }
-        entry.moved = true;
-        if (step.lifecycle) {
-          entry.lifecycleSet = true;
-          await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
+        for (const step of notes.after) await step.apply();
+        for (const item of maps) {
+          await repo.saveMap(item.mapPath, clone(item.write), {
+            authorize: current => requireMapSnapshot(current, item.restore),
+            preserveViewport: item.preserveViewport,
+            recordWrite: (before, after) => journal.maps.push({ mapPath: item.mapPath, restore: before, after })
+          });
         }
+        await derive(rebuild, refresh);
+        const snapshots = await journal.notes.snapshots();
+        for (const item of journal.maps) await deps.onApplied(item.mapPath, clone(item.after));
+        return snapshots;
+      } catch (error) {
+        return revert(journal, rebuild, error, refresh);
       }
-      for (const step of notes.after) await rewrite(step);
-      for (const item of maps) {
-        await repo.saveMap(item.mapPath, clone(item.write), {
-          authorize: current => requireMapSnapshot(current, item.restore),
-          preserveViewport: item.preserveViewport,
-          recordWrite: (before, after) => journal.maps.push({ mapPath: item.mapPath, restore: before, after })
-        });
-      }
-      await derive(rebuild, refresh);
-      for (const item of journal.maps) await deps.onApplied(item.mapPath, clone(item.after));
-    } catch (error) {
-      await revert(journal, rebuild, error, refresh);
-    }
+    });
   }
 
   /** The full rebuild when the step needs one, else a refresh of just the notes whose relation lines changed. */
@@ -329,6 +407,7 @@ export function begin(deps: TransactionDeps): Transaction {
 
   async function revert(journal: Journal, rebuild: boolean, error: unknown, refresh: string[] = []): Promise<never> {
     const problems: unknown[] = [];
+    journal.notes.startRollback();
     for (const item of [...journal.maps].reverse()) {
       try {
         const current = await repo.readMap(item.mapPath);
@@ -362,14 +441,7 @@ export function begin(deps: TransactionDeps): Transaction {
         }
       }
     }
-    for (const item of [...journal.notes].reverse()) {
-      if (!item.written) continue;
-      try {
-        if ((await readText(repo, item.path)) !== item.restore) await writeText(repo, item.path, item.restore);
-      } catch (problem) {
-        problems.push(problem);
-      }
-    }
+    await journal.notes.restore(problems);
     if (rebuild && (journal.files.length > 0 || journal.maps.length > 0)) {
       try {
         await deps.rebuildDerivedData();
@@ -436,14 +508,17 @@ export function begin(deps: TransactionDeps): Transaction {
       }
     };
     // Checked before `stale`: a note edited outside is a `guard` refusal even when files also moved.
-    const guarded = async (direction: "undo" | "redo"): Promise<void> => {
+    const guarded = async (direction: "undo" | "redo"): Promise<Map<string, string>> => {
+      const snapshots = new Map<string, string>();
       for (const note of noteRecords) {
         const at = noteAt(ops, note.path, direction);
         if (!exists(at)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
-        const expected = direction === "undo" ? note.guardAfter : note.guardBefore;
-        if (!sameGuard(guardOf(await repo.readNote(at)), expected))
-          throw tagged(new Error(t("error.map_transaction_stale")), "guard");
+        const expected = direction === "undo" ? note.afterExpected : note.beforeExpected;
+        const current = await readText(repo, at);
+        if (!sameText(current, expected)) throw noteConflict();
+        snapshots.set(at, current);
       }
+      return snapshots;
     };
     const stale = async (direction: "undo" | "redo"): Promise<Map<string, MapDocument>> => {
       const snapshots = new Map<string, MapDocument>();
@@ -476,7 +551,7 @@ export function begin(deps: TransactionDeps): Transaction {
     const refresh = [...new Set(records.flatMap(record => relationNotePaths(record.before, record.after)))];
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
       if (direction === "undo") choosePark();
-      await guarded(direction);
+      const noteSnapshots = await guarded(direction);
       const snapshots = await stale(direction);
       const files: FileStep[] = sequence(direction).map(op =>
         toward(op, direction)
@@ -497,7 +572,7 @@ export function begin(deps: TransactionDeps): Transaction {
       const notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] };
       for (const note of noteRecords) {
         const at = noteAt(ops, note.path, direction),
-          restore = await readText(repo, at);
+          restore = noteSnapshots.get(at)!;
         // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
         // A rename-back puts the note at `note.path` first, but a failed step finds it at `at` again.
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
@@ -509,7 +584,12 @@ export function begin(deps: TransactionDeps): Transaction {
             notes.after.push({ path: note.path, restore, apply: () => settle(noteAt(ops, note.path, "undo")) });
         }
       }
-      await run(files, maps, rebuild, notes, refresh);
+      const after = await run(files, maps, rebuild, notes, refresh);
+      for (const note of noteRecords) {
+        const text = after.get(noteAt(ops, note.path, direction))!;
+        if (undoing) note.beforeExpected = text;
+        else note.afterExpected = text;
+      }
     };
     return {
       undo: () => apply("undo"),
@@ -622,107 +702,107 @@ export function begin(deps: TransactionDeps): Transaction {
       const rebuildRequested = !options.deferRebuild;
       const noteRecords: NoteRecord[] = [];
       for (const note of noteOps) {
-        const before = guardOf(await repo.readNote(note.path));
-        noteRecords.push({
-          ...note,
-          guardBefore: before,
-          guardAfter: before,
-          beforeText: await readText(repo, note.path)
-        });
+        const before = await readText(repo, note.path);
+        noteRecords.push({ ...note, beforeText: before, beforeExpected: before, afterExpected: before });
       }
-      const journal: Journal = { files: [], maps: [], notes: [], attachments: placed };
+      const journal: Journal = {
+        files: [],
+        maps: [],
+        notes: new NoteWriteJournal(repo, noteRecords.map(note => ({ path: note.path, restore: note.beforeText }))),
+        attachments: placed
+      };
       let rebuildNeeded = ops.length > 0;
       const records: MapRecord[] = [];
       // Ends of relations this step changed; refreshed even when the caller defers the full rebuild.
       const refresh: string[] = [];
       // Marks the files this step creates until commit settles, so a parallel step does not reuse one it may trash.
       const owner = {};
-      try {
-        await place(owner);
-        for (const note of noteRecords) {
-          journal.notes.push({ path: note.path, restore: note.beforeText, written: true });
-          await note.write(note.path, attachment);
-        }
-        for (const op of ops) {
-          if (op.kind !== "move") continue;
-          const entry = {
-            from: op.original,
-            to: "",
-            lifecycle: op.lifecycle,
-            restore: op.previous,
-            moved: false,
-            lifecycleSet: false,
-            lost: false
-          };
-          journal.files.push(entry);
-          try {
-            op.target = await repo.moveUnique(op.original, op.folder);
-          } catch (problem) {
-            // The new path is unknown (not guessed), so a file that already left its origin is a rollback problem.
-            if (!exists(op.original)) entry.lost = true;
-            throw problem;
-          }
-          entry.to = op.target;
-          entry.moved = true;
-          entry.lifecycleSet = true;
-          await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
-        }
-        // Names are settled last: a name another note of this step just left is free now. A taken name keeps the note's own.
-        for (const op of [...ops]) {
-          const title = wanted.get(op);
-          if (title === undefined) continue;
-          const to = repo.exactFreePath(op.original.slice(0, op.original.lastIndexOf("/")), title);
-          if (!to || to === op.original) {
-            if (op.kind === "rename") ops.splice(ops.indexOf(op), 1);
-            continue;
-          }
-          const entry = { from: op.original, to, moved: false, lifecycleSet: false };
-          journal.files.push(entry);
-          try {
-            await repo.moveExact(op.original, to);
-          } catch (problem) {
-            // The move relocates first and rewrites links after; a throw in between leaves the file at `to`.
-            if (!exists(op.original) && exists(to)) entry.moved = true;
-            throw problem;
-          }
-          entry.moved = true;
-          if (op.kind === "create") op.original = to;
-          else op.target = to;
-        }
-        for (const note of noteRecords) await note.settle?.(noteAt(ops, note.path, "undo"));
-        for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(noteAt(ops, note.path, "undo")));
-        const resolve = (originalPath: string): string => {
-          const found = started.get(originalPath);
-          if (!found) throw new Error(`Not a moved note: ${originalPath}`);
-          // A created or renamed note is at its settled name; a rename that found its name taken left the note where it was.
-          if (found.kind === "create") return found.original;
-          return found.kind === "rename" && !ops.includes(found) ? originalPath : found.target;
-        };
-        for (const mapPath of mapPaths) {
-          const before = befores.get(mapPath)!;
-          const after = clone(before);
-          for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
-          // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
-          pruneAfterText(after);
-          records.push({ mapPath, before, after });
-          for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
-          if (ownership(before) !== ownership(after)) rebuildNeeded = true;
-          await repo.saveMap(mapPath, after, {
-            authorize: current => requireMapSnapshot(current, before),
-            preserveViewport: true,
-            recordWrite: (current, next) => {
-              journal.maps.push({ mapPath, restore: current, after: next });
-              records[records.length - 1] = { mapPath, before: current, after: next };
+      return journal.notes.run(async () => {
+        try {
+          await place(owner);
+          for (const note of noteRecords) await note.write(note.path, attachment);
+          for (const op of ops) {
+            if (op.kind !== "move") continue;
+            const entry = {
+              from: op.original,
+              to: "",
+              lifecycle: op.lifecycle,
+              restore: op.previous,
+              moved: false,
+              lifecycleSet: false,
+              lost: false
+            };
+            journal.files.push(entry);
+            try {
+              op.target = await repo.moveUnique(op.original, op.folder);
+            } catch (problem) {
+              // The new path is unknown (not guessed), so a file that already left its origin is a rollback problem.
+              if (!exists(op.original)) entry.lost = true;
+              throw problem;
             }
-          });
+            entry.to = op.target;
+            entry.moved = true;
+            entry.lifecycleSet = true;
+            await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
+          }
+          // Names are settled last: a name another note of this step just left is free now. A taken name keeps the note's own.
+          for (const op of [...ops]) {
+            const title = wanted.get(op);
+            if (title === undefined) continue;
+            const to = repo.exactFreePath(op.original.slice(0, op.original.lastIndexOf("/")), title);
+            if (!to || to === op.original) {
+              if (op.kind === "rename") ops.splice(ops.indexOf(op), 1);
+              continue;
+            }
+            const entry = { from: op.original, to, moved: false, lifecycleSet: false };
+            journal.files.push(entry);
+            try {
+              await repo.moveExact(op.original, to);
+            } catch (problem) {
+              // The move relocates first and rewrites links after; a throw in between leaves the file at `to`.
+              if (!exists(op.original) && exists(to)) entry.moved = true;
+              throw problem;
+            }
+            entry.moved = true;
+            if (op.kind === "create") op.original = to;
+            else op.target = to;
+          }
+          for (const note of noteRecords) await note.settle?.(noteAt(ops, note.path, "undo"));
+           const resolve = (originalPath: string): string => {
+            const found = started.get(originalPath);
+            if (!found) throw new Error(`Not a moved note: ${originalPath}`);
+            // A created or renamed note is at its settled name; a rename that found its name taken left the note where it was.
+            if (found.kind === "create") return found.original;
+            return found.kind === "rename" && !ops.includes(found) ? originalPath : found.target;
+          };
+          for (const mapPath of mapPaths) {
+            const before = befores.get(mapPath)!;
+            const after = clone(before);
+            for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
+            // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
+            pruneAfterText(after);
+            records.push({ mapPath, before, after });
+            for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
+            if (ownership(before) !== ownership(after)) rebuildNeeded = true;
+            await repo.saveMap(mapPath, after, {
+              authorize: current => requireMapSnapshot(current, before),
+              preserveViewport: true,
+              recordWrite: (current, next) => {
+                journal.maps.push({ mapPath, restore: current, after: next });
+                records[records.length - 1] = { mapPath, before: current, after: next };
+              }
+            });
+          }
+          await derive(rebuildRequested && rebuildNeeded, refresh);
+          const after = await journal.notes.snapshots();
+          for (const note of noteRecords) note.afterExpected = after.get(note.path)!;
+          for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
+        } catch (error) {
+          return revert(journal, rebuildRequested && rebuildNeeded, error, refresh).finally(() => release(owner));
         }
-        await derive(rebuildRequested && rebuildNeeded, refresh);
-        for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
-      } catch (error) {
-        return revert(journal, rebuildRequested && rebuildNeeded, error, refresh).finally(() => release(owner));
-      }
-      release(owner);
-      return entryFor(ops, records, rebuildNeeded, options.label, noteRecords, placed);
+        release(owner);
+        return entryFor(ops, records, rebuildNeeded, options.label, noteRecords, placed);
+      });
     }
   };
   return transaction;

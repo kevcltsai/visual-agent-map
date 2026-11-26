@@ -283,3 +283,49 @@ test('N14: a failing settle rolls the whole step back (note text, files and map)
   await entry.redo();
   assert.match(h.contents.get(h.parent), /Merged/, 'and can be retried');
 });
+
+
+test('N15: failed map write never rolls a note back over an external edit', async () => {
+  const h = await harness();
+  let external;
+  h.fail.saveMap = () => {
+    external = h.contents.get(h.parent) + '\nUser edit during transaction.\n';
+    h.contents.set(h.parent, external);
+    return true;
+  };
+  const error = await h.rejected(h.merge().commit());
+  assert.equal(error.kind, 'rollback-failed');
+  assert.match(h.contents.get(h.parent), /User edit during transaction/);
+  assert.match(h.contents.get(h.parent), /Merged summary/);
+  assert.equal(h.exists(h.a) && h.exists(h.b), true);
+});
+
+test('N16: undo refuses changes to user-owned Markdown outside the four old guard fields', async () => {
+  const h = await harness();
+  const entry = await begin(h.deps).rewriteNote(h.parent, async path => {
+    await h.repo.updateNote(path, { summary: 'Changed summary' });
+  }).commit();
+  const external = h.contents.get(h.parent).replace('---\n', '---\nuser-key: preserve-me\n');
+  h.contents.set(h.parent, external);
+  assert.equal((await h.rejected(entry.undo())).kind, 'guard');
+  assert.equal(h.contents.get(h.parent), external);
+});
+
+test('N17: note undo refuses a write queued behind an external edit', async () => {
+  const h = await harness();
+  const entry = await begin(h.deps).rewriteNote(h.parent, async path => {
+    await h.repo.updateNote(path, { summary: 'Changed summary' });
+  }).commit();
+  const external = h.contents.get(h.parent) + '\nUser edit after preflight.\n';
+  const process = h.app.vault.process;
+  let raced = false;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === h.parent && !raced) {
+      raced = true;
+      h.contents.set(h.parent, external);
+    }
+    return process(file, change);
+  };
+  assert.equal((await h.rejected(entry.undo())).kind, 'guard');
+  assert.equal(h.contents.get(h.parent), external);
+});

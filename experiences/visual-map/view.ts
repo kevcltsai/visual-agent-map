@@ -11692,6 +11692,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<MapNode[]> {
     if (!this.map || !this.mergeUnlocked(target ? [target.id] : [])) return [];
     const destination = clone(this.map);
+    const graph = (map: MapDocument): string => JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
     const ids = new Set(source.branch.map(node => node.id));
     const roots = new Set(source.roots.map(node => node.id));
     const cross = this.crossCutOf(payload, record, source.branch, destination.id);
@@ -11701,7 +11702,7 @@ export class VisualAgentMapView extends ItemView {
     const tops: MapNode[] = [];
     try {
       const entry = await tx.editMap(this.path, (map, resolve) => {
-        if (map.id !== destination.id || map.nodes.some(node => ids.has(node.id)))
+        if (map.id !== destination.id || graph(map) !== graph(destination) || map.nodes.some(node => ids.has(node.id)))
           throw new Error("ambiguous-card-identity");
         const parent = target ? map.nodes.find(node => node.id === target.id) : null;
         if (target && !parent) throw new Error(t("ui.outline_import_selected_missing"));
@@ -11774,11 +11775,10 @@ export class VisualAgentMapView extends ItemView {
         assertSource(sourceMap);
         if (branch.some(node => plugin.topicRuns.isBusy(node.path) || livingCoordinator(plugin).busy(node.path)))
           throw new Error(t("ui.merge_locked"));
-        if (destinationId) {
-          const destination = await repo.readMap(into);
-          if (destination.id !== destinationId) throw new Error("changed-target-identity");
-          await livingCrossCut(this.app, repo, sourceMap, destination, removed);
-        }
+        const destination = await repo.readMap(into);
+        if (destinationId && destination.id !== destinationId) throw new Error("changed-target-identity");
+        const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed);
+        if (checked.preserveIdentity !== Boolean(destinationId)) throw new Error("changed-source-identity");
       }),
       join: tx => {
         const parkFolder = repo.topicFolder(from, "Unassigned");

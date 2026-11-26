@@ -64,11 +64,11 @@ function makeView(existing, mapOverrides = {}) {
   return { view, calls, opened, items };
 }
 
-test('19 ⋯ menu: "Duplicate current mind map" copies as "<title> copy", then " 1" when taken, and opens the copy', async () => {
+test('19 title ▾ menu: "Duplicate" copies as "<title> copy", then " 1" when taken, and opens the copy', async () => {
   for (const [existing, expected] of [[['Trip'], 'Trip copy'], [['Trip', 'Trip copy'], 'Trip copy 1']]) {
     const { view, calls, opened, items } = makeView(existing);
-    view.openMapActions();
-    const item = items.find(i => i.title === 'Duplicate current mind map');
+    view.openMapTitleMenu();
+    const item = items.find(i => i.title === 'Duplicate');
     assert.ok(item, 'menu entry exists');
     item.fn(); await dom.tick(); await dom.tick();
     assert.deepEqual(calls, [['Agent Workspace/Mind Maps/Trip/Map.md', expected]]);
@@ -76,9 +76,9 @@ test('19 ⋯ menu: "Duplicate current mind map" copies as "<title> copy", then "
   }
 });
 
-test('19 ⋯ menu: no duplicate entry for an AIM map', () => {
+test('19 title ▾ menu: no duplicate entry for an AIM map', () => {
   const { view, items } = makeView([], { aim: { runs: [], branches: [] } });
-  view.openMapActions();
+  view.openMapTitleMenu();
   assert.equal(items.some(i => /Duplicate/.test(i.title)), false);
 });
 

@@ -192,6 +192,39 @@ export async function livingRemovalConsumers(
   ).map(card => card.id);
 }
 
+/** Preserve the original file and stable node ID when cutting a Living Node
+ * or any of its inputs across maps. The old copy/park behavior remains for
+ * ordinary, unrelated branches. Refuse identity collisions rather than let
+ * an existing explicit reference silently bind to an unrelated card. */
+export async function livingCrossCut(
+  app: App,
+  repo: Repository,
+  source: MapDocument,
+  destination: MapDocument,
+  moved: ReadonlySet<string>
+): Promise<{ preserveIdentity: boolean; affected: string[] }> {
+  const { cards, snapshots } = await prepareMap({ repo }, source);
+  const planned = planLivingMap(cards, [], sourceResolver(app));
+  const affected = cards.filter(card => isAiCard(card) && (
+    moved.has(card.id)
+      ? planned.sources.get(card.id)?.sources.some(input => input.cardId && !moved.has(input.cardId))
+      : planned.sources.get(card.id)?.sources.some(input => input.cardId && moved.has(input.cardId))
+  )).map(card => card.id);
+  const preserveIdentity = affected.length > 0 || cards.some(card => moved.has(card.id) &&
+    (card.aiCard || snapshots.get(card.id)?.note.livingNode));
+  if (!preserveIdentity) return { preserveIdentity, affected };
+  const destinationIds = new Set(destination.nodes.map(node => node.id));
+  if (source.nodes.some(node => destinationIds.has(node.id)))
+    throw new Error("ambiguous-card-identity");
+  for (const card of cards) {
+    if (!moved.has(card.id)) continue;
+    if (!snapshots.has(card.id) || card.sourceUnavailable) throw new Error("invalid-source");
+    if (card.explicitRefs.some(ref => ref.kind === "card" && !moved.has(ref.id) && destinationIds.has(ref.id)))
+      throw new Error("ambiguous-card-identity");
+  }
+  return { preserveIdentity, affected };
+}
+
 /** Check the final structural snapshot before Map.md is published. Reordering,
  * layout, viewport and collapse do not change dependencies. Existing cards use
  * their current note bytes (including after a file move); only graph edges that

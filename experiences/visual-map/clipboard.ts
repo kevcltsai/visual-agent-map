@@ -124,6 +124,7 @@ export function parseClipboard(raw: unknown): ClipboardParse {
         body.length > CLIPBOARD_MAX_BODY ||
         body.includes("\u0000") ||
         body.includes("<!-- visual-agent-map:") ||
+        /<!--\s*vam-living-node:/i.test(body) ||
         startsWithFrontmatter(body)
       )
         return fail("bad-body");

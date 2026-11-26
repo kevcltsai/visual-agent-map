@@ -193,6 +193,7 @@ import {
   ItemView,
   type Editor,
   Menu,
+  type MenuItem,
   Modal,
   MarkdownView,
   Notice,
@@ -229,7 +230,7 @@ import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
-import { KeyboardShortcutsModal } from "../../ui/modals/keyboard-shortcuts-modal";
+import { KeyboardShortcutsModal, shortcutLabel } from "../../ui/modals/keyboard-shortcuts-modal";
 import {
   applyCollapseLevel,
   canParent,
@@ -643,6 +644,7 @@ import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
+  type TopicChatChoice,
   type TopicChatHost,
   type TopicChatKind,
   type TopicChatMode,
@@ -752,6 +754,8 @@ const DOC_DRAG_ENDS = ["pointerup", "pointercancel", "lostpointercapture"] as co
 /** Zoom below which a card's tool row is hidden (its counter-scaled size would cover the neighbouring cards). */
 const TOOLS_MIN_ZOOM = 0.6;
 const TASK_PROGRESS_PREFIX = "vam-task:";
+/** This device's last Share destination for Markdown, PNG and SVG (Obsidian local storage, per vault). */
+const EXPORT_TARGET_SLOT = "vam-export-target";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
 /**
@@ -788,7 +792,6 @@ const CARD_EDITOR_STATES = [
 ];
 const CARD_EDITOR_DROP = [
   ".vam-node-tools",
-  ".vam-add-child",
   ".vam-card-resize",
   ".vam-card-resize-y",
   ".vam-card-fade",
@@ -1991,6 +1994,8 @@ export class VisualAgentMapView extends ItemView {
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
   private presentation: PresentationState | null = null;
+  /** Focus mode: the header and the canvas controls are hidden, one exit button stays; Esc or that button ends it. */
+  private focusMode = false;
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
@@ -2389,6 +2394,12 @@ export class VisualAgentMapView extends ItemView {
       // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (event.key === "Escape" && this.focusMode) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setFocusMode(false);
       return;
     }
     if (event.key === "Escape") {
@@ -2978,6 +2989,11 @@ export class VisualAgentMapView extends ItemView {
     area.setCssProps({ "--vam-summary-height": "auto" });
     area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
   }
+  private setFocusMode(on: boolean): void {
+    if (this.focusMode === on) return;
+    this.focusMode = on;
+    this.render();
+  }
   /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
   private startMapTitleEdit(): void {
     if (!this.map || this.inlineName || this.presentation) return;
@@ -3149,7 +3165,8 @@ export class VisualAgentMapView extends ItemView {
     return area;
   }
   /**
-   * A plain click on a card (no drag, no modifier): a click on the title or the summary text turns it into a field.
+   * A plain click on a card (no drag, no modifier): a click on the summary text turns it into a field. The title is not
+   * edited by a click (a click selects the card); double-click, Enter or F2 edits it.
    * The point is checked against the boxes because enableDrag captures the pointer, so the target is often the card.
    * The add-summary line (faint, shown while the card is selected) only counts when the card was already selected
    * before this press. Returns true when an editor opened.
@@ -3176,12 +3193,9 @@ export class VisualAgentMapView extends ItemView {
       );
     };
     // Looked up now, not when the card was drawn: a refresh can swap the summary line for the add-summary line.
-    const title = card.querySelector<HTMLElement>(".vam-card-title");
     const summary = card.querySelector<HTMLElement>(".vam-card-summary.is-inline-editable");
     const add = wasSelected ? card.querySelector<HTMLElement>(".vam-card-summary-add") : null;
-    if (title && hit(title)) {
-      this.startCardTitleEdit(node, { caret: this.caretOffsetAt(title, point.clientX, point.clientY) });
-    } else if (summary && hit(summary)) {
+    if (summary && hit(summary)) {
       this.startCardSummaryEdit(node, this.caretOffsetAt(summary, point.clientX, point.clientY));
     } else if (add && hit(add)) {
       this.startCardSummaryEdit(node, 0);
@@ -5541,6 +5555,13 @@ export class VisualAgentMapView extends ItemView {
     if (this.presentation || this.bookLock().structure) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
+    this.fillAddMenu(menu, parent, afterTextId);
+    menu.showAtMouseEvent(event);
+    // Enter on a freshly opened list takes its first row.
+    (menu as unknown as { select?: (index: number) => void }).select?.(0);
+  }
+  /** The add list's rows: the six topic types and, where text may follow, a text block. */
+  private fillAddMenu(menu: Menu, parent: MapNode | null, afterTextId?: string): void {
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
@@ -5576,9 +5597,6 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("text-cursor-input")
           .onClick(() => this.whenEditing(() => this.addTextNodeUnder(parent)))
       );
-    menu.showAtMouseEvent(event);
-    // Enter on a freshly opened list takes its first row.
-    (menu as unknown as { select?: (index: number) => void }).select?.(0);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
   private topicCoverOff(node: MapNode): boolean {
@@ -5842,8 +5860,13 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
-  private openLayoutMenu(event: MouseEvent): void {
+  private openLayoutMenu(event?: MouseEvent): void {
     const menu = this.newMenu();
+    this.fillLayoutMenu(menu);
+    this.showMenuUnder(menu, event);
+  }
+  /** Layout: collapse levels, direction, spacing and auto layout (a submenu of the header ⋯ menu). */
+  private fillLayoutMenu(menu: Menu): void {
     const choices: { title: string; icon: string; levels: number | null }[] = [
       { title: t("ui.collapse_all"), icon: "chevrons-down-up", levels: 0 },
       { title: t("ui.expand_all"), icon: "chevrons-up-down", levels: null },
@@ -5899,7 +5922,6 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("workflow")
         .onClick(() => this.autoLayout())
     );
-    menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
   override onPaneMenu(menu: Menu, source: string): void {
@@ -6372,9 +6394,26 @@ export class VisualAgentMapView extends ItemView {
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
   }
-  /** The New map button: one way to start a map, so the button makes it at once (no one-row menu). */
-  private openNewMapMenu(_event: MouseEvent): void {
-    this.openNewMindMapModal();
+  /** The title ▾ menu: switch, add, rename, duplicate and delete maps, all in one place. */
+  private openMapTitleMenu(event?: MouseEvent): void {
+    const menu = this.newMenu();
+    const add = (title: string, icon: string, action: () => void, warning = false): void => {
+      menu.addItem(item => {
+        item.setTitle(title).setIcon(icon).onClick(action);
+        if (warning) item.setWarning(true);
+      });
+    };
+    add(t("ui.switch_mind_map"), "chevrons-up-down", () => this.openMapSwitcher());
+    add(t("ui.new_map"), "plus", () => this.openNewMindMapModal());
+    if (this.map) {
+      menu.addSeparator();
+      add(t("ui.rename_current_mind_map"), "pencil", () => this.startMapTitleEdit());
+      if (!this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+        add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
+      menu.addSeparator();
+      add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);
+    }
+    this.showMenuUnder(menu, event);
   }
   /** True while the user is typing in a text field of the view. The chat field counts only during IME composition (as in changed()). */
   private typingInField(): boolean {
@@ -10317,62 +10356,159 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
-   * A card's right-click actions, the same ones as its hover tools plus adding a sibling and opening the note in a tab.
-   * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
+   * The selected card's toolbar: Research (the topic chat), Add (a topic under it, its type can change later), Note (the
+   * details sidebar; Cmd/Ctrl-click opens a new tab) and More (the rarer card actions). Every button has a text label.
+   */
+  private paintCardToolbar(tools: HTMLElement, node: MapNode): void {
+    const bookLock = this.bookLock();
+    const tool = (label: string, cls: string, action: (event: MouseEvent, button: HTMLButtonElement) => void) => {
+      const button = this.button(tools, label, () => {});
+      button.addEventListener("click", event => this.whenEditing(() => action(event, button)));
+      button.addClass("vam-card-tool", cls);
+      return button;
+    };
+    if (!bookLock.ai)
+      tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
+    if (!bookLock.structure)
+      tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
+    tool(t("ui.card_tool_note"), "vam-detail-button", event =>
+      event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
+    ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
+    more.setAttr("aria-label", t("ui.card_tool_more"));
+    more.setAttr("aria-haspopup", "menu");
+  }
+  /** Whether a card can become or edit an AI card (an ordinary note card; not under an AI lock or an argument card). */
+  private canSetAiCard(node: MapNode): boolean {
+    return !this.bookLock().ai && !this.isArgumentCard(node.id) && this.notes.has(node.id);
+  }
+  /** The toolbar's More list: card settings, select subtopics, summary bracket, note style, and the other topic types to add. */
+  private openCardMoreMenu(button: HTMLElement, node: MapNode): void {
+    const map = this.map;
+    if (!map || this.presentation) return;
+    const bookLock = this.bookLock();
+    const menu = this.newMenu(node.id);
+    this.drawInDom(menu);
+    if (!bookLock.structure)
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.card_settings_menu"))
+          .setIcon("settings-2")
+          .onClick(() => this.whenEditing(() => this.openNodePanel(node, "structure")))
+      );
+    if (this.canSetAiCard(node))
+      menu.addItem(item =>
+        item
+          .setTitle(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"))
+          .setIcon("star")
+          .onClick(() => this.whenEditing(() => this.openAiCardPopover(node)))
+      );
+    if (!bookLock.structure && !node.collapsed && map.nodes.some(item => item.parentId === node.id))
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.select_subtopics"))
+          .setIcon("list-checks")
+          .onClick(() => this.whenEditing(() => this.selectSubtopics(node)))
+      );
+    if (this.canEditSummary()) {
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.summary_add"))
+          .setIcon("brackets")
+          .onClick(() => this.addSummaryOver([node.id]))
+      );
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.note_style_menu"))
+          .setIcon("palette")
+          .onClick(() => void this.chooseTopicStyle(node))
+      );
+    }
+    if (!bookLock.structure) {
+      let sub: Menu | undefined;
+      menu.addSeparator();
+      menu.addItem(item => {
+        item.setTitle(t("ui.card_tool_add_other")).setIcon("plus");
+        sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+      });
+      this.fillAddMenu(sub ?? menu, node);
+    }
+    const box = button.getBoundingClientRect();
+    menu.showAtPosition({ x: box.left, y: box.bottom });
+  }
+  /** A menu row's key or click hint, drawn after its title (an Obsidian-drawn menu only). */
+  private menuHint(item: MenuItem, text: string): void {
+    (item as unknown as { dom?: HTMLElement }).dom?.createSpan({ cls: "vam-menu-hint", text });
+  }
+  /**
+   * A card's right-click actions in groups: new topics; research and fold; opening and settings; the picture book. Remove
+   * follows in the caller. The rarer actions (summary bracket, note style, select subtopics) are in the toolbar's More.
    */
   private addCardMenuActions(menu: Menu, node: MapNode): void {
     const map = this.map;
     if (!map) return;
-    const add = (title: string, icon: string, action: () => void): void => {
-      menu.addItem(item =>
+    const add = (title: string, icon: string, action: () => void, hint?: string): void => {
+      menu.addItem(item => {
         item
           .setTitle(title)
           .setIcon(icon)
-          .onClick(() => this.whenEditing(action))
-      );
+          .onClick(() => this.whenEditing(action));
+        if (hint) this.menuHint(item, hint);
+      });
     };
     const bookLock = this.bookLock();
-    if (!bookLock.ai) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
-    if (!bookLock.ai && !this.isArgumentCard(node.id) && this.notes.has(node.id))
-      add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
-        this.openAiCardPopover(node)
-      );
     if (!bookLock.structure) {
-      add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
-      add(t("ui.card_menu_add_sibling"), "list-plus", () =>
-        this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
+      add(
+        t("ui.card_menu_add_child"),
+        "plus",
+        () => this.enqueue(() => this.addNode(node)),
+        shortcutLabel("Mod+Enter")
+      );
+      add(
+        t("ui.card_menu_add_sibling"),
+        "list-plus",
+        () => this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null)),
+        shortcutLabel("Shift+Enter")
       );
     }
     menu.addSeparator();
-    if (!bookLock.structure) add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
-    const hasChildren = map.nodes.some(item => item.parentId === node.id);
-    if (hasChildren && !node.collapsed && !bookLock.structure)
-      add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
-    if (hasChildren)
+    if (!bookLock.ai) add(t("ui.card_menu_research"), "sparkles", () => this.openTopicChat(node));
+    if (map.nodes.some(item => item.parentId === node.id))
       add(
-        node.collapsed ? t("ui.expand") : t("ui.collapse"),
+        node.collapsed ? t("ui.card_menu_expand") : t("ui.card_menu_collapse"),
         node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
         () => this.toggleCollapsed(node)
       );
-    // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
-    if (this.markersEditable(node) && this.coverPictureOf(node))
-      add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
-    this.addBookRerunMenuItem(menu, node);
-    this.addBookRoleMenuItem(menu, node);
     menu.addSeparator();
-    menu.addItem(item =>
+    menu.addItem(item => {
       item
-        .setTitle(t("ui.open_details_in_right_sidebar"))
-        .setIcon("panel-right")
-        .onClick(() => this.openDetails(node))
-    );
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.card_menu_open_note_tab"))
+        .setTitle(t("ui.card_menu_open_note"))
         .setIcon("file-text")
-        .onClick(() => this.openNoteInTab(node))
-    );
+        .onClick(event => (event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)));
+      this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
+    });
+    if (!bookLock.structure) add(t("ui.card_settings_menu"), "settings-2", () => this.openNodePanel(node, "structure"));
+    if (this.canSetAiCard(node))
+      add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
+        this.openAiCardPopover(node)
+      );
+    this.addBookMenu(menu, node);
     menu.addSeparator();
+  }
+  /** "Picture book ▸": rewrite this chapter and the chapter role, only for a card that is a chapter of this map's book. */
+  private addBookMenu(menu: Menu, node: MapNode): void {
+    const why = this.bookRerunWhy(node);
+    const choices = this.bookRoleChoices(node);
+    if (why === undefined && !choices) return;
+    menu.addSeparator();
+    let sub: Menu | undefined;
+    menu.addItem(item => {
+      item.setTitle(t("ui.book_card_menu")).setIcon("book-open");
+      sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+    });
+    const target = sub ?? menu;
+    this.addBookRerunMenuItem(target, node, why);
+    this.addBookRoleMenuItem(target, node, choices);
   }
   /** Why this card's "rerun this card" (menu item and card button) cannot be used now: "" when it can; undefined when the map offers no rerun. */
   private bookRerunWhy(node: MapNode, gate2Only = false): string | undefined {
@@ -10486,11 +10622,9 @@ export class VisualAgentMapView extends ItemView {
       ...(this.bookBarFocus === "rerun-go" ? { focus: "go" as const } : {})
     };
   }
-  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
-  private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
-    const why = this.bookRerunWhy(node);
+  /** "Rewrite this chapter" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  private addBookRerunMenuItem(menu: Menu, node: MapNode, why = this.bookRerunWhy(node)): void {
     if (why === undefined) return;
-    menu.addSeparator();
     menu.addItem(item =>
       item
         .setTitle(t("ui.book_card_menu_rerun"))
@@ -10532,8 +10666,7 @@ export class VisualAgentMapView extends ItemView {
     ];
   }
   /** "Picture book: chapter role": a submenu where the menu has one, else a heading and the same items (all reachable by keyboard). */
-  private addBookRoleMenuItem(menu: Menu, node: MapNode): void {
-    const choices = this.bookRoleChoices(node);
+  private addBookRoleMenuItem(menu: Menu, node: MapNode, choices = this.bookRoleChoices(node)): void {
     if (!choices) return;
     const fill = (target: Menu): void => {
       for (const { choice, label, checked } of choices)
@@ -10634,14 +10767,16 @@ export class VisualAgentMapView extends ItemView {
         const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
         const single = topic && !this.selection.state.multiSelectMode ? topic : undefined;
         if (single) this.addCardMenuActions(menu, single);
-        menu.addItem(item =>
-          item
-            .setTitle(t("ui.summary_add"))
-            .setIcon("brackets")
-            .onClick(() => this.addSummaryOver(ids))
-        );
+        // A single card has these in its toolbar's More list; a selection of cards keeps them here.
+        if (!single)
+          menu.addItem(item =>
+            item
+              .setTitle(t("ui.summary_add"))
+              .setIcon("brackets")
+              .onClick(() => this.addSummaryOver(ids))
+          );
         // One topic only; the AIM conclusion cards have their own style row in the settings.
-        if (topic)
+        if (topic && !single)
           menu.addItem(item =>
             item
               .setTitle(t("ui.note_style_menu"))
@@ -10649,7 +10784,6 @@ export class VisualAgentMapView extends ItemView {
               .onClick(() => void this.chooseTopicStyle(topic))
           );
         if (single && !this.bookLock().structure) {
-          menu.addSeparator();
           menu.addItem(item =>
             item
               .setTitle(t("ui.remove_from_map"))
@@ -12003,34 +12137,72 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The header's export and share button (AIM and integration mode included, decision D11; sharing is not offered for AIM). */
   private addExportButton(parent: HTMLElement): HTMLButtonElement {
-    return this.iconButton(parent, "share", t("ui.export_or_share_map"), event => this.openExportMenu(event));
+    const button = parent.createEl("button", { cls: "vam-share-button", text: t("ui.share") });
+    button.setAttr("aria-label", t("ui.export_or_share_map"));
+    button.setAttr("aria-haspopup", "menu");
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      this.openExportMenu(event);
+    });
+    return button;
   }
+  /** Where Markdown, PNG and SVG go: the last choice on this device (vault by default). */
+  private exportTarget(): "vault" | "download" {
+    try {
+      return (this.app as { loadLocalStorage?(key: string): unknown }).loadLocalStorage?.(EXPORT_TARGET_SLOT) ===
+        "download"
+        ? "download"
+        : "vault";
+    } catch {
+      return "vault";
+    }
+  }
+  private setExportTarget(target: "vault" | "download"): void {
+    try {
+      (this.app as { saveLocalStorage?(key: string, data: unknown): void }).saveLocalStorage?.(
+        EXPORT_TARGET_SLOT,
+        target
+      );
+    } catch {
+      // Not saved on this device: the menu just shows the default again next time.
+    }
+  }
+  /** Share: four formats, then the one remembered destination (vault or download) for the file formats. */
   private openExportMenu(event: MouseEvent): void {
     const menu = this.newMenu();
-    const add = (title: string, icon: string, format: "png" | "svg" | "md", target: "vault" | "download"): void => {
+    const target = this.exportTarget();
+    const add = (title: string, icon: string, format: "png" | "svg" | "md"): void => {
       menu.addItem(item =>
         item
           .setTitle(title)
           .setIcon(icon)
-          .onClick(() => void this.exportMap(format, target))
+          .onClick(() => void this.exportMap(format, this.exportTarget()))
       );
     };
-    add(t("ui.export_png_vault"), "image-down", "png", "vault");
-    add(t("ui.export_png_download"), "download", "png", "download");
-    add(t("ui.export_svg_vault"), "image-down", "svg", "vault");
-    add(t("ui.export_svg_download"), "download", "svg", "download");
-    add(t("ui.export_md_vault"), "file-down", "md", "vault");
-    add(t("ui.export_md_download"), "download", "md", "download");
+    add(t("ui.share_markdown"), "file-text", "md");
+    add(t("ui.share_png"), "image", "png");
+    add(t("ui.share_svg"), "pen-tool", "svg");
     // The one place for export and sharing (the command palette's "Share map as HTML" opens the same dialog).
-    if (this.map) {
-      menu.addSeparator();
+    if (this.map)
       menu.addItem(item =>
         item
-          .setTitle(t("ui.export_share_html"))
+          .setTitle(t("ui.share_html"))
           .setIcon("globe")
           .onClick(() => void this.plugin.openShare(this))
       );
-    }
+    menu.addSeparator();
+    for (const [choice, label, icon] of [
+      ["vault", t("ui.share_to_vault"), "vault"],
+      ["download", t("ui.share_to_download"), "download"]
+    ] as const)
+      menu.addItem(item => {
+        item
+          .setTitle(label)
+          .setIcon(icon)
+          .onClick(() => this.setExportTarget(choice));
+        item.setChecked(target === choice);
+        (item as unknown as { dom?: HTMLElement }).dom?.addClass?.("vam-share-target");
+      });
     this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
@@ -12152,10 +12324,24 @@ export class VisualAgentMapView extends ItemView {
         if (warning) item.setWarning(true);
       });
     };
-    if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
-    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
-      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
-    if (this.map) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    // The canvas views and modes that used to float over the map (map management lives in the title ▾ menu).
+    if (this.map) {
+      if (this.canPresent()) add(t("ui.presentation_start"), "presentation", () => this.startPresentation());
+      menu.addItem(item => {
+        item.setTitle(t("ui.layout")).setIcon("list-tree");
+        const sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+        if (sub) this.fillLayoutMenu(sub);
+        else item.onClick(() => this.openLayoutMenu(event));
+      });
+      if (this.map.nodes.length && !this.selection.state.multiSelectMode)
+        add(t("ui.select_topics"), "square-check", () => this.applySelectionChange(this.selection.toggleMultiSelect()));
+      add(t("ui.open_topic_outline"), "list-tree", () => {
+        void this.plugin.activateOutline(this).catch(error => new Notice(String(error)));
+      });
+      add(t("ui.focus_mode"), "maximize-2", () => this.setFocusMode(true));
+      menu.addSeparator();
+      add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    }
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     // Hand every hand-set tier back to the AI: only for a gradable map that has pins, and not while it is being graded.
     const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
@@ -12163,10 +12349,6 @@ export class VisualAgentMapView extends ItemView {
       add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
-    if (this.map) {
-      menu.addSeparator();
-      add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);
-    }
     this.showMenuUnder(menu, event);
   }
   /** A header button's menu opens under the button (also from the keyboard, whose click has no pointer position). */
@@ -12179,12 +12361,6 @@ export class VisualAgentMapView extends ItemView {
       const rect = this.contentEl?.getBoundingClientRect?.();
       menu.showAtPosition({ x: rect?.right ?? 0, y: rect?.top ?? 0 });
     }
-  }
-  private renameCurrentMap(): void {
-    if (!this.map) return;
-    new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
-      this.enqueue(() => this.renameMapTo(title))
-    ).open();
   }
   /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
   private duplicateCurrentMap(): void {
@@ -12516,8 +12692,9 @@ export class VisualAgentMapView extends ItemView {
     this.removeGoalBar();
     this.contentEl.empty();
     this.contentEl.removeClass?.("is-notes-loading");
+    this.contentEl.toggleClass("is-focus-mode", this.focusMode && !!this.map);
     const toolbar = this.contentEl.createDiv("vam-toolbar");
-    // The title text renames the map in place; the arrows beside it switch maps.
+    // The title ▾ opens the map menu (switch, add, rename, duplicate, delete); a rename edits the title in place.
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
     const mapName = this.map?.title ?? "Visual Agent Map";
     if (this.map && this.inlineName?.target === "map") {
@@ -12536,36 +12713,22 @@ export class VisualAgentMapView extends ItemView {
       });
       field.setAttr("size", String(Math.max(8, Math.min(40, [...field.value].length + 2))));
     } else {
-      const rename = switcher.createEl("button", { cls: "vam-map-title-button" });
-      rename.setAttr("aria-label", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
-      rename.setAttr("title", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
-      rename.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
-      rename.addEventListener("click", () => (this.map ? this.startMapTitleEdit() : this.openMapSwitcher()));
+      // The title ▾ is the one place to switch, add, rename, duplicate and delete maps.
+      const title = switcher.createEl("button", { cls: "vam-map-title-button" });
+      title.setAttr("aria-label", this.map ? t("ui.map_menu") : t("ui.switch_mind_map"));
+      title.setAttr("aria-haspopup", this.map ? "menu" : "dialog");
+      title.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
+      setIcon(title.createSpan("vam-map-switcher-icon"), "chevron-down");
+      title.addEventListener("click", event => {
+        event.stopPropagation();
+        if (this.map) this.openMapTitleMenu(event);
+        else this.openMapSwitcher();
+      });
     }
-    const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
-    switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
-    switchMap.setAttr("title", t("ui.switch_mind_map"));
-    setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
-    switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
-      const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
-      newMap.createSpan({ text: t("ui.new_map") });
-      setIcon(newMap.createSpan("vam-new-map-icon"), "chevron-down");
-      newMap.addEventListener("click", event => {
-        event.stopPropagation();
-        this.openNewMapMenu(event);
-      });
-      const bookButton = headerActions.createEl("button", {
-        cls: "mod-cta vam-book-button",
-        text: t("ui.book_button")
-      });
-      bookButton.setAttr("title", t("ui.book_button_title"));
-      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
-      this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
-        void this.plugin.activateOutline(this).catch(error => new Notice(String(error)));
-      });
+      // Header: title ▾, undo, redo, book, share, more. Undo and redo stay visible (they are how a mistake is taken back).
       const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
       undo.disabled = !this.history.canUndo;
       undo.dataset.history = "undo";
@@ -12573,6 +12736,12 @@ export class VisualAgentMapView extends ItemView {
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
+      const bookButton = headerActions.createEl("button", {
+        cls: "mod-cta vam-book-button",
+        text: t("ui.book_button")
+      });
+      bookButton.setAttr("title", t("ui.book_button_title"));
+      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
       this.addExportButton(headerActions);
       this.renderRunAllButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
@@ -12580,6 +12749,8 @@ export class VisualAgentMapView extends ItemView {
       ).addClass("vam-map-actions-button");
     }
     this.renderBookPipelineBar(toolbar);
+    // Focus mode hides the header; a running book's bar (with its Stop) is the one thing it keeps.
+    toolbar.toggleClass("is-focus-empty", this.focusMode && !toolbar.querySelector(".vam-book-bar"));
     // The one line an old AIM map shows: AIM was removed, the map is an ordinary map now (no button, nothing to resume).
     if (this.map?.aim)
       this.contentEl.createDiv({
@@ -12745,14 +12916,11 @@ export class VisualAgentMapView extends ItemView {
       this.markCanvasHintSeen();
       this.fit();
     });
-    const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
-    present.disabled = !this.canPresent();
-    const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
-    layout.setAttr("aria-haspopup", "menu");
-    layout.addEventListener("click", event => {
-      event.stopPropagation();
-      this.openLayoutMenu(event);
-    });
+    // Presentation, layout and select-several moved to the header ⋯ menu; focus mode leaves only this way back.
+    if (this.focusMode)
+      this.iconButton(canvas, "minimize-2", t("ui.exit_focus_mode"), () => this.setFocusMode(false)).addClass(
+        "vam-exit-focus"
+      );
     this.stageEl = this.viewportEl.createDiv("vam-stage");
     // Before any card exists: focus handed back below measures the selected card's tool row, and a card on an untransformed stage
     // reads at scale 1 with no pan, which would throw the map off the canvas.
@@ -12912,8 +13080,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The one toolbar control: an icon-only button; the name shows as the aria-label tooltip. */
   private renderSelectTool(tools: HTMLElement): void {
-    if (!this.map?.nodes.length) return;
     const selecting = this.selection.state.multiSelectMode;
+    // Starting a selection is in the header ⋯ menu; the canvas keeps only the way to finish it.
+    if (!this.map?.nodes.length || !selecting) return;
     tools.addClass("vam-tools-mini");
     tools.toggleClass("is-open", selecting);
     const label = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");
@@ -13318,10 +13487,9 @@ export class VisualAgentMapView extends ItemView {
         this.button(header, t("ui.discard_synthesis"), () => this.discardSynthesis(node));
       }
     }
-    // Hover-only tools float beside the card (above its top edge unless that covers a neighbour), so showing them (hover,
-    // focus, selection) never moves the card's content. What must always show (status, stop and review actions, a folded
-    // branch's count) stays in the header. The floating tools are icon-only buttons: AI explore, Details, fold, this card
-    // (structure), select subtopics and remove. Add text is in the card's + menu only.
+    // The selected card's toolbar floats beside the card (above its top edge unless that covers a neighbour), so showing it
+    // never moves the card's content. What must always show (status, stop and review actions, a folded branch's count) stays
+    // in the header. The toolbar has four labelled buttons: Research, Add, Note and More (the rarer card actions).
     const tools = card.createDiv("vam-node-tools");
     const count = this.paintBranchSize?.(node.id) ?? descendants(this.map!.nodes, node.id).size;
     if (count) {
@@ -13334,45 +13502,7 @@ export class VisualAgentMapView extends ItemView {
         collapse.setAttr("aria-expanded", "false");
       }
     }
-    const bookLock = this.bookLock();
-    if (!this.selection.state.multiSelectMode && !bookLock.ai) {
-      const exploreName = t("ui.ai_explore");
-      const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
-      explore.addClass("vam-node-tool", "vam-ai-explore");
-      explore.setAttr("aria-label", exploreName);
-    }
-    const details = this.button(tools, "", () => this.openDetails(node));
-    details.addClass("vam-node-tool", "vam-detail-button");
-    setIcon(details, "panel-right");
-    details.setAttr("aria-label", t("ui.node_tool_details"));
-    const iconTool = (title: string, icon: string, cls: string, action: () => void): HTMLButtonElement => {
-      const button = this.button(tools, "", action);
-      button.addClass("vam-node-tool", cls);
-      setIcon(button, icon);
-      // Obsidian shows aria-label as the hover tooltip, so one string is the name and the tooltip.
-      button.setAttr("aria-label", title);
-      return button;
-    };
-    if (count && !node.collapsed)
-      iconTool(t("ui.collapse"), "chevrons-down-up", "vam-fold-tool", () =>
-        this.whenEditing(() => this.toggleCollapsed(node))
-      );
-    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
-      iconTool(t("ui.structure_and_links"), "git-fork", "vam-structure-tool", () =>
-        this.whenEditing(() => this.openNodePanel(node, "structure"))
-      );
-      // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
-      if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id))
-        iconTool(t("ui.select_subtopics"), "list-checks", "vam-select-subtopics-tool", () =>
-          this.whenEditing(() => this.selectSubtopics(node))
-        );
-    }
-    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
-      const add = this.button(card, "+", () => {});
-      add.addEventListener("click", event => this.openAddMenu(event, node));
-      add.addClass("vam-add-child");
-      add.setAttr("aria-label", t("ui.add_subtopic_manually"));
-    }
+    if (!this.selection.state.multiSelectMode) this.paintCardToolbar(tools, node);
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
     const shownTitle = loading
@@ -13525,9 +13655,11 @@ export class VisualAgentMapView extends ItemView {
         if (this.selection.state.multiSelectMode) {
           this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
+          // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
           this.selectMapNode(node);
-          if (this.notesLoading()) return;
-          this.openDetails(node);
+          if (this.notesLoading() || !note || event.isComposing) return;
+          event.preventDefault();
+          this.startCardTitleEdit(node, { select: true });
         }
       }
     });
@@ -15348,6 +15480,18 @@ export class VisualAgentMapView extends ItemView {
         entry.session.choice = null;
         entry.session.turns.push({ role: "ai", text: t("ui.topic_chat_choice_cancelled") });
         this.notifyTopicChat(entry);
+      },
+      showOtherWays: () => {
+        const other = entry.session.otherWays;
+        if (!other || entry.session.running || entry.session.choice) return;
+        // The quick way already ran: the card opens on the next way. Its asking line is a new one (not yet in the log).
+        entry.session.otherWays = null;
+        entry.session.choice = {
+          ...other,
+          selected: "bottom-up",
+          turn: { role: "user", kind: "synthesize", text: other.text }
+        };
+        this.notifyTopicChat(entry);
       }
     };
   }
@@ -15425,13 +15569,15 @@ export class VisualAgentMapView extends ItemView {
       this.notifyTopicChat(entry);
       return true;
     }
+    let otherWays: (TopicChatChoice & { text: string }) | null = null;
     if (kind === "synthesize" && depth === undefined && !followUp) {
-      // Deeper than one level: ask how deep first. The card writes no record and calls no AI; Cancel ends it there.
+      // Deeper than one level: the quick way runs at once and says what it covered; the other ways wait under
+      // "Other ways to integrate" (their depth card writes no record and calls no AI until confirmed).
       const nodes = this.subtreePlanNodes();
       const stats = subtreeStats(nodes, node.id);
       if (stats.levels > 1) {
-        entry.session.turns.push(userTurn);
-        entry.session.choice = {
+        depth = "quick";
+        otherWays = {
           levels: stats.levels,
           topics: stats.topics,
           researched: stats.researched,
@@ -15443,11 +15589,8 @@ export class VisualAgentMapView extends ItemView {
             "research-first": integrationCalls(stats, "research-first")
           },
           selected: "quick",
-          text,
-          turn: userTurn
+          text
         };
-        this.notifyTopicChat(entry);
-        return true;
       }
     }
     const mode = entry.session.mode;
@@ -15477,6 +15620,9 @@ export class VisualAgentMapView extends ItemView {
         entry.session.choice = null;
       }
       entry.session.turns.push(userTurn);
+      entry.session.otherWays = otherWays;
+      if (otherWays)
+        entry.session.turns.push({ role: "ai", text: t("ui.topic_chat_quick_scope_0", otherWays.children) });
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
       // The owner of this run's additions, made in the same tick as `running = true`.
@@ -16140,9 +16286,9 @@ export class VisualAgentMapView extends ItemView {
       note = this.notes.get(node.id);
     const heading = panel.createDiv("vam-inspector-heading");
     heading.createEl("strong", {
-      text: mode === "structure" ? t("ui.structure_and_links") : t("ui.expansion_suggestions")
+      text: mode === "structure" ? t("ui.card_settings") : t("ui.expansion_suggestions")
     });
-    // The card settings dialog is titled "This card" and the subtitle is just the card's name.
+    // The card settings dialog is titled "Card settings" and the subtitle is just the card's name.
     if (note)
       panel.createEl("p", {
         cls: "vam-inspector-topic",
@@ -16150,32 +16296,6 @@ export class VisualAgentMapView extends ItemView {
       });
     if (note) {
       if (mode === "proposals") this.renderPendingProposals(panel, node, note, close, host);
-      if (mode === "structure") {
-        const sourcePaths = this.referenceSourcePaths(note, node.path);
-        if (sourcePaths.length) {
-          const sources = panel.createDiv("vam-reference-sources");
-          sources.createEl("strong", { text: t("ui.source_topics") });
-          for (const path of sourcePaths) {
-            const sourceNode = this.map?.nodes.find(item => item.path === path),
-              sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
-            const file = this.app.vault.getAbstractFileByPath(path);
-            this.button(
-              sources,
-              sourceNote?.title ??
-                (file instanceof TFile ? file.basename : t("ui.0_moved", path.split("/").at(-1)?.replace(/\.md$/, ""))),
-              () => {
-                close?.();
-                if (sourceNode) {
-                  this.selection.setSelected(sourceNode.id);
-                  this.render();
-                  this.focusNode(sourceNode);
-                } else if (file instanceof TFile) void this.plugin.openDetails(file);
-              },
-              !(sourceNode || file instanceof TFile)
-            );
-          }
-        }
-      }
     } else if (mode === "structure") {
       panel.createEl("p", { text: t("ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem") });
       this.button(panel, t("ui.relink_note"), () =>
@@ -16188,17 +16308,26 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (ticket 41, card-dialog-search): what it is (type), where the evidence points and how much there is
-    // (leaning, strength), who it relates to; then the parent topic search; then the folded "Appearance" and
-    // "Layout" groups (Layout only when the card has an arrangement to choose); then the AI lock; then the footer.
-    if (note) this.renderHypothesisSection(panel, node, close);
+    // Card settings (simplify 2026-11-26): first the look (a hypothesis's leaning and strength, colour, style, cover)
+    // and one "whole branch" checkbox; everything else waits under a folded "More". A locked card says so beside the title.
+    const branch = { on: false };
+    let repaintStrength: (() => void) | undefined;
+    if (note) {
+      repaintStrength = this.renderHypothesisSection(panel, node, close, "strength");
+      this.renderColorSection(panel, node, () => branch.on);
+      this.renderStyleSection(panel, node, () => branch.on);
+      this.renderCoverSection(panel, node);
+      this.renderBranchToggle(panel, node, branch);
+    }
+    const more = this.renderDisclosure(panel, t("ui.card_settings_more"));
+    if (note) this.renderHypothesisSection(more, node, close, "type", () => repaintStrength?.());
     // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
     let currentParent = node.parentId ?? null;
     let moveTo = (_parentId: string | null): void => {};
     const titleOf = (id: string): string =>
       this.notes.get(id)?.title ?? this.map?.nodes.find(candidate => candidate.id === id)?.path ?? "";
     const parentLabel = (): string => (currentParent ? titleOf(currentParent) : t("ui.no_parent_root_topic"));
-    const relationship = panel.createDiv("vam-inspector-section vam-parent-section");
+    const relationship = more.createDiv("vam-inspector-section vam-parent-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -16226,30 +16355,45 @@ export class VisualAgentMapView extends ItemView {
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
     if (note) {
-      const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
-      this.renderMarkerSection(look, node);
-      this.renderLinkSection(look, node);
-      this.renderColorSection(look, node);
-      this.renderStyleSection(look, node);
-      this.renderCoverSection(look, node);
+      const sourcePaths = this.referenceSourcePaths(note, node.path);
+      if (sourcePaths.length) {
+        const sources = more.createDiv("vam-reference-sources");
+        sources.createEl("strong", { text: t("ui.source_topics") });
+        for (const path of sourcePaths) {
+          const sourceNode = this.map?.nodes.find(item => item.path === path),
+            sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
+          const file = this.app.vault.getAbstractFileByPath(path);
+          this.button(
+            sources,
+            sourceNote?.title ??
+              (file instanceof TFile ? file.basename : t("ui.0_moved", path.split("/").at(-1)?.replace(/\.md$/, ""))),
+            () => {
+              close?.();
+              if (sourceNode) {
+                this.selection.setSelected(sourceNode.id);
+                this.render();
+                this.focusNode(sourceNode);
+              } else if (file instanceof TFile) void this.plugin.openDetails(file);
+            },
+            !(sourceNode || file instanceof TFile)
+          );
+        }
+      }
+      this.renderMarkerSection(more, node);
+      this.renderLinkSection(more, node);
     }
-    if (this.branchLayoutChoices(node).length) {
-      const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
-      this.renderBranchLayoutSection(layout, node);
-    }
-    if (note) this.renderAiLockSection(panel, node);
+    if (this.branchLayoutChoices(node).length) this.renderBranchLayoutSection(more, node);
+    if (note) this.renderAiLockSection(more, node, heading);
+    if (note) this.renderAddSubtopic(more, node, close);
+    // Removing a card lives in its right-click menu; this dialog only closes.
     const actions = (host ?? panel).createDiv("vam-next-actions");
-    if (note) this.renderAddSubtopic(actions, node, close);
-    const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
-    remove.addEventListener("click", () => {
-      close?.();
-      this.confirmRemoveNode(node);
-    });
     const status = actions.createSpan({
       cls: "vam-next-actions-note vam-next-status",
       attr: { "aria-live": "polite" }
     });
-    actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
+    actions
+      .createEl("button", { text: t("ui.card_settings_done"), cls: "mod-cta" })
+      .addEventListener("click", () => close?.());
     moveTo = parentId => {
       if (parentId === currentParent) {
         parentField.setValue(parentLabel());
@@ -17036,50 +17180,47 @@ export class VisualAgentMapView extends ItemView {
     await this.refreshAfterSavedChange();
   }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
-  private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
+  /**
+   * The AI lock of the card settings: a locked card says so in a pill beside the title (`heading`) with Unlock next to it;
+   * an unlocked card offers Lock inside "More" (`panel`). An argument card is locked by the research flow: pill only.
+   */
+  private renderAiLockSection(panel: HTMLElement, node: MapNode, heading: HTMLElement): void {
     if (!this.map || this.selection.state.multiSelectMode) return;
-    const section = panel.createDiv("vam-inspector-section vam-ai-lock-section");
-    section.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
-    const group = section.createDiv("vam-topic-markers vam-choice-group");
-    group.setAttr("role", "group");
-    group.setAttr("aria-label", t("ui.ai_lock"));
+    const pill = heading.createSpan({ cls: "vam-card-lock-pill", attr: { role: "status", "aria-live": "polite" } });
     if (this.isArgumentCard(node.id)) {
-      // Managed by the argument flow: shown as locked, and the switch does nothing.
-      const choice = this.button(group, t("ui.ai_unlock_selected"), () => {}, true);
-      choice.setAttr("aria-pressed", "true");
-      choice.setAttr("aria-disabled", "true");
-      choice.addClass("is-pressed");
-      group.createSpan({
-        cls: "vam-ai-lock-state",
-        text: t("ui.ai_lock_state_managed"),
-        attr: { role: "status", "aria-live": "polite" }
-      });
-      section.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint_managed") });
+      pill.createSpan({ text: t("ui.card_settings_locked_managed") });
       return;
     }
+    const section = panel.createDiv("vam-inspector-section vam-ai-lock-section");
     // The metadata cache may lag behind the write, so the state after a click is tracked here.
     let locked = this.notes.get(node.id)?.aiLocked === true;
+    const toggle = (): void => {
+      this.enqueue(async () => {
+        await this.setAiLock([node], !locked);
+        locked = !locked;
+        paint(true);
+      });
+    };
     const paint = (focus = false): void => {
-      group.empty();
-      const choice = this.button(group, t(locked ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"), () => {
-        this.enqueue(async () => {
-          await this.setAiLock([node], !locked);
-          locked = !locked;
-          paint(true);
-        });
-      });
-      choice.setAttr("aria-pressed", String(locked));
-      if (locked) choice.addClass("is-pressed");
-      // The row says the state it is in now, not only what the button would do.
-      group.createSpan({
-        cls: "vam-ai-lock-state",
-        text: t(locked ? "ui.ai_lock_state_on" : "ui.ai_lock_state_off"),
-        attr: { role: "status", "aria-live": "polite" }
-      });
-      if (focus) choice.focus();
+      pill.empty();
+      section.empty();
+      pill.hidden = !locked;
+      section.hidden = locked;
+      if (locked) {
+        pill.createSpan({ text: t("ui.card_settings_locked") });
+        const unlock = pill.createEl("button", { text: t("ui.card_settings_unlock"), cls: "vam-card-lock-unlock" });
+        unlock.type = "button";
+        unlock.addEventListener("click", toggle);
+        if (focus) unlock.focus();
+        return;
+      }
+      section.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
+      const lock = this.button(section, t("ui.ai_lock_toggle"), toggle);
+      lock.addClass("vam-card-lock-button");
+      section.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint") });
+      if (focus) lock.focus();
     };
     paint();
-    section.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint") });
   }
   /**
    * A locked card shows a lock button in its header (a click unlocks) and says "locked" in its accessible name. Safe to
@@ -17144,10 +17285,13 @@ export class VisualAgentMapView extends ItemView {
   private renderCoverSection(panel: HTMLElement, node: MapNode): void {
     if (!this.markersEditable(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-cover-section");
-    section.createEl("strong", { text: t("ui.topic_cover"), cls: "vam-topic-tree-heading vam-section-heading" });
+    section.createEl("strong", {
+      text: t("ui.card_settings_cover"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
     const group = section.createDiv("vam-topic-markers vam-choice-group");
     group.setAttr("role", "group");
-    group.setAttr("aria-label", t("ui.topic_cover"));
+    group.setAttr("aria-label", t("ui.card_settings_cover"));
     // The metadata cache may lag behind the write, so the state after a click is tracked here.
     let off = this.topicCoverOff(node);
     const paint = (focus = false): void => {
@@ -17162,12 +17306,12 @@ export class VisualAgentMapView extends ItemView {
       if (off) choice.addClass("is-pressed");
       if (focus) choice.focus();
       if (!off && this.coverPictureOf(node))
-        this.button(group, t("ui.topic_cover_frame_adjust"), () => this.openCoverFrameEditor(node));
+        this.button(group, t("ui.card_settings_cover_frame"), () => this.openCoverFrameEditor(node));
     };
     paint();
   }
-  /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
-  private renderColorSection(panel: HTMLElement, node: MapNode): void {
+  /** The colour menu of the topic panel: None and six named colours as a radiogroup; `branch()` true colours the whole branch. */
+  private renderColorSection(panel: HTMLElement, node: MapNode, branch: () => boolean = () => false): void {
     if (!this.markersEditable(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-color-section");
     section.createEl("strong", { text: t("ui.topic_color"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -17183,7 +17327,7 @@ export class VisualAgentMapView extends ItemView {
       choices.forEach((id, index) => {
         const choice = this.button(group, id ? t(colorLabelKey(id)) : t("ui.topic_color_none"), () => {
           this.enqueue(async () => {
-            await this.changeTopicColor(node, id);
+            await this.changeTopicColor(node, id, branch());
             paint(id);
           });
         });
@@ -17208,7 +17352,7 @@ export class VisualAgentMapView extends ItemView {
           event.preventDefault();
           const next = (index + step + choices.length) % choices.length;
           this.enqueue(async () => {
-            await this.changeTopicColor(node, choices[next]);
+            await this.changeTopicColor(node, choices[next], branch());
             paint(choices[next]);
           });
         });
@@ -17217,12 +17361,6 @@ export class VisualAgentMapView extends ItemView {
       });
     };
     paint();
-    this.button(
-      section,
-      t("ui.topic_color_apply_branch"),
-      () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
-      branchNoteIds(this.map!.nodes, node.id).length < 2
-    ).setAttr("aria-label", t("ui.topic_color_apply_branch_aria"));
   }
   /**
    * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
@@ -17255,9 +17393,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The style menu of the topic panel: bold, thick border and thick line as pressed-state switches, the text size as a
-   * radiogroup (arrow keys choose), and a button that gives the branch the same styles.
+   * radiogroup (arrow keys choose); `branch()` true gives the whole branch the same styles.
    */
-  private renderStyleSection(panel: HTMLElement, node: MapNode): void {
+  private renderStyleSection(panel: HTMLElement, node: MapNode, branch: () => boolean = () => false): void {
     if (!this.markersEditable(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-style-section");
     section.createEl("strong", { text: t("ui.topic_style"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -17277,7 +17415,7 @@ export class VisualAgentMapView extends ItemView {
         const choice = this.button(switches, t(styleLabelKey(id)), () => {
           const current = this.styleOf(node.id);
           this.enqueue(async () => {
-            await this.changeTopicStyle(node, on ? current.filter(item => item !== id) : [...current, id]);
+            await this.changeTopicStyle(node, on ? current.filter(item => item !== id) : [...current, id], branch());
             paint({ toggle: id });
           });
         });
@@ -17291,7 +17429,7 @@ export class VisualAgentMapView extends ItemView {
         const text = id ? t(styleLabelKey(id)) : t("ui.topic_style_size_standard");
         const choice = this.button(group, text, () => {
           this.enqueue(async () => {
-            await this.changeTopicStyle(node, withSize(id));
+            await this.changeTopicStyle(node, withSize(id), branch());
             paint({ size: id });
           });
         });
@@ -17311,7 +17449,7 @@ export class VisualAgentMapView extends ItemView {
           event.preventDefault();
           const next = (index + step + sizes.length) % sizes.length;
           this.enqueue(async () => {
-            await this.changeTopicStyle(node, withSize(sizes[next]));
+            await this.changeTopicStyle(node, withSize(sizes[next]), branch());
             paint({ size: sizes[next] });
           });
         });
@@ -17323,12 +17461,17 @@ export class VisualAgentMapView extends ItemView {
     group.setAttr("role", "radiogroup");
     group.setAttr("aria-label", t("ui.topic_style_size"));
     paint();
-    this.button(
-      section,
-      t("ui.topic_style_apply_branch"),
-      () => this.enqueue(() => this.changeTopicStyle(node, this.styleOf(node.id), true)),
-      branchNoteIds(this.map!.nodes, node.id).length < 2
-    ).setAttr("aria-label", t("ui.topic_style_apply_branch_aria"));
+  }
+  /** One checkbox for the colour and style above: while it is ticked, a change goes to the card and every card under it. */
+  private renderBranchToggle(panel: HTMLElement, node: MapNode, branch: { on: boolean }): void {
+    if (!this.markersEditable(node) || branchNoteIds(this.map!.nodes, node.id).length < 2) return;
+    const row = panel.createEl("label", { cls: "vam-inspector-section vam-branch-toggle" });
+    const box = row.createEl("input", { type: "checkbox", cls: "vam-branch-toggle-box" });
+    box.checked = branch.on;
+    box.addEventListener("change", () => {
+      branch.on = box.checked;
+    });
+    row.createSpan({ text: t("ui.card_settings_whole_branch") });
   }
   /**
    * Sets the whitelisted styles of one topic, or of the topic and all its descendants (folded ones too), in one undoable
@@ -17358,8 +17501,18 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
-  private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
+  /**
+   * The six-type switch, a hypothesis's leaning and strength, and the relations that start or end at this topic. `part`
+   * "strength" draws only the leaning and strength (nothing for another type), "type" everything else; `onKind` runs
+   * after the type changed. Returns the repaint.
+   */
+  private renderHypothesisSection(
+    panel: HTMLElement,
+    node: MapNode,
+    close?: () => void,
+    part: "all" | "strength" | "type" = "all",
+    onKind?: () => void
+  ): (() => void) | undefined {
     if (!this.relationsEnabled()) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
@@ -17372,27 +17525,31 @@ export class VisualAgentMapView extends ItemView {
     ): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
-      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
-      const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
-      kinds.setAttr("role", "group");
-      kinds.setAttr("aria-label", t("ui.topic_type"));
-      for (const option of KIND_PICKER_ORDER) {
-        const choice = this.button(kinds, t(TOPIC_KIND_SHAPES[option].labelKey), () => {
-          if (option === currentKind) return;
-          this.enqueue(async () => {
-            await this.changeTopicKind(node, option);
-            paint(false, true);
+      section.hidden = part === "strength" && currentKind !== "hypothesis";
+      if (part !== "strength") {
+        body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
+        const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
+        kinds.setAttr("role", "group");
+        kinds.setAttr("aria-label", t("ui.topic_type"));
+        for (const option of KIND_PICKER_ORDER) {
+          const choice = this.button(kinds, t(TOPIC_KIND_SHAPES[option].labelKey), () => {
+            if (option === currentKind) return;
+            this.enqueue(async () => {
+              await this.changeTopicKind(node, option);
+              paint(false, true);
+              onKind?.();
+            });
           });
-        });
-        this.kindSwatch(choice, option);
-        choice.setAttr("aria-pressed", String(option === currentKind));
-        if (option === currentKind) {
-          choice.addClass("is-pressed");
-          // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
-          if (focusKind) choice.focus();
+          this.kindSwatch(choice, option);
+          choice.setAttr("aria-pressed", String(option === currentKind));
+          if (option === currentKind) {
+            choice.addClass("is-pressed");
+            // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+            if (focusKind) choice.focus();
+          }
         }
       }
-      if (currentKind === "hypothesis") {
+      if (currentKind === "hypothesis" && part !== "type") {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "none",
           currentLeaning = this.argumentVerdictOf(node.id) ?? this.notes.get(node.id)?.hypothesisLeaning ?? "undecided";
         body.createEl("strong", {
@@ -17448,17 +17605,19 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      this.relationEditor.renderList(
-        body,
-        node,
-        relationFocus,
-        () => paint(),
-        () => paint(false, false, true),
-        focusAdd,
-        close
-      );
+      if (part !== "strength")
+        this.relationEditor.renderList(
+          body,
+          node,
+          relationFocus,
+          () => paint(),
+          () => paint(false, false, true),
+          focusAdd,
+          close
+        );
     };
     paint();
+    return () => paint();
   }
   /**
    * `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out).

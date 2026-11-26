@@ -107,21 +107,20 @@ const menuOf = (h, nodeKey) => {
 };
 const atPhase = (h, phase) => { h.plugin.getBookPipelineProgress = () => (phase ? progress({ phase }) : undefined); h.view.bookPipelineSeen = null; };
 
-test('book lock: while the book writes, a card has no AI explore, no "+", no This card and no Select subtopics; Details stays', async () => {
+test('book lock: while the book writes, a card has no Research and no Add button; Note and More stay (More has no card settings or select subtopics: they are structure-locked)', async () => {
   const h = await harness({ book: true, stages: { a: 'planned', b: 'planned' } });
   for (const phase of ['planning', 'writing', 'gate2']) {
     atPhase(h, phase);
     const stage = h.paint();
-    assert.equal(named(stage, 'AI 探索').length, 0, `${phase}: no AI explore`);
-    assert.equal(byCls(stage, 'vam-add-child').length, 0, `${phase}: no +`);
-    assert.equal(byCls(stage, 'vam-structure-tool').length, 0, `${phase}: no This card`);
-    assert.equal(byCls(stage, 'vam-select-subtopics-tool').length, 0, `${phase}: no Select subtopics`);
-    assert.equal(byCls(stage, 'vam-detail-button').length, 3, `${phase}: Details stays on every card`);
+    assert.equal(byCls(stage, 'vam-ai-explore').length, 0, `${phase}: no Research`);
+    assert.equal(byCls(stage, 'vam-add-child-tool').length, 0, `${phase}: no Add`);
+    assert.equal(byCls(stage, 'vam-detail-button').length, 3, `${phase}: Note stays on every card`);
+    assert.equal(byCls(stage, 'vam-card-tool-more').length, 3, `${phase}: More stays on every card`);
     const items = menuOf(h, 'root');
-    for (const gone of ['AI 探索', tr('ui.add_subtopic_manually'), tr('ui.card_menu_add_sibling'), tr('ui.structure_and_links'), tr('ui.select_subtopics')])
+    for (const gone of [tr('ui.card_menu_research'), tr('ui.card_menu_add_child'), tr('ui.card_menu_add_sibling'), tr('ui.card_settings_menu'), tr('ui.select_subtopics')])
       assert.ok(!items.includes(gone), `${phase}: menu has no ${gone}`);
-    assert.ok(items.includes(tr('ui.open_details_in_right_sidebar')) && items.includes(tr('ui.card_menu_open_note_tab')), `${phase}: read-only items stay`);
-    assert.ok(items.includes(tr('ui.book_role_menu')), `${phase}: the book's own role item stays`);
+    assert.ok(items.includes(tr('ui.card_menu_open_note')), `${phase}: read-only items stay`);
+    assert.ok(items.includes(tr('ui.book_card_menu')), `${phase}: the book's own submenu (chapter role) stays`);
   }
 });
 
@@ -130,28 +129,28 @@ test('book lock: the saved phase counts when the runner knows nothing (after a r
   h.view.map.bookPipeline.status = 'stopped';
   atPhase(h, undefined);
   let stage = h.paint();
-  assert.equal(named(stage, 'AI 探索').length, 0, 'stopped but not abandoned: still locked');
-  assert.equal(byCls(stage, 'vam-add-child').length, 0);
+  assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'stopped but not abandoned: still locked');
+  assert.equal(byCls(stage, 'vam-add-child-tool').length, 0);
   atPhase(h, 'gate1');
   stage = h.paint();
-  assert.equal(named(stage, 'AI 探索').length, 0, 'gate 1: no AI');
-  assert.equal(byCls(stage, 'vam-add-child').length, 3, 'gate 1: + stays (the review detects hand edits)');
-  assert.equal(byCls(stage, 'vam-structure-tool').length, 3);
-  assert.ok(menuOf(h, 'a').includes(tr('ui.add_subtopic_manually')));
-  assert.ok(!menuOf(h, 'a').includes('AI 探索'));
+  assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'gate 1: no AI');
+  assert.equal(byCls(stage, 'vam-add-child-tool').length, 3, 'gate 1: Add stays (the review detects hand edits)');
+  assert.ok(menuOf(h, 'a').includes(tr('ui.card_settings_menu')), 'gate 1: card settings stay');
+  assert.ok(menuOf(h, 'a').includes(tr('ui.card_menu_add_child')));
+  assert.ok(!menuOf(h, 'a').includes(tr('ui.card_menu_research')));
 });
 
 test('book lock: done, and a map without a book, give every tool back', async () => {
   const h = await harness({ book: true, stages: { a: 'checked' } });
   atPhase(h, 'done');
   let stage = h.paint();
-  assert.equal(named(stage, 'AI 探索').length, 3);
-  assert.equal(byCls(stage, 'vam-add-child').length, 3);
-  assert.ok(menuOf(h, 'a').includes('AI 探索'));
+  assert.equal(byCls(stage, 'vam-ai-explore').length, 3);
+  assert.equal(byCls(stage, 'vam-add-child-tool').length, 3);
+  assert.ok(menuOf(h, 'a').includes(tr('ui.card_menu_research')));
   const plain = await harness({ book: false });
   stage = plain.paint();
-  assert.equal(named(stage, 'AI 探索').length, 3);
-  assert.equal(byCls(stage, 'vam-add-child').length, 3);
+  assert.equal(byCls(stage, 'vam-ai-explore').length, 3);
+  assert.equal(byCls(stage, 'vam-add-child-tool').length, 3);
 });
 
 test('book lock: the entries refuse too while the book writes (AI chat, the + list, Delete key, drag onto a card)', async () => {

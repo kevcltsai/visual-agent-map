@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+const { t } = support.load('i18n.ts');
 const machine = support.load('core/argument-map/machine.ts');
 const run = support.load('experiences/visual-map/argument-run.ts');
 const MAP = 'Agent Workspace/Topics/map-pv1/Map.md';
@@ -104,22 +105,22 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   assert.equal(goalSuggest.split('\n').filter(line => line.includes('this.ports.lockedParent(')).length, 2);
 });
 
-test('lock panel: a managed card shows locked and disabled with the managed text; a free card keeps the switch', async () => {
+test('lock panel: a managed card shows a pill with the managed text and no button or More item; a free card keeps the lock item', async () => {
   const h = await harness({ argument: true });
-  const panel = dom.element('div');
+  const panel = dom.element('div'), heading = dom.element('div');
   const node = id => h.view.map.nodes.find(n => n.id === id);
-  h.view.renderAiLockSection(panel, node(h.id('H')));
-  const button = dom.find(panel, i => i.tag === 'button');
-  assert.equal(button.disabled, true);
-  assert.equal(button.attrs['aria-disabled'], 'true');
-  assert.equal(button.attrs['aria-pressed'], 'true');
-  assert.ok(dom.texts(panel).some(text => /research flow/.test(text)));
+  h.view.renderAiLockSection(panel, node(h.id('H')), heading);
+  const pill = dom.find(heading, i => dom.hasCls(i, 'vam-card-lock-pill'));
+  assert.ok(pill && dom.texts(pill).includes(t('ui.card_settings_locked_managed')));
+  assert.equal(dom.findAll(pill, i => i.tag === 'button').length, 0, 'no unlock button');
+  assert.equal(dom.findAll(panel, i => i.tag === 'button').length, 0, 'no lock item in More');
   const free = await harness({ argument: false });
-  const plainPanel = dom.element('div');
-  free.view.renderAiLockSection(plainPanel, free.view.map.nodes[0]);
+  const plainPanel = dom.element('div'), plainHeading = dom.element('div');
+  free.view.renderAiLockSection(plainPanel, free.view.map.nodes[0], plainHeading);
   const plainButton = dom.find(plainPanel, i => i.tag === 'button');
   assert.equal(plainButton.disabled, false);
   assert.equal(plainButton.attrs['aria-disabled'], undefined);
+  assert.equal(dom.find(plainHeading, i => dom.hasCls(i, 'vam-card-lock-pill')).hidden, true);
 });
 
 test('card lock button: a managed card always shows a disabled, pressed lock that offers no unlock; a free unlocked card has none', async () => {

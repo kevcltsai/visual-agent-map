@@ -40,9 +40,11 @@
 .vam-research-progress-track { width: 88px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--background-modifier-border); }
 .vam-research-progress-fill { height: 100%; border-radius: inherit; background: var(--interactive-accent); }
 .vam-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 2px; max-width: 100%; margin-left: auto; }
-.vam-toolbar-actions .vam-new-map { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
-.vam-new-map-icon { display: inline-flex; color: var(--text-muted); }
-.vam-new-map-icon svg { width: 14px; height: 14px; }
+.vam-toolbar-actions .vam-share-button { margin-left: 4px; white-space: nowrap; }
+/* Focus mode: only the map (and a running book's bar, which keeps its Stop) stays; one button leads back. */
+.is-focus-mode .vam-toolbar > :not(.vam-book-bar), .is-focus-mode .vam-canvas-controls, .is-focus-mode .vam-map-chat-toggle { display: none; }
+.is-focus-mode .vam-toolbar.is-focus-empty { display: none; }
+.vam-exit-focus { position: absolute; z-index: 5; top: 12px; right: 12px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-icon-button:disabled { opacity: 0.4; cursor: default; }
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
@@ -65,8 +67,6 @@
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
-.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
-.vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 /* Token usage: the button at the left end of the zoom controls and the popover above them. */
 .vam-zoom-controls > .vam-usage-button { width: auto; gap: 4px; padding: 0 6px; font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -262,7 +262,6 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-topic-modal .vam-type-swatch[data-kind="evidence"] { --vam-kind-hue: var(--color-green); }
 .vam-topic-modal .vam-type-swatch[data-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
 .vam-topic-modal .vam-type-swatch[data-kind="action"] { --vam-kind-hue: var(--color-orange); }
-.vam-next-actions > .vam-add-subtopic { order: -3; }
 /* The parent tree: no grey fills. Obsidian's button styles (button:not(.clickable-icon), its :hover and :disabled) are more specific than a bare class, so the rows are matched through the tree and the dialog. */
 .vam-topic-modal .vam-topic-tree { max-height: min(240px, 40vh); }
 .vam-topic-modal .vam-topic-tree button.vam-topic-tree-row { background: transparent; box-shadow: none; }
@@ -281,8 +280,6 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node[data-aim-kind="conclusion"] { isolation: isolate; border: 0; background: transparent; box-shadow: none; }
 .vam-conclusion-background { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
 .vam-conclusion-background polygon { fill: var(--vam-card-bg); stroke: var(--background-modifier-border); stroke-width: 1; }
-.vam-node .vam-add-child { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--vam-card-bg); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; z-index: 2; pointer-events: none; }
-.vam-node .vam-add-child:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
 .vam-node:active { cursor: grabbing; }
 /* Export reads the saved border colour: no transition while the highlight class is taken off for that read. */
 .vam-view .vam-node.vam-export-measure, .vam-view .vam-text-node.vam-export-measure { transition: none; }
@@ -309,19 +306,17 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
-.vam-node > .vam-node-tools.is-side-right ~ .vam-add-child { z-index: 4; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
-.vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 /* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */
 /* With several cards selected only the hovered or focused one shows its row. Zoomed out the rows stay shown and clickable (a row that shows must always be clickable). */
-.vam-viewport.is-multi-selected:not(.is-selecting) .vam-node.is-selected:not(:hover):not(:focus-within) > .vam-node-tools { opacity: 0; visibility: hidden; transform: translateY(4px); }
+.vam-viewport.is-multi-selected:not(.is-selecting) .vam-node.is-selected:not(:focus-within) > .vam-node-tools { opacity: 0; visibility: hidden; transform: translateY(4px); }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
-.vam-node-tools > .vam-ai-explore { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-weight: 600; }
-.vam-node-tools > .vam-ai-explore::before { content: "✦" / ""; }
-.vam-node-tools > .vam-node-tool { width: 26px; padding-left: 0; padding-right: 0; display: inline-flex; align-items: center; justify-content: center; }
-.vam-node-tools > .vam-node-tool .svg-icon { width: 14px; height: 14px; }
-.vam-node:hover > .vam-add-child, .vam-node:focus-within > .vam-add-child, .vam-node.is-selected > .vam-add-child { opacity: 1; pointer-events: auto; }
+.vam-node-tools > .vam-ai-explore { background: color-mix(in srgb, var(--interactive-accent) 80%, black); color: var(--text-on-accent); font-weight: 600; }
+.vam-node-tools > .vam-ai-explore:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 80%, black); }
+.vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: 6px; padding-right: 6px; }
+.menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
@@ -554,7 +549,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
-  .vam-node, .vam-node .vam-add-child { transition: none; }
+  .vam-node { transition: none; }
   /* No motion, but the row still waits a moment before it hides. */
   .vam-node > .vam-node-tools { transition: visibility 0s linear 300ms; }
 }
@@ -566,6 +561,10 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-topic-panel { padding: 4px 0 12px; }
 .vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .vam-inspector-heading strong { font-size: var(--font-ui-medium); }
+.vam-card-lock-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; margin-right: auto; padding: 1px 4px 1px 10px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-card-lock-pill[hidden] { display: none; }
+.vam-card-lock-pill button.vam-card-lock-unlock { height: auto; padding: 0 8px; border-radius: 999px; font-size: var(--font-ui-smaller); }
+.vam-topic-modal .vam-branch-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .vam-inspector-topic { margin: -8px 0 14px; color: var(--text-muted); }
 /* Card settings (ticket 41): the add-relation sentence, the folded groups and the AI lock state. Classes below are not collected by the share viewer. */
 .vam-topic-modal .vam-relation-list { max-height: 9em; overflow-y: auto; }
@@ -593,7 +592,6 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-topic-modal .vam-disclosure-toggle::before { content: "▸"; display: inline-block; }
 .vam-topic-modal .vam-disclosure-toggle.is-open::before { content: "▾"; }
 .vam-topic-modal .vam-disclosure-body[hidden] { display: none; }
-.vam-topic-modal .vam-ai-lock-state { grid-column: 1 / -1; color: var(--text-muted); font-size: var(--font-ui-small); }
 
 .vam-inspector-section { margin: 14px 0 0; }
 .vam-inspector-proposals { margin: 0; }
@@ -1757,7 +1755,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 @keyframes vam-loading-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-loading-bar { animation: none; } }
 /* While notes are read only look and move are left: tools, resize handles and the add button are not shown (and so not reachable by keyboard). */
-.vam-view.is-notes-loading .vam-node-tools, .vam-view.is-notes-loading .vam-card-resize, .vam-view.is-notes-loading .vam-card-resize-y, .vam-view.is-notes-loading .vam-card-resize-corner, .vam-view.is-notes-loading .vam-add-child { display: none; }
+.vam-view.is-notes-loading .vam-node-tools, .vam-view.is-notes-loading .vam-card-resize, .vam-view.is-notes-loading .vam-card-resize-y, .vam-view.is-notes-loading .vam-card-resize-corner { display: none; }
 /* The first-use hint shares the bottom edge with the progress line: it waits until the notes are read. */
 .vam-view.is-notes-loading .vam-canvas-hint { display: none; }
 .vam-view .vam-goal-text[aria-disabled="true"] { cursor: default; opacity: 0.7; }
@@ -1778,7 +1776,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-stage[data-presenting] .vam-node { opacity: 0.35; }
 .vam-view .vam-stage[data-presenting] .vam-node.is-presenting { opacity: 1; outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
 .vam-view .vam-stage[data-presenting] .vam-hover-card { display: none; }
-.vam-view .vam-stage[data-presenting] .vam-node-tools, .vam-view .vam-stage[data-presenting] .vam-node .vam-add-child { display: none; }
+.vam-view .vam-stage[data-presenting] .vam-node-tools { display: none; }
 .vam-view .vam-stage[data-presenting] .vam-card-resize, .vam-view .vam-stage[data-presenting] .vam-card-resize-y, .vam-view .vam-stage[data-presenting] .vam-card-resize-corner { display: none; }
 .vam-view .vam-presentation-bar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px); padding: 4px 6px 4px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); z-index: 3; }
 .vam-view .vam-presentation-count { color: var(--text-normal); font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1907,9 +1905,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-steer.is-queued { border-left-style: dashed; border-left-color: var(--text-muted); }
 .vam-topic-chat-steer.is-queued .vam-topic-chat-steer-tag { color: var(--text-muted); }
 .vam-topic-chat-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vam-topic-chat-scope { align-self: center; padding: 1px 8px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
+.vam-topic-chat-other-ways { align-self: flex-start; font-size: var(--font-ui-smaller); }
 .vam-topic-chat-action { padding: 3px 10px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-primary); color: var(--text-normal); font-size: var(--font-ui-small); cursor: pointer; }
 .vam-topic-chat-action.is-active { border-color: var(--interactive-accent); background: var(--interactive-accent); color: var(--text-on-accent); }
-.vam-topic-chat-action:disabled, .vam-topic-chat-mode:disabled, .vam-topic-chat-mode-toggle:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
+.vam-topic-chat-action:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
 .vam-topic-chat-composer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 6px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); }
 .vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
 /* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. The class order (.has-topic-chat first) keeps scripts/viewer-css.mjs from pulling this rule into the share viewer. */
@@ -1920,17 +1920,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-ghost { position: absolute; top: 8px; left: 8px; right: 8px; color: var(--text-faint); overflow-wrap: anywhere; pointer-events: none; }
 .vam-topic-chat-ghost[hidden] { display: none; }
 .vam-topic-chat-foot { display: flex; align-items: center; gap: 6px; }
-.vam-topic-chat-mode-picker { position: relative; display: inline-flex; }
-.vam-topic-chat-mode-toggle { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
-.vam-topic-chat-mode-toggle svg, .vam-topic-chat-send svg { width: 13px; height: 13px; }
-.vam-topic-chat-mode-menu { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 1; box-sizing: border-box; width: 92px; display: flex; flex-direction: column; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }
-.vam-topic-chat-mode-menu[hidden] { display: none; }
-.vam-topic-chat-mode-menu button.vam-topic-chat-mode { height: 26px; padding: 0 6px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-smaller); cursor: pointer; }
-.vam-topic-chat-mode-menu button.vam-topic-chat-mode:hover, .vam-topic-chat-mode-menu button.vam-topic-chat-mode:focus-visible { background: var(--background-modifier-hover); }
-.vam-topic-chat-mode-icon svg, .vam-topic-chat-mode-check svg { width: 13px; height: 13px; }
-.vam-topic-chat-mode-label { flex: 1 1 auto; text-align: left; }
-.vam-topic-chat-mode-check { visibility: hidden; display: inline-flex; color: var(--text-accent); }
-.vam-topic-chat-mode[aria-checked="true"] .vam-topic-chat-mode-check { visibility: visible; }
+.vam-topic-chat-web { display: inline-flex; align-items: center; gap: 4px; margin-right: auto; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-topic-chat-send svg { width: 13px; height: 13px; }
 .vam-topic-chat-send { margin-left: auto; width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; }
 .vam-topic-chat-foot button.vam-topic-chat-send:not(:disabled) { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-topic-chat-mode-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }

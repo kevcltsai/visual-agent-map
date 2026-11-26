@@ -4,8 +4,7 @@ import { t, type TranslationKey } from "../../i18n";
 /** The map's keys, as the card and view handlers bind them; `Mod` reads ⌘ on macOS and Ctrl elsewhere. */
 export const MAP_KEYBOARD_SHORTCUTS: readonly { keys: readonly string[]; action: TranslationKey }[] = [
   { keys: ["↑", "↓", "←", "→"], action: "ui.shortcut_move_between_cards" },
-  { keys: ["Enter"], action: "ui.shortcut_open_details" },
-  { keys: ["F2"], action: "ui.shortcut_rename" },
+  { keys: ["Enter", "F2"], action: "ui.shortcut_rename" },
   { keys: ["Mod+Enter"], action: "ui.shortcut_add_subtopic" },
   { keys: ["Shift+Enter"], action: "ui.shortcut_add_sibling" },
   { keys: ["Alt+↑", "Alt+↓"], action: "ui.shortcut_reorder_sibling" },

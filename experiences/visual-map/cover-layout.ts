@@ -142,14 +142,7 @@ export function coverCardLayout(
 }
 
 /** Card children that stay outside the side layout's text column: they are drawn over or around the card, not in it. */
-const SIDE_OUTSIDE = [
-  "vam-add-child",
-  "vam-card-resize",
-  "vam-card-resize-y",
-  "vam-card-frame-width",
-  "vam-card-fade",
-  "vam-card-more"
-];
+const SIDE_OUTSIDE = ["vam-card-resize", "vam-card-resize-y", "vam-card-frame-width", "vam-card-fade", "vam-card-more"];
 /** What ends a card's text, first match wins: the summary, the open summary field, the add-summary line. */
 const SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
 /** Siblings that belong to the field just before them while a title or summary is being edited. */

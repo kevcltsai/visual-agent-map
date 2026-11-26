@@ -85,7 +85,7 @@ integrationTest('map actions (counterexample 9, Q15/Q17, C5; was: the map defaul
     const before = JSON.stringify(view.map);
     view.openMapActions();
     const labels = plain(menus.at(-1).items.map(item => item.title));
-    assert.ok(labels.length >= 2 && labels.includes('Rename current mind map'), labels.join('|'));
+    assert.ok(labels.length >= 2 && labels.includes('Keyboard shortcuts'), labels.join('|'));
     for (const label of labels) assert.ok(!/note style|voice|tone/i.test(label), `${aim ? 'AIM' : 'regular'} map: ${label}`);
     assert.equal(JSON.stringify(view.map), before, 'opening the actions leaves the old map values alone');
   }

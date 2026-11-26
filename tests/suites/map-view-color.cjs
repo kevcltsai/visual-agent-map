@@ -46,7 +46,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
     <svg class="vam-edges"><path class="vam-edge" data-parent-line d="M0 0 L200 0"/><path class="vam-edge vam-edge-aim" d="M0 -20 L200 -20"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/>${RELATION_FIXTURE}</svg>
-    ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-card-tool vam-ai-explore">Research</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
@@ -96,8 +96,9 @@ const CASES = [
   ['discard', '.vam-discard', 'color', 4.5, { buttonEnvelope: true }],
   ['share-warning', '.vam-share-note.vam-share-warning', 'color', 4.5],
   ['switcher-icon', '.vam-map-switcher-icon svg', 'color', 3],
-  ['ai-explore', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true }],
-  ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true, hover: true }],
+  // The Research button has its own accent fill (the page's button fill does not show behind it), so no buttonEnvelope.
+  ['ai-explore', '.vam-ai-explore', 'color', 4.5],
+  ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { hover: true }],
   ['argument-run-chip', '.vam-argument-chip.is-run', 'color', 4.5],
   ['argument-bar-resume', '.vam-argument-bar button.mod-cta', 'color', 4.5],
   ['argument-bar-resume-hover', '.vam-argument-bar button.mod-cta', 'color', 4.5, { hover: true }],

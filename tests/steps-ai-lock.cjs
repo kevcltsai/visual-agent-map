@@ -212,17 +212,24 @@ test('a user edit of a locked topic is still written', async () => {
 });
 
 // ---- UI ----------------------------------------------------------------------------------------------------------------
-test('inspector: an aria-pressed lock toggle; the card shows a lock button only when locked and a click unlocks', async () => {
+const lockPill = heading => dom.find(heading, i => dom.hasCls(i, 'vam-card-lock-pill'));
+const lockSection = panel => dom.find(panel, i => dom.hasCls(i, 'vam-ai-lock-section'));
+
+test('inspector: an unlocked card has the Lock item in More and a hidden pill; the header lock button shows only when locked and a click unlocks', async () => {
   const h = await harness(['A']);
   const [a] = h.nodes;
   const calls = [];
   h.view.setAiLock = async (nodes, locked) => { calls.push(JSON.stringify([nodes.map(n => n.id), locked])); };
   h.view.enqueue = fn => fn();
-  const panel = dom.element('div');
-  h.view.renderAiLockSection(panel, a);
-  const toggle = dom.findAll(panel, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0];
-  assert.equal(toggle.attrs['aria-pressed'], 'false');
-  toggle.click(); await dom.tick();
+  const panel = dom.element('div'), heading = dom.element('div');
+  h.view.renderAiLockSection(panel, a, heading);
+  assert.equal(lockPill(heading).hidden, true, 'unlocked: the pill is hidden');
+  assert.equal(lockSection(panel).hidden, false);
+  assert.ok(dom.texts(lockSection(panel)).includes(t('ui.ai_lock')), 'heading AI lock');
+  const lock = dom.find(lockSection(panel), i => i.tag === 'button' && dom.hasCls(i, 'vam-card-lock-button'));
+  assert.equal(lock.text, t('ui.ai_lock_toggle'));
+  assert.equal(lock.attrs['aria-pressed'], undefined, 'no pressed toggle any more');
+  lock.click(); await dom.tick();
   assert.deepEqual(calls, [JSON.stringify([[a.id], true])]);
   const header = dom.element('div'), card = dom.element('div');
   h.view.paintAiLock(card, header, a);
@@ -234,25 +241,31 @@ test('inspector: an aria-pressed lock toggle; the card shows a lock button only 
   assert.match(button.attrs['aria-label'], /解除|Unlock/);
   button.click(); await dom.tick();
   assert.equal(calls.at(-1), JSON.stringify([[a.id], false]));
-  const panel2 = dom.element('div');
-  h.view.renderAiLockSection(panel2, a);
-  assert.equal(dom.findAll(panel2, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0].attrs['aria-pressed'], 'true');
 });
 
-test('34 inspector: the lock button label follows the state like the selection bar (Lock -> Unlock)', async () => {
+test('34 inspector: a locked card shows the pill with Unlock and no lock item in More; Unlock calls setAiLock false and the item comes back', async () => {
   const h = await harness(['A']);
   const [a] = h.nodes;
-  h.view.setAiLock = async () => {};
+  const calls = [];
+  h.view.setAiLock = async (nodes, locked) => { calls.push([nodes.map(n => n.id), locked]); h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: locked }); };
   h.view.enqueue = fn => fn();
-  const panel = dom.element('div');
-  h.view.renderAiLockSection(panel, a);
-  const find = () => dom.findAll(panel, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0];
-  assert.equal(find().text, t('ui.ai_lock_toggle'));
-  find().click(); await dom.tick();
-  assert.equal(find().attrs['aria-pressed'], 'true');
-  assert.equal(find().text, t('ui.ai_unlock_selected'), 'locked: button says Unlock');
-  find().click(); await dom.tick();
-  assert.equal(find().text, t('ui.ai_lock_toggle'), 'unlocked again: back to Lock');
+  h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: true });
+  const panel = dom.element('div'), heading = dom.element('div');
+  h.view.renderAiLockSection(panel, a, heading);
+  const pill = lockPill(heading);
+  assert.equal(pill.hidden, false);
+  assert.ok(dom.texts(pill).includes(t('ui.card_settings_locked')), 'says why');
+  const unlock = dom.find(pill, i => i.tag === 'button' && dom.hasCls(i, 'vam-card-lock-unlock'));
+  assert.equal(unlock.text, t('ui.card_settings_unlock'));
+  assert.equal(lockSection(panel).hidden, true, 'the More item is hidden while locked');
+  assert.equal(dom.findAll(lockSection(panel), i => dom.hasCls(i, 'vam-card-lock-button')).length, 0);
+  unlock.click(); await dom.tick();
+  assert.equal(JSON.stringify(calls), JSON.stringify([[[a.id], false]]));
+  assert.equal(pill.hidden, true); assert.equal(lockSection(panel).hidden, false);
+  assert.equal(dom.find(lockSection(panel), i => dom.hasCls(i, 'vam-card-lock-button')).text, t('ui.ai_lock_toggle'), 'Lock from AI is back');
+  assert.equal(dom.findAll(pill, i => i.tag === 'button').length, 0, 'no unlock button while unlocked');
+  dom.find(lockSection(panel), i => dom.hasCls(i, 'vam-card-lock-button')).click(); await dom.tick();
+  assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify([[a.id], true])); assert.equal(pill.hidden, false);
 });
 
 test('i18n: the locked notice and the toggle names exist in every language', () => {

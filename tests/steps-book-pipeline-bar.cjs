@@ -360,19 +360,19 @@ test('right-click: the rerun item and its disabled sub line show at gate 2 and d
   const h = await viewRig();
   const node = h.view.map.nodes[1];
   h.progress(h.prog('gate1'));
-  assert.ok(h.menu(node).every(i => i.title !== '重跑圖文書這一張'), 'no rerun item at gate 1');
+  assert.ok(h.menu(node).every(i => i.title !== '重寫這一章'), 'no rerun item at gate 1');
   for (const phase of ['gate2', 'done']) {
     h.progress(h.prog(phase));
     const items = h.menu(node);
-    const at = items.findIndex(i => i.title === '重跑圖文書這一張');
+    const at = items.findIndex(i => i.title === '重寫這一章');
     assert.ok(at >= 0, phase);
     assert.equal(items[at].disabled, false);
     // The second line is a note (never the permanent grey "disabled" line it was): it describes the rerun while it can be used.
-    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章正文不動，只更新前後章節的連接行並標「接縫需看」');
+    assert.equal(items[at + 1].title, '約 2 分鐘，前後章只改銜接句');
     assert.notEqual(items[at + 1].disabled, true);
   }
   // When it cannot be used the second line says why.
-  const why = progressOver => { h.progress(h.prog('gate2', progressOver)); const items = h.menu(node); const at = items.findIndex(i => i.title === '重跑圖文書這一張'); return { disabled: items[at].disabled, line: items[at + 1].title }; };
+  const why = progressOver => { h.progress(h.prog('gate2', progressOver)); const items = h.menu(node); const at = items.findIndex(i => i.title === '重寫這一章'); return { disabled: items[at].disabled, line: items[at + 1].title }; };
   assert.deepEqual(why({ active: true }), { disabled: true, line: '圖文書正在執行，等它結束後再重跑' });
   assert.deepEqual(why({ busyCards: [node.id] }), { disabled: true, line: '這一張正在重跑' });
   assert.deepEqual(why({ rerun: { nodeId: node.id, startedAt: 1 } }), { disabled: true, line: '這一張正在重跑' });
@@ -381,11 +381,11 @@ test('right-click: the rerun item and its disabled sub line show at gate 2 and d
   assert.deepEqual(why({}), { disabled: true, line: '對話進行中，等它結束後再重跑' });
   h.view.chatChainRunner = null;
   h.progress(h.prog('writing'));
-  assert.equal(h.menu(node).some(i => i.title === '重跑圖文書這一張'), false, 'not while planning or writing');
+  assert.equal(h.menu(node).some(i => i.title === '重寫這一章'), false, 'not while planning or writing');
   h.progress(h.prog('gate2'));
   let reread = 0;
   h.view.rereadBookCard = async () => { reread++; };
-  h.menu(node).find(i => i.title === '重跑圖文書這一張').click();
+  h.menu(node).find(i => i.title === '重寫這一章').click();
   await settle();
   assert.deepEqual(h.calls, [['rerun', MAP, node.id]]);
   assert.equal(reread, 1);
@@ -398,7 +398,7 @@ test('right-click rerun through the view: "same result" lands on the review memo
   h.view.rereadBookCard = async () => {};
     let next = { unchanged: true };
   h.plugin.rerunBookCard = async () => next;
-  const click = async () => { h.menu(node).find(i => i.title === '重跑圖文書這一張').click(); await settle(); };
+  const click = async () => { h.menu(node).find(i => i.title === '重寫這一章').click(); await settle(); };
   await click();
   assert.ok(h.view.bookReview.unchanged.has(node.id), 'the same result is remembered');
   next = { unchanged: false };
@@ -436,13 +436,27 @@ test('runTrackedRerun: the same result is remembered, a changed result or a new 
 
 // ---- T14: the chapter-role item of the card right-click menu ----
 const roleMenu = (h, node, mode = 'sub') => {
-  const items = [];
-  const entry = () => { const it = {}; const chain = { setTitle(v) { it.title = v; return chain; }, setIcon(v) { it.icon = v; return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, setChecked(v) { it.checked = v; return chain; }, onClick(fn) { it.click = fn; return chain; } }; return { it, chain }; };
-  const sub = { items: [], addItem(build) { const e = entry(); build(e.chain); this.items.push(e.it); return this; } };
-  const m = { addItem(build) { const e = entry(); if (mode === 'sub') e.chain.setSubmenu = () => sub; build(e.chain); items.push(e.it); return m; }, addSeparator() { return m; } };
+  // A submenu-capable menu: every item can open a child menu (mode 'sub'); in mode 'flat' no item has setSubmenu, so all items land in one list.
+  const make = () => {
+    const items = [];
+    const m = { items, addItem(build) {
+      const it = {};
+      const chain = { setTitle(v) { it.title = v; return chain; }, setIcon(v) { it.icon = v; return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, setChecked(v) { it.checked = v; return chain; }, onClick(fn) { it.click = fn; return chain; } };
+      if (mode === 'sub') chain.setSubmenu = () => (it.sub = make());
+      build(chain); items.push(it); return m;
+    }, addSeparator() { return m; } };
+    return m;
+  };
+  const m = make();
   h.view.addCardMenuActions(m, node);
-  const at = items.findIndex(i => i.title === '圖文書：章節角色');
-  return { items, at, choices: mode === 'sub' ? sub.items : items.slice(at + 1, at + 6) };
+  if (mode === 'flat') {
+    const at = m.items.findIndex(i => i.title === '章節角色');
+    return { items: m.items, at, choices: m.items.slice(at + 1, at + 6) };
+  }
+  // The role item lives in the "Picture book" submenu, with its own submenu of choices.
+  const book = m.items.find(i => i.title === '圖文書');
+  const role = book?.sub?.items.find(i => i.title === '章節角色');
+  return { items: m.items, at: role ? m.items.indexOf(book) : -1, choices: role?.sub?.items ?? [] };
 };
 const noteOf = (h, node) => h.view.plugin.repo.readNote(node.path);
 
@@ -457,7 +471,7 @@ test('T14 menu: a chapter card of a usable book has the role item with five choi
     assert.deepEqual(m.choices.map(c => c.title), ['本文', '導讀', '素材導覽', '收尾', '交給 AI 決定'], mode);
     assert.deepEqual(m.choices.map(c => !!c.checked), [false, false, false, false, true], 'a pipeline role: the AI option is marked');
   }
-  for (const [lang, expect] of [['en', ['Picture book: chapter role', 'Let AI decide']], ['zh-CN', ['图文书：章节角色', '交给 AI 决定']], ['zh-TW', ['圖文書：章節角色', '交給 AI 決定']]]) {
+  for (const [lang, expect] of [['en', ['Chapter role', 'Let AI decide']], ['zh-CN', ['章节角色', '交给 AI 决定']], ['zh-TW', ['章節角色', '交給 AI 決定']]]) {
     setUiLanguage(lang);
     const items = []; h.view.addCardMenuActions({ addItem(b) { const it = {}; const c = { setTitle(v) { it.title = v; return c; }, setIcon() { return c; }, setDisabled() { return c; }, onClick() { return c; } }; b(c); items.push(it); return this; }, addSeparator() { return this; } }, node);
     assert.ok(items.some(i => i.title === expect[0]), lang);

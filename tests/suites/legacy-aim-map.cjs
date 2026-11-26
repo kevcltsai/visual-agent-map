@@ -350,21 +350,22 @@ test('legacy-aim-map: E1 the card of an AIM node has the generic tools and none 
   view.stageEl = element('stage', buttons);
   view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
   view.renderNode(conclusion);
-  // The card tools are icon-only buttons named by aria-label (no More menu).
-  const labels = buttons.map(button => button['aria-label'] ?? button.text);
-  for (const label of ['Details', 'AI explore', 'This card', 'Add subtopic manually']) assert.ok(labels.includes(label), label);
+  // The selected card's toolbar: four labelled buttons (the More button is named by aria-label).
+  const labels = buttons.flatMap(button => [button['aria-label'], button.text]);
+  for (const label of ['Research', 'Add', 'Note', 'More card actions']) assert.ok(labels.includes(label), label);
   assert.equal(labels.includes('Continue exploring'), false);
   assert.equal(labels.some(label => /Steer|Correct|new question|Answer|Retry|Start|Continue|Resume|direction/i.test(label ?? '')), false, 'no AIM action');
 });
 
-integrationTest('legacy-aim-map: the New map button makes the map at once (no one-row menu, no name dialog)', () => {
+integrationTest('legacy-aim-map: New mind map (title ▾ menu) makes the map at once (no further menu, no name dialog)', () => {
   const menus = [];
-  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, onClick() { return this; } }; callback(item); this.items.push(item); return this; } addSeparator() {} showAtMouseEvent() {} showAtPosition() {} setNoIcon() { return this; } }
+  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick(fn) { this.click = fn; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() {} showAtMouseEvent() {} showAtPosition() {} setNoIcon() { return this; } }
   const { VisualAgentMapView } = loadHidden('main.ts', { obsidian: { ...obsidian, Menu } });
   const view = new VisualAgentMapView({ app: {} }, { repo: {}, settings: { ...DEFAULT_SETTINGS } });
   let direct = 0; view.openNewMindMapModal = () => { direct++; };
-  view.openNewMapMenu({});
-  assert.equal(menus.length, 0, 'no menu');
+  view.openMapTitleMenu({});
+  menus[0].items.find(item => item.title === 'New mind map').click();
+  assert.equal(menus.length, 1, 'no further menu');
   assert.equal(direct, 1, 'the map is made directly');
 });
 

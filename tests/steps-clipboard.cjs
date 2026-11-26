@@ -255,3 +255,9 @@ test('hypothesis-leaning: the outline text of a clipboard payload and the share 
   assert.equal(outline, '- Claim\n\t- Sub');
   assert.doesNotMatch(outline, /leaning|supported|strong|hypothesis/i);
 });
+
+
+test('Living Node ownership markers cannot enter through a portable clipboard body', () => {
+  for (const body of ['<!-- vam-living-node:begin v1 -->', 'text\n<!-- vam-living-node:end v1 -->'])
+    assert.equal(reason(payload({ nodes: [node('a', null, { body })] })), 'bad-body');
+});

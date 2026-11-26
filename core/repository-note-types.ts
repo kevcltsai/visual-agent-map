@@ -55,6 +55,8 @@ export interface Note extends PipelineFields {
   /** Read-only Living Node knowledge and attempt diagnostics derived from the authoritative note. */
   livingNode?: {
     summary: string;
+    /** Snapshot of the saved configuration, not the knowledge or run diagnostics. */
+    configRevision?: string;
     knowledgeRevision: string;
     successfulKnowledgeRevision?: string;
     lastAttempt?: string;

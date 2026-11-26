@@ -30,6 +30,23 @@ S.integrationTest('Living Node: first commit uses real Repository guard and pres
   assert.equal((actual.match(/vam-living-node:begin/g) ?? []).length, 1);
 });
 
+S.integrationTest('Living Node: a Repository-created AI card can commit using its real map and node identity', async () => {
+  const f = S.fixture('en');
+  const mapPath = await f.repo.createMap('Living Node map');
+  const map = await f.repo.readMap(mapPath);
+  const card = await f.repo.createNote('Research card', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(card);
+  await f.repo.saveMap(mapPath, map);
+  await f.repo.updateNote(card.path, { prompt: 'Research' });
+  await f.repo.writeAiCard(card.path, true);
+  const expectedContent = f.contents.get(card.path);
+  const candidate = { executionId: 'actual-created-card', cardId: card.id, mapId: map.id,
+    baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'input', viewSession: 'view' };
+  const r = request(f, { path: card.path, expectedContent, candidate });
+  assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(card.path)).output.text, 'Current findings');
+});
+
 S.integrationTest('Living Node: existing Repository map identity is distinct from node identity', async () => {
   for (const bad of [
     initial.replace('node-id: card', 'node-id: another'),

@@ -24,6 +24,7 @@ import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
 import { styleChoiceField } from "./research-fields";
 import { errorNotice, stylePickerFor } from "./note-style-picker";
 import { type MapAiMode } from "./ai-mode";
+import type { UpdateMode } from "../../ai/note-style-recipe";
 import { titleProblemText } from "../../ui/modals/title-check";
 
 export type SynthesisContent = "full" | "summary";
@@ -65,6 +66,8 @@ export interface TaskOptions {
    * Set by the topic chat chain: the integration sends the subtree outline and an unset note style as a whole rewrite. Absent: the older behaviour (the style's own update mode, no outline).
    */
   subtreeIntegration?: boolean;
+  /** An AI card's own update mode ("keep old data" is "top", unticked is "fresh"); it wins over the note style's. Absent: the older behaviour. */
+  updateMode?: UpdateMode;
   /** Set for the chain's intermediate integrations: the note is material for the level above, so no chart step is queued after the write. */
   skipCharts?: boolean;
   /** Takes user additions while the run's main call is going (the topic chat window). Absent: the run takes none. */

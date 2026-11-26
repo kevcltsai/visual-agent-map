@@ -1,5 +1,5 @@
-// Prompt topics and "run all" (V1): the pure planner (experiences/visual-map/prompt-run.ts), the `reuse-last-result` frontmatter key,
-// and the view (confirm card, batch, stop, menus, arrows) with researchChild / integrateChildren / confirmAiUsage stubbed to count calls.
+// AI cards and "run all" (V2): the pure planner (experiences/visual-map/prompt-run.ts), the `ai-card` / `ai-run-*` / `ai-update-mode`
+// frontmatter keys, and the view (batch, stop, records) with researchChild / integrateChildren / confirmAiUsage stubbed to count calls.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,52 +20,46 @@ const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const nodes = [
   { id: 'root', parentId: null }, { id: 'a', parentId: 'root' }, { id: 'a1', parentId: 'a' }, { id: 'a2', parentId: 'a' }, { id: 'b', parentId: 'root' }, { id: 'c', parentId: null }
 ];
-const P = (extra = {}) => ({ prompt: 'p', researchMode: 'local', ...extra });
+const P = (extra = {}) => ({ prompt: 'p', aiCard: true, ...extra });
 const noteMap = spec => id => spec[id];
-const all = () => noteMap({ root: P(), a: P(), a1: P(), a2: P({ researchMode: 'research' }), b: P({ researchMode: 'research' }), c: P() });
+const all = () => noteMap({ root: P(), a: P(), a1: P(), a2: P(), b: P(), c: P() });
 const ids = items => items.map(i => i.id);
 
-test('plan: children before parents; a leaf researches, a topic with children integrates', () => {
-  const plan = pr.planPromptRun(nodes, all(), null);
+test('plan: children before parents; a leaf researches on the web, a card with children integrates without it', () => {
+  const plan = pr.planPromptRun(nodes, all());
   eq(ids(plan.order), ['a1', 'a2', 'a', 'b', 'root', 'c']);
   eq(plan.order.map(i => i.kind), ['research', 'research', 'integrate', 'research', 'integrate', 'research']);
+  eq(plan.order.map(i => i.web), [true, true, false, true, false, true]);
+  eq(plan.counts, { run: 6, web: 4 });
 });
 
-test('plan: counts X (run), Y (web leaves in Standard), Z (reuse or AI lock)', () => {
-  const plan = pr.planPromptRun(nodes, noteMap({ root: P(), a: P({ reuseLastResult: true }), a1: P(), a2: P({ researchMode: 'research' }), b: P({ researchMode: 'research', aiLocked: true }), c: P({ researchMode: 'research' }) }), null);
-  eq(plan.counts, { run: 4, web: 2, reuse: 2 });
-  eq(ids(plan.run), ['a1', 'a2', 'root', 'c']);
-  eq(ids(plan.reuse), ['a', 'b']);
-  assert.equal(plan.order.find(i => i.id === 'a').action, 'reuse', 'a reused topic stays in the order');
-  assert.equal(plan.order.find(i => i.id === 'b').web, false, 'a reused leaf does not search the web');
+test('plan: a locked AI card and its whole subtree are left out; a locked ordinary card cuts nothing', () => {
+  const plan = pr.planPromptRun(nodes, noteMap({ root: P(), a: P({ aiLocked: true }), a1: P(), a2: P(), b: P(), c: P() }));
+  eq(ids(plan.order), ['b', 'root', 'c'], 'a, a1 and a2 do not run and are not counted');
+  const ordinary = pr.planPromptRun(nodes, noteMap({ root: P(), a: { prompt: 'p', aiLocked: true }, a1: P(), a2: P(), b: P() }));
+  eq(ids(ordinary.order), ['a1', 'a2', 'b', 'root'], 'the locked ordinary card does not cut the chain');
 });
 
-test('plan: an integrating topic never counts as web even when its saved mode is Standard', () => {
-  const plan = pr.planPromptRun(nodes, noteMap({ root: P({ researchMode: 'research' }), a: P(), a1: P(), a2: P(), b: P() }), null);
-  assert.equal(plan.counts.web, 0);
-});
-
-test('plan: a subtree scope runs only that branch; an unknown scope runs nothing', () => {
-  eq(ids(pr.planPromptRun(nodes, all(), 'a').order), ['a1', 'a2', 'a']);
-  eq(pr.planPromptRun(nodes, all(), 'zzz').order, []);
-});
-
-test('plan: an empty Prompt topic is not in the order; its Prompt children still are', () => {
-  const plan = pr.planPromptRun(nodes, noteMap({ root: P(), a: P({ prompt: '  ' }), a1: P(), a2: P(), b: P() }), null);
-  eq(ids(plan.order), ['a1', 'a2', 'b', 'root']);
-  assert.equal(pr.isPromptTopic(P({ prompt: '\n ' })), false);
-  assert.equal(pr.isPromptTopic(undefined), false);
+test('plan: an AI card is `ai-card: true` and a non-empty Prompt; a Prompt alone (an AI-expanded child) is an ordinary card', () => {
+  assert.equal(pr.isAiCard(P({ prompt: '\n ' })), false);
+  assert.equal(pr.isAiCard({ prompt: 'p' }), false);
+  assert.equal(pr.isAiCard({ prompt: '', aiCard: true }), false);
+  assert.equal(pr.isAiCard(P()), true);
+  assert.equal(pr.isAiCard(undefined), false);
+  const plan = pr.planPromptRun(nodes, noteMap({ root: P(), a: { prompt: 'p' }, a1: P(), a2: { prompt: 'p' }, b: P() }));
+  eq(ids(plan.order), ['a1', 'b', 'root'], 'cards with only a Prompt never run; their AI-card children still do');
 });
 
 test('plan: a note that is not loaded is skipped; a parent cycle is walked once', () => {
-  eq(ids(pr.planPromptRun(nodes, noteMap({ root: P(), a: P() }), null).order), ['a', 'root']);
+  eq(ids(pr.planPromptRun(nodes, noteMap({ root: P(), a: P() })).order), ['a', 'root']);
   const loop = [{ id: 'x', parentId: 'y' }, { id: 'y', parentId: 'x' }];
-  assert.doesNotThrow(() => pr.planPromptRun(loop, noteMap({ x: P(), y: P() }), 'x'));
+  assert.doesNotThrow(() => pr.planPromptRun(loop, noteMap({ x: P(), y: P() })));
 });
 
-test('hasPromptTopic / isPromptEdge', () => {
-  assert.equal(pr.hasPromptTopic(nodes, noteMap({ a: P({ prompt: '' }) })), false);
-  assert.equal(pr.hasPromptTopic(nodes, noteMap({ a: P() })), true);
+test('hasAiCard / isPromptEdge', () => {
+  assert.equal(pr.hasAiCard(nodes, noteMap({ a: P({ prompt: '' }) })), false);
+  assert.equal(pr.hasAiCard(nodes, noteMap({ a: { prompt: 'p' } })), false);
+  assert.equal(pr.hasAiCard(nodes, noteMap({ a: P() })), true);
   assert.equal(pr.isPromptEdge(all(), 'root', 'a'), true);
   assert.equal(pr.isPromptEdge(noteMap({ root: P(), a: P({ prompt: '' }) }), 'root', 'a'), false);
 });
@@ -85,24 +79,18 @@ test('readPromptSources: a link that does not resolve or whose read throws is sk
   eq(seen, ['Missing', 'Boom', 'A', 'B'], 'stops reading at the limit');
 });
 
-test('blockingChildren: only Prompt, not reused, not locked children that are bad block; empty-Prompt and reused children never do', () => {
-  const spec = noteMap({ root: P(), a: P(), b: P({ reuseLastResult: true }), a1: P({ prompt: '' }), c: P({ aiLocked: true }) });
-  const kids = [{ id: 'root', parentId: null }, { id: 'a', parentId: 'root' }, { id: 'b', parentId: 'root' }, { id: 'a1', parentId: 'root' }, { id: 'c', parentId: 'root' }];
+test('blockingChildren: only unlocked AI-card children that are bad block; ordinary and locked children never do', () => {
+  const spec = noteMap({ root: P(), a: P(), a1: { prompt: 'p' }, c: P({ aiLocked: true }), d: P({ prompt: '' }) });
+  const kids = [{ id: 'root', parentId: null }, { id: 'a', parentId: 'root' }, { id: 'a1', parentId: 'root' }, { id: 'c', parentId: 'root' }, { id: 'd', parentId: 'root' }];
   eq(pr.blockingChildren(kids, spec, 'root', () => true), ['a']);
   eq(pr.blockingChildren(kids, spec, 'root', () => false), []);
 });
 
-test('staleAncestors: the unbroken Prompt chain upward; stops at an empty Prompt; a cycle ends', () => {
-  eq(pr.staleAncestors(nodes, all(), 'a1'), ['a', 'root']);
-  eq(pr.staleAncestors(nodes, noteMap({ root: P(), a: P({ prompt: '' }), a1: P() }), 'a1'), [], 'the empty Prompt stops the chain');
-  eq(pr.staleAncestors([{ id: 'x', parentId: 'y' }, { id: 'y', parentId: 'x' }], noteMap({ x: P(), y: P() }), 'x'), ['y']);
-});
-
 const items = (plan) => plan.order;
 test('runPromptItems: post-order calls, statuses, outcome counts; a failing child blocks its parents without an AI call', async () => {
-  const plan = pr.planPromptRun(nodes, all(), null);
+  const plan = pr.planPromptRun(nodes, all());
   const statuses = new Map(), ran = [];
-  const outcome = await pr.runPromptItems(items(plan), null, {
+  const outcome = await pr.runPromptItems(items(plan), {
     nodes, noteOf: all(), signal: new AbortController().signal, isBad: id => statuses.get(id)?.status === 'blocked',
     setStatus: (id, status, reason) => statuses.set(id, { status, reason }), titleOf: id => id.toUpperCase(), blockedReason: t => `below: ${t}`,
     runItem: async item => { ran.push(item.id); if (item.id === 'a1') throw new Error('boom'); }
@@ -114,34 +102,71 @@ test('runPromptItems: post-order calls, statuses, outcome counts; a failing chil
   eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false });
 });
 
-test('runPromptItems: Stop returns the running topic to idle and starts nothing new', async () => {
-  const plan = pr.planPromptRun(nodes, all(), null);
+test('runPromptItems: Stop returns the running card to idle and starts nothing new', async () => {
+  const plan = pr.planPromptRun(nodes, all());
   const controller = new AbortController(), statuses = new Map(), ran = [];
-  const outcome = await pr.runPromptItems(items(plan), null, {
+  const outcome = await pr.runPromptItems(items(plan), {
     nodes, noteOf: all(), signal: controller.signal, isBad: () => false, setStatus: (id, status) => statuses.set(id, status), titleOf: String, blockedReason: String,
     runItem: async item => { ran.push(item.id); if (item.id === 'a2') controller.abort(); }
   });
   eq(ran, ['a1', 'a2']);
   assert.equal(statuses.get('a2'), 'idle'); assert.equal(statuses.get('a1'), 'done');
-  for (const id of ['a', 'b', 'root', 'c']) assert.equal(statuses.get(id), 'idle', id);
+  for (const id of ['a', 'b', 'root', 'c']) assert.equal(statuses.has(id), false, `${id} keeps its mark`);
   assert.equal(outcome.stopped, true);
 });
 
-test('runPromptItems: a written scope marks its Prompt ancestors stale; "only this one" (no blocking check) reads children as they are', async () => {
-  const statuses = new Map(), ran = [];
-  const one = [{ id: 'a', kind: 'integrate', action: 'run', web: false }];
-  const outcome = await pr.runPromptItems(one, 'a', {
-    nodes, noteOf: all(), signal: new AbortController().signal, isBad: () => true, setStatus: (id, status) => statuses.set(id, status), titleOf: String, blockedReason: String,
-    runItem: async item => { ran.push(item.id); }
-  }, false);
-  eq(ran, ['a']);
-  assert.equal(statuses.get('root'), 'stale');
-  assert.equal(outcome.done, 1);
-  assert.equal(statuses.has('a1'), false);
+test('promptInputKey: Prompt (trimmed), children by id with their summary, source mtimes; order of children does not matter', () => {
+  const base = { prompt: ' Q ', children: [{ id: 'b', summary: 'B' }, { id: 'a', summary: 'A' }], sources: [{ path: 'N.md', mtime: 5 }] };
+  const key = pr.promptInputKey(base);
+  assert.match(key, /^[0-9a-f]{8}$/);
+  assert.equal(pr.promptInputKey({ ...base, prompt: 'Q', children: [...base.children].reverse() }), key);
+  assert.notEqual(pr.promptInputKey({ ...base, prompt: 'Q2' }), key);
+  assert.notEqual(pr.promptInputKey({ ...base, children: [{ id: 'b', summary: 'B2' }, { id: 'a', summary: 'A' }] }), key, 'a child summary changed');
+  assert.notEqual(pr.promptInputKey({ ...base, children: base.children.slice(1) }), key, 'a child removed');
+  assert.notEqual(pr.promptInputKey({ ...base, children: [...base.children, { id: 'c', summary: '' }] }), key, 'a child added');
+  assert.notEqual(pr.promptInputKey({ ...base, sources: [{ path: 'N.md', mtime: 6 }] }), key, 'a source note edited');
+  assert.notEqual(pr.promptInputKey({ ...base, sources: [] }), key);
+});
+
+test('aiCardStatus: pending, running, failed, stale (own input or a child not done), done', () => {
+  const ok = { at: 't', result: 'ok', input: 'k' };
+  const st = (extra) => pr.aiCardStatus({ running: false, inputKey: 'k', childStatuses: [], ...extra });
+  assert.equal(st({}), 'pending');
+  assert.equal(st({ run: ok, running: true }), 'running');
+  assert.equal(st({ run: ok }), 'done');
+  assert.equal(st({ run: { ...ok, input: 'old' } }), 'stale');
+  assert.equal(st({ run: { at: 't', result: 'ok' } }), 'stale', 'no input recorded');
+  assert.equal(st({ run: ok, childStatuses: ['done', 'stale'] }), 'stale', 'a child that needs a re-run');
+  assert.equal(st({ run: ok, childStatuses: ['pending'] }), 'stale', 'a child never run');
+  assert.equal(st({ run: ok, childStatuses: ['done', 'done'] }), 'done');
+  assert.equal(st({ run: { at: 't', result: 'failed', input: 'k' } }), 'failed');
+  assert.equal(st({ run: { at: 't', result: 'blocked', input: 'k' } }), 'failed');
+  assert.equal(st({ run: { at: 't', result: 'failed' }, childStatuses: ['stale'] }), 'failed', 'failed never turns into stale');
+});
+
+test('splitPrompt / joinPrompt: the question and the source notes round trip; other "name: content" lines stay in the question', () => {
+  eq(pr.splitPrompt('Why?\n資料來源：[[A]]、[[B]]'), { question: 'Why?', sources: ['A', 'B'] });
+  eq(pr.splitPrompt('Why?\nFormat: bullets\nSources: [[A]], [[B|x]]'), { question: 'Why?\nFormat: bullets', sources: ['A', 'B'] });
+  eq(pr.splitPrompt('Why?\n资料来源: [[A]]\n資料來源：[[A]]'), { question: 'Why?', sources: ['A'] }, 'a repeated link once');
+  eq(pr.splitPrompt('Why?\nSources: Plain name'), { question: 'Why?\nSources: Plain name', sources: [] }, 'a source line with words stays');
+  eq(pr.splitPrompt('Why?\n資料來源：https://e.com'), { question: 'Why?\n資料來源：https://e.com', sources: [] });
+  eq(pr.splitPrompt(''), { question: '', sources: [] });
+  assert.equal(pr.joinPrompt(' Why? ', ['A', 'B'], 'zh-TW'), 'Why?\n資料來源：[[A]]、[[B]]');
+  assert.equal(pr.joinPrompt('Why?', ['A', 'B'], 'zh-CN'), 'Why?\n资料来源：[[A]]、[[B]]');
+  assert.equal(pr.joinPrompt('Why?', ['A'], 'en'), 'Why?\nSources：[[A]]');
+  assert.equal(pr.joinPrompt('Why?', [], 'en'), 'Why?');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) eq(pr.splitPrompt(pr.joinPrompt('Q\nOther: x', ['A', 'B'], lang)), { question: 'Q\nOther: x', sources: ['A', 'B'] }, lang);
+});
+
+test('aiCardTitle: the first line, 20 characters, trailing punctuation dropped; nothing for an empty question', () => {
+  assert.equal(pr.aiCardTitle('這家公司的主要風險是什麼？\n第二行'), '這家公司的主要風險是什麼');
+  assert.equal(pr.aiCardTitle('\n  Short question?  '), 'Short question');
+  assert.equal(pr.aiCardTitle('A very long question that goes on'), 'A very long question');
+  assert.equal(pr.aiCardTitle('   '), '');
 });
 
 // ---- the harness ------------------------------------------------------------------------------------------------------
-// spec: [key, parentKey|null, { prompt, mode, reuse, locked }]
+// spec: [key, parentKey|null, { prompt, noAi (a Prompt without `ai-card`), fresh, locked }]
 async function harness(spec, { confirm = true } = {}) {
   const { repo, app, contents } = fixture('en');
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -155,8 +180,9 @@ async function harness(spec, { confirm = true } = {}) {
     mapDoc.nodes.push(created);
     byKey.set(key, created);
     const prompt = opt.prompt === undefined ? `Prompt ${key}` : opt.prompt;
-    await repo.updateNote(created.path, { prompt, ...(opt.mode ? { researchMode: opt.mode } : {}) });
-    if (opt.reuse) await repo.writeReuseLastResult(created.path, true);
+    await repo.updateNote(created.path, { prompt });
+    if (!opt.noAi) await repo.writeAiCard(created.path, true);
+    if (opt.fresh) await repo.writeAiUpdateMode(created.path, 'fresh');
     if (opt.locked) await repo.writeAiLocked(created.path, true);
   }
   await repo.saveMap(MAP, mapDoc);
@@ -216,151 +242,160 @@ async function harness(spec, { confirm = true } = {}) {
   const node = key => byKey.get(key);
   const status = key => view.promptRuns.get(MAP)?.get(node(key).id)?.status;
   const done = () => until(() => view.promptBatch?.outcome);
-  // Confirm card: start, then press the card's start button.
-  const runAll = async (scopeId = null) => {
-    view.startPromptRun(scopeId);
-    const modal = modals.at(-1);
-    if (!modal) return null;
-    find(modal.modalEl, i => i.tag === 'button' && i.cls.includes('mod-cta')).click();
-    return modal;
-  };
-  const origOpen = Modal.prototype.open;
-  Modal.prototype.open = function () { modals.push(this); return origOpen.call(this); };
+  const runAll = async () => { view.startPromptRun(); };
   return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey };
 }
 
-// root -> mid -> leaf1, leaf2 (Standard) ; root -> side
-const TREE = [['root', null], ['mid', 'root'], ['leaf1', 'mid'], ['leaf2', 'mid', { mode: 'research' }], ['side', 'root']];
+// root -> mid -> leaf1, leaf2 ; root -> side
+const TREE = [['root', null], ['mid', 'root'], ['leaf1', 'mid'], ['leaf2', 'mid'], ['side', 'root']];
+const stamp = (h, key) => ({ at: h.raw(key).match(/^ai-run-at: "(.*)"$/m)?.[1], result: h.raw(key).match(/^ai-run-result: "(.*)"$/m)?.[1], input: h.raw(key).match(/^ai-run-input: "(.*)"$/m)?.[1] });
+const updatedOf = h => key => h.raw(key).match(/^updated:.*$/m)?.[0]; // the stub's own summary write bumps it; the records must not (see the keys test)
 
-test('reuse key: reader accepts only true; writer adds and removes the key, `updated` unchanged, byte round trip', async () => {
-  for (const v of [undefined, false, 'true', 1, null]) assert.equal(values.readReuseLastResult({ 'reuse-last-result': v }), false, String(v));
-  assert.equal(values.readReuseLastResult({ 'reuse-last-result': true }), true);
-  const h = await harness([['A', null]]);
-  const before = h.raw('A');
-  assert.equal((await h.repo.readNote(h.node('A').path)).reuseLastResult, undefined);
-  await h.repo.writeReuseLastResult(h.node('A').path, true);
-  assert.match(h.raw('A'), /^reuse-last-result: true$/m);
-  assert.equal((await h.repo.readNote(h.node('A').path)).reuseLastResult, true);
-  assert.equal(h.raw('A').match(/^updated:.*$/m)?.[0], before.match(/^updated:.*$/m)?.[0], 'updated is not bumped');
-  assert.equal(h.raw('A').replace(/^reuse-last-result: true\n/m, ''), before, 'no other byte changes');
-  const on = h.raw('A');
-  await h.repo.writeReuseLastResult(h.node('A').path, true);
-  assert.equal(h.raw('A'), on, 'already on: byte for byte');
-  await h.repo.writeReuseLastResult(h.node('A').path, false);
-  assert.equal(h.raw('A'), before, 'off removes the key and restores the note');
+test('keys: `ai-card` / `ai-run-*` / `ai-update-mode` readers accept only valid values; `reuse-last-result` is not read', () => {
+  for (const v of [undefined, false, 'true', 1, null]) assert.equal(values.readAiCard({ 'ai-card': v }), false, String(v));
+  assert.equal(values.readAiCard({ 'ai-card': true }), true);
+  eq(values.readAiRun({ 'ai-run-at': 't', 'ai-run-result': 'ok', 'ai-run-input': 'k' }), { at: 't', result: 'ok', input: 'k' });
+  eq(values.readAiRun({ 'ai-run-at': 't', 'ai-run-result': 'failed' }), { at: 't', result: 'failed' });
+  for (const bad of [{}, { 'ai-run-at': 't' }, { 'ai-run-result': 'ok' }, { 'ai-run-at': '', 'ai-run-result': 'ok' }, { 'ai-run-at': 't', 'ai-run-result': 'done' }]) assert.equal(values.readAiRun(bad), undefined);
+  assert.equal(values.readAiUpdateMode({ 'ai-update-mode': 'fresh' }), 'fresh');
+  for (const v of [undefined, 'top', 'merge', true]) assert.equal(values.readAiUpdateMode({ 'ai-update-mode': v }), undefined, String(v));
+  assert.equal(values.readReuseLastResult, undefined);
 });
 
-test('counter-example 9: the switch is one undo step; undo restores the frontmatter and `updated`', async () => {
-  const h = await harness([['A', null]]);
+test('keys: writers add and remove their keys, `updated` unchanged, byte round trip; a note with `reuse-last-result` is read as an ordinary card and the key stays', async () => {
+  const h = await harness([['A', null, { noAi: true }]]);
   const before = h.raw('A');
-  const past = h.view.history.past.length;
-  await h.view.setReuseLastResult(h.node('A'), true);
-  assert.equal(h.view.history.past.length, past + 1);
-  assert.equal(h.view.notes.get(h.node('A').id).reuseLastResult, true);
-  assert.equal(h.raw('A').match(/^updated:.*$/m)[0], before.match(/^updated:.*$/m)[0]);
-  await h.view.setReuseLastResult(h.node('A'), true);
-  assert.equal(h.view.history.past.length, past + 1, 'already on: no new step');
-  await h.view.travel(false);
-  assert.equal(h.raw('A'), before, 'undo: byte for byte');
+  await h.repo.writeAiCard(h.node('A').path, true);
+  assert.match(h.raw('A'), /^ai-card: true$/m);
+  assert.equal((await h.repo.readNote(h.node('A').path)).aiCard, true);
+  assert.equal(updatedOf(h)('A'), before.match(/^updated:.*$/m)[0], 'updated is not bumped');
+  assert.equal(h.raw('A').replace(/^ai-card: true\n/m, ''), before, 'no other byte changes');
+  const on = h.raw('A');
+  await h.repo.writeAiCard(h.node('A').path, true);
+  assert.equal(h.raw('A'), on, 'already on: byte for byte');
+  await h.repo.writeAiCard(h.node('A').path, false);
+  assert.equal(h.raw('A'), before);
+  await h.repo.writeAiUpdateMode(h.node('A').path, 'fresh');
+  assert.match(h.raw('A'), /^ai-update-mode: "fresh"$/m);
+  assert.equal((await h.repo.readNote(h.node('A').path)).aiUpdateMode, 'fresh');
+  await h.repo.writeAiUpdateMode(h.node('A').path, 'top');
+  assert.equal(h.raw('A'), before, 'keeping old data removes the key');
+  await h.repo.writeAiRunStamp(h.node('A').path, { at: '2026-01-02T03:04:05.000Z', result: 'ok', input: 'abc12345' });
+  eq((await h.repo.readNote(h.node('A').path)).aiRun, { at: '2026-01-02T03:04:05.000Z', result: 'ok', input: 'abc12345' });
+  await h.repo.writeAiRunStamp(h.node('A').path, { at: '2026-01-03T00:00:00.000Z', result: 'failed' });
+  eq((await h.repo.readNote(h.node('A').path)).aiRun, { at: '2026-01-03T00:00:00.000Z', result: 'failed', input: 'abc12345' }, 'a failure keeps the last input');
+  assert.equal(updatedOf(h)('A'), before.match(/^updated:.*$/m)[0]);
+  // A V1 note: the key is neither read nor written, and stays as it is.
+  const g = await harness([['B', null, { noAi: true }]]);
+  await g.app.vault.process(g.app.vault.getAbstractFileByPath(g.node('B').path), c => c.replace(/^(---\n)/, '$1reuse-last-result: true\n'));
+  const note = await g.repo.readNote(g.node('B').path);
+  assert.equal(note.aiCard, undefined); assert.equal(note.reuseLastResult, undefined);
+  await g.repo.writeAiCard(g.node('B').path, true);
+  await g.repo.writeAiRunStamp(g.node('B').path, { at: 't', result: 'ok', input: 'k' });
+  assert.match(g.raw('B'), /^reuse-last-result: true$/m);
 });
 
 // ---- run all ----------------------------------------------------------------------------------------------------------
-test('run all: confirm card lists the order and counts; Start runs leaves to root, one AI call each, no charts', async () => {
-  const h = await harness(TREE.map(([k, p, o]) => k === 'side' ? [k, p, { reuse: true }] : [k, p, o]));
-  const modal = await h.runAll();
-  assert.equal(h.calls.length, 0, 'nothing runs before Start');
-  const rows = findAll(modal.contentEl, i => i.cls?.includes('vam-prompt-run-item')).map(r => r.children.map(c => c.text).join(''));
-  assert.equal(rows.length, 5);
-  assert.match(rows[0], /leaf1.*Quick/); assert.match(rows[1], /leaf2.*Standard/); assert.match(rows[2], /mid.*Integrate/); assert.match(rows[3], /side.*Reuses/); assert.match(rows[4], /root.*Integrate/);
-  const estimate = find(modal.contentEl, i => i.cls?.includes('vam-prompt-run-estimate')).text;
-  assert.match(estimate, /\b4\b[^0-9]+\b1\b[^0-9]+\b1\b/, estimate);
-  const start = find(modal.modalEl, i => i.cls?.includes('mod-cta'));
-  assert.match(start.text, /\b4\b/);
+test('run all: no confirmation card; the usage notice, then leaves to root, one AI call each, no charts; leaves go on the web, "keep old data" is top', async () => {
+  const h = await harness(TREE);
+  await h.runAll();
   await h.done();
-  eq(h.calls.map(c => `${c.kind}:${c.key}`), ['research:leaf1', 'research:leaf2', 'integrate:mid', 'integrate:root']);
+  assert.equal(h.modals.length, 0, 'no confirmation card');
+  assert.ok(h.usage.length >= 1, 'the usage notice was asked');
+  eq(h.calls.map(c => `${c.kind}:${c.key}`), ['research:leaf1', 'research:leaf2', 'integrate:mid', 'research:side', 'integrate:root']);
   assert.equal(h.calls[0].charts, false, 'research charts off');
+  assert.equal(h.calls[0].choices.researchMode, 'research', 'a leaf always searches the web');
+  assert.equal(h.calls[0].choices.updateMode, 'top');
   assert.equal(h.calls[2].options.skipCharts, true);
   assert.equal(h.calls[2].options.synthesisContent, 'summary');
-  assert.equal(h.calls[2].options.researchMode, 'local');
+  assert.equal(h.calls[2].options.researchMode, 'local', 'an integration does not search');
+  assert.equal(h.calls[2].options.updateMode, 'top');
   assert.match(h.calls[2].direction, /^Prompt mid\n\n.*organise/s, 'the note Prompt then the default instruction');
-  eq(h.view.promptBatch.outcome, { done: 4, failed: 0, blocked: 0, stopped: false });
-  for (const k of ['leaf1', 'leaf2', 'mid', 'root']) assert.equal(h.status(k), 'done', k);
-  assert.equal(h.status('side'), undefined, 'a reused topic is not run and gets no run state');
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  for (const k of ['leaf1', 'leaf2', 'mid', 'root', 'side']) assert.equal(h.status(k), 'done', k);
   assert.match(h.raw('root'), /I:root/);
 });
 
-test('confirm card names the vault notes a topic\'s 資料來源 line will send', async () => {
-  const h = await harness(TREE);
-  h.view.promptSourceNames = id => (id === h.node('leaf1').id ? ['Watchlist', 'Notes'] : []);
-  h.view.startPromptRun(null);
-  const modal = h.modals.at(-1);
-  const rows = findAll(modal.contentEl, i => i.cls?.includes('vam-prompt-run-item')).map(r => r.children.map(c => c.text).join(''));
-  assert.match(rows[0], /leaf1.*reads: Watchlist, Notes/);
-  assert.doesNotMatch(rows[1], /reads:/);
-});
-
-test('Cancel on the confirm card writes nothing, runs nothing and leaves no state', async () => {
-  const g = await harness(TREE);
-  const before = TREE.map(([k]) => g.raw(k));
-  g.view.startPromptRun(null);
-  const m = g.modals.at(-1);
-  find(m.modalEl, i => i.tag === 'button' && i.text === 'Cancel').click();
-  await dom.tick(); await dom.tick();
-  eq(g.calls.length, 0);
-  assert.equal(g.view.promptBatch, null);
-  assert.equal(g.view.promptRuns.size, 0);
-  eq(TREE.map(([k]) => g.raw(k)), before);
-  assert.equal(g.usage.length, 0, 'no usage notice before Start');
-});
-
-test('counter-example 2: a failing leaf blocks its parent and grandparent, with no extra AI call; the failure is named', async () => {
-  const h = await harness(TREE);
-  h.plan.fail.add('leaf1');
+test('run all: `ai-update-mode: fresh` goes to the research and the integration as "fresh"', async () => {
+  const h = await harness([['root', null, { fresh: true }], ['leaf', 'root', { fresh: true }]]);
   await h.runAll(); await h.done();
-  eq(h.calls.map(c => c.key), ['leaf1', 'leaf2', 'side'], 'only the leaves called the AI: no call for mid or root');
-  assert.equal(h.status('mid'), 'blocked'); assert.equal(h.status('root'), 'blocked');
-  assert.match(h.view.promptRuns.get(MAP).get(h.node('mid').id).reason, /leaf1/);
-  assert.equal(h.status('leaf2'), 'done');
-  eq(h.view.promptBatch.outcome, { done: 2, failed: 1, blocked: 2, stopped: false });
-  assert.equal(h.raw('mid').includes('I:mid'), false, 'nothing written for the blocked parent');
+  assert.equal(h.calls[0].choices.updateMode, 'fresh');
+  assert.equal(h.calls[1].options.updateMode, 'fresh');
 });
 
-test('an integration that reports a failure (no throw) is a failed topic, not a silent success', async () => {
+test('records: a success writes ai-run-at / result ok / input; the input follows the children as they were read at the start', async () => {
+  const h = await harness(TREE);
+  await h.runAll(); await h.done();
+  for (const [k] of TREE) { const s = stamp(h, k); assert.equal(s.result, 'ok', k); assert.match(s.at, /^\d{4}-\d\d-\d\dT/); assert.match(s.input, /^[0-9a-f]{8}$/); }
+  // The parent's input saw the summary its leaves had just written.
+  const note = await h.repo.readNote(h.node('mid').path);
+  const midKey = pr.promptInputKey({ prompt: 'Prompt mid', children: [{ id: h.node('leaf1').id, summary: 'R:leaf1' }, { id: h.node('leaf2').id, summary: 'R:leaf2' }], sources: [] });
+  assert.equal(note.aiRun.input, midKey);
+});
+
+test('records: a failed card gets failed, the cards it holds back get blocked with no AI call; neither changes the last input', async () => {
+  const h = await harness(TREE);
+  await h.runAll(); await h.done();
+  const input = stamp(h, 'mid').input;
+  const g = await harness(TREE);
+  g.plan.fail.add('leaf1');
+  await g.runAll(); await g.done();
+  eq(g.calls.map(c => c.key), ['leaf1', 'leaf2', 'side'], 'no call for mid or root');
+  assert.equal(stamp(g, 'leaf1').result, 'failed'); assert.equal(stamp(g, 'leaf1').input, undefined);
+  assert.equal(stamp(g, 'mid').result, 'blocked'); assert.equal(stamp(g, 'root').result, 'blocked');
+  assert.equal(stamp(g, 'mid').input, undefined, 'a blocked card that never ran has no input');
+  assert.equal(stamp(g, 'leaf2').result, 'ok');
+  assert.equal(g.raw('mid').includes('I:mid'), false, 'nothing written for the blocked parent');
+  // A card that had succeeded keeps its last input through a failed run.
+  h.plan.fail.add('leaf1');
+  await h.hydrate();
+  h.view.promptBatch = null;
+  await h.runAll(); await h.done();
+  assert.equal(stamp(h, 'leaf1').result, 'failed');
+  assert.equal(stamp(h, 'mid').result, 'blocked');
+  assert.equal(stamp(h, 'mid').input, input, 'the input of the last success stays');
+});
+
+test('an integration that reports a failure (no throw) is a failed card, not a silent success', async () => {
   const h = await harness(TREE);
   h.plan.fail.add('mid');
   await h.runAll(); await h.done();
   assert.equal(h.status('mid'), 'blocked'); assert.match(h.view.promptRuns.get(MAP).get(h.node('mid').id).reason, /integrate failed: mid/);
   assert.equal(h.status('root'), 'blocked');
+  assert.equal(stamp(h, 'mid').result, 'failed'); assert.equal(stamp(h, 'root').result, 'blocked');
 });
 
-test('counter-example 3: an empty-Prompt middle topic is not run; its Prompt children run and their failure does not block the grandparent', async () => {
-  const h = await harness([['root', null], ['mid', 'root', { prompt: '' }], ['leaf', 'mid'], ['side', 'root']]);
+test('counter-example: an ordinary card with only a Prompt is not run; an ordinary middle card stops the chain, its AI-card children still run', async () => {
+  const h = await harness([['root', null], ['mid', 'root', { noAi: true }], ['leaf', 'mid'], ['side', 'root']]);
   h.plan.fail.add('leaf');
   await h.runAll(); await h.done();
   eq(h.calls.map(c => `${c.kind}:${c.key}`), ['research:leaf', 'research:side', 'integrate:root']);
   assert.equal(h.status('mid'), undefined);
-  assert.equal(h.status('root'), 'done', 'the empty Prompt stops the chain: the failed leaf does not block root');
+  assert.equal(h.status('root'), 'done', 'the ordinary card stops the chain: the failed leaf does not block root');
+  assert.equal(stamp(h, 'mid').result, undefined, 'no record on an ordinary card');
+  const g = await harness([['solo', null, { noAi: true }]]);
+  g.view.startPromptRun();
+  assert.equal(g.calls.length, 0); assert.equal(g.notices.length, 1, 'nothing to run: a notice');
 });
 
-test('counter-example 4: a reused or AI-locked child is not run and the parent still runs', async () => {
-  const h = await harness([['root', null], ['r', 'root', { reuse: true }], ['l', 'root', { locked: true }], ['x', 'root']]);
+test('counter-example: a locked AI card and its subtree are not run and have no record; the parent still runs over the summaries', async () => {
+  const h = await harness([['root', null], ['l', 'root', { locked: true }], ['lc', 'l'], ['x', 'root']]);
   await h.runAll(); await h.done();
   eq(h.calls.map(c => c.key), ['x', 'root']);
-  assert.equal(h.status('r'), undefined); assert.equal(h.status('l'), undefined);
+  for (const k of ['l', 'lc']) { assert.equal(h.status(k), undefined); assert.equal(stamp(h, k).result, undefined); }
   assert.equal(h.status('root'), 'done');
+  assert.equal(h.view.promptBatch.total, 2, 'N counts only what runs');
 });
 
-test('counter-example 5: AI already running on a topic of the scope, or a multi-select research: Notice, 0 calls, 0 writes', async () => {
+test('counter-example 5: AI already running on a card of the map, or a multi-select research: Notice, 0 calls, 0 writes', async () => {
   const h = await harness(TREE);
   const gate = h.hold();
   const handle = await startResearch(h.host, h.node('leaf1'), { map: h.view.map, request: { task: 'go', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] } });
   assert.ok(handle && h.host.topicRuns.isBusy(h.node('leaf1').path));
   const before = TREE.map(([k]) => h.raw(k));
-  h.view.startPromptRun(null);
-  assert.equal(h.modals.length, 0, 'no confirm card');
+  h.view.startPromptRun();
   assert.equal(h.notices.length, 1);
-  h.view.runPromptOne(h.node('leaf1'));
-  assert.equal(h.notices.length, 2);
+  await dom.tick(); await dom.tick();
   assert.equal(h.calls.length, 0);
   assert.equal(h.view.promptBatch, null);
   eq(TREE.map(([k]) => h.raw(k)), before);
@@ -369,24 +404,23 @@ test('counter-example 5: AI already running on a topic of the scope, or a multi-
   await handle.finished;
   const g = await harness(TREE);
   g.host.expansionCoordinator.isRunning = () => true;
-  g.view.startPromptRun(null);
-  assert.equal(g.modals.length, 0); assert.equal(g.notices.length, 1);
+  g.view.startPromptRun();
+  assert.equal(g.notices.length, 1);
 });
 
-test('counter-example 8: refusing the usage notice runs nothing and leaves no state', async () => {
+test('counter-example 8: refusing the usage notice runs nothing and leaves no state or record', async () => {
   const h = await harness(TREE, { confirm: false });
+  const before = TREE.map(([k]) => h.raw(k));
   await h.runAll();
   await dom.tick(); await dom.tick();
   assert.ok(h.usage.length >= 1, 'the notice was asked');
   assert.equal(h.calls.length, 0);
   assert.equal(h.view.promptBatch, null);
   assert.equal(h.view.promptRuns.size, 0);
-  h.view.runPromptOne(h.node('leaf1'));
-  await dom.tick(); await dom.tick();
-  assert.equal(h.calls.length, 0); assert.equal(h.view.promptRuns.size, 0);
+  eq(TREE.map(([k]) => h.raw(k)), before);
 });
 
-test('counter-example 1: Stop after the call went out and before the write: the note is byte for byte unchanged, later topics are idle, no new call', async () => {
+test('counter-example 1: Stop after the call went out and before the write: the note is byte for byte unchanged, no record, later cards keep their mark, no new call', async () => {
   const h = await harness(TREE);
   h.plan.hang.add('mid');
   const rootBefore = h.raw('root');
@@ -395,15 +429,16 @@ test('counter-example 1: Stop after the call went out and before the write: the 
   const midBefore = h.raw('mid');
   h.view.stopPromptBatch();
   await h.done();
-  assert.equal(h.raw('mid'), midBefore, 'the integrating topic is not written');
+  assert.equal(h.raw('mid'), midBefore, 'the integrating card is not written, no ai-run-*');
   assert.equal(h.raw('root'), rootBefore);
   assert.equal(h.calls.some(c => c.key === 'root'), false, 'no new call after Stop');
-  assert.equal(h.status('mid'), 'idle'); assert.equal(h.status('root'), 'idle');
+  assert.equal(h.status('mid'), 'idle'); assert.equal(h.status('root'), undefined);
   assert.equal(h.status('leaf1'), 'done', 'finished work stays');
+  assert.equal(stamp(h, 'leaf1').result, 'ok', 'and keeps its record');
   assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
-test('counter-example 6: closing the view mid-batch: no later call or write', async () => {
+test('counter-example 6: closing the view mid-batch: no later call or write, no record', async () => {
   const h = await harness(TREE);
   h.plan.hang.add('leaf2');
   await h.runAll();
@@ -416,15 +451,17 @@ test('counter-example 6: closing the view mid-batch: no later call or write', as
   eq(TREE.map(([k]) => h.raw(k)), snapshot, 'no write after close');
 });
 
-test('counter-example 7: a Sources line with a URL or a [[missing]] link is skipped without throwing; a real Markdown note goes in as a reference group', async () => {
+test('counter-example 7: a Sources line with a URL or a [[missing]] link is skipped without throwing; a real Markdown note goes in as a reference group and into the input key', async () => {
   const h = await harness([['solo', null, { prompt: '資料來源：https://example.com/x [[Missing]] [[Ref]]' }]]);
-  await h.app.vault.create('Notes/Ref.md', 'reference body');
+  const file = await h.app.vault.create('Notes/Ref.md', 'reference body');
+  file.stat = { mtime: 111 };
   h.app.metadataCache = { getFirstLinkpathDest: link => h.app.vault.getAbstractFileByPath(`Notes/${link}.md`) ?? null };
   await h.runAll(); await h.done();
   const groups = h.calls[0].choices.referenceGroups;
   assert.equal(groups.length, 1);
   eq(groups[0].documents.map(d => d.path), ['Notes/Ref.md']);
   assert.equal(h.status('solo'), 'done');
+  assert.equal(stamp(h, 'solo').input, pr.promptInputKey({ prompt: '資料來源：https://example.com/x [[Missing]] [[Ref]]', children: [], sources: [{ path: 'Notes/Ref.md', mtime: 111 }] }));
   const g = await harness([['solo', null, { prompt: '資料來源：https://example.com/x [[Missing]]' }]]);
   g.app.metadataCache = { getFirstLinkpathDest: () => null };
   await g.runAll(); await g.done();
@@ -432,33 +469,14 @@ test('counter-example 7: a Sources line with a URL or a [[missing]] link is skip
   assert.equal(g.status('solo'), 'done');
 });
 
-test('only this one: no blocking check, children as they are; success marks the Prompt ancestors out of date, an empty Prompt stops that', async () => {
-  const h = await harness(TREE);
-  h.plan.fail.add('leaf1');
-  h.view.promptRuns.set(MAP, new Map([[h.node('leaf1').id, { status: 'blocked', reason: 'x' }]]));
-  h.view.runPromptOne(h.node('mid'));
-  await h.done();
-  eq(h.calls.map(c => c.key), ['mid'], 'a stuck child does not hold it back');
-  assert.equal(h.status('mid'), 'done'); assert.equal(h.status('root'), 'stale');
-  const g = await harness([['root', null, { prompt: '' }], ['mid', 'root'], ['leaf', 'mid']]);
-  g.view.runPromptOne(g.node('leaf'));
-  await g.done();
-  assert.equal(g.status('mid'), 'stale'); assert.equal(g.status('root'), undefined, 'the empty Prompt stops the chain');
-});
-
-test('a second run is refused while a batch runs; a non-Prompt topic cannot be run alone', async () => {
+test('a second run is refused while a batch runs', async () => {
   const h = await harness(TREE);
   h.plan.hang.add('leaf1');
   await h.runAll();
   await until(() => h.calls.length === 1);
-  h.view.startPromptRun(null);
+  h.view.startPromptRun();
   assert.equal(h.notices.length, 1);
   h.view.stopPromptBatch(); await h.done();
-  const g = await harness([['a', null, { prompt: '' }]]);
-  g.view.runPromptOne(g.node('a'));
-  assert.equal(g.calls.length, 0);
-  g.view.startPromptRun(null);
-  assert.equal(g.modals.length, 0);
 });
 
 test('the status bar shows progress with Stop while running, the result with a dismiss after', async () => {
@@ -483,71 +501,46 @@ test('the status bar shows progress with Stop while running, the result with a d
 const canvasEvent = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
 const titles = menu => menu.items.map(i => i.title ?? '|');
 
-test('counter-example 10 / menu 1: the canvas menu has "Run all" only when a Prompt topic exists, after a separator', async () => {
-  const h = await harness([['a', null, { prompt: '' }], ['b', 'a', { prompt: '  ' }]]);
+test('canvas menu: "Run all" only when an AI card exists, after a separator', async () => {
+  const h = await harness([['a', null, { prompt: '' }], ['b', 'a', { noAi: true }]]);
   h.view.onCanvasContextMenu(canvasEvent);
   assert.equal(h.menus.length, 1);
-  assert.equal(titles(h.menus[0]).includes('Run all'), false);
+  assert.equal(titles(h.menus[0]).includes('Run all'), false, 'a Prompt alone is not an AI card');
   const g = await harness([['a', null, { prompt: '' }], ['b', 'a']]);
   g.view.onCanvasContextMenu(canvasEvent);
   const list = titles(g.menus[0]);
   assert.ok(list.includes('Run all'));
   assert.equal(list[list.indexOf('Run all') - 1], '|', 'a separator before it');
-  assert.ok(list.indexOf('Run all') > list.indexOf('Add text node here') || !list.includes('Add text node here'));
   g.menus[0].items.find(i => i.title === 'Run all').click();
-  assert.equal(g.modals.length, 1);
-  // Hidden while the notes load or the book locks AI.
+  assert.equal(g.modals.length, 0, 'no confirmation card');
+  await until(() => g.view.promptBatch?.outcome);
   const l = await harness([['a', null]]);
   l.view.notes = new Map();
   l.view.onCanvasContextMenu(canvasEvent);
   assert.equal(titles(l.menus[0]).includes('Run all'), false, 'notes loading');
 });
 
-test('menu 2: card items only on Prompt topics, in order, reuse is a checked toggle; hidden under the book AI lock and while notes load', async () => {
-  const h = await harness([['p', null], ['plain', 'p', { prompt: '' }]]);
-  const menuFor = key => { const m = new (h.view.newMenu().constructor)(); h.view.addCardMenuActions(m, h.node(key)); return m; };
-  const mp = menuFor('p');
-  const own = ['Run only this one', 'Run all from here', 'Reuse last result'];
-  const at = own.map(t => mp.items.findIndex(i => i.title === t));
-  assert.ok(at.every(i => i >= 0) && at[0] < at[1] && at[1] < at[2], at.join());
-  assert.equal(mp.items[at[2]].checked, false);
-  assert.equal(titles(menuFor('plain')).some(t => own.includes(t)), false, 'a non-Prompt topic has none');
-  mp.items[at[1]].click();
-  assert.equal(h.modals.length, 1, 'from here opens the confirm card');
-  h.view.bookLock = () => ({ ai: true, structure: false });
-  assert.equal(titles(menuFor('p')).some(t => own.includes(t)), false, 'book AI lock');
-  h.view.bookLock = () => ({ ai: false, structure: false });
-  const saved = h.view.notes; h.view.notes = new Map();
-  assert.equal(titles(menuFor('p')).some(t => own.includes(t)), false, 'notes loading');
-  h.view.notes = saved;
-  menuFor('p').items.find(i => i.title === 'Reuse last result').click();
-  await until(() => h.view.notes.get(h.node('p').id).reuseLastResult === true);
-  assert.match(h.raw('p'), /^reuse-last-result: true$/m);
-  assert.equal(menuFor('p').items.find(i => i.title === 'Reuse last result').checked, true);
-});
-
-test('the card menu wiring and the closing abort are in the view source', () => {
+test('the closing abort is in the view source', () => {
   const src = fs.readFileSync(path.join(S.root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(src, /menu\.addSeparator\(\);\s*this\.addPromptRunMenu\(menu, node\);/);
   assert.match(src, /async onClose\(\)[^]*?this\.promptBatch\?\.controller\.abort\(\)/);
 });
 
 // ---- arrows -----------------------------------------------------------------------------------------------------------
-test('arrows: a line between two Prompt topics gets a marker-start arrow and a status class; other lines are unchanged', async () => {
+test('arrows: a line between two AI cards gets a marker-start arrow and a status class; other lines are unchanged', async () => {
   const h = await harness([['root', null], ['pa', 'root'], ['plain', 'root', { prompt: '' }], ['deep', 'plain']]);
   const { view } = h;
   view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
   view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
   view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
-  view.promptRuns.set(MAP, new Map([[h.node('pa').id, { status: 'stale' }]]));
+  view.promptRuns.set(MAP, new Map([[h.node('pa').id, { status: 'running' }]]));
   view.drawEdges();
   const edge = (p, c) => view.edgeEls.get(`${h.node(p).id}\u0000${h.node(c).id}`);
   const arrow = edge('root', 'pa');
-  assert.ok(arrow.classes.includes('vam-edge-prompt') && arrow.classes.includes('vam-edge-prompt-stale'));
-  assert.equal(arrow.getAttribute('marker-start'), `url(#${view.relationMarkerId}-prompt-stale)`);
+  assert.ok(arrow.classes.includes('vam-edge-prompt') && arrow.classes.includes('vam-edge-prompt-running'));
+  assert.equal(arrow.getAttribute('marker-start'), `url(#${view.relationMarkerId}-prompt-running)`);
   const defs = view.edgesEl.children.find(c => c.tag === 'defs');
   const marker = defs.children[0];
-  assert.equal(marker.getAttribute('id'), `${view.relationMarkerId}-prompt-stale`);
+  assert.equal(marker.getAttribute('id'), `${view.relationMarkerId}-prompt-running`);
   assert.equal(marker.getAttribute('orient'), 'auto-start-reverse');
   for (const [p, c] of [['root', 'plain'], ['plain', 'deep']]) {
     const line = edge(p, c);
@@ -555,10 +548,8 @@ test('arrows: a line between two Prompt topics gets a marker-start arrow and a s
     assert.equal(line.getAttribute('marker-start'), undefined);
   }
   assert.equal(edge('root', 'pa').classes.includes('vam-edge'), true);
-  // No run state yet: the arrow is still drawn, in the "none" state.
   view.promptRuns.clear(); view.drawEdges();
   assert.ok(edge('root', 'pa').classes.includes('vam-edge-prompt-none'));
-  // A map with no Prompt topic draws no defs at all.
   const g = await harness([['root', null, { prompt: '' }], ['k', 'root', { prompt: '' }]]);
   g.view.cardEls = new Map(g.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
   g.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };

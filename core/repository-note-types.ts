@@ -50,8 +50,12 @@ export interface Note extends PipelineFields {
   relevance?: NoteRelevance;
   /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
   aiLocked?: true;
-  /** From `reuse-last-result: true` (see readReuseLastResult): a Prompt topic that "run all" skips, its last returned summary standing in. Absent = off. */
-  reuseLastResult?: true;
+  /** From `ai-card: true` (see readAiCard): with a non-empty Prompt the topic is an AI card. Absent = an ordinary card. */
+  aiCard?: true;
+  /** From `ai-run-at` / `ai-run-result` / `ai-run-input` (see readAiRun): what the last "run all" did to this card. Absent = never run. */
+  aiRun?: { at: string; result: "ok" | "failed" | "blocked"; input?: string };
+  /** From `ai-update-mode: fresh` (see readAiUpdateMode): an AI card that rewrites its note instead of keeping the old text. Absent = keeps it (new on top). */
+  aiUpdateMode?: "fresh";
   /** The root topic's `book-*` settings; absent when none is set. */
   bookSettings?: BookSettings;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */

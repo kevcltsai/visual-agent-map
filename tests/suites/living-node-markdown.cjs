@@ -586,3 +586,17 @@ S.integrationTest('Living Node removal: surviving explicit consumers are identif
   assert.equal(snapshots.get('root.md').content, raw);
   assert.equal((await livingRemovalConsumers(port.app, port.repo, map, new Set(['root', 'up']))).length, 0);
 });
+
+S.integrationTest('Living Node configuration authorizes the actual resolved source path before any write', async () => {
+  const f = await roundFixture();
+  const before = f.contents.get('parent.md');
+  const checked = [];
+  await assert.rejects(
+    () => saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read child\n\nSources: [[child]]',
+      undefined, undefined, () => true, path => { checked.push(path); return false; }),
+    /unauthorized-source/
+  );
+  assert.deepEqual(checked, ['child.md']);
+  assert.equal(f.contents.get('parent.md'), before);
+  assert.deepEqual(f.calls, []);
+});

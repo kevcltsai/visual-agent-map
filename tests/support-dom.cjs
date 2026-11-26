@@ -28,6 +28,8 @@ function element(tag, options = {}) {
     contains(other) { return findAll(this, x => x === other).length > 0; },
     appendChild(node) { node.parent = this; this.children.push(node); return node; },
     insertBefore(node, ref) { if (node.parent) node.parent.children = node.parent.children.filter(c => c !== node); node.parent = this; const at = ref ? this.children.indexOf(ref) : -1; at < 0 ? this.children.push(node) : this.children.splice(at, 0, node); return node; },
+    prepend(node) { if (node.parent) node.parent.children = node.parent.children.filter(c => c !== node); node.parent = this; this.children.unshift(node); },
+    after(node) { if (!this.parent) return; if (node.parent) node.parent.children = node.parent.children.filter(c => c !== node); const at = this.parent.children.indexOf(this); node.parent = this.parent; this.parent.children.splice(at + 1, 0, node); },
     empty() { this.children = []; }, replaceChildren(...next) { this.children = next; }, add(option) { this.children.push(option); },
     remove() { if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); },
     addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); },

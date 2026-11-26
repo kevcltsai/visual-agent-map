@@ -436,14 +436,15 @@ test('21: new cards of one map are "New topic", "New topic 1", "New topic 2" in 
 test('21: the card "+" and the toolbar "+ Topic" open a type list (six types and a text block) instead of a name dialog; a pick adds with that type', async () => {
   const h = await harness(); realAdd(h);
   const menus = [];
-  h.view.newMenu = () => { const m = { items: [], addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() { m.shown = true; }, select(n) { m.selected = n; } }; menus.push(m); return m; };
+  h.view.newMenu = () => { const m = { items: [], addSeparator() { return m; }, addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() { m.shown = true; }, select(n) { m.selected = n; } }; menus.push(m); return m; };
   h.view.canEditText = () => true;
   const textUnder = []; h.view.addTextNodeUnder = parent => textUnder.push(parent?.id ?? null);
   const leaf = h.map().nodes.find(n => n.id === h.ids.leaf);
   h.view.openAddMenu({}, leaf);
   const menu = menus[0];
   assert.equal(menu.shown, true); assert.equal(menu.selected, 0, 'Enter takes the first row');
-  assert.equal(menu.items.length, 7, 'six types then the text block');
+  assert.equal(menu.items.length, 8, 'six types, the AI card, then the text block');
+  assert.equal(menu.items.at(-2).title, 'AI card');
   assert.equal(menu.items[0].title, 'Topic'); assert.equal(menu.items.at(-1).title, 'Add text');
   assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length, 0);
   assert.equal(h.map().nodes.length, 4, 'nothing is made before a pick');
@@ -493,7 +494,7 @@ test('F21: Mod+Enter, Shift+Enter, the type list and the card "+" all leave the 
     const h = await harness(); realAdd(h);
     if (entry === 'menu') {
       const menus = [];
-      h.view.newMenu = () => { const m = { items: [], addItem(cb) { const it = { setTitle() { return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() {}, select() {} }; menus.push(m); return m; };
+      h.view.newMenu = () => { const m = { items: [], addSeparator() { return m; }, addItem(cb) { const it = { setTitle() { return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() {}, select() {} }; menus.push(m); return m; };
       h.view.canEditText = () => true;
       h.view.openAddMenu({}, h.map().nodes.find(n => n.id === h.ids.leaf));
       menus[0].items[0].run();

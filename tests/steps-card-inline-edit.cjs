@@ -21,7 +21,7 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
   setPointerCapture() {}, focus() { this.focused++; make.last = this; make.onFocus?.(this); },
   select() { this.selectionStart = 0; this.selectionEnd = String(this.value ?? '').length; }, setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
-  querySelector(selector) { if (!['.vam-card-title', '.vam-card-summary.is-inline-editable', '.vam-card-summary-add'].includes(selector)) return null; const wanted = selector.split('.').filter(Boolean); return findAll(this, i => i !== this && wanted.every(c => i.classes.has(c)))[0] ?? null; }, querySelectorAll() { return []; }, replaceWith() {}, after() {} });
+  querySelector(selector) { if (!['.vam-card-title', '.vam-card-summary.is-inline-editable', '.vam-card-summary-add'].includes(selector)) return null; const wanted = selector.split('.').filter(Boolean); return findAll(this, i => i !== this && wanted.every(c => i.classes.has(c)))[0] ?? null; }, querySelectorAll() { return []; }, replaceWith() {}, after(el) { (this.afterEls ??= []).push(el); }, prepend(el) { this.children.unshift(el); }, appendChild(el) { this.children.push(el); } });
 const findAll = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))];
 
 class Setting {
@@ -51,7 +51,7 @@ async function harness({ language = 'en' } = {}) {
   const Base = dom.makeModal();
   class Modal extends Base { open() { modals.push(this); super.open(); } }
   const Notice = dom.makeNotice(notices);
-  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment, createSpan: value => make('span', typeof value === 'string' ? { cls: value } : value), createEl: (tag, value) => make(tag, value), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   if (language !== 'en') {
     // This bundle has its own UI language; switch it the way a language change does.
     const lp = new Plugin(); lp.settings = { ...DEFAULT_SETTINGS, language: 'en' }; lp.saveData = async () => {}; lp.repo = { settings: lp.settings };
@@ -409,6 +409,22 @@ test('P2: switching to a map open in another pane brings that pane forward once 
   assert.deepEqual(shown, [leaf]);
 });
 
+// A fresh full render (renderNode, the path a title edit takes) paints an AI card's face; refreshCard alone is not enough.
+test('AI card face on a fresh full render: star, question line and glyph; a locked card shows no glyph', async () => {
+  const h = await harness();
+  const path = key => h.view.map.nodes.find(n => n.id === h.ids[key]).path;
+  await h.repo.updateNote(path('leaf'), { prompt: 'Why is the sky blue?\nsecond line' }); await h.repo.writeAiCard(path('leaf'), true);
+  await h.repo.updateNote(path('branch'), { prompt: 'Locked?' }); await h.repo.writeAiCard(path('branch'), true); await h.repo.writeAiLocked(path('branch'), true);
+  await h.view.hydrate(); h.build();
+  const title = key => part(h, key, 'vam-card-title');
+  assert.equal(h.card('leaf').dataset.aiCard, 'true');
+  assert.ok(findAll(title('leaf'), i => i.classes.has('vam-ai-star')).length === 1, 'star');
+  assert.equal(findAll(title('leaf'), i => i.classes.has('vam-ai-glyph')).length, 1, 'glyph');
+  assert.equal(title('leaf').afterEls?.[0]?.text, 'Why is the sky blue?', 'question line');
+  assert.equal(findAll(title('branch'), i => i.classes.has('vam-ai-star')).length, 1, 'locked: star');
+  assert.equal(findAll(title('branch'), i => i.classes.has('vam-ai-glyph')).length, 0, 'locked: no glyph');
+  assert.ok(findAll(h.card('branch'), i => [...i.classes].some(c => /lock/.test(c))).length > 0, 'locked: lock shown');
+});
 // The selected card's toolbar and the slim right-click menu (mind-map simplification, 2026-11-27).
 const menuTitles = (h, fill) => {
   const items = [];
@@ -436,9 +452,9 @@ test('More lists card settings, the summary bracket, note style and the other to
   const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
   const more = key => menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, node(key)); });
   const leaf = more('leaf');
-  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', '—', 'Add another type']);
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Make it an AI card', 'Add summary bracket', 'Note style…', '—', 'Add another type']);
   assert.ok(leaf.at(-1).sub.list.length >= 6, 'the topic types are in the submenu');
-  assert.deepEqual(more('branch').map(i => i.title).slice(0, 2), ['Card settings…', 'Select subtopics']);
+  assert.deepEqual(more('branch').map(i => i.title).slice(0, 3), ['Card settings…', 'Make it an AI card', 'Select subtopics']);
 });
 test('right-click on one card: the eight-item menu; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
   const h = await harness();
@@ -449,7 +465,7 @@ test('right-click on one card: the eight-item menu; Collapse only with subtopics
     h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
-  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Open note', 'Card settings…', 'Remove from map']);
+  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
   for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Add summary bracket', 'Note style…', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;

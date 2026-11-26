@@ -2149,27 +2149,43 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-social-video-frame { width: 100%; height: 100%; border: 0; }
 .vam-social-video-note { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); margin-top: 4px; }
 
-/* Prompt topics and "Run all": card state chips, the reuse pill, arrowed Prompt lines, menu hints, the confirmation list */
-.vam-prompt-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); line-height: 1.4; }
-.vam-prompt-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.vam-prompt-status-idle { color: var(--text-muted); }
-.vam-prompt-status-idle::before { background: none; border: 1.5px solid currentColor; box-sizing: border-box; }
-.vam-prompt-status-running { color: var(--interactive-accent); }
-.vam-prompt-status-running::before { animation: vam-prompt-pulse 1.4s infinite; }
-.vam-prompt-status-done { color: var(--interactive-accent); }
-.vam-prompt-status-stale { color: var(--color-orange); }
-.vam-prompt-status-blocked { color: var(--color-red); }
-.vam-prompt-reuse { padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--interactive-accent); }
-@keyframes vam-prompt-pulse { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .vam-prompt-status-running::before { animation: none; } }
-.vam-edge.vam-edge-prompt-idle { stroke: var(--text-muted); }
-.vam-edge.vam-edge-prompt-stale { stroke: var(--color-orange); }
-.vam-edge.vam-edge-prompt-blocked { stroke: var(--color-red); }
-.vam-prompt-arrow { fill: var(--interactive-accent); stroke: none; }
-.vam-prompt-arrow-idle { fill: var(--text-muted); }
-.vam-prompt-arrow-stale { fill: var(--color-orange); }
-.vam-prompt-arrow-blocked { fill: var(--color-red); }
+/* AI cards and "Run all": the star, question line and state glyph on a card, the setup window, the toolbar button, grey arrowed lines */
+.vam-view .vam-ai-star { display: inline-flex; vertical-align: -2px; margin-inline-end: 5px; color: var(--text-faint); }
+.vam-view .vam-ai-star svg { width: 13px; height: 13px; }
+.vam-view .vam-ai-glyph { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; width: 12px; height: 12px; margin-inline-start: 6px; box-sizing: border-box; }
+.vam-view .vam-ai-glyph-pending { width: 9px; height: 9px; border: 1.5px solid var(--text-muted); border-radius: 50%; }
+.vam-view .vam-ai-glyph-stale { width: 10px; height: 10px; border: 1.5px solid var(--color-orange); border-radius: 50%; }
+.vam-view .vam-ai-glyph-stale::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--color-orange); }
+.vam-view .vam-ai-glyph-running { width: 10px; height: 10px; border: 1.5px solid color-mix(in srgb, var(--interactive-accent) 25%, transparent); border-top-color: var(--interactive-accent); border-radius: 50%; animation: vam-ai-spin .9s linear infinite; }
+.vam-view .vam-ai-glyph-failed { color: var(--color-red); font-size: 13px; line-height: 1; font-weight: 700; }
+.vam-view .vam-ai-glyph-failed::before { content: "\00d7"; }
+@keyframes vam-ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .vam-view .vam-ai-glyph-running { animation: none; } }
+.vam-view .vam-ai-question { margin: 3px 0 0; color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vam-view .vam-ai-question.is-clickable { cursor: pointer; }
+.vam-view .vam-node[data-ai-card][data-ai-locked] { opacity: .62; }
+.vam-view .vam-card-ai-lock.is-hover-only { opacity: 0; }
+.vam-view .vam-node:hover .vam-card-ai-lock.is-hover-only, .vam-view .vam-node:focus-within .vam-card-ai-lock.is-hover-only, .vam-view .vam-card-ai-lock.is-hover-only:focus-visible { opacity: 1; }
+.vam-ai-card-pop { gap: 10px; }
+.vam-ai-card-pop-title { font-weight: var(--font-semibold); overflow-wrap: anywhere; }
+.vam-ai-card-pop-name { width: 100%; }
+.vam-ai-card-pop-question { width: 100%; resize: vertical; }
+.vam-ai-card-pop-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vam-ai-card-pop-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 0 4px 0 8px; border-radius: 999px; background: var(--background-modifier-hover); font-size: var(--font-ui-smaller); }
+.vam-ai-card-pop-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-ai-card-pop-chip-x { padding: 0 4px; min-height: 0; height: auto; border: 0; box-shadow: none; background: transparent; color: var(--text-muted); cursor: pointer; }
+.vam-ai-card-pop-add { padding: 0 8px; min-height: 0; height: auto; border: 0; box-shadow: none; background: transparent; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-ai-card-pop-keep { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-ai-card-pop-foot { display: flex; justify-content: flex-end; }
+.vam-view .vam-run-all { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 0; box-shadow: none; background: transparent; color: var(--text-normal); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-view .vam-run-all:hover:not(:disabled) { background: var(--background-modifier-hover); }
+.vam-view .vam-run-all:disabled { color: var(--text-faint); cursor: default; }
+.vam-view .vam-run-all.is-running { background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--interactive-accent); font-variant-numeric: tabular-nums; }
+.vam-view .vam-run-all-icon svg { width: 13px; height: 13px; }
+.vam-view .vam-run-all-ring { width: 14px; height: 14px; transform: rotate(-90deg); }
+.vam-view .vam-run-all-track, .vam-view .vam-run-all-arc { fill: none; stroke-width: 3; }
+.vam-view .vam-run-all-track { stroke: color-mix(in srgb, var(--interactive-accent) 25%, transparent); }
+.vam-view .vam-run-all-arc { stroke: var(--interactive-accent); stroke-linecap: round; }
+.vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
+.vam-prompt-arrow { fill: var(--text-faint); stroke: none; }
 .vam-menu-hint { margin-inline-start: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-prompt-run-list { margin: 0 0 8px; padding-left: 1.3em; }
-.vam-prompt-run-mode { color: var(--text-muted); }
-.vam-prompt-run-estimate { padding: 8px 10px; border-radius: 8px; background: var(--background-secondary); font-variant-numeric: tabular-nums; }

@@ -459,8 +459,8 @@ test('C1 card context menu: one topic gets its card actions in groups (new topic
   h.view.onCanvasContextMenu(event());
   const menu = h.menus.at(-1);
   const titles = menu.items.map(i => i.title);
-  assert.deepEqual(titles, ['Add subtopic', 'Add sibling topic', 'Research this card', 'Collapse subtopics', 'Open note', 'Card settings…', 'Remove from map']);
-  assert.deepEqual(menu.separators, [2, 4, 6], 'separators between the groups');
+  assert.deepEqual(titles, ['Add subtopic', 'Add sibling topic', 'Research this card', 'Collapse subtopics', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
+  assert.deepEqual(menu.separators, [2, 4, 7], 'separators between the groups');
   assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list of the toolbar More');
   for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Edit card', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);
   assert.equal(menu.items.at(-1).warning, true, 'Remove is marked as a warning');

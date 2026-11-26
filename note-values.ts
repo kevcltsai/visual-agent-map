@@ -24,9 +24,24 @@ export function readRelevance(fm: Record<string, unknown>): NoteRelevance | unde
 export function readAiLocked(fm: Record<string, unknown>): boolean {
   return fm["ai-locked"] === true;
 }
-/** The "reuse last result" switch of a Prompt topic (`reuse-last-result: true`): only the boolean true switches it on. */
-export function readReuseLastResult(fm: Record<string, unknown>): boolean {
-  return fm["reuse-last-result"] === true;
+/** The AI card flag (`ai-card: true`): only the boolean true sets it. */
+export function readAiCard(fm: Record<string, unknown>): boolean {
+  return fm["ai-card"] === true;
+}
+/** The last "run all" record of an AI card: `ai-run-at` (text), `ai-run-result` (ok, failed or blocked) and `ai-run-input` (text); absent unless the first two are valid. */
+export function readAiRun(
+  fm: Record<string, unknown>
+): { at: string; result: "ok" | "failed" | "blocked"; input?: string } | undefined {
+  const at = fm["ai-run-at"];
+  const result = fm["ai-run-result"];
+  if (typeof at !== "string" || !at) return undefined;
+  if (result !== "ok" && result !== "failed" && result !== "blocked") return undefined;
+  const input = fm["ai-run-input"];
+  return { at, result, ...(typeof input === "string" && input ? { input } : {}) };
+}
+/** An AI card's "keep old data" switch off (`ai-update-mode: fresh`); any other value keeps the old text (new on top). */
+export function readAiUpdateMode(fm: Record<string, unknown>): "fresh" | undefined {
+  return fm["ai-update-mode"] === "fresh" ? "fresh" : undefined;
 }
 /**
  * The AI lock of a note given as text (an open editor's content): its frontmatter block is parsed with `parse` (Obsidian's

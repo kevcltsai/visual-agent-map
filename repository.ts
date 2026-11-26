@@ -97,7 +97,9 @@ import {
   managedHeadingValue,
   readRelevance,
   readAiLocked,
-  readReuseLastResult,
+  readAiCard,
+  readAiRun,
+  readAiUpdateMode,
   readTopicKind,
   readHypothesisStrength,
   readHypothesisLeaning,
@@ -784,7 +786,9 @@ export class Repository {
       ...(readAiLocked(fm) || managedNodeIds(map).has(this.nodeAtPath(path, map, ctx)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
-      ...(readReuseLastResult(fm) ? { reuseLastResult: true as const } : {}),
+      ...(readAiCard(fm) ? { aiCard: true as const } : {}),
+      ...(readAiRun(fm) ? { aiRun: readAiRun(fm) } : {}),
+      ...(readAiUpdateMode(fm) ? { aiUpdateMode: readAiUpdateMode(fm) } : {}),
       ...readPipelineFields(fm),
       ...(Object.keys(bookSettings).length ? { bookSettings } : {}),
       ...(topicKind !== "topic" ? { topicKind } : {}),
@@ -1339,14 +1343,48 @@ export class Repository {
   }
 
   /**
-   * Sets (`reuse-last-result: true`) or removes the "reuse last result" switch. No other key changes and `updated` is not
-   * bumped; a note already in the asked state is returned as it is, byte for byte.
+   * Sets (`ai-card: true`) or removes the AI card flag (and `ai-update-mode`, which only an AI card has). No other key changes and `updated` is not bumped; a note already in the
+   * asked state is returned as it is, byte for byte.
    */
-  async writeReuseLastResult(path: string, on: boolean): Promise<void> {
+  async writeAiCard(path: string, on: boolean): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
-      readReuseLastResult(frontmatter(content)) === on
+      readAiCard(frontmatter(content)) === on && (on || readAiUpdateMode(frontmatter(content)) === undefined)
         ? content
-        : setFrontmatterKeys(content, { "reuse-last-result": on ? true : null })
+        : setFrontmatterKeys(content, on ? { "ai-card": true } : { "ai-card": null, "ai-update-mode": null })
+    );
+  }
+
+  /** Removes the Prompt section (an AI card whose question was cleared); other sections and `updated` are left as they are. */
+  async clearPrompt(path: string): Promise<void> {
+    await this.app.vault.process(this.file(path), content => removeSection(content, "Prompt"));
+  }
+
+  /**
+   * Sets `ai-update-mode: fresh` (the AI card rewrites its note) or removes the key (keeps the old text, new on top). No other
+   * key changes and `updated` is not bumped.
+   */
+  async writeAiUpdateMode(path: string, mode: "fresh" | "top"): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      (readAiUpdateMode(frontmatter(content)) ?? "top") === mode
+        ? content
+        : setFrontmatterKeys(content, { "ai-update-mode": mode === "fresh" ? "fresh" : null })
+    );
+  }
+
+  /**
+   * Records what "run all" did to an AI card: `ai-run-at`, `ai-run-result`, and `ai-run-input` (only when given: a failure or a
+   * held-back card keeps the input of its last success). `updated` is not bumped.
+   */
+  async writeAiRunStamp(
+    path: string,
+    stamp: { at: string; result: "ok" | "failed" | "blocked"; input?: string }
+  ): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(content, {
+        "ai-run-at": stamp.at,
+        "ai-run-result": stamp.result,
+        ...(stamp.input !== undefined ? { "ai-run-input": stamp.input } : {})
+      })
     );
   }
 

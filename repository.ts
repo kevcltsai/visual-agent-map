@@ -52,7 +52,7 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
-import { remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
+import { livingConfigurationStamp, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
 import { readLivingMarkdown } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -777,6 +777,7 @@ export class Repository {
         : "never";
       livingNode = {
         summary,
+        configRevision: livingConfigurationStamp(section(content, "Prompt"), fm),
         knowledgeRevision,
         successfulKnowledgeRevision: text(fm["living-node-success-knowledge"]) || undefined,
         lastAttempt: text(fm["living-node-last-attempt"]) || undefined,

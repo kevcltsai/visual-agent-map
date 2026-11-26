@@ -28,6 +28,25 @@ export function sameLivingTarget(before: LivingSourceNode, after: LivingSourceNo
     (before.parentId ?? null) === (after.parentId ?? null);
 }
 
+/** Editing the question or reordering existing links cannot rebind a stored
+ * card identity to a newly created note with the same display name. Only an
+ * explicitly new link goes through Vault resolution. Legacy alias lists whose
+ * deduplication cannot be reversed must be repaired explicitly. */
+export function reconcileLivingDraftReferences(
+  previousLinks: readonly string[],
+  persisted: readonly LivingSourceRef[] | undefined,
+  nextLinks: readonly string[],
+  resolveNew: (link: string) => LivingSourceRef
+): LivingSourceRef[] {
+  if (!nextLinks.length) return [];
+  if (!persisted) return nextLinks.map(resolveNew);
+  if (JSON.stringify(previousLinks) === JSON.stringify(nextLinks)) return [...persisted];
+  if (previousLinks.length !== persisted.length && nextLinks.some(link => previousLinks.includes(link)))
+    throw new Error("ambiguous-saved-references");
+  const previous = new Map(previousLinks.map((link, index) => [link, persisted[index]]));
+  return nextLinks.map(link => previous.get(link) ?? resolveNew(link));
+}
+
 export type LivingSourceRole = "child" | "explicit" | "map";
 export type LivingResolvedSource = {
   identity: string;

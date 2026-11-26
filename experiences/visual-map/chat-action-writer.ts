@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { t, type TranslationKey } from "../../i18n";
 import type { App, Editor, TFile } from "obsidian";
 import { addedMermaidBlocks } from "../../ai/mermaid-safety";
+import { frontmatter } from "../../core/repository-frontmatter";
 import { saveLivingConfig } from "./living-node-runtime";
 import { promptSourceLinks } from "./prompt-run";
 import {
@@ -514,6 +515,7 @@ export class ChatActionWriter {
           path: action.path,
           oldContent: source.text,
           newContent: next,
+          parseFrontmatter: frontmatter,
           knownHashes: hashes,
           readOnlyPaths: baseline.mapSourcePaths,
           configDir
@@ -576,6 +578,7 @@ export class ChatActionWriter {
           kind: "create",
           path: action.path,
           newContent: content,
+          parseFrontmatter: frontmatter,
           exists,
           readOnlyPaths: baseline.mapSourcePaths,
           configDir

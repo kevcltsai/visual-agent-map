@@ -215,3 +215,75 @@ S.integrationTest('Living Node: ordinary Repository note edits preserve the mana
   await f.repo.writeAiCard(path, false);
   assert.equal(readLivingMarkdown(f.contents.get(path)).revision, knowledge.revision);
 });
+
+const { runLivingRound, saveLivingConfig } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+async function roundFixture() {
+  const f = S.fixture();
+  const map = S.map([S.node('parent'), S.node('child', 'parent'), S.node('ordinary')]);
+  for (const node of map.nodes) {
+    const flag = node.id === 'ordinary' ? '' : 'ai-card: true\n';
+    const raw = '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: ' + node.id + '\n' + flag +
+      '---\n# ' + node.id + '\n\n## Prompt\n\nResearch ' + node.id + '\n\n## Detail\n\nManual ' + node.id + '\n';
+    await f.app.vault.create(node.path, raw);
+  }
+  f.repo.readMap = async () => map;
+  const calls = [];
+  let beforeReply = async () => {};
+  const port = {
+    app: f.app, repo: f.repo, mapPath: 'Map.md', viewSession: 'view', signal: new AbortController().signal,
+    coordinator: new LivingCoordinator(), current: () => true, busy: () => false, language: () => 'English',
+    mapSources: async () => [], confirm: async (_model, run) => { await run(); return true; },
+    onStart() {}, onRunning() {}, onSettled() {}, onFailure() {},
+    calls: { run: async (prepared, options, finish) => {
+      calls.push(prepared.input.prompt);
+      await beforeReply(prepared.input.prompt);
+      const text = 'Result: ' + prepared.input.prompt;
+      const operations = prepared.input.base.output.text === text ? [] : [{ kind: 'output', text, evidence: [] }];
+      return finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations }),
+        { signal: options.signal, parsed() {} });
+    } }
+  };
+  return { ...f, map, port, calls, beforeReply: callback => { beforeReply = callback; } };
+}
+
+S.integrationTest('Living Node formal round: actual Repository writes in dependency order and reuses a valid upstream for Run Card', async () => {
+  const f = await roundFixture();
+  const first = await runLivingRound(f.port);
+  assert.equal(first.get('child'), 'changed');
+  assert.equal(first.get('parent'), 'changed');
+  assert.deepEqual(f.calls, ['Research child', 'Research parent']);
+  assert.ok(f.contents.get('parent.md').includes('Manual parent'));
+  assert.equal(readLivingMarkdown(f.contents.get('ordinary.md')).revision, 'empty');
+  const revision = readLivingMarkdown(f.contents.get('child.md')).revision;
+  const second = await runLivingRound(f.port, ['parent']);
+  assert.equal(second.get('child'), 'reused');
+  assert.equal(second.get('parent'), 'no-change');
+  assert.deepEqual(f.calls, ['Research child', 'Research parent', 'Research parent']);
+  assert.equal(readLivingMarkdown(f.contents.get('child.md')).revision, revision);
+});
+
+S.integrationTest('Living Node formal round: a target changed while its provider is running is not written; dependent branch is blocked', async () => {
+  const f = await roundFixture();
+  f.beforeReply(async prompt => {
+    if (prompt === 'Research child') {
+      await f.app.vault.process(f.files.get('child.md'), text => text + '\nOwner edited the card.\n');
+    }
+  });
+  const result = await runLivingRound(f.port);
+  assert.equal(result.get('child'), 'failed');
+  assert.equal(result.get('parent'), 'blocked');
+  assert.deepEqual(f.calls, ['Research child']);
+  assert.ok(f.contents.get('child.md').includes('Owner edited the card.'));
+  assert.equal(readLivingMarkdown(f.contents.get('child.md')).revision, 'empty');
+});
+
+S.integrationTest('Living Node config command: stable same-map source ID, self and cycle rejection, no execution on save', async () => {
+  const f = await roundFixture();
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read child\n\nSources: [[child]]');
+  assert.ok(f.contents.get('parent.md').includes('card:child'));
+  const before = f.contents.get('child.md');
+  await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'child', 'Cycle\n\nSources: [[parent]]'), /living-node-cycle/);
+  await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'child', 'Self\n\nSources: [[child]]'), /self-reference/);
+  assert.equal(f.contents.get('child.md'), before);
+  assert.deepEqual(f.calls, []);
+});

@@ -124,3 +124,54 @@ S.integrationTest('Living Node: source text cannot inject managed-region markers
   assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
   assert.equal(readLivingMarkdown(f.contents.get(path)).output.evidence[0].source, source);
 });
+
+const { LivingCoordinator } = S.load('experiences/visual-map/living-node-coordinator.ts');
+const { LivingTrial } = S.load('experiences/visual-map/living-node-trial.ts');
+function trialRequest(f, generate, extra = {}) {
+  return { ...request(f), generate, stillCurrent: async () => true, ...extra };
+}
+
+S.integrationTest('Living Node trial: preview never writes; adoption uses the same guard once without another AI call', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  let calls = 0;
+  const r = trialRequest(f, async () => { calls++; return proposal; });
+  assert.equal(await trial.run(r), true);
+  assert.equal(trial.state, 'ready');
+  assert.equal(trial.result.output.text, 'Current findings');
+  assert.equal(f.contents.get(path), initial);
+  assert.equal(await trial.adopt(f.repo, r), 'written');
+  assert.equal(calls, 1);
+  assert.equal(trial.state, 'none');
+  assert.equal(await trial.adopt(f.repo, r), 'discarded');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
+});
+
+S.integrationTest('Living Node trial: stale source, lock or draft invalidation cannot commit preview', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  const r = trialRequest(f, async () => proposal);
+  assert.equal(await trial.run(r), true);
+  const oldCheck = r.inspect;
+  assert.equal(await trial.adopt(f.repo, { ...r, inspect: async () => ({ ...await oldCheck(), dependenciesReady: false }) }), 'discarded');
+  assert.equal(f.contents.get(path), initial);
+  assert.equal(await trial.run(r), true);
+  trial.invalidate();
+  assert.equal(trial.state, 'invalid');
+  assert.equal(await trial.adopt(f.repo, r), 'discarded');
+  assert.equal(f.contents.get(path), initial);
+});
+
+S.integrationTest('Living Node trial: late provider result cannot revive a closed editor', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  let finish;
+  const r = trialRequest(f, () => new Promise(resolve => { finish = resolve; }));
+  const pending = trial.run(r);
+  trial.close();
+  finish(proposal);
+  assert.equal(await pending, false);
+  assert.equal(trial.state, 'none');
+  assert.equal(trial.result, undefined);
+  assert.equal(f.contents.get(path), initial);
+});

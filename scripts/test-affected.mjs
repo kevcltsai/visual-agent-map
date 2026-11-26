@@ -199,7 +199,8 @@ export function scanTestFile(root, rel, text = readFileSync(join(root, rel), "ut
   }
   // A helper that keeps a loaded module in a variable (`X ??= load('a.ts')`) loads it once per process, so only the first caller is recorded: its entry files are listed here and expanded to their bundles.
   const cachedLoads = [...text.matchAll(/(?:\?\?=|\|\|=)\s*[^;\n]*?\bload\(\s*(['"])([^'"]+)\1/g), ...text.matchAll(/if\s*\(\s*!\s*[\w$.]+\s*\)\s*[\w$.]+\s*=\s*[^;\n]*?\bload\(\s*(['"])([^'"]+)\1/g)].map(match => match[2]);
-  return { sources: [...sources].sort(), prefixes: [...prefixes].sort(), requires: [...requires].sort(), reasons: [...new Set(reasons)], cachedLoads: [...new Set(cachedLoads)].sort() };
+  const observedCachedLoads = [...text.matchAll(/\bloadCached\(\s*(['"])([^'"]+)\1/g)].map(match => match[2]);
+  return { sources: [...sources].sort(), prefixes: [...prefixes].sort(), requires: [...requires].sort(), reasons: [...new Set(reasons)], cachedLoads: [...new Set(cachedLoads)].sort(), ...(observedCachedLoads.length ? { observedCachedLoads: [...new Set(observedCachedLoads)].sort() } : {}) };
 }
 
 /** Reason class for a report: the first reason, shortened to its kind. */
@@ -224,6 +225,8 @@ export function buildDeps({ testFiles, records, bundles = {}, scans, sha, genera
       for (const source of records[member] ?? []) sources.add(source);
       for (const source of scans[member]?.sources ?? []) sources.add(source);
       for (const entry of scans[member]?.cachedLoads ?? []) for (const source of [entry, ...(bundles[entry] ?? [])]) sources.add(source);
+      // Only narrow these instrumented lazy loads when the full run recorded this consumer.
+      if (!Object.hasOwn(records, file)) for (const entry of scans[member]?.observedCachedLoads ?? []) for (const source of [entry, ...(bundles[entry] ?? [])]) sources.add(source);
       for (const prefix of scans[member]?.prefixes ?? []) prefixes.add(prefix);
       // A helper's own run-time reads take their paths from the callers, whose literals are scanned; only spawning and direct esbuild carry over.
       for (const reason of scans[member]?.reasons ?? []) if (member === file) reasons.push(reason); else if (/^(?:spawns|uses esbuild)/.test(reason)) reasons.push(`${reason} (in ${member})`);

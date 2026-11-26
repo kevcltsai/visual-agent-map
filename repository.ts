@@ -272,7 +272,10 @@ const VAULT_WRITES = new Set([
 const FILE_MANAGER_WRITES = new Set(["renameFile", "trashFile", "processFrontMatter"]);
 
 /** Transaction-local guard, evaluated on the actual preimage inside Vault.process. */
-export type NoteWriteGuard = (file: TFile, current: string, change: (content: string) => string) => string;
+export interface NoteWriteGuard {
+  (file: TFile, current: string, change: (content: string) => string): string;
+  aroundHostMove?(origin: string, target: string, move: () => Promise<void>): Promise<void>;
+}
 
 /** A view of `target` whose write methods throw once `disposed()` is true; reads and everything else pass through. */
 function guardWrites<T extends object>(
@@ -1889,7 +1892,8 @@ export class Repository {
         app: this.app,
         language: () => this.settings.language,
         message: key => this.message(key),
-        markedNotes: () => this.markedFiles("agent-map-node")
+        markedNotes: () => this.markedFiles("agent-map-node"),
+        aroundHostMove: this.noteWriteScope.getStore()?.aroundHostMove
       },
       item,
       target

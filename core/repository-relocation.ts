@@ -8,6 +8,7 @@ interface RelocationPorts {
   language(): UiLanguage;
   message(key: TranslationKey): string;
   markedNotes(): Promise<TFile[]>;
+  aroundHostMove?(origin: string, target: string, move: () => Promise<void>): Promise<void>;
 }
 
 /**
@@ -24,8 +25,11 @@ export async function relocateFile(ports: RelocationPorts, item: TFile | TFolder
     if (!ports.app.vault.getAbstractFileByPath(target)) throw new Error(ports.message("error.move_not_applied"));
   };
   const move = async (delegated: boolean): Promise<void> => {
-    const rename = (file: TFile | TFolder, path: string): Promise<void> =>
-      delegated ? ports.app.fileManager.renameFile(file, path) : ports.app.vault.rename(file, path);
+    const rename = (file: TFile | TFolder, path: string): Promise<void> => {
+      if (!delegated) return ports.app.vault.rename(file, path);
+      const action = (): Promise<void> => ports.app.fileManager.renameFile(file, path);
+      return ports.aroundHostMove ? ports.aroundHostMove(file.path, path, action) : action();
+    };
     try {
       await rename(item, target);
       verifyMove();

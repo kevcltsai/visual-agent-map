@@ -53,7 +53,6 @@ export async function writeStoreAtomically(adapter: StoreAdapter, path: string, 
   await adapter.rename(temporary, path);
 }
 
-
 /**
  * A serial writer with at most one in-flight snapshot and one pending request.
  * The snapshot is encoded when the write begins, not for every queued state

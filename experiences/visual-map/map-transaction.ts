@@ -4,6 +4,7 @@ import { pruneAfterText } from "./canvas-items";
 import { sameApartFromStamps } from "./cross-map-history";
 import type { NoteWriteGuard, Repository, TopicState } from "../../repository";
 import type { TFile } from "obsidian";
+import { findWikilinks, linkPathOf } from "../../core/link-rewrite";
 import {
   attachmentPath,
   claim,
@@ -248,6 +249,47 @@ const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, t
   );
 };
 
+/**
+ * A delegated Obsidian rename may expand a short wikilink to a vault-relative path.
+ * Accept only changes to the specific moved target; all other bytes must match.
+ * Unsupported host rewrites fail closed rather than being treated as our own edit.
+ */
+function isHostLinkRewrite(before: string, after: string, origin: string, target: string): boolean {
+  if (sameText(before, after)) return true;
+  const old = withoutBom(before);
+  const next = withoutBom(after);
+  const oldLinks = findWikilinks(old);
+  const newLinks = findWikilinks(next);
+  if (oldLinks.length !== newLinks.length) return false;
+  const names = (path: string): string[] => {
+    const stem = path.replace(/\.md$/i, "");
+    const base = stem.slice(stem.lastIndexOf("/") + 1);
+    return [stem, path, base, base + ".md"];
+  };
+  const origins = names(origin);
+  const targets = names(target);
+  let oldAt = 0;
+  let newAt = 0;
+  for (let i = 0; i < oldLinks.length; i++) {
+    const a = oldLinks[i];
+    const b = newLinks[i];
+    if (old.slice(oldAt, a.start) !== next.slice(newAt, b.start)) return false;
+    if (a.original !== b.original) {
+      const from = linkPathOf(a.target);
+      const to = linkPathOf(b.target);
+      if (!origins.includes(from) || !targets.includes(to)) return false;
+      const shape = (link: string, path: string): string => {
+        const at = link.indexOf(path, link.indexOf("[[") + 2);
+        return link.slice(0, at) + "<target>" + link.slice(at + path.length);
+      };
+      if (shape(a.original, from) !== shape(b.original, to)) return false;
+    }
+    oldAt = a.end;
+    newAt = b.end;
+  }
+  return old.slice(oldAt) === next.slice(newAt);
+}
+
 interface NoteWriteEntry {
   path: string;
   file: TFile;
@@ -295,8 +337,31 @@ class NoteWriteJournal {
     return next;
   };
 
+  private async aroundHostMove(origin: string, target: string, move: () => Promise<void>): Promise<void> {
+    if (!this.active) return move();
+    for (const entry of this.entries.values()) {
+      const current = await this.repo.app.vault.read(entry.file);
+      if (!sameText(current, entry.expected)) {
+        entry.conflict = true;
+        if (!this.reverting) throw noteConflict();
+      }
+    }
+    await move();
+    for (const entry of this.entries.values()) {
+      const current = await this.repo.app.vault.read(entry.file);
+      if (!isHostLinkRewrite(entry.expected, current, origin, target)) {
+        entry.conflict = true;
+        if (!this.reverting) throw noteConflict();
+        continue;
+      }
+      entry.changed ||= !sameText(current, entry.expected);
+      entry.expected = current;
+    }
+  }
+
   async run<T>(action: () => Promise<T>): Promise<T> {
     try {
+      this.guard.aroundHostMove = (origin, target, move) => this.aroundHostMove(origin, target, move);
       return this.entries.size ? await this.repo.withNoteWriteGuard(this.guard, action) : await action();
     } finally {
       this.active = false;

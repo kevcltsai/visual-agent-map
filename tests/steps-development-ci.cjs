@@ -25,6 +25,7 @@ test('shared test helpers load no unused bundles and retain module identity', ()
   const source = fs.readFileSync(path.join(__dirname, 'support.cjs'), 'utf8');
   const module = { exports: {} };
   const mockedRequire = name => name === './build.cjs' ? {
+    recordCachedEntry() {},
     buildSync: ({ entryPoints }) => {
       calls.push(path.basename(entryPoints[0]));
       return { outputFiles: [{ text: 'module.exports = { Repository: class Repository {}, DEFAULT_SETTINGS: {}, normalizeReasoningLevel: value => value };' }] };
@@ -71,7 +72,7 @@ test('lazy shared module loads remain visible to the existing conservative depen
     [helper]: scanTestFile(root, helper),
     [consumer]: { sources: [], prefixes: [], requires: [helper], reasons: [], cachedLoads: [] }
   };
-  for (const entry of ['map-model.ts', 'map-layout.ts', 'log-manager.ts', 'repository.ts']) assert.ok(scans[helper].cachedLoads.includes(entry), entry);
+  for (const entry of ['map-model.ts', 'map-layout.ts', 'log-manager.ts', 'repository.ts']) assert.ok(scans[helper].observedCachedLoads.includes(entry), entry);
   const deps = buildDeps({ testFiles: [consumer], records: {}, scans, bundles: { 'repository.ts': ['core/example.ts'] }, sha: 'a'.repeat(40) });
   assert.ok(deps.tests[consumer].sources.map(i => deps.paths[i]).includes('core/example.ts'));
 });

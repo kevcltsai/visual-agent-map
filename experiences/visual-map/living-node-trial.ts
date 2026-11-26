@@ -146,7 +146,7 @@ export class LivingTrial {
         candidate,
         proposal,
         signal: lease.signal,
-        inspect: check.inspect,
+        inspect: () => check.inspect(),
         isCurrent: current
       });
       if (!this.closed && this.generation === generation) {

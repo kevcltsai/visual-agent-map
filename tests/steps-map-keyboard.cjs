@@ -198,7 +198,7 @@ test('A4: keys typed in a field or during IME composition never reach a card act
   assert.equal(h.map().nodes.length, 4); assert.deepEqual(h.added, []); assert.deepEqual(modalNames(h), []);
 });
 
-test('A4: Mod+Enter adds a subtopic of the focused card; Shift+Enter adds a sibling (a new root for a root card); Tab and plain Enter are unchanged', async () => {
+test('A4: Mod+Enter adds a subtopic of the focused card; Shift+Enter adds a sibling (a new root for a root card); Tab is unchanged and plain Enter edits the title', async () => {
   const h = await harness();
   let details = 0; h.view.openDetails = () => { details++; };
   assert.equal(send(h, 'leaf', 'Enter', { ctrlKey: true }).defaultPrevented, true);
@@ -211,8 +211,9 @@ test('A4: Mod+Enter adds a subtopic of the focused card; Shift+Enter adds a sibl
   h.added.length = 0;
   const tab = send(h, 'leaf', 'Tab');
   assert.equal(tab.defaultPrevented, false, 'Tab keeps moving focus into the card tools'); assert.deepEqual(h.added, []);
-  send(h, 'leaf', 'Enter');
-  assert.equal(details, 1, 'plain Enter still opens details'); assert.deepEqual(h.added, []);
+  const enter = send(h, 'leaf', 'Enter');
+  assert.equal(details, 0, 'plain Enter no longer opens details (the toolbar Note does)'); assert.deepEqual(h.added, []);
+  assert.equal(enter.defaultPrevented, true); assert.equal(h.view.inlineName?.id, h.ids.leaf, 'plain Enter opens the title field');
 });
 
 test('A4: double-clicking a card title opens the inline title field even though the pointer is captured by the card', async () => {

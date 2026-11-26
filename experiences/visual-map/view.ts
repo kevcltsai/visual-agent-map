@@ -229,7 +229,7 @@ import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
-import { KeyboardShortcutsModal } from "../../ui/modals/keyboard-shortcuts-modal";
+import { KeyboardShortcutsModal, shortcutLabel } from "../../ui/modals/keyboard-shortcuts-modal";
 import {
   applyCollapseLevel,
   canParent,
@@ -779,7 +779,6 @@ const CARD_EDITOR_STATES = [
 ];
 const CARD_EDITOR_DROP = [
   ".vam-node-tools",
-  ".vam-add-child",
   ".vam-card-resize",
   ".vam-card-resize-y",
   ".vam-card-fade",
@@ -3116,7 +3115,8 @@ export class VisualAgentMapView extends ItemView {
     return area;
   }
   /**
-   * A plain click on a card (no drag, no modifier): a click on the title or the summary text turns it into a field.
+   * A plain click on a card (no drag, no modifier): a click on the summary text turns it into a field. The title is not
+   * edited by a click (a click selects the card); double-click, Enter or F2 edits it.
    * The point is checked against the boxes because enableDrag captures the pointer, so the target is often the card.
    * The add-summary line (faint, shown while the card is selected) only counts when the card was already selected
    * before this press. Returns true when an editor opened.
@@ -3143,12 +3143,9 @@ export class VisualAgentMapView extends ItemView {
       );
     };
     // Looked up now, not when the card was drawn: a refresh can swap the summary line for the add-summary line.
-    const title = card.querySelector<HTMLElement>(".vam-card-title");
     const summary = card.querySelector<HTMLElement>(".vam-card-summary.is-inline-editable");
     const add = wasSelected ? card.querySelector<HTMLElement>(".vam-card-summary-add") : null;
-    if (title && hit(title)) {
-      this.startCardTitleEdit(node, { caret: this.caretOffsetAt(title, point.clientX, point.clientY) });
-    } else if (summary && hit(summary)) {
+    if (summary && hit(summary)) {
       this.startCardSummaryEdit(node, this.caretOffsetAt(summary, point.clientX, point.clientY));
     } else if (add && hit(add)) {
       this.startCardSummaryEdit(node, 0);
@@ -5507,6 +5504,13 @@ export class VisualAgentMapView extends ItemView {
     if (this.presentation || this.bookLock().structure) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
+    this.fillAddMenu(menu, parent, afterTextId);
+    menu.showAtMouseEvent(event);
+    // Enter on a freshly opened list takes its first row.
+    (menu as unknown as { select?: (index: number) => void }).select?.(0);
+  }
+  /** The add list's rows: the six topic types and, where text may follow, a text block. */
+  private fillAddMenu(menu: Menu, parent: MapNode | null, afterTextId?: string): void {
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
@@ -5530,9 +5534,6 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("text-cursor-input")
           .onClick(() => this.whenEditing(() => this.addTextNodeUnder(parent)))
       );
-    menu.showAtMouseEvent(event);
-    // Enter on a freshly opened list takes its first row.
-    (menu as unknown as { select?: (index: number) => void }).select?.(0);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
   private topicCoverOff(node: MapNode): boolean {
@@ -10224,59 +10225,145 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
-   * A card's right-click actions, the same ones as its hover tools plus adding a sibling and opening the note in a tab.
-   * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
+   * The selected card's toolbar: Research (the topic chat), Add (a topic under it, its type can change later), Note (the
+   * details sidebar; Cmd/Ctrl-click opens a new tab) and More (the rarer card actions). Every button has a text label.
+   */
+  private paintCardToolbar(tools: HTMLElement, node: MapNode): void {
+    const bookLock = this.bookLock();
+    const tool = (label: string, cls: string, action: (event: MouseEvent, button: HTMLButtonElement) => void) => {
+      const button = this.button(tools, label, () => {});
+      button.addEventListener("click", event => this.whenEditing(() => action(event, button)));
+      button.addClass("vam-card-tool", cls);
+      return button;
+    };
+    if (!bookLock.ai)
+      tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
+    if (!bookLock.structure)
+      tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
+    tool(t("ui.card_tool_note"), "vam-detail-button", event =>
+      event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
+    ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
+    more.setAttr("aria-label", t("ui.card_tool_more"));
+    more.setAttr("aria-haspopup", "menu");
+  }
+  /** The toolbar's More list: card settings, select subtopics, summary bracket, note style, and the other topic types to add. */
+  private openCardMoreMenu(button: HTMLElement, node: MapNode): void {
+    const map = this.map;
+    if (!map || this.presentation) return;
+    const bookLock = this.bookLock();
+    const menu = this.newMenu(node.id);
+    this.drawInDom(menu);
+    if (!bookLock.structure)
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.card_settings_menu"))
+          .setIcon("settings-2")
+          .onClick(() => this.whenEditing(() => this.openNodePanel(node, "structure")))
+      );
+    if (!bookLock.structure && !node.collapsed && map.nodes.some(item => item.parentId === node.id))
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.select_subtopics"))
+          .setIcon("list-checks")
+          .onClick(() => this.whenEditing(() => this.selectSubtopics(node)))
+      );
+    if (this.canEditSummary()) {
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.summary_add"))
+          .setIcon("brackets")
+          .onClick(() => this.addSummaryOver([node.id]))
+      );
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.note_style_menu"))
+          .setIcon("palette")
+          .onClick(() => void this.chooseTopicStyle(node))
+      );
+    }
+    if (!bookLock.structure) {
+      let sub: Menu | undefined;
+      menu.addSeparator();
+      menu.addItem(item => {
+        item.setTitle(t("ui.card_tool_add_other")).setIcon("plus");
+        sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+      });
+      this.fillAddMenu(sub ?? menu, node);
+    }
+    const box = button.getBoundingClientRect();
+    menu.showAtPosition({ x: box.left, y: box.bottom });
+  }
+  /** A menu row's key or click hint, drawn after its title (an Obsidian-drawn menu only). */
+  private menuHint(item: MenuItem, text: string): void {
+    (item as unknown as { dom?: HTMLElement }).dom?.createSpan({ cls: "vam-menu-hint", text });
+  }
+  /**
+   * A card's right-click actions in groups: new topics; research and fold; opening and settings; the picture book. Remove
+   * follows in the caller. The rarer actions (summary bracket, note style, select subtopics) are in the toolbar's More.
    */
   private addCardMenuActions(menu: Menu, node: MapNode): void {
     const map = this.map;
     if (!map) return;
-    const add = (title: string, icon: string, action: () => void): void => {
-      menu.addItem(item =>
+    const add = (title: string, icon: string, action: () => void, hint?: string): void => {
+      menu.addItem(item => {
         item
           .setTitle(title)
           .setIcon(icon)
-          .onClick(() => this.whenEditing(action))
-      );
+          .onClick(() => this.whenEditing(action));
+        if (hint) this.menuHint(item, hint);
+      });
     };
     const bookLock = this.bookLock();
-    if (!bookLock.ai) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
     if (!bookLock.structure) {
-      add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
-      add(t("ui.card_menu_add_sibling"), "list-plus", () =>
-        this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
+      add(
+        t("ui.card_menu_add_child"),
+        "plus",
+        () => this.enqueue(() => this.addNode(node)),
+        shortcutLabel("Mod+Enter")
+      );
+      add(
+        t("ui.card_menu_add_sibling"),
+        "list-plus",
+        () => this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null)),
+        shortcutLabel("Shift+Enter")
       );
     }
     menu.addSeparator();
+    if (!bookLock.ai) add(t("ui.card_menu_research"), "sparkles", () => this.openTopicChat(node));
     this.addPromptRunMenu(menu, node);
-    if (!bookLock.structure) add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
-    const hasChildren = map.nodes.some(item => item.parentId === node.id);
-    if (hasChildren && !node.collapsed && !bookLock.structure)
-      add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
-    if (hasChildren)
+    if (map.nodes.some(item => item.parentId === node.id))
       add(
-        node.collapsed ? t("ui.expand") : t("ui.collapse"),
+        node.collapsed ? t("ui.card_menu_expand") : t("ui.card_menu_collapse"),
         node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
         () => this.toggleCollapsed(node)
       );
-    // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
-    if (this.markersEditable(node) && this.coverPictureOf(node))
-      add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
-    this.addBookRerunMenuItem(menu, node);
-    this.addBookRoleMenuItem(menu, node);
     menu.addSeparator();
-    menu.addItem(item =>
+    menu.addItem(item => {
       item
-        .setTitle(t("ui.open_details_in_right_sidebar"))
-        .setIcon("panel-right")
-        .onClick(() => this.openDetails(node))
-    );
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.card_menu_open_note_tab"))
+        .setTitle(t("ui.card_menu_open_note"))
         .setIcon("file-text")
-        .onClick(() => this.openNoteInTab(node))
-    );
+        .onClick(event => (event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)));
+      this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
+    });
+    if (!bookLock.structure) add(t("ui.card_settings_menu"), "settings-2", () => this.openNodePanel(node, "structure"));
+    this.addBookMenu(menu, node);
     menu.addSeparator();
+  }
+  /** "Picture book ▸": rewrite this chapter and the chapter role, only for a card that is a chapter of this map's book. */
+  private addBookMenu(menu: Menu, node: MapNode): void {
+    const why = this.bookRerunWhy(node);
+    const choices = this.bookRoleChoices(node);
+    if (why === undefined && !choices) return;
+    menu.addSeparator();
+    let sub: Menu | undefined;
+    menu.addItem(item => {
+      item.setTitle(t("ui.book_card_menu")).setIcon("book-open");
+      sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+    });
+    const target = sub ?? menu;
+    this.addBookRerunMenuItem(target, node, why);
+    this.addBookRoleMenuItem(target, node, choices);
   }
   /** Why this card's "rerun this card" (menu item and card button) cannot be used now: "" when it can; undefined when the map offers no rerun. */
   private bookRerunWhy(node: MapNode, gate2Only = false): string | undefined {
@@ -10390,11 +10477,9 @@ export class VisualAgentMapView extends ItemView {
       ...(this.bookBarFocus === "rerun-go" ? { focus: "go" as const } : {})
     };
   }
-  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
-  private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
-    const why = this.bookRerunWhy(node);
+  /** "Rewrite this chapter" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  private addBookRerunMenuItem(menu: Menu, node: MapNode, why = this.bookRerunWhy(node)): void {
     if (why === undefined) return;
-    menu.addSeparator();
     menu.addItem(item =>
       item
         .setTitle(t("ui.book_card_menu_rerun"))
@@ -10436,8 +10521,7 @@ export class VisualAgentMapView extends ItemView {
     ];
   }
   /** "Picture book: chapter role": a submenu where the menu has one, else a heading and the same items (all reachable by keyboard). */
-  private addBookRoleMenuItem(menu: Menu, node: MapNode): void {
-    const choices = this.bookRoleChoices(node);
+  private addBookRoleMenuItem(menu: Menu, node: MapNode, choices = this.bookRoleChoices(node)): void {
     if (!choices) return;
     const fill = (target: Menu): void => {
       for (const { choice, label, checked } of choices)
@@ -10538,14 +10622,16 @@ export class VisualAgentMapView extends ItemView {
         const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
         const single = topic && !this.selection.state.multiSelectMode ? topic : undefined;
         if (single) this.addCardMenuActions(menu, single);
-        menu.addItem(item =>
-          item
-            .setTitle(t("ui.summary_add"))
-            .setIcon("brackets")
-            .onClick(() => this.addSummaryOver(ids))
-        );
+        // A single card has these in its toolbar's More list; a selection of cards keeps them here.
+        if (!single)
+          menu.addItem(item =>
+            item
+              .setTitle(t("ui.summary_add"))
+              .setIcon("brackets")
+              .onClick(() => this.addSummaryOver(ids))
+          );
         // One topic only; the AIM conclusion cards have their own style row in the settings.
-        if (topic)
+        if (topic && !single)
           menu.addItem(item =>
             item
               .setTitle(t("ui.note_style_menu"))
@@ -10553,7 +10639,6 @@ export class VisualAgentMapView extends ItemView {
               .onClick(() => void this.chooseTopicStyle(topic))
           );
         if (single && !this.bookLock().structure) {
-          menu.addSeparator();
           menu.addItem(item =>
             item
               .setTitle(t("ui.remove_from_map"))
@@ -13229,10 +13314,9 @@ export class VisualAgentMapView extends ItemView {
         this.button(header, t("ui.discard_synthesis"), () => this.discardSynthesis(node));
       }
     }
-    // Hover-only tools float beside the card (above its top edge unless that covers a neighbour), so showing them (hover,
-    // focus, selection) never moves the card's content. What must always show (status, stop and review actions, a folded
-    // branch's count) stays in the header. The floating tools are icon-only buttons: AI explore, Details, fold, this card
-    // (structure), select subtopics and remove. Add text is in the card's + menu only.
+    // The selected card's toolbar floats beside the card (above its top edge unless that covers a neighbour), so showing it
+    // never moves the card's content. What must always show (status, stop and review actions, a folded branch's count) stays
+    // in the header. The toolbar has four labelled buttons: Research, Add, Note and More (the rarer card actions).
     const tools = card.createDiv("vam-node-tools");
     const count = this.paintBranchSize?.(node.id) ?? descendants(this.map!.nodes, node.id).size;
     if (count) {
@@ -13245,45 +13329,7 @@ export class VisualAgentMapView extends ItemView {
         collapse.setAttr("aria-expanded", "false");
       }
     }
-    const bookLock = this.bookLock();
-    if (!this.selection.state.multiSelectMode && !bookLock.ai) {
-      const exploreName = t("ui.ai_explore");
-      const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
-      explore.addClass("vam-node-tool", "vam-ai-explore");
-      explore.setAttr("aria-label", exploreName);
-    }
-    const details = this.button(tools, "", () => this.openDetails(node));
-    details.addClass("vam-node-tool", "vam-detail-button");
-    setIcon(details, "panel-right");
-    details.setAttr("aria-label", t("ui.node_tool_details"));
-    const iconTool = (title: string, icon: string, cls: string, action: () => void): HTMLButtonElement => {
-      const button = this.button(tools, "", action);
-      button.addClass("vam-node-tool", cls);
-      setIcon(button, icon);
-      // Obsidian shows aria-label as the hover tooltip, so one string is the name and the tooltip.
-      button.setAttr("aria-label", title);
-      return button;
-    };
-    if (count && !node.collapsed)
-      iconTool(t("ui.collapse"), "chevrons-down-up", "vam-fold-tool", () =>
-        this.whenEditing(() => this.toggleCollapsed(node))
-      );
-    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
-      iconTool(t("ui.structure_and_links"), "git-fork", "vam-structure-tool", () =>
-        this.whenEditing(() => this.openNodePanel(node, "structure"))
-      );
-      // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
-      if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id))
-        iconTool(t("ui.select_subtopics"), "list-checks", "vam-select-subtopics-tool", () =>
-          this.whenEditing(() => this.selectSubtopics(node))
-        );
-    }
-    if (!this.selection.state.multiSelectMode && !bookLock.structure) {
-      const add = this.button(card, "+", () => {});
-      add.addEventListener("click", event => this.openAddMenu(event, node));
-      add.addClass("vam-add-child");
-      add.setAttr("aria-label", t("ui.add_subtopic_manually"));
-    }
+    if (!this.selection.state.multiSelectMode) this.paintCardToolbar(tools, node);
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
     const shownTitle = loading
@@ -13434,9 +13480,11 @@ export class VisualAgentMapView extends ItemView {
         if (this.selection.state.multiSelectMode) {
           this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
+          // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
           this.selectMapNode(node);
-          if (this.notesLoading()) return;
-          this.openDetails(node);
+          if (this.notesLoading() || !note || event.isComposing) return;
+          event.preventDefault();
+          this.startCardTitleEdit(node, { select: true });
         }
       }
     });

@@ -1923,9 +1923,9 @@ test('P4 words in en and zh-CN; the start dialog line is the card count, time an
   lang('zh-CN');
   assert.equal(tr('ui.book_progress_writing_cards_0_1', 3, 6), '写作中 · 已完成 3/6 张卡');
   assert.equal(tr('ui.book_stopped_done_cards_0_1', 3, 6), '已停止 · 完成 3/6 张卡');
-  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('连接行'));
+  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('衔接句'));
   lang('zh-TW');
-  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('只更新前後章節的連接行'));
+  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('只改銜接句'));
   assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /structure: \{\s*chapters: startStructure\.chapters\.length/);
 });
 

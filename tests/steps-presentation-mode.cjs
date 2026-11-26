@@ -363,8 +363,8 @@ test('42: the new CSS stays out of the share viewer (every rule starts with .vam
 });
 
 // bug bash A #05: a presentation is read-only; the current card's tools and its "+" neither show nor act.
-test('bug bash #05: during a presentation the card tools and the "+" do nothing; after leaving they work again', async () => {
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8'), /\.vam-stage\[data-presenting\] \.vam-node-tools[^{]*\.vam-add-child[^{]*\{[^}]*display: none/, 'the stylesheet hides the tools and the plus while presenting');
+test('bug bash #05: during a presentation the card toolbar (Research, Add, More) does nothing; after leaving it works again', async () => {
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8'), /\.vam-stage\[data-presenting\] \.vam-node-tools[^{]*\{[^}]*display: none/, 'the stylesheet hides the toolbar while presenting');
   const h = await harness();
   h.recordModalsOnly();
   const menus = [];
@@ -377,16 +377,16 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   const before = bytes();
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();
-  const named = label => find(h.card('root'), n => n.tag === 'button' && n.attrs?.['aria-label'] === label)[0];
-  const tools = [byClass('root', 'vam-add-child'), named('AI explore'), named('Collapse'), named('This card'), named('Select subtopics')];
-  assert.ok(tools.every(Boolean), 'every tool exists on the card as its own button');
-  assert.equal(byClass('root', 'vam-more-tool'), undefined, 'no More tool');
-  // Fold, structure and select subtopics are direct buttons now: each does nothing while presenting.
+  const tools = [byClass('root', 'vam-ai-explore'), byClass('root', 'vam-add-child-tool'), byClass('root', 'vam-card-tool-more')];
+  assert.ok(tools.every(Boolean), 'Research, Add and More exist on the card as their own buttons');
+  assert.ok(byClass('root', 'vam-detail-button'), 'and Note');
+  const countBefore = h.view.map.nodes.length;
+  // Each does nothing while presenting (Note only reads, so it is not part of this list).
   for (const el of tools) click(el);
   await h.settle();
-  assert.equal(menus.length, 0, 'no tool and not the "+" opens a list while presenting');
-  assert.equal(h.view.selection.state.multiSelectMode, false, 'Select subtopics did not enter selection mode while presenting');
-  assert.equal(h.view.selection.state.multiSelected.size ?? h.view.selection.state.multiSelected.length, 0, 'Select subtopics selected nothing while presenting');
+  assert.equal(menus.length, 0, 'no toolbar button opens a list while presenting');
+  assert.equal(h.view.map.nodes.length, countBefore, 'Add created no topic while presenting');
+  assert.equal(h.view.selection.state.multiSelectMode, false, 'nothing entered selection mode while presenting');
   assert.deepEqual(h.modals, [], 'no dialog opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
   assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');
@@ -396,23 +396,23 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   await h.view.addNode(h.view.map.nodes[0], 'from AI', false, false); await h.settle();
   assert.equal(h.view.map.nodes.length, count + 1, 'the internal path (AI write-back) still creates a node during a presentation');
   h.view.exitPresentation();
-  click(byClass('root', 'vam-add-child')); await h.settle();
-  assert.equal(menus.length, 1, 'after leaving, the "+" opens its type list again');
+  click(byClass('root', 'vam-add-child-tool')); await h.settle();
+  assert.equal(h.view.map.nodes.length, count + 2, 'after leaving, Add creates a subtopic again');
 });
 
 // Overlaps the tools test above on purpose: there the stylesheet assertion fails first on the old code, so this one shows the undo assertion failing on its own.
-test('bug bash #05: during a presentation a collapse click leaves no undo step and folds nothing', async () => {
+test('bug bash #05: during a presentation the card menu Collapse row leaves no undo step and folds nothing', async () => {
   const h = await harness();
   h.recordModalsOnly();
-  const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
-  const menus = [];
-  h.view.newMenu = () => { const m = { items: [], addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, setDisabled() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); m.items.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() { menus.push(m); } }; return m; };
-  const collapse = find(h.card('root'), n => n.tag === 'button' && n.attrs?.['aria-label'] === 'Collapse')[0];
-  assert.ok(collapse, 'the root card has a Collapse tool button');
+  const rows = [];
+  const menu = { addItem(build) { const row = {}; const chain = { setTitle(v) { row.title = v; return chain; }, setIcon() { return chain; }, setDisabled() { return chain; }, setWarning() { return chain; }, onClick(fn) { row.fn = fn; return chain; } }; build(chain); rows.push(row); return menu; }, addSeparator() { return menu; } };
+  h.view.addCardMenuActions(menu, h.view.map.nodes.find(n => n.id === h.ids.root));
+  const collapse = rows.find(row => row.title === 'Collapse subtopics');
+  assert.ok(collapse, 'the root card menu has a Collapse subtopics row');
   assert.equal(h.view.history.canUndo, false, 'nothing to undo before');
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();
-  collapse.handlers.get('click')({ stopPropagation() {}, preventDefault() {} }); await h.settle();
+  collapse.fn({ metaKey: false, ctrlKey: false }); await h.settle();
   assert.equal(h.view.history.canUndo, false, 'a presentation is read-only: undo stays disabled');
   assert.equal(h.view.map.nodes.find(n => n.id === h.ids.root).collapsed, false, 'nothing was folded');
 });

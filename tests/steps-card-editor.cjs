@@ -108,7 +108,6 @@ test('card copy: the dialog gets the map card itself, without tools, handles, ma
   live.attrs = { id: 'x', role: 'treeitem', tabindex: '0', 'aria-level': '2', 'data-node-id': 'm', 'data-topic-color': 'red' };
   live.createDiv('vam-node-header').createSpan({ cls: 'vam-status', text: 'Done' });
   live.createDiv('vam-node-tools');
-  live.createEl('button', { cls: 'vam-add-child' });
   live.createDiv('vam-card-cover');
   live.createEl('h3', { cls: 'vam-card-title', text: 'Title' });
   live.createEl('p', { cls: 'vam-card-summary', text: 'Summary' });
@@ -133,7 +132,7 @@ test('card copy: the dialog gets the map card itself, without tools, handles, ma
   const left = copy.children.map(c => c.cls);
   assert.deepEqual(left, ['vam-node-header', 'vam-card-cover', 'vam-card-title', 'vam-card-summary']);
   assert.equal(copy.children[0].children.length, 1, 'the header shows as on the map');
-  assert.equal(live.children.length, 10, 'the map card keeps everything');
+  assert.equal(live.children.length, 9, 'the map card keeps everything');
 });
 
 test('card copy: a topic whose card is not drawn gets a plain card with its width, title and summary', () => {
@@ -263,7 +262,7 @@ const builtCard = () => {
   c.createEl('h3', { cls: 'vam-card-title' });
   c.createEl('p', { cls: 'vam-card-summary' });
   c.createEl('p', { cls: 'vam-card-error' });
-  c.createEl('button', { cls: 'vam-add-child' });
+  c.createEl('button', { cls: 'vam-card-resize' });
   c.createSpan({ cls: 'vam-card-fade' });
   return { c, frame };
 };
@@ -271,17 +270,17 @@ const order = el => el.children.map(child => child.cls.split(' ')[0] + (child.ch
 
 test('arrangeCover: top, bottom, left and right place the cover; calling again or switching back restores the card', () => {
   const { c, frame } = builtCard();
-  const top = ['vam-node-header', 'vam-card-cover', 'vam-card-title', 'vam-card-summary', 'vam-card-error', 'vam-add-child', 'vam-card-fade'];
+  const top = ['vam-node-header', 'vam-card-cover', 'vam-card-title', 'vam-card-summary', 'vam-card-error', 'vam-card-resize', 'vam-card-fade'];
   layout.arrangeCover(c, frame, 'top');
   assert.deepEqual(order(c), top);
   layout.arrangeCover(c, frame, 'bottom');
-  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-summary', 'vam-card-cover', 'vam-card-error', 'vam-add-child', 'vam-card-fade']);
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-summary', 'vam-card-cover', 'vam-card-error', 'vam-card-resize', 'vam-card-fade']);
   assert.ok(c.classes.includes('has-cover-bottom'));
   layout.arrangeCover(c, frame, 'left');
-  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-add-child', 'vam-card-fade']);
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-card-resize', 'vam-card-fade']);
   assert.ok(c.classes.includes('has-cover-left') && !c.classes.includes('has-cover-bottom'));
   layout.arrangeCover(c, frame, 'right');
-  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-add-child', 'vam-card-fade'], 'one row, not two');
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-card-resize', 'vam-card-fade'], 'one row, not two');
   assert.ok(c.classes.includes('has-cover-right') && !c.classes.includes('has-cover-left'));
   layout.arrangeCover(c, frame, 'top');
   assert.deepEqual(order(c), top);
@@ -289,16 +288,16 @@ test('arrangeCover: top, bottom, left and right place the cover; calling again o
 });
 
 test('arrangeCover: a bottom picture goes after the open summary field, the add-summary line, or the text when a title field is open', () => {
-  const cardWith = build => { const c = dom.element('div', { cls: 'vam-node' }); const frame = c.createDiv('vam-card-cover'); c.createEl('h3', { cls: 'vam-card-title' }); build(c); c.createDiv('vam-add-child'); return { c, frame }; };
+  const cardWith = build => { const c = dom.element('div', { cls: 'vam-node' }); const frame = c.createDiv('vam-card-cover'); c.createEl('h3', { cls: 'vam-card-title' }); build(c); c.createDiv('vam-card-resize'); return { c, frame }; };
   const summaryEdit = cardWith(c => { c.createEl('textarea', { cls: 'vam-card-summary-input' }); });
   layout.arrangeCover(summaryEdit.c, summaryEdit.frame, 'bottom');
-  assert.deepEqual(order(summaryEdit.c), ['vam-card-title', 'vam-card-summary-input', 'vam-card-cover', 'vam-add-child'], 'below the field');
+  assert.deepEqual(order(summaryEdit.c), ['vam-card-title', 'vam-card-summary-input', 'vam-card-cover', 'vam-card-resize'], 'below the field');
   const addLine = cardWith(c => c.createEl('p', { cls: 'vam-card-summary-add' }));
   layout.arrangeCover(addLine.c, addLine.frame, 'bottom');
-  assert.deepEqual(order(addLine.c), ['vam-card-title', 'vam-card-summary-add', 'vam-card-cover', 'vam-add-child'], 'below the add-summary line');
+  assert.deepEqual(order(addLine.c), ['vam-card-title', 'vam-card-summary-add', 'vam-card-cover', 'vam-card-resize'], 'below the add-summary line');
   const titleEdit = cardWith(c => { c.createEl('input', { cls: 'vam-card-title-input' }); c.createEl('p', { cls: 'vam-card-summary' }); });
   layout.arrangeCover(titleEdit.c, titleEdit.frame, 'bottom');
-  assert.deepEqual(order(titleEdit.c), ['vam-card-title', 'vam-card-title-input', 'vam-card-summary', 'vam-card-cover', 'vam-add-child'], 'a title edit keeps the picture under the summary');
+  assert.deepEqual(order(titleEdit.c), ['vam-card-title', 'vam-card-title-input', 'vam-card-summary', 'vam-card-cover', 'vam-card-resize'], 'a title edit keeps the picture under the summary');
 });
 
 test('arrangeCover: without a summary bottom follows the title; without a cover a side row is taken apart; an unbuilt card just gets the cover', () => {
@@ -309,7 +308,7 @@ test('arrangeCover: without a summary bottom follows the title; without a cover 
   layout.arrangeCover(c, frame, 'left');
   frame.remove();
   layout.arrangeCover(c, null, 'left');
-  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-error', 'vam-add-child', 'vam-card-fade']);
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-error', 'vam-card-resize', 'vam-card-fade']);
   const bare = dom.element('div');
   bare.createDiv('vam-node-header');
   const f = dom.element('div', { cls: 'vam-card-cover' });

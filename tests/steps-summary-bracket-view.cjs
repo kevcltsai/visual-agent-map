@@ -311,7 +311,7 @@ test('A3 clean-up: a member moved to another parent or removed shrinks or remove
   assert.equal((await h.repo.readMap(MAP)).canvasItems, undefined);
 });
 
-test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regular topic; a multi-selection and presentation get none; Menu key / Shift+F10 (client 0,0) opens the menu beside the card', async () => {
+test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regular topic (in the toolbar More list); a multi-selection and presentation get none; Menu key / Shift+F10 (client 0,0) opens the menu beside the card', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   card.getBoundingClientRect = () => ({ left: 500, bottom: 190, top: 150, right: 700 });
@@ -320,8 +320,11 @@ test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regu
   const opened = [];
   h.view.chooseTopicStyle = node => opened.push(node.id);
   h.view.onCanvasContextMenu(event());
+  assert.equal(titles().includes('Note style…'), false, 'the single-card right-click menu has no Note style…: it is in the toolbar More list');
+  const more = { getBoundingClientRect: () => ({ left: 10, bottom: 20 }) };
+  h.view.openCardMoreMenu(more, h.view.map.nodes.find(n => n.id === h.ids.b));
   h.menus.at(-1).items.find(i => i.title === 'Note style…').click();
-  assert.deepEqual(opened, [h.ids.b], 'the entry opens the chooser for the right-clicked topic');
+  assert.deepEqual(opened, [h.ids.b], 'the entry opens the chooser for the topic of the More list');
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.onCanvasContextMenu(event());
   assert.deepEqual(titles(), ['Add summary bracket'], 'two or more selected topics: no per-topic style');
@@ -336,6 +339,8 @@ test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regu
     const before = g.menus.length;
     g.view.onCanvasContextMenu({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? gcard : null) } });
     assert.equal(g.menus.length, before, `${mode}: no menu, so no Note style…`);
+    g.view.openCardMoreMenu(more, g.view.map.nodes.find(n => n.id === g.ids.b));
+    assert.equal(g.menus.length, before, `${mode}: no More list either`);
   }
 });
 
@@ -354,9 +359,12 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
   h.view.onCanvasContextMenu(event());
+  assert.equal(h.menus.at(-1).items.some(i => i.title === 'Add summary bracket'), false, 'one card: the bracket is in the toolbar More list, not the right-click menu');
+  assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
+  h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 10, bottom: 20 }) }, h.view.map.nodes.find(n => n.id === h.ids.b));
   const entryTitles = h.menus.at(-1).items.map(i => i.title);
   assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 2), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
-  assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
+  assert.deepEqual(plain(h.menus.at(-1).at), { x: 10, y: 20 }, 'the More list opens under its button');
   h.menus.at(-1).items.find(i => i.title === 'Add summary bracket').click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
   assert.deepEqual(plain(h.view.pendingSummary.members), [h.ids.b]);
@@ -433,7 +441,7 @@ test('bug bash #26 view: bracket text beside a card that is not a member is push
   assert.equal(find(h.el('s1'), i => i.tag === 'path').attrs.d, find(plainRun.el('s1'), i => i.tag === 'path').attrs.d, 'the brace is unchanged');
 });
 
-test('C1 card context menu: one topic gets its card actions in groups (AI and new topics, editing, opening), then the bracket and style, then Remove; each entry runs the same action as the card tool', async () => {
+test('C1 card context menu: one topic gets its card actions in groups (new topics; research and fold; open and settings), then Remove; each entry runs the same action as its toolbar button', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
@@ -451,16 +459,18 @@ test('C1 card context menu: one topic gets its card actions in groups (AI and ne
   h.view.onCanvasContextMenu(event());
   const menu = h.menus.at(-1);
   const titles = menu.items.map(i => i.title);
-  assert.deepEqual(titles, ['AI explore', 'Add subtopic manually', 'Add sibling topic', 'This card', 'Select subtopics', 'Collapse', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…', 'Remove from map']);
-  assert.deepEqual(menu.separators, [3, 6, 8, 10], 'separators between the groups');
-  assert.ok(!titles.includes('Add text'), 'Add text lives only in the + menu of the card');
+  assert.deepEqual(titles, ['Add subtopic', 'Add sibling topic', 'Research this card', 'Collapse subtopics', 'Open note', 'Card settings…', 'Remove from map']);
+  assert.deepEqual(menu.separators, [2, 4, 6], 'separators between the groups');
+  assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list of the toolbar More');
+  for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Edit card', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);
   assert.equal(menu.items.at(-1).warning, true, 'Remove is marked as a warning');
-  for (const item of menu.items) if (!['Add summary bracket', 'Note style…'].includes(item.title)) item.click();
+  for (const item of menu.items) item.click({ metaKey: false, ctrlKey: false });
+  menu.items.find(i => i.title === 'Open note').click({ metaKey: true });
   await h.settle();
   const b = h.view.map.nodes.find(n => n.id === h.ids.b);
   // The two add entries go through the map's work queue, so they land after the direct ones; the order is not the point.
   const sorted = list => plain(list).map(item => JSON.stringify(item)).sort();
-  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['add', b.parentId], ['panel', h.ids.b, 'structure'], ['select', h.ids.b], ['fold', h.ids.b], ['details', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
+  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['add', b.parentId], ['panel', h.ids.b, 'structure'], ['fold', h.ids.b], ['details', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.onCanvasContextMenu(event());
   assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket'], 'several topics: only the bracket');

@@ -5,6 +5,26 @@ export interface LivingSourceNode {
 }
 
 export type LivingSourceRef = { kind: "card"; id: string } | { kind: "note"; link: string };
+/** Only an absent field denotes legacy data. Corrupt persisted identities must not be re-resolved by name. */
+export function readLivingReferences(saved: unknown, legacyLinks: readonly string[]): LivingSourceRef[] {
+  if (saved === undefined) return legacyLinks.map(link => ({ kind: "note", link }));
+  if (!Array.isArray(saved)) throw new Error("invalid-source-reference");
+  return saved.map(value => {
+    if (typeof value !== "string") throw new Error("invalid-source-reference");
+    if (value.startsWith("card:") && value.slice(5).trim()) return { kind: "card", id: value.slice(5) };
+    if (value.startsWith("note:") && value.slice(5).trim()) return { kind: "note", link: value.slice(5) };
+    throw new Error("invalid-source-reference");
+  });
+}
+
+/** A target moved while an execution or trial is outstanding is a different structural snapshot.
+ * Parent is a runtime fence, not part of persistent input validity: moving alone does not change its knowledge.
+ */
+export function sameLivingTarget(before: LivingSourceNode, after: LivingSourceNode | undefined): boolean {
+  return !!after && before.id === after.id && before.path === after.path &&
+    (before.parentId ?? null) === (after.parentId ?? null);
+}
+
 export type LivingSourceRole = "child" | "explicit" | "map";
 export type LivingResolvedSource = {
   identity: string;

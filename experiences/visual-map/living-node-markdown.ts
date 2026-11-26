@@ -232,6 +232,10 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
   return result;
 }
 
+export function renderLivingPreview(knowledge: LivingKnowledge): string {
+  return renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
+}
+
 /** Reading never migrates or rewrites the legacy body. An edited region is not silently reclaimed by AI. */
 export function readLivingMarkdown(content: string): LivingKnowledge {
   const fm = frontmatter(content);

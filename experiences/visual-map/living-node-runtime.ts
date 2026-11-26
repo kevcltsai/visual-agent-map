@@ -19,6 +19,7 @@ import {
 } from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
+import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import { applyLivingChanges, type LivingEvidence } from "./living-node-changes";
 
 const coordinators = new WeakMap<object, LivingCoordinator>();
@@ -49,6 +50,11 @@ export interface LivingRoundPort {
   onSettled(id: string, result: LivingSettlement): void;
   onFailure(id: string, error: unknown): void;
 }
+
+type LivingTrialPort = Pick<
+  LivingRoundPort,
+  "app" | "repo" | "calls" | "mapPath" | "viewSession" | "signal" | "current" | "language" | "mapSources"
+>;
 
 interface Snapshot {
   note: Note;
@@ -98,7 +104,7 @@ function sourceResolver(app: App) {
   };
 }
 
-function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: LivingRoundPort): string {
+function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<LivingRoundPort, "language">): string {
   const node = map.nodes.find(item => item.id === id);
   if (!node) return "";
   const children = map.nodes.filter(item => item.parentId === id).map(item => item.id);
@@ -155,7 +161,7 @@ async function prepareMap(port: Pick<LivingRoundPort, "repo">, map: MapDocument)
 
 /** A bounded context read. Revisions cover full readable content, even when only a summary is delivered. */
 async function readInputs(
-  port: LivingRoundPort,
+  port: LivingTrialPort,
   map: MapDocument,
   id: string,
   snapshot: Snapshot,
@@ -382,22 +388,13 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   }
 }
 
-/** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
-export async function saveLivingConfig(
+function resolveDraft(
   app: App,
-  repo: Repository,
-  map: MapDocument,
-  id: string,
-  prompt: string,
-  expectedPrompt?: string
-): Promise<"written" | "unchanged"> {
+  cards: readonly LivingMapCard[],
+  target: LivingMapCard,
+  prompt: string
+) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
-  const { snapshots, cards } = await prepareMap({ repo }, map);
-  const snapshot = snapshots.get(id);
-  const target = cards.find(card => card.id === id);
-  if (!snapshot || !target) throw new Error("missing-target");
-  if (snapshot.note.aiLocked) throw new Error("locked-target");
-  if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
   const resolver = sourceResolver(app);
   const explicit: LivingSourceRef[] = [];
   for (const link of promptSourceLinks(prompt)) {
@@ -408,25 +405,167 @@ export async function saveLivingConfig(
     if (matches.length > 1) throw new Error("ambiguous-source");
     explicit.push(matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link });
   }
-  const encoded = [...new Set(explicit.map(ref => ref.kind === "card" ? "card:" + ref.id : "note:" + ref.link))];
+  const encoded = [...new Set(explicit.map(ref => (ref.kind === "card" ? "card:" + ref.id : "note:" + ref.link)))];
   const proposed = cards.map(card =>
-    card.id === id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
+    card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
   const oldPlan = planLivingMap(cards, [], resolver).plan;
   const next = planLivingMap(proposed, [], resolver);
-  if (next.sources.get(id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
+  if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
   for (const [affected, reason] of next.plan.blocked) {
-    if (reason === "cycle" && (affected === id || oldPlan.blocked.get(affected) !== "cycle"))
+    if (reason === "cycle" && (affected === target.id || oldPlan.blocked.get(affected) !== "cycle"))
       throw new Error("living-node-cycle");
   }
+  return { encoded, proposed };
+}
+
+export interface LivingConfigSave {
+  outcome: "written" | "unchanged";
+  before: string;
+  after: string;
+}
+
+/** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
+export async function saveLivingConfig(
+  app: App,
+  repo: Repository,
+  map: MapDocument,
+  id: string,
+  prompt: string,
+  expectedPrompt?: string
+): Promise<LivingConfigSave> {
+  const { snapshots, cards } = await prepareMap({ repo }, map);
+  const snapshot = snapshots.get(id);
+  const target = cards.find(card => card.id === id);
+  if (!snapshot || !target) throw new Error("missing-target");
+  if (snapshot.note.aiLocked) throw new Error("locked-target");
+  if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
+  const { encoded } = resolveDraft(app, cards, target, prompt);
   const fm = frontmatter(snapshot.content);
-  if (snapshot.note.aiCard && snapshot.note.prompt === prompt && JSON.stringify(fm["living-node-refs"]) === JSON.stringify(encoded))
-    return "unchanged";
-  const outcome = await repo.updateNoteGuarded(target.path, { prompt }, {
-    expectedContent: snapshot.content,
-    authorize: () => !repo.isDisposed(),
-    finalize: content => setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded })
-  });
+  if (
+    snapshot.note.aiCard &&
+    snapshot.note.prompt === prompt &&
+    JSON.stringify(fm["living-node-refs"]) === JSON.stringify(encoded)
+  )
+    return { outcome: "unchanged", before: snapshot.content, after: snapshot.content };
+  let saved = "";
+  const outcome = await repo.updateNoteGuarded(
+    target.path,
+    { prompt },
+    {
+      expectedContent: snapshot.content,
+      authorize: () => !repo.isDisposed(),
+      finalize: content => {
+        saved = setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded });
+        return saved;
+      }
+    }
+  );
   if (outcome !== "written") throw new Error("changed-configuration");
-  return "written";
+  return { outcome, before: snapshot.content, after: saved };
+}
+
+/** Build a draft request without executing dependencies, and an adoption guard over the same effective inputs. */
+export async function prepareLivingTrial(port: LivingTrialPort, id: string, prompt: string) {
+  const initialMap = await port.repo.readMap(port.mapPath);
+  const initial = await prepareMap(port, initialMap);
+  const target = initial.cards.find(card => card.id === id);
+  const original = initial.snapshots.get(id);
+  if (!target || !original || original.note.aiLocked || !port.current()) throw new Error("missing-or-locked-target");
+  const build = async (formal: boolean) => {
+    const map = await port.repo.readMap(port.mapPath);
+    if (!port.current() || map.id !== initialMap.id) throw new Error("cancelled");
+    const { cards, snapshots } = await prepareMap(port, map);
+    const saved = snapshots.get(id);
+    const card = cards.find(item => item.id === id);
+    if (!saved || !card || card.path !== target.path || saved.note.aiLocked) throw new Error("changed-target");
+    const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt);
+    const resolver = sourceResolver(port.app);
+    const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);
+    if (planned.plan.blocked.has(id)) throw new Error("required-dependency-blocked");
+    const sources = planned.sources.get(id);
+    if (!sources) throw new Error("missing-source-plan");
+    const snapshot = formal
+      ? saved
+      : {
+          note: { ...saved.note, prompt, aiCard: true as const },
+          content: setFrontmatterKeys(saved.content, { "living-node-refs": encoded, "ai-card": true })
+        };
+    if (formal && (saved.note.prompt !== prompt || !isAiCard(saved.note))) throw new Error("draft-not-saved");
+    const input = await readInputs(port, map, id, snapshot, sources);
+    let dependenciesReady = true;
+    if (formal) {
+      for (const item of planned.plan.order) {
+        if (item.id === id) continue;
+        const dependency = snapshots.get(item.id);
+        const resolved = planned.sources.get(item.id);
+        if (!dependency || !resolved) {
+          dependenciesReady = false;
+          break;
+        }
+        const data = await readInputs(port, map, item.id, dependency, resolved);
+        const fm = frontmatter(dependency.content);
+        if (
+          data.base.revision === "empty" ||
+          fm["living-node-input-revision"] !== data.inputRevision ||
+          fm["living-node-success-knowledge"] !== data.base.revision
+        ) {
+          dependenciesReady = false;
+          break;
+        }
+      }
+    }
+    return { saved, snapshot, input, dependenciesReady };
+  };
+  const prepared = await build(false);
+  const candidate = {
+    executionId: randomUUID(),
+    cardId: id,
+    mapId: initialMap.id,
+    viewSession: port.viewSession,
+    baseRevision: livingSnapshotRevision(prepared.saved.content),
+    inputRevision: prepared.input.inputRevision
+  };
+  const request: LivingTrialRequest = {
+    path: target.path,
+    expectedContent: prepared.saved.content,
+    candidate,
+    base: prepared.input.base,
+    context: { at: new Date().toISOString(), evidence: prepared.input.evidence },
+    generate: async signal => {
+      const result = await generateLivingProposal(port.calls, {
+        model: prepared.snapshot.note.model,
+        reasoning: prepared.snapshot.note.reasoning ?? "auto",
+        language: port.language(initialMap, prepared.snapshot.note),
+        prompt: prepared.input.prompt,
+        base: prepared.input.base,
+        context: prepared.input.context,
+        evidence: prepared.input.evidence,
+        mapPath: port.mapPath
+      }, signal);
+      return result;
+    },
+    stillCurrent: async () => {
+      const live = await build(false);
+      return live.saved.content === prepared.saved.content && live.input.inputRevision === candidate.inputRevision;
+    },
+    generatedEvidence: true
+  };
+  const adoption: LivingAdoptionCheck = {
+    isCurrent: () => port.current(),
+    readSavedContent: async () => (await port.repo.readNoteSnapshot(target.path, initialMap)).content,
+    inspect: async () => {
+      const live = await build(true);
+      return {
+        ...candidate,
+        baseRevision: livingSnapshotRevision(live.saved.content),
+        inputRevision: live.input.inputRevision,
+        locked: !!live.saved.note.aiLocked,
+        aborted: !port.current(),
+        dependenciesReady: live.dependenciesReady,
+        alreadyCommitted: false
+      };
+    }
+  };
+  return { request, adoption, model: original.note.model };
 }

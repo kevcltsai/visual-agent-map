@@ -1,5 +1,5 @@
 import type { LivingCoordinator, LivingLease } from "./living-node-coordinator";
-import { applyLivingChanges, type LivingKnowledge } from "./living-node-changes";
+import { applyLivingChanges, type LivingChangeContext, type LivingKnowledge } from "./living-node-changes";
 import {
   commitLivingMarkdown,
   readLivingMarkdown,
@@ -20,6 +20,8 @@ export interface LivingTrialRequest extends TrialSnapshot {
   stillCurrent(): Promise<boolean>;
   /** Exact bytes predicted by the trusted configuration-only save command for this draft. */
   savedContent?: string;
+  /** The provider returns its proposal together with the runtime-verified evidence catalog. */
+  generatedEvidence?: boolean;
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -85,14 +87,19 @@ export class LivingTrial {
       if (savedContent !== undefined && readLivingMarkdown(savedContent).revision !== base.revision)
         throw new Error("changed-knowledge");
       if (base.revision !== request.base.revision) throw new Error("stale-base");
-      const snapshot: TrialSnapshot = clone({
+      let snapshot: TrialSnapshot = clone({
         path: request.path,
         expectedContent: request.expectedContent,
         candidate: identity,
         base,
         context: request.context
       });
-      const proposal = clone(await request.generate(lease.signal));
+      let proposal = clone(await request.generate(lease.signal));
+      if (request.generatedEvidence) {
+        const result = proposal as { proposal: unknown; context: LivingChangeContext };
+        snapshot = { ...snapshot, context: result.context };
+        proposal = result.proposal;
+      }
       if (!current()) return false;
       const next = applyLivingChanges(base, proposal, snapshot.context);
       if (base.revision === "empty" && !next.records.length && !next.output.text)
@@ -113,6 +120,17 @@ export class LivingTrial {
       this.lease = undefined;
       if (this.status === "running") this.status = "invalid";
     }
+  }
+
+  /** Called only with the exact bytes returned by the shared guarded configuration save. */
+  acceptSave(before: string, after: string): void {
+    const ready = this.candidate;
+    if (!ready || this.status !== "ready") return;
+    if (before !== ready.snapshot.expectedContent || readLivingMarkdown(after).revision !== ready.snapshot.base.revision) {
+      this.invalidate();
+      return;
+    }
+    ready.savedContent = after;
   }
 
   /** Never calls the provider. A failed or consumed candidate cannot be reused. */

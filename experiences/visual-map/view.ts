@@ -212,6 +212,7 @@ import {
   prepareLivingTrial,
   runLivingRound,
   saveLivingConfig,
+  validateLivingStructure,
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
@@ -11798,6 +11799,7 @@ export class VisualAgentMapView extends ItemView {
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
       guardPath: path => this.assertChatWritable(path),
+      validateStructure: (before, after) => validateLivingStructure(this.app, this.plugin.repo, before, after),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },

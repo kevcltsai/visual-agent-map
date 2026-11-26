@@ -3,6 +3,7 @@ import { TFile, type App } from "obsidian";
 import { isPlaceholder } from "../../core/note-placeholder";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
+import { livingConfigurationStamp } from "../../core/living-node-region";
 import type { AiCalls } from "../../core/ai-calls";
 import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
@@ -517,7 +518,8 @@ export async function saveLivingConfig(
   map: MapDocument,
   id: string,
   prompt: string,
-  expectedPrompt?: string
+  expectedPrompt?: string,
+  expectedConfigRevision?: string
 ): Promise<LivingConfigSave> {
   const { snapshots, cards } = await prepareMap({ repo }, map);
   const snapshot = snapshots.get(id);
@@ -525,6 +527,9 @@ export async function saveLivingConfig(
   if (!snapshot || !target) throw new Error("missing-target");
   if (snapshot.note.aiLocked) throw new Error("locked-target");
   if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
+  if (expectedConfigRevision !== undefined &&
+      livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision)
+    throw new Error("changed-configuration");
   const { encoded } = resolveDraft(app, cards, target, prompt, snapshot);
   const fm = frontmatter(snapshot.content);
   if (

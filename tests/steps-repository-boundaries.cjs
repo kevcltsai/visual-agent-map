@@ -30,6 +30,14 @@ test('frontmatter patch distinguishes an explicit empty list from a removed key'
   assert.equal(removed, '---\r\nkeep: "value"\r\n---\r\n# Title\r\n');
 });
 
+test('frontmatter patch replaces quoted keys without adding duplicates or dropping unrelated keys', () => {
+  const input = '---\n"ai-card": false\n\'living-node-refs\' :\n  - "old"\n"unrelated": keep\n---\n# Title\n';
+  const updated = frontmatter.setFrontmatterKeys(input, { 'ai-card': true, 'living-node-refs': [] });
+  assert.equal(updated, '---\nai-card: true\nliving-node-refs: []\n"unrelated": keep\n---\n# Title\n');
+  const removed = frontmatter.setFrontmatterKeys(input, { 'living-node-refs': null });
+  assert.equal(removed, '---\n"ai-card": false\n"unrelated": keep\n---\n# Title\n');
+});
+
 test('map content preserves unrelated text and orders coordinates independently of viewport', () => {
   const map = { title: 'New title', nodes: [{ id: 'b', x: 2, y: 3 }, { id: 'a', x: 1, y: 4 }], viewport: { x: 20 } };
   const source = '---\nowner: keep\n---\n# Old title\n\n```agent-map\n{}\n```\n\nUser text\n';

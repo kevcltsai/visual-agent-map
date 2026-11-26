@@ -323,15 +323,16 @@ export class ChatActionWriter {
         const mapPath = this.path;
         const mapId = this.map.id;
         const nodeId = node.id;
+        const nodePath = node.path;
         const parentId = node.parentId;
         let firstCommit = true;
         const stillCurrent = (): boolean => {
           if (!firstCommit) return true; // redo is guarded by the transaction's own preimage checks
           const live = this.map?.nodes.find(item => item.id === nodeId);
           return same() && this.path === mapPath && this.map?.id === mapId &&
-            live?.path === node.path && live?.parentId === parentId;
+            live?.path === nodePath && live?.parentId === parentId;
         };
-        const entry = await this.ports.beginMapTransaction().rewriteNote(node.path, async path => {
+        const entry = await this.ports.beginMapTransaction().rewriteNote(nodePath, async path => {
           if (!stillCurrent()) throw new Error("changed-target");
           const liveMap = await repo.readMap(mapPath);
           const live = liveMap.nodes.find(item => item.id === nodeId);

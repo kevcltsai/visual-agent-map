@@ -9,7 +9,7 @@ import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
 import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
-import { readLivingReferences, sameLivingTarget, type LivingSourceRef, type resolveLivingSources } from "./living-node-sources";
+import { readLivingReferences, reconcileLivingDraftReferences, sameLivingTarget, type LivingSourceRef, type resolveLivingSources } from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
 import {
@@ -472,19 +472,27 @@ function resolveDraft(
   app: App,
   cards: readonly LivingMapCard[],
   target: LivingMapCard,
-  prompt: string
+  prompt: string,
+  saved: Snapshot
 ) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
   const resolver = sourceResolver(app);
-  const explicit: LivingSourceRef[] = [];
-  for (const link of promptSourceLinks(prompt)) {
+  const previousLinks = promptSourceLinks(saved.note.prompt);
+  const nextLinks = promptSourceLinks(prompt);
+  const raw = frontmatter(saved.content)["living-node-refs"];
+  // A corrupt saved list can be repaired by explicitly removing all old
+  // links, but an unchanged display alias must never rebind a lost identity.
+  const persisted = raw === undefined || !nextLinks.some(link => previousLinks.includes(link))
+    ? undefined
+    : readLivingReferences(raw, previousLinks);
+  const explicit = reconcileLivingDraftReferences(previousLinks, persisted, nextLinks, link => {
     const note = resolver.resolveAuthorized(link, target.path);
     if (!note) throw new Error("missing-source");
     if (note.path === target.path) throw new Error("self-reference");
     const matches = cards.filter(card => card.path === note.path);
     if (matches.length > 1) throw new Error("ambiguous-source");
-    explicit.push(matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link });
-  }
+    return matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link };
+  });
   const encoded = [...new Set(explicit.map(ref => (ref.kind === "card" ? "card:" + ref.id : "note:" + ref.link)))];
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
@@ -517,7 +525,7 @@ export async function saveLivingConfig(
   if (!snapshot || !target) throw new Error("missing-target");
   if (snapshot.note.aiLocked) throw new Error("locked-target");
   if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
-  const { encoded } = resolveDraft(app, cards, target, prompt);
+  const { encoded } = resolveDraft(app, cards, target, prompt, snapshot);
   const fm = frontmatter(snapshot.content);
   if (
     snapshot.note.aiCard &&
@@ -556,7 +564,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     const saved = snapshots.get(id);
     const card = cards.find(item => item.id === id);
     if (!saved || !card || !sameLivingTarget(target, card) || saved.note.aiLocked) throw new Error("changed-target");
-    const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt);
+    const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt, saved);
     const resolver = sourceResolver(port.app);
     const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);
     const blocked = planned.plan.blocked.get(id);

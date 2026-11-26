@@ -159,3 +159,12 @@ test('startup notice: saved data without the fingerprint key loads, and a saved 
   assert.equal(settingsFromSaved({ reportedRecoveryFiles: 'a.json' }).reportedRecoveryFiles, 'a.json');
   assert.equal('reportedRecoveryFiles' in settingsFromSaved({ reportedRecoveryFiles: 5 }), false);
 });
+
+test('a leading BOM that Vault.read drops but the process callback sees is not a conflict', async () => {
+  const f = fixture();
+  const process = f.write.process;
+  f.write.process = change => process(current => change('﻿' + current));
+  assert.equal(await f.journal.process(f.write), 'new VAM text');
+  assert.equal(f.writes(), 1);
+  assert.equal(f.files.size, 0);
+});

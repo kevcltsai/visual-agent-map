@@ -5526,7 +5526,7 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
+        await this.plugin.repo.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -5554,7 +5554,7 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => withCoverLook(content, write));
+        await this.plugin.repo.app.vault.process(file, content => withCoverLook(content, write));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -7219,7 +7219,7 @@ export class VisualAgentMapView extends ItemView {
           sourcePaths: sources.map(source => source.path),
           status: mergedStatus(detail)
         });
-      if (this.hasBookPipeline()) await this.app.vault.process(repo.file(created.path), bookMergeStampRaw);
+      if (this.hasBookPipeline()) await this.plugin.repo.app.vault.process(repo.file(created.path), bookMergeStampRaw);
       // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
       const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
@@ -7275,7 +7275,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.hasBookPipeline())
       try {
         const path = (await repo.readMap(mapPath)).nodes.find(item => item.id === created.id)?.path;
-        if (path) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+        if (path) await this.plugin.repo.app.vault.process(repo.file(path), bookMergeStampRaw);
       } catch {
         // the merge itself is done; without the new fingerprint the chapter only counts as hand-edited
       }
@@ -7361,7 +7361,7 @@ export class VisualAgentMapView extends ItemView {
         target.path,
         async path => {
           await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
-          if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+          if (book) await this.plugin.repo.app.vault.process(repo.file(path), bookMergeStampRaw);
           if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
           if (asked) await repo.writeTopicAppearance(path, asked);
         },
@@ -7369,7 +7369,7 @@ export class VisualAgentMapView extends ItemView {
         // text as committed (before the step records it, so undo still recognises it; redo does it again).
         book
           ? async path => {
-              await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+              await this.plugin.repo.app.vault.process(repo.file(path), bookMergeStampRaw);
             }
           : undefined
       );
@@ -10176,7 +10176,7 @@ export class VisualAgentMapView extends ItemView {
             const note = this.app.vault.getAbstractFileByPath(target);
             if (!(note instanceof TFile)) throw new Error(target);
             const link = attachment("image");
-            await this.app.vault.process(note, content => {
+            await this.plugin.repo.app.vault.process(note, content => {
               const withEmbed = appendImageEmbed(content, link);
               return setCover ? withCover(withEmbed, link) : withEmbed;
             });
@@ -11368,7 +11368,7 @@ export class VisualAgentMapView extends ItemView {
           if (!this.app.vault.getAbstractFileByPath(path)) continue;
           // Putting a parked note back rewrites its `updated:` stamp and front matter order; anything else is left alone.
           // The check runs on the text `process` hands over, so an edit made after any earlier read is never overwritten.
-          await this.app.vault.process(repo.file(path), current =>
+          await this.plugin.repo.app.vault.process(repo.file(path), current =>
             current !== text && sameApartFromStamps(current, text) ? text : current
           );
         }
@@ -23659,7 +23659,7 @@ export class VisualAgentMapView extends ItemView {
         const note = this.app.vault.getAbstractFileByPath(path);
         if (!(note instanceof TFile)) throw new Error(path);
         const link = attachment("image");
-        await this.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
+        await this.plugin.repo.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);

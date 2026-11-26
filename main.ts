@@ -1937,7 +1937,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         {
           label: t("ui.fix_math_start"),
           action: () =>
-            void applyMathRepair(this.app.vault, plan)
+            void applyMathRepair(this.repo.app.vault, plan)
               .then(
                 result =>
                   new Notice(

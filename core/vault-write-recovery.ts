@@ -114,7 +114,8 @@ export class VaultWriteRecovery {
       const result = await write.process(current => {
         ensureActive();
         if (write.path() !== originalPath) throw write.conflictError();
-        if (current !== before) {
+        // Vault.read drops a leading BOM that the process callback still sees (see math-repair).
+        if (current.replace(/^\uFEFF/, "") !== before.replace(/^\uFEFF/, "")) {
           stale.value = true;
           throw write.conflictError();
         }

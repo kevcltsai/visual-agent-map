@@ -41,6 +41,7 @@ export interface TransactionDeps {
     | "app"
     | "file"
     | "withNoteWriteGuard"
+    | "acceptsNoteHistory"
   >;
   rebuildDerivedData: () => Promise<void>;
   /**
@@ -307,13 +308,20 @@ class NoteWriteJournal {
 
   constructor(
     private readonly repo: TransactionDeps["repo"],
-    snapshots: readonly { path: string; restore: string }[]
+    snapshots: readonly { path: string; restore: string; file?: TFile }[],
+    grouped = false
   ) {
-    for (const { path, restore } of snapshots) {
+    for (const { path, restore, file: identity } of snapshots) {
       const file = repo.file(path);
+      if (identity && file !== identity) throw noteConflict();
       if (!this.entries.has(file))
         this.entries.set(file, { path, file, before: restore, expected: restore, changed: false, conflict: false });
     }
+    if (grouped)
+      this.guard.acceptsHistory = (file, current) => {
+        const entry = this.entries.get(file);
+        return this.active && !!entry && !entry.conflict && sameText(current, entry.expected);
+      };
   }
 
   private readonly guard: NoteWriteGuard = (file, current, change) => {
@@ -402,6 +410,19 @@ class NoteWriteJournal {
       }
     }
   }
+}
+
+/**
+ * A grouped history entry has already compared these exact texts against its own saved fingerprint.
+ * Child entries may use that preimage, but every repository write still checks the group's current expected text.
+ */
+export function withVerifiedNoteHistory<T>(
+  repo: TransactionDeps["repo"],
+  notes: ReadonlyMap<TFile, string>,
+  action: () => Promise<T>
+): Promise<T> {
+  const snapshots = [...notes].map(([file, restore]) => ({ path: file.path, file, restore }));
+  return new NoteWriteJournal(repo, snapshots, true).run(action);
 }
 
 export function begin(deps: TransactionDeps): Transaction {
@@ -598,7 +619,8 @@ export function begin(deps: TransactionDeps): Transaction {
         if (!exists(at)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
         const expected = direction === "undo" ? note.afterExpected : note.beforeExpected;
         const current = await readText(repo, at);
-        if (!sameHistoryText(current, expected)) throw noteConflict();
+        if (!sameHistoryText(current, expected) && !repo.acceptsNoteHistory(repo.file(at), current))
+          throw noteConflict();
         snapshots.set(at, current);
       }
       return snapshots;

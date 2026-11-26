@@ -92,6 +92,7 @@ import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts"
 import {
   begin as beginTransaction,
   isTransactionError,
+  withVerifiedNoteHistory,
   type AttachmentPath,
   type Transaction,
   type TransactionEntry
@@ -22852,19 +22853,27 @@ export class VisualAgentMapView extends ItemView {
     mapPath: string,
     noteIds: ReadonlySet<string>,
     files: ReadonlySet<string>,
-    parked: ReadonlySet<string> = new Set()
+    parked: ReadonlySet<string> = new Set(),
+    snapshots?: Map<TFile, string>
   ): Promise<string> {
     const map = await this.plugin.repo.readMap(mapPath);
     const notes: [string, string | null][] = [];
     for (const node of map.nodes)
       if (noteIds.has(node.id)) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
-        notes.push([node.id, file instanceof TFile ? await this.app.vault.read(file) : null]);
+        const text = file instanceof TFile ? await this.app.vault.read(file) : null;
+        notes.push([node.id, text]);
+        if (file instanceof TFile && text !== null) snapshots?.set(file, text);
       }
     const texts: [string, string | null][] = [];
     for (const path of files) texts.push([path, await this.chatFileText(path)]);
     // Cards the reply deleted are not in the map any more; their notes, where they were parked, count like the others.
-    for (const path of parked) texts.push([path, await this.chatFileText(path)]);
+    for (const path of parked) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      const text = await this.chatFileText(path);
+      texts.push([path, text]);
+      if (file instanceof TFile && text !== null) snapshots?.set(file, text);
+    }
     return JSON.stringify({
       map: { ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) },
       notes,
@@ -22886,28 +22895,32 @@ export class VisualAgentMapView extends ItemView {
     record: MapChatTurnRecord | null = null
   ): Promise<ChatReplyStep | undefined> {
     if (!entries.length) return undefined;
-    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
+    const fingerprint = (snapshots?: Map<TFile, string>): Promise<string> =>
+      this.chatReplyFingerprint(mapPath, noteIds, files, parked, snapshots);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
-      if ((await fingerprint()) !== expected) {
+      const snapshots = new Map<TFile, string>();
+      if ((await fingerprint(snapshots)) !== expected) {
         record?.event("undo_refused");
         throw this.chatUndoRefusal();
       }
       const list = redo ? entries : [...entries].reverse();
-      const done: TransactionEntry[] = [];
-      try {
-        for (const entry of list) {
-          await (redo ? entry.redo() : entry.undo());
-          done.push(entry);
-        }
-      } catch (error) {
+      await withVerifiedNoteHistory(this.plugin.repo, snapshots, async () => {
+        const done: TransactionEntry[] = [];
         try {
-          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
-        } catch {
-          // best effort; the original error is what the user sees
+          for (const entry of list) {
+            await (redo ? entry.redo() : entry.undo());
+            done.push(entry);
+          }
+        } catch (error) {
+          try {
+            for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+          } catch {
+            // best effort; the original error is what the user sees
+          }
+          throw error;
         }
-        throw error;
-      }
+      });
       expected = await fingerprint();
       record?.event(redo ? "redo" : "undo");
     };

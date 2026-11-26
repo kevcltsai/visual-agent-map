@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { fixture, load, obsidian, core, DEFAULT_SETTINGS } = require('./support.cjs');
 
-const { begin, isTransactionError } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+const { begin, isTransactionError, withVerifiedNoteHistory } = load('experiences/visual-map/map-transaction.ts', { obsidian });
 const TOPICS = 'Agent Workspace/Topics';
 const MAP = `${TOPICS}/map-u/Map.md`;
 const UNASSIGNED = `${TOPICS}/map-u/Unassigned`;
@@ -347,5 +347,22 @@ test('N18: an independent writer is not part of the note transaction and its upd
   const external = h.contents.get(h.parent);
   resume();
   assert.equal((await h.rejected(tx)).kind, 'rollback-failed');
+  assert.equal(h.contents.get(h.parent), external);
+});
+
+test('N19: grouped history accepts its verified preimage but refuses an edit queued during its write', async () => {
+  const h = await harness();
+  const entry = await begin(h.deps).rewriteNote(h.parent, path => h.repo.updateNote(path, { summary: 'Changed summary' })).commit();
+  // A sibling history entry may have legitimately changed metadata after this child recorded its original postimage.
+  await h.repo.updateNote(h.parent, { title: 'Group title' });
+  const file = h.repo.file(h.parent);
+  const verified = new Map([[file, h.contents.get(h.parent)]]);
+  const external = h.contents.get(h.parent) + '\nExternal edit during grouped undo.\n';
+  const process = h.app.vault.process;
+  h.app.vault.process = async (item, change) => {
+    if (item === file) h.contents.set(h.parent, external);
+    return process(item, change);
+  };
+  assert.equal((await h.rejected(withVerifiedNoteHistory(h.repo, verified, () => entry.undo()))).kind, 'guard');
   assert.equal(h.contents.get(h.parent), external);
 });

@@ -275,6 +275,7 @@ const FILE_MANAGER_WRITES = new Set(["renameFile", "trashFile", "processFrontMat
 export interface NoteWriteGuard {
   (file: TFile, current: string, change: (content: string) => string): string;
   aroundHostMove?: (origin: string, target: string, move: () => Promise<void>) => Promise<void>;
+  acceptsHistory?: (file: TFile, current: string) => boolean;
 }
 
 /** A view of `target` whose write methods throw once `disposed()` is true; reads and everything else pass through. */
@@ -391,7 +392,21 @@ export class Repository {
 
   /** Restrict the guard to this async operation; unrelated concurrent writers do not inherit it. */
   withNoteWriteGuard<T>(guard: NoteWriteGuard, action: () => Promise<T>): Promise<T> {
-    return this.noteWriteScope.run(guard, action);
+    const outer = this.noteWriteScope.getStore();
+    if (!outer) return this.noteWriteScope.run(guard, action);
+    const combined: NoteWriteGuard = (file, current, change) =>
+      outer(file, current, text => guard(file, text, change));
+    combined.acceptsHistory = outer.acceptsHistory;
+    combined.aroundHostMove = (origin, target, move) => {
+      const inner = (): Promise<void> => (guard.aroundHostMove ? guard.aroundHostMove(origin, target, move) : move());
+      return outer.aroundHostMove ? outer.aroundHostMove(origin, target, inner) : inner();
+    };
+    return this.noteWriteScope.run(combined, action);
+  }
+
+  /** Only a verified grouped-history scope may authorize a newer preimage from an earlier child entry. */
+  acceptsNoteHistory(file: TFile, current: string): boolean {
+    return this.noteWriteScope.getStore()?.acceptsHistory?.(file, current) ?? false;
   }
 
   /**

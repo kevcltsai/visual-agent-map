@@ -394,8 +394,7 @@ export class Repository {
   withNoteWriteGuard<T>(guard: NoteWriteGuard, action: () => Promise<T>): Promise<T> {
     const outer = this.noteWriteScope.getStore();
     if (!outer) return this.noteWriteScope.run(guard, action);
-    const combined: NoteWriteGuard = (file, current, change) =>
-      outer(file, current, text => guard(file, text, change));
+    const combined: NoteWriteGuard = (file, current, change) => outer(file, current, text => guard(file, text, change));
     combined.acceptsHistory = outer.acceptsHistory;
     combined.aroundHostMove = (origin, target, move) => {
       const inner = (): Promise<void> => (guard.aroundHostMove ? guard.aroundHostMove(origin, target, move) : move());

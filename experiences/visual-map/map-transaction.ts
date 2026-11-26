@@ -813,7 +813,10 @@ export function begin(deps: TransactionDeps): Transaction {
       const journal: Journal = {
         files: [],
         maps: [],
-        notes: new NoteWriteJournal(repo, noteRecords.map(note => ({ path: note.path, restore: note.beforeText }))),
+        notes: new NoteWriteJournal(
+          repo,
+          noteRecords.map(note => ({ path: note.path, restore: note.beforeText }))
+        ),
         attachments: placed
       };
       let rebuildNeeded = ops.length > 0;

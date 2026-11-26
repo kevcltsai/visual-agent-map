@@ -1274,3 +1274,12 @@ integrationTest('quick outline: a result from a departed session cannot repopula
   await rejected;
   assert.equal(h.view.quickOutlineSummaries.size, 0);
 });
+
+
+test('outline import refuses Living Node execution metadata and ownership markers', () => {
+  for (const input of [
+    '---\n"ai-card": true\n---\n# R',
+    '---\n{living-node-refs: []}\n---\n# R',
+    '<!-- vam-living-node:begin v1 -->\n# R'
+  ]) assert.ok(api.parseOutline(input).errors.some(issue => issue.key === 'ui.outline_error_vam_note'), input);
+});

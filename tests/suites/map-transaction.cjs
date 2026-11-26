@@ -615,3 +615,24 @@ integrationTest('map transaction: an edit that leaves a dangling afterTextId is 
   await entry.redo();
   assert.equal((await h.repo.readMap(MAP)).nodes[2].afterTextId, 'tx');
 });
+
+integrationTest('map transaction: structural replay preflight refuses a newly invalid undo or redo', async () => {
+  const h = await harness();
+  let refuse = false;
+  h.deps.validateStructure = async () => {
+    if (refuse) throw new Error('injected dependency cycle');
+  };
+  const step = await begin(h.deps).editMap(MAP, map => {
+    map.nodes[1].parentId = map.nodes[0].id;
+  }).commit();
+  const applied = h.snapshot();
+  refuse = true;
+  await assert.rejects(step.undo(), /injected dependency cycle/);
+  assert.deepEqual(h.snapshot(), applied);
+  refuse = false;
+  await step.undo();
+  const undone = h.snapshot();
+  refuse = true;
+  await assert.rejects(step.redo(), /injected dependency cycle/);
+  assert.deepEqual(h.snapshot(), undone);
+});

@@ -4,7 +4,7 @@ export interface LivingSourceNode {
   parentId?: string | null;
 }
 
-export type LivingSourceRef = { kind: "card"; id: string } | { kind: "note"; link: string };
+export type LivingSourceRef = { kind: "card"; id: string } | { kind: "note"; link: string; exact?: true };
 /** Only an absent field denotes legacy data. Corrupt persisted identities must not be re-resolved by name. */
 export function readLivingReferences(saved: unknown, legacyLinks: readonly string[]): LivingSourceRef[] {
   if (saved === undefined) return legacyLinks.map(link => ({ kind: "note", link }));
@@ -15,6 +15,7 @@ export function readLivingReferences(saved: unknown, legacyLinks: readonly strin
   return saved.map(value => {
     if (typeof value !== "string") throw new Error("invalid-source-reference");
     if (value.startsWith("card:") && value.slice(5).trim()) return { kind: "card", id: value.slice(5) };
+    if (value.startsWith("note-path:") && value.slice(10).trim()) return { kind: "note", link: value.slice(10), exact: true };
     if (value.startsWith("note:") && value.slice(5).trim()) return { kind: "note", link: value.slice(5) };
     throw new Error("invalid-source-reference");
   });
@@ -68,7 +69,7 @@ export interface LivingSourceFailure {
 
 /** The Vault adapter must check authorization and provide a unique resolved file identity. */
 export interface LivingSourcePort {
-  resolveAuthorized(link: string, fromPath: string, role: "explicit" | "map"): LivingAuthorizedNote | undefined;
+  resolveAuthorized(link: string, fromPath: string, role: "explicit" | "map", exact?: true): LivingAuthorizedNote | undefined;
 }
 
 export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], port: LivingSourcePort) {
@@ -125,7 +126,7 @@ export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], p
       }
       let note: LivingAuthorizedNote | undefined;
       try {
-        note = port.resolveAuthorized(ref.link, target.path, role);
+        note = port.resolveAuthorized(ref.link, target.path, role, ref.exact);
       } catch {
         fail(ref, "missing-or-unauthorized", role);
         return;

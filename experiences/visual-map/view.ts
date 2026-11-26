@@ -19415,7 +19415,10 @@ export class VisualAgentMapView extends ItemView {
   /** True when the map has a Prompt topic and the entry points may show "Run all". */
   private canRunPrompts(): boolean {
     return (
-      !!this.map && !this.notesLoading() && !this.bookLock().ai && hasPromptTopic(this.map.nodes, id => this.promptNoteOf(id))
+      !!this.map &&
+      !this.notesLoading() &&
+      !this.bookLock().ai &&
+      hasPromptTopic(this.map.nodes, id => this.promptNoteOf(id))
     );
   }
   /** Why the AI is busy on any topic the plan would run (or a multi-select research runs): then nothing starts. */

@@ -12,7 +12,7 @@ import type { MapDocument } from "../../map-model";
 import type { Note } from "../../repository";
 import { translate } from "../../i18n";
 import { createAssetRegistry, cleanShareMarkdown } from "./share-clean";
-import { anchorEmbeddedFiles, extractEmbedContent } from "./share-embeds";
+import { anchorEmbeddedFiles, extractEmbedContent, isManagedShareEmbed, shareNoteMarkdown } from "./share-embeds";
 import { classifyShareTarget, markdownProtectedRanges, normalizeNewlines } from "./share-code";
 import { applyNodeLinks } from "./share-node-links";
 import { replaceMediaWithLinks } from "./share-media";
@@ -532,7 +532,7 @@ export class ShareExporter {
    * matter, not in the detail). A cover the detail already embeds is not shown twice. Empty when there is neither.
    */
   private renderSource(id: string): string {
-    const raw = this.source.notes.get(id)?.detail?.trim() ? (this.source.notes.get(id)?.detail ?? "") : "";
+    const raw = shareNoteMarkdown(this.source.notes.get(id));
     const detail = withoutFigures(raw, this.dropped.get(id) ?? new Set());
     const cover = this.source.covers?.get(id);
     if (!cover) return detail;
@@ -552,7 +552,7 @@ export class ShareExporter {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
       const detail = this.renderSource(node.id);
-      const own = this.source.notes.get(node.id)?.detail ?? "";
+      const own = shareNoteMarkdown(this.source.notes.get(node.id));
       const embeds = await this.readEmbeds(detail, node.path, node.id, figuresOf(own).length);
       assertCurrent(ticket);
       const result = await this.renderOne(detail, titles, nodeIds, embeds, node.path, ticket);
@@ -599,7 +599,8 @@ export class ShareExporter {
       const mapFolder = this.source.mapPath.split("/").slice(0, -1).join("/");
       const card = this.source.map.nodes.find(node => node.path === file.path);
       if (!card && mapFolder && file.path.startsWith(`${mapFolder}/`)) continue;
-      const text = card ? (this.source.notes.get(card.id)?.detail ?? "") : await this.app.vault.cachedRead(file);
+      const text = card ? shareNoteMarkdown(this.source.notes.get(card.id)) : await this.app.vault.cachedRead(file);
+      if (!card && isManagedShareEmbed(text)) continue;
       let content = extractEmbedContent(text, hash < 0 ? "" : target.slice(hash + 1));
       if (!content) continue;
       // The embedded note's pictures are checked and dropped like the card's own (numbered after them), then every file
@@ -1070,7 +1071,7 @@ export class ShareExporter {
       if (!note) continue;
       const entry: ShareNoteInput = {
         title: plainWikilinks(note.title),
-        summary: plainWikilinks(note.summary),
+        summary: plainWikilinks(note.livingNode?.summary || note.summary),
         status: note.status,
         ...(note.topicKind && !argumentIds.has(node.id) ? { kind: note.topicKind } : {}),
         shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,
@@ -1081,7 +1082,7 @@ export class ShareExporter {
         ...(note.links?.length ? { links: note.links } : {})
       };
       const rendered = this.rendered.get(node.id);
-      if (note.detail?.trim()) notesWithContent++;
+      if (shareNoteMarkdown(note).trim()) notesWithContent++;
       if (rendered && options.includeDetail) {
         undrawn += rendered.mermaidUndrawn;
         blocked += rendered.mermaidBlocked;

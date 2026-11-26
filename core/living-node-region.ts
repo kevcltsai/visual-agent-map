@@ -19,3 +19,35 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
     region: content.slice(start, after)
   };
 }
+
+/** Copy only formal knowledge and configuration. Run diagnostics belong to the original node. */
+export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): void {
+  if (metadata["ai-run-result"] === "ok" || metadata["living-node-copy-snapshot"] === true)
+    metadata["living-node-copy-snapshot"] = true;
+  for (const key of [
+    "ai-run-at", "ai-run-result", "ai-run-input",
+    "living-node-last-execution", "living-node-last-attempt", "living-node-last-successful-check",
+    "living-node-last-content-change", "living-node-outcome", "living-node-input-revision",
+    "living-node-success-knowledge", "last-error"
+  ]) delete metadata[key];
+  if (metadata.status === "running") metadata.status = "idea";
+}
+
+/** Source identities are scoped to their original map. An unresolved cross-map
+ * reference remains an explicit missing reference until the user repairs it.
+ */
+export function remapLivingCopyCardReferences(
+  refs: readonly string[],
+  sourceMap: string,
+  destinationMap: string,
+  copies: ReadonlyMap<string, string>
+): string[] {
+  return refs.map(ref => {
+    if (!ref.startsWith("card:")) return ref;
+    const id = ref.slice(5);
+    if (id.startsWith("foreign:")) return ref;
+    const replacement = copies.get(JSON.stringify([sourceMap, id]));
+    if (replacement) return "card:" + replacement;
+    return sourceMap && sourceMap === destinationMap ? ref : "card:foreign:" + JSON.stringify([sourceMap, id]);
+  });
+}

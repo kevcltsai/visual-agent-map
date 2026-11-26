@@ -638,3 +638,19 @@ S.integrationTest('Living Node share projection exposes only committed readable 
   assert.ok(isManagedShareEmbed('<!-- vam-living-node:begin -->'));
   assert.ok(!isManagedShareEmbed('---\ntags: public\n---\n# Ordinary note'));
 });
+
+
+S.integrationTest('Living Node cross-map cut preserves referenced ordinary inputs and identifies consumers', async () => {
+  const f = await roundFixture();
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read ordinary\n\nSources: [[ordinary]]');
+  const { livingCrossCut } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+  const destination = { ...f.map, id: 'other', nodes: [] };
+  const result = await livingCrossCut(f.app, f.repo, f.map, destination, new Set(['ordinary']));
+  assert.equal(result.preserveIdentity, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.affected)), ['parent']);
+  await assert.rejects(
+    () => livingCrossCut(f.app, f.repo, f.map, { ...destination, nodes: [S.node('ordinary')] }, new Set(['ordinary'])),
+    /ambiguous-card-identity/
+  );
+  assert.deepEqual(f.calls, []);
+});

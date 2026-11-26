@@ -13198,7 +13198,6 @@ export class VisualAgentMapView extends ItemView {
     this.paintCardLinks(card, header, node.id);
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
-    this.paintPromptState(card, header, node, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
     this.paintCardColor(card, note);
     this.paintCardStyle(card, note);
@@ -13384,6 +13383,8 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
+    // An AI card's star, question line and glyph hang on the title, so they are painted once it exists.
+    if (header) this.paintPromptState(card, header, node, note);
     if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
       // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
       title.addClass("vam-sr-only");

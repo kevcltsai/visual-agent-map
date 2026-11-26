@@ -1343,12 +1343,14 @@ export class Repository {
   }
 
   /**
-   * Sets (`ai-card: true`) or removes the AI card flag. No other key changes and `updated` is not bumped; a note already in the
+   * Sets (`ai-card: true`) or removes the AI card flag (and `ai-update-mode`, which only an AI card has). No other key changes and `updated` is not bumped; a note already in the
    * asked state is returned as it is, byte for byte.
    */
   async writeAiCard(path: string, on: boolean): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
-      readAiCard(frontmatter(content)) === on ? content : setFrontmatterKeys(content, { "ai-card": on ? true : null })
+      readAiCard(frontmatter(content)) === on && (on || readAiUpdateMode(frontmatter(content)) === undefined)
+        ? content
+        : setFrontmatterKeys(content, on ? { "ai-card": true } : { "ai-card": null, "ai-update-mode": null })
     );
   }
 

@@ -276,7 +276,9 @@ test('keys: writers add and remove their keys, `updated` unchanged, byte round t
   const on = h.raw('A');
   await h.repo.writeAiCard(h.node('A').path, true);
   assert.equal(h.raw('A'), on, 'already on: byte for byte');
+  await h.repo.writeAiUpdateMode(h.node('A').path, 'fresh');
   await h.repo.writeAiCard(h.node('A').path, false);
+  assert.doesNotMatch(h.raw('A'), /ai-update-mode/, 'a card that stops being an AI card loses ai-update-mode');
   assert.equal(h.raw('A'), before);
   await h.repo.writeAiUpdateMode(h.node('A').path, 'fresh');
   assert.match(h.raw('A'), /^ai-update-mode: "fresh"$/m);

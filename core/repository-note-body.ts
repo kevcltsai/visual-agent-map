@@ -311,7 +311,9 @@ export function replaceSummarySection(content: string, value: string): string {
 
 /** Takes the Prompt callout (`> [!info]- Prompt` and its quoted lines) out of a note; outside the Detail only. */
 function removePromptCallout(content: string): string {
-  const lines = content.split("\n");
+  // The callout title is in the note's language (`> [!info]- 提示`): scan the canonical text (same lines) and cut the original.
+  const original = content.split("\n");
+  const lines = canonicalHeadings(content, noteHeadingSet(content) ?? CANONICAL_HEADINGS).split("\n");
   const code = fencedOutsideDetail(lines);
   let inDetail = false;
   let origin: "none" | "heading" | "quote" = "none";
@@ -329,7 +331,7 @@ function removePromptCallout(content: string): string {
     let end = index + 1;
     while (end < lines.length && lines[end].startsWith(">") && !CALLOUT_SECTION.test(lines[end])) end++;
     while (end < lines.length && !lines[end].trim()) end++;
-    return `${lines.slice(0, index).join("\n").trimEnd()}\n\n${lines.slice(end).join("\n")}`;
+    return `${original.slice(0, index).join("\n").trimEnd()}\n\n${original.slice(end).join("\n")}`;
   }
   return content;
 }

@@ -201,3 +201,18 @@ test('P0 (2026-10-19): the open items marker survives with Preview before Detail
   await repo.updateNote(note.path, { status: 'idea' });
   assert.deepEqual([...readOpenItems((await repo.readNote(note.path)).detail)], ['Budget']);
 });
+
+test('clearPrompt removes the localized Prompt callout (zh-TW, zh-CN, en) and keeps the rest of the note', async () => {
+  for (const [language, title] of [['zh-TW', '提示'], ['zh-CN', null], ['en', 'Prompt']]) {
+    const { repo, contents, note, text } = await calloutNote(language);
+    await repo.updateNote(note.path, { summary: 'S.', detail: 'Detail text.', prompt: 'Q one.\nQ two.' });
+    if (title) assert.match(text(), new RegExp(`^> \\[!info\\]- ${title}$`, 'm'), `${language}: the callout is localized`);
+    else assert.doesNotMatch(text(), /^> \[!info\]- Prompt$/m, 'zh-CN uses its own title');
+    const kept = contents.get(note.path).replace(/\n*> \[!info\]- [^\n]+\n> Q one\.\n> Q two\.\n*/, '\n\n');
+    await repo.clearPrompt(note.path);
+    assert.doesNotMatch(contents.get(note.path), /Q one|Q two/, `${language}: the question is gone`);
+    assert.equal((await repo.readNote(note.path)).prompt, '', language);
+    assert.match(text(), /Detail text\./, `${language}: Detail kept`);
+    assert.equal(contents.get(note.path).trimEnd(), kept.trimEnd(), `${language}: nothing else changes`);
+  }
+});

@@ -29,6 +29,7 @@ import {
 import type { ForbiddenString } from "./share-leak-scan";
 import { publishInstructions } from "./share-publish";
 import { figuresOf, type FigureProblem } from "./share-image-check";
+import { shareNoteMarkdown } from "./share-embeds";
 import { saveShareFile, type SaveEnvironment } from "./share-save";
 import type { ShareTranslationCache } from "./share-translate-plan";
 import type {
@@ -825,7 +826,7 @@ export class ShareModal extends Modal {
     }));
     const own = this.options.source.map.nodes.flatMap(node => {
       const note = this.options.source.notes.get(node.id);
-      return figuresOf(note?.detail ?? "").flatMap(figure =>
+      return figuresOf(shareNoteMarkdown(note)).flatMap(figure =>
         figure.problem
           ? [
               {

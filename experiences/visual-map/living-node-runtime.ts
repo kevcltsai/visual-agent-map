@@ -111,7 +111,7 @@ function refs(snapshot: Snapshot): LivingSourceRef[] {
 
 function allowedLivingNotePath(app: App, path: string): boolean {
   const key = normalizeVaultPath(path);
-  const config = normalizeVaultPath(app.vault.configDir || ".obsidian");
+  const config = normalizeVaultPath(app.vault?.configDir || ".obsidian");
   return !!key && key === path && !!config &&
     key.toLowerCase() !== config.toLowerCase() &&
     !key.toLowerCase().startsWith(config.toLowerCase() + "/") &&
@@ -148,12 +148,13 @@ function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<
   );
 }
 
-async function prepareMap(port: Pick<LivingRoundPort, "repo">, map: MapDocument) {
+async function prepareMap(port: Pick<LivingRoundPort, "repo" | "app">, map: MapDocument) {
   const snapshots = new Map<string, Snapshot>();
   const cards: LivingMapCard[] = [];
   for (const node of map.nodes) {
     let snapshot: Snapshot | undefined;
     try {
+      if (!allowedLivingNotePath(port.app, node.path)) throw new Error("unauthorized-source");
       snapshot = await port.repo.readNoteSnapshot(node.path, map);
       snapshots.set(node.id, snapshot);
     } catch {
@@ -194,7 +195,7 @@ export async function livingRemovalConsumers(
   removed: ReadonlySet<string>
 ): Promise<string[]> {
   if (!removed.size) return [];
-  const { cards } = await prepareMap({ repo }, map);
+  const { cards } = await prepareMap({ repo, app }, map);
   const planned = planLivingMap(cards, [], sourceResolver(app));
   return cards.filter(card => !removed.has(card.id) && isAiCard(card) &&
     planned.sources.get(card.id)?.sources.some(source =>
@@ -214,7 +215,7 @@ export async function livingCrossCut(
   destination: MapDocument,
   moved: ReadonlySet<string>
 ): Promise<{ preserveIdentity: boolean; affected: string[] }> {
-  const { cards, snapshots } = await prepareMap({ repo }, source);
+  const { cards, snapshots } = await prepareMap({ repo, app }, source);
   const planned = planLivingMap(cards, [], sourceResolver(app));
   const affected = cards.filter(card => isAiCard(card) && (
     moved.has(card.id)
@@ -250,7 +251,7 @@ export async function validateLivingStructure(
     map.nodes.map(node => [node.id, node.parentId ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
   );
   if (parentGraph(before) === parentGraph(after)) return;
-  const { cards } = await prepareMap({ repo }, after);
+  const { cards } = await prepareMap({ repo, app }, after);
   const oldById = new Map(before.nodes.map(node => [node.id, node]));
   const oldCards = cards.filter(card => oldById.has(card.id)).map(card => ({
     ...card,
@@ -294,6 +295,7 @@ async function readInputs(
   add("self:" + id, snapshot.note.title, ownKnowledge(snapshot.note));
   for (const source of resolved.sources) {
     if (port.signal.aborted || !port.current()) throw new Error("cancelled");
+    if (!allowedLivingNotePath(port.app, source.path)) throw new Error("unauthorized-source");
     if (source.cardId) {
       const data = await port.repo.readNoteSnapshot(source.path, map);
       if (isAiCard(data.note) && !usableKnowledge(data)) throw new Error("missing-ai-knowledge");
@@ -544,8 +546,10 @@ function resolveDraft(
     if (matches.length > 1) throw new Error("ambiguous-source");
     return matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link: note.path, exact: true };
   });
-  const encoded = [...new Set(explicit.map(ref => ref.kind === "card" ? "card:" + ref.id :
-    (ref.exact ? "note-path:" : "note:") + ref.link))];
+  // Keep one saved identity for each distinct display link. The resolver
+  // deduplicates actual sources, while positional aliases remain editable.
+  const encoded = explicit.map(ref => ref.kind === "card" ? "card:" + ref.id :
+    (ref.exact ? "note-path:" : "note:") + ref.link);
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
@@ -584,7 +588,7 @@ export async function saveLivingConfig(
 ): Promise<LivingConfigSave> {
   const authorized = (): boolean => !repo.isDisposed() && isCurrent();
   if (!authorized()) throw new Error("changed-configuration");
-  const { snapshots, cards } = await prepareMap({ repo }, map);
+  const { snapshots, cards } = await prepareMap({ repo, app }, map);
   if (!authorized()) throw new Error("changed-configuration");
   const snapshot = snapshots.get(id);
   const target = cards.find(card => card.id === id);

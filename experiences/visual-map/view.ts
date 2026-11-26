@@ -6977,7 +6977,8 @@ export class VisualAgentMapView extends ItemView {
       ids,
       nodes: this.map?.nodes ?? [],
       hasNote: id => this.notes.has(id),
-      busy: node => this.mergeBusy(node, except)
+      busy: node => this.mergeBusy(node, except),
+      livingNode: node => this.notes.get(node.id)?.aiCard === true
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -7079,11 +7080,16 @@ export class VisualAgentMapView extends ItemView {
         check.sources.every(node => snapshot.sources.find(source => source.id === node.id)?.path === node.path)
       );
     };
+    const fresh = await this.freshNotes();
+    if (snapshot.sources.some(source => fresh.get(source.id)?.aiCard === true)) {
+      new Notice(t("ui.merge_living_node_convert"));
+      return false;
+    }
     if (
       this.mergeLockReason(
         snapshot.sources.map(source => source.id),
         snapshot.targetId,
-        await this.freshNotes()
+        fresh
       )
     ) {
       new Notice(t("ui.ai_locked_notice"));
@@ -7315,14 +7321,19 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_missing_note"));
       return;
     }
-    // The late-result fence of the AI merge: a topic locked while the AI ran stops the write (a merge by hand is the
-    // user's own edit and is not asked).
+    const fresh = await this.freshNotes();
+    if (check.sources.some(source => fresh.get(source.id)?.aiCard === true)) {
+      if (content) throw new Error(t("ui.merge_living_node_convert"));
+      new Notice(t("ui.merge_living_node_convert"));
+      return;
+    }
+    // The late-result fence of the AI merge: a topic locked while the AI ran stops the write.
     if (
       content &&
       this.mergeLockReason(
         check.sources.map(source => source.id),
         check.targetId,
-        await this.freshNotes()
+        fresh
       )
     )
       throw aiLockedError();
@@ -7344,6 +7355,7 @@ export class VisualAgentMapView extends ItemView {
     let detail = "";
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (sourceNotes.some(note => note.aiCard === true)) throw new Error(t("ui.merge_living_node_convert"));
     if (!content)
       detail = mergedDetail(
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
@@ -7512,6 +7524,7 @@ export class VisualAgentMapView extends ItemView {
       detailTemplate = (await this.mapStyle(language)).template;
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (sourceNotes.some(note => note.aiCard === true)) throw new Error(t("ui.merge_living_node_convert"));
     const name = title.trim(),
       sourcePaths = [...new Set([...sourceNotes[0].sourcePaths, ...children.map(child => child.path)])];
     let patch: NotePatch;

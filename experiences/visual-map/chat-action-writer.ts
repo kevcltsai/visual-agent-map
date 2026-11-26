@@ -12,7 +12,7 @@ import { t, type TranslationKey } from "../../i18n";
 import type { App, Editor, TFile } from "obsidian";
 import { addedMermaidBlocks } from "../../ai/mermaid-safety";
 import { frontmatter } from "../../core/repository-frontmatter";
-import { saveLivingConfig } from "./living-node-runtime";
+import { saveLivingConfig, type LivingConfigSave } from "./living-node-runtime";
 import { promptSourceLinks } from "./prompt-run";
 import {
   canParent,
@@ -268,11 +268,11 @@ export class ChatActionWriter {
       return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
     };
     // Authorize the actual resolved path, not just a preliminary display alias.
-    const allowedLivingSource = (path: string): boolean => {
+    const allowedLivingSource = (path: string, map = this.map): boolean => {
       const key = normalizeVaultPath(path);
       if (!key || key !== path || key.toLowerCase() === configDir.toLowerCase() ||
           key.toLowerCase().startsWith(configDir.toLowerCase() + "/")) return false;
-      return !!this.map?.nodes.some(item => item.path === key) ||
+      return !!map?.nodes.some(item => item.path === key) ||
         Object.prototype.hasOwnProperty.call(hashes, key) ||
         !!baseline.mapSourcePaths?.includes(key);
     };
@@ -352,6 +352,7 @@ export class ChatActionWriter {
         const nodePath = node.path;
         const parentId = node.parentId;
         let firstCommit = true;
+        let configured: LivingConfigSave | undefined;
         const stillCurrent = (): boolean => {
           if (!firstCommit) return true; // redo is guarded by the transaction's own preimage checks
           const live = this.map?.nodes.find(item => item.id === nodeId);
@@ -364,11 +365,11 @@ export class ChatActionWriter {
           const live = liveMap.nodes.find(item => item.id === nodeId);
           if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
             throw new Error("changed-target-identity");
-          await saveLivingConfig(this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp, stillCurrent, path => {
-            // On redo, the original authorized paths are still required even if the
-            // chat's view changed; the current map's membership comes from disk.
-            return liveMap.nodes.some(item => item.path === path) || allowedLivingSource(path);
-          });
+          configured = await saveLivingConfig(
+            this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp,
+            stillCurrent, source => allowedLivingSource(source, liveMap),
+            firstCommit ? undefined : configured?.sourceRevision
+          );
         }).commit({ deferRebuild: true, label: t("ui.ai_card") });
         firstCommit = false;
         this.history.push(entry);

@@ -15608,7 +15608,9 @@ export class VisualAgentMapView extends ItemView {
           joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
           expectedPrompt,
           expectedConfigRevision,
-          stillCurrent
+          stillCurrent,
+          undefined,
+          firstCommit ? undefined : saved?.sourceRevision
         );
       })
       .editMap(mapPath, map => {

@@ -53,7 +53,7 @@ import {
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import { livingConfigurationStamp, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
-import { readLivingMarkdown } from "./experiences/visual-map/living-node-markdown";
+import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
@@ -764,8 +764,10 @@ export class Repository {
       let knowledgeRevision = "empty";
       let summary = "";
       let damaged = false;
+      let shareMarkdown = "";
       try {
         const knowledge = readLivingMarkdown(raw);
+        shareMarkdown = renderLivingShareKnowledge(knowledge);
         knowledgeRevision = knowledge.revision;
         summary = knowledge.output.text.split(/\r?\n/).find(line => line.trim())?.trim().slice(0, 180) ?? "";
       } catch {
@@ -777,6 +779,7 @@ export class Repository {
         : "never";
       livingNode = {
         summary,
+        shareMarkdown,
         configRevision: livingConfigurationStamp(section(content, "Prompt"), fm),
         knowledgeRevision,
         successfulKnowledgeRevision: text(fm["living-node-success-knowledge"]) || undefined,

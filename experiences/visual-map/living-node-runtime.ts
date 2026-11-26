@@ -32,6 +32,24 @@ export function livingCoordinator(owner: object): LivingCoordinator {
   return coordinator;
 }
 
+/** Map-level sources remain optional, but a missing read must be disclosed instead of silently disappearing. */
+export interface LivingMapContext {
+  groups: ReferenceGroup[];
+  unavailable: number;
+}
+type LivingMapSources = ReferenceGroup[] | LivingMapContext;
+
+async function readLivingMapContext(port: Pick<LivingRoundPort, "mapSources" | "signal" | "current">): Promise<LivingMapContext> {
+  try {
+    const result = await port.mapSources(port.signal);
+    if (port.signal.aborted || !port.current()) throw new Error("cancelled");
+    return Array.isArray(result) ? { groups: result, unavailable: 0 } : result;
+  } catch (error) {
+    if (port.signal.aborted || !port.current() || (error instanceof Error && error.name === "AbortError")) throw error;
+    return { groups: [], unavailable: 1 };
+  }
+}
+
 export interface LivingRoundPort {
   app: App;
   repo: Repository;
@@ -43,7 +61,8 @@ export interface LivingRoundPort {
   current(): boolean;
   busy(path: string): boolean;
   language(map: MapDocument, note: Note): string;
-  mapSources(signal: AbortSignal): Promise<ReferenceGroup[]>;
+  mapSources(signal: AbortSignal): Promise<LivingMapSources>;
+  onOptionalSourcesUnavailable?(): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
   onStart(total: number): void;
   onRunning(id: string): void;
@@ -244,7 +263,9 @@ async function readInputs(
     }
   }
   const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
-  for (const group of await port.mapSources(port.signal)) {
+  const mapContext = await readLivingMapContext(port);
+  if (mapContext.unavailable > 0) warnings.push("map-source-unavailable");
+  for (const group of mapContext.groups) {
     for (const document of group.documents) {
       if (document.external) {
         // External paths require the existing scrubbed gateway identity, never a new direct file read.
@@ -262,7 +283,7 @@ async function readInputs(
     language: port.language(map, snapshot.note),
     reads
   });
-  return { base, evidence, reads, inputRevision, context: JSON.stringify({ documents, warnings }), prompt };
+  return { base, evidence, reads, inputRevision, context: JSON.stringify({ documents, warnings }), prompt, warnings };
 }
 
 export async function runLivingRound(port: LivingRoundPort, requested?: readonly string[]) {
@@ -319,6 +340,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     ).sources.get(id);
     if (JSON.stringify(live) !== JSON.stringify(resolved)) throw new Error("changed-source-resolution");
     const input = await readInputs(port, map, id, snapshot, resolved);
+    if (input.warnings.includes("map-source-unavailable")) port.onOptionalSourcesUnavailable?.();
     return { snapshot, input };
   };
   const cache = new Map<string, Awaited<ReturnType<typeof read>>>();
@@ -552,7 +574,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
         };
     if (formal && (saved.note.prompt !== prompt || !isAiCard(saved.note))) throw new Error("draft-not-saved");
     let dependenciesReady = !blocked;
-    let groups: Promise<ReferenceGroup[]> | undefined;
+    let groups: Promise<LivingMapSources> | undefined;
     const readPort: LivingTrialPort = { ...port, mapSources: signal => (groups ??= port.mapSources(signal)) };
     if (dependenciesReady) {
       for (const item of planned.plan.order) {
@@ -590,7 +612,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       ...(frozen ? ["frozen-source"] as const : [])
     ];
     const input = await readInputs(readPort, map, id, snapshot, sources, warnings);
-    return { saved, snapshot, input, dependenciesReady, warnings };
+    return { saved, snapshot, input, dependenciesReady, warnings: input.warnings };
   };
   const prepared = await build(false);
   const candidate = {
@@ -657,7 +679,7 @@ export async function inspectLivingValidity(port: LivingTrialPort) {
     else if (planned.plan.blocked.has(card.id)) validity.set(card.id, card.hasKnowledge ? "stale" : "none");
   }
   // Read the optional map context once, not once per card.
-  let groups: Promise<ReferenceGroup[]> | undefined;
+  let groups: Promise<LivingMapSources> | undefined;
   const readPort: LivingTrialPort = { ...port, mapSources: signal => (groups ??= port.mapSources(signal)) };
   for (const item of planned.plan.order) {
     if (!port.current() || port.signal.aborted) break;

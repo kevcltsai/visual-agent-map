@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveLivingSources, readLivingReferences, sameLivingTarget } = require('./support.cjs').load('experiences/visual-map/living-node-sources.ts');
+const { resolveLivingSources, readLivingReferences, sameLivingTarget, reconcileLivingDraftReferences } = require('./support.cjs').load('experiences/visual-map/living-node-sources.ts');
 const nodes = [
   { id: 'root', path: 'root.md' }, { id: 'a', path: 'a.md', parentId: 'root' },
   { id: 'grandchild', path: 'grandchild.md', parentId: 'a' }, { id: 'b', path: 'b.md' }
@@ -115,4 +115,14 @@ test('structural graph: a new cycle within previously blocked nodes is refused; 
   assert.equal(introducesLivingCycle(before, before, port), false);
   const ordinary = after.map(n => n.id === 'c' ? { ...n, aiCard: false } : n);
   assert.equal(introducesLivingCycle(before, ordinary, port), false);
+});
+
+test('draft source edits preserve persisted identity rather than rebinding an unchanged display name', () => {
+  const resolveNew = link => card('new:' + link);
+  assert.deepEqual(plain(reconcileLivingDraftReferences(['Renamed', 'B'], [card('old'), card('b')], ['Renamed', 'B'], resolveNew)), [card('old'), card('b')]);
+  assert.deepEqual(plain(reconcileLivingDraftReferences(['Renamed', 'B'], [card('old'), card('b')], ['B', 'Renamed', 'C'], resolveNew)), [card('b'), card('old'), card('new:C')]);
+  assert.deepEqual(plain(reconcileLivingDraftReferences(['A'], [card('old')], [], resolveNew)), []);
+  assert.deepEqual(plain(reconcileLivingDraftReferences(['A'], [card('old')], ['C'], resolveNew)), [card('new:C')]);
+  assert.deepEqual(plain(reconcileLivingDraftReferences(['A', 'Alias'], [card('old')], ['A', 'Alias'], resolveNew)), [card('old')]);
+  assert.throws(() => reconcileLivingDraftReferences(['A', 'Alias'], [card('old')], ['A', 'C'], resolveNew), /ambiguous-saved-references/);
 });

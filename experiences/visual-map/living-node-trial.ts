@@ -3,6 +3,7 @@ import { applyLivingChanges, type LivingKnowledge } from "./living-node-changes"
 import {
   commitLivingMarkdown,
   readLivingMarkdown,
+  livingSnapshotRevision,
   type LivingMarkdownCommit,
   type LivingMarkdownPort
 } from "./living-node-markdown";
@@ -17,6 +18,8 @@ export interface LivingTrialRequest extends TrialSnapshot {
   generate(signal: AbortSignal): Promise<unknown>;
   /** Must check the draft read set, effective configuration and formal base after the provider settles. */
   stillCurrent(): Promise<boolean>;
+  /** Exact bytes predicted by the trusted configuration-only save command for this draft. */
+  savedContent?: string;
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -24,6 +27,8 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 export interface LivingAdoptionCheck {
   /** Includes exact saved effective configuration and re-read formal source revisions. */
   inspect(): Promise<LivingCommitCheck>;
+  /** Re-read the target after the optional explicit save. No mutation is allowed here. */
+  readSavedContent?(): Promise<string>;
   isCurrent(): boolean;
 }
 
@@ -31,7 +36,7 @@ export interface LivingAdoptionCheck {
 export class LivingTrial {
   private status: LivingPreviewStatus = "none";
   private preview?: LivingKnowledge;
-  private candidate?: { snapshot: TrialSnapshot; proposal: unknown };
+  private candidate?: { snapshot: TrialSnapshot; proposal: unknown; savedContent?: string };
   private lease?: LivingLease;
   private generation = 0;
   private closed = false;
@@ -75,6 +80,10 @@ export class LivingTrial {
     const current = (): boolean => lease.current() && !this.closed && this.generation === generation;
     try {
       const base = readLivingMarkdown(request.expectedContent);
+      if (identity.baseRevision !== livingSnapshotRevision(request.expectedContent)) throw new Error("stale-base");
+      const savedContent = request.savedContent;
+      if (savedContent !== undefined && readLivingMarkdown(savedContent).revision !== base.revision)
+        throw new Error("changed-knowledge");
       if (base.revision !== request.base.revision) throw new Error("stale-base");
       const snapshot: TrialSnapshot = clone({
         path: request.path,
@@ -93,7 +102,7 @@ export class LivingTrial {
         return false;
       }
       this.preview = { ...base, records: next.records, output: next.output };
-      this.candidate = { snapshot, proposal };
+      this.candidate = { snapshot, proposal, savedContent };
       this.status = "ready";
       return true;
     } catch {
@@ -110,7 +119,7 @@ export class LivingTrial {
   async adopt(port: LivingMarkdownPort, check: LivingAdoptionCheck): Promise<"written" | "discarded"> {
     const ready = this.candidate;
     if (this.closed || this.status !== "ready" || !ready || this.adopting) return "discarded";
-    const { snapshot, proposal } = ready;
+    const { snapshot, proposal, savedContent } = ready;
     const identity = snapshot.candidate;
     const lease = this.coordinator.acquire(identity.mapId, identity.viewSession, [snapshot.path], true);
     if (!lease) return "discarded";
@@ -121,8 +130,20 @@ export class LivingTrial {
     const current = (): boolean =>
       lease.current() && !this.closed && this.generation === generation && check.isCurrent();
     try {
+      const expectedContent = check.readSavedContent ? await check.readSavedContent() : snapshot.expectedContent;
+      if (
+        !current() ||
+        (expectedContent !== snapshot.expectedContent && expectedContent !== savedContent) ||
+        readLivingMarkdown(expectedContent).revision !== snapshot.base.revision
+      ) {
+        if (!this.closed && this.generation === generation) this.status = "invalid";
+        return "discarded";
+      }
+      const candidate = { ...identity, baseRevision: livingSnapshotRevision(expectedContent) };
       const outcome = await commitLivingMarkdown(port, {
         ...snapshot,
+        expectedContent,
+        candidate,
         proposal,
         signal: lease.signal,
         inspect: check.inspect,

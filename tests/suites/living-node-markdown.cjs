@@ -126,7 +126,7 @@ S.integrationTest('Living Node: source text cannot inject managed-region markers
 });
 
 const { LivingCoordinator } = S.load('experiences/visual-map/living-node-coordinator.ts');
-const { LivingTrial } = S.load('experiences/visual-map/living-node-trial.ts');
+const { LivingTrial } = S.load('experiences/visual-map/living-node-trial.ts', { obsidian: S.obsidian });
 function trialRequest(f, generate, extra = {}) {
   return { ...request(f), generate, stillCurrent: async () => true, ...extra };
 }
@@ -174,4 +174,30 @@ S.integrationTest('Living Node trial: late provider result cannot revive a close
   assert.equal(trial.state, 'none');
   assert.equal(trial.result, undefined);
   assert.equal(f.contents.get(path), initial);
+});
+
+S.integrationTest('Living Node trial: exact configuration-only save permits adoption, unrelated changes do not', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  const savedContent = initial + '\n## Prompt\n\nResearch this topic.\n';
+  let calls = 0;
+  const r = trialRequest(f, async () => { calls++; return proposal; }, { savedContent });
+  assert.equal(await trial.run(r), true);
+  await f.app.vault.process(f.files.get(path), () => savedContent);
+  const check = {
+    isCurrent: () => true,
+    readSavedContent: async () => f.contents.get(path),
+    inspect: async () => ({ ...await r.inspect(), baseRevision: livingSnapshotRevision(f.contents.get(path)) })
+  };
+  assert.equal(await trial.adopt(f.repo, check), 'written');
+  assert.equal(calls, 1);
+  assert.ok(f.contents.get(path).includes('Research this topic.'));
+  const other = await setup();
+  const invalid = new LivingTrial(new LivingCoordinator());
+  const next = trialRequest(other, async () => proposal, { savedContent });
+  assert.equal(await invalid.run(next), true);
+  const edited = savedContent + '\nUnrelated manual edit.';
+  await other.app.vault.process(other.files.get(path), () => edited);
+  assert.equal(await invalid.adopt(other.repo, { ...next, readSavedContent: async () => edited }), 'discarded');
+  assert.equal(other.contents.get(path), edited);
 });

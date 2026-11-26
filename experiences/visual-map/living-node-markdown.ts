@@ -325,6 +325,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-last-successful-check": context.at,
         "living-node-outcome": "ok",
         "living-node-input-revision": candidate.inputRevision,
+        "living-node-success-knowledge": livingSnapshotRevision(managed),
         ...(changed ? { "living-node-last-content-change": context.at } : {})
       });
     },

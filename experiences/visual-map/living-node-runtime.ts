@@ -132,8 +132,8 @@ async function prepareMap(port: LivingRoundPort, map: MapDocument) {
     let explicitRefs: LivingSourceRef[] = [];
     if (snapshot) {
       try {
-        hasKnowledge = usableKnowledge(snapshot);
         explicitRefs = refs(snapshot);
+        hasKnowledge = usableKnowledge(snapshot);
       } catch {
         sourceUnavailable = true;
       }
@@ -237,12 +237,19 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   if (port.signal.aborted) stop();
   const current = (): boolean => lease.current() && port.current();
   const config = new Map<string, string>();
-  for (const [id, snapshot] of snapshots) config.set(id, configKey(snapshot, initialMap, id, port));
+  for (const [id, snapshot] of snapshots) {
+    try {
+      config.set(id, configKey(snapshot, initialMap, id, port));
+    } catch {
+      // A damaged source configuration blocks its own branch, not unrelated cards.
+    }
+  }
   const pathOf = (id: string): string => initialMap.nodes.find(node => node.id === id)?.path ?? "";
   const checkCard = async (id: string) => {
     const map = await port.repo.readMap(port.mapPath);
     if (!current() || map.id !== initialMap.id) throw new Error("cancelled");
     const path = pathOf(id);
+    if (map.nodes.find(node => node.id === id)?.path !== path) throw new Error("changed-target-identity");
     const snapshot = await port.repo.readNoteSnapshot(path, map);
     const unchanged = config.get(id) === configKey(snapshot, map, id, port);
     return { map, snapshot, unchanged };
@@ -254,7 +261,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     if (!resolved) throw new Error("missing-source-plan");
     // Resolve the exact same references again; a replaced/renamed alias must not silently select a new file.
     const live = planLivingMap(
-      initialMap.nodes.map(node => ({
+      map.nodes.map(node => ({
         ...node,
         prompt: node.id === id ? snapshot.note.prompt : "",
         aiCard: node.id === id,
@@ -271,6 +278,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   };
   const cache = new Map<string, Awaited<ReturnType<typeof read>>>();
   try {
+    if (!current()) return undefined;
     if (paths.some(path => port.busy(path))) throw new Error("living-node-busy");
     const models = [...new Set(plan.order.map(item => snapshots.get(item.id)?.note.model ?? "").filter(Boolean))];
     let results: Map<string, LivingSettlement> | undefined;
@@ -294,7 +302,10 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           const fm = frontmatter(value.snapshot.content);
           const validity = value.input.base.revision === "empty"
             ? usableKnowledge(value.snapshot) ? "stale" : "none"
-            : fm["living-node-input-revision"] === value.input.inputRevision ? "valid" : "stale";
+            : fm["living-node-input-revision"] === value.input.inputRevision &&
+                fm["living-node-success-knowledge"] === value.input.base.revision
+              ? "valid"
+              : "stale";
           return { current: true, locked: false, validity };
         },
         execute: async (id, signal) => {

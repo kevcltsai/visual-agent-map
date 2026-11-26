@@ -27,7 +27,7 @@ export function planLivingMap(
     return {
       ...card,
       explicitCardIds: resolved.dependencyIds,
-      sourceUnavailable: resolved.failures.some(failure => failure.required)
+      sourceUnavailable: card.sourceUnavailable || resolved.failures.some(failure => failure.required)
     };
   });
   return { plan: planLivingNodes(nodes, requested), sources };

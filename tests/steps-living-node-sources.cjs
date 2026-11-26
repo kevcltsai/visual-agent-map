@@ -50,7 +50,7 @@ test('source resolution: ambiguous path alias is refused', () => {
   assert.equal(result.failures[0].required, true);
 });
 
-const { planLivingMap } = require('./support.cjs').load('experiences/visual-map/living-node-map.ts');
+const { planLivingMap, introducesLivingCycle } = require('./support.cjs').load('experiences/visual-map/living-node-map.ts');
 const asAi = (node, refs = []) => ({ ...node, aiCard: true, prompt: 'p', hasKnowledge: true, explicitRefs: refs });
 
 test('map planning: unresolved required Markdown blocks dependent branch while optional context does not', () => {
@@ -96,4 +96,23 @@ test('source resolution: copied foreign references remain missing even with a ma
   assert.equal(result.sources.some(s => s.cardId === foreign), false);
   assert.equal(result.failures[0].reason, 'missing-or-unauthorized');
   assert.equal(result.failures[0].required, true);
+});
+
+test('structural graph: moving an AI card under a consumer of its explicit reference would close a cycle', () => {
+  const before = [asAi({ id: 'a', path: 'a.md' }, [card('b')]), asAi({ id: 'b', path: 'b.md' })];
+  const after = before.map(n => n.id === 'a' ? { ...n, parentId: 'b' } : n);
+  assert.equal(introducesLivingCycle(before, after, port), true);
+  assert.equal(introducesLivingCycle(after, before, port), false, 'repair is permitted');
+  assert.equal(introducesLivingCycle(after, [...after, asAi({ id: 'unrelated', path: 'u.md' })], port), false);
+});
+
+test('structural graph: a new cycle within previously blocked nodes is refused; locks do not hide cycles', () => {
+  const before = [asAi({ id: 'a', path: 'a.md' }, [card('b')]),
+    { ...asAi({ id: 'b', path: 'b.md' }, [card('a')]), aiLocked: true },
+    asAi({ id: 'c', path: 'c.md' }, [card('a')])];
+  const after = before.map(n => n.id === 'c' ? { ...n, parentId: 'b' } : n);
+  assert.equal(introducesLivingCycle(before, after, port), true);
+  assert.equal(introducesLivingCycle(before, before, port), false);
+  const ordinary = after.map(n => n.id === 'c' ? { ...n, aiCard: false } : n);
+  assert.equal(introducesLivingCycle(before, ordinary, port), false);
 });

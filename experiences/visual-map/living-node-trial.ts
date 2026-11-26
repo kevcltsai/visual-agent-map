@@ -11,7 +11,7 @@ import type { LivingCommitCheck } from "./living-node-state";
 
 export type LivingPreviewStatus = "none" | "running" | "ready" | "invalid" | "error";
 
-type TrialSnapshot = Omit<LivingMarkdownCommit, "proposal" | "signal" | "isCurrent" | "inspect">;
+type TrialSnapshot = Omit<LivingMarkdownCommit, "proposal" | "signal" | "isCurrent" | "inspect" | "onCommit">;
 
 export interface LivingTrialRequest extends TrialSnapshot {
   /** Reads only the authorized draft inputs. It may not write, dispatch dependencies or modify formal diagnostics. */
@@ -32,6 +32,7 @@ export interface LivingAdoptionCheck {
   /** Re-read the target after the optional explicit save. No mutation is allowed here. */
   readSavedContent?(): Promise<string>;
   isCurrent(): boolean;
+  onCommit?(path: string, before: string, after: string): void;
 }
 
 /** One editor-scoped preview. The host invalidates it on draft/source changes and disposes it on close. */
@@ -165,6 +166,7 @@ export class LivingTrial {
         proposal,
         signal: lease.signal,
         inspect: () => check.inspect(),
+        onCommit: (path, before, after) => check.onCommit?.(path, before, after),
         isCurrent: current
       });
       if (!this.closed && this.generation === generation) {

@@ -15352,7 +15352,10 @@ export class VisualAgentMapView extends ItemView {
           ? async () => {
               const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
               if (!check || !current()) return false;
-              const outcome = await trial.adopt(this.plugin.repo, check);
+              const outcome = await trial.adopt(this.plugin.repo, {
+                ...check,
+                onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
+              });
               if (outcome !== "written") {
                 new Notice(t("ui.living_node_trial_invalid"));
                 this.plugin.invalidateLivingTrial();
@@ -20037,7 +20040,8 @@ export class VisualAgentMapView extends ItemView {
         },
         onFailure: (id, error) => {
           failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
-        }
+        },
+        onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
       }, requested);
       const values = [...(result?.values() ?? [])];
       const outcome = {
@@ -20062,6 +20066,24 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
+  private recordLivingCommit(path: string, before: string, after: string): void {
+    if (before === after || this.closed) return;
+    const restore = async (expected: string, replacement: string): Promise<void> => {
+      const repo = this.plugin.repo;
+      const result = await repo.updateNoteRawGuarded(path, () => replacement, {
+        expectedContent: expected,
+        authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
+      });
+      if (result !== "written") throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    };
+    this.history.push({
+      label: t("ui.living_node_run_card"),
+      undo: () => restore(after, before),
+      redo: () => restore(before, after)
+    });
+    this.updateHistoryButtons();
+  }
+
   stopPromptBatch(): void {
     this.promptBatch?.controller.abort();
   }

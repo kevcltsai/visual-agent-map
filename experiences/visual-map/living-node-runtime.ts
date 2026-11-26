@@ -49,6 +49,7 @@ export interface LivingRoundPort {
   onRunning(id: string): void;
   onSettled(id: string, result: LivingSettlement): void;
   onFailure(id: string, error: unknown): void;
+  onCommit?(path: string, before: string, after: string): void;
 }
 
 type LivingTrialPort = Pick<
@@ -288,6 +289,22 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     if (paths.some(path => port.busy(path))) throw new Error("living-node-busy");
     const models = [...new Set(plan.order.map(item => snapshots.get(item.id)?.note.model ?? "").filter(Boolean))];
     let results: Map<string, LivingSettlement> | undefined;
+    const diagnostics: Promise<unknown>[] = [];
+    const stamp = async (id: string, outcome: "failed" | "blocked"): Promise<void> => {
+      if (!current()) return;
+      try {
+        const checked = await checkCard(id);
+        const attempted = cache.get(id)?.snapshot.content;
+        if (!checked.unchanged || checked.snapshot.note.aiLocked || !isAiCard(checked.snapshot.note)) return;
+        if (attempted !== undefined && attempted !== checked.snapshot.content) return;
+        await port.repo.updateNoteRawGuarded(pathOf(id), content => setFrontmatterKeys(content, {
+          "living-node-last-attempt": new Date().toISOString(),
+          "living-node-outcome": outcome
+        }), { expectedContent: checked.snapshot.content, authorize: current });
+      } catch {
+        // A missing or edited target cannot safely accept a diagnostic write.
+      }
+    };
     const dispatch = async (): Promise<void> => {
       if (!current()) return;
       port.onStart(plan.order.length + plan.blocked.size);
@@ -348,6 +365,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
               context: generated.context,
               signal,
               isCurrent: current,
+              onCommit: (path, before, after) => port.onCommit?.(path, before, after),
               inspect: async () => {
                 const live = await read(id);
                 return {
@@ -370,10 +388,12 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           }
         },
         onSettled: (id, result) => {
-          cache.delete(id);
+          if (result === "failed" || result === "blocked") diagnostics.push(stamp(id, result));
           port.onSettled(id, result);
         }
       });
+      await Promise.all(diagnostics);
+      cache.clear();
     };
     const confirm = async (index: number): Promise<void> => {
       if (!current()) return;

@@ -266,6 +266,8 @@ export interface LivingMarkdownCommit {
   inspect(): Promise<LivingCommitCheck>;
   /** Shared execution lease and in-memory revision/identity fence, evaluated inside the write boundary. */
   isCurrent(): boolean;
+  /** Called only after the guarded write has committed, with the exact bytes needed for conflict-safe undo. */
+  onCommit?(path: string, before: string, after: string): void;
 }
 
 function validateNoteIdentity(content: string, candidate: LivingCandidateIdentity): Record<string, unknown> {
@@ -311,7 +313,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   const managed = region && !changed ? region.text : renderRegion(nextKnowledge);
   const checked = await request.inspect();
   if (signal.aborted || !request.isCurrent() || !canCommitLivingCandidate(candidate, checked)) return "discarded";
-  return port.updateNoteRawGuarded(
+  let committedContent: string | undefined;
+  const outcome = await port.updateNoteRawGuarded(
     request.path,
     content => {
       const live = validateNoteIdentity(content, candidate);
@@ -321,7 +324,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
           ? content.slice(0, region.start) + managed + content.slice(region.end)
           : content + (content.endsWith("\n") ? "\n" : "\n\n") + managed + "\n"
         : content;
-      return setFrontmatterKeys(replaced, {
+      committedContent = setFrontmatterKeys(replaced, {
         [HASH_KEY]: livingSnapshotRevision(managed),
         [COMMIT_KEY]: candidate.executionId,
         "living-node-last-attempt": context.at,
@@ -331,10 +334,19 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-success-knowledge": livingSnapshotRevision(managed),
         ...(changed ? { "living-node-last-content-change": context.at } : {})
       });
+      return committedContent;
     },
     {
       expectedContent,
       authorize: () => !signal.aborted && request.isCurrent()
     }
   );
+  if (outcome === "written" && committedContent !== undefined) {
+    try {
+      request.onCommit?.(request.path, expectedContent, committedContent);
+    } catch {
+      // An already committed note remains authoritative even if its view history cannot refresh.
+    }
+  }
+  return outcome;
 }

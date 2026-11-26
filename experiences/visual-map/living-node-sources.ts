@@ -8,6 +8,9 @@ export type LivingSourceRef = { kind: "card"; id: string } | { kind: "note"; lin
 /** Only an absent field denotes legacy data. Corrupt persisted identities must not be re-resolved by name. */
 export function readLivingReferences(saved: unknown, legacyLinks: readonly string[]): LivingSourceRef[] {
   if (saved === undefined) return legacyLinks.map(link => ({ kind: "note", link }));
+  // Early V1 drafts serialized an empty list as a bare YAML key (null). Accept it only
+  // when the saved prompt also has no links; never use null to rebind existing references.
+  if (saved === null && legacyLinks.length === 0) return [];
   if (!Array.isArray(saved)) throw new Error("invalid-source-reference");
   return saved.map(value => {
     if (typeof value !== "string") throw new Error("invalid-source-reference");

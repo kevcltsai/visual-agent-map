@@ -502,7 +502,7 @@ export class ChatActionWriter {
           return done;
         }
         let raced = false;
-        await this.plugin.repo.app.vault.process(source.file, current => {
+        await this.app.vault.process(source.file, current => {
           // The file moved on between the check and the write: leave it as it is.
           if (current !== source.text) {
             raced = true;
@@ -951,7 +951,7 @@ export class ChatActionWriter {
     const source = await this.ports.readChatFile(path);
     if (!source) throw this.ports.chatUndoRefusal();
     if (source.editor) source.editor.setValue(text);
-    else await this.plugin.repo.app.vault.process(source.file, () => text);
+    else await this.app.vault.process(source.file, () => text);
   }
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
   private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {

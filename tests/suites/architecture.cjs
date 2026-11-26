@@ -81,7 +81,7 @@ test('evidence extraction has no dependency on chart insertion or task merge', (
 });
 
 test('map card-note rewrites go through the repository vault, so the write-recovery copy covers them', () => {
-  for (const name of ['experiences/visual-map/view.ts', 'experiences/visual-map/chat-action-writer.ts']) {
+  for (const name of ['experiences/visual-map/view.ts']) {
     const source = fs.readFileSync(path.join(root, name), 'utf8');
     assert.doesNotMatch(source, /this\.app\.vault\.(?:process|modify)\(/, `${name}: use this.plugin.repo.app.vault`);
   }

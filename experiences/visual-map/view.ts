@@ -214,6 +214,7 @@ import {
   saveLivingConfig,
   validateLivingStructure,
   livingRemovalConsumers,
+  livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
@@ -11460,17 +11461,24 @@ export class VisualAgentMapView extends ItemView {
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    // A cut made in another map: this map gets copies, the originals park in the source map's Unassigned (D8).
+    // A Living Node cut transfers the original files and IDs. Ordinary unrelated cuts keep the existing D8 behavior.
     if (record?.mode === "cut" && !source && record.sourceMapPath !== this.path) {
       const accepted = await this.acceptCrossCut(payload, record);
       if (!accepted) return;
-      tops = await this.copyFromOtherMap(
-        accepted,
-        target,
-        payload,
-        record.nodeIds,
-        this.crossCutOf(payload, record, accepted.branch)
-      );
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const living = await livingCrossCut(this.app, this.plugin.repo, sourceMap, map, new Set(record.nodeIds));
+      if (living.preserveIdentity) {
+        tops = await this.moveLivingAcrossMaps(accepted, target, payload, record);
+        if (tops.length) this.noticeLivingRemoval(living.affected);
+      } else {
+        tops = await this.copyFromOtherMap(
+          accepted,
+          target,
+          payload,
+          record.nodeIds,
+          this.crossCutOf(payload, record, accepted.branch)
+        );
+      }
       const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
       if (landed) {
         this.selection.setSelected(landed.id);
@@ -11670,11 +11678,69 @@ export class VisualAgentMapView extends ItemView {
     const problem = cutSourceProblem(sourceMap, record, found);
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
+    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path) || livingCoordinator(this.plugin).busy(node.path)))
+      return refuse("ui.merge_locked");
     return found;
   }
-  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
-  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[]): CrossCut {
+  /** Move original notes as one cross-map transaction, so Undo/Redo can restore
+   * the exact stable node IDs and content rather than a duplicated snapshot. */
+  private async moveLivingAcrossMaps(
+    source: { branch: MapNode[]; roots: MapNode[] },
+    target: MapNode | null,
+    payload: ClipboardPayload,
+    record: ClipRecord
+  ): Promise<MapNode[]> {
+    if (!this.map || !this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const destination = clone(this.map);
+    const ids = new Set(source.branch.map(node => node.id));
+    const roots = new Set(source.roots.map(node => node.id));
+    const cross = this.crossCutOf(payload, record, source.branch, destination.id);
+    await cross.snapshot();
+    const tx = cross.begin();
+    cross.join(tx);
+    const tops: MapNode[] = [];
+    try {
+      const entry = await tx.editMap(this.path, (map, resolve) => {
+        if (map.id !== destination.id || map.nodes.some(node => ids.has(node.id)))
+          throw new Error("ambiguous-card-identity");
+        const parent = target ? map.nodes.find(node => node.id === target.id) : null;
+        if (target && !parent) throw new Error(t("ui.outline_import_selected_missing"));
+        const moved = source.branch.map(original => {
+          const node = { ...clone(original), path: resolve(original.path) };
+          if (roots.has(node.id)) node.parentId = parent?.id ?? null;
+          delete node.afterTextId;
+          return node;
+        });
+        tops.splice(0, tops.length, ...moved.filter(node => roots.has(node.id)));
+        map.nodes.push(...moved);
+        for (const relation of payload.relations) {
+          const from = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.from)];
+          const to = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.to)];
+          if (!ids.has(from) || !ids.has(to)) continue;
+          const link: TopicRelation = { kind: relation.kind, from, to,
+            ...(relation.description !== undefined ? { description: relation.description } : {}) };
+          if (relationAllowed(map.topicRelations ?? [], link))
+            setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+        }
+        if (parent) {
+          parent.collapsed = false;
+          this.arrangeBranch(map, parent.id, ids, undefined);
+        } else {
+          for (const top of tops) map.nodes = arrangeNewTree(map.nodes, top.id,
+            new Set([top.id, ...descendants(moved, top.id)]), this.cardHeightOf, layoutOf(map));
+        }
+      }).commit();
+      await cross.finish(entry);
+    } catch (error) {
+      if (!isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {});
+      throw error;
+    }
+    this.selection.afterPaste();
+    await this.refreshAfterSavedChange();
+    return tops;
+  }
+  /** The source side of a cross-map cut: re-check before writing; transfer or park originals. */
+  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[], destinationId?: string): CrossCut {
     const plugin = this.plugin,
       repo = plugin.repo,
       from = record.sourceMapPath,
@@ -11703,10 +11769,23 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       },
-      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      begin: () => this.beginCrossTransaction(from, async () => {
+        const sourceMap = await repo.readMap(from);
+        assertSource(sourceMap);
+        if (branch.some(node => plugin.topicRuns.isBusy(node.path) || livingCoordinator(plugin).busy(node.path)))
+          throw new Error(t("ui.merge_locked"));
+        if (destinationId) {
+          const destination = await repo.readMap(into);
+          if (destination.id !== destinationId) throw new Error("changed-target-identity");
+          await livingCrossCut(this.app, repo, sourceMap, destination, removed);
+        }
+      }),
       join: tx => {
         const parkFolder = repo.topicFolder(from, "Unassigned");
-        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        for (const node of branch) {
+          if (destinationId) tx.unpark(node.path, repo.topicFolder(into, "Notes"), destinationId, destinationId);
+          else tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        }
         tx.editMap(from, map => {
           // The transaction hands over Map.md as it reads it at commit: a change made since the checks stops here.
           assertSource(map);
@@ -11744,6 +11823,7 @@ export class VisualAgentMapView extends ItemView {
       repo: plugin.repo,
       rebuildDerivedData: () => plugin.rebuildDerivedData(),
       refreshNotes: paths => plugin.rebuildDerivedData(paths),
+      validateStructure: (before, after) => validateLivingStructure(plugin.repo.app, plugin.repo, before, after),
       onApplied: () => {},
       checkConflict: async mapPath => {
         // The source map is judged first, so a cut that cannot go ahead never opens a conflict window in its view.

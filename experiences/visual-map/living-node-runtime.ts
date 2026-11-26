@@ -4,6 +4,7 @@ import { isPlaceholder } from "../../core/note-placeholder";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import { livingConfigurationStamp } from "../../core/living-node-region";
+import { normalizeVaultPath } from "../../core/map-chat-guard";
 import type { AiCalls } from "../../core/ai-calls";
 import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
@@ -108,11 +109,21 @@ function refs(snapshot: Snapshot): LivingSourceRef[] {
   return readLivingReferences(frontmatter(snapshot.content)["living-node-refs"], promptSourceLinks(snapshot.note.prompt));
 }
 
+function allowedLivingNotePath(app: App, path: string): boolean {
+  const key = normalizeVaultPath(path);
+  const config = normalizeVaultPath(app.vault.configDir || ".obsidian");
+  return !!key && key === path && !!config &&
+    key.toLowerCase() !== config.toLowerCase() &&
+    !key.toLowerCase().startsWith(config.toLowerCase() + "/") &&
+    key.toLowerCase().endsWith(".md");
+}
+
 function sourceResolver(app: App) {
   return {
-    resolveAuthorized(link: string, fromPath: string) {
-      const file = app.metadataCache.getFirstLinkpathDest(link, fromPath);
-      return file instanceof TFile && file.extension.toLowerCase() === "md"
+    resolveAuthorized(link: string, fromPath: string, _role?: "explicit" | "map", exact?: true) {
+      const file = exact ? app.vault.getAbstractFileByPath(link) : app.metadataCache.getFirstLinkpathDest(link, fromPath);
+      return file instanceof TFile && allowedLivingNotePath(app, file.path) &&
+        app.vault.getAbstractFileByPath(file.path) === file
         ? { identity: file.path, path: file.path }
         : undefined;
     }
@@ -292,8 +303,8 @@ async function readInputs(
       add(source.identity, data.note.title, text, current);
     } else {
       const file = port.app.vault.getAbstractFileByPath(source.path);
-      if (!(file instanceof TFile) || file.extension.toLowerCase() !== "md") throw new Error("missing-source");
-      add(source.identity, source.path, readableMarkdown(await port.app.vault.read(file)));
+      if (!(file instanceof TFile) || !allowedLivingNotePath(port.app, file.path)) throw new Error("missing-source");
+      add(source.identity, file.basename, readableMarkdown(await port.app.vault.read(file)));
     }
   }
   const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
@@ -307,6 +318,10 @@ async function readInputs(
         continue;
       }
       if (document.path === map.nodes.find(node => node.id === id)?.path) continue;
+      if (!allowedLivingNotePath(port.app, document.path)) {
+        warnings.push("map-source-unavailable");
+        continue;
+      }
       if (resolved.sources.some(source => source.path === document.path)) continue;
       add("map:" + document.path, document.path, readableMarkdown(document.content));
     }
@@ -527,9 +542,10 @@ function resolveDraft(
     if (note.path === target.path) throw new Error("self-reference");
     const matches = cards.filter(card => card.path === note.path);
     if (matches.length > 1) throw new Error("ambiguous-source");
-    return matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link };
+    return matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link: note.path, exact: true };
   });
-  const encoded = [...new Set(explicit.map(ref => (ref.kind === "card" ? "card:" + ref.id : "note:" + ref.link)))];
+  const encoded = [...new Set(explicit.map(ref => ref.kind === "card" ? "card:" + ref.id :
+    (ref.exact ? "note-path:" : "note:") + ref.link))];
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );

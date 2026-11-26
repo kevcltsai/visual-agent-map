@@ -6,6 +6,7 @@ export const LIVING_READER_VIEW = "vam-living-node-reader";
 
 export class LivingReaderView extends ItemView {
   private file?: TFile;
+  private owner?: string;
   private preview = "";
   private tab: "official" | "trial" = "trial";
   private invalid = false;
@@ -28,15 +29,21 @@ export class LivingReaderView extends ItemView {
     return "book-open";
   }
 
-  async show(file: TFile, preview: string, invalid = false): Promise<void> {
+  owns(owner: string): boolean {
+    return this.owner === owner;
+  }
+
+  async show(file: TFile, preview: string, owner: string, invalid = false): Promise<void> {
     this.file = file;
+    this.owner = owner;
     this.preview = preview;
     this.invalid = invalid;
     this.tab = "trial";
     await this.paint();
   }
 
-  markInvalid(): void {
+  markInvalid(owner: string): void {
+    if (!this.owns(owner)) return;
     this.invalid = true;
     void this.paint();
   }
@@ -46,6 +53,7 @@ export class LivingReaderView extends ItemView {
     this.rendered?.unload();
     this.rendered = undefined;
     this.file = undefined;
+    this.owner = undefined;
     this.preview = "";
   }
 

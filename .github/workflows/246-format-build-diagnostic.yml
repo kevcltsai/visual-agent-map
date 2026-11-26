@@ -1,0 +1,36 @@
+name: PR 246 isolated format and build diagnosis
+on:
+  push:
+    branches: [diag/246-format-build-3c08a9a]
+permissions:
+  contents: read
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Format and build with the repository toolchain
+        run: |
+          npm run format
+          npm run check:i18n
+          npm run build
+      - name: Capture generated changes for the exact candidate
+        run: |
+          git diff --name-only
+          git diff --binary --no-color --no-ext-diff --unified=0 > "$RUNNER_TEMP/generated.patch"
+          git diff --name-only -z | xargs -0 -r git hash-object
+          printf 'VAM_PATCH_BEGIN\n'
+          gzip -n -c "$RUNNER_TEMP/generated.patch" | base64 -w 1000 | sed 's/^/VAM_PATCH /'
+          printf '\nVAM_PATCH_END\n'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-patch
+          path: ${{ runner.temp }}/generated.patch
+          retention-days: 1

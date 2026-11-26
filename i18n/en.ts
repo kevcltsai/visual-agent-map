@@ -1242,6 +1242,7 @@ export const en = {
   "ui.living_node_official": "Official",
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_removed_source_0": "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",
+  "ui.living_node_optional_source_unavailable": "Some optional map sources could not be read. Results use available material only.",
   "ui.living_node_trial_stale_sources": "The preview uses existing upstream knowledge that needs updating. Run Card before adoption.",
   "ui.living_node_trial_frozen_sources": "The preview uses locked upstream knowledge; its information may be old.",
   "ui.living_node_trial_invalid": "Trial · invalidated",

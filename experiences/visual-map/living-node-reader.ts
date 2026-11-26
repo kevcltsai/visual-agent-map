@@ -8,6 +8,7 @@ export class LivingReaderView extends ItemView {
   private file?: TFile;
   private owner?: string;
   private preview = "";
+  private warnings: readonly string[] = [];
   private tab: "official" | "trial" = "trial";
   private invalid = false;
   private generation = 0;
@@ -33,10 +34,11 @@ export class LivingReaderView extends ItemView {
     return this.owner === owner;
   }
 
-  async show(file: TFile, preview: string, owner: string, invalid = false): Promise<void> {
+  async show(file: TFile, preview: string, owner: string, warnings: readonly string[] = [], invalid = false): Promise<void> {
     this.file = file;
     this.owner = owner;
     this.preview = preview;
+    this.warnings = [...warnings];
     this.invalid = invalid;
     this.tab = "trial";
     await this.paint();
@@ -55,6 +57,7 @@ export class LivingReaderView extends ItemView {
     this.file = undefined;
     this.owner = undefined;
     this.preview = "";
+    this.warnings = [];
   }
 
   private async paint(): Promise<void> {
@@ -82,8 +85,11 @@ export class LivingReaderView extends ItemView {
         void this.paint();
       });
     }
-    if (this.tab === "trial")
+    if (this.tab === "trial") {
       host.createDiv({ cls: "vam-living-reader-banner", text: t(this.invalid ? "ui.living_node_trial_invalid" : "ui.living_node_trial_unsaved") });
+      for (const warning of this.warnings)
+        host.createDiv({ cls: "vam-living-reader-banner", text: warning, attr: { role: "status" } });
+    }
     const outline = host.createDiv("vam-living-reader-outline");
     const content = host.createDiv("vam-living-reader-content");
     try {

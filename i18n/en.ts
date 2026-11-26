@@ -1240,6 +1240,8 @@ export const en = {
   "ui.living_node_trial": "Trial",
   "ui.living_node_official": "Official",
   "ui.living_node_trial_unsaved": "Trial · not saved",
+  "ui.living_node_trial_stale_sources": "The preview uses existing upstream knowledge that needs updating. Run Card before adoption.",
+  "ui.living_node_trial_frozen_sources": "The preview uses locked upstream knowledge; its information may be old.",
   "ui.living_node_trial_invalid": "Trial · invalidated",
   "ui.living_node_try_prompt": "Try prompt",
   "ui.living_node_adopt": "Adopt trial",

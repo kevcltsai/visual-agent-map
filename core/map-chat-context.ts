@@ -93,6 +93,7 @@ export interface MapChatOutlineNode {
   styles?: TopicStyle[];
   /** The user locked this card against AI changes (AI lock); sent only when true. */
   aiLocked?: boolean;
+  aiCard?: boolean;
   /** Set only for a card whose last AI task failed. */
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
@@ -108,6 +109,9 @@ export interface MapChatRelation {
   description?: string;
 }
 export interface MapChatTopicRef {
+  /** Saved configuration is exposed only for selected or referenced AI cards. */
+  livingPrompt?: string;
+  livingConfigRevision?: string;
   id: string;
   title: string;
   summary: string;
@@ -368,6 +372,7 @@ export interface MapChatTopicHash {
   parentId: string | null;
   summary?: string;
   detailHash?: string;
+  livingConfigRevision?: string;
 }
 
 /** True when the file now differs from what was sent, or was never sent whole (no baseline = cannot judge, so stale). */
@@ -625,11 +630,13 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         basis.read.push({ id: ref.id, path: ref.path, title: ref.title });
       }
     }
+    const withLivingPrompt = withDetail && ref.livingPrompt !== undefined && ref.livingPrompt.length <= 8_000 && !!ref.livingConfigRevision;
     topicHashes[ref.id] = {
       title: ref.title,
       parentId: node?.parentId ?? null,
       summary: ref.summary,
-      ...(withDetail ? { detailHash: contentHash(ref.detail) } : {})
+      ...(withDetail ? { detailHash: contentHash(ref.detail) } : {}),
+      ...(withLivingPrompt ? { livingConfigRevision: ref.livingConfigRevision } : {})
     };
     return {
       id: ref.id,
@@ -637,6 +644,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
       summary: ref.summary,
       ...(withDetail ? { detail: ref.detail } : { detailOmitted: true }),
       path: ref.path,
+      ...(withLivingPrompt ? { aiCard: true, livingPrompt: ref.livingPrompt } : {}),
       ...errorFields(ref),
       ...(withLinks
         ? {
@@ -837,6 +845,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
       ...kindFields(node, !!input.aim),
       ...appearanceFields(node, !!input.aim),
       ...(node.aiLocked ? { aiLocked: true } : {}),
+      ...(node.aiCard ? { aiCard: true } : {}),
       ...errorFields(node)
     })),
     ...(shrink.outlineSummaries ? {} : { outlineSummariesOmitted: true }),

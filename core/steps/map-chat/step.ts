@@ -125,6 +125,8 @@ export type MapChatAction =
       parentId: string;
       title: string;
       summary: string;
+      /** New AI card, configured before the card becomes visible; empty/absent means ordinary. */
+      livingPrompt?: string;
       ref?: string;
       topicKind?: TopicKind;
       leaning?: HypothesisLeaning;
@@ -664,6 +666,9 @@ export function parseMapChat(
       };
       switch (kind as MapChatActionKind) {
         case "add_child": {
+          const livingPrompt = text("content", false);
+          if (livingPrompt && (context.bookPlan || context.aim || livingPrompt.length > 8_000 || text("summary", false)))
+            throw new Dropped("bad_value");
           if (book) {
             // Under a chapter or the book (an existing card); a `new:` parent is not possible here. `note` is the reason.
             const parentId = node("parentId");
@@ -698,6 +703,7 @@ export function parseMapChat(
             parentId,
             title,
             summary: linkSources(text("summary", false), context.sourcePaths),
+            ...(livingPrompt ? { livingPrompt } : {}),
             ...(ref ? { ref } : {}),
             ...(keepType ? { topicKind: typed as TopicKind } : {}),
             ...(keepType && lean ? { leaning: lean } : {}),
@@ -713,7 +719,18 @@ export function parseMapChat(
           if (context.bookPlan || context.aim) throw new Dropped("bad_value");
           const content = text("content");
           if (content.length > 8_000) throw new Dropped("bad_value");
-          actions.push({ kind: "configure_ai_card", nodeId: node("nodeId", true), content });
+          const nodeId = node("nodeId", true);
+          if (nodeId.startsWith(MAP_CHAT_NEW_PREFIX)) {
+            // Compatibility with the previous protocol's adjacent two-action creation.
+            // Fold it before confirmation, never publish an ordinary card then configure it.
+            const previous = actions[actions.length - 1];
+            if (previous?.kind !== "add_child" || previous.ref !== nodeId.slice(MAP_CHAT_NEW_PREFIX.length) ||
+                previous.livingPrompt || previous.summary)
+              throw new Dropped("bad_ref");
+            previous.livingPrompt = content;
+          } else {
+            actions.push({ kind: "configure_ai_card", nodeId, content });
+          }
           break;
         }
         case "rename_topic":

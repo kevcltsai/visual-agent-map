@@ -21,7 +21,7 @@ export function setFrontmatterKeys(content: string, values: Record<string, Front
     typeof value === "boolean"
       ? [`${key}: ${value}`]
       : Array.isArray(value)
-        ? [`${key}:`, ...value.map(item => `  - ${JSON.stringify(item)}`)]
+        ? value.length ? [`${key}:`, ...value.map(item => `  - ${JSON.stringify(item)}`)] : [`${key}: []`]
         : [`${key}: ${JSON.stringify(value)}`];
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(content);
   if (!match) {

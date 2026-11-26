@@ -1178,6 +1178,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial": "试跑",
   "ui.living_node_official": "正式内容",
   "ui.living_node_trial_unsaved": "试跑・尚未保存",
+  "ui.living_node_removed_source_0": "已移除下列 AI 卡片引用的来源：{0}。原引用仍保留，请修复来源或撤销。",
   "ui.living_node_trial_stale_sources": "此试跑使用仍需更新的上游知识；请先正式执行卡片，再采用结果。",
   "ui.living_node_trial_frozen_sources": "此试跑使用已锁定的上游知识，信息可能不是最新。",
   "ui.living_node_trial_invalid": "试跑・已失效",

@@ -152,11 +152,12 @@ test('splitPrompt / joinPrompt: the question and the source notes round trip; ot
   eq(pr.splitPrompt('Why?\nSources: Plain name'), { question: 'Why?\nSources: Plain name', sources: [] }, 'a source line with words stays');
   eq(pr.splitPrompt('Why?\n資料來源：https://e.com'), { question: 'Why?\n資料來源：https://e.com', sources: [] });
   eq(pr.splitPrompt(''), { question: '', sources: [] });
-  assert.equal(pr.joinPrompt(' Why? ', ['A', 'B'], 'zh-TW'), 'Why?\n資料來源：[[A]]、[[B]]');
-  assert.equal(pr.joinPrompt('Why?', ['A', 'B'], 'zh-CN'), 'Why?\n资料来源：[[A]]、[[B]]');
-  assert.equal(pr.joinPrompt('Why?', ['A'], 'en'), 'Why?\nSources：[[A]]');
-  assert.equal(pr.joinPrompt('Why?', [], 'en'), 'Why?');
-  for (const lang of ['en', 'zh-TW', 'zh-CN']) eq(pr.splitPrompt(pr.joinPrompt('Q\nOther: x', ['A', 'B'], lang)), { question: 'Q\nOther: x', sources: ['A', 'B'] }, lang);
+  const langs = { 'zh-TW': ['資料來源', '、'], 'zh-CN': ['资料来源', '、'], en: ['Sources', ', '] };
+  assert.equal(pr.joinPrompt(' Why? ', ['A', 'B'], ...langs['zh-TW']), 'Why?\n資料來源：[[A]]、[[B]]');
+  assert.equal(pr.joinPrompt('Why?', ['A', 'B'], ...langs['zh-CN']), 'Why?\n资料来源：[[A]]、[[B]]');
+  assert.equal(pr.joinPrompt('Why?', ['A'], ...langs.en), 'Why?\nSources：[[A]]');
+  assert.equal(pr.joinPrompt('Why?', [], ...langs.en), 'Why?');
+  for (const lang of Object.keys(langs)) eq(pr.splitPrompt(pr.joinPrompt('Q\nOther: x', ['A', 'B'], ...langs[lang])), { question: 'Q\nOther: x', sources: ['A', 'B'] }, lang);
 });
 
 test('aiCardTitle: the first line, 20 characters, trailing punctuation dropped; nothing for an empty question', () => {

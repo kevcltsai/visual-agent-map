@@ -290,7 +290,6 @@ export function aiCardStatus(input: AiCardStatusInput): AiCardStatus {
   return "done";
 }
 
-const SOURCES_LABEL: Record<string, string> = { "zh-TW": "資料來源", "zh-CN": "资料来源" };
 const LINK_ONLY = /^[\s、,，;；]*(?:\[\[[^\]]+\]\][\s、,，;；]*)+$/;
 /**
  * Splits a Prompt into the question text and the notes of its 資料來源 line. Only a source line made of nothing but links is taken
@@ -307,12 +306,11 @@ export function splitPrompt(prompt: string): { question: string; sources: string
   }
   return { question: keep.join("\n").trim(), sources };
 }
-/** The Prompt text of an AI card: the question, then the 資料來源 line (named in the interface language) when there are notes. */
-export function joinPrompt(question: string, sources: readonly string[], language: string): string {
+/** The Prompt text of an AI card: the question, then the 資料來源 line (its label and list separator come from the interface language) when there are notes. */
+export function joinPrompt(question: string, sources: readonly string[], label: string, separator: string): string {
   const text = question.trim();
   if (!sources.length) return text;
-  const zh = language in SOURCES_LABEL;
-  const line = `${SOURCES_LABEL[language] ?? "Sources"}：${sources.map(name => `[[${name}]]`).join(zh ? "、" : ", ")}`;
+  const line = `${label}：${sources.map(name => `[[${name}]]`).join(separator)}`;
   return text ? `${text}\n${line}` : line;
 }
 /** The name of a new AI card when the user left it blank: the question's first line, 20 characters at most, without trailing punctuation. */

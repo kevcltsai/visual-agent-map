@@ -15208,7 +15208,6 @@ export class VisualAgentMapView extends ItemView {
   private async writeAiCard(node: MapNode, values: AiCardPopoverValues): Promise<void> {
     if (!this.map) return;
     const repo = this.plugin.repo;
-    const language = this.plugin.settings.language;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
@@ -15218,7 +15217,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         await repo.updateNote(path, {
-          prompt: joinPrompt(values.question, values.sources, language),
+          prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
           researchMode: "research"
         });
         await repo.writeAiCard(path, true);

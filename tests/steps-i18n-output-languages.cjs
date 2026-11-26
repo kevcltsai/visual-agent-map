@@ -599,7 +599,7 @@ test('card output language follows the map title when the card title is Latin (d
 test('card output language call sites use cardOutputLanguage with the map title', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((view.match(/cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, (?:note|latest)\.title\)/g) ?? []).length, 1, 'rerunStandard; the old dialog call site is gone');
-  assert.equal((view.match(/cardOutputLanguage\(\s*languageSource \?\? this\.map,\s*this\.plugin\.settings\.language,\s*note\.title\s*\)/g) ?? []).length, 2, 'researchChild and runPromptItem (Prompt run-all integration) use the batch snapshot');
+  assert.equal((view.match(/cardOutputLanguage\(\s*languageSource \?\? (?:this\.)?map,\s*this\.plugin\.settings\.language,\s*note\.title\s*\)/g) ?? []).length, 2, 'researchChild and runPromptItem (Prompt run-all integration) use the batch snapshot');
   assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 5, 'the topic chat request adds one map-level use');
   assert.equal((view.match(/defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*this\.outputLanguageMemory\(\)\.outputLanguage,\s*this\.map\?\.title\s*\)/g) ?? []).length, 3, 'both chat-expand calls and the topic chat turn pass the map title');
   assert.equal((view.match(/defaultOutputLanguage\(\s*settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*remembered,\s*map\.title\s*\)/g) ?? []).length, 1, 'chat synthesis passes the map title');

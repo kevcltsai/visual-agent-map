@@ -1153,6 +1153,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_card_failed_0": "失敗：{0}",
   "ui.ai_card_blocked_0": "子卡「{0}」未完成，沒有執行",
   "ui.ai_lock_card": "鎖住這張 AI 卡",
+  "ui.ai_sources_label": "資料來源",
+  "ui.ai_sources_separator": "、",
   "ui.ai_run_all": "全部執行",
   "ui.ai_run_all_empty": "先新增一張 AI 卡",
   "ui.ai_run_all_stop": "停止全部執行",

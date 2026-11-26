@@ -426,7 +426,7 @@ test('Bug bash E #35 (follow-up): through the real paint() and a leaf that behav
   // what Obsidian does for leaf.setViewState: hand the state to the view with a result object, then redraw the title when the view asked for a layout refresh
   const leaf = { setViewState: async viewState => { const result = { history: true }; await view.setState(viewState.state, result); if (result.layout) workspace.updateTitle(); } };
   const maps = { 'A.md': { title: 'Map A', nodes: [] }, 'B.md': { title: 'Map B', nodes: [] } };
-  Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, paintCount: 0, plugin: { syncOutline() {} }, notes: new Map() });
+  Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, paintCount: 0, plugin: { syncOutline() {} }, notes: new Map(), aiStatusMemo: new Map() });
   // the switcher / openMap path: the other map is read, then painted
   view.openMap = async file => { view.path = file; view.map = maps[file]; try { view.paint(); } catch (error) { if (error !== stop) throw error; } };
   const settle = () => new Promise(resolve => setTimeout(resolve, 60));

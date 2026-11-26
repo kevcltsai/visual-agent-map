@@ -451,8 +451,8 @@ test('C1 card context menu: one topic gets its card actions in groups (AI and ne
   h.view.onCanvasContextMenu(event());
   const menu = h.menus.at(-1);
   const titles = menu.items.map(i => i.title);
-  assert.deepEqual(titles, ['AI explore', 'Add subtopic manually', 'Add sibling topic', 'This card', 'Select subtopics', 'Collapse', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…', 'Remove from map']);
-  assert.deepEqual(menu.separators, [3, 6, 8, 10], 'separators between the groups');
+  assert.deepEqual(titles, ['AI explore', 'Make it an AI card', 'Add subtopic manually', 'Add sibling topic', 'This card', 'Select subtopics', 'Collapse', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…', 'Remove from map']);
+  assert.deepEqual(menu.separators, [4, 7, 9, 11], 'separators between the groups');
   assert.ok(!titles.includes('Add text'), 'Add text lives only in the + menu of the card');
   assert.equal(menu.items.at(-1).warning, true, 'Remove is marked as a warning');
   for (const item of menu.items) if (!['Add summary bracket', 'Note style…'].includes(item.title)) item.click();

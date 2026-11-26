@@ -321,6 +321,23 @@ S.integrationTest('Living Node config command: stable same-map source ID, self a
   assert.deepEqual(f.calls, []);
 });
 
+S.integrationTest('Living Node config: invalidated editor or chat lease refuses the queued write and preserves bytes', async () => {
+  const f = await roundFixture();
+  const before = f.contents.get('parent.md');
+  let current = true;
+  const write = f.repo.updateNoteGuarded.bind(f.repo);
+  f.repo.updateNoteGuarded = async (...args) => {
+    current = false;
+    return write(...args);
+  };
+  await assert.rejects(
+    () => saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Changed prompt', undefined, undefined, () => current),
+    /changed-configuration/
+  );
+  assert.equal(f.contents.get('parent.md'), before);
+  assert.deepEqual(f.calls, []);
+});
+
 S.integrationTest('Living Node ownership: protect an edited output and append an unrelated observation without restoring deleted text', async () => {
   const f = await setup();
   const first = request(f, { proposal: { baseRevision: 'empty', operations: [

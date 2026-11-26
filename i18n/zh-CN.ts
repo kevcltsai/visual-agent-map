@@ -1172,6 +1172,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_sources_separator": "、",
   "ui.ai_run_all": "全部执行",
   "ui.living_node_run_card": "运行卡片",
+  "ui.living_node_use_run_card": "请使用「运行卡片」更新这张 AI 卡片。",
   "ui.ai_run_all_empty": "先新增一张 AI 卡",
   "ui.ai_run_all_stop": "停止全部执行",
   "ui.ai_run_finished_0_1_2": "全部执行结束：完成 {0}、失败 {1}、没有执行 {2}",

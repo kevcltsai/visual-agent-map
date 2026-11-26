@@ -1173,6 +1173,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_sources_separator": "、",
   "ui.ai_run_all": "全部執行",
   "ui.living_node_run_card": "執行卡片",
+  "ui.living_node_use_run_card": "請使用「執行卡片」更新這張 AI 卡片。",
   "ui.ai_run_all_empty": "先新增一張 AI 卡",
   "ui.ai_run_all_stop": "停止全部執行",
   "ui.ai_run_finished_0_1_2": "全部執行結束：完成 {0}、失敗 {1}、沒有執行 {2}",

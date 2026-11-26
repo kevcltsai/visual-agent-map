@@ -52,7 +52,7 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
-import { splitLivingNodeRegion } from "./core/living-node-region";
+import { remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
 import { readLivingMarkdown } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -1155,6 +1155,8 @@ export class Repository {
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
+    if (readAiCard(metadata) || metadata["living-node-region-hash"] !== undefined)
+      resetLivingCopyDiagnostics(metadata);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle
       ? sourceTitle
@@ -1172,8 +1174,8 @@ export class Repository {
 
   /**
    * Rewrites the body links of notes just copied for "Copy to…": each link is read from the source note's place and
-   * written for the copy's place, following the copies of this run. Only the copies (`to`) are written, and only when
-   * their body changes; the sources and the frontmatter are never touched.
+   * written for the copy's place, following the copies of this run. Only copies are written.
+   * Living Node record bytes and ownership hashes are preserved; persisted card references are remapped separately.
    */
   async rewriteCopiedNoteLinks(
     pairs: Array<{ from: string; to: string }>
@@ -1183,17 +1185,57 @@ export class Repository {
         linkPath ? this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath)?.path : undefined,
       unverified: string[] = [];
     let rewritten = 0;
+    const copiedIds = new Map<string, string>();
+    const identities = new Map<string, { sourceMap: string; destinationMap: string; content: string }>();
     for (const { from, to } of pairs) {
-      const file = this.file(to),
-        { body } = splitFrontmatter(await this.app.vault.read(file)),
-        result = rewriteCopiedLinks(body, { sourcePath: from, newPath: to, copies, resolve });
-      rewritten += result.rewritten;
-      unverified.push(...result.unverified);
-      if (result.text === body) continue;
-      // The copy was created a moment ago by this run; rewrite it only if its body is still the one read above.
+      const source = frontmatter(await this.app.vault.read(this.file(from)));
+      const content = await this.app.vault.read(this.file(to));
+      const target = frontmatter(content);
+      const sourceMap = text(source["agent-map-id"], text(source["topic-id"]));
+      const destinationMap = text(target["agent-map-id"], text(target["topic-id"]));
+      const sourceId = text(source["node-id"]);
+      const targetId = text(target["node-id"]);
+      if (sourceMap && sourceId && targetId) {
+        const key = JSON.stringify([sourceMap, sourceId]);
+        if (copiedIds.has(key)) throw new Error("ambiguous-copied-card-identity");
+        copiedIds.set(key, targetId);
+      }
+      identities.set(to, { sourceMap, destinationMap, content });
+    }
+    for (const { from, to } of pairs) {
+      const file = this.file(to);
+      const identity = identities.get(to)!;
+      const { body, head } = splitFrontmatter(identity.content);
+      const region = splitLivingNodeRegion(body).region;
+      const rewrite = (part: string) => rewriteCopiedLinks(part, { sourcePath: from, newPath: to, copies, resolve });
+      const at = region ? body.indexOf(region) : body.length;
+      const before = rewrite(body.slice(0, at));
+      const after = rewrite(body.slice(at + region.length));
+      rewritten += before.rewritten + after.rewritten;
+      unverified.push(...before.unverified, ...after.unverified);
+      let next = head + before.text + region + after.text;
+      const refs = frontmatter(identity.content)["living-node-refs"];
+      if (Array.isArray(refs) && refs.every(value => typeof value === "string")) {
+        const remapped = remapLivingCopyCardReferences(refs, identity.sourceMap, identity.destinationMap, copiedIds);
+        // Resolve persisted external note references from the original path, not from the new card.
+        const updated = remapped.map(ref => {
+          if (!ref.startsWith("note:")) return ref;
+          const sourcePath = resolve(ref.slice(5), from);
+          if (!sourcePath) return "card:foreign:" + JSON.stringify([identity.sourceMap, ref]);
+          const targetPath = copies.get(sourcePath) ?? sourcePath;
+          return resolve(targetPath, to) === targetPath
+            ? "note:" + targetPath
+            : "card:foreign:" + JSON.stringify([identity.sourceMap, ref]);
+        });
+        if (JSON.stringify(updated) !== JSON.stringify(refs))
+          next = setFrontmatterKeys(next, { "living-node-refs": updated });
+      }
+      if (next === identity.content) continue;
+      // A change to a freshly created copy is a conflict, not permission to
+      // attach a new card whose stored identities still point to the originals.
       await this.app.vault.process(file, content => {
-        const current = splitFrontmatter(content);
-        return current.body === body ? current.head + result.text : content;
+        if (content !== identity.content) throw new Error("changed-copied-note");
+        return next;
       });
     }
     return { rewritten, unverified };

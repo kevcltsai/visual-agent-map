@@ -8,7 +8,7 @@ import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
-import { planLivingMap, type LivingMapCard } from "./living-node-map";
+import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
 import { readLivingReferences, sameLivingTarget, type LivingSourceRef, type resolveLivingSources } from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
@@ -152,6 +152,29 @@ async function prepareMap(port: Pick<LivingRoundPort, "repo">, map: MapDocument)
     });
   }
   return { snapshots, cards };
+}
+
+/** Check the final structural snapshot before Map.md is published. Reordering,
+ * layout, viewport and collapse do not change dependencies. Existing cards use
+ * their current note bytes (including after a file move); only graph edges that
+ * the structural edit creates are prohibited. */
+export async function validateLivingStructure(
+  app: App,
+  repo: Repository,
+  before: MapDocument,
+  after: MapDocument
+): Promise<void> {
+  const parentGraph = (map: MapDocument): string => JSON.stringify(
+    map.nodes.map(node => [node.id, node.parentId ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+  );
+  if (parentGraph(before) === parentGraph(after)) return;
+  const { cards } = await prepareMap({ repo }, after);
+  const oldById = new Map(before.nodes.map(node => [node.id, node]));
+  const oldCards = cards.filter(card => oldById.has(card.id)).map(card => ({
+    ...card,
+    parentId: oldById.get(card.id)!.parentId
+  }));
+  if (introducesLivingCycle(oldCards, cards, sourceResolver(app))) throw new Error("living-node-cycle");
 }
 
 /** A bounded context read. Revisions cover full readable content, even when only a summary is delivered. */
@@ -426,13 +449,10 @@ function resolveDraft(
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
-  const oldPlan = planLivingMap(cards, [], resolver).plan;
   const next = planLivingMap(proposed, [], resolver);
   if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
-  for (const [affected, reason] of next.plan.blocked) {
-    if (reason === "cycle" && (affected === target.id || oldPlan.blocked.get(affected) !== "cycle"))
-      throw new Error("living-node-cycle");
-  }
+  if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
+    throw new Error("living-node-cycle");
   return { encoded, proposed };
 }
 

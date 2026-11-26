@@ -373,7 +373,10 @@ class NoteWriteJournal {
     const result = new Map<string, string>();
     for (const entry of this.entries.values()) {
       const current = await this.repo.app.vault.read(entry.file);
-      if (this.repo.app.vault.getAbstractFileByPath(entry.file.path) !== entry.file || !sameText(current, entry.expected))
+      if (
+        this.repo.app.vault.getAbstractFileByPath(entry.file.path) !== entry.file ||
+        !sameText(current, entry.expected)
+      )
         throw noteConflict();
       result.set(entry.path, entry.expected);
     }
@@ -437,7 +440,11 @@ export function begin(deps: TransactionDeps): Transaction {
     notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] },
     refresh: string[] = []
   ): Promise<Map<string, string>> {
-    const journal: Journal = { files: [], maps: [], notes: new NoteWriteJournal(repo, [...notes.before, ...notes.after]) };
+    const journal: Journal = {
+      files: [],
+      maps: [],
+      notes: new NoteWriteJournal(repo, [...notes.before, ...notes.after])
+    };
     return journal.notes.run(async () => {
       try {
         for (const step of notes.before) await step.apply();

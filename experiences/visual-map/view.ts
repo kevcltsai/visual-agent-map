@@ -5545,16 +5545,25 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     frame: CoverFrame | null,
     look: Omit<CoverLook, "frame"> = {},
-    width?: number
+    width?: number,
+    text: Pick<NotePatch, "title" | "summary"> = {}
   ): Promise<TransactionEntry | null> {
     if (!this.map || !this.markersEditable(node)) return null;
     const write: CoverLook = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
+    const repo = this.plugin.repo;
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.plugin.repo.app.vault.process(file, content => withCoverLook(content, write));
+        await repo.app.vault.process(file, content => withCoverLook(content, write));
+        if (Object.keys(text).length) {
+          const current = await repo.readNote(path, this.map ?? undefined);
+          if (Object.keys(text).some(key => current[key as "title" | "summary"] !== text[key as "title" | "summary"])) {
+            await repo.updateNote(path, text);
+            this.plugin.topicRuns.stopTask(path);
+          }
+        }
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -5653,19 +5662,13 @@ export class VisualAgentMapView extends ItemView {
     width: number | undefined,
     text: { title?: string; summary?: string }
   ): Promise<void> {
-    const mark = this.history.mark();
-    try {
-      const entry = await this.changeTopicCoverFrame(node, frame, look, width);
-      if (!entry) return;
-      const patch: NotePatch = {};
-      // An empty title is never written (the dialog refuses it too); the old title stays.
-      if (text.title?.trim() && !titleProblemText(text.title)) patch.title = text.title.trim();
-      if (text.summary !== undefined) patch.summary = text.summary;
-      if (Object.keys(patch).length) await this.noteChange(node, patch);
-    } finally {
-      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
-      this.updateHistoryButtons();
-    }
+    const patch: Pick<NotePatch, "title" | "summary"> = {};
+    // An empty title is never written (the dialog refuses it too); the old title stays.
+    if (text.title?.trim() && !titleProblemText(text.title)) patch.title = text.title.trim();
+    if (text.summary !== undefined) patch.summary = text.summary;
+    // Both changes belong to the same transaction and share its exact write journal.
+    await this.changeTopicCoverFrame(node, frame, look, width, patch);
+    this.updateHistoryButtons();
   }
   /**
    * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does

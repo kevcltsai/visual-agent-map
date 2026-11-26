@@ -274,7 +274,7 @@ const FILE_MANAGER_WRITES = new Set(["renameFile", "trashFile", "processFrontMat
 /** Transaction-local guard, evaluated on the actual preimage inside Vault.process. */
 export interface NoteWriteGuard {
   (file: TFile, current: string, change: (content: string) => string): string;
-  aroundHostMove?(origin: string, target: string, move: () => Promise<void>): Promise<void>;
+  aroundHostMove?: (origin: string, target: string, move: () => Promise<void>) => Promise<void>;
 }
 
 /** A view of `target` whose write methods throw once `disposed()` is true; reads and everything else pass through. */

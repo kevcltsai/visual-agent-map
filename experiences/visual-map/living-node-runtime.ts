@@ -213,7 +213,8 @@ export async function livingCrossCut(
   repo: Repository,
   source: MapDocument,
   destination: MapDocument,
-  moved: ReadonlySet<string>
+  moved: ReadonlySet<string>,
+  destinationParentId?: string | null
 ): Promise<{ preserveIdentity: boolean; affected: string[] }> {
   const { cards, snapshots } = await prepareMap({ repo, app }, source);
   const planned = planLivingMap(cards, [], sourceResolver(app));
@@ -222,7 +223,9 @@ export async function livingCrossCut(
       ? planned.sources.get(card.id)?.sources.some(input => input.cardId && !moved.has(input.cardId))
       : planned.sources.get(card.id)?.sources.some(input => input.cardId && moved.has(input.cardId))
   )).map(card => card.id);
-  const preserveIdentity = affected.length > 0 || cards.some(card => moved.has(card.id) &&
+  const destinationParent = destination.nodes.find(node => node.id === destinationParentId);
+  const destinationNote = destinationParent && await repo.readNoteSnapshot(destinationParent.path, destination);
+  const preserveIdentity = !!destinationNote?.note.aiCard || affected.length > 0 || cards.some(card => moved.has(card.id) &&
     (card.aiCard || snapshots.get(card.id)?.note.livingNode));
   if (!preserveIdentity) return { preserveIdentity, affected };
   const destinationIds = new Set(destination.nodes.map(node => node.id));

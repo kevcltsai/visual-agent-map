@@ -1,0 +1,121 @@
+import { createHash } from "node:crypto";
+import type { LivingValidity } from "./living-node-execution";
+
+export interface LivingRead {
+  id: string;
+  revision: string;
+  scope: string;
+}
+
+export interface LivingInput {
+  configRevision: string;
+  model: string;
+  language: string;
+  reads: readonly LivingRead[];
+}
+
+export interface LivingSuccess {
+  inputRevision: string;
+  knowledgeRevision: string;
+}
+
+export interface LivingDiagnostics {
+  latestOutcome: "never" | "ok" | "failed" | "blocked" | "cancelled";
+  lastAttempt?: string;
+  lastSuccessfulCheck?: string;
+  lastContentChange?: string;
+  lastSuccessfulInput?: LivingSuccess;
+}
+
+const digest = (value: string): string => createHash("sha256").update(value).digest("hex");
+const canonical = (values: readonly string[]): string[] => [...new Set(values)].sort();
+
+/** Configuration identity is independent of display order and execution times. */
+export function livingConfigRevision(prompt: string, sourceIds: readonly string[]): string {
+  return digest(JSON.stringify([prompt.trim(), canonical(sourceIds)]));
+}
+
+/** The caller supplies only formal knowledge and semantic evidence, not diagnostics or UI metadata. */
+export function livingKnowledgeRevision(content: string, evidence: readonly string[]): string {
+  return digest(JSON.stringify([content.replace(/\r\n/g, "\n"), canonical(evidence)]));
+}
+
+export function livingInputRevision(input: LivingInput): string {
+  const reads = canonical(input.reads.map(read => JSON.stringify([read.id, read.revision, read.scope])));
+  return digest(JSON.stringify([input.configRevision, input.model, input.language, reads]));
+}
+
+/** A failed latest attempt is independent of the validity of its last successful output. */
+export function livingValidity(
+  success: LivingSuccess | undefined,
+  input: LivingInput,
+  knowledgeRevision: string,
+  upstreamPending: boolean
+): LivingValidity {
+  if (!success) return "none";
+  if (
+    upstreamPending ||
+    success.inputRevision !== livingInputRevision(input) ||
+    success.knowledgeRevision !== knowledgeRevision
+  )
+    return "stale";
+  return "valid";
+}
+
+export function livingAttempt(
+  previous: LivingDiagnostics,
+  at: string,
+  outcome: "failed" | "blocked" | "cancelled"
+): LivingDiagnostics {
+  return { ...previous, latestOutcome: outcome, lastAttempt: at };
+}
+
+/** A successful no-change check updates diagnostics only; it does not advance content time. */
+export function livingSuccess(
+  previous: LivingDiagnostics,
+  at: string,
+  input: LivingInput,
+  knowledgeRevision: string
+): LivingDiagnostics {
+  const changed = previous.lastSuccessfulInput?.knowledgeRevision !== knowledgeRevision;
+  return {
+    ...previous,
+    latestOutcome: "ok",
+    lastAttempt: at,
+    lastSuccessfulCheck: at,
+    ...(changed ? { lastContentChange: at } : {}),
+    lastSuccessfulInput: { inputRevision: livingInputRevision(input), knowledgeRevision }
+  };
+}
+
+export interface LivingCandidateIdentity {
+  executionId: string;
+  cardId: string;
+  mapId: string;
+  baseRevision: string;
+  inputRevision: string;
+  viewSession: string;
+}
+
+export interface LivingCommitCheck extends LivingCandidateIdentity {
+  locked: boolean;
+  aborted: boolean;
+  dependenciesReady: boolean;
+  alreadyCommitted: boolean;
+}
+
+/** Compare at the write boundary, not only before the AI call. The storage port must serialize this with the write. */
+export function canCommitLivingCandidate(candidate: LivingCandidateIdentity, current: LivingCommitCheck): boolean {
+  return (
+    !current.locked &&
+    !current.aborted &&
+    current.dependenciesReady &&
+    !current.alreadyCommitted &&
+    candidate.executionId === current.executionId &&
+    candidate.cardId === current.cardId &&
+    candidate.mapId === current.mapId &&
+    candidate.baseRevision === current.baseRevision &&
+    candidate.inputRevision === current.inputRevision &&
+    candidate.viewSession === current.viewSession
+  );
+}

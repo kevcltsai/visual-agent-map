@@ -16,6 +16,8 @@ export interface LivingNodePlan {
   lockedTargets: string[];
   /** Frozen, readable dependencies reached by the runnable plan. */
   frozen: string[];
+  /** Exact required AI dependencies, including frozen ones, by consumer. */
+  dependencies: Map<string, readonly string[]>;
 }
 
 function graph(nodes: readonly LivingNodePlanNode[]) {
@@ -148,7 +150,10 @@ export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?
     order: sorted.order.filter(id => required.has(id)).map(id => ({ id, forced: targets.has(id) })),
     blocked,
     lockedTargets,
-    frozen: [...frozen]
+    frozen: [...frozen],
+    dependencies: new Map(
+      sorted.order.filter(id => required.has(id)).map(id => [id, [...(edges.get(id) ?? []), ...(frozenByCard.get(id) ?? [])]])
+    )
   };
 }
 

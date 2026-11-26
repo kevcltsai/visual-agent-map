@@ -53,7 +53,8 @@ export type MapChatPlanReason =
   | "source_text_other_actions"
   | "call_budget"
   | "auto_apply_confirm"
-  | "book_plan_edit";
+  | "book_plan_edit"
+  | "living_node_confirm";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -208,7 +209,7 @@ const isPlaceImage = (action: MapChatAction): boolean => action.kind === "place_
  */
 export function estimateChatCalls(
   actions: readonly MapChatAction[],
-  context: Pick<PlanContext, "selectedCount">,
+  context: Pick<PlanContext, "selectedCount"> & Partial<Pick<PlanContext, "parents">>,
   options: { diagrams?: boolean; mapAiMode?: MapAiMode } = {}
 ): number {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
@@ -220,6 +221,13 @@ export function estimateChatCalls(
     else if (action.kind === "run_map_action") {
       if (action.nodeIds.length) selection = action.nodeIds.length;
       switch (action.action) {
+        case "run_living_card":
+        case "run_living_all":
+          // Dependency planning happens at execution. The whole map is an upper
+          // bound, including new cards created by this reply.
+          calls += Math.max(action.nodeIds.length, Object.keys(context.parents ?? {}).length +
+            actions.filter(item => item.kind === "add_child").length);
+          break;
         case "research_standard":
           // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
           calls +=
@@ -347,6 +355,9 @@ export function planFor(
   if (!auto && research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
     reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
+  if (actions.some(action => action.kind === "configure_ai_card" ||
+      (action.kind === "run_map_action" && (action.action === "run_living_card" || action.action === "run_living_all"))))
+    reasons.push("living_node_confirm");
   if (
     actions.some(
       action =>

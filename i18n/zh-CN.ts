@@ -883,6 +883,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.merge_target_changed": "合并后的议题已被修改，撤销或重做未运行。",
   "ui.merge_busy": "有议题正在运行 AI 任务，完成后才能合并",
   "ui.merge_missing_note": "有议题的笔记找不到，无法合并",
+  "ui.merge_living_node_convert": "请先将 AI 卡片转为普通卡，再进行合并；已有正式知识会保留。",
   "ui.merge_title_label": "合并后的议题名称",
   "ui.merge_ai_untitled": "（由 AI 替合并后的议题命名）",
   "ui.merge_confirm_desc": "{0} 张卡会合并成 1 张新议题并取代原本的卡；原笔记移到这张图的 Unassigned，可以用撤销还原。",

@@ -30,7 +30,9 @@ function fixture({ anchor, submit, steer, stoppable } = {}) {
     steer: text => { calls.steer.push(text); return steer ? steer(text) : true; },
     canStop: () => (stoppable ? stoppable() : true),
     stop: () => { calls.stop++; },
-    close: () => { calls.close++; }
+    close: () => { calls.close++; },
+    cancelChoice: () => { calls.cancelChoice = (calls.cancelChoice ?? 0) + 1; session.choice = null; watchers.slice().forEach(fn => fn()); },
+    showOtherWays: () => { calls.otherWays = (calls.otherWays ?? 0) + 1; }
   };
   const opener = { focus: () => { calls.opener++; } };
   const win = new TopicChatWindow(host, opener, root);
@@ -41,11 +43,9 @@ function fixture({ anchor, submit, steer, stoppable } = {}) {
   const type = text => { input.value = text; input.input(); };
   const press = (key, extra = {}) => { let prevented = false; input.keydown({ key, preventDefault() { prevented = true; }, ...extra }); return prevented; };
   const refresh = () => watchers.slice().forEach(fn => fn());
-  const toggle = () => find(win.el, i => hasClass(i, 'vam-topic-chat-mode-toggle'));
-  const menu = () => find(win.el, i => hasClass(i, 'vam-topic-chat-mode-menu'));
-  const options = () => findAll(win.el, i => hasClass(i, 'vam-topic-chat-mode'));
-  const outside = target => (docListeners.mousedown ?? []).slice().forEach(fn => fn({ target }));
-  return { win, root, session, calls, input, action, send, type, press, refresh, watchers, doc, toggle, menu, options, outside };
+  const web = () => find(win.el, i => hasClass(i, 'vam-topic-chat-web-box'));
+  const scope = () => find(win.el, i => hasClass(i, 'vam-topic-chat-scope'));
+  return { win, root, session, calls, input, action, send, type, press, refresh, watchers, doc, web, scope };
 }
 const ghost = f => f.input.attrs.placeholder;
 
@@ -128,87 +128,58 @@ test('topic chat has three equal buttons without a suggested mark', () => {
   assert.deepEqual(buttons.map(b => b.attrs['aria-pressed']), ['false', 'false', 'true']);
 });
 
-test('topic chat mode picker: an icon button opens a menu; picking sets the mode, closes the menu and updates the note', () => {
+test('topic chat web search box: a checkbox that is checked exactly in the standard mode; toggling sets the mode', () => {
   const f = fixture();
-  const toggle = f.toggle(), menu = f.menu();
-  assert.equal(toggle.attrs['aria-haspopup'], 'menu');
-  assert.equal(toggle.attrs['aria-expanded'], 'false');
-  assert.equal(toggle.text, '', 'icon only');
-  assert.equal(toggle.iconName, 'zap');
-  assert.equal(toggle.attrs['aria-label'], t('ui.topic_chat_mode_button_0', t('ui.quick')));
-  assert.equal(menu.attrs.role, 'menu');
-  assert.equal(menu.attrs['aria-label'], t('ui.ai_mode'));
-  assert.equal(menu.hidden, true);
-  const [quick, standard] = f.options();
-  assert.deepEqual([quick.attrs.role, standard.attrs.role], ['menuitemradio', 'menuitemradio']);
-  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['true', 'false']);
-  assert.deepEqual(f.options().map(b => findAll(b, i => i.tag === 'span' && i.text).map(i => i.text)), [[t('ui.quick')], [t('ui.standard')]]);
-  const note = find(f.win.el, i => i.attrs['aria-live'] === 'polite');
-  assert.equal(note.text, t('ui.topic_chat_mode_quick_hint'));
-  toggle.click();
-  assert.equal(menu.hidden, false);
-  assert.equal(toggle.attrs['aria-expanded'], 'true');
-  assert.notEqual(f.doc.activeElement, quick, 'a mouse click does not move the focus into the menu');
-  standard.click();
+  const box = f.web();
+  assert.equal(box.attrs.type ?? box.type, 'checkbox');
+  assert.equal(box.checked, false, 'quick: unchecked');
+  assert.equal(find(f.win.el, i => hasClass(i, 'vam-topic-chat-web'))?.tag, 'label');
+  assert.ok(findAll(f.win.el, i => i.text === t('ui.topic_chat_web_search')).length === 1);
+  assert.equal(findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-mode-toggle') || hasClass(i, 'vam-topic-chat-mode-menu')).length, 0, 'the icon button and menu are gone');
+  box.checked = true; box.change();
   assert.deepEqual(f.calls.modes, ['standard']);
-  assert.equal(menu.hidden, true);
-  assert.equal(toggle.attrs['aria-expanded'], 'false');
-  assert.equal(f.doc.activeElement, toggle, 'the focus returns to the trigger');
-  assert.equal(toggle.iconName, 'globe');
-  assert.equal(toggle.attrs['aria-label'], t('ui.topic_chat_mode_button_0', t('ui.standard')));
-  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['false', 'true']);
-  assert.equal(note.text, t('ui.topic_chat_mode_standard_hint'));
-  toggle.click(); toggle.click();
-  assert.equal(menu.hidden, true, 'the trigger toggles the menu');
-});
-
-test('topic chat mode picker keyboard: Enter/Space (detail 0) and arrows open on the current option, arrows cycle', () => {
-  const f = fixture();
-  const [quick, standard] = f.options();
-  f.toggle().fire('click', { detail: 0 });
-  assert.equal(f.menu().hidden, false);
-  assert.equal(f.doc.activeElement, quick, 'the focus goes to the current option');
-  f.menu().fire('keydown', { key: 'ArrowDown', target: quick });
-  assert.equal(f.doc.activeElement, standard);
-  f.menu().fire('keydown', { key: 'ArrowDown', target: standard });
-  assert.equal(f.doc.activeElement, quick, 'wraps around');
-  f.menu().fire('keydown', { key: 'ArrowUp', target: quick });
-  assert.equal(f.doc.activeElement, standard, 'wraps backwards');
+  assert.equal(f.session.mode, 'standard'); assert.equal(f.web().checked, true);
+  box.checked = false; box.change();
+  assert.deepEqual(f.calls.modes, ['standard', 'quick']);
   f.session.mode = 'standard'; f.refresh();
-  f.menu().hidden = true;
-  f.toggle().fire('keydown', { key: 'ArrowUp' });
-  assert.equal(f.menu().hidden, false);
-  assert.equal(f.doc.activeElement, standard);
+  assert.equal(f.web().checked, true, 'a repaint follows the session mode');
+  f.session.mode = 'quick'; f.refresh();
+  assert.equal(f.web().checked, false);
 });
 
-test('topic chat counterexample 1: Escape with the mode menu open only closes the menu; the next Escape closes the window', () => {
+test('topic chat scope pill: this card by default, this branch when the draft is an integration', () => {
   const f = fixture();
-  f.toggle().click();
-  let stopped = false;
-  f.win.el.fire('keydown', { key: 'Escape', stopPropagation() { stopped = true; } });
-  assert.equal(f.menu().hidden, true);
+  assert.equal(f.scope().text, t('ui.topic_chat_scope_card'));
+  assert.ok(hasClass(f.win.el.children.find(c => hasClass(c, 'vam-topic-chat-actions')).children[0], 'vam-topic-chat-scope'), 'first in the actions row');
+  f.action('synthesize').click();
+  assert.equal(f.scope().text, t('ui.topic_chat_scope_branch'));
+  f.action('research').click();
+  assert.equal(f.scope().text, t('ui.topic_chat_scope_card'));
+});
+
+test('topic chat Escape: an open depth card takes the first Escape, then the window closes', () => {
+  const f = fixture();
+  f.session.choice = { levels: 3, topics: 9, researched: 0, leaves: 5, children: 2, calls: 4, selected: 'quick', turn: { role: 'user', kind: 'synthesize', text: 'x' } };
+  f.refresh();
+  f.win.el.fire('keydown', { key: 'Escape' });
+  assert.equal(f.calls.cancelChoice, 1);
   assert.equal(f.calls.close, 0);
-  assert.equal(f.calls.opener, 0);
-  assert.equal(stopped, true);
-  assert.equal(f.doc.activeElement, f.toggle());
   f.win.el.fire('keydown', { key: 'Escape' });
   assert.equal(f.calls.close, 1);
 });
 
-test('topic chat mode menu closes on a click outside (document) and when the focus leaves the picker', () => {
+test('topic chat Other ways button shows after a quick deeper integration and calls the host; hidden while running or while the depth card shows', () => {
   const f = fixture();
-  f.toggle().click();
-  f.outside(f.options()[0]);
-  assert.equal(f.menu().hidden, false, 'a press inside the picker keeps it open');
-  f.outside(f.input);
-  assert.equal(f.menu().hidden, true);
-  f.toggle().click();
-  f.win.el.fire('keydown', { key: 'x' });
-  f.menu().parent.fire('focusout', { relatedTarget: f.input });
-  assert.equal(f.menu().hidden, true, 'focus left the picker');
-  f.toggle().click();
-  f.menu().parent.fire('focusout', { relatedTarget: f.options()[1] });
-  assert.equal(f.menu().hidden, false, 'focus moving inside the picker keeps it open');
+  const other = () => find(f.win.el, i => hasClass(i, 'vam-topic-chat-other-ways'));
+  assert.equal(other(), undefined);
+  f.session.otherWays = { levels: 3 }; f.refresh();
+  assert.equal(other().text, t('ui.topic_chat_other_ways'));
+  other().click();
+  assert.equal(f.calls.otherWays, 1);
+  f.session.running = true; f.refresh();
+  assert.equal(other(), undefined, 'hidden while running');
+  f.session.running = false; f.session.choice = { levels: 3, topics: 9, researched: 0, leaves: 5, children: 2, calls: 4, selected: 'bottom-up', turn: { role: 'user', kind: 'synthesize', text: 'x' } }; f.refresh();
+  assert.equal(other(), undefined, 'hidden while the depth card shows');
 });
 
 test('topic chat Escape closes and gives the focus back to the opener', () => {
@@ -246,8 +217,9 @@ test('topic chat while running: shows the running line and disables the buttons 
   assert.deepEqual(f.calls.submit, []);
   assert.deepEqual(f.calls.steer, []);
   assert.ok(['research', 'expand', 'synthesize'].every(k => f.action(k).disabled));
-  assert.ok(f.options().every(b => b.disabled));
-  assert.equal(f.toggle().disabled, true);
+  assert.equal(f.web().disabled, true);
+  f.web().checked = true; f.web().change();
+  assert.deepEqual(f.calls.modes, [], 'no mode change while running');
 });
 
 test('topic chat steer A1/A2: while running a typed text enables send, Enter adds it, the box clears and the hint and placeholder change', () => {
@@ -256,7 +228,7 @@ test('topic chat steer A1/A2: while running a typed text enables send, Enter add
   const hint = () => find(f.win.el, i => hasClass(i, 'vam-topic-chat-mode-hint')).text;
   assert.equal(f.send().disabled, true);
   assert.equal(ghost(f), t('ui.map_chat_steer_placeholder'));
-  assert.equal(hint(), t('ui.topic_chat_mode_quick_hint'), 'an empty box keeps the mode hint');
+  assert.equal(hint(), '', 'an empty box shows no hint');
   f.type('add the code');
   assert.equal(f.send().disabled, false);
   assert.equal(hint(), t('ui.map_chat_steer_hint'));
@@ -264,11 +236,11 @@ test('topic chat steer A1/A2: while running a typed text enables send, Enter add
   assert.deepEqual(f.calls.steer, ['add the code']);
   assert.deepEqual(f.calls.submit, [], 'not a new run');
   assert.equal(f.input.value, ''); assert.equal(f.session.draftText, '');
-  assert.equal(hint(), t('ui.topic_chat_mode_quick_hint'));
+  assert.equal(hint(), '');
   f.type('more'); f.send().click();
   assert.deepEqual(f.calls.steer, ['add the code', 'more']);
   assert.ok(['research', 'expand', 'synthesize'].every(k => f.action(k).disabled));
-  assert.equal(f.toggle().disabled, true);
+  assert.equal(f.web().disabled, true);
 });
 
 test('topic chat steer: a refused addition stays in the box; a not running window still asks', async () => {
@@ -300,34 +272,6 @@ test('topic chat steer A3: steer bubbles sit under their turn in typed order, li
   assert.ok(hasClass(rows[0], 'vam-topic-chat-msg') && hasClass(rows[1], 'vam-topic-chat-steer') && hasClass(rows[2], 'vam-topic-chat-steer') && hasClass(rows[3], 'vam-topic-chat-msg'));
   f.refresh(); assert.equal(f.input.value, '', 'a repaint never writes the box');
   f.win.setInputText('back'); assert.equal(f.input.value, 'back'); assert.equal(f.send().disabled, false);
-});
-
-test('topic chat counterexample 2b: when a run starts the open mode menu closes, the trigger is disabled and no mode is set', () => {
-  const f = fixture();
-  f.toggle().click();
-  assert.equal(f.menu().hidden, false);
-  f.session.running = true; f.refresh();
-  assert.equal(f.menu().hidden, true);
-  assert.equal(f.toggle().attrs['aria-expanded'], 'false');
-  assert.equal(f.toggle().disabled, true);
-  f.toggle().fire('click', { detail: 0 });
-  assert.equal(f.menu().hidden, true, 'a disabled trigger cannot reopen it');
-  f.options()[1].fire('click');
-  assert.deepEqual(f.calls.modes, []);
-});
-
-test('topic chat counterexample 3: refresh with the mode menu open keeps it open, on the same option elements, without moving the focus', () => {
-  const f = fixture();
-  const before = f.options();
-  f.toggle().fire('click', { detail: 0 });
-  const focused = f.doc.activeElement;
-  f.session.mode = 'standard'; f.refresh(); f.refresh();
-  assert.equal(f.menu().hidden, false);
-  assert.equal(f.doc.activeElement, focused);
-  const after = f.options();
-  assert.equal(after.length, 2);
-  assert.ok(after.every((b, i) => b === before[i]), 'same elements');
-  assert.equal(after[1].attrs['aria-checked'], 'true');
 });
 
 test('topic chat send button is an Enter icon without text; the keyboard still sends on Enter, not Shift+Enter or while composing', async () => {
@@ -723,6 +667,25 @@ integrationTest('topic chat research: Quick is local without charts, Standard se
   await waitFor(() => calls.length === 4); host.close();
   calls[3].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[3].gate.resolve(); await finished(h);
   assert.ok(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Quick gap offers the Standard run');
+});
+
+integrationTest('topic chat web search box at view level: ticked sends a research like the old Standard mode, unticked like the old Quick mode', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  const host = h.host('a');
+  const box = () => find(h.win().el, i => hasClass(i, 'vam-topic-chat-web-box'));
+  assert.equal(box().checked, false, 'a new session starts unticked (quick)');
+  box().checked = true; box().change();
+  assert.equal(h.entry('a').session.mode, 'standard'); assert.equal(box().checked, true);
+  await host.submit('research', 'with web'); await waitFor(() => calls.length === 1);
+  assert.equal(calls[0].request.researchMode, 'research'); assert.equal(calls[0].request.addCharts, true);
+  assert.equal(box().disabled, true, 'disabled while running');
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal(box().disabled, false);
+  box().checked = false; box().change();
+  assert.equal(h.entry('a').session.mode, 'quick');
+  await host.submit('research', 'without web'); await waitFor(() => calls.length === 2);
+  assert.equal(calls[1].request.researchMode, 'local'); assert.equal(calls[1].request.addCharts, false);
+  calls[1].done({ summary: 'S', detail: 'D' }); calls[1].gate.resolve(); await finished(h);
 });
 
 integrationTest('topic chat busy topic: submit is refused with a Notice and nothing starts', async () => {
@@ -1796,36 +1759,72 @@ const stubChain = (h, on = () => true) => {
   h.view.detailTemplateFor = async () => undefined;
   return { steps, research };
 };
-const startDeep = async (h, depth, { mode = 'quick', text = 'all' } = {}) => {
+// The quick way runs at once on submit; the other depths come through "Other ways to integrate". For those, the quick
+// run is made harmless here (nothing recorded by the chain stubs) so each test sees only the way it picked.
+const openOtherWay = async (h, depth, { mode = 'quick', text = 'all' } = {}) => {
   const host = h.host('root'); host.setMode(mode);
+  const keep = { synth: h.view.startSynthesis, agent: h.view.runAgent };
+  h.view.startSynthesis = async (_n, _o, _d, _f, accepted, observer) => { accepted(); observer.onWritten(); };
+  h.view.runAgent = async (_n, done, _f, _r, accepted) => { accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
   assert.equal(await host.submit('synthesize', text), true);
-  host.chooseDepth(depth);
+  await waitFor(() => !h.entry('root').session.running);
+  Object.assign(h.view, { startSynthesis: keep.synth, runAgent: keep.agent });
+  host.showOtherWays(); host.chooseDepth(depth);
+  return host;
+};
+const startDeep = async (h, depth, { mode = 'quick', text = 'all' } = {}) => {
+  let host;
   const asks = h.control.usageAsks;
-  assert.equal(await host.confirmChoice(), true);
-  assert.equal(h.control.usageAsks, asks + 1, 'one usage question for the whole chain');
+  if (depth === 'quick') { host = h.host('root'); host.setMode(mode); assert.equal(await host.submit('synthesize', text), true); }
+  else { host = await openOtherWay(h, depth, { mode, text }); }
+  const before = depth === 'quick' ? asks : h.control.usageAsks;
+  if (depth !== 'quick') assert.equal(await host.confirmChoice(), true);
+  assert.equal(h.control.usageAsks, before + 1, 'one usage question for the whole chain');
   await waitFor(() => !h.entry('root').session.running);
   return h.entry('root').session.turns.at(-1).text;
 };
 
-integrationTest('topic chat depth card: a deeper subtree shows the card with the numbers from the map; Cancel runs no AI and writes no record', async () => {
+integrationTest('topic chat deeper subtree: the quick way runs at once with a scope line and keeps the other ways; Other ways opens the depth card on bottom-up and Cancel runs no AI and writes no record', async () => {
   const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
   const asks = h.control.usageAsks; const host = h.host('root');
   assert.equal(await host.submit('synthesize', 'all'), true);
+  assert.equal(h.entry('root').session.choice ?? null, null, 'no depth card first');
+  await waitFor(() => !h.entry('root').session.running);
+  assert.deepEqual(steps.map(s => s.key), ['a', 'root']); assert.deepEqual(research.map(r => r.key), ['b']); assert.equal(h.control.usageAsks, asks + 1);
+  const turns = h.entry('root').session.turns;
+  assert.deepEqual(plain(turns.slice(0, 2).map(x => [x.role, x.text])), [['user', 'all'], ['ai', t('ui.topic_chat_quick_scope_0', 2)]], 'the scope line follows the user turn right away');
+  assert.deepEqual(plain(h.entry('root').session.otherWays), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 4, 'bottom-up': 4, 'research-first': 6 }, selected: 'quick', text: 'all' }));
+  const win = h.win(); const other = () => find(win.el, i => hasClass(i, 'vam-topic-chat-other-ways'));
+  assert.equal(other().text, t('ui.topic_chat_other_ways'));
+  assert.equal(find(win.el, i => i.attrs?.role === 'radiogroup'), undefined, 'no card until asked');
+  const linesBefore = (await topicLines(h, 'root')).length; const turnsBefore = turns.length;
+  other().click(); await tick();
   const choice = h.entry('root').session.choice;
-  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 4, 'bottom-up': 4, 'research-first': 6 }, selected: 'quick', text: 'all', turn: undefined }));
-  assert.equal(h.entry('root').session.running, false); assert.equal(h.control.usageAsks, asks, 'no usage question yet');
-  const win = h.win(); const card = find(win.el, i => i.attrs?.role === 'radiogroup');
-  assert.ok(card, 'the radio group is drawn');
-  assert.deepEqual(findAll(card, i => i.attrs?.role === 'radio').map(i => i.attrs['aria-checked']), ['true', 'false', 'false']);
+  assert.equal(choice.selected, 'bottom-up'); assert.equal(h.entry('root').session.otherWays, null); assert.equal(other(), undefined, 'the button goes once the card shows');
+  const card = find(win.el, i => i.attrs?.role === 'radiogroup');
+  assert.deepEqual(findAll(card, i => i.attrs?.role === 'radio').map(i => i.attrs['aria-checked']), ['false', 'true', 'false']);
   assert.ok(find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_choice_start')));
-  const cancel = find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_choice_cancel'));
-  cancel.click(); await tick();
+  find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_choice_cancel')).click(); await tick();
   assert.equal(h.entry('root').session.choice, null);
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_choice_cancelled'));
-  assert.deepEqual([steps.length, research.length, h.control.usageAsks], [0, 0, asks]);
-  assert.deepEqual(await topicLines(h, 'root'), null, 'no record file line');
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_choice_cancelled')); assert.ok(h.entry('root').session.turns.length >= turnsBefore);
+  assert.deepEqual([steps.length, research.length, h.control.usageAsks], [2, 1, asks + 1], 'cancel ran nothing');
+  assert.equal((await topicLines(h, 'root')).length, linesBefore, 'no record line for the card');
   assert.equal(find(win.el, i => i.attrs?.role === 'radiogroup'), undefined, 'the card is gone');
   assert.ok(h.page.doc.activeElement === find(win.el, i => i.tag === 'textarea'), 'the focus is back in the input');
+});
+
+integrationTest('topic chat deeper subtree: confirming the card from Other ways runs bottom-up; a new run drops the button', async () => {
+  const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a', 'root'], 'bottom-up ran after Other ways'); assert.equal(research.length, 0);
+  assert.equal(text, t('ui.topic_chat_subtree_done_0_1_2', 4, 4, 3));
+  assert.equal(h.entry('root').session.otherWays ?? null, null, 'the confirmed run has no further other ways');
+  assert.equal(find(h.win().el, i => hasClass(i, 'vam-topic-chat-other-ways')), undefined);
+  const g = await harness(); await deepen(g); stubChain(g);
+  await g.host('root').submit('synthesize', 'all'); await waitFor(() => !g.entry('root').session.running);
+  assert.ok(g.entry('root').session.otherWays);
+  await g.host('root').submit('ask', 'a free question');
+  assert.equal(g.entry('root').session.otherWays ?? null, null, 'any new run resets it');
 });
 
 integrationTest('topic chat depth card: a one-level subtree shows no card and starts as before', async () => {
@@ -1836,7 +1835,7 @@ integrationTest('topic chat depth card: a one-level subtree shows no card and st
 
 integrationTest('topic chat depth card keyboard: arrows switch (wrapping), Enter starts, Escape cancels and the input gets the focus, the card has a name and states', async () => {
   const h = await harness(); await deepen(h); const { steps } = stubChain(h);
-  const host = h.host('root'); await host.submit('synthesize', 'all');
+  const host = await openOtherWay(h, 'quick'); host.chooseDepth('quick');
   const win = h.win(); const radios = () => findAll(win.el, i => i.attrs?.role === 'radio');
   const group = find(win.el, i => i.attrs?.role === 'radiogroup');
   assert.ok(find(win.el, i => i.attrs?.id === group.attrs['aria-labelledby']).text.includes('3'), 'the group is named by the question');
@@ -1851,7 +1850,8 @@ integrationTest('topic chat depth card keyboard: arrows switch (wrapping), Enter
   win.el.fire('keydown', { key: 'Escape' });
   assert.equal(h.entry('root').session.choice, null, 'Escape cancels the card first'); assert.ok(h.view.topicChatOpen?.win === win, 'the window stays');
   assert.ok(h.page.doc.activeElement === find(win.el, i => i.tag === 'textarea'), 'Escape: the focus is in the input');
-  await host.submit('synthesize', 'again');
+  await host.submit('synthesize', 'again'); await waitFor(() => !h.entry('root').session.running); steps.length = 0;
+  host.showOtherWays(); host.chooseDepth('quick');
   radios()[0].keydown({ key: 'Enter' }); await waitFor(() => steps.length > 0 && !h.entry('root').session.running);
   assert.equal(steps.at(-1).key, 'root');
 });
@@ -2022,12 +2022,12 @@ integrationTest('topic chat chain: when every step fails the root is not integra
 integrationTest('topic chat chain: a view that closed mid-chain stops it and a late result is not written into the session or the record', async () => {
   const h = await harness(); await deepen(h);
   const { steps } = stubChain(h, key => { if (key === 'c') h.view.closed = true; return true; });
-  const host = h.host('root'); await host.submit('synthesize', 'all'); host.chooseDepth('bottom-up');
-  const turnsBefore = h.entry('root').session.turns.length;
+  const host = await openOtherWay(h, 'bottom-up');
+  const turnsBefore = h.entry('root').session.turns.length; const resultsBefore = ((await topicLines(h, 'root')) ?? []).filter(l => l.type === 'result').length;
   await host.confirmChoice(); await waitFor(() => !h.entry('root').session.running);
   assert.deepEqual(steps.map(s => s.key), ['c']);
-  assert.equal(h.entry('root').session.turns.length, turnsBefore, 'no sentence in the closed chat');
-  assert.equal((await topicLines(h, 'root'))?.some(l => l.type === 'result') ?? false, false);
+  assert.equal(h.entry('root').session.turns.length, turnsBefore + 1, 'only the asking line, no sentence in the closed chat');
+  assert.equal(((await topicLines(h, 'root')) ?? []).filter(l => l.type === 'result').length, resultsBefore, 'no new result line (the quick run before it has its own)');
 });
 
 integrationTest('topic chat chain: additions typed during the chain wait and go into the root integration once', async () => {

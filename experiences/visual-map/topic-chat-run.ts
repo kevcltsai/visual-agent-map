@@ -27,6 +27,8 @@ export interface TopicChatEntry {
     draftText: string;
     /** The depth card of an integration over a deeper subtree, waiting for an answer; `turn` is the user line that asked. */
     choice?: (TopicChatChoice & { text: string; turn: TopicChatTurn }) | null;
+    /** After a deeper integration ran its quick option: the depth card's numbers, shown again on "Other ways to integrate". */
+    otherWays?: (TopicChatChoice & { text: string }) | null;
     progress?: string;
   };
   watchers: Set<() => void>;

@@ -517,13 +517,13 @@ test('open: no dialog when the topic has no cover picture or the cover is off', 
 });
 
 // ---- the panel button
-test('panel: "Edit card" appears with the cover switch only when the topic has a cover picture, and opens the dialog', async () => {
+test('panel: "Crop and size…" appears with the cover switch only when the topic has a cover picture, and opens the dialog', async () => {
   const withPicture = await harness(TEXT);
   const calls = [];
   Object.assign(withPicture.view, { enqueue: fn => fn(), openCoverFrameEditor: node => { calls.push(node.id); return null; } });
   const panel = dom.element('div');
   withPicture.view.renderCoverSection(panel, { id: 'm', path: NOTE });
-  const adjust = dom.find(panel, i => i.tag === 'button' && i.text === 'Edit card');
+  const adjust = dom.find(panel, i => i.tag === 'button' && i.text === 'Crop and size…');
   assert.ok(adjust, 'the button is there');
   adjust.click();
   assert.deepEqual(calls, ['m']);
@@ -531,7 +531,7 @@ test('panel: "Edit card" appears with the cover switch only when the topic has a
     const none = await harness(TEXT, { cache });
     const p = dom.element('div');
     none.view.renderCoverSection(p, { id: 'm', path: NOTE });
-    assert.equal(dom.find(p, i => i.tag === 'button' && i.text === 'Edit card'), undefined, 'no picture or cover off: no button');
+    assert.equal(dom.find(p, i => i.tag === 'button' && i.text === 'Crop and size…'), undefined, 'no picture or cover off: no button');
   }
   const locked = await harness(TEXT);
   locked.view.selection.toggleMultiSelect();
@@ -543,8 +543,9 @@ test('panel: "Edit card" appears with the cover switch only when the topic has a
 test('i18n: every language has the new strings; the stylesheet uses no CSS variable for the frame editor', () => {
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = read(`i18n/${lang}.ts`);
-    for (const key of ['ui.topic_cover_frame_adjust', 'ui.topic_cover_frame_title', 'ui.topic_cover_frame_reset', 'ui.topic_cover_frame_apply', 'ui.topic_cover_frame_box', 'ui.topic_cover_frame_status', 'ui.topic_cover_frame_load_failed', 'ui.topic_cover_frame_handle_nw', 'ui.topic_cover_frame_handle_se'])
+    for (const key of ['ui.card_settings_cover_frame', 'ui.topic_cover_frame_title', 'ui.topic_cover_frame_reset', 'ui.topic_cover_frame_apply', 'ui.topic_cover_frame_box', 'ui.topic_cover_frame_status', 'ui.topic_cover_frame_load_failed', 'ui.topic_cover_frame_handle_nw', 'ui.topic_cover_frame_handle_se'])
       assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+    assert.ok(!text.includes('"ui.topic_cover_frame_adjust"'), `${lang}: the old button key is gone`);
   }
   const lines = read('styles.css').split('\n').filter(l => /\.vam-card-frame/.test(l));
   assert.ok(lines.length >= 5);

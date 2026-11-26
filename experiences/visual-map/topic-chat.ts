@@ -45,6 +45,8 @@ export interface TopicChatSession {
   choice?: TopicChatChoice | null;
   /** One line of progress for the running row (a subtree integration's "step x of y"); replaces the plain running text. */
   progress?: string;
+  /** Set after a deeper integration ran its quick option: the log then offers "Other ways to integrate". */
+  otherWays?: object | null;
 }
 
 export interface TopicChatRect {
@@ -80,9 +82,10 @@ export interface TopicChatHost {
   confirmChoice(): Promise<boolean>;
   /** The depth card: drops it; nothing runs and nothing is written. */
   cancelChoice(): void;
+  /** After a quick integration of a deeper branch: shows the depth card for the other ways. */
+  showOtherWays(): void;
 }
 
-const MODES: readonly TopicChatMode[] = ["quick", "standard"];
 const KINDS: readonly TopicChatButtonKind[] = ["research", "expand", "synthesize"];
 const WIDTH_FALLBACK = 340;
 const NARROW_AREA = 360;
@@ -90,14 +93,6 @@ const GAP = 8;
 
 function kindLabel(kind: TopicChatButtonKind): string {
   return t(`ui.topic_chat_${kind}`);
-}
-
-function modeName(mode: TopicChatMode): string {
-  return mode === "quick" ? t("ui.quick") : t("ui.standard");
-}
-
-function modeIcon(mode: TopicChatMode): string {
-  return mode === "quick" ? "zap" : "globe";
 }
 
 function suggestion(kind: TopicChatButtonKind): string {
@@ -116,11 +111,8 @@ export class TopicChatWindow {
   private readonly ghostTextEl: HTMLElement;
   private readonly modeHintEl: HTMLElement;
   private readonly kindEls = new Map<TopicChatButtonKind, HTMLButtonElement>();
-  private readonly modeEls = new Map<TopicChatMode, HTMLButtonElement>();
-  private readonly modePickerEl: HTMLElement;
-  private readonly modeToggleEl: HTMLButtonElement;
-  private readonly modeMenuEl: HTMLElement;
-  private iconMode: TopicChatMode | null = null;
+  private readonly scopeEl: HTMLElement;
+  private readonly webEl: HTMLInputElement;
   private readonly cleanups: Array<() => void> = [];
   private parentEl: HTMLElement | null = null;
   private submitting = false;
@@ -155,6 +147,8 @@ export class TopicChatWindow {
     this.logEl = this.el.createDiv("vam-topic-chat-log");
 
     const actions = this.el.createDiv("vam-topic-chat-actions");
+    // What the next request covers: this card, or its whole branch for an integration.
+    this.scopeEl = actions.createSpan({ cls: "vam-topic-chat-scope" });
     for (const kind of KINDS) {
       const button = actions.createEl("button", {
         cls: "vam-topic-chat-action",
@@ -177,58 +171,16 @@ export class TopicChatWindow {
     this.ghostEl = composer.createDiv({ cls: "vam-topic-chat-ghost", attr: { "aria-hidden": "true" } });
     this.ghostTextEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-ph" });
     const foot = composer.createDiv("vam-topic-chat-foot");
-    // The AI mode is one small icon button; its menu is built once and only its attributes change afterwards.
-    this.modePickerEl = foot.createSpan("vam-topic-chat-mode-picker");
-    this.modeToggleEl = this.modePickerEl.createEl("button", {
-      cls: "vam-topic-chat-mode-toggle",
-      attr: { type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }
+    // Web search is the one difference between the two AI modes: ticked is the standard mode, unticked the quick one.
+    // The map remembers the mode once a research or expand is confirmed.
+    const web = foot.createEl("label", { cls: "vam-topic-chat-web" });
+    this.webEl = web.createEl("input", { type: "checkbox", cls: "vam-topic-chat-web-box" });
+    this.on(this.webEl, "change", () => {
+      if (this.host.session().running) return;
+      this.host.setMode(this.webEl.checked ? "standard" : "quick");
     });
-    this.modeMenuEl = this.modePickerEl.createDiv({
-      cls: "vam-topic-chat-mode-menu",
-      attr: { role: "menu", "aria-label": t("ui.ai_mode") }
-    });
-    this.modeMenuEl.hidden = true;
-    for (const mode of MODES) {
-      const button = this.modeMenuEl.createEl("button", {
-        cls: "vam-topic-chat-mode",
-        attr: { type: "button", role: "menuitemradio", "aria-checked": "false" }
-      });
-      setIcon(button.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
-      button.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
-      setIcon(button.createSpan("vam-topic-chat-mode-check"), "check");
-      this.modeEls.set(mode, button);
-      this.on(button, "click", () => this.pickMode(mode));
-    }
-    this.on(this.modeToggleEl, "click", event => {
-      if (this.modeMenuEl.hidden) this.openModeMenu(event.detail === 0);
-      else this.closeModeMenu(true);
-    });
-    this.on(this.modeToggleEl, "keydown", event => {
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-      event.preventDefault();
-      if (this.modeMenuEl.hidden) this.openModeMenu(true);
-    });
-    this.on(this.modeMenuEl, "keydown", event => {
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-      event.preventDefault();
-      const buttons = MODES.map(mode => this.modeEls.get(mode)!);
-      const at = buttons.findIndex(button => button === event.target);
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      buttons[(Math.max(at, 0) + step + buttons.length) % buttons.length].focus();
-    });
-    this.on(this.modePickerEl, "focusout", event => {
-      const next = event.relatedTarget as Node | null;
-      if (!next || !this.modePickerEl.contains(next)) this.closeModeMenu(false);
-    });
-    const doc = parent.ownerDocument;
-    this.doc = doc ?? null;
-    if (doc?.addEventListener) {
-      const outside = (event: MouseEvent): void => {
-        if (!this.modeMenuEl.hidden && !this.modePickerEl.contains(event.target as Node)) this.closeModeMenu(false);
-      };
-      doc.addEventListener("mousedown", outside);
-      this.cleanups.push(() => doc.removeEventListener("mousedown", outside));
-    }
+    web.createSpan({ text: t("ui.topic_chat_web_search") });
+    this.doc = parent.ownerDocument ?? null;
     this.sendEl = foot.createEl("button", {
       cls: "vam-topic-chat-send",
       attr: { type: "button", "aria-label": t("ui.topic_chat_send") }
@@ -244,9 +196,8 @@ export class TopicChatWindow {
       if (event.key !== "Escape") return;
       event.preventDefault?.();
       event.stopPropagation?.();
-      // An open mode menu takes the first Escape, then an open depth card; only the next one closes the window.
-      if (!this.modeMenuEl.hidden) this.closeModeMenu(true);
-      else if (this.host.session().choice) this.cancelChoice();
+      // An open depth card takes the first Escape; only the next one closes the window.
+      if (this.host.session().choice) this.cancelChoice();
       else this.requestClose();
     });
     this.cleanups.push(host.subscribe(() => this.refresh()));
@@ -334,20 +285,6 @@ export class TopicChatWindow {
     this.opener?.focus();
   }
 
-  private openModeMenu(focusCurrent: boolean): void {
-    if (this.host.session().running) return;
-    this.modeMenuEl.hidden = false;
-    this.modeToggleEl.setAttr("aria-expanded", "true");
-    if (focusCurrent) this.modeEls.get(this.host.session().mode)?.focus();
-  }
-
-  private closeModeMenu(focusToggle: boolean): void {
-    if (this.modeMenuEl.hidden) return;
-    this.modeMenuEl.hidden = true;
-    this.modeToggleEl.setAttr("aria-expanded", "false");
-    if (focusToggle) this.modeToggleEl.focus();
-  }
-
   private cancelChoice(): void {
     this.host.cancelChoice();
     if (!this.destroyed) this.inputEl.focus();
@@ -356,12 +293,6 @@ export class TopicChatWindow {
   private async confirmChoice(): Promise<void> {
     const started = await this.host.confirmChoice();
     if (started && !this.destroyed) this.inputEl.focus();
-  }
-
-  private pickMode(mode: TopicChatMode): void {
-    if (this.host.session().running) return;
-    this.host.setMode(mode);
-    this.closeModeMenu(true);
   }
 
   private pickKind(kind: TopicChatButtonKind): void {
@@ -440,25 +371,12 @@ export class TopicChatWindow {
       button.toggleClass("is-active", session.draftKind === kind);
       button.disabled = busy;
     }
-    if (session.running) this.closeModeMenu(false);
-    for (const [mode, button] of this.modeEls) {
-      button.setAttr("aria-checked", String(session.mode === mode));
-      button.toggleClass("is-active", session.mode === mode);
-      button.disabled = session.running;
-    }
-    this.modeToggleEl.disabled = session.running;
-    this.modeToggleEl.setAttr("aria-label", t("ui.topic_chat_mode_button_0", modeName(session.mode)));
-    if (this.iconMode !== session.mode) {
-      this.iconMode = session.mode;
-      setIcon(this.modeToggleEl, modeIcon(session.mode));
-    }
-    this.modeHintEl.setText(
-      session.running && !empty
-        ? t("ui.map_chat_steer_hint")
-        : session.mode === "quick"
-          ? t("ui.topic_chat_mode_quick_hint")
-          : t("ui.topic_chat_mode_standard_hint")
+    this.webEl.checked = session.mode === "standard";
+    this.webEl.disabled = session.running;
+    this.scopeEl.setText(
+      t(session.draftKind === "synthesize" ? "ui.topic_chat_scope_branch" : "ui.topic_chat_scope_card")
     );
+    this.modeHintEl.setText(session.running && !empty ? t("ui.map_chat_steer_hint") : "");
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
     this.inputEl.setAttr(
       "placeholder",
@@ -506,6 +424,14 @@ export class TopicChatWindow {
     }
     if (session.choice) this.paintChoice(session.choice, heldPart, !this.choiceShown);
     this.choiceShown = !!session.choice;
+    if (session.otherWays && !session.choice && !session.running) {
+      const other = this.logEl.createEl("button", {
+        cls: "vam-topic-chat-other-ways",
+        text: t("ui.topic_chat_other_ways"),
+        attr: { type: "button" }
+      });
+      other.addEventListener("click", () => this.host.showOtherWays());
+    }
     if (session.running) {
       const running = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
       running.createSpan({ text: session.progress || t("ui.topic_chat_running") });

@@ -509,6 +509,7 @@ export interface LivingConfigSave {
   outcome: "written" | "unchanged";
   before: string;
   after: string;
+  configRevision: string;
 }
 
 /** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
@@ -519,9 +520,13 @@ export async function saveLivingConfig(
   id: string,
   prompt: string,
   expectedPrompt?: string,
-  expectedConfigRevision?: string
+  expectedConfigRevision?: string,
+  isCurrent: () => boolean = () => true
 ): Promise<LivingConfigSave> {
+  const authorized = (): boolean => !repo.isDisposed() && isCurrent();
+  if (!authorized()) throw new Error("changed-configuration");
   const { snapshots, cards } = await prepareMap({ repo }, map);
+  if (!authorized()) throw new Error("changed-configuration");
   const snapshot = snapshots.get(id);
   const target = cards.find(card => card.id === id);
   if (!snapshot || !target) throw new Error("missing-target");
@@ -537,14 +542,19 @@ export async function saveLivingConfig(
     snapshot.note.prompt === prompt &&
     JSON.stringify(fm["living-node-refs"]) === JSON.stringify(encoded)
   )
-    return { outcome: "unchanged", before: snapshot.content, after: snapshot.content };
+    return {
+      outcome: "unchanged",
+      before: snapshot.content,
+      after: snapshot.content,
+      configRevision: livingConfigurationStamp(prompt, fm)
+    };
   let saved = "";
   const outcome = await repo.updateNoteGuarded(
     target.path,
     { prompt },
     {
       expectedContent: snapshot.content,
-      authorize: () => !repo.isDisposed(),
+      authorize: authorized,
       finalize: content => {
         saved = setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded });
         return saved;
@@ -552,7 +562,12 @@ export async function saveLivingConfig(
     }
   );
   if (outcome !== "written") throw new Error("changed-configuration");
-  return { outcome, before: snapshot.content, after: saved };
+  return {
+    outcome,
+    before: snapshot.content,
+    after: saved,
+    configRevision: livingConfigurationStamp(prompt, frontmatter(saved))
+  };
 }
 
 /** Build a draft request without executing dependencies, and an adoption guard over the same effective inputs. */

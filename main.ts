@@ -2652,8 +2652,14 @@ export default class VisualAgentMapPlugin extends Plugin {
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();
   }
-  showLivingTrial(file: TFile, markdown: string, owner: string, isCurrent: () => boolean): Promise<boolean> {
-    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent);
+  showLivingTrial(
+    file: TFile,
+    markdown: string,
+    owner: string,
+    isCurrent: () => boolean,
+    warnings: readonly string[] = []
+  ): Promise<boolean> {
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings);
   }
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);

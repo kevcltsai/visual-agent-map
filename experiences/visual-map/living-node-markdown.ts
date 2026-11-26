@@ -48,7 +48,9 @@ function quote(value: string): string {
 /** Render only validated domain values, never the raw model response or arbitrary replacement Markdown. */
 function renderRegion(knowledge: LivingKnowledge): string {
   const lines = [BEGIN, "", "## Living Node", ""];
-  if (knowledge.output.text) lines.push("### Current output", "", quote(knowledge.output.text), "");
+  if (knowledge.output.text) {
+    lines.push("### Current output", "", quote(`Ownership: ${knowledge.output.owner}`), quote(knowledge.output.text), "");
+  }
   const sourceLines = (entries: LivingKnowledge["output"]["evidence"]): string[] =>
     entries.map(entry => quote(`Source ${entry.id}: ${entry.source} (retrieved ${entry.retrievedAt})`));
   lines.push(...sourceLines(knowledge.output.evidence));
@@ -79,7 +81,7 @@ function renderRegion(knowledge: LivingKnowledge): string {
       );
     }
   }
-  if (!knowledge.output.text && !knowledge.records.length) lines.push("", "> No matching information.", "");
+  for (const id of knowledge.suppressed) lines.push("", quote(`Suppressed record ID: ${id}`));
   lines.push("", END);
   return lines.join("\n");
 }
@@ -131,8 +133,11 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   if (fm[COMMIT_KEY] === candidate.executionId) return "discarded";
   const region = readRegion(expectedContent, fm[HASH_KEY]);
   if (region) {
-    if (renderRegion(request.base) !== region.text) throw new Error("base-mismatch");
+    if (request.base.revision !== fm[HASH_KEY] || renderRegion(request.base) !== region.text)
+      throw new Error("base-mismatch");
   } else if (
+    request.base.revision !== "empty" ||
+    request.base.output.owner !== "ai" ||
     request.base.records.length ||
     request.base.output.text ||
     request.base.output.evidence.length ||
@@ -140,10 +145,10 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   )
     throw new Error("unknown-ownership");
   const next = applyLivingChanges(request.base, request.proposal, context);
+  if (!region && !next.records.length && !next.output.text) throw new Error("missing-formal-result");
   const changed = !region || next.changed;
-  const managed = changed
-    ? renderRegion({ ...request.base, records: next.records, output: next.output })
-    : region.text;
+  const managed =
+    region && !changed ? region.text : renderRegion({ ...request.base, records: next.records, output: next.output });
   const checked = await request.inspect();
   if (signal.aborted || !request.isCurrent() || !canCommitLivingCandidate(candidate, checked)) return "discarded";
   return port.updateNoteRawGuarded(

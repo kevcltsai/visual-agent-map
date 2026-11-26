@@ -37,8 +37,9 @@ S.integrationTest('Living Node: repeat no-change writes diagnostics only and doe
   assert.equal(await commitLivingMarkdown(f.repo, first), 'written');
   const before = f.contents.get(path);
   const result = applyLivingChanges(first.base, first.proposal, first.context);
-  const base = { ...first.base, records: result.records, output: result.output, revision: 'saved' };
-  const second = request(f, { base, proposal: { baseRevision: 'saved', operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  const revision = before.match(/living-node-region-hash: "([a-f0-9]+)"/)[1];
+  const base = { ...first.base, records: result.records, output: result.output, revision };
+  const second = request(f, { base, proposal: { baseRevision: revision, operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
   assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
   const after = f.contents.get(path);
   assert.equal(after.slice(after.indexOf('# Existing title')), before.slice(before.indexOf('# Existing title')));
@@ -51,7 +52,7 @@ S.integrationTest('Living Node: external edit during inspect is preserved by the
   const r = request(f);
   const inspect = r.inspect;
   r.inspect = async () => {
-    await f.app.vault.modify(f.files.get(path), initial + '\nOwner typed this.');
+    await f.app.vault.process(f.files.get(path), () => initial + '\nOwner typed this.');
     return inspect();
   };
   assert.equal(await commitLivingMarkdown(f.repo, r), 'discarded');
@@ -76,7 +77,13 @@ S.integrationTest('Living Node: manually edited or removed owned region fails cl
   const f = await setup();
   assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
   const edited = f.contents.get(path).replace('> Current findings', '> Owner revised it');
-  await f.app.vault.modify(f.files.get(path), edited);
+  await f.app.vault.process(f.files.get(path), () => edited);
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { candidate: { executionId: 'e2' } })), /edited-or-deleted-knowledge/);
   assert.equal(f.contents.get(path), edited);
+});
+
+S.integrationTest('Living Node: an empty first proposal is not evidence of a successful no-match', async () => {
+  const f = await setup();
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [] } })), /missing-formal-result/);
+  assert.equal(f.contents.get(path), initial);
 });

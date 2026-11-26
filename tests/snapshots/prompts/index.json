@@ -1566,6 +1566,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-prompt-default.en": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, task = a Prompt topic integration (the Prompt then the default organise-only instruction)",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-prompt-default.zh": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, task = a Prompt topic integration (the Prompt then the default organise-only instruction)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-prompt-default.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, task = a Prompt topic integration (the Prompt then the default organise-only instruction)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.synthesize-standard.en": {
       "builder": "AiTaskService instructions: mode synthesize, Standard (web research), visual off",
       "language": "en",

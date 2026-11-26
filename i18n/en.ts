@@ -1229,6 +1229,7 @@ export const en = {
   "ui.ai_card_status_done": "Done",
   "ui.ai_card_failed_0": "Failed: {0}",
   "ui.ai_card_blocked_0": 'Card "{0}" did not finish; not run',
+  "ui.ai_card_blocked_unnamed": "A card below did not finish last time; not run",
   "ui.ai_lock_card": "Lock this AI card",
   "ui.ai_sources_label": "Sources",
   "ui.ai_sources_separator": ", ",

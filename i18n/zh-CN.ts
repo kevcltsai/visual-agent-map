@@ -1166,6 +1166,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_card_status_done": "已生成",
   "ui.ai_card_failed_0": "失败：{0}",
   "ui.ai_card_blocked_0": "子卡“{0}”未完成，没有执行",
+  "ui.ai_card_blocked_unnamed": "上次有子卡未完成，没有执行",
   "ui.ai_lock_card": "锁住这张 AI 卡",
   "ui.ai_sources_label": "资料来源",
   "ui.ai_sources_separator": "、",

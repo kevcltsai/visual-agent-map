@@ -20133,8 +20133,10 @@ export class VisualAgentMapView extends ItemView {
       id => this.aiStatusOf(id) === "failed"
     );
     const blocked = entry ? blockers.length > 0 : note.aiRun?.result === "blocked";
-    if (blocked)
-      return t("ui.ai_card_blocked_0", blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001") || "");
+    if (blocked) {
+      const names = blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001");
+      return names ? t("ui.ai_card_blocked_0", names) : t("ui.ai_card_blocked_unnamed");
+    }
     return t("ui.ai_card_failed_0", (entry ? entry.reason : undefined) ?? note.lastError ?? "");
   }
   /**

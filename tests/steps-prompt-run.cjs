@@ -705,3 +705,18 @@ test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fenc
   assert.match(out, /```md\n> \[!info\]- Prompt\n> example in a code block\n```/);
   assert.equal(out.includes('Real question'), false);
 });
+
+test('blocked tooltip: names the failed child, or says so without a name when no child is failing now', async () => {
+  const h = await harness([['P', null, { prompt: 'Parent?' }], ['C', 'P', { prompt: 'Child?' }]]);
+  const note = id => h.view.notes.get(h.node(id).id);
+  note('P').aiRun = { at: '2026-11-27T00:00:00.000Z', result: 'blocked' };
+  note('C').aiRun = { at: '2026-11-27T00:00:00.000Z', result: 'failed' };
+  h.view.aiStatusMemo?.clear?.();
+  const named = h.view.aiStatusTip(h.node('P'), note('P'), 'failed');
+  assert.match(named, /C/);
+  note('C').aiRun = { at: '2026-11-27T00:01:00.000Z', result: 'ok', input: 'x' };
+  h.view.aiStatusMemo?.clear?.();
+  const unnamed = h.view.aiStatusTip(h.node('P'), note('P'), 'failed');
+  assert.equal(/""|「」|“”/.test(unnamed), false, `no empty name: ${unnamed}`);
+  assert.match(unnamed, /did not finish last time/);
+});

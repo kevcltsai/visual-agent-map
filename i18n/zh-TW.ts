@@ -1167,6 +1167,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_card_status_done": "已產生",
   "ui.ai_card_failed_0": "失敗：{0}",
   "ui.ai_card_blocked_0": "子卡「{0}」未完成，沒有執行",
+  "ui.ai_card_blocked_unnamed": "上次有子卡未完成，沒有執行",
   "ui.ai_lock_card": "鎖住這張 AI 卡",
   "ui.ai_sources_label": "資料來源",
   "ui.ai_sources_separator": "、",

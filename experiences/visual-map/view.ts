@@ -11335,7 +11335,7 @@ export class VisualAgentMapView extends ItemView {
         const node = map.nodes.find(item => item.id === id);
         return {
           title: note?.title ?? node?.path.replace(/^.*\//, "").replace(/\.md$/, "") ?? "",
-          body: note?.detail ?? "",
+          body: [note?.detail, note?.livingNode?.shareMarkdown].filter(value => value?.trim()).join("\n\n"),
           kind: note?.topicKind ?? "topic",
           ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {}),
           ...(note?.hypothesisLeaning !== undefined ? { leaning: note.hypothesisLeaning } : {})

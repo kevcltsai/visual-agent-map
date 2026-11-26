@@ -127,11 +127,28 @@ function duplicateRecord(records: ReadonlyMap<string, LivingRecord>, candidate: 
     if (sameTime && isPeriod(candidate.granularity)) throw new Error("period-conflict-requires-correction");
   }
   if (isChange(candidate.granularity)) {
-    const latest = related.at(-1);
-    if (latest && latest.validity === "active" && sameClaim(latest, candidate)) {
-      const previousTime = timeKey(latest.eventTime);
-      if (time !== null && previousTime !== null && time >= previousTime) return latest;
+    // Knowledge may arrive out of order (for example a historical backfill).
+    // Compare with the most recent comparable observation at or before this event,
+    // not the last inserted record. Do not guess the order of unknown times.
+    const comparable = (value: string | null): boolean =>
+      value !== null && time !== null &&
+      ((/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) &&
+        /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(time)) ||
+        (/^\d{4}-\d\d-\d\d$/.test(value) && /^\d{4}-\d\d-\d\d$/.test(time)));
+    let latest: LivingRecord | undefined;
+    let latestTime: string | undefined;
+    for (const item of related) {
+      const previousTime = timeKey(item.eventTime);
+      if (previousTime === null || time === null || !comparable(previousTime) || previousTime > time) continue;
+      if (latestTime === undefined || previousTime > latestTime) {
+        latest = item;
+        latestTime = previousTime;
+      } else if (previousTime === latestTime && latest && !sameClaim(latest, item)) {
+        // Conflicting observations at the same instant are not a safe deduplication basis.
+        latest = undefined;
+      }
     }
+    if (latest && latest.validity === "active" && sameClaim(latest, candidate)) return latest;
   }
   return undefined;
 }

@@ -474,7 +474,8 @@ function resolveDraft(
   cards: readonly LivingMapCard[],
   target: LivingMapCard,
   prompt: string,
-  saved: Snapshot
+  saved: Snapshot,
+  allowNewSource?: (path: string) => boolean
 ) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
   const resolver = sourceResolver(app);
@@ -489,6 +490,7 @@ function resolveDraft(
   const explicit = reconcileLivingDraftReferences(previousLinks, persisted, nextLinks, link => {
     const note = resolver.resolveAuthorized(link, target.path);
     if (!note) throw new Error("missing-source");
+    if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
     if (note.path === target.path) throw new Error("self-reference");
     const matches = cards.filter(card => card.path === note.path);
     if (matches.length > 1) throw new Error("ambiguous-source");
@@ -521,7 +523,8 @@ export async function saveLivingConfig(
   prompt: string,
   expectedPrompt?: string,
   expectedConfigRevision?: string,
-  isCurrent: () => boolean = () => true
+  isCurrent: () => boolean = () => true,
+  allowNewSource?: (path: string) => boolean
 ): Promise<LivingConfigSave> {
   const authorized = (): boolean => !repo.isDisposed() && isCurrent();
   if (!authorized()) throw new Error("changed-configuration");
@@ -535,7 +538,7 @@ export async function saveLivingConfig(
   if (expectedConfigRevision !== undefined &&
       livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision)
     throw new Error("changed-configuration");
-  const { encoded } = resolveDraft(app, cards, target, prompt, snapshot);
+  const { encoded } = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
   const fm = frontmatter(snapshot.content);
   if (
     snapshot.note.aiCard &&

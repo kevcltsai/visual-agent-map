@@ -1,3 +1,10 @@
+import { contentHash } from "./content-hash";
+
+/** Saved configuration baseline shared by editor and chat; no knowledge or diagnostics. */
+export function livingConfigurationStamp(prompt: string, fm: Record<string, unknown>): string {
+  return contentHash(JSON.stringify([prompt, fm["living-node-refs"], fm["ai-card"], fm["ai-locked"]]));
+}
+
 /** Living Node's same-note region is outside the legacy note-section rewriting contract. */
 export const LIVING_NODE_BEGIN = "<!-- vam-living-node:begin v1 -->";
 export const LIVING_NODE_END = "<!-- vam-living-node:end v1 -->";

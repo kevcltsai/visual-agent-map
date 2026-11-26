@@ -350,7 +350,11 @@ export class Repository {
       backup: () => new Error(this.message("error.recovery_backup_failed")),
       saveOpenEditors: async (file: TFile) => {
         for (const leaf of app.workspace?.getLeavesOfType?.("markdown") ?? []) {
-          const view = leaf.view as unknown as { file?: TFile | null; getViewData?: () => string; save?: () => Promise<void> };
+          const view = leaf.view as unknown as {
+            file?: TFile | null;
+            getViewData?: () => string;
+            save?: () => Promise<void>;
+          };
           if (view.file?.path !== file.path || !view.getViewData || !view.save) continue;
           if (view.getViewData() !== (await app.vault.read(file))) await view.save();
         }

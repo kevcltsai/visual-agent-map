@@ -1175,6 +1175,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_run_all": "全部執行",
   "ui.living_node_run_card": "執行卡片",
   "ui.living_node_chat_configure_0": "設定 AI 卡片：{0}",
+  "ui.living_node_chat_plan_confirm": "請先確認 AI 卡片的正式配置與執行目標，再套用。",
   "ui.living_node_chat_existing_only": "聊天只能設定本次新建的卡片或既有 AI 卡片；普通卡請自行轉換。",
   "ui.living_node_chat_source_refused": "此來源未獲本次聊天配置授權。",
   "ui.living_node_last_success": "最後成功檢查",

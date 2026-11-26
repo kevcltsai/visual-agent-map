@@ -9,7 +9,7 @@ import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
 import { planLivingMap, type LivingMapCard } from "./living-node-map";
-import type { LivingSourceRef, resolveLivingSources } from "./living-node-sources";
+import { readLivingReferences, sameLivingTarget, type LivingSourceRef, type resolveLivingSources } from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
 import {
@@ -83,16 +83,7 @@ function usableKnowledge(snapshot: Snapshot): boolean {
 }
 
 function refs(snapshot: Snapshot): LivingSourceRef[] {
-  const saved = frontmatter(snapshot.content)["living-node-refs"];
-  if (Array.isArray(saved)) {
-    return saved.map(value => {
-      if (typeof value !== "string") throw new Error("invalid-source-reference");
-      if (value.startsWith("card:")) return { kind: "card", id: value.slice(5) };
-      if (value.startsWith("note:")) return { kind: "note", link: value.slice(5) };
-      throw new Error("invalid-source-reference");
-    });
-  }
-  return promptSourceLinks(snapshot.note.prompt).map(link => ({ kind: "note", link }));
+  return readLivingReferences(frontmatter(snapshot.content)["living-node-refs"], promptSourceLinks(snapshot.note.prompt));
 }
 
 function sourceResolver(app: App) {
@@ -257,7 +248,9 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     const map = await port.repo.readMap(port.mapPath);
     if (!current() || map.id !== initialMap.id) throw new Error("cancelled");
     const path = pathOf(id);
-    if (map.nodes.find(node => node.id === id)?.path !== path) throw new Error("changed-target-identity");
+    const original = initialMap.nodes.find(node => node.id === id);
+    if (!original || !sameLivingTarget(original, map.nodes.find(node => node.id === id)))
+      throw new Error("changed-target-identity");
     const snapshot = await port.repo.readNoteSnapshot(path, map);
     const unchanged = config.get(id) === configKey(snapshot, map, id, port);
     return { map, snapshot, unchanged };
@@ -499,7 +492,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     const { cards, snapshots } = await prepareMap(port, map);
     const saved = snapshots.get(id);
     const card = cards.find(item => item.id === id);
-    if (!saved || !card || card.path !== target.path || saved.note.aiLocked) throw new Error("changed-target");
+    if (!saved || !card || !sameLivingTarget(target, card) || saved.note.aiLocked) throw new Error("changed-target");
     const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt);
     const resolver = sourceResolver(port.app);
     const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);

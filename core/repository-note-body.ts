@@ -312,9 +312,11 @@ export function replaceSummarySection(content: string, value: string): string {
 /** Takes the Prompt callout (`> [!info]- Prompt` and its quoted lines) out of a note; outside the Detail only. */
 function removePromptCallout(content: string): string {
   const lines = content.split("\n");
+  const code = fencedOutsideDetail(lines);
   let inDetail = false;
   let origin: "none" | "heading" | "quote" = "none";
   for (let index = 0; index < lines.length; index++) {
+    if (code[index]) continue;
     if (lines[index].trim() === DETAIL_START) inDetail = true;
     if (lines[index].trim() === DETAIL_END) inDetail = false;
     // Quoted Thinking Origin text is source text: a line there that looks like a callout title is not one.

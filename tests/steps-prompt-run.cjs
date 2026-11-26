@@ -690,3 +690,16 @@ test('save path: a new card is made only on save; the popover blocks an empty qu
   assert.match(h.contents.get(made.path), /^ai-card: true$/m);
   assert.match(h.contents.get(made.path), /Brand new\?/);
 });
+
+test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fence alone', () => {
+  const { load, obsidian } = require('./support.cjs');
+  const body = load('core/repository-note-body.ts', { obsidian });
+  const note = [
+    '## Current Summary', '', 'S', '',
+    '```md', '> [!info]- Prompt', '> example in a code block', '```', '',
+    '> [!info]- Prompt', '> Real question', ''
+  ].join('\n');
+  const out = body.removeSection(note, 'Prompt');
+  assert.match(out, /```md\n> \[!info\]- Prompt\n> example in a code block\n```/);
+  assert.equal(out.includes('Real question'), false);
+});

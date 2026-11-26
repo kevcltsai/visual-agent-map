@@ -112,7 +112,7 @@ test('parser drops a move under itself or its own descendant, a bad run_map_acti
   assert.deepEqual(result.rejected.map(entry => entry.code), ['cycle', 'cycle', 'bad_value', 'bad_item', 'bad_item', 'bad_item', 'bad_value']);
 });
 test('parser select_topics all=true selects every card and run_map_action accepts the five actions', () => {
-  const result = parse(reply(item('select_topics', { all: true }), ...MAP_RUN_ACTIONS.map(action => item('run_map_action', { action, title: 'T', goal: 'G' }))));
+  const result = parse(reply(item('select_topics', { all: true }), ...MAP_RUN_ACTIONS.map(action => item('run_map_action', { action, title: 'T', goal: 'G', ...(action === 'run_living_card' ? { nodeIds: ['a'] } : {}) }))));
   assert.equal(result.rejected.length, 0);
   assert.deepEqual(result.actions[0], { kind: 'select_topics', nodeIds: ['r', 'a', 'a1', 'b'], all: true });
   assert.deepEqual(result.actions.slice(1).map(action => action.action), plain(MAP_RUN_ACTIONS));
@@ -129,7 +129,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property but "rewrite" is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 29);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 30);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).filter(key => key !== 'rewrite').sort());
   // Codex strict output: every object in the schema Codex gets, top level included, lists all its properties as required (a missing one is a 400).
@@ -611,7 +611,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-13, -6)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-14, -7)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -937,7 +937,7 @@ test('B2 prompt: research options, "research only when asked", headless integrat
 });
 test('B2 structure tidy: no action kind or run action opens the structure-review window', () => {
   for (const name of [...MAP_CHAT_ACTION_KINDS, ...MAP_RUN_ACTIONS]) assert.doesNotMatch(name, /structure|review|suggest/i, name);
-  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'rate_by_goal', 'merge', 'find_images']);
+  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'rate_by_goal', 'merge', 'find_images', 'run_living_card', 'run_living_all']);
 });
 
 
@@ -2128,4 +2128,60 @@ test('book plan: edit_book_plan, edit_book_structure and edit_book_thread are al
     assert.deepEqual(plain(result.reasons), ['book_plan_edit']);
     assert.equal(result.estimatedCalls, 0);
   }
+});
+
+test('Living Node chat: explicit configuration of an existing or just-created card, never an unknown target or empty prompt', () => {
+  const result = parse(reply(
+    item('add_child', { title: 'Tracker', ref: 'tracker' }),
+    item('configure_ai_card', { nodeId: 'new:tracker', content: 'Track news' }),
+    item('configure_ai_card', { nodeId: 'a', content: 'Track changes' }),
+    item('configure_ai_card', { nodeId: 'ghost', content: 'Invalid' }),
+    item('configure_ai_card', { nodeId: 'a', content: ' ' }),
+    item('run_map_action', { action: 'run_living_card', nodeIds: ['a', 'new:tracker'] }),
+    item('run_map_action', { action: 'run_living_all' }),
+    item('run_map_action', { action: 'run_living_card' }),
+    item('run_map_action', { action: 'run_living_all', nodeIds: ['a'] })
+  ));
+  assert.deepEqual(result.actions.map(action => action.kind), ['add_child', 'configure_ai_card', 'configure_ai_card', 'run_map_action', 'run_map_action']);
+  assert.equal(result.actions[1].content, 'Track news');
+  assert.equal(result.rejected.length, 4);
+});
+
+test('Living Node chat: configuration and formal execution need a plan even under auto apply', () => {
+  const ctx = { parents: { a: null, b: 'a', c: 'b' }, selectedCount: 1 };
+  for (const autoApply of [false, true]) {
+    const config = planFor([{ kind: 'configure_ai_card', nodeId: 'a', content: 'Track news' }], ctx, { autoApply });
+    assert.ok(config.reasons.includes('living_node_confirm'));
+    assert.equal(config.estimatedCalls, 0);
+    const run = planFor([{ kind: 'run_map_action', action: 'run_living_card', nodeIds: ['a'] }], ctx, { autoApply });
+    assert.ok(run.reasons.includes('living_node_confirm'));
+    assert.equal(run.estimatedCalls, 3, 'upper bound includes dependencies');
+    const all = planFor([{ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }], ctx, { autoApply });
+    assert.ok(all.reasons.includes('living_node_confirm'));
+    assert.equal(all.estimatedCalls, 3);
+  }
+});
+
+test('Living Node chat: raw edits and creates cannot introduce execution metadata or touch managed knowledge', () => {
+  for (const raw of [
+    '---\nai-card: true\n---\n# Card',
+    '---\n"living-node-refs": []\n---\n# Card',
+    '---\n{ai-card: true}\n---\n# Card',
+    '# Card\n<!-- vam-living-node:begin v1 -->\nKnowledge\n<!-- vam-living-node:end v1 -->'
+  ]) {
+    assert.deepEqual(plain(create('x.md', raw)), { ok: false, code: 'living_node_protected' });
+    assert.deepEqual(plain(edit('x.md', '# ordinary', raw)), { ok: false, code: 'living_node_protected' });
+    assert.deepEqual(plain(edit('x.md', raw, '# overwritten')), { ok: false, code: 'living_node_protected' });
+  }
+  assert.equal(edit('x.md', '# ordinary', '# updated').ok, true);
+});
+
+test('Living Node chat: the saved prompt baseline is only granted to a fully shown card', () => {
+  const selected = topic('a', { livingPrompt: 'Research X', livingConfigRevision: 'v1' });
+  const shown = context({ selected: [selected] });
+  assert.equal(shown.topicHashes.a.livingConfigRevision, 'v1');
+  assert.equal(JSON.parse(shown.json).selected[0].livingPrompt, 'Research X');
+  const hidden = context({ selected: [selected], detailBudget: 0 });
+  assert.equal(hidden.topicHashes.a.livingConfigRevision, undefined);
+  assert.equal(JSON.parse(hidden.json).selected[0].livingPrompt, undefined);
 });

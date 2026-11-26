@@ -1551,6 +1551,7 @@ export class VisualAgentMapView extends ItemView {
     win: AiCardPopover;
     trial: LivingTrial;
     controller: AbortController;
+    viewSession: string;
     adoption?: LivingAdoptionCheck;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
@@ -15319,6 +15320,14 @@ export class VisualAgentMapView extends ItemView {
     const viewSession = randomUUID();
     const current = (): boolean =>
       !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
+    let activeTrial: AbortController | undefined;
+    controller.signal.addEventListener("abort", () => activeTrial?.abort(), { once: true });
+    const invalidateTrial = (): void => {
+      activeTrial?.abort();
+      activeTrial = undefined;
+      trial.invalidate();
+      this.plugin.invalidateLivingTrial(viewSession);
+    };
     const promptOf = (values: AiCardPopoverValues): string =>
       joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"));
     const win = new AiCardPopover(
@@ -15341,6 +15350,11 @@ export class VisualAgentMapView extends ItemView {
         },
         trial: node
           ? async values => {
+              invalidateTrial();
+              const attempt = new AbortController();
+              activeTrial = attempt;
+              const currentTrial = (): boolean =>
+                current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
               try {
                 const prepared = await prepareLivingTrial({
                   app: this.app,
@@ -15348,28 +15362,38 @@ export class VisualAgentMapView extends ItemView {
                   calls: this.plugin.aiCalls,
                   mapPath,
                   viewSession,
-                  signal: controller.signal,
-                  current,
+                  signal: attempt.signal,
+                  current: currentTrial,
                   language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
                   mapSources: signal => this.readMapSourceGroups(signal)
                 }, node.id, promptOf(values));
                 let ready = false;
                 await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (current()) ready = await trial.run(prepared.request);
+                  if (currentTrial()) ready = await trial.run(prepared.request);
                 });
-                if (!current() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
-                  if (current()) new Notice(t("ui.living_node_trial_invalid"));
+                if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
+                  if (currentTrial()) {
+                    invalidateTrial();
+                    new Notice(t("ui.living_node_trial_invalid"));
+                  }
                   return false;
                 }
                 this.aiCardOpen.adoption = prepared.adoption;
-                await this.plugin.showLivingTrial(this.plugin.repo.file(node.path), renderLivingPreview(trial.result));
-                return true;
+                const shown = await this.plugin.showLivingTrial(
+                  this.plugin.repo.file(node.path), renderLivingPreview(trial.result), viewSession, currentTrial
+                );
+                if (!shown && currentTrial()) invalidateTrial();
+                return shown && currentTrial();
               } catch (error) {
-                if (current()) new Notice(this.plugin.recordFailure(t("ui.living_node_trial"), error));
+                if (currentTrial()) {
+                  invalidateTrial();
+                  new Notice(this.plugin.recordFailure(t("ui.living_node_trial"), error));
+                }
                 return false;
               }
             }
           : undefined,
+        stopTrial: node ? invalidateTrial : undefined,
         adopt: node
           ? async () => {
               const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
@@ -15380,11 +15404,11 @@ export class VisualAgentMapView extends ItemView {
               });
               if (outcome !== "written") {
                 new Notice(t("ui.living_node_trial_invalid"));
-                this.plugin.invalidateLivingTrial();
+                this.plugin.invalidateLivingTrial(viewSession);
                 return false;
               }
               if (current()) {
-                await this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path));
+                await this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path), viewSession);
                 await this.refreshAfterSavedChange();
               }
               return true;
@@ -15409,10 +15433,7 @@ export class VisualAgentMapView extends ItemView {
               }
             }
           : undefined,
-        changed: () => {
-          trial.invalidate();
-          this.plugin.invalidateLivingTrial();
-        },
+        changed: invalidateTrial,
         cancel: () => this.closeAiCardPopover()
       },
       overlay
@@ -15424,10 +15445,13 @@ export class VisualAgentMapView extends ItemView {
       mapId,
       win,
       trial,
-      controller
+      controller,
+      viewSession
     };
     win.mount(overlay);
-    if (node) this.openDetails(node);
+    if (node) void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
+      if (current()) new Notice(error instanceof Error ? error.message : String(error));
+    });
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
@@ -15438,7 +15462,7 @@ export class VisualAgentMapView extends ItemView {
     open.win.destroy();
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     if (node && !this.closed && !this.plugin.repo.isDisposed())
-      void this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path)).catch(() => {});
+      void this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path), open.viewSession, true).catch(() => {});
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {

@@ -37,6 +37,7 @@ import conciseZh from "./style.concise.zh.md";
 
 export const MAP_CHAT_ACTION_KINDS = [
   "add_child",
+  "configure_ai_card",
   "rename_topic",
   "update_summary",
   "edit_topic_note",
@@ -88,7 +89,9 @@ export const MAP_RUN_ACTIONS = [
   "synthesize",
   "rate_by_goal",
   "merge",
-  "find_images"
+  "find_images",
+  "run_living_card",
+  "run_living_all"
 ] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
 /** Research modes a reply may name; "" (not named) is read as the map's remembered mode by the view. */
@@ -127,6 +130,7 @@ export type MapChatAction =
       leaning?: HypothesisLeaning;
       strength?: HypothesisStrength;
     }
+  | { kind: "configure_ai_card"; nodeId: string; content: string }
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
@@ -705,6 +709,13 @@ export function parseMapChat(
           }
           break;
         }
+        case "configure_ai_card": {
+          if (context.bookPlan || context.aim) throw new Dropped("bad_value");
+          const content = text("content");
+          if (content.length > 8_000) throw new Dropped("bad_value");
+          actions.push({ kind: "configure_ai_card", nodeId: node("nodeId", true), content });
+          break;
+        }
         case "rename_topic":
           if (book) {
             const nodeId = node("nodeId");
@@ -829,6 +840,9 @@ export function parseMapChat(
           const action = text("action");
           if (!(MAP_RUN_ACTIONS as readonly string[]).includes(action)) throw new Dropped("bad_value");
           const nodeIds = list("nodeIds");
+          if (action === "run_living_card" && !nodeIds.length) throw new Dropped("missing_field");
+          if (action === "run_living_all" && nodeIds.length) throw new Dropped("bad_value");
+          if ((action === "run_living_card" || action === "run_living_all") && (context.bookPlan || context.aim)) throw new Dropped("bad_value");
           const title = text("title", false),
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");

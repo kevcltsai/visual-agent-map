@@ -629,3 +629,34 @@ test('A3 copy (same map and across maps): the copies carry no anchor relation an
   assert.equal(a.nodes.length, 5, 'copies landed in A');
   assert.deepEqual(JSON.parse(JSON.stringify(a.canvasItems[0].relations)).map(r => r.to).sort(), [h.ids.p, h.ids.q, h.ids.top].sort(), 'the image has exactly the relations it had');
 });
+
+
+test('Living Node cross-map cut moves original IDs and files, preserving knowledge and internal references through undo and redo', async () => {
+  const h = await harness();
+  const pFile = h.app.vault.getAbstractFileByPath(h.paths.p);
+  const qFile = h.app.vault.getAbstractFileByPath(h.paths.q);
+  const original = h.contents.get(h.paths.p);
+  await h.app.vault.process(pFile, text => text.replace(/^---\n/, '---\nai-card: true\nliving-node-refs:\n  - "card:' + h.ids.q + '"\n'));
+  await h.viewA.hydrate();
+  await cutAndPaste(h);
+  assert.deepEqual(h.errors, []);
+  const moved = h.viewB.map.nodes.find(n => n.id === h.ids.p);
+  const child = h.viewB.map.nodes.find(n => n.id === h.ids.q);
+  assert.ok(moved && child);
+  assert.equal(moved.parentId, h.ids.anchor);
+  assert.equal(child.parentId, moved.id);
+  assert.equal(h.app.vault.getAbstractFileByPath(moved.path), pFile);
+  assert.equal(h.app.vault.getAbstractFileByPath(child.path), qFile);
+  assert.match(h.contents.get(moved.path), new RegExp('card:' + h.ids.q));
+  assert.ok(h.contents.get(moved.path).includes('P detail'));
+  assert.equal(await idsOn(h, MAP_A), h.ids.top);
+  assert.equal([...h.contents.keys()].filter(path => path.startsWith(A_PREFIX + 'Unassigned/')).length, 0);
+  await h.viewB.travel(false); await h.idle();
+  assert.equal(h.app.vault.getAbstractFileByPath(h.paths.p), pFile);
+  assert.equal(await idsOn(h, MAP_A), [h.ids.top, h.ids.p, h.ids.q].sort().join());
+  assert.equal(await idsOn(h, MAP_B), h.ids.anchor);
+  await h.viewB.travel(true); await h.idle();
+  assert.equal(await idsOn(h, MAP_B), [h.ids.anchor, h.ids.p, h.ids.q].sort().join());
+  assert.equal(h.app.vault.getAbstractFileByPath(moved.path), pFile);
+  assert.ok(original.includes('P detail'));
+});

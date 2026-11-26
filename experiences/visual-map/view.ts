@@ -15379,8 +15379,11 @@ export class VisualAgentMapView extends ItemView {
                   return false;
                 }
                 this.aiCardOpen.adoption = prepared.adoption;
+                const warnings = prepared.warnings.map(warning => t(
+                  warning === "upstream-stale" ? "ui.living_node_trial_stale_sources" : "ui.living_node_trial_frozen_sources"
+                ));
                 const shown = await this.plugin.showLivingTrial(
-                  this.plugin.repo.file(node.path), renderLivingPreview(trial.result), viewSession, currentTrial
+                  this.plugin.repo.file(node.path), renderLivingPreview(trial.result), viewSession, currentTrial, warnings
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 return shown && currentTrial();

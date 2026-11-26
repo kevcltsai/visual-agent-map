@@ -58,3 +58,13 @@ export function remapLivingCopyCardReferences(
     return sourceMap && sourceMap === destinationMap ? ref : "card:foreign:" + JSON.stringify([sourceMap, id]);
   });
 }
+
+
+/** Canonical file references follow actual Vault renames, never basename guesses.
+ * Legacy note aliases and stable card IDs are untouched. Invalid lists are not repaired silently. */
+export function rebaseLivingNoteReferences(raw: unknown, rebase: (path: string) => string): string[] | null {
+  if (!Array.isArray(raw) || raw.some(value => typeof value !== "string")) return null;
+  const refs = raw as string[];
+  const next = refs.map(ref => ref.startsWith("note-path:") ? "note-path:" + rebase(ref.slice(10)) : ref);
+  return next.some((ref, index) => ref !== refs[index]) ? next : null;
+}

@@ -37,7 +37,6 @@ import conciseZh from "./style.concise.zh.md";
 
 export const MAP_CHAT_ACTION_KINDS = [
   "add_child",
-  "configure_ai_card",
   "rename_topic",
   "update_summary",
   "edit_topic_note",
@@ -65,7 +64,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "read_md_file",
   "edit_book_plan",
   "edit_book_thread",
-  "place_image"
+  "place_image",
+  "configure_ai_card"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 /** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */

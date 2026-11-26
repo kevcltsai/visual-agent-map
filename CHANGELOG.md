@@ -2,16 +2,22 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-26
+
 ### Removed
 
-- Coffee Tables (talking an unfinished idea through with AI guests) is gone, which makes the plugin file about 0.43 MB smaller (4.27 MB to 3.84 MB). Its ribbon button, the "Open Coffee Tables" command and the Coffee Tables side outline no longer exist; a hotkey you set for that command stops working.
-- Nothing in your vault is deleted or changed. Conversations you already had stay in your workspace's `Coffee Tables` folder as ordinary Markdown notes you can still open, read and move. The hidden `Coffee Tables/.sessions` folder (used only to continue a conversation) is left in place and is no longer read; you can delete it yourself. Custom guest styles saved in the plugin settings are dropped from the settings file the next time settings are saved.
-- Maps, map chat, data sources and sharing never depended on Coffee Tables and are unchanged.
+- Coffee Tables (talking an unfinished idea through with AI guests) is gone, so the plugin file is smaller (about 3.8 MB instead of 4.3 MB). Its button, its command and its side outline no longer exist.
+- Nothing in your vault is deleted: past Coffee Tables conversations stay in your vault as ordinary notes. Maps, map chat, data sources and sharing are unchanged.
+
+### Changed
+
+- Quitting Obsidian also stops any AI task still running, so no Codex or Claude Code program is left running in the background.
+- Before VAM changes a card note or a map, it keeps a checked copy of the previous text, so an interrupted save no longer loses it. The installation guide explains how to restore one.
+- Undo and redo in map chat no longer overwrite a note you edited in the meantime.
 
 ### Fixes
 
-- The stylesheet no longer uses `:has` or `all`, which the Obsidian plugin review flagged; pictures, the book page, the goal bar icons, the usage filter, the picture-book loading shimmer and the empty proofread box look the same.
-- Renaming a map whose notes show a picture with a relative link (such as `../Attachments/route.webp`) no longer stops at Obsidian's "Update links" question: the picture moves with the map, so the link still works and the rename finishes at once. Until that question was answered the map kept its old title.
+- Renaming a map with relative picture links no longer stops at the "Update links" question, the stylesheet passes the Obsidian plugin review, and the usage panel marks incomplete token counts as not exact.
 
 ## [0.35.1] - 2026-11-25
 

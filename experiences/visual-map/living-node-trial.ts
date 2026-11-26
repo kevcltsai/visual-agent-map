@@ -141,7 +141,12 @@ export class LivingTrial {
     const { snapshot, proposal, savedContent } = ready;
     const identity = snapshot.candidate;
     const lease = this.coordinator.acquire(identity.mapId, identity.viewSession, [snapshot.path], true);
-    if (!lease) return "discarded";
+    if (!lease) {
+      // An explicit adoption attempt that cannot acquire its write lease consumes the candidate.
+      // Never retry an old preview after a competing formal operation has settled.
+      this.invalidate();
+      return "discarded";
+    }
     this.adopting = true;
     this.adoptionLease = lease;
     this.candidate = undefined;

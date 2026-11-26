@@ -89,3 +89,11 @@ test('target snapshot: parent, path, identity and existence must remain stable; 
   assert.equal(sameLivingTarget(before, undefined), false);
   assert.equal(sameLivingTarget({ id: 'a', path: 'a.md' }, { id: 'a', path: 'a.md', parentId: null }), true);
 });
+
+test('source resolution: copied foreign references remain missing even with a matching malformed ID in the destination', () => {
+  const foreign = 'foreign:' + JSON.stringify(['old-map', 'b']);
+  const result = resolve([card(foreign)], [], [...nodes, { id: foreign, path: 'other.md' }]);
+  assert.equal(result.sources.some(s => s.cardId === foreign), false);
+  assert.equal(result.failures[0].reason, 'missing-or-unauthorized');
+  assert.equal(result.failures[0].required, true);
+});

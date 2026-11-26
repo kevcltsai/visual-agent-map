@@ -213,6 +213,7 @@ import {
   runLivingRound,
   saveLivingConfig,
   validateLivingStructure,
+  livingRemovalConsumers,
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
@@ -6905,6 +6906,7 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
+    const consumers = await livingRemovalConsumers(this.app, this.plugin.repo, before, ids);
     const removed = before.nodes.filter(item => ids.has(item.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
     const tx = this.beginMapTransaction();
@@ -6941,6 +6943,7 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
+    this.noticeLivingRemoval(consumers);
     return entry;
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
@@ -11002,6 +11005,7 @@ export class VisualAgentMapView extends ItemView {
       for (const id of branchIds) ids.add(id);
     }
     if (!this.mergeUnlocked(ids)) return;
+    const consumers = await livingRemovalConsumers(this.app, this.plugin.repo, before, ids);
     const removed = before.nodes.filter(node => ids.has(node.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned"),
       viewport = clone(this.map.viewport);
@@ -11033,6 +11037,13 @@ export class VisualAgentMapView extends ItemView {
     this.selection.afterRemove();
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+    this.noticeLivingRemoval(consumers);
+  }
+  private noticeLivingRemoval(consumers: readonly string[]): void {
+    if (!consumers.length) return;
+    const names = consumers.slice(0, 5).map(id => this.notes.get(id)?.title ?? id).join(", ");
+    const remaining = consumers.length > 5 ? ` (+${consumers.length - 5})` : "";
+    new Notice(t("ui.living_node_removed_source_0", names + remaining));
   }
   private chooseSelectedParent(copyNodes: boolean): void {
     if (!this.map) return;

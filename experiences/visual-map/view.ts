@@ -193,6 +193,7 @@ import {
   ItemView,
   type Editor,
   Menu,
+  type MenuItem,
   Modal,
   MarkdownView,
   Notice,
@@ -203,7 +204,7 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { type ReferenceGroup } from "../../ai/reference-materials";
+import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -310,6 +311,7 @@ import {
   researchTopicTask,
   synthesisDirectionsTask,
   synthesisGoalTask,
+  promptIntegrationTask,
   thinkingOriginDocumentBlock
 } from "./steps/fragments";
 import {
@@ -582,6 +584,20 @@ import {
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
+import { PromptRunModal } from "./prompt-run-modal";
+import {
+  hasPromptTopic,
+  isPromptEdge,
+  isPromptTopic,
+  planPromptRun,
+  readPromptSources,
+  runPromptItems,
+  type PromptBatchState,
+  type PromptNoteRef,
+  type PromptPlan,
+  type PromptPlanItem,
+  type PromptRunEntry
+} from "./prompt-run";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
   BookSettingsViewModal,
@@ -1608,6 +1624,10 @@ export class VisualAgentMapView extends ItemView {
   private anchorDragCancel: ((restore: boolean) => void) | null = null;
   /** The anchor that gets the keyboard focus on the next paint (set when a drag settles). */
   private focusAnchorRef: string | null = null;
+  /** Prompt topics run from this view, by map path: memory only, so a reopened view starts blank (V1). */
+  private promptRuns = new Map<string, Map<string, PromptRunEntry>>();
+  /** The run-all batch of this view (running, or ended and not yet dismissed). */
+  private promptBatch: PromptBatchState | null = null;
   /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
   private relationEndIds = new Set<string>();
   /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -3136,6 +3156,8 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    // A run-all batch stops with its view: nothing it has in flight is written afterwards.
+    this.promptBatch?.controller.abort();
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.dropBookReviewSession();
@@ -10221,6 +10243,7 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     menu.addSeparator();
+    this.addPromptRunMenu(menu, node);
     if (!bookLock.structure) add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
     const hasChildren = map.nodes.some(item => item.parentId === node.id);
     if (hasChildren && !node.collapsed && !bookLock.structure)
@@ -10581,6 +10604,19 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("sticky-note")
           .onClick(() => this.enqueue(() => this.addFreeText(point)))
       );
+    if (this.canRunPrompts()) {
+      menu.addSeparator();
+      menu.addItem(item => {
+        item
+          .setTitle(t("ui.prompt_run_all"))
+          .setIcon("play")
+          .onClick(() => this.startPromptRun(null));
+        (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({
+          cls: "vam-menu-hint",
+          text: t("ui.prompt_run_all_hint")
+        });
+      });
+    }
     menu.showAtMouseEvent(event);
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
@@ -12546,6 +12582,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.renderMultiResearchStatus(this.contentEl);
+    this.renderPromptRunStatus(this.contentEl);
     // Goal grading stays off for an old AIM map (a source-text test pins this condition).
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     this.renderBackgroundBars(this.contentEl);
@@ -13067,6 +13104,7 @@ export class VisualAgentMapView extends ItemView {
     this.paintCardLinks(card, header, node.id);
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
+    this.paintPromptState(card, header, node, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
     this.paintCardColor(card, note);
     this.paintCardStyle(card, note);
@@ -14640,6 +14678,7 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardMarkers(card, header, node.id);
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
+      this.paintPromptState(card, header, node, note);
     }
     this.paintCardColor(card, note);
     this.paintCardStyle(card, note);
@@ -19352,6 +19391,362 @@ export class VisualAgentMapView extends ItemView {
         this.render();
       }
     });
+  }
+  // ---- Prompt topics and "run all" -------------------------------------------------------------------------------------
+  private promptNoteOf = (id: string): PromptNoteRef | undefined => {
+    const note = this.notes.get(id);
+    return note
+      ? {
+          prompt: note.prompt,
+          researchMode: note.researchMode,
+          ...(note.reuseLastResult ? { reuseLastResult: true } : {}),
+          ...(note.aiLocked ? { aiLocked: true } : {})
+        }
+      : undefined;
+  };
+  /** The run state of a Prompt topic as this view knows it; undefined for a topic not run or queued here. */
+  private promptEntryOf(id: string): PromptRunEntry | undefined {
+    return this.promptRuns.get(this.path)?.get(id);
+  }
+  /** True when the map has a Prompt topic and the entry points may show "Run all". */
+  private canRunPrompts(): boolean {
+    return (
+      !!this.map && !this.notesLoading() && !this.bookLock().ai && hasPromptTopic(this.map.nodes, this.promptNoteOf)
+    );
+  }
+  /** Why the AI is busy on any topic the plan would run (or a multi-select research runs): then nothing starts. */
+  private promptScopeBusy(plan: PromptPlan): boolean {
+    if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey())) return true;
+    return plan.run.some(item => {
+      const node = this.map?.nodes.find(candidate => candidate.id === item.id);
+      return (
+        !!node &&
+        (this.plugin.topicRuns.isBusy(node.path) ||
+          this.plugin.quickExpandPending.has(node.path) ||
+          this.plugin.topicRuns.hasTask(node.path))
+      );
+    });
+  }
+  private promptRunning(): boolean {
+    return !!this.promptBatch && !this.promptBatch.outcome;
+  }
+  /** "Run all" (whole map, `scopeId` null) or "Run all from here" (a branch): the confirmation card first, nothing is written before it. */
+  startPromptRun(scopeId: string | null): void {
+    const map = this.map;
+    if (!map || !this.path || this.notesLoading() || this.bookLock().ai) return;
+    if (this.promptRunning()) {
+      new Notice(t("ui.prompt_run_already"));
+      return;
+    }
+    const plan = planPromptRun(map.nodes, this.promptNoteOf, scopeId);
+    if (!plan.run.length) {
+      new Notice(t("ui.prompt_run_nothing"));
+      return;
+    }
+    if (this.promptScopeBusy(plan)) {
+      new Notice(t("ui.prompt_run_busy"));
+      return;
+    }
+    this.openMapModal(
+      new PromptRunModal(
+        this.app,
+        plan,
+        id => this.notes.get(id)?.title ?? id,
+        () => void this.confirmPromptRun(plan, scopeId, true)
+      )
+    );
+  }
+  /** "Run only this one": the topic alone, over its children's summaries as they are now. */
+  runPromptOne(node: MapNode): void {
+    const map = this.map;
+    const note = this.notes.get(node.id);
+    if (
+      !map ||
+      !this.path ||
+      !note ||
+      this.notesLoading() ||
+      this.bookLock().ai ||
+      !isPromptTopic(this.promptNoteOf(node.id))
+    )
+      return;
+    if (this.promptRunning()) {
+      new Notice(t("ui.prompt_run_already"));
+      return;
+    }
+    const kind = map.nodes.some(item => item.parentId === node.id) ? "integrate" : "research";
+    const item: PromptPlanItem = {
+      id: node.id,
+      kind,
+      action: "run",
+      web: kind === "research" && note.researchMode === "research"
+    };
+    const plan: PromptPlan = {
+      order: [item],
+      run: [item],
+      reuse: [],
+      counts: { run: 1, web: item.web ? 1 : 0, reuse: 0 }
+    };
+    if (this.promptScopeBusy(plan)) {
+      new Notice(t("ui.prompt_run_busy"));
+      return;
+    }
+    void this.confirmPromptRun(plan, node.id, false);
+  }
+  /** The usage notice of every model the batch will use (a refusal starts nothing and leaves no state), then the batch. */
+  private async confirmPromptRun(plan: PromptPlan, scopeId: string | null, checkBlocked: boolean): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    const models = [
+      ...new Set(
+        await Promise.all(
+          plan.run.map(async item => {
+            const node = map.nodes.find(candidate => candidate.id === item.id);
+            return node ? (await this.plugin.repo.resolveTopicModel(node.path, map)).model : this.currentModelId();
+          })
+        )
+      )
+    ];
+    const confirmEach = async (index: number, run: () => Promise<void>): Promise<boolean> =>
+      index >= models.length
+        ? (await run(), true)
+        : this.plugin.confirmAiUsage(models[index], async () => {
+            await confirmEach(index + 1, run);
+          });
+    await confirmEach(0, async () => {
+      if (this.closed || this.map !== map) return;
+      if (this.promptRunning()) {
+        new Notice(t("ui.prompt_run_already"));
+        return;
+      }
+      if (this.promptScopeBusy(plan)) {
+        new Notice(t("ui.prompt_run_busy"));
+        return;
+      }
+      await this.runPromptBatch(plan, scopeId, checkBlocked);
+    });
+  }
+  private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
+    let entries = this.promptRuns.get(mapPath);
+    if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
+    entries.set(id, reason === undefined ? { status } : { status, reason });
+    if (!this.closed && this.path === mapPath) this.render();
+  }
+  /** One topic of a batch: the research (a leaf) or the integration (its children's summaries, the Prompt as the direction). */
+  private async runPromptItem(
+    item: PromptPlanItem,
+    signal: AbortSignal,
+    languageSource: Pick<MapDocument, "title" | "outputLanguage"> | undefined,
+    gate: { shown: boolean }
+  ): Promise<void> {
+    const node = this.map?.nodes.find(candidate => candidate.id === item.id);
+    if (!node || !this.map) throw new Error(t("ui.note_missing"));
+    const note = await this.plugin.repo.readNote(node.path, this.map);
+    if (!note.prompt.trim()) throw new Error(t("ui.prompt_run_not_written"));
+    if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) throw new Error(t("ui.ai_locked_notice"));
+    // Only the Markdown notes on the "資料來源：" line go in; a link that does not resolve, or a URL, is skipped.
+    const documents = await readPromptSources(note.prompt, async link => {
+      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
+      return file instanceof TFile && file.extension.toLowerCase() === "md"
+        ? await readMarkdownFile(this.app, file)
+        : null;
+    });
+    const referenceGroups: ReferenceGroup[] = documents.length
+      ? [{ id: "prompt-sources", name: t("ui.prompt_run_sources_group"), location: "", documents }]
+      : [];
+    if (item.kind === "research") {
+      await this.researchChild(
+        node,
+        signal,
+        () => {},
+        { ...aiModeOptions(noteAiMode(note.researchMode), "research"), referenceGroups, requirements: "" },
+        false,
+        undefined,
+        gate,
+        languageSource
+      );
+      return;
+    }
+    const outputLanguage = cardOutputLanguage(languageSource ?? this.map, this.plugin.settings.language, note.title);
+    let written = false;
+    let failure: string | undefined;
+    await this.integrateChildren(
+      node,
+      {
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: note.visualMode,
+        synthesisContent: "summary",
+        skipCharts: true,
+        referenceGroups,
+        signal,
+        outputLanguage
+      },
+      promptIntegrationTask(outputLanguage, note.prompt),
+      async (_result, write, summary, detail) => {
+        await write(summary, detail);
+        written = true;
+      },
+      message => {
+        failure = message;
+      }
+    );
+    if (!written) throw new Error(failure ?? t("ui.prompt_run_not_written"));
+  }
+  private async runPromptBatch(plan: PromptPlan, scopeId: string | null, checkBlocked: boolean): Promise<void> {
+    const map = this.map;
+    const mapPath = this.path;
+    if (!map || !mapPath) return;
+    const mapId = map.id;
+    const controller = new AbortController();
+    const state: PromptBatchState = { mapPath, controller, total: plan.run.length, finished: 0 };
+    this.promptBatch = state;
+    const notes = new Map(this.notes);
+    const noteOf = (id: string): PromptNoteRef | undefined => {
+      const note = notes.get(id);
+      return note
+        ? {
+            prompt: note.prompt,
+            researchMode: note.researchMode,
+            ...(note.reuseLastResult ? { reuseLastResult: true } : {}),
+            ...(note.aiLocked ? { aiLocked: true } : {})
+          }
+        : undefined;
+    };
+    const languageSource = this.batchLanguageSource();
+    const gate = { shown: false };
+    const here = (): boolean => !this.closed && this.path === mapPath && this.map?.id === mapId;
+    try {
+      const outcome = await runPromptItems(
+        plan.order,
+        scopeId,
+        {
+          nodes: map.nodes,
+          noteOf,
+          signal: controller.signal,
+          isBad: id => this.promptRuns.get(mapPath)?.get(id)?.status === "blocked",
+          setStatus: (id, status, reason) => this.setPromptStatus(mapPath, id, status, reason),
+          titleOf: id => notes.get(id)?.title ?? id,
+          blockedReason: titles => t("ui.prompt_run_blocked_by_0", titles),
+          onStart: (id, finished) => {
+            state.finished = finished;
+            state.current = notes.get(id)?.title ?? id;
+          },
+          runItem: async item => {
+            // The view closed or the map changed under the batch: stop before any further call.
+            if (!here()) {
+              controller.abort();
+              return;
+            }
+            await this.runPromptItem(item, controller.signal, languageSource, gate);
+          }
+        },
+        checkBlocked
+      );
+      state.outcome = outcome;
+      state.finished = outcome.done + outcome.failed + outcome.blocked;
+    } finally {
+      state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
+      if (!this.closed) {
+        await this.hydrate();
+        this.render();
+      }
+    }
+  }
+  stopPromptBatch(): void {
+    this.promptBatch?.controller.abort();
+  }
+  /** The run-all bar: "Run all a / b · name" with Stop while it runs; the result and × after. */
+  private renderPromptRunStatus(parent: HTMLElement): void {
+    const state = this.promptBatch;
+    if (!state || state.mapPath !== this.path) return;
+    const bar = parent.createDiv(`vam-aim-statusbar vam-prompt-run-statusbar${state.outcome ? "" : " is-active"}`);
+    bar.setAttr("aria-live", "polite");
+    bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.prompt_run_all") });
+    const outcome = state.outcome;
+    bar.createSpan({
+      cls: `vam-aim-status-value ${outcome ? (outcome.failed || outcome.blocked ? "vam-status-error" : "") : "vam-status-running"}`,
+      text: !outcome
+        ? t("ui.prompt_run_progress_0_1_2", Math.min(state.finished + 1, state.total), state.total, state.current ?? "")
+        : outcome.stopped
+          ? t("ui.prompt_run_stopped_0_1", outcome.done, state.total)
+          : t("ui.prompt_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
+    });
+    if (!outcome) this.button(bar, t("ui.prompt_run_stop"), () => this.stopPromptBatch());
+    else {
+      const dismiss = this.button(bar, "×", () => {
+        if (this.promptBatch === state) this.promptBatch = null;
+        if (!this.closed) this.render();
+      });
+      dismiss.setAttr("aria-label", t("ui.dismiss"));
+    }
+  }
+  /** The "reuse last result" switch of a Prompt topic: `reuse-last-result` in the note, one undoable step, `updated` untouched. */
+  async setReuseLastResult(node: MapNode, on: boolean): Promise<void> {
+    if (!this.map || !this.notes.get(node.id)) return;
+    if ((this.notes.get(node.id)?.reuseLastResult === true) === on) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeReuseLastResult(path, on))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.prompt_run_reuse") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The Prompt state of a card: its run status (only when run or queued here) and the reuse pill; the card's name says both. */
+  private paintPromptState(card: HTMLElement, header: HTMLElement, node: MapNode, note: Note | undefined): void {
+    header.querySelectorAll(".vam-prompt-chip").forEach(chip => chip.remove());
+    if (!note || !isPromptTopic(this.promptNoteOf(node.id))) return;
+    const entry = this.promptEntryOf(node.id);
+    const parts: string[] = [];
+    if (entry) {
+      const label = t(`ui.prompt_run_status_${entry.status}`);
+      const chip = header.createSpan({
+        cls: `vam-prompt-chip vam-prompt-status vam-prompt-status-${entry.status}`,
+        text: label
+      });
+      if (entry.reason) chip.setAttr("title", entry.reason);
+      parts.push(label);
+    }
+    if (note.reuseLastResult) {
+      header.createSpan({ cls: "vam-prompt-chip vam-prompt-reuse", text: t("ui.prompt_run_reuse") });
+      parts.push(t("ui.prompt_run_reuse"));
+    }
+    const named = cardLabels.get(card)?.textContent;
+    if (named && parts.length) {
+      const extra = parts.filter(part => !named.includes(part));
+      if (extra.length) this.labelCard(card, t("ui.topic_card_label_0_1", named, extra.join(", ")));
+    }
+  }
+  private addPromptRunMenu(menu: Menu, node: MapNode): void {
+    const note = this.notes.get(node.id);
+    if (!note || !isPromptTopic(this.promptNoteOf(node.id)) || this.notesLoading() || this.bookLock().ai) return;
+    const hint = (item: MenuItem, text: string): void => {
+      (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({ cls: "vam-menu-hint", text });
+    };
+    menu.addItem(item => {
+      item
+        .setTitle(t("ui.prompt_run_only_this"))
+        .setIcon("play")
+        .onClick(() => this.whenEditing(() => this.runPromptOne(node)));
+      hint(item, t("ui.prompt_run_only_this_hint"));
+    });
+    menu.addItem(item => {
+      item
+        .setTitle(t("ui.prompt_run_from_here"))
+        .setIcon("list-start")
+        .onClick(() => this.whenEditing(() => this.startPromptRun(node.id)));
+      hint(item, t("ui.prompt_run_from_here_hint"));
+    });
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.prompt_run_reuse"))
+        .setIcon("history")
+        .setChecked(note.reuseLastResult === true)
+        .onClick(() => this.whenEditing(() => void this.setReuseLastResult(node, note.reuseLastResult !== true)))
+    );
+    menu.addSeparator();
   }
   private async startSynthesis(
     node: MapNode,
@@ -24995,6 +25390,7 @@ export class VisualAgentMapView extends ItemView {
           )
         : null;
     const tipped = new Set<string>();
+    const promptArrowStatuses = new Set<string>();
     for (const node of shown) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -25025,6 +25421,18 @@ export class VisualAgentMapView extends ItemView {
         if (!this.map.aim && this.notes.get(node.id)?.relevance?.tier === "side") path.addClass("vam-edge-side");
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
+        // A line between two Prompt topics carries data upward: an arrow at the parent's end, coloured by the child's run state.
+        if (
+          !this.map.aim &&
+          !afterText &&
+          parentId === node.parentId &&
+          isPromptEdge(this.promptNoteOf, parentId, node.id)
+        ) {
+          const status = this.promptEntryOf(node.id)?.status ?? "none";
+          path.addClass("vam-edge-prompt", `vam-edge-prompt-${status}`);
+          path.setAttribute("marker-start", `url(#${this.relationMarkerId}-prompt-${status})`);
+          promptArrowStatuses.add(status);
+        }
         lines.push(path);
         if (tipSkip && direction === "right" && parentId === node.parentId && !afterText && !tipSkip.has(parentId)) {
           if (!tipped.has(parentId)) {
@@ -25092,6 +25500,11 @@ export class VisualAgentMapView extends ItemView {
         if (path.getAttribute("d")) lines.push(path);
         else this.spineEls.delete(node.id);
       }
+    }
+    if (promptArrowStatuses.size) {
+      const defs = createSvg("defs");
+      for (const status of promptArrowStatuses) defs.appendChild(this.promptArrowMarker(status));
+      this.edgesEl.appendChild(defs);
     }
     for (const line of lines) this.edgesEl.appendChild(line);
     this.drawRelations(boxFor);
@@ -25298,6 +25711,23 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     return out;
+  }
+  /** The arrowhead of a Prompt line, drawn at the line's start (the parent's end) and turned to point at the parent; its colour follows the child's state. */
+  private promptArrowMarker(status: string): SVGMarkerElement {
+    const marker = createSvg("marker"),
+      arrow = createSvg("path");
+    marker.setAttribute("id", `${this.relationMarkerId}-prompt-${status}`);
+    marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "10");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "10");
+    marker.setAttribute("markerUnits", "userSpaceOnUse");
+    marker.setAttribute("orient", "auto-start-reverse");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.addClass("vam-prompt-arrow", `vam-prompt-arrow-${status}`);
+    marker.appendChild(arrow);
+    return marker;
   }
   /**
    * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The

@@ -97,6 +97,7 @@ import {
   managedHeadingValue,
   readRelevance,
   readAiLocked,
+  readReuseLastResult,
   readTopicKind,
   readHypothesisStrength,
   readHypothesisLeaning,
@@ -783,6 +784,7 @@ export class Repository {
       ...(readAiLocked(fm) || managedNodeIds(map).has(this.nodeAtPath(path, map, ctx)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
+      ...(readReuseLastResult(fm) ? { reuseLastResult: true as const } : {}),
       ...readPipelineFields(fm),
       ...(Object.keys(bookSettings).length ? { bookSettings } : {}),
       ...(topicKind !== "topic" ? { topicKind } : {}),
@@ -1333,6 +1335,18 @@ export class Repository {
       readAiLocked(frontmatter(content)) === locked
         ? content
         : setFrontmatterKeys(content, { "ai-locked": locked ? true : null })
+    );
+  }
+
+  /**
+   * Sets (`reuse-last-result: true`) or removes the "reuse last result" switch. No other key changes and `updated` is not
+   * bumped; a note already in the asked state is returned as it is, byte for byte.
+   */
+  async writeReuseLastResult(path: string, on: boolean): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      readReuseLastResult(frontmatter(content)) === on
+        ? content
+        : setFrontmatterKeys(content, { "reuse-last-result": on ? true : null })
     );
   }
 

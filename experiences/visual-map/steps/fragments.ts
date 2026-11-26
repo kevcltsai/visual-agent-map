@@ -31,6 +31,8 @@ import MergeGoalZH from "./merge-goal.zh.md";
 import MergeSupplementZH from "./merge-supplement.zh.md";
 import MergeSupplementEN from "./merge-supplement.en.md";
 import MergeGoalEN from "./merge-goal.en.md";
+import PromptIntegrationDefaultZH from "./prompt-integration-default.zh.md";
+import PromptIntegrationDefaultEN from "./prompt-integration-default.en.md";
 
 /**
  * Task text that Visual Map builds into the task of an AI request (expand, synthesize, research). Markdown files next to
@@ -54,6 +56,7 @@ const SYNTHESIS_DIRECTIONS: FragmentPair = pair(SynthesisDirectionsZH, Synthesis
 const SYNTHESIS_GOAL: FragmentPair = pair(SynthesisGoalZH, SynthesisGoalEN);
 const MERGE_GOAL: FragmentPair = pair(MergeGoalZH, MergeGoalEN);
 const MERGE_SUPPLEMENT: FragmentPair = pair(MergeSupplementZH, MergeSupplementEN);
+const PROMPT_INTEGRATION_DEFAULT: FragmentPair = pair(PromptIntegrationDefaultZH, PromptIntegrationDefaultEN);
 
 export const researchTopicTask = (language: ContentLanguage, title: string): string =>
   renderTemplate(inLanguage(RESEARCH_TOPIC, language), { title });
@@ -71,6 +74,9 @@ export const synthesisGoalTask = (language: ContentLanguage): string => inLangua
 export const mergeGoalTask = (language: ContentLanguage): string => inLanguage(MERGE_GOAL, language);
 /** The task of the second request of an AI merge: what the map's data sources add to the finished merged text, in a block of its own. */
 export const mergeSupplementTask = (language: ContentLanguage): string => inLanguage(MERGE_SUPPLEMENT, language);
+/** The direction of a Prompt topic's integration: the note's own Prompt, then the default instruction (evidence, for and against, contradictions; no conclusion unless the Prompt asks). */
+export const promptIntegrationTask = (language: ContentLanguage, prompt: string): string =>
+  `${prompt.trim()}\n\n${inLanguage(PROMPT_INTEGRATION_DEFAULT, language)}`;
 export const noSummaryYet = (language: ContentLanguage): string => inLanguage(NO_SUMMARY_YET, language);
 export const labelCurrentSummary = (language: ContentLanguage): string => inLanguage(LABEL_CURRENT_SUMMARY, language);
 export const labelVisualReferences = (language: ContentLanguage): string =>

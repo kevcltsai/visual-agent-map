@@ -24,6 +24,10 @@ export function readRelevance(fm: Record<string, unknown>): NoteRelevance | unde
 export function readAiLocked(fm: Record<string, unknown>): boolean {
   return fm["ai-locked"] === true;
 }
+/** The "reuse last result" switch of a Prompt topic (`reuse-last-result: true`): only the boolean true switches it on. */
+export function readReuseLastResult(fm: Record<string, unknown>): boolean {
+  return fm["reuse-last-result"] === true;
+}
 /**
  * The AI lock of a note given as text (an open editor's content): its frontmatter block is parsed with `parse` (Obsidian's
  * parseYaml) and read with {@link readAiLocked}. No frontmatter, or one that does not parse, reads as unlocked.

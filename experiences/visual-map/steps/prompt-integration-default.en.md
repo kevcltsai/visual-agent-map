@@ -1,0 +1,1 @@
+By default only organise the material: list what each subtopic (evidence) says, the reasons in favour, the reasons against, and where the pieces of evidence contradict each other. Do not draw a conclusion or give a recommendation unless the Prompt above explicitly asks for one.

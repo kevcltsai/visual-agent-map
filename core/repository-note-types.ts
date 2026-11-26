@@ -50,6 +50,8 @@ export interface Note extends PipelineFields {
   relevance?: NoteRelevance;
   /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
   aiLocked?: true;
+  /** From `reuse-last-result: true` (see readReuseLastResult): a Prompt topic that "run all" skips, its last returned summary standing in. Absent = off. */
+  reuseLastResult?: true;
   /** The root topic's `book-*` settings; absent when none is set. */
   bookSettings?: BookSettings;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */

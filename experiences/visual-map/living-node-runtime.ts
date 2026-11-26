@@ -504,7 +504,11 @@ function resolveDraft(
   if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
   if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
     throw new Error("living-node-cycle");
-  return { encoded, proposed };
+  const sourceRevision = livingSnapshotRevision(JSON.stringify(
+    (next.sources.get(target.id)?.sources ?? []).filter(source => source.roles.includes("explicit"))
+      .map(source => source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path])
+  ));
+  return { encoded, proposed, sourceRevision };
 }
 
 export interface LivingConfigSave {
@@ -512,6 +516,8 @@ export interface LivingConfigSave {
   before: string;
   after: string;
   configRevision: string;
+  /** Exact resolved explicit source identities, kept only by the undo/redo entry. */
+  sourceRevision: string;
 }
 
 /** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
@@ -524,7 +530,8 @@ export async function saveLivingConfig(
   expectedPrompt?: string,
   expectedConfigRevision?: string,
   isCurrent: () => boolean = () => true,
-  allowNewSource?: (path: string) => boolean
+  allowNewSource?: (path: string) => boolean,
+  expectedSourceRevision?: string
 ): Promise<LivingConfigSave> {
   const authorized = (): boolean => !repo.isDisposed() && isCurrent();
   if (!authorized()) throw new Error("changed-configuration");
@@ -538,7 +545,9 @@ export async function saveLivingConfig(
   if (expectedConfigRevision !== undefined &&
       livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision)
     throw new Error("changed-configuration");
-  const { encoded } = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
+  const { encoded, sourceRevision } = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
+  if (expectedSourceRevision !== undefined && sourceRevision !== expectedSourceRevision)
+    throw new Error("changed-source-identity");
   const fm = frontmatter(snapshot.content);
   if (
     snapshot.note.aiCard &&
@@ -549,7 +558,8 @@ export async function saveLivingConfig(
       outcome: "unchanged",
       before: snapshot.content,
       after: snapshot.content,
-      configRevision: livingConfigurationStamp(prompt, fm)
+      configRevision: livingConfigurationStamp(prompt, fm),
+      sourceRevision
     };
   let saved = "";
   let savedRevision = "";
@@ -575,7 +585,8 @@ export async function saveLivingConfig(
     outcome,
     before: snapshot.content,
     after: saved,
-    configRevision: savedRevision
+    configRevision: savedRevision,
+    sourceRevision
   };
 }
 

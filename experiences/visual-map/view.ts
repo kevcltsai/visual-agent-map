@@ -15461,8 +15461,10 @@ export class VisualAgentMapView extends ItemView {
     open.trial.close();
     open.win.destroy();
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
-    if (node && !this.closed && !this.plugin.repo.isDisposed())
-      void this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path), open.viewSession, true).catch(() => {});
+    const target = node && !this.closed && !this.plugin.repo.isDisposed()
+      ? this.app.vault.getAbstractFileByPath(node.path)
+      : undefined;
+    void this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true).catch(() => {});
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {

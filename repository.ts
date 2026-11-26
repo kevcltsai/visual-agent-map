@@ -52,7 +52,7 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
-import { livingConfigurationStamp, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
+import { livingConfigurationStamp, rebaseLivingNoteReferences, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
 import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -2061,14 +2061,19 @@ export class Repository {
         const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (
           cached &&
-          ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs))
+          ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)) &&
+          !rebaseLivingNoteReferences(cached["living-node-refs"], chainRebase(pairs))
         )
           continue;
         const note = await this.readNoteIfManaged(file);
         if (!note) continue;
         const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
         const sourcePaths = rebasePathList(note.sourcePaths, pairs);
-        if (!referencePaths && !sourcePaths) continue;
+        // The Living Node reference list is separate from the legacy citation lists.
+        const livingRefs = rebaseLivingNoteReferences(
+          frontmatter(await this.app.vault.read(file))["living-node-refs"], chainRebase(pairs)
+        );
+        if (!referencePaths && !sourcePaths && !livingRefs) continue;
         await this.app.vault.process(file, content => {
           const fm = frontmatter(content);
           if (!marker(fm["agent-map-node"])) return content;
@@ -2080,13 +2085,15 @@ export class Repository {
           };
           const references = rebasePathList(paths("reference-materials"), pairs);
           const sources = rebasePathList(paths("source-notes"), pairs);
-          if (!references && !sources) return content;
-          return this.patchedNote(
+          const living = rebaseLivingNoteReferences(fm["living-node-refs"], chainRebase(pairs));
+          if (!references && !sources && !living) return content;
+          const next = references || sources ? this.patchedNote(
             file.path,
             content,
             { ...(references ? { referencePaths: references } : {}), ...(sources ? { sourcePaths: sources } : {}) },
             {}
-          );
+          ) : content;
+          return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
         });
       } catch (error) {
         // One unreadable or unwritable note must not prevent later candidates from following the rename.
@@ -2121,8 +2128,10 @@ export class Repository {
       const patch: NotePatch = {};
       if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
       if (sources.some(path => rebase(path) !== path)) patch.sourcePaths = sources.map(rebase);
-      if (!Object.keys(patch).length) return content;
-      const text = this.patchedNote(file.path, content, patch, {});
+      const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
+      if (!Object.keys(patch).length && !living) return content;
+      const next = Object.keys(patch).length ? this.patchedNote(file.path, content, patch, {}) : content;
+      const text = living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
       recordPrior(content, text);
       return text;
     });

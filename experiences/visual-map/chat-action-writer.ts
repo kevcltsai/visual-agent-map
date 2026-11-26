@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 import { t, type TranslationKey } from "../../i18n";
 import type { App, Editor, TFile } from "obsidian";
 import { addedMermaidBlocks } from "../../ai/mermaid-safety";
+import { saveLivingConfig } from "./living-node-runtime";
+import { promptSourceLinks } from "./prompt-run";
 import {
   canParent,
   clone,
@@ -286,6 +288,48 @@ export class ChatActionWriter {
         run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
+        return done;
+      }
+      case "configure_ai_card": {
+        const id = real(action.nodeId);
+        const node = id ? nodeOf(id) : undefined;
+        if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
+        if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const createdHere = action.nodeId.startsWith(MAP_CHAT_NEW_PREFIX) && run.created.includes(node.id);
+        const repo = this.plugin.repo;
+        const current = await repo.readNoteSnapshot(node.path, this.map);
+        if (!same()) return skipped("ui.map_chat_skip_map_changed");
+        if (current.note.aiLocked) return skipped("ui.ai_locked_notice");
+        // Existing ordinary cards cannot be implicitly converted by chat.
+        if (!createdHere && current.note.aiCard !== true) return skipped("ui.living_node_chat_existing_only");
+        const stamp = baseline.topicHashes[node.id]?.livingConfigRevision;
+        if (!createdHere && (!stamp || stamp !== current.note.livingNode?.configRevision))
+          return skipped("ui.map_chat_skip_topic_changed");
+        // A model-generated new link may only name a card already in the map,
+        // or a file authorized in this turn. Unchanged aliases retain their
+        // persisted identities through the shared save preflight.
+        const previous = new Set(promptSourceLinks(current.note.prompt));
+        for (const link of promptSourceLinks(action.content)) {
+          if (previous.has(link)) continue;
+          const dest = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
+          if (!dest || (!this.map.nodes.some(item => item.path === dest.path) &&
+              !Object.prototype.hasOwnProperty.call(hashes, normalizeVaultPath(dest.path) ?? dest.path) &&
+              !baseline.mapSourcePaths?.includes(dest.path)))
+            return skipped("ui.living_node_chat_source_refused");
+        }
+        const entry = await this.ports.beginMapTransaction().rewriteNote(node.path, async path => {
+          if (!same()) throw new Error("changed-target");
+          const liveMap = await repo.readMap(this.path);
+          if (liveMap.nodes.find(item => item.id === node.id)?.path !== path) throw new Error("changed-target-identity");
+          await saveLivingConfig(this.app, repo, liveMap, node.id, action.content, current.note.prompt, stamp);
+        }).commit({ deferRebuild: true, label: t("ui.ai_card") });
+        this.history.push(entry);
+        run.notes?.add(node.id);
+        const saved = await repo.readNote(node.path, this.map);
+        this.notes.set(node.id, saved);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
       case "set_topic_kind":
@@ -861,6 +905,8 @@ export class ChatActionWriter {
           "write",
           action.nodeIds.map(id => real(id))
         );
+      case "configure_ai_card":
+        return check("write", [real(action.nodeId)]);
       case "rename_topic":
       case "update_summary":
       case "edit_topic_note":
@@ -946,7 +992,9 @@ export class ChatActionWriter {
       title: now.title,
       parentId: now.parentId,
       ...(seen.summary !== undefined ? { summary: now.summary } : {}),
-      ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
+      ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {}),
+      ...(seen.livingConfigRevision !== undefined && this.notes.get(id)?.livingNode?.configRevision
+        ? { livingConfigRevision: this.notes.get(id)!.livingNode!.configRevision } : {})
     };
   }
   /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */

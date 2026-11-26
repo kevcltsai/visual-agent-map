@@ -3,6 +3,8 @@ import { isAiCard, type PromptNoteRef, type PromptNodeRef } from "./prompt-run";
 /** Resolved same-map references only; ordinary Markdown sources are read-only inputs, not execution edges. */
 export interface LivingNodePlanNode extends PromptNodeRef, PromptNoteRef {
   explicitCardIds?: readonly string[];
+  /** Required note references that could not be resolved or authorized. */
+  sourceUnavailable?: boolean;
   hasKnowledge: boolean;
 }
 
@@ -104,6 +106,7 @@ export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?
   const discovered = new Set(pending);
   for (let i = 0; i < pending.length; i++) {
     const id = pending[i];
+    if (byId.get(id)?.sourceUnavailable) blocked.set(id, "missing-source");
     const deps: string[] = [];
     const frozen: string[] = [];
     for (const sourceId of sources(id)) {

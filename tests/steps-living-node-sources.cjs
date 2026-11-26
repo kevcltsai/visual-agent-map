@@ -49,3 +49,23 @@ test('source resolution: ambiguous path alias is refused', () => {
   assert.equal(result.failures[0].reason, 'ambiguous');
   assert.equal(result.failures[0].required, true);
 });
+
+const { planLivingMap } = require('./support.cjs').load('experiences/visual-map/living-node-map.ts');
+const asAi = (node, refs = []) => ({ ...node, aiCard: true, prompt: 'p', hasKnowledge: true, explicitRefs: refs });
+
+test('map planning: unresolved required Markdown blocks dependent branch while optional context does not', () => {
+  const cards = [asAi(nodes[0], [card('b')]), asAi(nodes[1]), asAi(nodes[2]), asAi(nodes[3], [note('missing')])];
+  const result = planLivingMap(cards, ['optionalMissing'], port);
+  assert.equal(result.plan.blocked.get('b'), 'missing-source');
+  assert.equal(result.plan.blocked.get('root'), 'dependency-blocked');
+  assert.deepEqual(plain(result.plan.order.map(x => x.id)), ['grandchild', 'a']);
+  assert.equal(result.sources.get('a').failures[0].required, false);
+});
+
+test('map planning: same-map Markdown alias participates in cycle detection', () => {
+  const cards = [asAi(nodes[0], [note('B')]), asAi(nodes[1]), asAi(nodes[2]), asAi(nodes[3], [note('rootAlias')])];
+  const result = planLivingMap(cards, [], port);
+  assert.equal(result.plan.blocked.get('root'), 'cycle');
+  assert.equal(result.plan.blocked.get('b'), 'cycle');
+  assert.deepEqual(plain(result.plan.order.map(x => x.id)), ['grandchild', 'a']);
+});

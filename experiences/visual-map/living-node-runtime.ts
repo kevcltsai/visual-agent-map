@@ -154,6 +154,24 @@ async function prepareMap(port: Pick<LivingRoundPort, "repo">, map: MapDocument)
   return { snapshots, cards };
 }
 
+/** Before a removal moves files, identify surviving consumers of explicit card
+ * references. The removal itself does not erase or retarget the saved IDs. */
+export async function livingRemovalConsumers(
+  app: App,
+  repo: Repository,
+  map: MapDocument,
+  removed: ReadonlySet<string>
+): Promise<string[]> {
+  if (!removed.size) return [];
+  const { cards } = await prepareMap({ repo }, map);
+  const planned = planLivingMap(cards, [], sourceResolver(app));
+  return cards.filter(card => !removed.has(card.id) && isAiCard(card) &&
+    planned.sources.get(card.id)?.sources.some(source =>
+      !!source.cardId && removed.has(source.cardId) && source.roles.includes("explicit")
+    )
+  ).map(card => card.id);
+}
+
 /** Check the final structural snapshot before Map.md is published. Reordering,
  * layout, viewport and collapse do not change dependencies. Existing cards use
  * their current note bytes (including after a file move); only graph edges that

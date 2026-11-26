@@ -91,7 +91,13 @@ export class NodeDetailsSidebar {
       const leaf = this.detailsLeaf;
       if (!leaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
       if (!(leaf.view instanceof LivingReaderView)) await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
-      if (!current() || this.detailsLeaf !== leaf) return false;
+      if (!current() || this.detailsLeaf !== leaf) {
+        // Stop during view creation must not leave an empty preview pane. A newer
+        // selection has its own queued transition and must never be replaced here.
+        if (revision === this.revision && this.trialOwner === owner && this.detailsLeaf === leaf)
+          await this.openOfficial(file, revision);
+        return false;
+      }
       if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
       await leaf.view.show(file, markdown, owner);
       if (!current()) return false;
@@ -105,9 +111,22 @@ export class NodeDetailsSidebar {
       this.detailsLeaf.view.markInvalid(owner);
   }
 
-  restoreLivingOfficial(file: TFile, owner: string, release = false): Promise<void> {
+  restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
     if (this.trialOwner !== owner) return Promise.resolve();
-    return this.openDetails(file, release ? undefined : owner);
+    if (file) return this.openDetails(file, release ? undefined : owner);
+    // The edited card may have been deleted, or its view may have closed. Clear
+    // ownership immediately, then discard only the matching transient reader.
+    this.trialOwner = undefined;
+    const revision = ++this.revision;
+    return this.enqueue(async () => {
+      if (revision !== this.revision) return;
+      const leaf = this.detailsLeaf;
+      if (leaf?.view instanceof LivingReaderView && leaf.view.owns(owner)) {
+        leaf.detach();
+        this.detailsLeaf = null;
+        this.detailsPath = null;
+      }
+    });
   }
 
   closeStaleDetails(): void {

@@ -11466,7 +11466,7 @@ export class VisualAgentMapView extends ItemView {
       const accepted = await this.acceptCrossCut(payload, record);
       if (!accepted) return;
       const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
-      const living = await livingCrossCut(this.app, this.plugin.repo, sourceMap, map, new Set(record.nodeIds));
+      const living = await livingCrossCut(this.app, this.plugin.repo, sourceMap, map, new Set(record.nodeIds), target?.id);
       if (living.preserveIdentity) {
         tops = await this.moveLivingAcrossMaps(accepted, target, payload, record);
         if (tops.length) this.noticeLivingRemoval(living.affected);
@@ -11476,7 +11476,7 @@ export class VisualAgentMapView extends ItemView {
           target,
           payload,
           record.nodeIds,
-          this.crossCutOf(payload, record, accepted.branch)
+          this.crossCutOf(payload, record, accepted.branch, undefined, target?.id)
         );
       }
       const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
@@ -11695,7 +11695,7 @@ export class VisualAgentMapView extends ItemView {
     const graph = (map: MapDocument): string => JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
     const ids = new Set(source.branch.map(node => node.id));
     const roots = new Set(source.roots.map(node => node.id));
-    const cross = this.crossCutOf(payload, record, source.branch, destination.id);
+    const cross = this.crossCutOf(payload, record, source.branch, destination.id, target?.id);
     await cross.snapshot();
     const tx = cross.begin();
     cross.join(tx);
@@ -11741,7 +11741,9 @@ export class VisualAgentMapView extends ItemView {
     return tops;
   }
   /** The source side of a cross-map cut: re-check before writing; transfer or park originals. */
-  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[], destinationId?: string): CrossCut {
+  private crossCutOf(
+    payload: ClipboardPayload, record: ClipRecord, branch: MapNode[], destinationId?: string, destinationParentId?: string
+  ): CrossCut {
     const plugin = this.plugin,
       repo = plugin.repo,
       from = record.sourceMapPath,
@@ -11777,7 +11779,7 @@ export class VisualAgentMapView extends ItemView {
           throw new Error(t("ui.merge_locked"));
         const destination = await repo.readMap(into);
         if (destinationId && destination.id !== destinationId) throw new Error("changed-target-identity");
-        const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed);
+        const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed, destinationParentId);
         if (checked.preserveIdentity !== Boolean(destinationId)) throw new Error("changed-source-identity");
       }),
       join: tx => {

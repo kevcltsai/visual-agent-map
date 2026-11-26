@@ -654,3 +654,51 @@ S.integrationTest('Living Node cross-map cut preserves referenced ordinary input
   );
   assert.deepEqual(f.calls, []);
 });
+
+
+S.integrationTest('Living Node config: external file path is canonical, follows rename and never falls back to an alias', async () => {
+  const f = await roundFixture();
+  await f.app.vault.create('Source.md', '# Source\nKnowledge');
+  const prompt = 'Read source\n\nSources: [[Source]], [[Source.md]]';
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', prompt);
+  const raw = f.contents.get('parent.md');
+  const metadata = text => S.obsidian.parseYaml(text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+  assert.deepEqual(metadata(raw)['living-node-refs'], ['note-path:Source.md', 'note-path:Source.md']);
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read source\n\nSources: [[Source]]');
+  assert.deepEqual(metadata(f.contents.get('parent.md'))['living-node-refs'], ['note-path:Source.md']);
+  await f.repo.moveExact('Source.md', 'Renamed.md');
+  assert.deepEqual(metadata(f.contents.get('parent.md'))['living-node-refs'], ['note-path:Renamed.md']);
+  const saved = await f.repo.readNote('parent.md');
+  await f.app.vault.rename(f.files.get('Renamed.md'), 'Untracked.md');
+  await f.app.vault.create('Source.md', '# Different source');
+  await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'parent', saved.prompt), /invalid-source/);
+  assert.deepEqual(f.calls, []);
+});
+
+S.integrationTest('Living Node config: a resolved note in the vault configuration directory is refused', async () => {
+  const f = await roundFixture();
+  f.app.vault.configDir = '.settings';
+  await f.app.vault.create('.settings/Private.md', '# Private\nNot a research source');
+  const before = f.contents.get('parent.md');
+  await assert.rejects(
+    () => saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read source\n\nSources: [[.settings/Private]]'),
+    /missing-source/
+  );
+  assert.equal(f.contents.get('parent.md'), before);
+  assert.deepEqual(f.calls, []);
+});
+
+S.integrationTest('Living Node share: only verified public web evidence is exported', () => {
+  const { renderLivingShareKnowledge } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+  const evidence = source => ({ id: 'web:' + livingSnapshotRevision(source), source, retrievedAt: '2026-11-27' });
+  const knowledge = { ...empty(), output: { owner: 'ai', text: 'Formal result', evidence: [
+    evidence('https://example.com/article'),
+    evidence('https://example.com/article?token=secret'),
+    evidence('http://localhost/private'),
+    { id: 'note:private', source: 'https://example.com/private', retrievedAt: 'today' },
+    { id: 'web:wrong', source: 'https://example.com/unverified', retrievedAt: 'today' }
+  ] } };
+  const shared = renderLivingShareKnowledge(knowledge);
+  assert.match(shared, /https:\/\/example\.com\/article/);
+  assert.doesNotMatch(shared, /secret|localhost|private|unverified|web:/);
+});

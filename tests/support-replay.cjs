@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { buildSync } = require('./build.cjs');
+const { buildSync, recordCachedEntry } = require('./build.cjs');
 
 const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, globals = {}) {
@@ -53,6 +53,7 @@ function makeService(runtime, { language = 'en', logging = false, exchanges = nu
   let AiTaskService;
   if (reuseModule) {
     if (!serviceClasses.has(language)) serviceClasses.set(language, load('core/ai-task-service.ts').AiTaskService);
+    else recordCachedEntry('core/ai-task-service.ts', 'tests/support-replay.cjs');
     AiTaskService = serviceClasses.get(language);
   } else ({ AiTaskService } = load('core/ai-task-service.ts'));
   return new AiTaskService({

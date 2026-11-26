@@ -186,6 +186,27 @@ test('test-affected: tests/build.cjs records the sources of every bundle for the
     assert.ok(record.bundles['map-model.ts'].includes('map-model.ts'));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+test('test-affected: cached fixture modules credit every consumer without crediting unrelated helpers', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-deps-cache-'));
+  const names = ['a', 'b', 'unrelated'].map(name => `affected-cache-${name}-${process.pid}.cjs`);
+  const files = names.map(name => path.join(root, 'tests', name));
+  try {
+    for (const file of files.slice(0, 2)) fs.writeFileSync(file, "const S = require('./support.cjs'); void S.core;\n");
+    fs.writeFileSync(files[2], "const S = require('./support.cjs'); S.node('x');\n");
+    const run = spawnSync(process.execPath, ['-e', files.map(file => `require(${JSON.stringify(file)});`).join('')], { cwd: root, env: { ...process.env, VAM_TEST_DEPS_DIR: dir }, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    const records = fs.readdirSync(dir).map(name => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')));
+    const record = records.find(item => item.callers[`tests/${names[0]}`]);
+    assert.ok(record, 'first consumer recorded');
+    assert.deepEqual(record.callers[`tests/${names[0]}`], record.bundles['map-model.ts']);
+    assert.deepEqual(record.callers[`tests/${names[1]}`], record.bundles['map-model.ts']);
+    assert.equal(record.callers[`tests/${names[2]}`], undefined);
+  } finally {
+    for (const file of files) fs.rmSync(file, { force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('test-affected: without VAM_TEST_DEPS_DIR nothing is recorded', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-deps-'));
   try {
@@ -200,6 +221,7 @@ test('test-affected: VAM_AFFECTED_TESTS keeps the listed node --test files, drop
   assert.equal(applyAffected(parts, {}), parts);
   assert.deepEqual(applyAffected(parts, { VAM_AFFECTED_TESTS: 'tests/b.cjs,tests/suites/x.cjs' }).map(part => part.args), [['tests/run.cjs', '--layer=unit'], ['--test', 'tests/b.cjs']]);
   assert.deepEqual(applyAffected(parts, { VAM_AFFECTED_TESTS: 'tests/suites/x.cjs' }).map(part => part.name), ['run']);
+  assert.deepEqual(applyAffected(parts, { VAM_AFFECTED_TESTS: 'tests/b.cjs' }).map(part => part.name), ['files']);
 });
 
 // A fake gh answers `gh run list` with the given tab-separated rows (id, head sha, run name, optional conclusion; default success).

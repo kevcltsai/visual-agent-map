@@ -73,12 +73,15 @@ function writeReport(result, layer, shard) {
 }
 
 // With VAM_AFFECTED_TESTS (set by scripts/test-affected.mjs), a `node --test` part keeps only the listed files and is dropped when none is left.
-// A tests/run.cjs part stays: run.cjs filters its own suites.
+// A tests/run.cjs part is only needed when at least one suite is selected; run.cjs filters its own shards.
 export function applyAffected(list, env = process.env) {
   if (!env.VAM_AFFECTED_TESTS) return list;
   const affected = new Set(env.VAM_AFFECTED_TESTS.split(","));
   return list.flatMap(part => {
-    if (part.args[0] !== "--test") return [part];
+    if (part.args[0] !== "--test") {
+      if (part.args[0] === "tests/run.cjs" && ![...affected].some(file => file.startsWith("tests/suites/"))) return [];
+      return [part];
+    }
     const files = part.args.slice(1).filter(file => affected.has(file));
     return files.length ? [{ ...part, args: ["--test", ...files] }] : [];
   });

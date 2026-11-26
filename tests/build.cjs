@@ -57,7 +57,25 @@ function record(key, result, options) {
     bundleSources.set(key, sources);
     for (const entryPoint of [options.entryPoints].flat()) if (typeof entryPoint === 'string') { const rel = path.relative(repoRoot, path.resolve(cwd, entryPoint)).split(path.sep).join('/'); let set = bundles.get(rel); if (!set) bundles.set(rel, set = new Set()); for (const source of sources) set.add(source); }
   }
-  for (const caller of callerFiles()) { let set = recorded.get(caller); if (!set) recorded.set(caller, set = new Set()); for (const source of bundleSources.get(key)) set.add(source); }
+  recordSources(bundleSources.get(key));
+}
+function recordSources(sources, fallback) {
+  const callers = callerFiles();
+  // An unattributed cached access must remain conservative, not silently disappear.
+  if (!callers.length && fallback) callers.push(fallback);
+  for (const caller of callers) {
+    let set = recorded.get(caller);
+    if (!set) recorded.set(caller, set = new Set());
+    for (const source of sources) set.add(source);
+  }
+}
+// Helpers that cache the evaluated module (rather than only the bundle) must credit
+// every consumer, even when they did not have to call buildSync again.
+function recordCachedEntry(entry, fallback = 'tests/support.cjs') {
+  if (!depsDir) return;
+  const sources = bundles.get(entry);
+  if (!sources) throw new Error(`Missing dependency record for cached entry: ${entry}`);
+  recordSources(sources, fallback);
 }
 if (depsDir) process.on('exit', () => {
   if (!recorded.size) return;
@@ -76,4 +94,4 @@ function buildSync(options) {
   return result;
 }
 
-module.exports = { buildSync };
+module.exports = { buildSync, recordCachedEntry };

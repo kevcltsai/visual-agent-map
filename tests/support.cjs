@@ -16,7 +16,7 @@ const register = (name, optionsOrFn, maybeFn) => {
 };
 const test = (name, optionsOrFn, maybeFn) => { if (!layer || layer === 'unit') register(name, optionsOrFn, maybeFn); };
 const integrationTest = (name, optionsOrFn, maybeFn) => { if (!layer || layer === 'integration') register(name, optionsOrFn, maybeFn); };
-const { buildSync } = require('./build.cjs');
+const { buildSync, recordCachedEntry } = require('./build.cjs');
 // Obsidian's own YAML options, so frontmatter in tests round-trips like the real app (not a one-line-per-key stub).
 const YAML = require('yaml');
 const root = path.resolve(__dirname, '..');
@@ -28,7 +28,7 @@ function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
   const module = { exports: {} };
   vm.runInNewContext(code, { get activeWindow() { return windowValues.activeWindow; }, get activeDocument() { return windowValues.activeDocument; }, module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, TextEncoder, btoa, Blob, URL, Event, crypto: require('node:crypto').webcrypto, process, AbortController, navigator: windowValues.navigator, CSS: windowValues.CSS, document: windowValues.document, createSvg: windowValues.createSvg, createEl: windowValues.createEl, Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
   // The view reaches the running set, stop registry and pending suggestions only through plugin.topicRuns (04c): a plugin double gets a TopicRuns over its own fields.
-  if ((entry === 'main.ts' || entry === 'experiences/visual-map/view.ts') && module.exports.VisualAgentMapView) {
+  if (typeof module.exports.VisualAgentMapView === 'function') {
     const View = module.exports.VisualAgentMapView;
     return { ...module.exports, VisualAgentMapView: class extends View { constructor(leaf, plugin) { super(leaf, plugin && !('topicRuns' in plugin) ? attachTopicRuns(plugin) : plugin); } } };
   }
@@ -36,22 +36,30 @@ function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
 }
 /** The shipped build: AIM was removed, so this is `load` (tests/suites/legacy-aim-map.cjs keeps its name for what it loads). */
 const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues);
+// Cache evaluated modules without attributing their entire dependency graph to
+// every test that imports this helper. Credit the actual consumer on each hit.
+function loadCached(entry, cached, overrides = {}) {
+  if (cached) { recordCachedEntry(entry); return cached; }
+  return load(entry, overrides);
+}
 let core, layout, logging;
 const node = (id, parentId = null, collapsed = false) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed });
 const map = nodes => ({ id: 'map', title: '測試心智圖', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } });
 const plain = obj => JSON.parse(JSON.stringify(obj));
 const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
-let TopicRunsClass;
+let topicRunsModule;
 /** The run module over a view-level plugin double: every port reads the double on use, like the real composition root. */
-let NoteStyleStoreClass;
+let noteStyleModule;
 /** Starts a research run straight on the plugin's run module, with no view: the callbacks a view would give are test stand-ins. */
 function startResearch(plugin, node, { map, request, runOnce, done, failed, accepted, ...rest } = {}) {
   return plugin.topicRuns.start(node.path, 'research', { map, request, runOnce, done, failed, accepted, notify: () => {}, ancestors: async () => '', userTexts: () => '', ...rest });
 }
 function attachTopicRuns(plugin) {
   if (plugin.topicRuns) return plugin;
-  NoteStyleStoreClass ??= load('ai/note-style-store.ts', { obsidian: module.exports.obsidian ?? {} }).NoteStyleStore;
-  TopicRunsClass ??= load('experiences/visual-map/topic-run.ts', { obsidian: module.exports.obsidian ?? {} }).TopicRuns;
+  noteStyleModule = loadCached('ai/note-style-store.ts', noteStyleModule, { obsidian: module.exports.obsidian ?? {} });
+  topicRunsModule = loadCached('experiences/visual-map/topic-run.ts', topicRunsModule, { obsidian: module.exports.obsidian ?? {} });
+  const { NoteStyleStore: NoteStyleStoreClass } = noteStyleModule;
+  const { TopicRuns: TopicRunsClass } = topicRunsModule;
   plugin.topicRuns = new TopicRunsClass({
     aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate ? plugin.mutate(work) : work(), progress: () => plugin.researchProgress,
     repository: () => plugin.repo, running: () => plugin.running ??= new Set(), pendingSuggestions: () => plugin.pendingSuggestions ??= new Map(), activeTasks: () => plugin.activeTasks ??= new Map(),
@@ -98,7 +106,7 @@ const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, setTo
 };
 // Preserve shared module identity without evaluating unused product modules for basic helpers.
 let repository;
-const repositoryModule = () => (repository ??= load('repository.ts', { obsidian }));
+const repositoryModule = () => (repository = loadCached('repository.ts', repository, { obsidian }));
 function fixture(language = 'zh-TW', options = {}) {
   const { Repository, DEFAULT_SETTINGS } = repositoryModule();
   const files = new Map(), contents = new Map(), trashed = [];
@@ -143,4 +151,4 @@ const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, get core() { return core ??= load('map-model.ts'); }, get layout() { return layout ??= load('map-layout.ts'); }, get logging() { return logging ??= load('log-manager.ts'); }, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, get Repository() { return repositoryModule().Repository; }, get DEFAULT_SETTINGS() { return repositoryModule().DEFAULT_SETTINGS; }, get normalizeReasoningLevel() { return repositoryModule().normalizeReasoningLevel; }, fixture, topicNote, deferred, until };
+module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, get core() { return core = loadCached('map-model.ts', core); }, get layout() { return layout = loadCached('map-layout.ts', layout); }, get logging() { return logging = loadCached('log-manager.ts', logging); }, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, get Repository() { return repositoryModule().Repository; }, get DEFAULT_SETTINGS() { return repositoryModule().DEFAULT_SETTINGS; }, get normalizeReasoningLevel() { return repositoryModule().normalizeReasoningLevel; }, fixture, topicNote, deferred, until };

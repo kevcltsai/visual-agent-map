@@ -235,7 +235,7 @@ interface NoteStep {
   restore: string;
   apply: () => Promise<void>;
 }
- const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
+const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
   repo.app.vault.read(repo.file(path));
 const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, text: string): Promise<void> => {
   await repo.app.vault.process(repo.file(path), current =>
@@ -271,7 +271,13 @@ class NoteWriteJournal {
 
   private readonly guard: NoteWriteGuard = (file, current, change) => {
     const entry = this.entries.get(file);
-    if (!entry || !this.active) return change(current);
+    if (!this.active) return change(current);
+    if (!entry) {
+      // A replacement at a tracked path is not the file that this transaction owns.
+      if ([...this.entries.values()].some(tracked => tracked.path === file.path || tracked.file.path === file.path))
+        throw noteConflict();
+      return change(current);
+    }
     if (!sameText(current, entry.expected)) {
       entry.conflict = true;
       if (!this.reverting) throw noteConflict();
@@ -768,7 +774,7 @@ export function begin(deps: TransactionDeps): Transaction {
             else op.target = to;
           }
           for (const note of noteRecords) await note.settle?.(noteAt(ops, note.path, "undo"));
-           const resolve = (originalPath: string): string => {
+          const resolve = (originalPath: string): string => {
             const found = started.get(originalPath);
             if (!found) throw new Error(`Not a moved note: ${originalPath}`);
             // A created or renamed note is at its settled name; a rename that found its name taken left the note where it was.

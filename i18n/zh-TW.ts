@@ -1178,6 +1178,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_trial": "試跑",
   "ui.living_node_official": "正式內容",
   "ui.living_node_trial_unsaved": "試跑・尚未儲存",
+  "ui.living_node_trial_stale_sources": "此試跑使用仍需更新的上游知識；請先正式執行卡片，再採用結果。",
+  "ui.living_node_trial_frozen_sources": "此試跑使用已鎖定的上游知識，資訊可能不是最新。",
   "ui.living_node_trial_invalid": "試跑・已失效",
   "ui.living_node_try_prompt": "試跑 Prompt",
   "ui.living_node_adopt": "採用試跑",

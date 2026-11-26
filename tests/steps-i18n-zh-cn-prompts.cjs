@@ -138,7 +138,7 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 106 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 107 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
@@ -149,11 +149,11 @@ test('zh-CN prompt snapshots: exactly 106 lines carry a research.* text that dif
   // note-style-recipe T4 P1, one line each = 95; + the four zh-CN snapshots service.reference-groups-{top,fresh}.{1,2}
   // of note-style-recipe T4 F1, one line each = 99; + the two zh-CN snapshots service.{research,decompose}-anchor-context
   // of annotated-image P5a, one line each = 101; + the two zh-CN snapshots service.task-ai-{decided,followed} of
-  // ai-proposed-note-style P2, one line each = 103; + the zh-CN snapshot service.synthesize-standard (topic chat P1b), one line = 104; + the zh-CN snapshot service.argument-evidence (argument map P4), one line = 105; + the zh-CN snapshot service.argument-evidence-context (V1 boost P3), one line = 106.
-  assert.equal(lines.length, 106);
+  // ai-proposed-note-style P2, one line each = 103; + the zh-CN snapshot service.synthesize-standard (topic chat P1b), one line = 104; + the zh-CN snapshot service.argument-evidence (argument map P4), one line = 105; + the zh-CN snapshot service.argument-evidence-context (V1 boost P3), one line = 106; + the zh-CN snapshot service.synthesize-prompt-default (Prompt run-all integration), one line = 107.
+  assert.equal(lines.length, 107);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 104 output-language sentences and 92 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 105 output-language sentences and 93 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -171,5 +171,6 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 104 out
   // sections, so no six-standard-headings sentence): 103 - 2 = 101; the followed one keeps its clause. The zh-CN snapshot
   // service.synthesize-standard (topic chat P1b) adds 1 sentence and 1 clause: 102 and 95. The zh-CN snapshot service.argument-evidence (argument map P4) adds 1 and 1: 103 and 96. The zh-CN snapshot service.argument-evidence-context (V1 boost P3) adds 1 and 1: 104 and 97.
   // Coffee Tables removal: its five zh-CN prompt snapshots carried five clauses and no sentence: 104 and 92.
-  assert.deepEqual(total, { rules: 104, clauses: 92 });
+  // The zh-CN snapshot service.synthesize-prompt-default (Prompt run-all integration) adds 1 sentence and 1 clause: 105 and 93.
+  assert.deepEqual(total, { rules: 105, clauses: 93 });
 });

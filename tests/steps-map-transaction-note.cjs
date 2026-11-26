@@ -329,3 +329,23 @@ test('N17: note undo refuses a write queued behind an external edit', async () =
   assert.equal((await h.rejected(entry.undo())).kind, 'guard');
   assert.equal(h.contents.get(h.parent), external);
 });
+
+
+test('N18: an independent writer is not part of the note transaction and its update survives', async () => {
+  const h = await harness();
+  let entered, resume;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const release = new Promise(resolve => { resume = resolve; });
+  const tx = begin(h.deps).rewriteNote(h.parent, async path => {
+    await h.repo.updateNote(path, { summary: 'Transaction summary' });
+    entered();
+    await release;
+    await h.repo.updateNote(path, { detail: 'Transaction detail' });
+  }).commit();
+  await ready;
+  await h.repo.updateNote(h.parent, { summary: 'Independent user update' });
+  const external = h.contents.get(h.parent);
+  resume();
+  assert.equal((await h.rejected(tx)).kind, 'rollback-failed');
+  assert.equal(h.contents.get(h.parent), external);
+});

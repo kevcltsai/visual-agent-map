@@ -217,7 +217,7 @@ export class CodexAppServerRuntime {
     }
     this.pending.clear();
     this.turns.clear();
-    this.child?.kill();
+    if (this.child) terminate(this.child);
     this.child = null;
     this.initializing = null;
   }
@@ -791,8 +791,25 @@ export class CodexAppServerRuntime {
     this.turns.clear();
     this.child = null;
     this.initializing = null;
-    child.kill();
+    terminate(child);
   }
+}
+
+/** SIGTERM, then SIGKILL after 1.5 s if the app-server has not closed (same escalation as the Claude CLI). */
+function terminate(child: ChildProcessHandle): void {
+  let closed = false;
+  child.on("close", () => {
+    closed = true;
+  });
+  child.kill();
+  window.setTimeout(() => {
+    if (closed) return;
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* Process may already have exited. */
+    }
+  }, 1_500);
 }
 
 /** Codex strict mode wants every object closed: the private keyword goes, `additionalProperties: false` stays. */

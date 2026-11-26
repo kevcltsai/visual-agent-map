@@ -59,6 +59,30 @@ integrationTest('repository write recovery wraps both existing topic notes and M
   assert.equal(saved.size, 0);
   assert.equal(pending.length, 0);
 });
+integrationTest('repository write recovery saves unsaved typing in an open editor before the snapshot, so the write keeps it', async () => {
+  const { repo, app, contents } = fixture('en');
+  const n = await topicNote(repo, 'Typing');
+  const { Repository } = load('repository.ts', { obsidian });
+  const { VaultWriteRecovery } = load('core/vault-write-recovery.ts');
+  const saved = new Map(), dirs = new Set();
+  const adapter = {
+    exists: async p => saved.has(p) || dirs.has(p), mkdir: async p => { dirs.add(p); }, read: async p => saved.get(p),
+    write: async (p, value) => { saved.set(p, value); }, rename: async (from, to) => { saved.set(to, saved.get(from)); saved.delete(from); },
+    remove: async p => { saved.delete(p); }, list: async () => ({ files: [...saved.keys()] })
+  };
+  const file = app.vault.getAbstractFileByPath(n.path);
+  let buffer = contents.get(n.path) + 'typed but unsaved\n', saves = 0;
+  const view = { file, getViewData: () => buffer, save: async () => { saves++; contents.set(n.path, buffer); } };
+  app.workspace = { ...(app.workspace ?? {}), getLeavesOfType: type => (type === 'markdown' ? [{ view }] : []) };
+  const protectedRepo = new Repository(app, repo.settings, new VaultWriteRecovery(adapter, 'plugin/write-recovery', () => {}));
+  await protectedRepo.updateNote(n.path, { summary: 'Updated' });
+  assert.equal(saves, 1);
+  assert.match(contents.get(n.path), /typed but unsaved/);
+  assert.match(contents.get(n.path), /Updated/);
+  buffer = contents.get(n.path);
+  await protectedRepo.updateNote(n.path, { summary: 'Again' });
+  assert.equal(saves, 1, 'a clean editor is not saved again');
+});
 integrationTest('editing note fields preserves latest AI detail and unrelated frontmatter', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));

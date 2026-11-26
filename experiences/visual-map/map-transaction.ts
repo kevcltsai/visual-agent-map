@@ -1,6 +1,7 @@
 import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
 import { pruneAfterText } from "./canvas-items";
+import { sameApartFromStamps } from "./cross-map-history";
 import type { NoteWriteGuard, Repository, TopicState } from "../../repository";
 import type { TFile } from "obsidian";
 import {
@@ -218,7 +219,11 @@ const tagged = (error: Error, kind: TransactionErrorKind): TransactionError => O
 // Note rewrite (ticket 04)
 const noteConflict = (): TransactionError => tagged(new Error(t("error.map_transaction_stale")), "guard");
 // Vault.read may omit a leading BOM, whereas Vault.process may supply it.
-const sameText = (a: string, b: string): boolean => a.replace(/^\uFEFF/, "") === b.replace(/^\uFEFF/, "");
+const withoutBom = (text: string): string => text.replace(/^\uFEFF/, "");
+const sameText = (a: string, b: string): boolean => withoutBom(a) === withoutBom(b);
+// History tolerates only the existing documented stamp/key-order equivalence. In-flight writes still compare exact text.
+const sameHistoryText = (a: string, b: string): boolean =>
+  sameText(a, b) || sameApartFromStamps(withoutBom(a), withoutBom(b));
 interface NoteOp {
   path: string;
   write: (path: string, attachment: AttachmentPath) => Promise<void>;
@@ -521,7 +526,7 @@ export function begin(deps: TransactionDeps): Transaction {
         if (!exists(at)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
         const expected = direction === "undo" ? note.afterExpected : note.beforeExpected;
         const current = await readText(repo, at);
-        if (!sameText(current, expected)) throw noteConflict();
+        if (!sameHistoryText(current, expected)) throw noteConflict();
         snapshots.set(at, current);
       }
       return snapshots;

@@ -1,5 +1,4 @@
 import { parseMap } from "../map-model";
-import { frontmatter } from "./repository-frontmatter";
 
 /**
  * "Do not break VAM" guard for the writes a map chat reply asks for. Pure: it looks only at the target path and the old and
@@ -37,6 +36,8 @@ export interface MapChatWriteCheck {
   readOnlyPaths?: readonly string[];
   /** `app.vault.configDir`, the vault's configuration folder (not always `.obsidian`). */
   configDir: string;
+  /** Real raw-write callers provide the same YAML parser as Repository. */
+  parseFrontmatter?: (content: string) => Record<string, unknown>;
 }
 
 /** The identity keys of a topic note; a write must leave each exactly as it was. */
@@ -120,12 +121,16 @@ function hasDuplicateIdentityKey(block: string | null): boolean {
 /** Raw Markdown actions never grant executable configuration or edit protected
  * Living Node knowledge. Parse YAML as the Repository does (including quoted
  * keys and flow mappings), rather than relying on a line-pattern allowlist. */
-function protectedLivingMarkdown(content: string): boolean {
+function protectedLivingMarkdown(content: string, parse?: MapChatWriteCheck["parseFrontmatter"]): boolean {
   if (!content) return false;
   if (content.includes("<!-- vam-living-node:")) return true;
+  const block = frontmatterBlock(content);
+  if (block === null) return false;
+  // Conservative lexical fallback also keeps this guard independent of Obsidian.
+  if (/(?:ai-card|ai-locked|ai-update-mode|ai-run-[\w-]+|living-node-[\w-]+)["']?\s*:/i.test(block)) return true;
+  if (!parse) return false;
   try {
-    const fm = frontmatter(content);
-    return Object.keys(fm).some(key =>
+    return Object.keys(parse(content)).some(key =>
       key === "ai-card" || key === "ai-locked" || key === "ai-update-mode" ||
       key.startsWith("ai-run-") || key.startsWith("living-node-")
     );
@@ -156,7 +161,7 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
       topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0
     )
       return { ok: false, code: "reserved_frontmatter" };
-    if (protectedLivingMarkdown(check.newContent)) return { ok: false, code: "living_node_protected" };
+    if (protectedLivingMarkdown(check.newContent, check.parseFrontmatter)) return { ok: false, code: "living_node_protected" };
     return { ok: true };
   }
   const baseline = check.knownHashes ?? {};
@@ -185,7 +190,7 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
     hypothesisLines(frontmatterBlock(check.newContent)).join("\n")
   )
     return { ok: false, code: "hypothesis_frontmatter_changed" };
-  if (protectedLivingMarkdown(before) || protectedLivingMarkdown(check.newContent))
+  if (protectedLivingMarkdown(before, check.parseFrontmatter) || protectedLivingMarkdown(check.newContent, check.parseFrontmatter))
     return { ok: false, code: "living_node_protected" };
   return { ok: true };
 }

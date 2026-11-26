@@ -299,8 +299,8 @@ export class ChatActionWriter {
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const createdHere = action.nodeId.startsWith(MAP_CHAT_NEW_PREFIX) && run.created.includes(node.id);
         const repo = this.plugin.repo;
-        const current = await repo.readNoteSnapshot(node.path, this.map);
-        if (!same()) return skipped("ui.map_chat_skip_map_changed");
+        const current = await repo.readNoteSnapshot(node.path, this.map ?? undefined);
+        if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
         if (current.note.aiLocked) return skipped("ui.ai_locked_notice");
         // Existing ordinary cards cannot be implicitly converted by chat.
         if (!createdHere && current.note.aiCard !== true) return skipped("ui.living_node_chat_existing_only");
@@ -327,7 +327,7 @@ export class ChatActionWriter {
         }).commit({ deferRebuild: true, label: t("ui.ai_card") });
         this.history.push(entry);
         run.notes?.add(node.id);
-        const saved = await repo.readNote(node.path, this.map);
+        const saved = await repo.readNote(node.path, this.map ?? undefined);
         this.notes.set(node.id, saved);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;

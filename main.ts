@@ -2658,7 +2658,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);
   }
-  restoreLivingOfficial(file: TFile, owner: string, release = false): Promise<void> {
+  restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
     return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release);
   }
   openDetails(file: TFile, owner?: string): Promise<void> {

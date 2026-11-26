@@ -1360,6 +1360,14 @@ export class VisualAgentMapView extends ItemView {
     topicState: (id, fresh) => this.chatTopicState(id, fresh),
     addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
       this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+    createLivingNode: (parent, action, rebuild, current, allowSource) =>
+      this.createNode(parent, action.title, rebuild, false, action.topicKind ?? "topic", false,
+        { leaning: action.leaning, strength: action.strength }, undefined, {
+          prompt: action.livingPrompt ?? "",
+          current,
+          allowSource,
+          onSaved: () => {}
+        }),
     noteChange: (node, patch) => this.noteChange(node, patch),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
@@ -17888,7 +17896,12 @@ export class VisualAgentMapView extends ItemView {
     hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {},
     /** The text block (on `parentNode`) the new topic follows: it is laid out after the block and drawn with its line from it. */
     afterTextId?: string,
-    livingConfig?: { prompt: string; current: () => boolean; onSaved: (saved: LivingConfigSave) => void }
+    livingConfig?: {
+      prompt: string;
+      current: () => boolean;
+      allowSource?: (path: string) => boolean;
+      onSaved: (saved: LivingConfigSave) => void;
+    }
   ): Promise<MapNode | undefined> {
     if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
     const creationMapPath = this.path;
@@ -17955,7 +17968,7 @@ export class VisualAgentMapView extends ItemView {
         configurationGraph = graph(disk);
         configured = await saveLivingConfig(
           this.app, repo, { ...disk, nodes: [...disk.nodes, node] }, node.id,
-          livingConfig.prompt, undefined, undefined, livingConfig.current
+          livingConfig.prompt, undefined, undefined, livingConfig.current, livingConfig.allowSource
         );
         provisionalText = configured.after;
         if (!livingConfig.current()) throw new Error("changed-target");
@@ -22786,11 +22799,14 @@ export class VisualAgentMapView extends ItemView {
       refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
     switch (action.kind) {
-      case "add_child":
-        // No parent (the same test as the apply step): the card becomes a root topic.
-        return action.parentId
+      case "add_child": {
+        // Include the complete executable configuration in the confirmation, not merely the card title.
+        const label = action.parentId
           ? t("ui.map_chat_do_add_child_0", action.title)
           : t("ui.map_chat_do_add_root_0", action.title);
+        return action.livingPrompt ? label + "\n" + t("ui.living_node_chat_configure_0", action.title) +
+          "\n" + action.livingPrompt : label;
+      }
       case "configure_ai_card":
         return t("ui.living_node_chat_configure_0", title(action.nodeId)) + "\n" + action.content;
       case "rename_topic":

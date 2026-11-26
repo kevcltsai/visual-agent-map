@@ -15,6 +15,7 @@ export type MergeBlock =
   | "ui.merge_parent_direct_only"
   | "ui.merge_needs_same_parent"
   | "ui.merge_missing_note"
+  | "ui.merge_living_node_convert"
   | "ui.merge_busy";
 
 export type MergeEligibility =
@@ -41,6 +42,7 @@ export function mergeEligibility(input: {
   nodes: MapNode[];
   hasNote: (id: string) => boolean;
   busy: (node: MapNode) => boolean;
+  livingNode?: (node: MapNode) => boolean;
 }): MergeEligibility {
   const wanted = new Set(input.ids);
   const picked = input.nodes.filter(node => wanted.has(node.id));
@@ -63,12 +65,14 @@ export function mergeEligibility(input: {
     const children = picked.filter(node => node !== target);
     if (children.some(node => !input.hasNote(node.id)) || !input.hasNote(target.id))
       return { ok: false, reason: "ui.merge_missing_note" };
+    if (picked.some(node => input.livingNode?.(node))) return { ok: false, reason: "ui.merge_living_node_convert" };
     if (picked.some(node => input.busy(node))) return { ok: false, reason: "ui.merge_busy" };
     return { ok: true, sources: [target, ...readingOrder(children)], parentId: target.parentId, targetId: target.id };
   }
   const parentId = picked[0].parentId;
   if (picked.some(node => node.parentId !== parentId)) return { ok: false, reason: "ui.merge_needs_same_parent" };
   if (picked.some(node => !input.hasNote(node.id))) return { ok: false, reason: "ui.merge_missing_note" };
+  if (picked.some(node => input.livingNode?.(node))) return { ok: false, reason: "ui.merge_living_node_convert" };
   if (picked.some(node => input.busy(node))) return { ok: false, reason: "ui.merge_busy" };
   return { ok: true, sources: readingOrder(picked), parentId, targetId: null };
 }

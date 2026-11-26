@@ -2142,14 +2142,30 @@ test('Living Node chat: explicit configuration of an existing or just-created ca
     item('run_map_action', { action: 'run_living_card' }),
     item('run_map_action', { action: 'run_living_all', nodeIds: ['a'] })
   ));
-  assert.deepEqual(result.actions.map(action => action.kind), ['add_child', 'configure_ai_card', 'configure_ai_card', 'run_map_action', 'run_map_action']);
-  assert.equal(result.actions[1].content, 'Track news');
+  assert.deepEqual(result.actions.map(action => action.kind), ['add_child', 'configure_ai_card', 'run_map_action', 'run_map_action']);
+  assert.equal(result.actions[0].livingPrompt, 'Track news');
+  assert.equal(result.actions[1].content, 'Track changes');
   assert.equal(result.rejected.length, 4);
+});
+
+test('Living Node chat: direct creation carries the complete prompt, not a second write', () => {
+  const result = parse(reply(
+    item('add_child', { title: 'AI tracker', ref: 'tracker', content: 'Track news' }),
+    item('add_child', { title: 'Ordinary', ref: 'ordinary' }),
+    item('add_child', { title: 'Invalid', content: 'Track news', summary: 'Pretend result' })
+  ));
+  assert.equal(result.actions.length, 2);
+  assert.equal(result.actions[0].livingPrompt, 'Track news');
+  assert.equal(result.actions[1].livingPrompt, undefined);
+  assert.equal(result.rejected.length, 1);
 });
 
 test('Living Node chat: configuration and formal execution need a plan even under auto apply', () => {
   const ctx = { parents: { a: null, b: 'a', c: 'b' }, selectedCount: 1 };
   for (const autoApply of [false, true]) {
+    const creation = planFor([{ kind: 'add_child', parentId: 'a', title: 'Tracker', summary: '', livingPrompt: 'Track news' }], ctx, { autoApply });
+    assert.ok(creation.reasons.includes('living_node_confirm'));
+    assert.equal(creation.estimatedCalls, 0);
     const config = planFor([{ kind: 'configure_ai_card', nodeId: 'a', content: 'Track news' }], ctx, { autoApply });
     assert.ok(config.reasons.includes('living_node_confirm'));
     assert.equal(config.estimatedCalls, 0);

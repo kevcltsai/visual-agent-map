@@ -6839,7 +6839,8 @@ export class VisualAgentMapView extends ItemView {
     change: (map: MapDocument, attachment: AttachmentPath) => void,
     rebuildDerivedData = true,
     created: string[] = [],
-    attachment?: { name: string; data: ArrayBuffer }
+    attachment?: { name: string; data: ArrayBuffer },
+    authorize?: () => boolean
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
@@ -6849,9 +6850,10 @@ export class VisualAgentMapView extends ItemView {
     let before!: MapDocument, after!: MapDocument;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
+    const mapPath = this.path;
     try {
       const entry = await tx
-        .editMap(this.path, (map, _resolve, attachmentPath) => {
+        .editMap(mapPath, (map, _resolve, attachmentPath) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
@@ -6859,7 +6861,8 @@ export class VisualAgentMapView extends ItemView {
           this.pruneSummariesIn(map);
           after = clone(map);
         })
-        .commit({ deferRebuild: true });
+        .commit({ deferRebuild: true, authorize });
+      if (authorize && (this.closed || this.path !== mapPath || this.map?.id !== opened.id)) return { before, after };
       this.history.push(entry);
       // Commit is asynchronous: the user may have panned meanwhile, so only a viewport the change itself set is applied.
       // A conflict window replaces this.map with another object (possibly the older file version): the viewport on screen wins then.
@@ -15536,13 +15539,18 @@ export class VisualAgentMapView extends ItemView {
     try {
       await this.plugin.mutate(async () => {
         if (!current()) return;
-        let target = node ? this.mapNodeById(node.id) : undefined;
         if (!node) {
           const name = values.title || aiCardTitle(values.question);
           const found = parent ? this.mapNodeById(parent.id) : null;
           if (parent && !found) throw new Error("changed-target-identity");
-          target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
+          await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
+            prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
+            current,
+            onSaved: result => { saved = result; }
+          });
+          return;
         }
+        const target = this.mapNodeById(node.id);
         if (!target || !current()) return;
         saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
       });
@@ -17879,9 +17887,12 @@ export class VisualAgentMapView extends ItemView {
     keyboardFocus = false,
     hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {},
     /** The text block (on `parentNode`) the new topic follows: it is laid out after the block and drawn with its line from it. */
-    afterTextId?: string
+    afterTextId?: string,
+    livingConfig?: { prompt: string; current: () => boolean; onSaved: (saved: LivingConfigSave) => void }
   ): Promise<MapNode | undefined> {
-    if (!this.map) return undefined;
+    if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
+    const creationMapPath = this.path;
+    const creationMapId = this.map.id;
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
@@ -17891,6 +17902,7 @@ export class VisualAgentMapView extends ItemView {
     const model = parent
       ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
       : this.plugin.currentModelChoice().model;
+    if (livingConfig && !livingConfig.current()) return undefined;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return undefined;
@@ -17922,23 +17934,50 @@ export class VisualAgentMapView extends ItemView {
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;
     node.y = parent?.y ?? 80;
-    this.notes.set(
-      node.id,
-      await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
-    );
-    this.selection.setSelected(node.id);
-    // Set before the repaint that shows the card, so the card is drawn with its title field.
-    if (interactive && focus && !this.inlineName)
-      this.inlineName = {
-        target: "card",
-        id: node.id,
-        draft: this.notes.get(node.id)?.title ?? defaultName,
-        fresh: true,
-        created: true
-      };
+    const repo = this.plugin.repo;
+    let provisionalFile: TFile | undefined;
+    let provisionalText: string | undefined;
+    let configured: LivingConfigSave | undefined;
+    let configurationGraph: string | undefined;
+    const graph = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(item => [item.id, item.path, item.parentId]));
     try {
+      if (livingConfig) {
+        // Configure the new note before publishing its card. The ordinary creation
+        // transaction then owns one history entry; redo restores the configured note.
+        provisionalFile = repo.file(node.path);
+        provisionalText = await this.app.vault.read(provisionalFile);
+        if (!livingConfig.current()) throw new Error("changed-target");
+        const disk = await repo.readMap(creationMapPath);
+        if (disk.id !== creationMapId || (parent && !disk.nodes.some(item => item.id === parent.id)))
+          throw new Error("changed-target-identity");
+        configurationGraph = graph(disk);
+        configured = await saveLivingConfig(
+          this.app, repo, { ...disk, nodes: [...disk.nodes, node] }, node.id,
+          livingConfig.prompt, undefined, undefined, livingConfig.current
+        );
+        provisionalText = configured.after;
+        if (!livingConfig.current()) throw new Error("changed-target");
+      }
+      if (!this.map) throw new Error("changed-target");
+      this.notes.set(
+        node.id,
+        await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
+      );
+      this.selection.setSelected(node.id);
+      // Set before the repaint that shows the card, so the card is drawn with its title field.
+      if (interactive && focus && !this.inlineName)
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: this.notes.get(node.id)?.title ?? defaultName,
+          fresh: true,
+          created: true
+        };
       await this.mapChangeSnapshots(
         map => {
+          if (livingConfig && (map.id !== creationMapId || graph(map) !== configurationGraph))
+            throw new Error("changed-target-identity");
           map.nodes.push(node);
           const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
           // Only a block that hangs on this very topic can be followed; anything else adds an ordinary child.
@@ -17969,13 +18008,41 @@ export class VisualAgentMapView extends ItemView {
               node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
           }
         },
-        rebuildDerivedData,
-        [node.path]
+        livingConfig ? false : rebuildDerivedData,
+        [node.path],
+        undefined,
+        livingConfig?.current
       );
+      if (livingConfig && configured) {
+        livingConfig.onSaved(configured);
+        // Derived data is recoverable and is not part of the authoritative commit.
+        try {
+          if (rebuildDerivedData) await this.plugin.rebuildDerivedData();
+          if (livingConfig.current()) await this.refreshAfterSavedChange();
+        } catch {
+          if (livingConfig.current()) new Notice(t("ui.change_saved_refresh_failed"));
+        }
+        if (!livingConfig.current()) return node;
+      }
       // The step that made the topic (pushed by the change above): Esc in its name field takes it back.
       if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
+      if (livingConfig && provisionalFile && provisionalText !== undefined && !isTransactionError(error, "rollback-failed")) {
+        try {
+          const disk = await repo.readMap(creationMapPath);
+          // Never remove a published note, a replacement, or a note edited since creation.
+          if (disk.id === creationMapId && !disk.nodes.some(item => item.id === node.id || item.path === node.path) &&
+              this.app.vault.getAbstractFileByPath(node.path) === provisionalFile &&
+              await this.app.vault.read(provisionalFile) === provisionalText &&
+              provisionalFile.path === node.path) {
+            await this.app.fileManager.trashFile(provisionalFile);
+            this.notes.delete(node.id);
+          }
+        } catch (cleanupError) {
+          throw new AggregateError([error, cleanupError], "Living Node creation rollback failed");
+        }
+      }
       throw error;
     }
     if (!focus) return this.map?.nodes.find(n => n.id === node.id) ?? node;

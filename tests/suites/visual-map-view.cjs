@@ -24,29 +24,28 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
   view.render = () => {};
   let added = 0, opened = [], details = [], next = [], renders = 0;
-  view.addNode = () => { throw new Error('the card + asks for a type first'); }; view.openAddMenu = (event, parent) => { added += parent.id === topic.id ? 1 : 0; }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
+  view.addNode = parent => { added += parent.id === topic.id ? 1 : 0; }; view.openAddMenu = () => { throw new Error('the toolbar Add adds right away, with no type menu'); }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
   view.openDetails = topic => details.push(topic.id); view.openTopicChat = topic => next.push(topic.id); view.render = () => { renders++; };
   view.renderNode(topic);
-  const plus = buttons.find(button => button.text === '+');
-  assert.equal(plus['aria-label'], 'Add subtopic manually');
+  assert.equal(buttons.some(button => button.text === '+'), false, 'the + circle is gone');
+  const plus = buttons.find(button => button.text === 'Add');
   plus.click({ stopPropagation() {} });
-  assert.equal(added, 1);
+  assert.equal(added, 1, 'the toolbar Add adds a child right away');
   const badge = buttons.find(button => button.text === 'View 1 expansion suggestions');
   badge.click({ stopPropagation() {} });
-  buttons.find(button => button['aria-label'] === 'AI explore').click({ stopPropagation() {} });
-  // The structure action is its own icon button now (no More menu in between): one click runs it.
-  view.newMenu = () => { throw new Error('the card tools open no menu'); };
-  buttons.find(button => button['aria-label'] === 'This card').click({ stopPropagation() {} });
-  buttons.find(button => button['aria-label'] === 'Details').click({ stopPropagation() {} });
-  assert.deepEqual(details, [topic.id], 'the icon-only Details button opens the details');
+  buttons.find(button => button.text === 'Research').click({ stopPropagation() {} });
+  view.newMenu = () => { throw new Error('the Note button opens no menu'); };
+  buttons.find(button => button.text === 'Note').click({ stopPropagation() {}, metaKey: false, ctrlKey: false });
+  assert.deepEqual(details, [topic.id], 'the Note button opens the details');
   details.length = 0;
-  assert.deepEqual(opened, [[topic.id, 'proposals'], [topic.id, 'structure']]); assert.deepEqual(next, [topic.id]);
+  assert.deepEqual(opened, [[topic.id, 'proposals']]); assert.deepEqual(next, [topic.id]);
   assert.equal(view.selection.state.selected, null);
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
   assert.equal(view.selection.state.selected, topic.id); assert.equal(renders, 0, 'a click repaints the card in place instead of rendering'); assert.deepEqual(details, [], 'a click selects without opening the sidebar note');
   view.applySelectionChange(view.selection.setSelected(null)); renders = 0; details.length = 0;
-  events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0] });
-  assert.equal(view.selection.state.selected, topic.id); assert.equal(renders, 0); assert.deepEqual(details, [topic.id]);
+  const titleEdits = []; view.startCardTitleEdit = (item, options) => titleEdits.push([item.id, options?.select]);
+  events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0], preventDefault() {} });
+  assert.equal(view.selection.state.selected, topic.id); assert.equal(renders, 0); assert.deepEqual(details, []); assert.deepEqual(titleEdits, [[topic.id, true]], 'Enter starts the title edit');
   view.applySelectionChange(view.selection.setSelected(null)); renders = 0; details.length = 0;
   view.mapChange = async () => {}; view.drawEdges = () => {};
   events.get('div:pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 2, clientX: 10, clientY: 10 });
@@ -69,8 +68,8 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   events.get('div:pointerup')({ type: 'pointerup', clientX: 0, clientY: 0 });
   assert.deepEqual(details, [topic.id], 'a tap also updates an open details sidebar');
   details.length = 0; detailsShown = false;
-  events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0] });
-  assert.deepEqual(details, [topic.id], 'Enter remains the keyboard path to the sidebar note');
+  events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0], preventDefault() {} });
+  assert.deepEqual(details, [], 'Enter no longer opens the sidebar note; the Note button does'); assert.equal(titleEdits.length, 2);
   assert.equal(events.has('div:contextmenu'), false);
 });
 integrationTest('map cards keep the generic map actions; no card exposes an AIM action', () => {
@@ -89,12 +88,11 @@ integrationTest('map cards keep the generic map actions; no card exposes an AIM 
     view.renderNode(topic); return buttons;
   };
   const ordinaryButtons = render(map([topic]));
-  assert.equal(ordinaryButtons.some(button => button.text === '⋯ More' || button['aria-haspopup']), false, 'no More button or menu on the card tools');
-  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'This card' && button.iconName === 'git-fork' && !button.text), 'Structure is an icon-only button with a tooltip');
-  assert.equal(ordinaryButtons.some(button => button.text === 'Structure' || button.text === 'Rename'), false, 'they no longer float over the map');
-  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'AI explore' && !button.text), 'every card shows an icon-only AI explore action with a name');
-  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Details' && button.iconName === 'panel-right' && !button.text));
-  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Add subtopic manually'));
+  assert.ok(ordinaryButtons.some(button => button.text === '⋯' && button['aria-label'] === 'More card actions' && button['aria-haspopup'] === 'menu'), 'the toolbar has one labelled More button that opens a menu');
+  assert.equal(ordinaryButtons.some(button => button.text === 'Structure' || button.text === 'Rename' || button.text === '+' || button['aria-label'] === 'This card'), false, 'Structure is in the More list, there is no Rename and no + circle');
+  assert.ok(ordinaryButtons.some(button => button.text === 'Research'), 'every card shows a labelled Research action');
+  assert.ok(ordinaryButtons.some(button => button.text === 'Note' && /^Note: open in the right sidebar/.test(button['aria-label'])), 'Note names its action');
+  assert.ok(ordinaryButtons.some(button => button.text === 'Add'));
   const ordinaryResult = node('ordinary-synthesis'); ordinaryResult.aimKind = 'synthesis';
   const ordinaryButtonsForResult = [], ordinaryResultView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
@@ -945,7 +943,7 @@ integrationTest('Space on a card with subtopics folds or unfolds it on key-up (f
   view.presentation = { order: [], currentId: 'x' }; assert.equal(down('a').prevented, false); up(); view.presentation = null;
   assert.deepEqual(folded, [], 'multi-select, loading and presentation never fold');
 });
-integrationTest('F2 starts the in-place title edit, Enter opens details, and the collapse button reports aria-expanded', () => {
+integrationTest('F2 and Enter both start the in-place title edit (Enter no longer opens details), and the collapse button reports aria-expanded', () => {
   const dialogs = [];
   class Modal { open() { dialogs.push(this); } close() {} }
   const fixture = selectionView(load, {}, { ...obsidian, Modal });
@@ -955,11 +953,12 @@ integrationTest('F2 starts the in-place title edit, Enter opens details, and the
   fixture.build();
   const cards = fixture.cards();
   cards.a.handlers.get('keydown')({ key: 'Enter', target: cards.a, preventDefault() {} });
-  assert.deepEqual(opened, ['a']); assert.equal(view.selection.state.selected, 'a'); assert.equal(fixture.renders(), 0);
+  assert.deepEqual(opened, [], 'Enter does not open details'); assert.equal(view.selection.state.selected, 'a'); assert.equal(view.inlineName?.id, 'a', 'Enter opens the title field of the card');
+  assert.equal(fixture.renders(), 1, 'one repaint draws the field'); view.inlineName = null;
   let renamed = 0;
   cards.a.handlers.get('keydown')({ key: 'F2', target: cards.a, preventDefault() { renamed++; } });
   assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 0, 'F2 opens no name dialog'); assert.equal(view.inlineName?.id, 'a', 'F2 opens the title field of the card');
-  assert.equal(fixture.renders(), 1, 'one repaint draws the field');
+  assert.equal(fixture.renders(), 2, 'one more repaint draws the field');
   const expanded = [];
   const walk = item => { if (item.attrs && 'aria-expanded' in item.attrs) expanded.push(item.attrs['aria-expanded']); item.children.forEach(walk); };
   walk(cards.root); assert.deepEqual(expanded, [], 'an expanded branch has no floating collapse button: Collapse is in More; only the folded Expand button reports aria-expanded');
@@ -1207,16 +1206,15 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(outlined.map, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: AI explore, Details, Collapse, This card and Select subtopics are icon-only buttons with no More menu (the title is edited in place, so no Rename)', () => {
+integrationTest('card toolbar: a selected card shows labelled Research, Add, Note and ⋯ buttons; no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
+  // The tools float over the card's top edge, hidden until focus or selection (no longer hover), and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
-  assert.match(css, /\.vam-node:hover > \.vam-node-tools, \.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible;/);
-  assert.equal(/vam-ai-slot|vam-ai-tool/.test(css), false, 'no selected-only swap remains');
-  assert.match(css, /\.vam-node-tools > \.vam-ai-explore::before \{ content: "✦" \/ "";/, 'the sparkle is decoration, not part of the name');
-  assert.match(css, /\.vam-node-tools > \.vam-node-tool \{[^}]*width: 26px;[^}]*padding-left: 0; padding-right: 0;/, 'icon-only tools are 26px wide with no side padding');
-  assert.match(css, /\.vam-node-tools > \.vam-node-tool \.svg-icon \{ width: 14px; height: 14px; \}/);
-  assert.doesNotMatch(css, /\.vam-ai-explore::before \{[^}]*margin-right/, 'the icon-only sparkle needs no gap');
+  assert.match(css, /^\.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible;/m);
+  assert.equal(/\.vam-node:hover > \.vam-node-tools/.test(css), false, 'hovering a card no longer shows its tools');
+  assert.equal(/vam-ai-slot|vam-ai-tool|vam-add-child(?!-tool)|vam-node-tool\b/.test(css), false, 'no icon-only tool, selected-only swap or + circle style remains');
+  assert.match(css, /\.vam-node-tools > \.vam-ai-explore \{[^}]*color: var\(--text-on-accent\)/, 'Research is the accent button');
+  assert.match(css, /\.vam-node-tools > \.vam-card-tool-more \{ min-width: 26px;/);
   const toolsOf = (setup = () => {}, id = 'a') => {
     const fixture = selectionView(load);
     setup(fixture);
@@ -1224,31 +1222,25 @@ integrationTest('card tools: AI explore, Details, Collapse, This card and Select
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
     return tools.children.filter(child => child.tag === 'button');
   };
-  const names = buttons => buttons.map(button => button.attrs['aria-label']);
-  const noMore = (buttons, why) => assert.equal(buttons.some(button => button.classes.has('vam-more-tool') || button.attrs['aria-haspopup'] || button.attrs['aria-label'] === 'More actions for this topic' || /More/.test(button.text ?? '')), false, `no More button or menu: ${why}`);
-  // Unfolded card with a subtopic: five icon-only buttons, one press each (no More menu in between).
+  const names = buttons => buttons.map(button => button.text);
+  const expected = ['Research', 'Add', 'Note', '⋯'];
+  // Unfolded card with a subtopic, a leaf and a folded card all show the same four buttons; Collapse, This card and Select subtopics are not tools any more.
   const buttons = toolsOf();
-  assert.deepEqual(names(buttons), ['AI explore', 'Details', 'Collapse', 'This card', 'Select subtopics'], 'five floating buttons in order');
-  assert.deepEqual(buttons.map(button => button.iconName), [undefined, 'panel-right', 'chevrons-down-up', 'git-fork', 'list-checks'], 'AI explore keeps the sparkle pseudo-element, the rest set an icon');
-  assert.ok(buttons.every(button => !button.text), 'icon only: no visible text');
-  noMore(buttons, 'unfolded card');
-  const explore = buttons[0];
-  assert.ok(explore.classes.has('vam-ai-explore'));
+  assert.deepEqual(names(buttons), expected, 'four labelled buttons in order');
+  assert.ok(buttons.every(button => button.classes.has('vam-card-tool') && !button.iconName), 'text buttons, no icon-only tool');
+  assert.deepEqual(buttons.map(button => [...button.classes].find(name => name !== 'vam-card-tool')), ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']);
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
-  assert.ok(!buttons[2].classes.has('vam-collapse-button'), 'the fold tool is not the header fold button');
-  // A leaf has no Collapse and no Select subtopics.
-  const leaf = toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); });
-  assert.deepEqual(names(leaf), ['AI explore', 'Details', 'This card']); noMore(leaf, 'leaf');
-  // A folded card keeps its Expand in the header: no Collapse and no Select subtopics in the tools.
-  const folded = toolsOf(({ doc }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; });
-  assert.deepEqual(names(folded), ['AI explore', 'Details', 'This card']); noMore(folded, 'folded card');
-  // Select mode with a subtopic: Details and Collapse only; without one: Details only.
-  const selecting = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); });
-  assert.deepEqual(names(selecting), ['Details', 'Collapse']); noMore(selecting, 'select mode');
-  const selectingLeaf = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b');
-  assert.deepEqual(names(selectingLeaf), ['Details']); noMore(selectingLeaf, 'select mode, leaf');
+  const [, , note, more] = buttons;
+  assert.match(note.attrs['aria-label'], /^Note: open in the right sidebar/); assert.equal(more.attrs['aria-label'], 'More card actions'); assert.equal(more.attrs['aria-haspopup'], 'menu');
+  assert.equal(buttons.some(button => button.classes.has('vam-collapse-button')), false, 'the fold control is not a tool');
+  assert.deepEqual(names(toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); })), expected, 'leaf');
+  // A folded card keeps its Expand in the header, not in the tools.
+  assert.deepEqual(names(toolsOf(({ doc }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; })), expected, 'folded card');
+  // Select mode: no toolbar at all.
+  assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); })), [], 'select mode');
+  assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b')), [], 'select mode, leaf');
   const { translate } = load('i18n.ts');
-  assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '詳情', 'AI 探索']);
+  assert.deepEqual(['ui.card_tool_research', 'ui.card_tool_add', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['研究', '新增', '筆記', '更多卡片動作']);
 });
 integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
@@ -1544,22 +1536,27 @@ integrationTest('AIM canvas treats superseded interim results as hidden (behavio
 });
 
 // ---- Merge topics, Phase 1: quick selection (select subtopics, Shift-drag, Cmd-click, Option-drag) ----
-integrationTest('Select subtopics: shown only for an unfolded card that has direct subtopics, and it picks exactly those', () => {
-  const toolTexts = (setup = () => {}, id = 'a') => {
+integrationTest('Select subtopics: shown in the More list only for an unfolded card that has direct subtopics, and it picks exactly those', () => {
+  // The toolbar's ⋯ button opens the More list; a recording menu stands in for Obsidian's.
+  const moreList = (setup = () => {}, id = 'a') => {
     const fixture = selectionView(load); setup(fixture); fixture.build();
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
-    return { fixture, buttons: tools.children.filter(child => child.tag === 'button').map(button => ({ text: button.attrs['aria-label'], handlers: button.handlers })) };
+    const more = tools.children.find(child => child.tag === 'button' && child.classes.has('vam-card-tool-more'));
+    const items = [];
+    fixture.view.newMenu = () => { const menu = { addItem(cb) { const entry = { setTitle(title) { entry.title = title; return entry; }, setIcon() { return entry; }, onClick(fn) { entry.click = fn; return entry; } }; cb(entry); items.push(entry); return menu; }, addSeparator() { return menu; }, showAtPosition() {} }; return menu; };
+    if (more) { more.getBoundingClientRect = () => ({ left: 0, bottom: 0 }); more.handlers.get('click')({ stopPropagation() {} }); }
+    return { fixture, items, hasMore: !!more };
   };
-  const has = (setup, id) => toolTexts(setup, id).buttons.some(button => button.text === 'Select subtopics');
+  const has = (setup, id) => moreList(setup, id).items.some(item => item.title === 'Select subtopics');
   assert.equal(has(), true, 'a has the direct subtopic c');
   assert.equal(has(undefined, 'b'), false, 'a leaf has none');
   assert.equal(has(({ doc, view }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; }), false, 'a folded card hides its subtopics and offers Expand instead');
-  assert.equal(has(({ view }) => { view.selection.toggleMultiSelect(); }), false, 'not while selecting');
-  // Root has direct children a and b but not grandchild c; the button replaces any earlier selection.
-  const { fixture, buttons } = toolTexts(undefined, 'root');
+  assert.equal(moreList(({ view }) => { view.selection.toggleMultiSelect(); }).hasMore, false, 'not while selecting: no toolbar, so no More list');
+  // Root has direct children a and b but not grandchild c; the entry replaces any earlier selection.
+  const { fixture, items } = moreList(undefined, 'root');
   const { view } = fixture;
   view.applySelectionChange(view.selection.replaceMulti(['c'])); view.applySelectionChange(view.selection.setSelected('b'));
-  buttons.find(button => button.text === 'Select subtopics').handlers.get('click')({ stopPropagation() {} });
+  items.find(item => item.title === 'Select subtopics').click();
   assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b']); assert.equal(view.selection.state.selected, null);
   assert.equal(view.selection.state.multiSelectMode, true); assert.equal(fixture.renders(), 1);
 });
@@ -1780,7 +1777,7 @@ function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [], opened = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
   const Notice = class { constructor(message) { notices.push(message); } };
-  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
+  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('experiences/visual-map/view.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
@@ -1836,13 +1833,21 @@ integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-
   menus[0].clicks.forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
 });
-integrationTest('hypothesis-evidence: the card "+" opens the type list for its card (no name dialog, nothing is added before a pick)', () => {
-  const { view } = heFixture();
-  const calls = []; view.addNode = () => { throw new Error('not before a pick'); }; view.openAddMenu = (event, parent) => calls.push([parent.id]); view.enqueue = work => work();
+integrationTest('hypothesis-evidence: the card More list offers Add another type with the six types for its card (no name dialog, nothing is added before a pick)', () => {
+  const { view, menus } = heFixture();
+  const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
   view.stageEl = hePatch(dom.element('stage')); view.renderNode(view.map.nodes[2]);
-  const plus = dom.button(view.stageEl.children[0], '+');
-  plus.click();
-  assert.deepEqual(calls, [['other']]);
+  const more = dom.button(view.stageEl.children[0], '⋯');
+  more.getBoundingClientRect = () => ({ left: 0, bottom: 0 });
+  more.click();
+  assert.equal(menus.length, 1); assert.deepEqual(calls, [], 'opening the list adds nothing');
+  const first = menus[0].titles.indexOf(heKindNames[0]);
+  assert.ok(first >= 0, `the More list holds the type list: ${menus[0].titles.join(', ')}`);
+  assert.deepEqual(menus[0].titles.slice(first, first + heKindNames.length), heKindNames);
+  assert.equal(menus[0].titles[first - 1], 'Add another type', 'the types follow the Add another type row');
+  // The Add another type row only opens the list (no click handler), so the type clicks start where that row sits.
+  menus[0].clicks.slice(first - 1, first - 1 + heKindNames.length).forEach(click => click());
+  assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
 });
 integrationTest('hypothesis-evidence: addNode hands createNote a topicKind only for a typed topic on an ordinary map', async () => {
   const seen = [];

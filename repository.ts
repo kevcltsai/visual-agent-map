@@ -52,6 +52,7 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
+import { splitLivingNodeRegion } from "./core/living-node-region";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
@@ -959,7 +960,8 @@ export class Repository {
     if (patch.sourcePaths !== undefined)
       patch.sourcePaths.length ? (fm["source-notes"] = patch.sourcePaths) : delete fm["source-notes"];
     fm.updated = new Date().toISOString();
-    let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    const separated = splitLivingNodeRegion(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    let body = decodeCalloutSections(separated.body);
     // AIM notes carry their content language; every other note keeps following the interface language.
     const textLanguage = options.contentLanguage ?? noteContentLanguage(fm) ?? language;
     if (options.contentLanguage !== undefined && noteContentLanguage(fm) === undefined)
@@ -1027,7 +1029,8 @@ export class Repository {
       isBookCardFrontmatter(fm)
     );
     // Headings stay in the language the note was written in: a language switch never relabels an existing note.
-    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
+    const rendered = localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)));
+    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}\n` : ""}`;
   }
 
   async createNote(
@@ -1348,9 +1351,9 @@ export class Repository {
    */
   async writeAiCard(path: string, on: boolean): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
-      readAiCard(frontmatter(content)) === on && (on || readAiUpdateMode(frontmatter(content)) === undefined)
+      readAiCard(frontmatter(content)) === on
         ? content
-        : setFrontmatterKeys(content, on ? { "ai-card": true } : { "ai-card": null, "ai-update-mode": null })
+        : setFrontmatterKeys(content, { "ai-card": on ? true : null })
     );
   }
 

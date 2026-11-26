@@ -10,8 +10,7 @@ import {
 } from "./living-node-changes";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
-const BEGIN = "<!-- vam-living-node:begin v1 -->";
-const END = "<!-- vam-living-node:end v1 -->";
+import { LIVING_NODE_BEGIN as BEGIN, LIVING_NODE_END as END } from "../../core/living-node-region";
 const HASH_KEY = "living-node-region-hash";
 const COMMIT_KEY = "living-node-last-execution";
 

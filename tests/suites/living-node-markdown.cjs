@@ -201,3 +201,17 @@ S.integrationTest('Living Node trial: exact configuration-only save permits adop
   assert.equal(await invalid.adopt(other.repo, { ...next, readSavedContent: async () => edited }), 'discarded');
   assert.equal(other.contents.get(path), edited);
 });
+
+S.integrationTest('Living Node: ordinary Repository note edits preserve the managed region byte for byte', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  const knowledge = readLivingMarkdown(old);
+  await f.repo.updateNote(path, { prompt: 'New saved instruction', title: 'New title' });
+  const updated = f.contents.get(path);
+  assert.equal(readLivingMarkdown(updated).revision, knowledge.revision);
+  assert.ok(updated.includes('New saved instruction'));
+  assert.equal((updated.match(/vam-living-node:begin/g) ?? []).length, 1);
+  await f.repo.writeAiCard(path, false);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, knowledge.revision);
+});

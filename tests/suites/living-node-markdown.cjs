@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const S = require('../support.cjs');
 const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
-const initial = '---\nagent-map-id: map\ntopic-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
+const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
 const empty = () => ({ revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } });
 const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
 const proposal = { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Current findings', evidence: ['e1'] }] };
@@ -28,6 +28,20 @@ S.integrationTest('Living Node: first commit uses real Repository guard and pres
   assert.ok(actual.includes('living-node-last-execution: "e1"'));
   assert.ok(actual.includes('living-node-last-successful-check:'));
   assert.equal((actual.match(/vam-living-node:begin/g) ?? []).length, 1);
+});
+
+S.integrationTest('Living Node: existing Repository map identity is distinct from node identity', async () => {
+  for (const bad of [
+    initial.replace('node-id: card', 'node-id: another'),
+    initial.replace('topic-id: map', 'topic-id: card'),
+    initial.replace('agent-map-id: map', 'agent-map-id: another'),
+    initial.replace('node-id: card\\n', '')
+  ]) {
+    const f = await setup();
+    await f.app.vault.process(f.files.get(path), () => bad);
+    await assert.rejects(() => commitLivingMarkdown(f.repo, request(f)), /target-unavailable/);
+    assert.equal(f.contents.get(path), bad);
+  }
 });
 
 S.integrationTest('Living Node: repeat no-change writes diagnostics only and does not advance content change time', async () => {
@@ -415,10 +429,10 @@ function livingTrialRuntimeFixture({ locked = false, usable = true } = {}) {
   ] };
   const snapshots = new Map([
     ['root.md', { note: { title: 'Root', prompt: 'Research root', aiCard: true, model: 'model-a' },
-      content: '---\nagent-map-id: map\ntopic-id: root\nai-card: true\nliving-node-refs: []\n---\n# Root\n' }],
+      content: '---\nagent-map-id: map\ntopic-id: map\nnode-id: root\nai-card: true\nliving-node-refs: []\n---\n# Root\n' }],
     ['up.md', { note: { title: 'Up', prompt: 'Research up\nSources: [[missing]]', aiCard: true,
       aiLocked: locked, model: 'model-a', summary: usable ? 'Existing findings' : '', aiRun: usable ? { result: 'ok' } : undefined },
-      content: '---\nagent-map-id: map\ntopic-id: up\nai-card: true\nliving-node-refs:\n  - "note:missing"\n---\n# Up\n' }]
+      content: '---\nagent-map-id: map\ntopic-id: map\nnode-id: up\nai-card: true\nliving-node-refs:\n  - "note:missing"\n---\n# Up\n' }]
   ]);
   const port = { repo: { readMap: async () => map, readNoteSnapshot: async path => snapshots.get(path) },
     app: { metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',

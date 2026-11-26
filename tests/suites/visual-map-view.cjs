@@ -1379,7 +1379,7 @@ test('applyCollapseLevel: collapse all, expand all and expand to level N set the
 integrationTest('New mind map (title ▾ menu) makes a map at once and imports no outline; the toolbar has no topic menu; the palette command adds to the open map only', () => {
   const opened = [], menus = [];
   class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
-  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } }
+  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, setWarning() { return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu });
   let made = 0; view.openNewMindMapModal = () => { made++; };
   view.openMapTitleMenu({});

@@ -73,6 +73,7 @@ test('map planning: same-map Markdown alias participates in cycle detection', ()
 test('source metadata: only absent persisted references permit legacy fallback; corrupt values fail closed', () => {
   assert.deepEqual(plain(readLivingReferences(undefined, ['B'])), [note('B')]);
   assert.deepEqual(plain(readLivingReferences([], ['B'])), []);
+  assert.deepEqual(plain(readLivingReferences(null, [])), []);
   assert.deepEqual(plain(readLivingReferences(['card:b', 'note:external'], ['A'])), [card('b'), note('external')]);
   for (const malformed of [null, 'card:b', {}, [42], ['card:'], ['note:  '], ['unknown:b']])
     assert.throws(() => readLivingReferences(malformed, ['B']), /invalid-source-reference/);

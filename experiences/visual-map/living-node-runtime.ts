@@ -158,7 +158,8 @@ async function readInputs(
   map: MapDocument,
   id: string,
   snapshot: Snapshot,
-  resolved: ReturnType<typeof resolveLivingSources>
+  resolved: ReturnType<typeof resolveLivingSources>,
+  additionalWarnings: readonly string[] = []
 ) {
   const base = readLivingMarkdown(snapshot.content);
   const reads: LivingRead[] = [];
@@ -199,7 +200,7 @@ async function readInputs(
       add(source.identity, source.path, readableMarkdown(await port.app.vault.read(file)));
     }
   }
-  const warnings = resolved.failures.filter(failure => !failure.required).map(failure => failure.reason);
+  const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
   for (const group of await port.mapSources(port.signal)) {
     for (const document of group.documents) {
       if (document.external) {
@@ -496,7 +497,11 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt);
     const resolver = sourceResolver(port.app);
     const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);
-    if (planned.plan.blocked.has(id)) throw new Error("required-dependency-blocked");
+    const blocked = planned.plan.blocked.get(id);
+    // A trial reads direct existing knowledge, never dispatches upstream. An
+    // indirect failure may leave readable stale knowledge, but adoption still
+    // requires the complete formal dependency graph to be ready.
+    if (blocked && (formal || blocked !== "dependency-blocked")) throw new Error("required-dependency-blocked");
     const sources = planned.sources.get(id);
     if (!sources) throw new Error("missing-source-plan");
     const snapshot = formal
@@ -506,30 +511,46 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
           content: setFrontmatterKeys(saved.content, { "living-node-refs": encoded, "ai-card": true })
         };
     if (formal && (saved.note.prompt !== prompt || !isAiCard(saved.note))) throw new Error("draft-not-saved");
-    const input = await readInputs(port, map, id, snapshot, sources);
-    let dependenciesReady = true;
-    if (formal) {
+    let dependenciesReady = !blocked;
+    let groups: Promise<ReferenceGroup[]> | undefined;
+    const readPort: LivingTrialPort = { ...port, mapSources: signal => (groups ??= port.mapSources(signal)) };
+    if (dependenciesReady) {
       for (const item of planned.plan.order) {
         if (item.id === id) continue;
+        if (!port.current() || port.signal.aborted) throw new Error("cancelled");
         const dependency = snapshots.get(item.id);
         const resolved = planned.sources.get(item.id);
         if (!dependency || !resolved) {
           dependenciesReady = false;
           break;
         }
-        const data = await readInputs(port, map, item.id, dependency, resolved);
-        const fm = frontmatter(dependency.content);
-        if (
-          data.base.revision === "empty" ||
-          fm["living-node-input-revision"] !== data.inputRevision ||
-          fm["living-node-success-knowledge"] !== data.base.revision
-        ) {
+        try {
+          const data = await readInputs(readPort, map, item.id, dependency, resolved);
+          const fm = frontmatter(dependency.content);
+          if (
+            data.base.revision === "empty" ||
+            fm["living-node-input-revision"] !== data.inputRevision ||
+            fm["living-node-success-knowledge"] !== data.base.revision
+          ) {
+            dependenciesReady = false;
+            break;
+          }
+        } catch {
           dependenciesReady = false;
           break;
         }
       }
     }
-    return { saved, snapshot, input, dependenciesReady };
+    if (!port.current() || port.signal.aborted) throw new Error("cancelled");
+    const frozen = planned.plan.frozen.length > 0 || sources.sources.some(source =>
+      source.cardId && cards.some(card => card.id === source.cardId && isAiCard(card) && card.aiLocked)
+    );
+    const warnings = [
+      ...(!dependenciesReady ? ["upstream-stale"] as const : []),
+      ...(frozen ? ["frozen-source"] as const : [])
+    ];
+    const input = await readInputs(readPort, map, id, snapshot, sources, warnings);
+    return { saved, snapshot, input, dependenciesReady, warnings };
   };
   const prepared = await build(false);
   const candidate = {
@@ -581,7 +602,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       };
     }
   };
-  return { request, adoption, model: original.note.model };
+  return { request, adoption, model: original.note.model, warnings: prepared.warnings };
 }
 
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */

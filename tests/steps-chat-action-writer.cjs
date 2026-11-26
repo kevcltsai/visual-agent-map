@@ -197,6 +197,41 @@ test('chat action writer: edit_md_file writes through vault.process, records one
   assert.equal(w.files.get('notes/x.md'), 'typed by the user');
 });
 
+test('chat action writer: undo and redo refuse a write queued behind an external edit', async () => {
+  for (const direction of ['undo', 'redo']) {
+    const path = 'notes/x.md';
+    const w = world({ files: { [path]: 'hello world' } });
+    const baseline = w.baseline({ mdHashes: { [path]: contentHash('hello world') } });
+    assert.equal((await apply(w, { kind: 'edit_md_file', path, find: 'world', replace: 'there' }, baseline)).outcome.status, 'done');
+    const entry = w.history[0];
+    if (direction === 'redo') await entry.undo();
+    const vault = w.ports.app().vault;
+    const original = vault.process;
+    vault.process = async (file, change) => {
+      w.files.set(path, 'new user text');
+      return original(file, change);
+    };
+    await assert.rejects(() => entry[direction](), /refused/);
+    assert.equal(w.files.get(path), 'new user text');
+  }
+});
+
+test('chat action writer: undo refuses newer live editor content even when the read snapshot still matches', async () => {
+  const path = 'notes/x.md';
+  const w = world({ files: { [path]: 'hello world' } });
+  const baseline = w.baseline({ mdHashes: { [path]: contentHash('hello world') } });
+  assert.equal((await apply(w, { kind: 'edit_md_file', path, find: 'world', replace: 'there' }, baseline)).outcome.status, 'done');
+  const original = w.ports.readChatFile;
+  let editorText = 'new unsaved user text';
+  w.ports.readChatFile = async name => ({
+    ...(await original(name)),
+    editor: { getValue: () => editorText, setValue: value => { editorText = value; } }
+  });
+  await assert.rejects(() => w.history[0].undo(), /refused/);
+  assert.equal(editorText, 'new unsaved user text');
+  assert.equal(w.files.get(path), 'hello there');
+});
+
 test('chat action writer: a card or file that is a data source of the map is refused for rename_topic and edit_md_file, nothing written', async () => {
   const w = world({ files: { 'a.md': 'source text' } });
   const baseline = w.baseline({ mapSourcePaths: ['a.md'], mdHashes: { 'a.md': contentHash('source text') } });

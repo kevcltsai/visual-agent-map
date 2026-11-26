@@ -947,19 +947,27 @@ export class ChatActionWriter {
     };
   }
   /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */
-  private async chatWriteFile(path: string, text: string): Promise<void> {
+  private async chatWriteFile(path: string, expected: string, text: string): Promise<void> {
     const source = await this.ports.readChatFile(path);
-    if (!source) throw this.ports.chatUndoRefusal();
-    if (source.editor) source.editor.setValue(text);
-    else await this.app.vault.process(source.file, () => text);
+    if (!source || source.text !== expected || source.file.path !== path) throw this.ports.chatUndoRefusal();
+    if (source.editor) {
+      // No await between the live editor comparison and replacement.
+      if (source.editor.getValue() !== expected) throw this.ports.chatUndoRefusal();
+      source.editor.setValue(text);
+    } else {
+      await this.app.vault.process(source.file, current => {
+        // Vault.process may wait behind another writer. Compare the actual preimage.
+        if (source.file.path !== path || current !== expected) throw this.ports.chatUndoRefusal();
+        return text;
+      });
+    }
   }
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
   private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {
     run.files?.add(path);
     this.ports.noteChatOwnFile(path, after, false);
     const swap = async (expected: string, replacement: string): Promise<void> => {
-      if ((await this.ports.chatFileText(path)) !== expected) throw this.ports.chatUndoRefusal();
-      await this.chatWriteFile(path, replacement);
+      await this.chatWriteFile(path, expected, replacement);
     };
     this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
   }

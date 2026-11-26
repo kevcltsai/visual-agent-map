@@ -63,3 +63,12 @@ test('F4: importing from a vault note keeps its wikilink', async () => {
   const note = await repo.readNote((await repo.readMap(result.mapPath)).nodes[0].path);
   assert.match(note.detail, /\[\[Inbox\/outline\.md\]\]/);
 });
+
+
+test('Living Node marker in an imported OPML body is refused before creating any map', async () => {
+  const { repo } = fixture('en');
+  const text = opml('<outline text="R" _note="x &lt;!-- vam-living-node:begin v1 --&gt;"/>');
+  const { ok, request } = await importFile(repo, file('managed.opml', text));
+  assert.equal(ok, false);
+  assert.equal(request, undefined);
+});

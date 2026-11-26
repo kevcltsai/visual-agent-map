@@ -9,7 +9,7 @@ const stable = text => text.split('\n').filter(line => !/^(updated|agent-map-id)
 const MAP = 'Agent Workspace/Topics/map-u/Map.md';
 
 async function harness() {
-  const { repo, app, contents } = fixture('en', { linkIndex: true });
+  const { repo, app, contents, trashed } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
   const mapDoc = { id: 'map-u', title: 'Undo', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -34,7 +34,7 @@ async function harness() {
   const notesIn = folder => [...contents.keys()].filter(p => p.startsWith(`Agent Workspace/Topics/map-u/${folder}/`) && p.endsWith('.md'));
   const snapshot = () => new Map([...contents].map(([p, text]) => [p, p.endsWith('Map.md') ? text : stable(text)]));
   const rejected = async promise => { try { await promise; } catch (error) { return error; } return assert.fail('expected a rejection'); };
-  return { repo, app, contents, view, saves, root: view.map.nodes[0], notesIn, snapshot, rejected };
+  return { repo, app, contents, trashed, view, saves, root: view.map.nodes[0], notesIn, snapshot, rejected };
 }
 
 test('C1: addNode undo, redo, undo parks in the same Unassigned path both times and redo returns to the original path', async () => {
@@ -188,4 +188,67 @@ test('persona-03: a synthesis topic is a conclusion and derives from every sourc
   const links = (await h.repo.readMap(MAP)).topicRelations ?? [];
   for (const source of sources)
     assert.ok(links.some(r => r.kind === 'derives_from' && r.from === made.id && r.to === source.id), `links back to ${source.id}`);
+});
+
+test('Living Node creation: configured note is published in one undo step and redo retains the saved prompt', async () => {
+  const h = await harness();
+  let saved;
+  const node = await h.view.createNode(h.root, 'Research', true, false, 'topic', false, {}, undefined, {
+    prompt: 'Research this topic',
+    current: () => true,
+    onSaved: result => { saved = result; }
+  });
+  assert.ok(saved);
+  assert.equal((await h.repo.readNote(node.path)).aiCard, true);
+  assert.match((await h.repo.readNote(node.path)).prompt, /Research this topic/);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 2);
+  await h.view.travel(false);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 1);
+  assert.equal(h.view.history.canUndo, false);
+  await h.view.travel(true);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 2);
+  assert.equal((await h.repo.readNote(node.path)).aiCard, true);
+  assert.match((await h.repo.readNote(node.path)).prompt, /Research this topic/);
+});
+
+test('Living Node creation: invalidated session before map publication rolls back the provisional note', async () => {
+  const h = await harness();
+  let current = true, saved = false;
+  const save = h.view.plugin.repo.saveMap;
+  h.view.plugin.repo.saveMap = async (...args) => {
+    current = false;
+    return save(...args);
+  };
+  await assert.rejects(h.view.createNode(h.root, 'Cancelled research', true, false, 'topic', false, {}, undefined, {
+    prompt: 'Research this topic',
+    current: () => current,
+    onSaved: () => { saved = true; }
+  }));
+  assert.equal(saved, false);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 1);
+  assert.equal(h.view.history.canUndo, false);
+  assert.equal(h.trashed.length, 1);
+  assert.match(h.trashed[0], /Cancelled research/);
+});
+
+test('Living Node creation: failed map publication must not trash a provisionally configured note edited by the user', async () => {
+  const h = await harness();
+  const save = h.view.plugin.repo.saveMap;
+  h.view.plugin.repo.saveMap = async (...args) => {
+    const path = h.notesIn('Notes').find(p => /Edited research/.test(p));
+    h.contents.set(path, h.contents.get(path) + '\nUser edit\n');
+    throw new Error('injected publication failure');
+  };
+  try {
+    await assert.rejects(h.view.createNode(h.root, 'Edited research', true, false, 'topic', false, {}, undefined, {
+      prompt: 'Research this topic',
+      current: () => true,
+      onSaved: () => assert.fail('failed creation is not published')
+    }), /injected publication failure/);
+  } finally {
+    h.view.plugin.repo.saveMap = save;
+  }
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 1);
+  assert.equal(h.trashed.length, 0);
+  assert.match(h.contents.get(h.notesIn('Notes').find(p => /Edited research/.test(p))), /User edit/);
 });

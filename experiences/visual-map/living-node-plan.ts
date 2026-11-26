@@ -61,7 +61,7 @@ function topology(edges: ReadonlyMap<string, readonly string[]>) {
 }
 
 /** Check proposed structural/config changes without treating a lock as permission to introduce a cycle. */
-export function hasLivingNodeCycle(nodes: readonly LivingNodePlanNode[]): boolean {
+function cycleAffected(nodes: readonly LivingNodePlanNode[]): Set<string> {
   const { byId, sources } = graph(nodes);
   const edges = new Map<string, string[]>();
   for (const node of nodes) {
@@ -71,7 +71,11 @@ export function hasLivingNodeCycle(nodes: readonly LivingNodePlanNode[]): boolea
       sources(node.id).filter(id => id === node.id || isAiCard(byId.get(id)))
     );
   }
-  return topology(edges).unresolved.length > 0;
+  return new Set(topology(edges).unresolved);
+}
+
+export function hasLivingNodeCycle(nodes: readonly LivingNodePlanNode[]): boolean {
+  return cycleAffected(nodes).size > 0;
 }
 
 /**
@@ -81,6 +85,7 @@ export function hasLivingNodeCycle(nodes: readonly LivingNodePlanNode[]): boolea
  */
 export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?: readonly string[]): LivingNodePlan {
   const { byId, sources } = graph(nodes);
+  const cyclic = cycleAffected(nodes);
   const targets = new Set<string>();
   const lockedTargets: string[] = [];
   for (const id of new Set(requested ?? nodes.map(node => node.id))) {
@@ -117,6 +122,7 @@ export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?
         pending.push(sourceId);
       }
     }
+    if (cyclic.has(id)) blocked.set(id, "cycle");
     edges.set(id, deps);
     frozenByCard.set(id, frozen);
   }
@@ -135,7 +141,7 @@ export function planLivingNodes(nodes: readonly LivingNodePlanNode[], requested?
     const id = runnable[i];
     if (required.has(id)) continue;
     required.add(id);
-    runnable.push(...(edges.get(id) ?? []));
+    for (const dep of edges.get(id) ?? []) runnable.push(dep);
     for (const dep of frozenByCard.get(id) ?? []) frozen.add(dep);
   }
   return {

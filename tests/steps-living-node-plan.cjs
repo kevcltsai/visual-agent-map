@@ -73,3 +73,11 @@ test('deep dependency chains do not recurse on the JavaScript call stack', () =>
   assert.equal(plan.order[count - 1].id, '0');
   assert.equal(hasLivingNodeCycle(nodes), false);
 });
+
+test('a pre-existing structural cycle cannot be hidden by a frozen dependency', () => {
+  const nodes = [ai('a', { explicitCardIds: ['b'] }), ai('b', { aiLocked: true, explicitCardIds: ['a'] }), ai('consumer', { explicitCardIds: ['b'] }), ai('independent')];
+  const plan = planLivingNodes(nodes);
+  assert.deepEqual(plain(ids(plan)), ['independent']);
+  assert.equal(plan.blocked.get('a'), 'cycle');
+  assert.equal(plan.blocked.get('consumer'), 'cycle');
+});

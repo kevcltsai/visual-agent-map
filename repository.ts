@@ -277,7 +277,7 @@ function guardWrites<T extends object>(
   disposed: () => boolean,
   message: () => string,
   recovery?: VaultWriteRecovery,
-  recoveryErrors?: { conflict: () => Error; backup: () => Error }
+  recoveryErrors?: { conflict: () => Error; backup: () => Error; saveOpenEditors: (file: TFile) => Promise<void> }
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -300,7 +300,11 @@ function guardWrites<T extends object>(
               const vault = object as unknown as App["vault"];
               return recovery.process({
                 path: () => file.path,
-                read: () => vault.read(file),
+                read: async () => {
+                  // Unsaved typing in an open editor is not on disk yet; save it so the snapshot and write include it.
+                  await recoveryErrors.saveOpenEditors(file);
+                  return vault.read(file);
+                },
                 process: transform =>
                   Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
                 change,
@@ -343,7 +347,14 @@ export class Repository {
     const message = (): string => this.message("error.unloaded_write_not_performed");
     const recoveryErrors = {
       conflict: () => new Error(this.message("error.recovery_write_conflict")),
-      backup: () => new Error(this.message("error.recovery_backup_failed"))
+      backup: () => new Error(this.message("error.recovery_backup_failed")),
+      saveOpenEditors: async (file: TFile) => {
+        for (const leaf of app.workspace?.getLeavesOfType?.("markdown") ?? []) {
+          const view = leaf.view as unknown as { file?: TFile | null; getViewData?: () => string; save?: () => Promise<void> };
+          if (view.file?.path !== file.path || !view.getViewData || !view.save) continue;
+          if (view.getViewData() !== (await app.vault.read(file))) await view.save();
+        }
+      }
     };
     this.app = new Proxy(app, {
       get(object, property) {

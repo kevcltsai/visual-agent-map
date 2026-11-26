@@ -14,7 +14,8 @@ export class PromptRunModal extends Modal {
     app: App,
     private plan: PromptPlan,
     private titleOf: (id: string) => string,
-    private confirm: () => void
+    private confirm: () => void,
+    private sourcesOf: (id: string) => string[] = () => []
   ) {
     super(app);
   }
@@ -36,6 +37,10 @@ export class PromptRunModal extends Modal {
               ? t("ui.prompt_run_mode_standard")
               : t("ui.prompt_run_mode_quick");
       row.createSpan({ text: ` · ${mode}`, cls: "vam-prompt-run-mode" });
+      // The vault notes its "資料來源" line sends to the provider, so they are visible before Start.
+      const sources = item.action === "run" ? this.sourcesOf(item.id) : [];
+      if (sources.length)
+        row.createSpan({ text: ` · ${t("ui.prompt_run_reads_0", sources.join(", "))}`, cls: "vam-prompt-run-mode" });
     }
     this.contentEl.createDiv({
       cls: "vam-prompt-run-estimate",

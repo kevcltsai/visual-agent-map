@@ -289,6 +289,16 @@ test('run all: confirm card lists the order and counts; Start runs leaves to roo
   assert.match(h.raw('root'), /I:root/);
 });
 
+test('confirm card names the vault notes a topic\'s 資料來源 line will send', async () => {
+  const h = await harness(TREE);
+  h.view.promptSourceNames = id => (id === h.node('leaf1').id ? ['Watchlist', 'Notes'] : []);
+  h.view.startPromptRun(null);
+  const modal = h.modals.at(-1);
+  const rows = findAll(modal.contentEl, i => i.cls?.includes('vam-prompt-run-item')).map(r => r.children.map(c => c.text).join(''));
+  assert.match(rows[0], /leaf1.*reads: Watchlist, Notes/);
+  assert.doesNotMatch(rows[1], /reads:/);
+});
+
 test('Cancel on the confirm card writes nothing, runs nothing and leaves no state', async () => {
   const g = await harness(TREE);
   const before = TREE.map(([k]) => g.raw(k));

@@ -591,6 +591,7 @@ import {
   isPromptTopic,
   planPromptRun,
   readPromptSources,
+  promptSourceLinks,
   runPromptItems,
   type PromptBatchState,
   type PromptNoteRef,
@@ -10610,7 +10611,7 @@ export class VisualAgentMapView extends ItemView {
         item
           .setTitle(t("ui.prompt_run_all"))
           .setIcon("play")
-          .onClick(() => this.startPromptRun(null));
+          .onClick(() => this.whenEditing(() => this.startPromptRun(null)));
         (item as unknown as { dom?: HTMLElement }).dom?.createSpan?.({
           cls: "vam-menu-hint",
           text: t("ui.prompt_run_all_hint")
@@ -19452,9 +19453,23 @@ export class VisualAgentMapView extends ItemView {
         this.app,
         plan,
         id => this.notes.get(id)?.title ?? id,
-        () => void this.confirmPromptRun(plan, scopeId, true)
+        () => void this.confirmPromptRun(plan, scopeId, true),
+        id => this.promptSourceNames(id)
       )
     );
+  }
+  /** The Markdown notes a topic's "資料來源" line resolves to, as the run would read them (at most 10). */
+  private promptSourceNames(id: string): string[] {
+    const node = this.map?.nodes.find(candidate => candidate.id === id);
+    const prompt = this.notes.get(id)?.prompt;
+    if (!node || !prompt) return [];
+    const names: string[] = [];
+    for (const link of promptSourceLinks(prompt)) {
+      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
+      if (file instanceof TFile && file.extension.toLowerCase() === "md") names.push(file.basename);
+      if (names.length >= 10) break;
+    }
+    return names;
   }
   /** "Run only this one": the topic alone, over its children's summaries as they are now. */
   runPromptOne(node: MapNode): void {
@@ -19529,8 +19544,15 @@ export class VisualAgentMapView extends ItemView {
     let entries = this.promptRuns.get(mapPath);
     if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
     entries.set(id, reason === undefined ? { status } : { status, reason });
-    if (!this.closed && this.path === mapPath) this.render();
+    // A batch resets every queued topic in one synchronous loop; paint once for all of them.
+    if (this.promptRenderQueued) return;
+    this.promptRenderQueued = true;
+    void Promise.resolve().then(() => {
+      this.promptRenderQueued = false;
+      if (!this.closed && this.path === mapPath) this.render();
+    });
   }
+  private promptRenderQueued = false;
   /** One topic of a batch: the research (a leaf) or the integration (its children's summaries, the Prompt as the direction). */
   private async runPromptItem(
     item: PromptPlanItem,

@@ -81,4 +81,4 @@ Ancestor A
 Current task:
 Compare the three vendors on price.
 
-By default only organise the material: list what each subtopic (evidence) says, the reasons in favour, the reasons against, and where the pieces of evidence contradict each other. Do not draw a conclusion or give a recommendation unless the Prompt above explicitly asks for one.
+By default only organise the material: list what each subtopic (evidence) says, the reasons in favour, the reasons against, and where the pieces of evidence contradict each other. Do not draw a conclusion or give a recommendation unless the Prompt above explicitly asks for one. This overrides any format rule that asks for a conclusion: the summary and the "Core conclusions" section only summarise the evidence and its main contradictions, and do not answer yes/no, whether it is worth it, or what to do.

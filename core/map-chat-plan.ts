@@ -92,7 +92,8 @@ export const CHAIN_SAFE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAct
 const CHAIN_SAFE_RUN: ReadonlySet<string> = new Set(["research_standard", "expand"]);
 /** True when the kind of action may be part of an automatic round without a plan (its targets are judged by {@link isChainSafeFor}). */
 export const isChainSafe = (action: MapChatAction): boolean =>
-  action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
+  action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) :
+    action.kind === "add_child" && action.livingPrompt ? false : CHAIN_SAFE.has(action.kind);
 
 /** The cards a reply that read web research text may rewrite or research without a plan (decision #14). */
 export interface MapChatTrusted {
@@ -356,6 +357,7 @@ export function planFor(
     reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   if (actions.some(action => action.kind === "configure_ai_card" ||
+      (action.kind === "add_child" && !!action.livingPrompt) ||
       (action.kind === "run_map_action" && (action.action === "run_living_card" || action.action === "run_living_all"))))
     reasons.push("living_node_confirm");
   if (

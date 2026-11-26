@@ -32,7 +32,8 @@ export function setFrontmatterKeys(content: string, values: Record<string, Front
   const written = new Set<string>();
   let skipping = false;
   for (const line of match[1].split(/\r?\n/)) {
-    const key = /^([A-Za-z][\w-]*):/.exec(line)?.[1];
+    const match = /^(?:([A-Za-z][\w-]*)|"([A-Za-z][\w-]*)"|'([A-Za-z][\w-]*)')\s*:/.exec(line);
+    const key = match?.[1] ?? match?.[2] ?? match?.[3];
     if (key) {
       skipping = Object.keys(values).includes(key);
       if (skipping && !written.has(key)) {

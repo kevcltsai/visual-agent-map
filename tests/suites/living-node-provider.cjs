@@ -230,7 +230,7 @@ async function runtimeFixture({ count, prompt, notes = {}, reply, mapSources } )
     const base = readLivingMarkdown(expectedContent);
     const operations = Array.from({ length: Math.min(100, count - from) }, (_, i) => append(from + i));
     const candidate = { executionId: 'seed' + from, cardId: 'parent', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
-    assert.equal(await commitLivingMarkdown(f.repo, { path: 'parent.md', expectedContent, candidate, base, proposal: { baseRevision: base.revision, operations }, context: SEED_AT,
+    assert.equal(await commitLivingMarkdown(f.repo, { path: 'parent.md', expectedContent, candidate, base, baseGeneration: livingGeneration(expectedContent), proposal: { baseRevision: base.revision, operations }, context: SEED_AT,
       signal: new AbortController().signal, isCurrent: () => true, inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) }), 'written');
   }
   await saveLivingConfig(f.app, f.repo, map, 'parent', prompt);
@@ -342,7 +342,7 @@ S.integrationTest('T04 follow-up: the checked artifact comes from observed web a
   const expectedContent = f.contents.get(path);
   const candidate = { executionId: 'w1', cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
   const save = async (generated, id) => commitLivingMarkdown(f.repo, { path, expectedContent: f.contents.get(path), candidate: { ...candidate, executionId: id, baseRevision: livingSnapshotRevision(f.contents.get(path)) },
-    base: readLivingMarkdown(f.contents.get(path)), proposal: generated.proposal, context: generated.context, signal: new AbortController().signal, isCurrent: () => true,
+    base: readLivingMarkdown(f.contents.get(path)), baseGeneration: livingGeneration(f.contents.get(path)), proposal: generated.proposal, context: generated.context, signal: new AbortController().signal, isCurrent: () => true,
     inspect: async () => ({ ...candidate, executionId: id, baseRevision: livingSnapshotRevision(f.contents.get(path)), locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
   assert.equal(await save(seen, 'w1'), 'written');
   const written = f.contents.get(path);

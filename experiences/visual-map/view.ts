@@ -226,6 +226,7 @@ import { livingReasonKey } from "./living-node-state";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
+import { livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
@@ -15600,7 +15601,8 @@ export class VisualAgentMapView extends ItemView {
                   if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
-                    win.showTrialFailure(t("ui.living_node_trial_invalid"));
+                    const failed = livingTrialReason(trial.failureCode ?? "");
+                    win.showTrialFailure(failed.reason, failed.code);
                   }
                   return false;
                 }
@@ -15636,7 +15638,8 @@ export class VisualAgentMapView extends ItemView {
                   invalidateTrial();
                   const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
                   new Notice(reason);
-                  win.showTrialFailure(reason);
+                  const failed = livingTrialReason(error);
+                  win.showTrialFailure(failed.reason, failed.code);
                 }
                 return false;
               }

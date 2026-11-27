@@ -610,6 +610,7 @@ import {
   type PromptNoteRef,
   type PromptRunEntry
 } from "./prompt-run";
+import type { CardActionContext, CardActionHost } from "./card-actions";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
   BookSettingsViewModal,
@@ -11746,6 +11747,87 @@ export class VisualAgentMapView extends ItemView {
       case "shortcuts":
         return run(true, () => this.openKeyboardShortcuts());
     }
+  }
+  /** The card action registry's view methods (card-actions.ts), made once. */
+  private cardActionHost?: CardActionHost;
+  /**
+   * What a card action reads now (card-actions.ts): one card, a selection or the right-clicked cards (`ids`), or the map
+   * (null). No entry uses it yet; the entries move to the registry in B05–B10.
+   */
+  cardActionContext(target: MapNode | readonly string[] | null): CardActionContext {
+    const node = target && "id" in target ? target : null;
+    this.cardActionHost ??= {
+      addTopic: () => this.enqueue(() => this.addNode(null)),
+      addChild: card => this.enqueue(() => this.addNode(card)),
+      addSibling: card =>
+        this.enqueue(() => this.addNode(this.map?.nodes.find(item => item.id === card.parentId) ?? null)),
+      research: (card, opener) => this.openTopicChat(card, opener),
+      rename: card => this.startCardTitleEdit(card, { select: true }),
+      openNote: (card, newTab) => (newTab ? this.openNoteInTab(card) : this.openDetails(card)),
+      addSummaryField: card => this.startCardSummaryEdit(card, 0),
+      cardSettings: card => this.openNodePanel(card, "structure"),
+      runCard: card => this.startPromptRun([card.id]),
+      editAiCard: card => this.openAiCardPopover(card),
+      selectSubtopics: card => this.selectSubtopics(card),
+      addSummary: ids => this.addSummaryOver(ids),
+      noteStyle: card => void this.chooseTopicStyle(card),
+      fillAddMenu: (menu, card) => this.fillAddMenu(menu, card),
+      fillBookMenu: (menu, card) => this.addBookMenu(menu, card),
+      toggleCollapse: (card, byKey) => (byKey ? this.collapseByKey(card) : this.toggleCollapsed(card)),
+      reorderSibling: (card, offset) => this.enqueue(() => this.shiftSiblingByKey(card, offset)),
+      remove: card => this.removeByKey(card),
+      zoomFit: () => this.fit(),
+      zoomReset: () => {
+        if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
+      },
+      search: () => this.openMapSearch(),
+      shortcuts: () => this.openKeyboardShortcuts(),
+      merge: () => this.openMerge(),
+      multiResearch: () => this.openMultiResearch(),
+      chooseParent: copy => this.chooseSelectedParent(copy),
+      synthesize: () => this.integrateSelected(),
+      addFrame: () => this.openAddBoundary(),
+      setAiLock: (nodes, locked) => this.enqueue(() => this.setAiLock(nodes, locked)),
+      clearSelection: () => this.applySelectionChange(this.selection.clearMulti()),
+      removeSelected: () => this.confirmRemoveSelected(),
+      selectionHelp: () => {
+        new Notice(t("ui.drag_to_select_topics_hint"), 12000);
+      },
+      finishSelection: () => this.applySelectionChange(this.selection.toggleMultiSelect())
+    };
+    return {
+      node,
+      ids: node ? [node.id] : ((target as readonly string[] | null) ?? []),
+      nodes: this.map?.nodes ?? [],
+      presentation: !!this.presentation,
+      readOnly: this.notesLoading(),
+      multiSelect: this.selection.state.multiSelectMode,
+      bookLock: this.bookLock(),
+      hasViewport: !!this.viewportEl,
+      note: id => this.notes.get(id),
+      isMerging: id => this.isMerging(id),
+      isArgumentCard: id => this.isArgumentCard(id),
+      // paintCardToolbar's `addSummary` argument.
+      summaryFieldOffered: () => {
+        const note = node ? this.notes.get(node.id) : undefined;
+        return (
+          !!node &&
+          !!note &&
+          !this.argumentCardView(node.id) &&
+          this.cardTextEditable() &&
+          !this.plugin.researchProgress?.get(node.path)?.preview?.summary &&
+          this.inlineSummary?.id !== node.id &&
+          isPlaceholder(note.summary)
+        );
+      },
+      bookMenu: () => !!node && (this.bookRerunWhy(node) !== undefined || !!this.bookRoleChoices(node)),
+      mergeBlock: () => {
+        const check = this.mergeCheck();
+        return check.ok ? null : check.reason;
+      },
+      multiResearchRunning: () => this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running",
+      host: this.cardActionHost
+    };
   }
   openKeyboardShortcuts(): void {
     this.openMapModal(new KeyboardShortcutsModal(this.app));

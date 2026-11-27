@@ -165,6 +165,7 @@ import {
   type CoverLook,
   type CoverPosition
 } from "./card-cover";
+import { paintCardEdge, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
@@ -1810,6 +1811,8 @@ export class VisualAgentMapView extends ItemView {
     draft: string;
     fresh: boolean;
     created: boolean;
+    /** A new topic from the edge entry: a blank name cancels it (other entries keep the default name). */
+    cancelBlank?: boolean;
     /** For a new topic: the history step that made it. Esc in its name field takes exactly this step back. */
     createdStep?: TransactionEntry;
     /** Where the caret goes on the next focus (a click in the text puts it there); cleared by typing. */
@@ -3081,6 +3084,11 @@ export class VisualAgentMapView extends ItemView {
         this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
+      // A topic made from the edge entry and left with a blank name (Enter or leaving) is cancelled the same way: no card, no note.
+      if (value !== null && !value.trim() && edit?.created && edit.cancelBlank && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep);
+        return;
+      }
       // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.
       const problem = titleProblemText(value ?? "");
       if (problem) {
@@ -3090,6 +3098,7 @@ export class VisualAgentMapView extends ItemView {
           draft: value ?? "",
           fresh: false,
           created: edit?.created ?? false,
+          cancelBlank: edit?.cancelBlank,
           createdStep: edit?.createdStep,
           caret: null
         };
@@ -10470,6 +10479,49 @@ export class VisualAgentMapView extends ItemView {
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
   }
+  /** The edge "+ Topic card" on a single editable card (V3.3 A6); it sits on the card's edge and never changes its size. */
+  private paintCardEdgeEntries(card: HTMLElement, node: MapNode): void {
+    if (
+      !this.cardTextEditable() ||
+      this.bookLock().structure ||
+      !this.plugin.settings ||
+      !isManagedMapPath(this.plugin.settings, this.path)
+    )
+      return;
+    paintCardEdge(
+      card,
+      [
+        {
+          kind: "add",
+          label: t("ui.card_edge_add"),
+          ariaLabel: t("ui.card_edge_add_label"),
+          onClick: () => this.addTopicFromEdge(node)
+        }
+      ],
+      this.edgeSideOf(node),
+      !this.renderingCard
+    );
+  }
+  /** The side child cards grow toward (read from the layout, never changed); other layouts fall back to the right. */
+  private edgeSideOf(node: MapNode): CardEdgeSide {
+    const direction = this.map ? this.directionOf(this.map, node.id) : "right";
+    return direction === "left" || direction === "down" || direction === "up" ? direction : "right";
+  }
+  /** True from the click on an edge entry until its topic is made: a second click (or an old button) adds nothing. */
+  private edgeAddPending = false;
+  private addTopicFromEdge(node: MapNode): void {
+    if (this.edgeAddPending || this.inlineName?.created) return;
+    this.whenEditing(() => {
+      this.edgeAddPending = true;
+      this.enqueue(async () => {
+        try {
+          await this.addNode(node);
+        } finally {
+          this.edgeAddPending = false;
+        }
+      });
+    });
+  }
   /** Whether a card can become or edit an AI card (an ordinary note card; not under an AI lock or an argument card). */
   private canSetAiCard(node: MapNode): boolean {
     return !this.bookLock().ai && !this.isArgumentCard(node.id) && this.notes.has(node.id);
@@ -13733,6 +13785,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.selection.state.multiSelectMode) this.paintCardToolbar(tools, node);
+    if (note) this.paintCardEdgeEntries(card, node);
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
     const shownTitle = loading
@@ -18231,7 +18284,8 @@ export class VisualAgentMapView extends ItemView {
           id: node.id,
           draft: this.notes.get(node.id)?.title ?? defaultName,
           fresh: true,
-          created: true
+          created: true,
+          ...(this.edgeAddPending ? { cancelBlank: true } : {})
         };
       await this.mapChangeSnapshots(
         map => {

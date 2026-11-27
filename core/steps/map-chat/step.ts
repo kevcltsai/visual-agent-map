@@ -666,12 +666,12 @@ export function parseMapChat(
       };
       switch (kind as MapChatActionKind) {
         case "add_child": {
-          const livingPrompt = text("content", false);
-          if (
-            livingPrompt &&
-            (context.bookPlan || context.aim || livingPrompt.length > 8_000 || text("summary", false))
-          )
-            throw new Dropped("bad_value");
+          // Plain `content` means "create an AI card" only where that can be true; anywhere else it is ignored (pre-Living-Node behaviour).
+          const rawPrompt = text("content", false);
+          const livingPrompt =
+            rawPrompt && !context.bookPlan && !context.aim && rawPrompt.length <= 8_000 && !text("summary", false)
+              ? rawPrompt
+              : "";
           if (book) {
             // Under a chapter or the book (an existing card); a `new:` parent is not possible here. `note` is the reason.
             const parentId = node("parentId");

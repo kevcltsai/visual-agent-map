@@ -2152,12 +2152,13 @@ test('Living Node chat: direct creation carries the complete prompt, not a secon
   const result = parse(reply(
     item('add_child', { title: 'AI tracker', ref: 'tracker', content: 'Track news' }),
     item('add_child', { title: 'Ordinary', ref: 'ordinary' }),
-    item('add_child', { title: 'Invalid', content: 'Track news', summary: 'Pretend result' })
+    item('add_child', { title: 'Has summary', content: 'Track news', summary: 'Pretend result' })
   ));
-  assert.equal(result.actions.length, 2);
+  assert.equal(result.actions.length, 3);
   assert.equal(result.actions[0].livingPrompt, 'Track news');
   assert.equal(result.actions[1].livingPrompt, undefined);
-  assert.equal(result.rejected.length, 1);
+  assert.equal(result.actions[2].livingPrompt, undefined);
+  assert.equal(result.rejected.length, 0);
 });
 
 test('Living Node chat: configuration and formal execution need a plan even under auto apply', () => {
@@ -2226,4 +2227,14 @@ test('Living Node chat: the saved prompt baseline is only granted to a fully sho
   const hidden = context({ selected: [selected], detailBudget: 0 });
   assert.equal(hidden.topicHashes.a.livingConfigRevision, undefined);
   assert.equal(JSON.parse(hidden.json).selected[0].livingPrompt, undefined);
+});
+
+test('add_child with summary plus stray content stays an ordinary card and its new: child still attaches', () => {
+  const result = parse(reply(
+    item('add_child', { parentId: 'a', title: 'P', summary: 'S', content: 'stray prompt', ref: 'p' }),
+    item('add_child', { parentId: 'new:p', title: 'C' })
+  ));
+  assert.equal(result.actions.length, 2);
+  assert.equal(result.actions[0].livingPrompt, undefined);
+  assert.equal(result.actions[1].parentId, 'new:p');
 });

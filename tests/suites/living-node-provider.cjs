@@ -177,7 +177,7 @@ S.integrationTest('T06: an AI output op blocked by a user-edited AI latest is dr
 // ---- T05: exact retrieval and one budget (A07, A43) ----
 const { parseLivingSelectors, resolveLivingSection, projectLivingRecords } = S.load('experiences/visual-map/living-node-retrieval.ts', { obsidian: S.obsidian });
 const { LivingCoordinator } = S.load('experiences/visual-map/living-node-coordinator.ts');
-const { runLivingRound, saveLivingConfig, prepareLivingTrial } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+const { runLivingRound, saveLivingConfig, prepareLivingTrial, setLivingIdentityStore: set } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
 
 S.test('A43 grammar: YYYY, YYYY-MM, YYYY-MM-DD, a day range, Qn YYYY and known record ids are the only selectors', () => {
   const range = prompt => S.plain(parseLivingSelectors(prompt, ['r5', 'evt:9']).ranges.map(r => [r.start, r.end]));
@@ -361,4 +361,44 @@ S.integrationTest('T04 follow-up: the checked artifact comes from observed web a
   none.proposal.operations = [];
   assert.equal(await save(none, 'w2'), 'written');
   assert.ok(!f.contents.get(path).includes('living-node-checked'));
+});
+
+// ---- Draft source confirmation belongs to a saved configuration only ----
+async function unresolvedSourceFixture() {
+  const { LivingIdentityStore } = S.load('experiences/visual-map/living-node-sources.ts');
+  const f = await runtimeFixture({ count: 0, prompt: 'track things', notes: { Note: '# Note\nbody\n' } });
+  let n = 0;
+  const store = new LivingIdentityStore(undefined, () => {}, () => 'id' + ++n);
+  set(f.app, store);
+  const file = f.app.vault.getAbstractFileByPath('Note.md');
+  store.observe('Note.md', { ctime: file.stat.ctime + 1000, size: file.stat.size });
+  assert.equal(store.observe('Note.md', file.stat).state, 'unknown', 'fixture: another file now sits at the source path');
+  return { ...f, store, file, restore: () => set(f.app, undefined) };
+}
+
+S.integrationTest('Draft confirmation: a trial on an unsaved draft treats the unresolved link as resolved without touching the identity store or the card', async () => {
+  const f = await unresolvedSourceFixture();
+  const before = S.plain(f.store.at('Note.md'));
+  const bytes = f.contents.get('parent.md');
+  const prepared = await prepareLivingTrial(f.port, 'parent', 'track things\n\nSources: [[Note]]');
+  assert.ok(prepared.request, 'the trial is built');
+  assert.deepEqual(S.plain(f.store.at('Note.md')), before, 'identity store untouched');
+  assert.equal(f.store.at('Note.md').state, 'unknown');
+  assert.equal(f.contents.get('parent.md'), bytes);
+  f.restore();
+});
+
+S.integrationTest('Draft confirmation: a failed save does not reconfirm; a successful save does', async () => {
+  const f = await unresolvedSourceFixture();
+  const before = S.plain(f.store.at('Note.md'));
+  const real = f.repo.updateNoteGuarded;
+  f.repo.updateNoteGuarded = async () => 'conflict';
+  await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'parent', 'track things\n\nSources: [[Note]]'), /changed-configuration/);
+  assert.deepEqual(S.plain(f.store.at('Note.md')), before, 'failed save leaves the identity store untouched');
+  f.repo.updateNoteGuarded = real;
+  const saved = await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'track things\n\nSources: [[Note]]');
+  assert.equal(saved.outcome, 'written');
+  assert.equal(f.store.at('Note.md').state, 'resolved', 'the saved configuration confirms the source');
+  assert.notEqual(f.store.at('Note.md').refId, before.refId);
+  f.restore();
 });

@@ -794,7 +794,17 @@ function resolveDraft(
   allowNewSource?: (path: string) => boolean
 ) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
-  const resolver = sourceResolver(app);
+  const base = sourceResolver(app);
+  // Choosing an unresolved link again is the explicit confirmation, but only a saved configuration may record it. Until
+  // then (and for a trial) the link counts as resolved without touching the identity store.
+  const pending = new Map<string, TFile>();
+  const resolver = {
+    resolveAuthorized(...args: Parameters<typeof base.resolveAuthorized>) {
+      const note = base.resolveAuthorized(...args);
+      if (note?.unresolved && pending.has(note.path)) return { identity: note.identity, path: note.path };
+      return note;
+    }
+  };
   const previousLinks = promptSourceLinks(saved.note.prompt);
   const nextLinks = promptSourceLinks(prompt);
   const raw = frontmatter(saved.content)["living-node-refs"];
@@ -810,7 +820,7 @@ function resolveDraft(
     // Choosing the link again is the user's explicit confirmation of an unresolved source.
     if (note.unresolved) {
       const file = app.vault.getAbstractFileByPath(note.path);
-      if (file instanceof TFile) livingIdentityStore(app)?.reconfirm(file.path, file.stat);
+      if (file instanceof TFile) pending.set(file.path, file);
     }
     if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
     if (note.path === target.path) throw new Error("self-reference");
@@ -830,14 +840,25 @@ function resolveDraft(
   if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
   if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
     throw new Error("living-node-cycle");
-  const sourceRevision = livingSnapshotRevision(
-    JSON.stringify(
-      (next.sources.get(target.id)?.sources ?? [])
-        .filter(source => source.roles.includes("explicit"))
-        .map(source => (source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path]))
-    )
-  );
-  return { encoded, proposed, sourceRevision };
+  const revisionOf = (planned: typeof next) =>
+    livingSnapshotRevision(
+      JSON.stringify(
+        (planned.sources.get(target.id)?.sources ?? [])
+          .filter(source => source.roles.includes("explicit"))
+          .map(source => (source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path]))
+      )
+    );
+  return {
+    encoded,
+    proposed,
+    resolver,
+    sourceRevision: revisionOf(next),
+    /** Records the explicit confirmations after the formal save succeeded; returns the revision under the new identities. */
+    confirm() {
+      for (const file of pending.values()) livingIdentityStore(app)?.reconfirm(file.path, file.stat);
+      return revisionOf(planLivingMap(proposed, [], resolver));
+    }
+  };
 }
 
 export interface LivingConfigSave {
@@ -876,7 +897,8 @@ export async function saveLivingConfig(
     livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision
   )
     throw new Error("changed-configuration");
-  const { encoded, sourceRevision } = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
+  const draft = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
+  const { encoded, sourceRevision } = draft;
   if (expectedSourceRevision !== undefined && sourceRevision !== expectedSourceRevision)
     throw new Error("changed-source-identity");
   const fm = frontmatter(snapshot.content);
@@ -890,7 +912,7 @@ export async function saveLivingConfig(
       before: snapshot.content,
       after: snapshot.content,
       configRevision: livingConfigurationStamp(prompt, fm),
-      sourceRevision
+      sourceRevision: draft.confirm()
     };
   let saved = "";
   let savedRevision = "";
@@ -919,7 +941,7 @@ export async function saveLivingConfig(
     before: snapshot.content,
     after: saved,
     configRevision: savedRevision,
-    sourceRevision
+    sourceRevision: draft.confirm()
   };
 }
 
@@ -937,8 +959,10 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     const saved = snapshots.get(id);
     const card = cards.find(item => item.id === id);
     if (!saved || !card || !sameLivingTarget(target, card) || saved.note.aiLocked) throw new Error("changed-target");
-    const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt, saved);
-    const resolver = sourceResolver(port.app);
+    const draft = resolveDraft(port.app, cards, card, prompt, saved);
+    const { encoded, proposed } = draft;
+    // A trial treats a link the draft confirms as resolved; the formal graph keeps the stored identity state.
+    const resolver = formal ? sourceResolver(port.app) : draft.resolver;
     const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);
     const blocked = planned.plan.blocked.get(id);
     // A trial reads direct existing knowledge, never dispatches upstream. An

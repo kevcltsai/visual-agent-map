@@ -211,7 +211,7 @@ async function harness(spec, { confirm = true } = {}) {
     addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; }
   }
   const Modal = dom.makeModal();
-  const { VisualAgentMapView, setLivingIdentityStore: setViewIdentityStore } = S.load('tests/support-view-identity-entry.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value), requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
+  const { VisualAgentMapView, setLivingIdentityStore: setViewIdentityStore, livingCoordinator: viewCoordinator } = S.load('tests/support-view-identity-entry.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value), requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   view.armHighlightFade = () => {};
   const hydrate = async () => { view.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
@@ -221,7 +221,7 @@ async function harness(spec, { confirm = true } = {}) {
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   await hydrate();
   // Exercise the production execution path through the real Repository. Only the provider transport is stubbed.
-  const plan = { fail: new Set(), hang: new Set(), pause: new Set(), waiters: [], go() { this.waiters.splice(0).forEach(resolve => resolve()); } };
+  const plan = { fail: new Set(), errors: new Map(), reply: new Map(), hang: new Set(), pause: new Set(), waiters: [], go() { this.waiters.splice(0).forEach(resolve => resolve()); } };
   view.readMapSourceGroups = async () => [];
   host.aiCalls = { run: async (prepared, options, finish) => {
     const input = prepared.input;
@@ -231,6 +231,8 @@ async function harness(spec, { confirm = true } = {}) {
     if (options.signal.aborted) throw new Error('stopped');
     if (plan.pause.has(key)) await new Promise(resolve => plan.waiters.push(resolve));
     if (plan.fail.has(key)) throw new Error('provider failed: ' + key);
+    if (plan.errors.has(key)) throw plan.errors.get(key);
+    if (plan.reply.has(key)) return finish(plan.reply.get(key), { signal: options.signal, parsed() {} });
     const text = 'Result: ' + key;
     const operations = input.base.output.text === text ? [] : [{ kind: 'output', text, evidence: [] }];
     return finish(JSON.stringify({ baseRevision: input.base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} });
@@ -273,7 +275,7 @@ async function harness(spec, { confirm = true } = {}) {
   const status = key => view.promptRuns.get(MAP)?.get(node(key).id)?.status;
   const done = () => until(() => view.promptBatch?.outcome);
   const runAll = async () => { view.startPromptRun(); };
-  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort, runtime, setViewIdentityStore };
+  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort, runtime, setViewIdentityStore, viewCoordinator };
 }
 
 // root -> mid -> leaf1, leaf2 ; root -> side
@@ -806,6 +808,7 @@ async function ranOnce() {
   h.calls.length = 0;
   return h;
 }
+const skipText = () => S.load('i18n.ts').t('ui.living_node_trial_skipped');
 const midTrial = h => h.roundPort().port.coordinator.acquire('map-a', 'trial-view', [h.node('mid').path], false);
 
 test('trial + Run All, valid upstream: the trial card is skipped and its knowledge is used as is', async () => {
@@ -927,14 +930,14 @@ test('reason: a failed card and the cards blocked by it keep a short reason in t
   const h = await harness(TREE);
   h.plan.fail.add('leaf1');
   await h.runAll(); await h.done();
-  assert.equal(reasonOf(h, 'leaf1'), 'failed');
+  assert.equal(reasonOf(h, 'leaf1'), 'provider-failed');
   assert.equal(reasonOf(h, 'mid'), 'dependency-blocked');
   assert.equal(reasonOf(h, 'root'), 'dependency-blocked');
   await h.view.hydrate();
   const note = h.view.notes.get(h.node('mid').id);
   assert.equal(note.livingNode.reason, 'dependency-blocked', 'it is read back from the note, so it survives a reopen');
   assert.equal(livingState.livingReasonKey(note.livingNode), 'ui.living_node_reason_dependency');
-  assert.equal(livingState.livingReasonKey((await livingOf(h, 'leaf1'))), 'ui.living_node_reason_failed');
+  assert.equal(livingState.livingReasonKey((await livingOf(h, 'leaf1'))), 'ui.living_node_trial_reason_provider');
   h.plan.fail.clear();
   await h.runAll(); await h.done();
   for (const key of ['leaf1', 'mid', 'root']) {
@@ -942,6 +945,42 @@ test('reason: a failed card and the cards blocked by it keep a short reason in t
     assert.equal(reasonOf(h, key), undefined, key + ' reason cleared');
     assert.equal((await livingOf(h, key)).reason, undefined);
   }
+});
+
+test('reason: each error class is stored as a short code and shows its own line on the card; raw error text is never stored', async () => {
+  const cases = [
+    ['provider', { errors: new Error('connect ECONNRESET /Users/me/secret') }, 'provider-failed', 'ui.living_node_trial_reason_provider'],
+    ['timeout', { errors: new Error('Request timed out') }, 'timeout', 'ui.living_node_trial_reason_timeout'],
+    ['not-json', { reply: 'this is not json {' }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
+    ['bad-answer', { reply: JSON.stringify({ baseRevision: 'x', requiresWeb: false, operations: 'nope' }) }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
+    ['web', { reply: JSON.stringify({ requiresWeb: true, operations: [] }) }, 'web-required', 'ui.living_node_trial_reason_web']
+  ];
+  for (const [name, how, code, key] of cases) {
+    const h = await harness([['solo', null, { prompt: 'Find facts' }]]);
+    for (const [kind, value] of Object.entries(how)) h.plan[kind].set('solo', value);
+    await h.runAll(); await h.done();
+    assert.equal(reasonOf(h, 'solo'), code, name);
+    assert.doesNotMatch(h.raw('solo'), /Unexpected token|ECONNRESET|secret|not valid JSON/, name + ' raw text not stored');
+    assert.equal(livingState.livingReasonKey(await livingOf(h, 'solo')), key, name);
+  }
+});
+
+test('reason codes map to lines: unknown code gets the generic line, trial-reason categories are reused', () => {
+  const mapped = code => livingState.livingReasonKey({ damaged: false, outcome: 'failed', reason: code });
+  assert.equal(mapped('range-too-large'), 'ui.living_node_reason_range_too_large');
+  assert.equal(mapped('source-changed'), 'ui.living_node_trial_reason_replaced');
+  assert.equal(mapped('markers-damaged'), 'ui.living_node_reason_markers_damaged');
+  assert.equal(mapped('missing-source'), 'ui.living_node_reason_missing_source');
+  assert.equal(mapped('zzz'), 'ui.living_node_reason_failed');
+  const code = e => livingState.livingFailureCode(e);
+  assert.equal(code(new SyntaxError('Unexpected token')), 'validation-rejected');
+  assert.equal(code(new Error('missing-evidence')), 'validation-rejected');
+  assert.equal(code(new Error('stale-base')), 'source-changed');
+  assert.equal(code(new Error('ambiguous-living-node-region')), 'markers-damaged');
+  assert.equal(code(new Error('unauthorized-source')), 'missing-source');
+  assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
+  assert.equal(code(new Error('cancelled')), 'failed');
+  assert.equal(code('plain text'), 'provider-failed');
 });
 
 test('reason: a missing required source is reported as missing-source', async () => {
@@ -962,6 +1001,26 @@ test('reason: a card waiting on a card in trial says so; the trial card itself i
   assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'upstream-trial' }), 'ui.living_node_upstream_trial');
 });
 
+test('Run All: a card under trial shows the skip line on the card while the batch runs and in the result, without being stamped', async () => {
+  const h = await harness(TREE);
+  const trial = h.viewCoordinator(h.host).acquire('map-a', 'trial-view', [h.node('mid').path], false);
+  const before = h.raw('mid');
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  const skipLine = () => {
+    const card = element('div'), header = element('div'), title = element('h3', { cls: 'vam-card-title' });
+    header.appendChild?.(title); card.appendChild?.(header); card.appendChild?.(title);
+    h.view.paintPromptState(card, header, h.node('mid'), h.view.notes.get(h.node('mid').id));
+    return findAll(card, i => i.cls?.includes('vam-ai-reason')).map(i => i.text);
+  };
+  eq(skipLine(), [skipText()], 'while the batch runs');
+  h.view.stopPromptBatch(); await h.done();
+  trial.release();
+  eq(skipLine(), [skipText()], 'in the batch result');
+  assert.equal(h.raw('mid'), before, 'a card under trial is not stamped');
+});
+
 test('reason: a source note that was replaced blocks with source-replaced', async () => {
   const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
   await h.app.vault.create('Notes/Ref.md', 'reference body');
@@ -976,9 +1035,9 @@ test('reason: a source note that was replaced blocks with source-replaced', asyn
   assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'source-replaced' }), 'ui.living_node_source_replaced');
 });
 
-test('reason: a damaged region shows the markers message whatever the outcome; an unknown or missing code shows nothing', () => {
+test('reason: a damaged region shows the markers message whatever the outcome; an unknown code shows the generic line, a missing one nothing', () => {
   assert.equal(livingState.livingReasonKey({ damaged: true, outcome: 'ok' }), 'ui.living_node_reason_markers_damaged');
-  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'failed', reason: 'zzz' }), undefined);
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'failed', reason: 'zzz' }), 'ui.living_node_reason_failed');
   assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'failed' }), undefined);
   assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'ok', reason: 'failed' }), undefined, 'a finished card never shows an old reason');
   assert.equal(livingState.livingReasonKey(undefined), undefined);

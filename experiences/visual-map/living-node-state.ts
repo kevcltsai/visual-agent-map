@@ -9,8 +9,39 @@ const REASON_KEYS: Record<string, TranslationKey> = {
   "dependency-blocked": "ui.living_node_reason_dependency",
   cycle: "ui.living_node_reason_cycle",
   "range-too-large": "ui.living_node_reason_range_too_large",
-  failed: "ui.living_node_reason_failed"
+  failed: "ui.living_node_reason_failed",
+  "provider-failed": "ui.living_node_trial_reason_provider",
+  timeout: "ui.living_node_trial_reason_timeout",
+  "web-required": "ui.living_node_trial_reason_web",
+  "source-changed": "ui.living_node_trial_reason_replaced",
+  "markers-damaged": "ui.living_node_reason_markers_damaged",
+  "validation-rejected": "ui.living_node_trial_reason_validation"
 };
+
+/** A bare error code such as "required-web-unavailable"; anything longer or free-form may carry private text. */
+const CODE = /^[a-z][a-z0-9-]{1,63}$/;
+
+/**
+ * The short code stored with a failed card. Never raw error text, which can carry prompt text or paths: only the
+ * class of the failure survives, and an unrecognised internal code is the generic "failed".
+ */
+export function livingFailureCode(error: unknown): string {
+  const message = String((error as { message?: unknown } | null)?.message ?? error);
+  const code = CODE.test(message) ? message : "";
+  if (/required-web|forbidden-web|web-check|web-excerpt|missing-search-decision/.test(code)) return "web-required";
+  if (/too-large|^living-section-ambiguous/.test(code)) return "range-too-large";
+  if (/^(stale-base|changed-knowledge|stale-or-cancelled-write|changed-[a-z-]+)$/.test(code)) return "source-changed";
+  if (/^(ambiguous-living-node-region|invalid-generation|invalid-receipts|unknown-ownership)$/.test(code))
+    return "markers-damaged";
+  if (/^(unauthorized-source|missing-source|invalid-source)$/.test(code)) return "missing-source";
+  if (/^(cancelled|living-node-busy.*|missing-or-locked-target|missing-target|locked-target|empty-prompt)$/.test(code))
+    return "failed";
+  if (code) return "validation-rejected";
+  if ((error as { name?: unknown } | null)?.name === "SyntaxError" || /JSON/i.test(message))
+    return "validation-rejected";
+  if (/time.?out|timed out/i.test(message)) return "timeout";
+  return "provider-failed";
+}
 
 /** The short line a card shows for an unfinished state; it comes from the note, so it survives a reopen. */
 export function livingReasonKey(
@@ -18,7 +49,8 @@ export function livingReasonKey(
 ): TranslationKey | undefined {
   if (!living) return undefined;
   if (living.damaged) return "ui.living_node_reason_markers_damaged";
-  if ((living.outcome === "failed" || living.outcome === "blocked") && living.reason) return REASON_KEYS[living.reason];
+  if ((living.outcome === "failed" || living.outcome === "blocked") && living.reason)
+    return REASON_KEYS[living.reason] ?? "ui.living_node_reason_failed";
   return undefined;
 }
 

@@ -31,7 +31,7 @@ import {
   livingSnapshotRevision,
   readLivingMarkdown
 } from "./living-node-markdown";
-import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
+import { livingConfigRevision, livingFailureCode, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
 import { fitLivingContext, livingModelView, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
@@ -647,14 +647,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     let results: Map<string, LivingSettlement> | undefined;
     const diagnostics: Promise<unknown>[] = [];
     const failed = (id: string, error: unknown): void => {
-      reasons.set(
-        id,
-        /^(?:living-range-too-large|living-section-ambiguous|living-node-context-too-large)/.test(
-          String((error as Error)?.message)
-        )
-          ? "range-too-large"
-          : "failed"
-      );
+      reasons.set(id, livingFailureCode(error));
       port.onFailure(id, error);
     };
     const stamp = async (id: string, outcome: "failed" | "blocked"): Promise<void> => {

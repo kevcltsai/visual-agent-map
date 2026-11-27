@@ -20440,6 +20440,7 @@ export class VisualAgentMapView extends ItemView {
     const state: PromptBatchState = { mapPath, controller: run.controller, total: 0, finished: 0 };
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
+    const trialSkipped = new Set<string>();
     const tally = { done: 0, failed: 0, blocked: 0 };
     let warnedOptionalSources = false;
     const viewCurrent = (): boolean => session() && !this.plugin.repo.isDisposed();
@@ -20451,6 +20452,7 @@ export class VisualAgentMapView extends ItemView {
         case "start":
           state.total = event.total;
           this.promptRuns.delete(mapPath);
+          for (const id of trialSkipped) this.setPromptStatus(mapPath, id, "idle", failureReasons.get(id));
           if (current()) this.render();
           break;
         case "running":
@@ -20461,7 +20463,11 @@ export class VisualAgentMapView extends ItemView {
           failureReasons.set(event.id, event.reason);
           break;
         case "trial":
-          for (const id of event.skipped) failureReasons.set(id, t("ui.living_node_trial_skipped"));
+          for (const id of event.skipped) {
+            failureReasons.set(id, t("ui.living_node_trial_skipped"));
+            trialSkipped.add(id);
+            this.setPromptStatus(mapPath, id, "idle", failureReasons.get(id));
+          }
           for (const id of event.blocked) failureReasons.set(id, t("ui.living_node_upstream_trial"));
           if (event.skipped.length && viewCurrent()) new Notice(t("ui.living_node_trial_boundary"));
           break;
@@ -20696,10 +20702,17 @@ export class VisualAgentMapView extends ItemView {
         parts.push(line);
         questionLine = line;
       }
-      const reason = status === "running" ? undefined : livingReasonKey(note.livingNode);
+      const reasonKey = status === "running" ? undefined : livingReasonKey(note.livingNode);
+      // A card under trial is skipped by the batch without being stamped, so its skip line lives only in the batch.
+      const entry = this.promptEntryOf(node.id);
+      const reason = reasonKey
+        ? t(reasonKey)
+        : status !== "running" && entry?.status === "idle" && entry.reason === t("ui.living_node_trial_skipped")
+          ? entry.reason
+          : undefined;
       if (reason) {
-        const line = createEl("p", { cls: "vam-ai-reason", text: t(reason) });
-        line.setAttr("title", t(reason));
+        const line = createEl("p", { cls: "vam-ai-reason", text: reason });
+        line.setAttr("title", reason);
         line.setAttr("dir", "auto");
         (questionLine ?? title).after(line);
         parts.push(line);

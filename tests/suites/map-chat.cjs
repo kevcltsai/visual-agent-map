@@ -3197,8 +3197,8 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
     const idle = findAll(draw(h, method), i => i.tag === 'button');
-    // The ordinary toolbar keeps the always-visible 「Data sources」 button; the hidden-AIM one has nothing while idle.
-    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), method === 'renderMapTools' ? [true] : [], `${method}: no select icon while idle`);
+    // B17: 「Data sources」 moved to the header, so neither canvas toolbar has anything while idle.
+    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), [], `${method}: no select icon while idle`);
     assert.equal(findAll(draw(h, method), i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
     h.view.selection.toggleMultiSelect();
     assert.equal(h.view.selection.state.multiSelectMode, true);
@@ -3283,7 +3283,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics" and the 
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
+  assert.deepEqual(all, [], 'select several is in the header ⋯ menu; data sources is a header button (B17)'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
@@ -3472,7 +3472,7 @@ test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only
   assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
   assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
   assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
-  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/, 'B17: the folded chat edge is 28px');
 });
 
 test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay), and the selection bar lives in the canvas', () => {

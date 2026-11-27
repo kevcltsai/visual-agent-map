@@ -1002,10 +1002,12 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   return lines;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
-const CHAT_RAIL_WIDTH = 44;
+const CHAT_RAIL_WIDTH = 28;
 const CHAT_TOOLS_GAP = 12;
 /** The sources panel hangs this far under the tool group. */
 const SOURCES_PANEL_GAP = 6;
+/** Under this pane width the header keeps only the title, undo and ⋯ (the rest moves into ⋯). */
+const HEADER_NARROW_WIDTH = 480;
 /**
  * A found picture's title as it is written into a note: letters, digits, spaces and plain punctuation only. Nothing a Markdown
  * or Dataview reader would act on (a backtick, `%%`, `$=`, an embed, a table bar, a heading) survives; the rest becomes a space.
@@ -1030,6 +1032,14 @@ class MapSourceWriteError extends Error {
 let mapChatTaskSequence = 0;
 
 /** The map actions the command palette offers (`VisualAgentMapView.mapCommand`). */
+/** One entry a narrow header moves into ⋯ (see narrowHeaderItems). */
+interface MapActionItem {
+  title: string;
+  icon: string;
+  action: () => void;
+  disabled?: boolean;
+  checked?: boolean;
+}
 export type MapCommandAction =
   | "add-topic"
   | "add-subtopic"
@@ -2162,13 +2172,19 @@ export class VisualAgentMapView extends ItemView {
     // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
     this.registerEvent(
       workspace.on("layout-change", () => {
+        this.syncReaderToggle();
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
         this.drawWhenShown();
       })
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
-    this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
+    this.registerEvent(
+      workspace.on("resize", () => {
+        this.chat?.refreshNote();
+        this.syncReaderToggle();
+      })
+    );
     // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
     const vault = this.app.vault;
     if (typeof vault?.on === "function") {
@@ -11682,7 +11698,7 @@ export class VisualAgentMapView extends ItemView {
     this.openMapModal(new KeyboardShortcutsModal(this.app));
   }
   /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
-  private openMapActions(event?: MouseEvent): void {
+  private openMapActions(event?: MouseEvent, extra?: MapActionItem[]): void {
     const menu = this.newMenu();
     const add = (title: string, icon: string, action: () => void, warning = false): void => {
       menu.addItem(item => {
@@ -11690,6 +11706,16 @@ export class VisualAgentMapView extends ItemView {
         if (warning) item.setWarning(true);
       });
     };
+    // A narrow header: the tools it hid come first.
+    if (extra?.length) {
+      for (const entry of extra)
+        menu.addItem(item => {
+          item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action);
+          if (entry.disabled) item.setDisabled(true);
+          if (entry.checked !== undefined) item.setChecked(entry.checked);
+        });
+      menu.addSeparator();
+    }
     // The canvas views and modes that used to float over the map (map management lives in the title ▾ menu).
     if (this.map) {
       if (this.canPresent()) add(t("ui.presentation_start"), "presentation", () => this.startPresentation());
@@ -12069,27 +12095,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
-    if (this.map) {
-      // Header: title ▾, undo, redo, book, share, more. Undo and redo stay visible (they are how a mistake is taken back).
-      const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
-      undo.disabled = !this.history.canUndo;
-      undo.dataset.history = "undo";
-      const redo = this.iconButton(headerActions, "redo-2", t("ui.redo"), () => this.enqueue(() => this.travel(true)));
-      redo.disabled = !this.history.canRedo;
-      redo.dataset.history = "redo";
-      this.updateHistoryButtons();
-      const bookButton = headerActions.createEl("button", {
-        cls: "mod-cta vam-book-button",
-        text: t("ui.book_button")
-      });
-      bookButton.setAttr("title", t("ui.book_button_title"));
-      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
-      this.addExportButton(headerActions);
-      this.renderRunAllButton(headerActions);
-      this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
-        this.openMapActions(event)
-      ).addClass("vam-map-actions-button");
-    }
+    if (this.map) this.renderHeaderActions(headerActions);
     this.renderBookPipelineBar(toolbar);
     // Focus mode hides the header; a running book's bar (with its Stop) is the one thing it keeps.
     toolbar.toggleClass("is-focus-empty", this.focusMode && !toolbar.querySelector(".vam-book-bar"));
@@ -12394,8 +12400,103 @@ export class VisualAgentMapView extends ItemView {
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
     this.renderSelectTool(tools);
-    // Like main's design, an empty map has no sources button either.
-    if (this.map.nodes.length) this.mapSourcesControl?.renderMapSourcesControl(tools);
+  }
+  /**
+   * The header holds the tools for the whole map: data sources, search, undo, redo, book, share, run all, ⋯ and the reader
+   * toggle. Undo and redo stay where they were (they are how a mistake is taken back). A narrow pane (is-header-narrow) shows
+   * only the title, undo and ⋯; the rest (`vam-header-wide`) moves to the top of ⋯.
+   */
+  private renderHeaderActions(headerActions: HTMLElement): void {
+    this.renderHeaderSources(headerActions);
+    this.iconButton(headerActions, "search", t("ui.command_map_search"), () => this.openMapSearch()).addClass(
+      "vam-header-wide"
+    );
+    const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
+    undo.disabled = !this.history.canUndo;
+    undo.dataset.history = "undo";
+    const redo = this.iconButton(headerActions, "redo-2", t("ui.redo"), () => this.enqueue(() => this.travel(true)));
+    redo.disabled = !this.history.canRedo;
+    redo.dataset.history = "redo";
+    redo.addClass("vam-header-wide");
+    this.updateHistoryButtons();
+    const bookButton = headerActions.createEl("button", { cls: "mod-cta vam-book-button", text: t("ui.book_button") });
+    bookButton.addClass("vam-header-wide");
+    bookButton.setAttr("title", t("ui.book_button_title"));
+    bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
+    this.addExportButton(headerActions).addClass("vam-header-wide");
+    this.renderRunAllButton(headerActions);
+    headerActions.querySelector(".vam-run-all")?.addClass("vam-header-wide");
+    this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
+      this.openMapActions(event, this.headerNarrow() ? this.narrowHeaderItems(headerActions, event) : undefined)
+    ).addClass("vam-map-actions-button");
+    this.renderReaderToggle(headerActions);
+  }
+  /** The data sources button (and the panel hanging under it); an empty map and an old AIM map have none. */
+  private renderHeaderSources(parent: HTMLElement): void {
+    if (!this.map || this.map.aim || !this.map.nodes.length) return;
+    // The wrapper stays in a narrow header (only its button hides), so the panel opened from ⋯ still has its place.
+    this.mapSourcesControl?.renderMapSourcesControl(parent.createDiv("vam-header-sources"));
+  }
+  /** The reader toggle folds and unfolds Obsidian's right sidebar (its width stays Obsidian's); a popout window has none. */
+  private renderReaderToggle(parent: HTMLElement): void {
+    const workspace = this.app.workspace;
+    const split = workspace?.rightSplit;
+    if (!split || this.leaf?.getRoot?.() !== workspace.rootSplit) return;
+    const button = this.iconButton(parent, "panel-right", t("ui.reader_toggle"), () => {
+      if (split.collapsed) split.expand();
+      else split.collapse();
+      this.syncReaderToggle();
+    });
+    button.addClass("vam-reader-toggle", "vam-header-wide");
+    this.syncReaderToggle();
+  }
+  /** aria-pressed follows the right sidebar: after a press, and when it is folded elsewhere (layout change, resize). */
+  private syncReaderToggle(): void {
+    const button = this.contentEl?.querySelector?.<HTMLButtonElement>(".vam-reader-toggle");
+    const split = this.app.workspace?.rightSplit;
+    if (button && split) button.setAttr("aria-pressed", String(!split.collapsed));
+  }
+  private headerNarrow(): boolean {
+    return !!this.contentEl?.hasClass?.("is-header-narrow");
+  }
+  /** A pane under HEADER_NARROW_WIDTH keeps title, undo and ⋯ in the header; a hidden pane (width 0) keeps its state. */
+  private syncHeaderNarrow(): void {
+    const width = this.contentEl?.getBoundingClientRect?.().width ?? 0;
+    if (width > 0) this.contentEl.toggleClass("is-header-narrow", width < HEADER_NARROW_WIDTH);
+  }
+  /** What a narrow header hid, in header order, for the top of ⋯. Entries act as their buttons do. */
+  private narrowHeaderItems(header: HTMLElement, event: MouseEvent): MapActionItem[] {
+    const items: MapActionItem[] = [];
+    const sources = header.querySelector<HTMLButtonElement>(".vam-sources-button");
+    if (sources) items.push({ title: t("ui.map_sources_button"), icon: "files", action: () => sources.click() });
+    items.push({ title: t("ui.command_map_search"), icon: "search", action: () => this.openMapSearch() });
+    items.push({
+      title: t("ui.redo"),
+      icon: "redo-2",
+      disabled: !this.history.canRedo,
+      action: () => this.enqueue(() => this.travel(true))
+    });
+    items.push({ title: t("ui.book_button"), icon: "book-open", action: () => void this.startBookPipelineFromUi() });
+    items.push({ title: t("ui.export_or_share_map"), icon: "share-2", action: () => this.openExportMenu(event) });
+    const runAll = header.querySelector<HTMLButtonElement>(".vam-run-all");
+    if (runAll) {
+      const running = runAll.hasClass("is-running");
+      items.push({
+        title: t(running ? "ui.ai_run_all_stop" : "ui.ai_run_all"),
+        icon: running ? "square" : "play",
+        disabled: runAll.disabled,
+        action: () => runAll.click()
+      });
+    }
+    const reader = header.querySelector<HTMLButtonElement>(".vam-reader-toggle");
+    if (reader)
+      items.push({
+        title: t("ui.reader_toggle"),
+        icon: "panel-right",
+        checked: reader.getAttr("aria-pressed") === "true",
+        action: () => reader.click()
+      });
+    return items;
   }
   /**
    * The tools on an old AIM map (AIM was removed): the select tool only, no goal or sources control. A separate method so
@@ -20952,11 +21053,12 @@ export class VisualAgentMapView extends ItemView {
   private placeMapTools(): void {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     this.watchToolPlacement();
-    if (!tools) return;
-    // The canvas starts after the 44px edge the laid-over window leaves in place.
-    const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
-    tools.style.left = left > 0 ? `${left}px` : "";
-    // Last: the stack reads where the tools are horizontally.
+    if (tools) {
+      // The canvas starts after the narrow edge the laid-over window leaves in place.
+      const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
+      tools.style.left = left > 0 ? `${left}px` : "";
+    }
+    // Last: the sources panel hangs from the header, whether or not the canvas has its tool group.
     this.layoutTopStack();
   }
   /**
@@ -20991,18 +21093,14 @@ export class VisualAgentMapView extends ItemView {
   private toolPlacementObserver: ResizeObserver | null = null;
   private toolPlacementObserved: HTMLElement[] = [];
   /**
-   * The one place that stacks what hangs off the top of the canvas: the sources panel hanging from the tool group (height
+   * The one place that places what hangs over the top of the canvas: the sources panel under its header button (height
    * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   private layoutTopStack(): void {
-    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
-    if (!tools?.style) return;
     const sources = this.mapSourcesControl?.mapSourcesPanelEl;
-    const open = !!sources && sources.isConnected !== false;
-    tools.toggleClass?.("has-panel", open);
-    if (!open || !sources) return;
+    if (!sources || sources.isConnected === false) return;
     this.mapSourcesControl.placeMapSourcesPanel(sources);
-    const room = this.sourcesRoom(tools);
+    const room = this.sourcesRoom(sources);
     if (room !== null && typeof sources.style?.setProperty === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
@@ -21019,17 +21117,19 @@ export class VisualAgentMapView extends ItemView {
     );
     return (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
   }
-  /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
-  private sourcesRoom(tools: HTMLElement): number | null {
-    const overlay = tools.parentElement;
+  /** Height the sources panel may take: from its header button's bottom edge (plus the gap) down to the same limit. */
+  private sourcesRoom(panel: HTMLElement): number | null {
+    const overlay = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay");
     const canvasHeight = overlay?.clientHeight ?? 0;
-    const toolsRect = tools.getBoundingClientRect?.();
-    if (!(canvasHeight > 0) || !toolsRect) return null;
-    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - toolsRect.bottom - SOURCES_PANEL_GAP);
+    const anchor = panel.parentElement?.getBoundingClientRect?.();
+    if (!(canvasHeight > 0) || !anchor) return null;
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - anchor.bottom - SOURCES_PANEL_GAP);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
     this.drawWhenShown();
+    this.syncHeaderNarrow();
+    this.syncReaderToggle();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();

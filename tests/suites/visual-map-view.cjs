@@ -4840,17 +4840,18 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
   view.path = 'Current/Map.md'; view.map = map(Array.from({ length: nodes }, (_, i) => node(`n${i}`))); if (aim) view.map.aim = { runs: [] };
   view.mapSourcesControl.mapSources = plain(stored); view.announcer = dom.element('status');
   const tools = dom.element('tools');
-  const draw = () => { tools.children = []; view.renderMapTools(tools); return tools; };
+  // B17: the button and its panel live in the header (renderHeaderSources); `tools` stands for the header row.
+  const draw = () => { tools.children = []; view.renderHeaderSources(tools); return tools; };
   return { view, tree, state, tools, draw, plugin };
 }
 const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
 const msLabel = tools => msButton(tools).attrs['aria-label'];
 const msBadge = tools => dom.find(msButton(tools), c => (c.cls ?? '').split(' ').includes('vam-sources-button-badge'));
-integrationTest('map sources toolbar: the button stands alone while idle, reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
+integrationTest('map sources header button: it stands alone in its wrapper, reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
   const none = msViewFixture(); none.draw();
-  const buttons = none.tools.children.filter(c => c.tag === 'button');
+  const buttons = dom.findAll(none.tools, c => c.tag === 'button');
   assert.equal(buttons.at(-1), msButton(none.tools), 'the data sources button is there');
-  assert.equal(buttons.length, 1, 'no select icon while idle: select several is in the header ⋯ menu');
+  assert.equal(buttons.length, 1, 'only the data sources button: select several is in the header ⋯ menu');
   assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
   assert.equal(msLabel(none.tools), 'Data sources'); assert.equal(msBadge(none.tools), undefined, 'no sources: no badge');
   assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-label'), undefined, 'no text label node');
@@ -4859,7 +4860,7 @@ integrationTest('map sources toolbar: the button stands alone while idle, reads 
   assert.equal(msLabel(three.tools), 'Data sources · 3'); assert.equal(dom.find(msButton(three.tools), c => c.iconName === 'alert-triangle'), undefined);
   assert.equal(msBadge(three.tools).text, '3'); assert.equal(msBadge(three.tools).attrs['aria-hidden'], 'true'); assert.equal(msBadge(three.tools).classes.includes('is-bad'), false);
   assert.equal(msButton(three.tools).attrs['aria-haspopup'], 'dialog'); assert.equal(msButton(three.tools).attrs['aria-expanded'], 'false'); assert.ok(msButton(three.tools).attrs['aria-controls']);
-  assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no tools at all on an AIM map');
+  assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no data sources button on an AIM map');
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /vam-sources-button-label|vam-map-sources-warning|vam-tools-select-label/, 'the removed label and warning rules are gone');
   const empty = msViewFixture({ nodes: 0 }).draw();
   assert.equal(msButton(empty), undefined, 'an empty map has no data sources button');
@@ -4937,6 +4938,79 @@ integrationTest('map sources in the view: deleting a source note repaints the bu
   assert.ok(dom.find(fx.tools, c => (c.cls ?? '').includes('vam-map-sources-remove')), 'the unreadable row keeps Remove');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.registerEvent\(vault\.on\("delete"[\s\S]*this\.registerEvent\(vault\.on\("rename"/);
+});
+// ---- B17 (P1.7) workspace layout: the header holds the whole-map tools, the reader toggle folds Obsidian's right sidebar ----
+const b17Header = ({ popout = false, collapsed = true, nodes = 1 } = {}) => {
+  const fx = msViewFixture({ nodes });
+  const calls = [], rootSplit = {}, layoutHandlers = [];
+  const rightSplit = { collapsed, collapse() { this.collapsed = true; calls.push('collapse'); }, expand() { this.collapsed = false; calls.push('expand'); } };
+  fx.tree.app.workspace = { rightSplit, rootSplit };
+  fx.view.leaf = { getRoot: () => (popout ? {} : rootSplit) };
+  const header = dom.element('div');
+  fx.view.contentEl = header;
+  fx.view.renderHeaderActions(header);
+  const kind = b => ((b.cls ?? '').includes('vam-sources-button') ? 'sources' : (b.cls ?? '').includes('vam-book-button') ? 'book' : (b.cls ?? '').includes('vam-share-button') ? 'share' : (b.cls ?? '').includes('vam-run-all') ? 'run-all' : b.dataset.icon);
+  const order = () => dom.findAll(header, c => c.tag === 'button').map(kind);
+  const reader = () => dom.find(header, c => c.tag === 'button' && (c.cls ?? '').includes('vam-reader-toggle'));
+  return { ...fx, calls, rightSplit, header, order, reader, layoutHandlers };
+};
+integrationTest('B17 header: data sources, search, undo, redo, book, share, run all, ⋯, then the reader toggle; the canvas toolbar no longer has the sources button', () => {
+  const fx = b17Header();
+  assert.deepEqual(fx.order(), ['sources', 'search', 'undo-2', 'redo-2', 'book', 'share', 'run-all', 'more-vertical', 'panel-right']);
+  const search = dom.find(fx.header, c => c.tag === 'button' && c.dataset.icon === 'search');
+  assert.equal(search.attrs['aria-label'], 'Search this map');
+  let searched = 0; fx.view.openMapSearch = () => searched++;
+  search.click(); assert.equal(searched, 1, 'the search button opens the map search');
+  const tools = dom.element('tools'); fx.view.renderMapTools(tools);
+  assert.equal(dom.find(tools, c => (c.cls ?? '').includes('vam-sources-button')), undefined, 'the canvas toolbar has no sources button');
+  assert.equal(b17Header({ nodes: 0 }).order().includes('sources'), false, 'an empty map has no data sources button');
+});
+integrationTest('B17 reader toggle: folds and unfolds the Obsidian right sidebar, aria-pressed follows the sidebar at once and on layout change and resize; a popout window has none', () => {
+  const fx = b17Header({ collapsed: true });
+  const reader = fx.reader();
+  assert.equal(reader.attrs['aria-label'], 'Reader'); assert.equal(reader.attrs['aria-pressed'], 'false');
+  reader.click(); assert.deepEqual(fx.calls, ['expand']); assert.equal(reader.attrs['aria-pressed'], 'true', 'pressed right after the click');
+  reader.click(); assert.deepEqual(fx.calls, ['expand', 'collapse']); assert.equal(reader.attrs['aria-pressed'], 'false');
+  fx.rightSplit.collapsed = false; fx.view.syncReaderToggle(); assert.equal(reader.attrs['aria-pressed'], 'true', 'a sidebar opened elsewhere is picked up');
+  fx.rightSplit.collapsed = true; fx.view.onResize(); assert.equal(reader.attrs['aria-pressed'], 'false', 'onResize syncs it too');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /workspace\.on\("layout-change", \(\) => \{[^}]*this\.syncReaderToggle\(\);/, 'layout-change syncs it');
+  assert.equal(b17Header({ popout: true }).reader(), undefined, 'a popout window has no reader toggle');
+  const zh = fs.readFileSync(path.join(root, 'i18n/zh-TW.ts'), 'utf8'); assert.match(zh, /"ui\.reader_toggle": "閱讀器"/);
+});
+integrationTest('B17 narrow header: under 480px the pane gets is-header-narrow and ⋯ lists the hidden header tools first; wide ⋯ is unchanged', () => {
+  const menus = [];
+  const fx = b17Header();
+  fx.view.newMenu = () => { const menu = { items: [], separators: [], addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon(v) { this.icon = v; return this; }, setWarning() { return this; }, setChecked(v) { this.checked = v; return this; }, setDisabled(v) { this.disabled = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); menu.items.push(item); return menu; }, addSeparator() { menu.separators.push(menu.items.length); return menu; }, showAtPosition() { return menu; }, showAtMouseEvent() { return menu; } }; menus.push(menu); return menu; };
+  let width = 900; fx.header.getBoundingClientRect = () => ({ left: 0, top: 0, right: width, bottom: 600, width, height: 600 });
+  fx.view.onResize();
+  assert.equal(fx.header.hasClass('is-header-narrow'), false);
+  const more = dom.find(fx.header, c => c.tag === 'button' && c.dataset.icon === 'more-vertical');
+  more.click(); const wide = menus.at(-1).items.map(i => i.title);
+  assert.equal(wide.includes('Search this map') || wide.includes('Reader'), false, 'wide: none of the header tools is repeated in ⋯');
+  width = 380; fx.view.onResize();
+  assert.equal(fx.header.hasClass('is-header-narrow'), true, '380px is narrow');
+  more.click(); const narrow = menus.at(-1);
+  assert.deepEqual(narrow.items.slice(0, 7).map(i => i.title), ['Data sources', 'Search this map', 'Redo', 'Picture book', 'Export or share map', 'Run all', 'Reader']);
+  assert.equal(narrow.items[5].disabled, true, 'run all is greyed out like its button (no AI card)');
+  assert.equal(narrow.separators[0], 7, 'a separator after the moved tools');
+  assert.equal(narrow.items[2].disabled, true, 'redo is greyed out with nothing to redo');
+  assert.deepEqual(narrow.items.slice(7).map(i => i.title), wide, 'then the usual entries');
+  narrow.items[6].click(); assert.deepEqual(fx.calls, ['expand'], 'the reader entry folds the sidebar like the button');
+  let searched = 0; fx.view.openMapSearch = () => searched++; narrow.items[1].click(); assert.equal(searched, 1);
+  narrow.items[0].click(); assert.equal(fx.view.mapSourcesControl.mapSourcesOpen, true, 'the sources entry opens the panel');
+  width = 0; fx.view.onResize(); assert.equal(fx.header.hasClass('is-header-narrow'), true, 'a hidden pane (width 0) keeps its state');
+  width = 520; fx.view.onResize(); assert.equal(fx.header.hasClass('is-header-narrow'), false);
+});
+test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat edge is 28px; a narrow status bar keeps one line and its Stop', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-header-wide[^{]*\{ display: none; \}/);
+  assert.match(css, /\.vam-map-chat\.is-rail \{ width: 28px;/); assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });
 test('map sources: the removed task-dialog picker, its styles and its dead keys are gone', () => {
   assert.equal(fs.existsSync(path.join(root, 'ui', ['reference', 'picker'].join('-') + '.ts')), false);

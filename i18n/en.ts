@@ -643,6 +643,7 @@ export const en = {
     "Remove only the map file. Keep all topic notes. Restore is available in this Obsidian session.",
   "ui.review": "Review",
   "ui.more_mind_map_actions": "More mind map actions",
+  "ui.reader_toggle": "Reader",
   "ui.additional_map_management_actions": "Additional map management actions.",
   "ui.rename_mind_map": "Rename mind map",
   "ui.delete_mind_map": "Delete mind map",

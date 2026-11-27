@@ -28,6 +28,20 @@ test('counter-example 2: topic-cover pointing at a missing file falls back to th
   assert.deepEqual(pick({ frontmatter: { 'topic-cover': '[[missing.png]]' }, embeds: [{ link: 'https://x/y.png' }, { link: 'doc.pdf' }, { link: 'img/a.png' }, { link: 'img/b.jpg' }] }), { path: 'img/a.png' });
 });
 
+test('V3.3 P1.2 declaredCoverMissing: a topic-cover local link that does not resolve names the missing file; anything else is null', () => {
+  const missing = cache => cover.declaredCoverMissing(cache, resolve);
+  assert.equal(missing({ frontmatter: { 'topic-cover': '[[img/gone.png]]' } }), 'img/gone.png');
+  assert.equal(missing({ frontmatter: { 'topic-cover': '[[img/gone.png|alias]]' }, embeds: [{ link: 'img/a.png' }] }), 'img/gone.png', 'an embed does not hide the broken declared link');
+  assert.equal(missing({ frontmatter: { 'topic-cover': [['img/gone.png']] } }), 'img/gone.png');
+  assert.equal(missing({ frontmatter: { 'topic-cover': 'gone.jpg' } }), 'gone.jpg');
+  for (const value of ['[[img/a.png]]', 'none', 'NONE', 'https://example.com/x.png', '//cdn/x.png', '', '[[]]', 42, null, undefined])
+    assert.equal(missing({ frontmatter: { 'topic-cover': value } }), null, String(value));
+  assert.equal(missing({ frontmatter: { 'topic-cover': '[[doc.pdf]]' } }), null, 'a file that exists is not missing (it is just not a picture)');
+  assert.equal(missing({ embeds: [{ link: 'gone.png' }] }), null, 'only a declared cover counts');
+  assert.equal(missing(null), null);
+  assert.equal(missing(undefined), null);
+});
+
 test('a resolved file with a non-image extension is not a cover', () => {
   assert.equal(pick({ embeds: [{ link: 'doc.pdf' }] }), null);
 });

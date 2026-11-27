@@ -116,7 +116,8 @@ test('obsolete cover callbacks cannot load, remove or resize a replacement cover
 
 test('counterexample 1: a cover file that does not exist adds no frame, no image and no console error', () => {
   before();
-  for (const cache of [{ frontmatter: { 'topic-cover': '[[gone.png]]' } }, { embeds: [{ link: 'gone.png' }] }, null, undefined]) {
+  // A declared topic-cover that is missing shows a placeholder instead (V3.3 P1.2, next test).
+  for (const cache of [{ embeds: [{ link: 'gone.png' }] }, null, undefined]) {
     const c = card(), count = c.children.length;
     make(cache).paintCover(c, 'Topics/n.md');
     assert.equal(frames(c).length, 0);
@@ -150,12 +151,31 @@ test('counterexample 2: a URL cover or URL embed builds no img', () => {
   }
 });
 
-test('an image that fails to load removes its frame quietly', () => {
+test('V3.3 P1.2: a declared topic-cover whose file is missing leaves a dashed placeholder naming the file, before the title, with no img', () => {
+  before();
+  const c = card();
+  const view = make({ frontmatter: { 'topic-cover': '[[pics/gone.png]]' }, embeds: [{ link: 'img/a.png' }] });
+  view.paintCover(c, 'Topics/n.md');
+  const [frame] = frames(c);
+  assert.ok(frame && dom.hasCls(frame, 'is-missing'), 'a missing-picture placeholder');
+  assert.equal(c.children[0], frame, 'in the cover place, before the title');
+  assert.ok(dom.texts(frame).join(' ').includes('gone.png'), dom.texts(frame).join(' '));
+  assert.equal(imgs(c).length, 0, 'nothing to load');
+  view.paintCover(c, 'Topics/n.md');
+  assert.equal(frames(c).length, 1, 'painting again replaces the placeholder');
+  assert.equal(errors.length, 0);
+});
+
+test('V3.3 P1.2: an image that fails to load becomes the same placeholder (file name, no img) and is no longer a pending cover', () => {
   before();
   const c = card();
   make({ embeds: [{ link: 'img/a.png' }] }).paintCover(c, 'Topics/n.md');
   imgs(c)[0].fire('error');
-  assert.equal(frames(c).length, 0);
+  const [frame] = frames(c);
+  assert.equal(frames(c).length, 1);
+  assert.ok(dom.hasCls(frame, 'is-missing'));
+  assert.ok(dom.texts(frame).join(' ').includes('a.png'), dom.texts(frame).join(' '));
+  assert.equal(imgs(c).length, 0);
   assert.equal(errors.length, 0);
 });
 
@@ -339,12 +359,15 @@ test('counter-example: topic-cover none beats a valid frame (no cover at all)', 
   assert.equal(frames(c).length, 0);
 });
 
-test('a framed picture that fails to load removes its frame like any cover', () => {
+test('a framed picture that fails to load becomes the missing-picture placeholder like any cover', () => {
   before();
   const c = card();
   relay(framed({ 'topic-cover-frame': '0.1 0.2 0.5 0.5' })).paintCover(c, 'Topics/n.md');
   imgs(c)[0].fire('error');
-  assert.equal(frames(c).length, 0);
+  // V3.3 P1.2: the frame becomes the plain missing-picture placeholder (no window, no mask).
+  assert.equal(frames(c).length, 1);
+  assert.ok(dom.hasCls(frames(c)[0], 'is-missing'));
+  assert.equal(dom.findAll(c, i => dom.hasCls(i, 'vam-card-cover-window')).length, 0);
   assert.equal(errors.length, 0);
 });
 

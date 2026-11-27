@@ -110,7 +110,7 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
     view.focusNode = (node, persist) => { log.push(`focus:${node.id}`); proto.focusNode.call(view, node, persist); };
     view.startShallowResearch = async () => { log.push('research'); };
     // Not under test: widths, shapes, status bar, the stage transform and the write queue (writes records what would have been saved).
-    view.syncChatNarrow = view.fitKindShapes = view.syncStatusBarClearance = () => {};
+    view.syncChatNarrow = view.syncHeaderNarrow = view.fitKindShapes = view.syncStatusBarClearance = () => {};
     view.transform = () => { counts.transform++; };
     view.queueViewportWrite = () => { writes.push({ ...view.map.viewport, width: view.viewportEl.clientWidth }); };
     // A stand-in for the pane's element and Obsidian's event helpers: onOpen itself is the real one.
@@ -573,4 +573,131 @@ test('M3 a viewport save scheduled while shown is written even if the tab hides 
   assert.deepEqual(w.writes, [], 'a save asked for while hidden is not scheduled');
   await w.workspace.revealLeaf(leaf); view.saveViewport(); await w.flush();
   assert.equal(w.writes.length, 1); assert.equal(w.writes[0].width, 800);
+});
+
+// B17 (P1.7): every map keeps its own viewport. Switching A → B → A in one tab writes A's pending pan before B is read, and A comes back where it was.
+test('V1 switching maps A → B → A in one tab: A keeps its own viewport, B keeps its own', async () => {
+  const { repo } = fixture('en');
+  await repo.ensureWorkspace();
+  const w = makeWorld({ realRepo: repo });
+  const pathA = await repo.createMap('Map A'), pathB = await repo.createMap('Map B');
+  await repo.updateMap(pathB, map => { map.viewport = { x: -40, y: 12, zoom: 0.5 }; });
+  const { view } = w.makeView(pathA);
+  view.map = await repo.readMap(pathA);
+  const open = w.VisualAgentMapView.prototype.openMapInMutation;
+  Object.assign(view, { hydrate: async () => {}, render: () => {}, reconcileBookNotes: async () => {} });
+  w.plugin.closeStaleDetails = () => {};
+  w.workspace.requestSaveLayout = () => {};
+  // A pan on A that is still waiting for its 250 ms save when the switch starts.
+  view.map.viewport = { x: 210, y: -35, zoom: 1.4 };
+  view.viewportTimer = setTimeout(() => assert.fail('the pending save must be flushed by the switch, not by its timer'), 60000);
+  await w.plugin.mutate(() => open.call(view, pathB));
+  assert.equal(view.viewportTimer, null, 'the switch claimed the pending save');
+  assert.equal(view.path, pathB); assert.deepEqual(plain(view.map.viewport), { x: -40, y: 12, zoom: 0.5 }, 'B opens at its own viewport');
+  await w.plugin.mutate(() => open.call(view, pathA));
+  assert.deepEqual(plain(view.map.viewport), { x: 210, y: -35, zoom: 1.4 }, "A comes back at the viewport it was left at");
+  assert.deepEqual(plain((await repo.readMap(pathB)).viewport), { x: -40, y: 12, zoom: 0.5 }, 'and B on disk was not touched');
+});
+
+// P1.7a: the other entries that would swap this tab's map follow the switcher's rule (running work: a new tab; idle: in place).
+const B = 'Maps/B/Map.md';
+const busyChat = view => { const chat = new AbortController(); view.chatController = chat; return chat; };
+
+each('N7 setState to another map: running work opens it in a new tab; the tab keeps its map and its work', async ({ focusNewTab }) => {
+  const w = makeWorld({ focusNewTab }); const a = w.makeView('Maps/A/Map.md');
+  const chat = busyChat(a.view);
+  await withTimeout(a.view.setState({ file: B }, { history: false })); await w.flush();
+  assert.deepEqual(w.getLeafCalls, ['tab']); assert.deepEqual(a.calls.openInPlace, []);
+  assert.equal(a.view.path, 'Maps/A/Map.md'); assert.equal(chat.signal.aborted, false); assert.equal(a.view.chatController, chat);
+  assert.equal(w.viewStates.at(-1).state.file, B); assert.equal(w.activeLeaf(), w.leaves.at(-1), 'the new tab is the active leaf');
+});
+
+test('N7 setState to another map with no running work swaps in place as before', async () => {
+  const w = makeWorld(); const a = w.makeView('Maps/A/Map.md');
+  await withTimeout(a.view.setState({ file: B }, { history: false })); await w.flush();
+  assert.deepEqual(w.getLeafCalls, []); assert.deepEqual(a.calls.openInPlace, [B]);
+});
+
+async function repairChoices(w, view) {
+  const shown = []; const open = CapturingModal.prototype.open;
+  CapturingModal.prototype.open = function () { shown.push(this); };
+  try {
+    w.plugin.repo.brokenTopics = async () => [{ title: 'Lost', noteCount: 2, root: 'Maps/Lost' }];
+    w.plugin.repo.rebuildMissingMap = async root => { w.order.push('write'); return `${root}/Map.md`; };
+    w.plugin.repo.relinkMissingMap = async (root, path) => { w.order.push('write'); return `${root}/Map.md`; };
+    w.plugin.repo.mapFiles = async () => [{ path: 'Maps/Old/Map.md' }];
+    await view.repairMissingTopic(); shown.at(-1).choices[0].action();
+    return { shown, pick: async index => { shown.at(-1).choices[index].action(); await settle(); }, restore: () => { CapturingModal.prototype.open = open; } };
+  } catch (error) { CapturingModal.prototype.open = open; throw error; }
+}
+const trackNewTab = w => { w.order = []; const getLeaf = w.workspace.getLeaf; w.workspace.getLeaf = kind => { w.order.push(`tab(depth ${w.plugin.writing})`); return getLeaf(kind); }; };
+
+each('N8 repair rebuild / relink: running work opens the repaired map in a new tab after the write, never inside it', async ({ focusNewTab }) => {
+  for (const choice of [0, 1]) {
+    const w = makeWorld({ focusNewTab }); const a = w.makeView('Maps/A/Map.md'); trackNewTab(w);
+    const chat = busyChat(a.view);
+    const modals = await repairChoices(w, a.view);
+    try {
+      if (choice === 0) await modals.pick(0);
+      else { await modals.pick(1); await modals.pick(0); }
+      await withTimeout(w.flush());
+      await withTimeout(w.plugin.mutate(async () => {}));
+    } finally { modals.restore(); }
+    assert.deepEqual(w.getLeafCalls, ['tab'], `choice ${choice}`); assert.deepEqual(a.calls.openInPlace, []);
+    assert.deepEqual(w.order, ['write', 'tab(depth 0)'], 'the new tab is made after the write has left the queue');
+    assert.equal(w.viewStates.at(-1).state.file, 'Maps/Lost/Map.md');
+    assert.equal(a.view.path, 'Maps/A/Map.md'); assert.equal(chat.signal.aborted, false);
+  }
+});
+
+test('N8 repair rebuild / relink with no running work open the repaired map in place as before', async () => {
+  for (const choice of [0, 1]) {
+    const w = makeWorld(); const a = w.makeView('Maps/A/Map.md'); trackNewTab(w);
+    const modals = await repairChoices(w, a.view);
+    try {
+      if (choice === 0) await modals.pick(0);
+      else { await modals.pick(1); await modals.pick(0); }
+      await withTimeout(w.plugin.mutate(async () => {}));
+    } finally { modals.restore(); }
+    assert.deepEqual(w.getLeafCalls, [], `choice ${choice}`); assert.deepEqual(a.calls.openInPlace, ['Maps/Lost/Map.md']);
+  }
+});
+
+const coffee = { title: 'Coffee', mapPath: 'Maps/Coffee/Map.md' };
+const inTurn = view => { view.chatApplying = true; view.chatController = new AbortController(); };
+
+each('N9 chat open_map inside its own turn: other running work opens the map in a new tab and the chat stays on this map', async ({ focusNewTab }) => {
+  const w = makeWorld({ focusNewTab }); const a = w.makeView('Maps/A/Map.md'); trackNewTab(w);
+  w.plugin.repo.topics = async () => [coffee, { title: 'Tea', mapPath: 'Maps/Tea/Map.md' }];
+  inTurn(a.view); a.view.startingExpand.add('n1');
+  const anchor = { path: 'Maps/A/Map.md', id: 'id-A' };
+  const outcome = await withTimeout(a.view.chatOpenMap('coffee', anchor, () => true));
+  assert.equal(outcome.status, 'done'); assert.equal(outcome.label, 'This map still has AI running; opened “Coffee” in a new tab');
+  assert.deepEqual(w.getLeafCalls, ['tab']); assert.deepEqual(a.calls.openInPlace, []); assert.deepEqual(w.order, ['tab(depth 0)']);
+  assert.equal(w.viewStates.at(-1).state.file, coffee.mapPath);
+  assert.equal(a.view.path, 'Maps/A/Map.md'); assert.deepEqual(anchor, { path: 'Maps/A/Map.md', id: 'id-A' }, 'the conversation stays with this map');
+  assert.equal(a.view.startingExpand.has('n1'), true); assert.equal(a.view.chatController.signal.aborted, false);
+});
+
+test('N9 chat open_map inside its own turn with no other work stays in the same tab (the turn itself is not running work here)', async () => {
+  const w = makeWorld(); const a = w.makeView('Maps/A/Map.md');
+  w.plugin.repo.topics = async () => [coffee];
+  inTurn(a.view); a.view.chat = { isBusy: true }; a.view.chatRecords = null;
+  assert.equal(a.view.hasRunningWork(), true, 'the turn counts for the other entries');
+  await withTimeout(a.view.chatOpenMap('coffee', { path: 'Maps/A/Map.md', id: 'id-A' }, () => true));
+  assert.deepEqual(w.getLeafCalls, []); assert.deepEqual(a.calls.openInPlace, [coffee.mapPath]);
+});
+
+each('N9 chat open_map picked from several matches: other running work opens it in a new tab with the same line', async ({ focusNewTab }) => {
+  const w = makeWorld({ focusNewTab }); const a = w.makeView('Maps/A/Map.md');
+  const lines = []; a.view.chat = { isBusy: false, takeQueued: () => [], appendLines: l => lines.push(...l) };
+  a.view.outlineDraftTask = { controller: new AbortController() };
+  await withTimeout(a.view.chatPickMap(coffee)); await w.flush();
+  assert.deepEqual(w.getLeafCalls, ['tab']); assert.deepEqual(a.calls.openInPlace, []); assert.equal(a.view.path, 'Maps/A/Map.md');
+  assert.deepEqual(lines.map(l => l.status), ['done']); assert.match(lines[0].text, /opened “Coffee” in a new tab/);
+  assert.equal(a.view.chatApplying, false); assert.equal(a.view.outlineDraftTask.controller.signal.aborted, false);
+
+  const idle = makeWorld({ focusNewTab }); const b = idle.makeView('Maps/A/Map.md'); b.view.chat = { isBusy: false, takeQueued: () => [], appendLines() {} }; b.view.chatRecords = null;
+  await withTimeout(b.view.chatPickMap(coffee));
+  assert.deepEqual(idle.getLeafCalls, []); assert.deepEqual(b.calls.openInPlace, [coffee.mapPath]);
 });

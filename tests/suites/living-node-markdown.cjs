@@ -468,7 +468,9 @@ S.integrationTest('Living Node ownership: protect an edited output and append an
   const base = readLivingMarkdown(edited);
   assert.equal(base.output.owner, 'user');
   assert.equal(base.records.length, 0);
-  assert.deepEqual(S.plain(base.suppressed), ['r1']);
+  assert.equal(base.suppressed[0], 'r1');
+  assert.equal(base.suppressed.length, 2);
+  assert.match(base.suppressed[1], /^@event:[a-f0-9]{64}:[a-f0-9]{64}:k:r1$/);
   const append = { kind: 'append', id: 'r2', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-27', claim: 'New information', evidence: ['e1'] };
   const req = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [append] } });
   assert.equal(await commitLivingMarkdown(f.repo, req), 'written');
@@ -476,9 +478,12 @@ S.integrationTest('Living Node ownership: protect an edited output and append an
   assert.ok(after.includes('User-owned output'));
   assert.ok(after.includes('New information'));
   assert.equal(after.includes('Old deleted text'), false);
+  const alias = { ...append, id: 'alias-id', eventTime: '2026-11-26', claim: 'Reworded observation' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: readLivingMarkdown(after), candidate: { executionId: 'alias' }, proposal: { baseRevision: readLivingMarkdown(after).revision, operations: [alias] } })), /suppressed-record/);
+  assert.equal(f.contents.get(path), after);
   const recovered = readLivingMarkdown(after);
   assert.equal(recovered.output.owner, 'user');
-  assert.deepEqual(S.plain(recovered.suppressed), ['r1']);
+  assert.deepEqual(S.plain(recovered.suppressed), S.plain(base.suppressed));
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: recovered, candidate: { executionId: 'e3' }, proposal: { baseRevision: recovered.revision, operations: [{ ...append, id: 'r1' }] } })), /suppressed-record/);
 });
 

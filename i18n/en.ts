@@ -476,6 +476,10 @@ export const en = {
   "ui.new_topic_name": "New topic name",
   "ui.rename_topic": "Rename",
   "ui.topic_cover": "Topic cover",
+  "ui.card_cover_missing_0": "Picture not found: {0}",
+  "ui.card_state_locked": "Locked",
+  "ui.card_state_preview": "Preview · not saved yet",
+  "ui.card_tool_stop": "Stop",
   "ui.topic_cover_off": "Turn card cover off",
   "ui.topic_cover_on": "Turn card cover on",
   "ui.topic_cover_frame_title": "Edit card",
@@ -1056,6 +1060,7 @@ export const en = {
   "ui.parent_topic": "Parent topic",
   "ui.no_parent_root_topic": "No parent (root topic)",
   "ui.circular_links_are_not_allowed": "Circular links are not allowed.",
+  "ui.outline_move_readonly": "This map is read-only right now, so nothing was moved.",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "The parent shapes what the next AI task reads.",
   "ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can":
     "The note will move to this topic's Unassigned folder. You can add it back or undo.",

@@ -156,6 +156,9 @@ import {
 } from "../../topic-colors";
 import {
   appendImageEmbed,
+  COVER_POSITION_KEY,
+  declaredCoverMissing,
+  parseCoverPosition,
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
@@ -236,6 +239,7 @@ import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
+import type { OutlineMove } from "../../ui/outline-view";
 import { NameModal } from "../../ui/modals/name-modal";
 import {
   readSourceGroups,
@@ -772,6 +776,15 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement; position: CoverPosition }>();
+/** A card's "picture not found" placeholder (a declared cover that is missing, or a picture that failed to load). */
+const missingCovers = new WeakMap<HTMLElement, HTMLElement>();
+/** The dashed placeholder with the same height as a cover frame; the file name says what is missing. Nothing is written. */
+function missingCoverFrame(path: string): HTMLElement {
+  const name = path.split("/").pop() || path;
+  const frame = createDiv({ cls: "vam-card-cover is-missing", text: t("ui.card_cover_missing_0", name) });
+  frame.setAttr("title", path);
+  return frame;
+}
 /** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
 /** Map-only states a copied card must not carry into the dialog. */
 const CARD_EDITOR_STATES = [
@@ -5021,6 +5034,7 @@ export class VisualAgentMapView extends ItemView {
           summary.removeAttribute("title");
         }
       }
+      card.querySelector(".vam-status-preview")?.remove();
       for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
       return card;
     }
@@ -5880,11 +5894,14 @@ export class VisualAgentMapView extends ItemView {
       else this.renderPreservingFocus();
     }, 150);
   }
-  /** Marks a card summary as the unsaved preview: a label plus plain text (never Markdown). Not a live region. */
-  private fillCardPreview(summary: HTMLElement, text: string): void {
+  /**
+   * Marks a summary as the unsaved preview: plain text (never Markdown), not a live region. `label` adds the inline
+   * "not saved yet" label; a card leaves it out because its header says so (paintPreviewLabel).
+   */
+  private fillCardPreview(summary: HTMLElement, text: string, label = true): void {
     summary.addClass("is-preview");
     summary.empty();
-    summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
+    if (label) summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
     summary.title = text;
   }
@@ -5906,7 +5923,8 @@ export class VisualAgentMapView extends ItemView {
         this.arrangeCardCover(card);
       }
       if (!summary) return;
-      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
+      this.paintPreviewLabel(card, true);
+      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text, false);
       else {
         summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
         summary.title = text;
@@ -5914,6 +5932,7 @@ export class VisualAgentMapView extends ItemView {
       this.fitKindShape(card, this.shapeKindOf(node.id));
       return;
     }
+    this.paintPreviewLabel(card, false);
     if (!summary?.hasClass("is-preview")) return;
     const note = this.notes.get(node.id);
     if (!note || isPlaceholder(note.summary)) summary.remove();
@@ -5923,6 +5942,20 @@ export class VisualAgentMapView extends ItemView {
       summary.title = note.summary;
     }
     this.fitKindShape(card, this.shapeKindOf(node.id));
+  }
+  /** The header's grey "Preview · not saved yet" label while a card streams an unsaved summary (V3.3 P1.2). */
+  private paintPreviewLabel(card: HTMLElement, on: boolean): void {
+    const header = card.querySelector<HTMLElement>(".vam-node-header");
+    const old = header?.querySelector<HTMLElement>(".vam-status-preview");
+    if (!header || on === !!old) return;
+    if (old) {
+      old.remove();
+      return;
+    }
+    const label = header.createSpan({ cls: "vam-status vam-status-preview", text: t("ui.card_state_preview") });
+    const check = header.querySelector<HTMLElement>(":scope > input");
+    if (check) check.after(label);
+    else header.prepend(label);
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -9625,13 +9658,20 @@ export class VisualAgentMapView extends ItemView {
       button.addClass("vam-card-tool", cls);
       return button;
     };
-    if (!bookLock.ai)
+    // Read-only while the notes load: Note is the only entry (V3.3 P1.2).
+    const readOnly = this.notesLoading();
+    if (!bookLock.ai && !readOnly)
       tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
-    if (!bookLock.structure)
+    if (!bookLock.structure && !readOnly)
       tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
-    tool(t("ui.card_tool_note"), "vam-detail-button", event =>
+    // Note only reads, so it works even when the map is read-only (notes still loading, a presentation).
+    const note = this.button(tools, t("ui.card_tool_note"), () => {});
+    note.addEventListener("click", event =>
       event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
-    ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    );
+    note.addClass("vam-card-tool", "vam-detail-button");
+    note.setAttr("aria-label", t("ui.card_tool_note_label"));
+    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
     if (addSummary)
       addSummaryTools.set(
@@ -10288,9 +10328,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
-   * its own descendants; the moved branches are laid out once, in the same entry.
+   * its own descendants; the moved branches are laid out once, in the same entry. With `before` (a child of `target`) the
+   * moved topics are placed right in front of it instead of last.
    */
-  private async moveBranches(roots: MapNode[], target: MapNode | null, clearSelection = true): Promise<void> {
+  private async moveBranches(
+    roots: MapNode[],
+    target: MapNode | null,
+    clearSelection = true,
+    before?: MapNode
+  ): Promise<void> {
     if (!this.map) return;
     if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
     await this.mapChange(map => {
@@ -10305,6 +10351,7 @@ export class VisualAgentMapView extends ItemView {
         moving.parentId = target?.id ?? null;
         delete moving.afterTextId;
         if (target) map.nodes = this.moveLastAmongSiblings(map.nodes, target.id, root.id);
+        if (target && before) map.nodes = reorderSiblings(map.nodes, target.id, root.id, before.id);
         const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -10319,6 +10366,47 @@ export class VisualAgentMapView extends ItemView {
     });
     this.selection.afterMove(clearSelection);
     this.render();
+  }
+  /**
+   * The topic outline's only way to move a topic: a drop next to a row or under it (`target`, `place`), or Alt+Up/Down (`shift`).
+   * Returns the reason in words when the move is refused (nothing is written then), null otherwise. The write is moveBranches
+   * (one history entry) or the canvas's Alt+arrow sibling shift; no other reparent code.
+   */
+  async outlineMove(id: string, to: OutlineMove): Promise<string | null> {
+    const map = this.map;
+    const node = map?.nodes.find(item => item.id === id);
+    if (!map || !node) return null;
+    if (this.presentation || this.notesLoading() || this.bookLock().structure || map.aim)
+      return t("ui.outline_move_readonly");
+    const merging = (ids: string[]): string | null =>
+      ids.some(item => this.isMerging(item)) ? t("ui.merge_locked") : null;
+    if ("shift" in to) {
+      if (!node.parentId) return null;
+      const reason = merging([node.id, node.parentId]);
+      if (reason) return reason;
+      this.enqueue(() => this.shiftSiblingByKey(node, to.shift));
+      return null;
+    }
+    const target = map.nodes.find(item => item.id === to.target);
+    const parent = to.place === "into" ? target : map.nodes.find(item => item.id === target?.parentId);
+    if (!target || !parent || (to.place !== "into" && (target.id === id || target.afterTextId))) return null;
+    if (!canParent(map.nodes, id, parent.id)) return t("ui.circular_links_are_not_allowed");
+    const reason = merging([parent.id, node.id]);
+    if (reason) return reason;
+    let before: MapNode | undefined;
+    if (to.place !== "into") {
+      const siblings = this.onScreenSiblingOrder(map).filter(item => item.parentId === parent.id && !item.afterTextId);
+      const others = siblings.filter(item => item.id !== id);
+      const at = others.findIndex(item => item.id === target.id);
+      before = to.place === "before" ? target : others[at + 1];
+      if (node.parentId === parent.id && !node.afterTextId) {
+        const slot = before ? others.indexOf(before) : others.length;
+        const next = [...others.slice(0, slot), node, ...others.slice(slot)];
+        if (next.every((item, index) => item.id === siblings[index].id)) return null;
+      }
+    }
+    this.enqueue(() => this.moveBranches([node], parent, false, before));
+    return null;
   }
   private async copySelected(target: MapNode): Promise<void> {
     await this.copyBranches(this.selectedRoots(), target, {});
@@ -13004,9 +13092,10 @@ export class VisualAgentMapView extends ItemView {
         }
       );
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
-    else if (research?.preview?.summary)
-      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (loading) {
+    else if (research?.preview?.summary) {
+      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary, false);
+      this.paintPreviewLabel(card, true);
+    } else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
       bars.setAttr("aria-hidden", "true");
       bars.createSpan({ cls: "vam-loading-bar" });
@@ -13786,6 +13875,8 @@ export class VisualAgentMapView extends ItemView {
       this.releaseCardCover(card);
       old.frame.remove();
     }
+    missingCovers.get(card)?.remove();
+    missingCovers.delete(card);
     const placed = this.paintCoverFrame(card, notePath);
     // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
     arrangeCover(card, placed?.frame ?? null, placed?.position ?? "top");
@@ -13799,9 +13890,16 @@ export class VisualAgentMapView extends ItemView {
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return null;
-      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
-        this.app.metadataCache.getFirstLinkpathDest(link, notePath)
-      );
+      const cache = this.app.metadataCache.getFileCache(file);
+      const resolve = (link: string) => this.app.metadataCache.getFirstLinkpathDest(link, notePath);
+      // A declared cover whose file is gone keeps its place as a placeholder, so the card does not jump or hide the problem.
+      const missing = declaredCoverMissing(cache, resolve);
+      if (missing) {
+        const frame = missingCoverFrame(missing);
+        missingCovers.set(card, frame);
+        return { frame, position: parseCoverPosition(cache?.frontmatter?.[COVER_POSITION_KEY]) };
+      }
+      const cover = resolveCoverWithFrame(cache, resolve);
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
@@ -13829,12 +13927,14 @@ export class VisualAgentMapView extends ItemView {
     const generation = this.coverGeneration;
     const current = (): boolean =>
       !this.closed && generation === this.coverGeneration && cardCovers.get(card)?.img === img;
-    // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
+    // A file that cannot be decoded turns into the "picture not found" placeholder in the same place.
     img.addEventListener("error", () => {
       if (!current()) return;
       this.releaseCardCover(card);
       frame.remove();
-      arrangeCover(card, null, "top");
+      const placeholder = missingCoverFrame(imagePath);
+      missingCovers.set(card, placeholder);
+      arrangeCover(card, placeholder, position);
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
@@ -14305,6 +14405,7 @@ export class VisualAgentMapView extends ItemView {
       summary?.setText(note.livingNode?.summary || note.summary);
       summary?.setAttr("title", note.livingNode?.summary || note.summary);
       summary?.removeClass("is-preview");
+      this.paintPreviewLabel(card, false);
       if (editable) summary?.addClass("is-inline-editable");
     }
     // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
@@ -16966,6 +17067,8 @@ export class VisualAgentMapView extends ItemView {
     cardAiLockButtons.set(card, button);
     button.type = "button";
     setIcon(button, "lock");
+    // Locked says so in words next to the icon, never by a dimmed card alone (V3.3 P1.2).
+    if (locked) button.createSpan({ cls: "vam-card-ai-lock-label", text: t("ui.card_state_locked") });
     button.tabIndex = -1;
     if (managed) {
       // The argument flow owns this card: always locked, and the button offers nothing to unlock.
@@ -19921,7 +20024,7 @@ export class VisualAgentMapView extends ItemView {
       setIcon(star, "sparkles");
       title.prepend(star);
       parts.push(star);
-      if (status !== "done" && note.aiLocked !== true) {
+      if (status === "pending" && note.aiLocked !== true) {
         const glyph = createSpan({ cls: `vam-ai-glyph vam-ai-glyph-${status}` });
         glyph.setAttr("title", this.aiStatusTip(node, note, status));
         title.appendChild(glyph);
@@ -19961,6 +20064,30 @@ export class VisualAgentMapView extends ItemView {
         (questionLine ?? title).after(line);
         parts.push(line);
       }
+    }
+    // Running, stale and failed say so in the header with a mark and words, never by colour alone (the lock label takes the place when locked).
+    if ((status === "running" || status === "stale" || status === "failed") && note.aiLocked !== true) {
+      const chip = createSpan({ cls: `vam-status vam-status-${status}`, text: t(`ui.ai_card_status_${status}`) });
+      chip.setAttr("title", this.aiStatusTip(node, note, status));
+      const check = header.querySelector<HTMLElement>(":scope > input");
+      if (check) check.after(chip);
+      else header.prepend(chip);
+      parts.push(chip);
+    }
+    // Stop for a card Run all is working on: in the toolbar, so it shows with the selection (a card's own run has its Stop in the header).
+    const tools = cardToolbars.get(card) ?? card.querySelector<HTMLElement>(".vam-node-tools");
+    if (
+      status === "running" &&
+      tools &&
+      this.promptRunning() &&
+      this.promptEntryOf(node.id)?.status === "running" &&
+      !this.selection.state.multiSelectMode &&
+      !this.presentation
+    ) {
+      const stop = this.button(tools, t("ui.card_tool_stop"), () => this.stopPromptBatch());
+      stop.addClass("vam-card-tool", "vam-card-tool-stop");
+      tools.prepend(stop);
+      parts.push(stop);
     }
     promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;

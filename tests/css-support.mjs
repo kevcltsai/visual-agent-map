@@ -110,3 +110,9 @@ test("hover deepens an unselected card's border (V3.3 P1.2: hover changes only t
     [":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind])", ":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]:not(.is-selected)):hover"],
   ]) assert.ok(mix(hover) > mix(base), `${hover} must mix more muted than ${base}`);
 });
+
+test('A5: a locked card is not dimmed; it says "locked" in words instead (V3.3 P1.2)', () => {
+  const css = readFileSync(resolve(root, 'styles.css'), 'utf8');
+  for (const line of css.split('\n').filter(l => /data-ai-locked/.test(l))) assert.ok(!/opacity/.test(line), `no dimming: ${line.slice(0, 80)}`);
+  assert.match(css, /\.vam-card-ai-lock-label\b/);
+});

@@ -111,7 +111,7 @@ function refs(snapshot: Snapshot): LivingSourceRef[] {
 
 function allowedLivingNotePath(app: App, path: string): boolean {
   const key = normalizeVaultPath(path);
-  const config = normalizeVaultPath(app.vault?.configDir || ".obsidian");
+  const config = normalizeVaultPath(app.vault.configDir);
   return !!key && key === path && !!config &&
     key.toLowerCase() !== config.toLowerCase() &&
     !key.toLowerCase().startsWith(config.toLowerCase() + "/") &&

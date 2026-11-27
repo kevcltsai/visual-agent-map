@@ -7,6 +7,7 @@
 .vam-outline-search { margin: 4px 10px 8px; width: calc(100% - 20px); }
 .vam-outline-tree { overflow-y: auto; flex: 1; padding: 4px 6px 12px; }
 .vam-outline-row { display: flex; align-items: center; min-width: 0; min-height: 30px; }
+.vam-outline-tree .is-folded { display: none; }
 /* Scoped under the tree so these beat Obsidian's `button:not(.clickable-icon)` background. */
 .vam-outline-tree .vam-outline-toggle, .vam-outline-tree .vam-outline-note { border: 0; box-shadow: none; background: transparent; color: var(--text-normal); }
 .vam-outline-toggle, .vam-outline-spacer { flex: 0 0 22px; width: 22px; padding: 0; text-align: center; }

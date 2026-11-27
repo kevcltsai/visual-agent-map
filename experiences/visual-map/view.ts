@@ -15132,7 +15132,8 @@ export class VisualAgentMapView extends ItemView {
     // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
     const toolbar = cardToolbars.get(card);
     const addTool = toolbar ? addSummaryTools.get(toolbar) : undefined;
-    const wantsAddTool = !argumentView && !typing && editable && isPlaceholder(note.livingNode?.summary || note.summary);
+    const wantsAddTool =
+      !argumentView && !typing && editable && isPlaceholder(note.livingNode?.summary || note.summary);
     if (addTool && !wantsAddTool) {
       addTool.remove();
       addSummaryTools.delete(toolbar!);

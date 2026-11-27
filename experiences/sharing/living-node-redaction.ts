@@ -51,7 +51,5 @@ export function redactLivingShareText(text: string, basePath?: string): string {
   out = out.replace(LOCAL_PATH, "");
   // Every image opener (`![[`, `![alt](`, `![alt][ref]`, nested or multiline alt) becomes a plain link, also inside code, so no
   // fence elsewhere in the note can change what is read in.
-  return out
-    .replace(/!\[/g, "[")
-    .replace(/\n{3,}/g, "\n\n");
+  return out.replace(/!\[/g, "[").replace(/\n{3,}/g, "\n\n");
 }

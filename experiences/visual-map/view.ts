@@ -15589,11 +15589,15 @@ export class VisualAgentMapView extends ItemView {
                   promptOf(values)
                 );
                 let ready = false;
+                let started = false;
                 await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (currentTrial()) ready = await trial.run(prepared.request);
+                  if (!currentTrial()) return;
+                  started = true;
+                  ready = await trial.run(prepared.request);
                 });
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
-                  if (currentTrial()) {
+                  // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
+                  if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
                     win.showTrialFailure(t("ui.living_node_trial_invalid"));
@@ -15822,7 +15826,8 @@ export class VisualAgentMapView extends ItemView {
           stillCurrent,
           undefined,
           firstCommit ? undefined : saved?.sourceRevision,
-          values.reconfirm
+          values.reconfirm,
+          firstCommit
         );
       })
       .editMap(mapPath, map => {
@@ -15830,6 +15835,8 @@ export class VisualAgentMapView extends ItemView {
       })
       .commit({ deferRebuild: true, label: t("ui.ai_card") });
     firstCommit = false;
+    // The user's explicit re-confirmation is recorded only once the whole step committed.
+    if (saved?.confirm) saved = { ...saved, sourceRevision: saved.confirm(), confirm: undefined };
     if (this.path === mapPath && this.map?.id === mapId && !this.closed) {
       this.history.push(entry);
       await this.refreshAfterSavedChange();

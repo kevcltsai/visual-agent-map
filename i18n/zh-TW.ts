@@ -2354,7 +2354,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.knowledge_ref_copy": "複製為引用",
   "ui.knowledge_ref_paste": "貼上引用",
   "ui.knowledge_ref_copied": "已複製為引用，可貼到其他圖的卡片上。",
-  "ui.knowledge_ref_self": "地圖不能引用自己的卡片。",
+  "ui.knowledge_ref_self": "心智圖不能引用自己的卡片。",
   "ui.knowledge_ref_duplicate": "這張卡已經引用了那張卡。",
   "ui.knowledge_ref_need_card": "請先選一張卡，引用會掛在它上面。",
   "ui.knowledge_ref_unusable": "原卡無法取用，沒有加入引用。",

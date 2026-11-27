@@ -319,7 +319,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       return { title: note.title, summary: note.summary };
     },
     updateNote: async (path, patch) => {
-      await this.repo.updateNote(path, patch);
+      await this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true });
     },
     askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
     runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
@@ -749,8 +749,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     readCard: path => this.readBookCard(path),
     writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
     writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
-    updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
-    updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
+    updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
+    updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
     editBookStructure: (mapPath, work) =>
       createBookStructurePort({ repo: this.repo, rebuildDerivedData: () => this.rebuildDerivedData() })(mapPath, work),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),

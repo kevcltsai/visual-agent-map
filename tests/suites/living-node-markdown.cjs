@@ -82,8 +82,9 @@ S.integrationTest('Living Node: existing Repository map identity is distinct fro
     initial.replace('node-id: card', 'node-id: another'),
     initial.replace('topic-id: map', 'topic-id: card'),
     initial.replace('agent-map-id: map', 'agent-map-id: another'),
-    initial.replace('node-id: card\\n', '')
+    initial.replace('node-id: card\n', '')
   ]) {
+    assert.notEqual(bad, initial, 'identity corruption fixture must change the original');
     const f = await setup();
     await f.app.vault.process(f.files.get(path), () => bad);
     await assert.rejects(() => commitLivingMarkdown(f.repo, request(f)), /target-unavailable/);
@@ -613,7 +614,7 @@ S.integrationTest('Living Node trial: unreadable upstream blocks even read-only 
 S.integrationTest('Living Node trial: legacy success metadata and title without knowledge do not authorize a locked upstream', async () => {
   const { prepare, snapshots } = livingTrialRuntimeFixture({ locked: true });
   snapshots.get('up.md').note.summary = '   ';
-  await assert.rejects(prepare, /missing-ai-knowledge/);
+  await assert.rejects(prepare, /required-dependency-blocked/);
 });
 
 S.integrationTest('Living Node trial: a readable locked dependency is a disclosed frozen boundary and does not block adoption', async () => {

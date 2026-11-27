@@ -591,7 +591,7 @@ function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources =
       content: '---\nagent-map-id: map\ntopic-id: map\nnode-id: up\nai-card: true\nliving-node-refs:\n  - "note:missing"\n---\n# Up\n' }]
   ]);
   const port = { repo: { readMap: async () => map, readNoteSnapshot: async path => snapshots.get(path) },
-    app: { metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
+    app: { vault: { configDir: '.obsidian' }, metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
     viewSession: 'editor', signal: new AbortController().signal, current: () => true, language: () => 'en',
     mapSources };
   return { prepare: () => prepareLivingTrial(port, 'root', 'Research root'), snapshots, map, port };

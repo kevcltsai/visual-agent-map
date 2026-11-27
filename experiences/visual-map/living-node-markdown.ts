@@ -305,6 +305,23 @@ export interface LivingReaderLabels {
   /** A source line: `link` is a ready Markdown link or plain title. */
   source(title: string, date: string): string;
   generated(at: string): string;
+  /** A readable date for an ISO time (`time`: with the clock). Absent: the raw text is kept. */
+  date?(iso: string, time: boolean): string;
+}
+
+/** An ISO time as a short date in the reader's language; text that is not a date is returned unchanged. */
+export function readableDate(iso: string, locale: string, time: boolean, timeZone?: string): string {
+  const at = new Date(iso);
+  if (!/^\d{4}-\d\d-\d\d/.test(iso) || Number.isNaN(at.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      ...(time ? { timeStyle: "short" as const } : {}),
+      ...(timeZone ? { timeZone } : {})
+    }).format(at);
+  } catch {
+    return iso;
+  }
 }
 
 const escapeMarkdown = (value: string): string => value.replace(/[\\[\]<>*_`|]/g, match => "\\" + match);
@@ -321,7 +338,8 @@ function readableSource(raw: string, labels: LivingReaderLabels): string | undef
   const url = allowedUrl(source);
   const title = url ? url.hostname.replace(/^www\./, "") : source;
   const link = url ? `[${escapeMarkdown(title)}](<${url.toString()}>)` : escapeMarkdown(title);
-  return labels.source(link, /^\d{4}-\d\d-\d\d/.test(retrievedAt) ? retrievedAt.slice(0, 10) : retrievedAt);
+  const day = /^\d{4}-\d\d-\d\d/.test(retrievedAt) ? retrievedAt : "";
+  return labels.source(link, day ? (labels.date?.(retrievedAt, false) ?? retrievedAt.slice(0, 10)) : retrievedAt);
 }
 
 /**
@@ -335,11 +353,12 @@ export function localizeLivingReader(markdown: string, labels: LivingReaderLabel
   if (!whole && (start < 0 || end < start)) return markdown;
   const [from, to] = whole ? [0, markdown.length] : [start, end];
   const region = relabel(markdown.slice(from, to), labels.aiLatest)
+    .replace(/^- Ownership: ".*"\r?\n/gm, "")
     .replace(/^- Source: (\[.*\])$/gm, (line, raw: string) => "- " + (readableSource(raw, labels) ?? line.slice(2)))
     .replace(/^- Generated: (".*")$/gm, (line, raw: string) => {
       try {
         const at: unknown = JSON.parse(raw);
-        return typeof at === "string" ? "- " + labels.generated(at) : line;
+        return typeof at === "string" ? "- " + labels.generated(labels.date?.(at, true) ?? at) : line;
       } catch {
         return line;
       }

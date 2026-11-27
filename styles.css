@@ -2176,7 +2176,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-ai-card-pop-chip-x { padding: 0 4px; min-height: 0; height: auto; border: 0; box-shadow: none; background: transparent; color: var(--text-muted); cursor: pointer; }
 .vam-ai-card-pop-add { padding: 0 8px; min-height: 0; height: auto; border: 0; box-shadow: none; background: transparent; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
 .vam-ai-card-pop-keep { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-ai-card-pop-foot { display: flex; justify-content: flex-end; }
+.vam-ai-card-pop-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.vam-ai-card-pop-foot > button { max-width: 100%; white-space: normal; }
 .vam-view .vam-run-all { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 0; box-shadow: none; background: transparent; color: var(--text-normal); font-size: var(--font-ui-smaller); cursor: pointer; }
 .vam-view .vam-run-all:hover:not(:disabled) { background: var(--background-modifier-hover); }
 .vam-view .vam-run-all:disabled { color: var(--text-faint); cursor: default; }

@@ -1,6 +1,6 @@
 import { Component, ItemView, MarkdownRenderer, type TFile, type WorkspaceLeaf } from "obsidian";
-import { t } from "../../i18n";
-import { localizeLivingReader } from "./living-node-markdown";
+import { getUiLanguage, t } from "../../i18n";
+import { localizeLivingReader, readableDate } from "./living-node-markdown";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 
 export const LIVING_READER_VIEW = "vam-living-node-reader";
@@ -116,7 +116,8 @@ export class LivingReaderView extends ItemView {
         {
           aiLatest: t("ui.living_node_ai_latest"),
           source: (title, date) => t("ui.living_node_source_line_0_1", title, date),
-          generated: at => t("ui.living_node_generated_0", at)
+          generated: at => t("ui.living_node_generated_0", at),
+          date: (iso, time) => readableDate(iso, getUiLanguage(), time)
         },
         this.tab === "trial"
       );

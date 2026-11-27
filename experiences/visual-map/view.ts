@@ -15602,7 +15602,7 @@ export class VisualAgentMapView extends ItemView {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
                     const failed = livingTrialReason(trial.failureCode ?? "");
-                    win.showTrialFailure(failed.reason, failed.code);
+                    win.showTrialFailure(failed.key, failed.code);
                   }
                   return false;
                 }
@@ -15639,7 +15639,7 @@ export class VisualAgentMapView extends ItemView {
                   const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
                   new Notice(reason);
                   const failed = livingTrialReason(error);
-                  win.showTrialFailure(failed.reason, failed.code);
+                  win.showTrialFailure(failed.key, failed.code);
                 }
                 return false;
               }

@@ -731,9 +731,14 @@ export class Repository {
   }
 
   /** The parsed note and the exact same bytes, for a later guarded commit. */
-  async readNoteSnapshot(path: string, map?: MapDocument): Promise<{ note: Note; content: string }> {
-    const content = await this.app.vault.read(this.file(path));
-    return { note: await this.parseNote(path, content, map), content };
+  async readNoteSnapshot(
+    path: string,
+    map?: MapDocument,
+    ctx?: NoteReadContext
+  ): Promise<{ note: Note; content: string }> {
+    const file = this.file(path);
+    const content = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+    return { note: await this.parseNote(path, content, map, ctx), content };
   }
 
   /** Parses already-read note content; `readNote` reads the file once and calls this. */

@@ -113,24 +113,44 @@ function isPeriod(granularity: string): boolean {
   return /^(?:daily|day|daily close|hourly|hour|weekly|week|monthly|month|quarterly|quarter|yearly|year|每日|每小時|每小时|日|小時|小时|每週|每周|每月|每季|每年)$/.test(normalized(granularity));
 }
 
-/** Privacy-preserving deterministic event fingerprint; never store deleted claims.
- * Period observations use the bucket identity even if the value changes.
- * For other events, exact normalized claims are a conservative fallback.
- */
+/** Suppression uses stable normalized scope and time, not the old claim.
+ * A match is a conservative hold, not a proof of semantic identity. */
+function granularityKey(value: string): string {
+  const key = normalized(value);
+  if (/^(?:daily|day|daily close|每日|日)$/.test(key)) return "day";
+  if (/^(?:hourly|hour|每小時|每小时|小時|小时)$/.test(key)) return "hour";
+  if (/^(?:weekly|week|每週|每周)$/.test(key)) return "week";
+  if (/^(?:monthly|month|每月)$/.test(key)) return "month";
+  if (/^(?:quarterly|quarter|每季)$/.test(key)) return "quarter";
+  if (/^(?:yearly|year|每年)$/.test(key)) return "year";
+  if (isChange(key)) return "change";
+  return key;
+}
+
+const fingerprint = (values: readonly unknown[]): string =>
+  createHash("sha256").update(JSON.stringify(values)).digest("hex");
+
+export function livingEventScopeFingerprint(record: LivingRecord): string {
+  return fingerprint([normalized(record.subject), normalized(record.scope)]);
+}
+
 export function livingEventFingerprint(record: LivingRecord): string {
-  return createHash("sha256").update(JSON.stringify([
-    normalized(record.subject), normalized(record.scope), normalized(record.granularity),
-    timeKey(record.eventTime), isPeriod(record.granularity) ? null : normalized(record.claim)
-  ])).digest("hex");
+  const time = timeKey(record.eventTime);
+  // Compare the time independently of the model's description or proposed ID.
+  // Unknown times are ambiguous and get a separate scope-level hold.
+  return fingerprint([livingEventScopeFingerprint(record), granularityKey(record.granularity), time]);
 }
 
-export function livingEventTombstone(recordId: string, fingerprint: string): string {
-  return "@event:" + fingerprint + ":" + recordId;
+export function livingEventTombstone(recordId: string, event: string, scope?: string, unknownTime = false): string {
+  return scope ? "@event:" + event + ":" + scope + ":" + (unknownTime ? "u" : "k") + ":" + recordId
+    : "@event:" + event + ":" + recordId;
 }
 
-export function parseLivingEventTombstone(value: string): { fingerprint: string; recordId: string } | undefined {
-  const match = /^@event:([a-f0-9]{64}):(.+)$/.exec(value);
-  return match ? { fingerprint: match[1], recordId: match[2] } : undefined;
+export function parseLivingEventTombstone(value: string): { fingerprint: string; recordId: string; scope?: string; unknownTime?: boolean } | undefined {
+  const full = /^@event:([a-f0-9]{64}):([a-f0-9]{64}):([uk]):(.+)$/.exec(value);
+  if (full) return { fingerprint: full[1], scope: full[2], unknownTime: full[3] === "u", recordId: full[4] };
+  const legacy = /^@event:([a-f0-9]{64}):(.+)$/.exec(value);
+  return legacy ? { fingerprint: legacy[1], recordId: legacy[2] } : undefined;
 }
 
 function isChange(granularity: string): boolean {
@@ -196,7 +216,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   const allowed = new Map(context.evidence.map(entry => [entry.id, entry]));
   // Retained evidence can be selected explicitly for a new conclusion. It is
   // already formal knowledge, not a new retrieval or an invented source.
-  const outputEvidence = new Map([...base.records.flatMap(record => record.evidence), ...base.output.evidence, ...context.evidence].map(entry => [entry.id, entry]));
+  const outputEvidence = new Map([...base.records.filter(record => record.validity === "active").flatMap(record => record.evidence), ...base.output.evidence, ...context.evidence].map(entry => [entry.id, entry]));
   let output = base.output;
   let changed = false;
   for (const rawOperation of proposal.operations as unknown[]) {
@@ -219,7 +239,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
       continue;
     }
     const recordId = id(operation.id);
-    if (suppressed.has(recordId)) throw new Error("suppressed-record");
+    if (suppressed.has(recordId) || knownSuppression.has(recordId)) throw new Error("suppressed-record");
     const old = records.get(recordId);
     if (kind === "append") {
       exactKeys(operation, ["kind", "id", "subject", "scope", "granularity", "eventTime", "claim", "evidence"]);
@@ -238,11 +258,14 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         history: []
       };
       if (suppressedFingerprints.has(livingEventFingerprint(candidate))) throw new Error("suppressed-record");
+      if (events.some(event => event.scope === livingEventScopeFingerprint(candidate) && (event.unknownTime || candidate.eventTime === null)))
+        throw new Error("ambiguous-suppression");
       const duplicate = duplicateRecord(records, candidate);
       // A legacy ID-only tombstone cannot prove an unknown new record is safe.
       if (!duplicate && ambiguousSuppression) throw new Error("ambiguous-suppression");
       if (duplicate) {
         if (duplicate.owner !== "ai") throw new Error("protected-record");
+        if (duplicate.validity !== "active") throw new Error("inactive-record-requires-resolution");
         const merged = mergeEvidence(duplicate.evidence, evidence);
         if (merged.length !== duplicate.evidence.length) {
           records.set(duplicate.id, { ...duplicate, evidence: merged });
@@ -274,7 +297,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     if (!evidence.length) throw new Error("missing-evidence");
     const reason = string(operation.reason);
     const claim = kind === "invalidate" ? old.claim : string(operation.claim);
-    if (kind === "correct" && claim === old.claim) throw new Error("unchanged-correction");
+    if (kind === "correct" && sameClaim(old, { ...old, claim })) throw new Error("unchanged-correction");
     const validity = kind === "invalidate" ? "invalidated" : kind === "dispute" ? "disputed" : "active";
     const merged = mergeEvidence(old.evidence, evidence);
     // Disputes preserve the original claim and record the conflicting one separately.
@@ -287,12 +310,12 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         evidence.every(entry => item.evidence.some(previous => previous.id === entry.id))
     );
     if (kind === "correct" && merged.length === old.evidence.length) throw new Error("missing-new-evidence");
-    if (duplicate && validity === old.validity && merged.length === old.evidence.length) continue;
+    if (duplicate && validity === old.validity && kind !== "correct") continue;
     records.set(recordId, {
       ...old,
       claim: kind === "correct" ? claim : old.claim,
       validity,
-      evidence: merged,
+      evidence: kind === "correct" ? evidence : old.evidence,
       history: [...old.history, history]
     });
     changed = true;

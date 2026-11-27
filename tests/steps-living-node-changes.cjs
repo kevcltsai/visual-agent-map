@@ -160,3 +160,12 @@ test('change set: suppression survives new record ID, value and day alias; unrel
   const ub = base({ records: [], suppressed: ['r1', livingEventTombstone(unknown.id, livingEventFingerprint(unknown), livingEventScopeFingerprint(unknown), true)] });
   assert.throws(() => apply(ub, { ...op, eventTime: '2026-11-27' }), /ambiguous-suppression/);
 });
+
+test('A08: re-querying an already recorded change observation under a new ID is a no-op, not a fifth record', () => {
+  const op = (id, time, claim) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'change', eventTime: '2026-11-26T' + time + ':00+08:00', claim, evidence: ['e1'] });
+  const first = apply(base({ records: [] }), op('c0', '09:00', '100'), op('c1', '11:00', '105'));
+  const again = apply(base({ records: first.records }), op('requery-a', '11:00', '105'), op('requery-b', '12:00', '105'));
+  assert.equal(again.changed, false);
+  assert.equal(again.records.length, 2);
+  assert.deepEqual(plain(again.records), plain(first.records));
+});

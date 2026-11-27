@@ -2744,6 +2744,31 @@ integrationTest('B1 map: open_map with several matches lists them and opens noth
   h.type('open wine'); await h.view.sendMapChat();
   assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
 });
+integrationTest('B16 map: open_map in its own turn with no other work switches this tab; the reply and the running turn are kept', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push(path); return null; };
+  let aborted = null;
+  h.control.reply = async (_request, signal) => { aborted = signal; return { reply: 'Switching now.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] }; };
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [], 'the turn itself does not send the map to a new tab'); assert.equal(h.view.path, coffee);
+  assert.equal(aborted.aborted, false, 'the turn was not stopped'); assert.equal(chat.isBusy, false);
+  assert.equal(chat.transcript().at(-1).text, 'Switching now.', 'the reply is kept'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+});
+integrationTest('B16 map: open_map while other AI work runs on this map opens it in a new tab after the write queue; the chat stays here', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  h.view.startingExpand.add(h.ids.a);
+  // Like the real one: the new tab opens its map through mutate, so a call made inside a write would never finish.
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push([path, h.control.depth]); await h.plugin.mutate(async () => {}); return {}; };
+  h.control.reply = async () => ({ reply: 'Opening it.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [[coffee, 0]], 'one new tab, outside the write queue'); assert.equal(h.view.path, MAP, 'this tab keeps its map');
+  assert.equal(h.view.startingExpand.has(h.ids.a), true, 'the running work is not dropped');
+  assert.equal(chat.transcript().at(-1).text, 'Opening it.');
+  const line = chat.transcript().at(-1).lines[0];
+  assert.equal(line.status, 'done'); assert.match(line.text, /This map still has AI running; opened “Coffee industry” in a new tab/);
+});
 
 integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
@@ -3197,8 +3222,8 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
     const idle = findAll(draw(h, method), i => i.tag === 'button');
-    // The ordinary toolbar keeps the always-visible 「Data sources」 button; the hidden-AIM one has nothing while idle.
-    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), method === 'renderMapTools' ? [true] : [], `${method}: no select icon while idle`);
+    // B17: 「Data sources」 moved to the header, so neither canvas toolbar has anything while idle.
+    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), [], `${method}: no select icon while idle`);
     assert.equal(findAll(draw(h, method), i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
     h.view.selection.toggleMultiSelect();
     assert.equal(h.view.selection.state.multiSelectMode, true);
@@ -3283,7 +3308,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics" and the 
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
+  assert.deepEqual(all, [], 'select several is in the header ⋯ menu; data sources is a header button (B17)'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
@@ -3472,7 +3497,7 @@ test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only
   assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
   assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
   assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
-  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/, 'B17: the folded chat edge is 28px');
 });
 
 test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay), and the selection bar lives in the canvas', () => {
@@ -3750,8 +3775,8 @@ integrationTest('B1 fix 26: after create_map re-mounts the conversation in the n
 integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px of it; the tool group moves to the window\'s right edge and comes back; the hover preview is under the window', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const tools = h.rootEl.createDiv('vam-map-tools'); h.plugin.settings.mapChatWidth = 340;
   h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isNarrow, true); assert.equal(tools.style.left ?? '', '', 'folded: the group stays at the canvas corner');
-  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 44 + 12}px`, 'beside the window, like a docked one');
-  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 44 + 12}px`);
+  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 28 + 12}px`, 'beside the window, like a docked one');
+  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 28 + 12}px`);
   h.rootEl.clientWidth = 500; h.view.onResize(); assert.equal(chat.el.style.width, '340px');
   chat.collapseOverlay(); assert.equal(tools.style.left, '', 'folded again: the group goes back');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const z = selector => Number(css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*z-index: (\\d+)`))[1]);

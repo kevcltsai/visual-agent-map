@@ -156,6 +156,9 @@ import {
 } from "../../topic-colors";
 import {
   appendImageEmbed,
+  COVER_POSITION_KEY,
+  declaredCoverMissing,
+  parseCoverPosition,
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
@@ -165,6 +168,7 @@ import {
   type CoverLook,
   type CoverPosition
 } from "./card-cover";
+import { paintCardEdge, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
@@ -774,6 +778,15 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement; position: CoverPosition }>();
+/** A card's "picture not found" placeholder (a declared cover that is missing, or a picture that failed to load). */
+const missingCovers = new WeakMap<HTMLElement, HTMLElement>();
+/** The dashed placeholder with the same height as a cover frame; the file name says what is missing. Nothing is written. */
+function missingCoverFrame(path: string): HTMLElement {
+  const name = path.split("/").pop() || path;
+  const frame = createDiv({ cls: "vam-card-cover is-missing", text: t("ui.card_cover_missing_0", name) });
+  frame.setAttr("title", path);
+  return frame;
+}
 /** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
 /** Map-only states a copied card must not carry into the dialog. */
 const CARD_EDITOR_STATES = [
@@ -1018,10 +1031,12 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   return lines;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
-const CHAT_RAIL_WIDTH = 44;
+const CHAT_RAIL_WIDTH = 28;
 const CHAT_TOOLS_GAP = 12;
 /** The sources panel hangs this far under the tool group. */
 const SOURCES_PANEL_GAP = 6;
+/** Under this pane width the header keeps only the title, undo and ⋯ (the rest moves into ⋯). */
+const HEADER_NARROW_WIDTH = 480;
 /**
  * A found picture's title as it is written into a note: letters, digits, spaces and plain punctuation only. Nothing a Markdown
  * or Dataview reader would act on (a backtick, `%%`, `$=`, an embed, a table bar, a heading) survives; the rest becomes a space.
@@ -1046,6 +1061,14 @@ class MapSourceWriteError extends Error {
 let mapChatTaskSequence = 0;
 
 /** The map actions the command palette offers (`VisualAgentMapView.mapCommand`). */
+/** One entry a narrow header moves into ⋯ (see narrowHeaderItems). */
+interface MapActionItem {
+  title: string;
+  icon: string;
+  action: () => void;
+  disabled?: boolean;
+  checked?: boolean;
+}
 export type MapCommandAction =
   | "add-topic"
   | "add-subtopic"
@@ -2130,9 +2153,17 @@ export class VisualAgentMapView extends ItemView {
    * {@link dropMapBackground}, abortMapChat and the map-change branch of the chat mount).
    */
   hasRunningWork(): boolean {
-    if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
+    if (this.chatController || this.chatApplying) return true;
     // The chat's preparing stage (before its controller exists) is stopped by a map change too.
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
+    return this.hasRunningWorkBesideChatTurn();
+  }
+  /**
+   * {@link hasRunningWork} without the chat turn itself: inside its own turn the chat always counts as running, so a chat
+   * open_map asks this to know whether switching would stop anything else.
+   */
+  private hasRunningWorkBesideChatTurn(): boolean {
+    if (this.chatImageFinder.isRunning()) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
     if (this.structureReviewTask || this.outlineDraftTask) return true;
@@ -2147,7 +2178,12 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   async setState(state: Record<string, unknown>, result: { history: boolean; layout?: boolean }): Promise<void> {
-    if (typeof state.file === "string" && state.file !== this.path) {
+    if (typeof state.file === "string" && state.file !== this.path && this.path && this.hasRunningWork()) {
+      // Swapping this tab's map would stop its running work (as in switchToMap): the map opens in a new tab instead. Deferred,
+      // so the new tab is made the active leaf after Obsidian's own activation of this one.
+      const path = state.file;
+      window.setTimeout(() => void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error)), 0);
+    } else if (typeof state.file === "string" && state.file !== this.path) {
       this.requestedFile = state.file;
       try {
         await this.openMap(state.file);
@@ -2178,13 +2214,19 @@ export class VisualAgentMapView extends ItemView {
     // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
     this.registerEvent(
       workspace.on("layout-change", () => {
+        this.syncReaderToggle();
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
         this.drawWhenShown();
       })
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
-    this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
+    this.registerEvent(
+      workspace.on("resize", () => {
+        this.chat?.refreshNote();
+        this.syncReaderToggle();
+      })
+    );
     // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
     const vault = this.app.vault;
     if (typeof vault?.on === "function") {
@@ -2940,6 +2982,11 @@ export class VisualAgentMapView extends ItemView {
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
       // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
       if (value === null && edit?.created && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep, node.parentId ?? null);
+        return;
+      }
+      // A new topic left with a blank name (Enter or leaving, V3.3 P1.3) is cancelled the same way: no card, no note.
+      if (value !== null && !value.trim() && edit?.created && edit.createdStep) {
         this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
@@ -5007,6 +5054,7 @@ export class VisualAgentMapView extends ItemView {
           summary.removeAttribute("title");
         }
       }
+      card.querySelector(".vam-status-preview")?.remove();
       for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
       return card;
     }
@@ -5866,11 +5914,14 @@ export class VisualAgentMapView extends ItemView {
       else this.renderPreservingFocus();
     }, 150);
   }
-  /** Marks a card summary as the unsaved preview: a label plus plain text (never Markdown). Not a live region. */
-  private fillCardPreview(summary: HTMLElement, text: string): void {
+  /**
+   * Marks a summary as the unsaved preview: plain text (never Markdown), not a live region. `label` adds the inline
+   * "not saved yet" label; a card leaves it out because its header says so (paintPreviewLabel).
+   */
+  private fillCardPreview(summary: HTMLElement, text: string, label = true): void {
     summary.addClass("is-preview");
     summary.empty();
-    summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
+    if (label) summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
     summary.title = text;
   }
@@ -5892,7 +5943,8 @@ export class VisualAgentMapView extends ItemView {
         this.arrangeCardCover(card);
       }
       if (!summary) return;
-      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
+      this.paintPreviewLabel(card, true);
+      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text, false);
       else {
         summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
         summary.title = text;
@@ -5900,6 +5952,7 @@ export class VisualAgentMapView extends ItemView {
       this.fitKindShape(card, this.shapeKindOf(node.id));
       return;
     }
+    this.paintPreviewLabel(card, false);
     if (!summary?.hasClass("is-preview")) return;
     const note = this.notes.get(node.id);
     if (!note || isPlaceholder(note.summary)) summary.remove();
@@ -5909,6 +5962,20 @@ export class VisualAgentMapView extends ItemView {
       summary.title = note.summary;
     }
     this.fitKindShape(card, this.shapeKindOf(node.id));
+  }
+  /** The header's grey "Preview · not saved yet" label while a card streams an unsaved summary (V3.3 P1.2). */
+  private paintPreviewLabel(card: HTMLElement, on: boolean): void {
+    const header = card.querySelector<HTMLElement>(".vam-node-header");
+    const old = header?.querySelector<HTMLElement>(".vam-status-preview");
+    if (!header || on === !!old) return;
+    if (old) {
+      old.remove();
+      return;
+    }
+    const label = header.createSpan({ cls: "vam-status vam-status-preview", text: t("ui.card_state_preview") });
+    const check = header.querySelector<HTMLElement>(":scope > input");
+    if (check) check.after(label);
+    else header.prepend(label);
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -9611,13 +9678,20 @@ export class VisualAgentMapView extends ItemView {
       button.addClass("vam-card-tool", cls);
       return button;
     };
-    if (!bookLock.ai)
+    // Read-only while the notes load: Note is the only entry (V3.3 P1.2).
+    const readOnly = this.notesLoading();
+    if (!bookLock.ai && !readOnly)
       tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
-    if (!bookLock.structure)
+    if (!bookLock.structure && !readOnly)
       tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
-    tool(t("ui.card_tool_note"), "vam-detail-button", event =>
+    // Note only reads, so it works even when the map is read-only (notes still loading, a presentation).
+    const note = this.button(tools, t("ui.card_tool_note"), () => {});
+    note.addEventListener("click", event =>
       event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
-    ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    );
+    note.addClass("vam-card-tool", "vam-detail-button");
+    note.setAttr("aria-label", t("ui.card_tool_note_label"));
+    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
     if (addSummary)
       addSummaryTools.set(
@@ -9627,6 +9701,49 @@ export class VisualAgentMapView extends ItemView {
     const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
+  }
+  /** The edge "+ Topic card" on a single editable card (V3.3 A6); it sits on the card's edge and never changes its size. */
+  private paintCardEdgeEntries(card: HTMLElement, node: MapNode): void {
+    if (
+      !this.cardTextEditable() ||
+      this.bookLock().structure ||
+      !this.plugin.settings ||
+      !isManagedMapPath(this.plugin.settings, this.path)
+    )
+      return;
+    paintCardEdge(
+      card,
+      [
+        {
+          kind: "add",
+          label: t("ui.card_edge_add"),
+          ariaLabel: t("ui.card_edge_add_label"),
+          onClick: () => this.addTopicFromEdge(node)
+        }
+      ],
+      this.edgeSideOf(node),
+      !this.renderingCard
+    );
+  }
+  /** The side child cards grow toward (read from the layout, never changed); other layouts fall back to the right. */
+  private edgeSideOf(node: MapNode): CardEdgeSide {
+    const direction = this.map ? this.directionOf(this.map, node.id) : "right";
+    return direction === "left" || direction === "down" || direction === "up" ? direction : "right";
+  }
+  /** True from the click on an edge entry until its topic is made: a second click (or an old button) adds nothing. */
+  private edgeAddPending = false;
+  private addTopicFromEdge(node: MapNode): void {
+    if (this.edgeAddPending || this.inlineName?.created) return;
+    this.whenEditing(() => {
+      this.edgeAddPending = true;
+      this.enqueue(async () => {
+        try {
+          await this.addNode(node);
+        } finally {
+          this.edgeAddPending = false;
+        }
+      });
+    });
   }
   /** Whether a card can become or edit an AI card (an ordinary note card; not under an AI lock or an argument card). */
   private canSetAiCard(node: MapNode): boolean {
@@ -11833,7 +11950,7 @@ export class VisualAgentMapView extends ItemView {
     this.openMapModal(new KeyboardShortcutsModal(this.app));
   }
   /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
-  private openMapActions(event?: MouseEvent): void {
+  private openMapActions(event?: MouseEvent, extra?: MapActionItem[]): void {
     const menu = this.newMenu();
     const add = (title: string, icon: string, action: () => void, warning = false): void => {
       menu.addItem(item => {
@@ -11841,6 +11958,16 @@ export class VisualAgentMapView extends ItemView {
         if (warning) item.setWarning(true);
       });
     };
+    // A narrow header: the tools it hid come first.
+    if (extra?.length) {
+      for (const entry of extra)
+        menu.addItem(item => {
+          item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action);
+          if (entry.disabled) item.setDisabled(true);
+          if (entry.checked !== undefined) item.setChecked(entry.checked);
+        });
+      menu.addSeparator();
+    }
     // The canvas views and modes that used to float over the map (map management lives in the title ▾ menu).
     if (this.map) {
       if (this.canPresent()) add(t("ui.presentation_start"), "presentation", () => this.startPresentation());
@@ -12220,27 +12347,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
-    if (this.map) {
-      // Header: title ▾, undo, redo, book, share, more. Undo and redo stay visible (they are how a mistake is taken back).
-      const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
-      undo.disabled = !this.history.canUndo;
-      undo.dataset.history = "undo";
-      const redo = this.iconButton(headerActions, "redo-2", t("ui.redo"), () => this.enqueue(() => this.travel(true)));
-      redo.disabled = !this.history.canRedo;
-      redo.dataset.history = "redo";
-      this.updateHistoryButtons();
-      const bookButton = headerActions.createEl("button", {
-        cls: "mod-cta vam-book-button",
-        text: t("ui.book_button")
-      });
-      bookButton.setAttr("title", t("ui.book_button_title"));
-      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
-      this.addExportButton(headerActions);
-      this.renderRunAllButton(headerActions);
-      this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
-        this.openMapActions(event)
-      ).addClass("vam-map-actions-button");
-    }
+    if (this.map) this.renderHeaderActions(headerActions);
     this.renderBookPipelineBar(toolbar);
     // Focus mode hides the header; a running book's bar (with its Stop) is the one thing it keeps.
     toolbar.toggleClass("is-focus-empty", this.focusMode && !toolbar.querySelector(".vam-book-bar"));
@@ -12545,8 +12652,103 @@ export class VisualAgentMapView extends ItemView {
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
     this.renderSelectTool(tools);
-    // Like main's design, an empty map has no sources button either.
-    if (this.map.nodes.length) this.mapSourcesControl?.renderMapSourcesControl(tools);
+  }
+  /**
+   * The header holds the tools for the whole map: data sources, search, undo, redo, book, share, run all, ⋯ and the reader
+   * toggle. Undo and redo stay where they were (they are how a mistake is taken back). A narrow pane (is-header-narrow) shows
+   * only the title, undo and ⋯; the rest (`vam-header-wide`) moves to the top of ⋯.
+   */
+  private renderHeaderActions(headerActions: HTMLElement): void {
+    this.renderHeaderSources(headerActions);
+    this.iconButton(headerActions, "search", t("ui.command_map_search"), () => this.openMapSearch()).addClass(
+      "vam-header-wide"
+    );
+    const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
+    undo.disabled = !this.history.canUndo;
+    undo.dataset.history = "undo";
+    const redo = this.iconButton(headerActions, "redo-2", t("ui.redo"), () => this.enqueue(() => this.travel(true)));
+    redo.disabled = !this.history.canRedo;
+    redo.dataset.history = "redo";
+    redo.addClass("vam-header-wide");
+    this.updateHistoryButtons();
+    const bookButton = headerActions.createEl("button", { cls: "mod-cta vam-book-button", text: t("ui.book_button") });
+    bookButton.addClass("vam-header-wide");
+    bookButton.setAttr("title", t("ui.book_button_title"));
+    bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
+    this.addExportButton(headerActions).addClass("vam-header-wide");
+    this.renderRunAllButton(headerActions);
+    headerActions.querySelector(".vam-run-all")?.addClass("vam-header-wide");
+    this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
+      this.openMapActions(event, this.headerNarrow() ? this.narrowHeaderItems(headerActions, event) : undefined)
+    ).addClass("vam-map-actions-button");
+    this.renderReaderToggle(headerActions);
+  }
+  /** The data sources button (and the panel hanging under it); an empty map and an old AIM map have none. */
+  private renderHeaderSources(parent: HTMLElement): void {
+    if (!this.map || this.map.aim || !this.map.nodes.length) return;
+    // The wrapper stays in a narrow header (only its button hides), so the panel opened from ⋯ still has its place.
+    this.mapSourcesControl?.renderMapSourcesControl(parent.createDiv("vam-header-sources"));
+  }
+  /** The reader toggle folds and unfolds Obsidian's right sidebar (its width stays Obsidian's); a popout window has none. */
+  private renderReaderToggle(parent: HTMLElement): void {
+    const workspace = this.app.workspace;
+    const split = workspace?.rightSplit;
+    if (!split || this.leaf?.getRoot?.() !== workspace.rootSplit) return;
+    const button = this.iconButton(parent, "panel-right", t("ui.reader_toggle"), () => {
+      if (split.collapsed) split.expand();
+      else split.collapse();
+      this.syncReaderToggle();
+    });
+    button.addClass("vam-reader-toggle", "vam-header-wide");
+    this.syncReaderToggle();
+  }
+  /** aria-pressed follows the right sidebar: after a press, and when it is folded elsewhere (layout change, resize). */
+  private syncReaderToggle(): void {
+    const button = this.contentEl?.querySelector?.<HTMLButtonElement>(".vam-reader-toggle");
+    const split = this.app.workspace?.rightSplit;
+    if (button && split) button.setAttr("aria-pressed", String(!split.collapsed));
+  }
+  private headerNarrow(): boolean {
+    return !!this.contentEl?.hasClass?.("is-header-narrow");
+  }
+  /** A pane under HEADER_NARROW_WIDTH keeps title, undo and ⋯ in the header; a hidden pane (width 0) keeps its state. */
+  private syncHeaderNarrow(): void {
+    const width = this.contentEl?.getBoundingClientRect?.().width ?? 0;
+    if (width > 0) this.contentEl.toggleClass("is-header-narrow", width < HEADER_NARROW_WIDTH);
+  }
+  /** What a narrow header hid, in header order, for the top of ⋯. Entries act as their buttons do. */
+  private narrowHeaderItems(header: HTMLElement, event: MouseEvent): MapActionItem[] {
+    const items: MapActionItem[] = [];
+    const sources = header.querySelector<HTMLButtonElement>(".vam-sources-button");
+    if (sources) items.push({ title: t("ui.map_sources_button"), icon: "files", action: () => sources.click() });
+    items.push({ title: t("ui.command_map_search"), icon: "search", action: () => this.openMapSearch() });
+    items.push({
+      title: t("ui.redo"),
+      icon: "redo-2",
+      disabled: !this.history.canRedo,
+      action: () => this.enqueue(() => this.travel(true))
+    });
+    items.push({ title: t("ui.book_button"), icon: "book-open", action: () => void this.startBookPipelineFromUi() });
+    items.push({ title: t("ui.export_or_share_map"), icon: "share-2", action: () => this.openExportMenu(event) });
+    const runAll = header.querySelector<HTMLButtonElement>(".vam-run-all");
+    if (runAll) {
+      const running = runAll.hasClass("is-running");
+      items.push({
+        title: t(running ? "ui.ai_run_all_stop" : "ui.ai_run_all"),
+        icon: running ? "square" : "play",
+        disabled: runAll.disabled,
+        action: () => runAll.click()
+      });
+    }
+    const reader = header.querySelector<HTMLButtonElement>(".vam-reader-toggle");
+    if (reader)
+      items.push({
+        title: t("ui.reader_toggle"),
+        icon: "panel-right",
+        checked: reader.getAttr("aria-pressed") === "true",
+        action: () => reader.click()
+      });
+    return items;
   }
   /**
    * The tools on an old AIM map (AIM was removed): the select tool only, no goal or sources control. A separate method so
@@ -12691,6 +12893,7 @@ export class VisualAgentMapView extends ItemView {
           this.inlineSummary?.id !== node.id &&
           isPlaceholder(note.summary)
       );
+    if (note) this.paintCardEdgeEntries(card, node);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
     const active =
@@ -13034,9 +13237,10 @@ export class VisualAgentMapView extends ItemView {
         }
       );
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
-    else if (research?.preview?.summary)
-      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (loading) {
+    else if (research?.preview?.summary) {
+      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary, false);
+      this.paintPreviewLabel(card, true);
+    } else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
       bars.setAttr("aria-hidden", "true");
       bars.createSpan({ cls: "vam-loading-bar" });
@@ -13816,6 +14020,8 @@ export class VisualAgentMapView extends ItemView {
       this.releaseCardCover(card);
       old.frame.remove();
     }
+    missingCovers.get(card)?.remove();
+    missingCovers.delete(card);
     const placed = this.paintCoverFrame(card, notePath);
     // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
     arrangeCover(card, placed?.frame ?? null, placed?.position ?? "top");
@@ -13829,9 +14035,16 @@ export class VisualAgentMapView extends ItemView {
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return null;
-      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
-        this.app.metadataCache.getFirstLinkpathDest(link, notePath)
-      );
+      const cache = this.app.metadataCache.getFileCache(file);
+      const resolve = (link: string) => this.app.metadataCache.getFirstLinkpathDest(link, notePath);
+      // A declared cover whose file is gone keeps its place as a placeholder, so the card does not jump or hide the problem.
+      const missing = declaredCoverMissing(cache, resolve);
+      if (missing) {
+        const frame = missingCoverFrame(missing);
+        missingCovers.set(card, frame);
+        return { frame, position: parseCoverPosition(cache?.frontmatter?.[COVER_POSITION_KEY]) };
+      }
+      const cover = resolveCoverWithFrame(cache, resolve);
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
@@ -13859,12 +14072,14 @@ export class VisualAgentMapView extends ItemView {
     const generation = this.coverGeneration;
     const current = (): boolean =>
       !this.closed && generation === this.coverGeneration && cardCovers.get(card)?.img === img;
-    // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
+    // A file that cannot be decoded turns into the "picture not found" placeholder in the same place.
     img.addEventListener("error", () => {
       if (!current()) return;
       this.releaseCardCover(card);
       frame.remove();
-      arrangeCover(card, null, "top");
+      const placeholder = missingCoverFrame(imagePath);
+      missingCovers.set(card, placeholder);
+      arrangeCover(card, placeholder, position);
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
@@ -14335,6 +14550,7 @@ export class VisualAgentMapView extends ItemView {
       summary?.setText(note.livingNode?.summary || note.summary);
       summary?.setAttr("title", note.livingNode?.summary || note.summary);
       summary?.removeClass("is-preview");
+      this.paintPreviewLabel(card, false);
       if (editable) summary?.addClass("is-inline-editable");
     }
     // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
@@ -16343,8 +16559,7 @@ export class VisualAgentMapView extends ItemView {
           new ChoiceModal(this.app, topic.title, t("ui.rebuild_a_map_from_notes_as_root_nodes_or_relink_an_existing"), [
             {
               label: t("ui.rebuild_from_notes"),
-              action: () =>
-                this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.rebuildMissingMap(topic.root)))
+              action: () => this.openRepairedMap(() => this.plugin.repo.rebuildMissingMap(topic.root))
             },
             {
               label: t("ui.relink_existing_map"),
@@ -16359,10 +16574,7 @@ export class VisualAgentMapView extends ItemView {
                     t("ui.move_the_selected_map_into_this_topic_and_rebuild_node_paths"),
                     candidates.map(file => ({
                       label: file.path,
-                      action: () =>
-                        this.enqueue(async () =>
-                          this.openMapInMutation(await this.plugin.repo.relinkMissingMap(topic.root, file.path))
-                        )
+                      action: () => this.openRepairedMap(() => this.plugin.repo.relinkMissingMap(topic.root, file.path))
                     }))
                   ).open();
                 })
@@ -16371,6 +16583,23 @@ export class VisualAgentMapView extends ItemView {
         }
       }))
     ).open();
+  }
+  /**
+   * Repair rebuild / relink: `write` runs in the queue; the map it gives replaces this tab's map, or (while this tab has running
+   * work) opens in a new tab once the queue is left (openMapInNewTab inside mutate would never finish).
+   */
+  private openRepairedMap(write: () => Promise<string>): void {
+    let later = "";
+    void this.plugin
+      .mutate(async () => {
+        const path = await write();
+        if (path !== this.path && this.hasRunningWork()) later = path;
+        else await this.openMapInMutation(path);
+      })
+      .then(
+        () => (later ? this.plugin.openMapInNewTab(later).catch(error => errorNotice(error)) : undefined),
+        () => {}
+      );
   }
   /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
   private async changeHypothesisStrength(node: MapNode, strength: HypothesisStrength): Promise<void> {
@@ -16996,6 +17225,8 @@ export class VisualAgentMapView extends ItemView {
     cardAiLockButtons.set(card, button);
     button.type = "button";
     setIcon(button, "lock");
+    // Locked says so in words next to the icon, never by a dimmed card alone (V3.3 P1.2).
+    if (locked) button.createSpan({ cls: "vam-card-ai-lock-label", text: t("ui.card_state_locked") });
     button.tabIndex = -1;
     if (managed) {
       // The argument flow owns this card: always locked, and the button offers nothing to unlock.
@@ -19951,7 +20182,7 @@ export class VisualAgentMapView extends ItemView {
       setIcon(star, "sparkles");
       title.prepend(star);
       parts.push(star);
-      if (status !== "done" && note.aiLocked !== true) {
+      if (status === "pending" && note.aiLocked !== true) {
         const glyph = createSpan({ cls: `vam-ai-glyph vam-ai-glyph-${status}` });
         glyph.setAttr("title", this.aiStatusTip(node, note, status));
         title.appendChild(glyph);
@@ -19991,6 +20222,30 @@ export class VisualAgentMapView extends ItemView {
         (questionLine ?? title).after(line);
         parts.push(line);
       }
+    }
+    // Running, stale and failed say so in the header with a mark and words, never by colour alone (the lock label takes the place when locked).
+    if ((status === "running" || status === "stale" || status === "failed") && note.aiLocked !== true) {
+      const chip = createSpan({ cls: `vam-status vam-status-${status}`, text: t(`ui.ai_card_status_${status}`) });
+      chip.setAttr("title", this.aiStatusTip(node, note, status));
+      const check = header.querySelector<HTMLElement>(":scope > input");
+      if (check) check.after(chip);
+      else header.prepend(chip);
+      parts.push(chip);
+    }
+    // Stop for a card Run all is working on: in the toolbar, so it shows with the selection (a card's own run has its Stop in the header).
+    const tools = cardToolbars.get(card) ?? card.querySelector<HTMLElement>(".vam-node-tools");
+    if (
+      status === "running" &&
+      tools &&
+      this.promptRunning() &&
+      this.promptEntryOf(node.id)?.status === "running" &&
+      !this.selection.state.multiSelectMode &&
+      !this.presentation
+    ) {
+      const stop = this.button(tools, t("ui.card_tool_stop"), () => this.stopPromptBatch());
+      stop.addClass("vam-card-tool", "vam-card-tool-stop");
+      tools.prepend(stop);
+      parts.push(stop);
     }
     promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;
@@ -21122,11 +21377,12 @@ export class VisualAgentMapView extends ItemView {
   private placeMapTools(): void {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     this.watchToolPlacement();
-    if (!tools) return;
-    // The canvas starts after the 44px edge the laid-over window leaves in place.
-    const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
-    tools.style.left = left > 0 ? `${left}px` : "";
-    // Last: the stack reads where the tools are horizontally.
+    if (tools) {
+      // The canvas starts after the narrow edge the laid-over window leaves in place.
+      const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
+      tools.style.left = left > 0 ? `${left}px` : "";
+    }
+    // Last: the sources panel hangs from the header, whether or not the canvas has its tool group.
     this.layoutTopStack();
   }
   /**
@@ -21161,18 +21417,14 @@ export class VisualAgentMapView extends ItemView {
   private toolPlacementObserver: ResizeObserver | null = null;
   private toolPlacementObserved: HTMLElement[] = [];
   /**
-   * The one place that stacks what hangs off the top of the canvas: the sources panel hanging from the tool group (height
+   * The one place that places what hangs over the top of the canvas: the sources panel under its header button (height
    * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   private layoutTopStack(): void {
-    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
-    if (!tools?.style) return;
     const sources = this.mapSourcesControl?.mapSourcesPanelEl;
-    const open = !!sources && sources.isConnected !== false;
-    tools.toggleClass?.("has-panel", open);
-    if (!open || !sources) return;
+    if (!sources || sources.isConnected === false) return;
     this.mapSourcesControl.placeMapSourcesPanel(sources);
-    const room = this.sourcesRoom(tools);
+    const room = this.sourcesRoom(sources);
     if (room !== null && typeof sources.style?.setProperty === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
@@ -21189,17 +21441,19 @@ export class VisualAgentMapView extends ItemView {
     );
     return (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
   }
-  /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
-  private sourcesRoom(tools: HTMLElement): number | null {
-    const overlay = tools.parentElement;
+  /** Height the sources panel may take: from its header button's bottom edge (plus the gap) down to the same limit. */
+  private sourcesRoom(panel: HTMLElement): number | null {
+    const overlay = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay");
     const canvasHeight = overlay?.clientHeight ?? 0;
-    const toolsRect = tools.getBoundingClientRect?.();
-    if (!(canvasHeight > 0) || !toolsRect) return null;
-    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - toolsRect.bottom - SOURCES_PANEL_GAP);
+    const anchor = panel.parentElement?.getBoundingClientRect?.();
+    if (!(canvasHeight > 0) || !anchor) return null;
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - anchor.bottom - SOURCES_PANEL_GAP);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
     this.drawWhenShown();
+    this.syncHeaderNarrow();
+    this.syncReaderToggle();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();
@@ -23174,6 +23428,10 @@ export class VisualAgentMapView extends ItemView {
       });
       return skipped("ui.map_chat_skip_map_choose");
     }
+    if (match.map.mapPath !== this.path && this.hasRunningWorkBesideChatTurn()) {
+      if (!same()) return skipped("ui.map_chat_skip_map_changed");
+      return this.chatOpenMapInNewTab(match.map);
+    }
     let opened = "";
     await this.plugin.mutate(async () => {
       if (!same()) return;
@@ -23181,19 +23439,36 @@ export class VisualAgentMapView extends ItemView {
     });
     return opened ? { status: "done" } : skipped("ui.map_chat_skip_map_changed");
   }
+  /**
+   * open_map while other AI work runs on this map: the map opens in a new tab and the conversation stays here. Never called
+   * inside mutate (the new tab opens its map through it).
+   */
+  private async chatOpenMapInNewTab(topic: { title: string; mapPath: string }): Promise<ChatOutcome> {
+    const view = await this.plugin.openMapInNewTab(topic.mapPath);
+    return view
+      ? { status: "done", label: t("ui.map_chat_open_map_new_tab_0", topic.title) }
+      : skipped("ui.map_chat_skip_map_changed");
+  }
   /** The user picked one of several maps the reply named. */
   private async chatPickMap(topic: { title: string; mapPath: string }): Promise<void> {
     const chat = this.chat;
     if (!chat || this.closed || chat.isBusy || this.chatApplying) return;
     this.chatApplying = true;
     try {
+      // While other AI work runs on this map the picked map opens in a new tab and the conversation stays here.
+      const newTab = topic.mapPath !== this.path && this.hasRunningWorkBesideChatTurn();
       let opened = "";
-      await this.plugin.mutate(async () => {
-        if (!this.closed) opened = await this.chatSwitchTo(topic.mapPath, { path: this.path, id: this.map?.id });
-      });
+      if (newTab) opened = (await this.plugin.openMapInNewTab(topic.mapPath)) ? topic.mapPath : "";
+      else
+        await this.plugin.mutate(async () => {
+          if (!this.closed) opened = await this.chatSwitchTo(topic.mapPath, { path: this.path, id: this.map?.id });
+        });
       this.chat?.appendLines([
         opened
-          ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) }
+          ? {
+              status: "done",
+              text: t(newTab ? "ui.map_chat_open_map_new_tab_0" : "ui.map_chat_choose_opened_0", topic.title)
+            }
           : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {

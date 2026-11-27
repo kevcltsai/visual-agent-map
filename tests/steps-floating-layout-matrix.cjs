@@ -32,7 +32,7 @@ function run(s, passes = 1) {
   const view = Object.create(VisualAgentMapView.prototype);
   const narrow = w < 700;
   const toolsH = narrow ? 88 : 38;
-  const toolsLeft = (s.chat === 'overlay' ? 320 - 44 + 12 : 0) + 12;
+  const toolsLeft = (s.chat === 'overlay' ? 320 - 28 + 12 : 0) + 12;
   const toolbar = el('toolbar', rect(0, 0, w, top));
   const toolsRect = rect(canvas.left + toolsLeft, top + 12, canvas.left + toolsLeft + (narrow ? 150 : 300), top + 12 + toolsH);
   nodes['.vam-map-tools'] = el('tools', toolsRect);
@@ -44,7 +44,8 @@ function run(s, passes = 1) {
   nodes['.vam-canvas-hint'] = el('hint', rect(12, top + h - 32 - cl, 260, top + h - 12 - cl));
   if (s.chat === 'overlay') nodes['.vam-map-chat.is-overlay'] = el('chat-overlay', rect(0, top, 320, top + h));
   let sources = null;
-  if (s.sources) { sources = el('sources', rect(canvas.left + toolsLeft, top + 12 + toolsH, canvas.left + toolsLeft + 260, top + h - 60)); }
+  // B17: the panel hangs from the data sources button in the header row (its wrapper is the panel's parent).
+  if (s.sources) { sources = el('sources', rect(12, top + 6, 272, top + h - 60), { parentElement: el('sources-anchor', rect(12, 9, 42, 39)) }); }
   const statusBar = s.statusBar ? el('status-bar', rect(w - 140, top + h - 22, w, top + h)) : null;
   const chatEl = el('chat', rect(0, top, 320, top + h));
   const canvasEl = el('canvas', canvas);

@@ -17,22 +17,22 @@
   },
   "wide, sources panel open": {
     "toolsLeft": "",
-    "hasPanel": true,
-    "sourcesMax": "592px",
+    "hasPanel": false,
+    "sourcesMax": "651px",
     "sourcesPlaced": 1,
     "canvasClear": "0px",
     "chatClear": null
   },
   "wide, sources panel + status bar": {
     "toolsLeft": "",
-    "hasPanel": true,
-    "sourcesMax": "570px",
+    "hasPanel": false,
+    "sourcesMax": "629px",
     "sourcesPlaced": 1,
     "canvasClear": "22px",
     "chatClear": null
   },
   "wide, overlay chat": {
-    "toolsLeft": "288px",
+    "toolsLeft": "304px",
     "hasPanel": false,
     "sourcesMax": null,
     "sourcesPlaced": null,
@@ -57,16 +57,16 @@
   },
   "narrow, sources panel open": {
     "toolsLeft": "",
-    "hasPanel": true,
-    "sourcesMax": "520px",
+    "hasPanel": false,
+    "sourcesMax": "629px",
     "sourcesPlaced": 1,
     "canvasClear": "22px",
     "chatClear": null
   },
   "narrow, overlay chat + sources": {
-    "toolsLeft": "288px",
-    "hasPanel": true,
-    "sourcesMax": "542px",
+    "toolsLeft": "304px",
+    "hasPanel": false,
+    "sourcesMax": "651px",
     "sourcesPlaced": 1,
     "canvasClear": "0px",
     "chatClear": "0px"

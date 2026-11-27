@@ -857,6 +857,7 @@ export class Repository {
         lastSuccessfulCheck: text(fm["living-node-last-successful-check"]) || undefined,
         lastContentChange: text(fm["living-node-last-content-change"]) || undefined,
         outcome,
+        ...(text(fm["living-node-reason"]) ? { reason: text(fm["living-node-reason"]) } : {}),
         damaged,
         ...(damageKind ? { damageKind } : {})
       };

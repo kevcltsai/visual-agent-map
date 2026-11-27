@@ -182,6 +182,7 @@ export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): v
     "living-node-last-content-change",
     "living-node-checked",
     "living-node-outcome",
+    "living-node-reason",
     "living-node-input-revision",
     "living-node-success-knowledge",
     "last-error"

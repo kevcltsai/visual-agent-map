@@ -298,6 +298,53 @@ export function localizeAiLatestHeading(markdown: string, label: string): string
   return markdown.slice(0, start) + relabel(markdown.slice(start, end), label) + markdown.slice(end);
 }
 
+export interface LivingReaderLabels {
+  aiLatest: string;
+  /** A source line: `link` is a ready Markdown link or plain title. */
+  source(title: string, date: string): string;
+  generated(at: string): string;
+}
+
+const escapeMarkdown = (value: string): string => value.replace(/[\\[\]<>*_`|]/g, match => "\\" + match);
+
+function readableSource(raw: string, labels: LivingReaderLabels): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 3 || parsed.some(item => typeof item !== "string")) return undefined;
+  const [, source, retrievedAt] = parsed as string[];
+  const url = allowedUrl(source);
+  const title = url ? url.hostname.replace(/^www\./, "") : source;
+  const link = url ? `[${escapeMarkdown(title)}](<${url.toString()}>)` : escapeMarkdown(title);
+  return labels.source(link, /^\d{4}-\d\d-\d\d/.test(retrievedAt) ? retrievedAt.slice(0, 10) : retrievedAt);
+}
+
+/**
+ * What the reader shows: the AI latest heading and its generated time in the interface language, and each evidence source
+ * as "title (date)" (a link when it is a public web page). The note file itself is not changed. Inside a note only the
+ * managed region is touched; a trial preview (`whole`) is generated text from its first line.
+ */
+export function localizeLivingReader(markdown: string, labels: LivingReaderLabels, whole = false): string {
+  const start = markdown.indexOf(BEGIN);
+  const end = markdown.indexOf(END);
+  if (!whole && (start < 0 || end < start)) return markdown;
+  const [from, to] = whole ? [0, markdown.length] : [start, end];
+  const region = relabel(markdown.slice(from, to), labels.aiLatest)
+    .replace(/^- Source: (\[.*\])$/gm, (line, raw: string) => "- " + (readableSource(raw, labels) ?? line.slice(2)))
+    .replace(/^- Generated: (".*")$/gm, (line, raw: string) => {
+      try {
+        const at: unknown = JSON.parse(raw);
+        return typeof at === "string" ? "- " + labels.generated(at) : line;
+      } catch {
+        return line;
+      }
+    });
+  return markdown.slice(0, from) + region + markdown.slice(to);
+}
+
 export function renderLivingPreview(knowledge: LivingKnowledge, aiLatestLabel?: string): string {
   const text = renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
   return aiLatestLabel ? relabel(text, aiLatestLabel) : text;
@@ -645,6 +692,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-last-attempt": context.at,
         "living-node-last-successful-check": context.at,
         "living-node-outcome": "ok",
+        "living-node-reason": null,
         "living-node-input-revision": candidate.inputRevision,
         "living-node-success-knowledge": livingSnapshotRevision(managed),
         // What this run observably checked on the web; cleared when it checked nothing, so it is never stale.

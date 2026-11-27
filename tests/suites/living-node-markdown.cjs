@@ -165,13 +165,20 @@ S.integrationTest('Living Node migration: legacy fresh and run stamps remain rea
 });
 
 S.integrationTest('Living Node recovery: orphaned successful diagnostics cannot turn lost knowledge into a fresh card', async () => {
-  for (const key of ['living-node-last-execution', 'living-node-success-knowledge', 'living-node-last-successful-check', 'living-node-last-content-change']) {
+  for (const key of ['living-node-last-execution', 'living-node-success-knowledge', 'living-node-last-successful-check', 'living-node-last-content-change', 'living-node-outcome']) {
     const f = await setup();
-    const damaged = initial.replace('custom-key: keep', 'custom-key: keep\n' + key + ': "old"');
+    const damaged = initial.replace('custom-key: keep', 'custom-key: keep\n' + key + (key === 'living-node-outcome' ? ': ok' : ': "old"'));
     await f.app.vault.process(f.files.get(path), () => damaged);
     assert.throws(() => readLivingMarkdown(damaged), /unknown-ownership/);
     await assert.rejects(() => commitLivingMarkdown(f.repo, request(f)), /unknown-ownership/);
     assert.equal(f.contents.get(path), damaged);
+    const note = await f.repo.readNote(path);
+    assert.equal(note.livingNode.damaged, true);
+    const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+    await assert.rejects(() => f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md'), /unknown-ownership/);
+    await f.repo.writeAiCard(path, false);
+    assert.equal((await f.repo.readNote(path)).livingNode.damaged, true);
+    await assert.rejects(() => f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md'), /unknown-ownership/);
   }
 });
 

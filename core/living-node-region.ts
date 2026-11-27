@@ -249,3 +249,38 @@ export function rebaseLivingNoteReferences(raw: unknown, rebase: (path: string) 
   const next = refs.map(ref => (ref.startsWith("note-path:") ? "note-path:" + rebase(ref.slice(10)) : ref));
   return next.some((ref, index) => ref !== refs[index]) ? next : null;
 }
+
+const canonicalJson = (value: unknown): string =>
+  JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : item
+  );
+
+/**
+ * Whether `after` is only a re-layout of the Living Node note `before`: same frontmatter values (quoting and key order
+ * aside), same managed region, same body text outside the region (blank lines and the place of the region aside). A
+ * derived-data rebuild must not rewrite such a note: nothing in it changed, and every rewrite moves the offsets that
+ * Obsidian's own pending link updates were collected at.
+ */
+export function livingRewriteIsReformatOnly(
+  before: string,
+  after: string,
+  readFrontmatter: (content: string) => Record<string, unknown>
+): boolean {
+  try {
+    if (livingMarkerState(before) !== "paired" || livingMarkerState(after) !== "paired") return false;
+    const first = splitLivingNodeRegion(before),
+      second = splitLivingNodeRegion(after);
+    if (first.region !== second.region) return false;
+    if (canonicalJson(readFrontmatter(before)) !== canonicalJson(readFrontmatter(after))) return false;
+    const bodyOf = (content: string): string =>
+      content
+        .replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    return bodyOf(first.body) === bodyOf(second.body);
+  } catch {
+    return false;
+  }
+}

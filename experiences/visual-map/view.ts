@@ -7489,6 +7489,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
+    if (!this.canEditKnowledgeRefs()) return;
     if (!this.mergeUnlocked([parentId])) return;
     const check = checkAddKnowledgeRef(map, { mapId: target.mapId, nodeId: target.nodeId, parentId });
     if (check === "self") {

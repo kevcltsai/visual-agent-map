@@ -153,7 +153,7 @@ test('14: OPML and FreeMind carry the reference as a child node, and an import o
   const md = outline.mapOutline([...map.nodes, ...refs.nodes], id => refs.titles.get(id) ?? ({ r: 'Root', c: 'Kid' })[id], () => '', 'Host');
   const parsedMd = importer.parseOutline(md);
   assert.equal(JSON.stringify(parsedMd).includes('knowledgeRefs'), false);
-  assert.equal(importer.parseOutline ? true : false, true);
+  assert.ok(parsedMd.nodes.some(n => n.title === '[Reference] Original card'), 'Markdown re-import gives the reference line back as an ordinary card');
 });
 
 test('14: the OPML/FreeMind file export tells about titles only first, only when the map has references, and writes the reference line', async () => {
@@ -164,7 +164,7 @@ test('14: the OPML/FreeMind file export tells about titles only first, only when
   const request = format_ => ({ mapPath: 'Topics/Map.md', map, notes: new Map([['r', { title: 'Root', detail: '' }], ['c', { title: 'Kid', detail: '' }]]), format: format_ });
   notices.length = 0;
   await io.exportMapWithNotice(vault, { ...request('opml'), references: refs });
-  assert.ok(notices.some(n => /title only/.test(n)) || notices.some(n => /ui\.knowledge_ref_export_notice/.test(n)) || notices.length === 2, `notices: ${notices}`);
+  assert.match(notices[0], /title only/, `notices: ${notices}`);
   assert.match([...files.values()][0], /\[Reference\] Original card/);
   notices.length = 0; files.clear();
   await io.exportMapWithNotice(vault, request('freemind'));

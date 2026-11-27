@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyLivingChanges } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
+const { applyLivingChanges, hasLivingResult } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
 const e = (id, retrievedAt = 't1') => ({ id, source: 'source:' + id, retrievedAt });
 const context = { at: 't2', evidence: [e('e1', 't2'), e('e2')] };
 const record = (extra = {}) => ({ id: 'r1', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: [e('e1')], validity: 'active', owner: 'ai', history: [], ...extra });
@@ -108,4 +108,28 @@ test('change set: late historical observations do not become the latest change',
   assert.equal(changed.records.length, 4);
   const intermediate = apply(withBackfill, op('r12', '12:00', '105'));
   assert.equal(intermediate.changed, false);
+});
+
+test('change set: empty knowledge cannot be successful even when it has a stored revision', () => {
+  for (const revision of ['empty', 'stored-revision']) {
+    for (const text of ['', ' \n ']) {
+      const original = base({ revision, records: [], output: { text, owner: 'user', evidence: [e('e1')] } });
+      assert.equal(hasLivingResult(original), false);
+      assert.throws(() => applyLivingChanges(original, { baseRevision: revision, operations: [] }, context), /missing-formal-result/);
+    }
+  }
+  const blankClaim = base({ records: [record({ claim: '   ', owner: 'user' })], output: { text: '', owner: 'ai', evidence: [] } });
+  assert.equal(hasLivingResult(blankClaim), false);
+  assert.throws(() => apply(blankClaim), /missing-formal-result/);
+});
+
+test('change set: explicit no-match and observation-only results remain usable; repeats remain no-change', () => {
+  const original = base({ records: [], output: { text: '', owner: 'ai', evidence: [] } });
+  const result = apply(original, { kind: 'output', text: 'No matching observations found.', evidence: ['e1'] });
+  assert.equal(hasLivingResult(result), true);
+  assert.equal(result.changed, true);
+  assert.equal(apply({ ...original, output: result.output }).changed, false);
+  const observations = base({ output: { text: '', owner: 'ai', evidence: [] } });
+  assert.equal(hasLivingResult(observations), true);
+  assert.equal(apply(observations).changed, false);
 });

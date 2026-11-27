@@ -2,24 +2,6 @@
 export const managedSectionValue = (value: string): string => value.trim();
 export const managedHeadingValue = (value: string): string => value.replace(/\n/g, " ").trim();
 
-export type RelevanceTier = "core" | "support" | "side";
-export interface NoteRelevance {
-  tier: RelevanceTier;
-  /** True when the owner set this tier by hand (`relevance-manual: true`). */
-  manual?: true;
-}
-const RELEVANCE_TIERS: readonly string[] = ["core", "support", "side"];
-/**
- * Relevance read from note frontmatter (`relevance-tier`, `relevance-manual`). A valid tier is a grade; a missing or
- * unrecognised tier reads as no relevance at all, so the map looks exactly as it did without grading. A leftover
- * `relevance-reason` from an older version is ignored.
- */
-export function readRelevance(fm: Record<string, unknown>): NoteRelevance | undefined {
-  const tier = fm["relevance-tier"];
-  if (typeof tier !== "string" || !RELEVANCE_TIERS.includes(tier)) return undefined;
-  if (fm["relevance-manual"] === true) return { tier: tier as RelevanceTier, manual: true };
-  return { tier: tier as RelevanceTier };
-}
 /** The AI lock (`ai-locked: true`): only the boolean true locks; a missing or any other value reads as unlocked. */
 export function readAiLocked(fm: Record<string, unknown>): boolean {
   return fm["ai-locked"] === true;

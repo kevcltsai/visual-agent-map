@@ -5995,10 +5995,12 @@ const looksOf = async (h, key) => { const note = await h.note(key); return { col
 integrationTest('chat 08: set_appearance sets colour, markers and styles on every card it names, with the panel\'s writes; the note text stays', async () => {
   const h = await harness(); await h.view.hydrate();
   const before = { a: h.contents.get(h.node('a').path), b: h.contents.get(h.node('b').path) };
-  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold', 'text-large'] })]);
+  // P1.10b: a removed marker id the model still sends is dropped without an error; the status marker is set.
+  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'star', 'priority-2'], formats: ['bold', 'text-large'] })]);
   eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Done: Set the appearance of 2 topics');
   for (const key of ['a', 'b']) {
-    eq(await looksOf(h, key), { color: 'red', markers: ['priority-2', 'flag-red'], style: ['bold', 'text-large'] });
+    eq(await looksOf(h, key), { color: 'red', markers: ['star'], style: ['bold', 'text-large'] });
+    assert.doesNotMatch(h.contents.get(h.node(key).path), /flag-red|priority-2/, 'a removed id is not written');
     assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
   }
   eq(await looksOf(h, 'c'), { color: null, markers: [], style: [] }, 'other cards are untouched');
@@ -6013,12 +6015,12 @@ integrationTest('chat 08 / L1: set_appearance counts the cards it could not touc
   const clean = await apply(h, [lookAct([h.ids.b], { color: 'red' })]);
   assert.doesNotMatch(clean[0].text, /skipped/, 'no filtered card, nothing to count');
 });
-integrationTest('chat 08: a single-choice marker group keeps one value and the text size one choice, as in the panel', async () => {
+integrationTest('chat 08: the text size keeps one choice, as in the panel (P1.10b: the single-choice marker groups are gone)', async () => {
   const h = await harness();
   const path = h.node('a').path;
-  await h.repo.writeTopicMarkers(path, 'priority-1'); await h.repo.writeTopicMarkers(path, 'progress-25'); await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
-  await apply(h, [lookAct([h.ids.a], { markers: ['priority-4', 'progress-100'], formats: ['text-large'] })]);
-  eq(await looksOf(h, 'a'), { color: null, markers: ['priority-4', 'progress-100'], style: ['text-large'] });
+  await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
+  await apply(h, [lookAct([h.ids.a], { formats: ['text-large'] })]);
+  eq(await looksOf(h, 'a'), { color: null, markers: [], style: ['text-large'] });
 });
 integrationTest('chat 08: set_appearance clears a colour, every marker and every style; unknown frontmatter values stay', async () => {
   const h = await harness(); const path = h.node('a').path;
@@ -6038,14 +6040,14 @@ integrationTest('chat 08: a card that already looks like that is not written, an
 });
 integrationTest('chat 08: a real send carries each card\'s appearance (default left out); an unknown value is counted as skipped and writes nothing', async () => {
   const h = await harness(); const path = h.node('a').path;
-  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'flag-blue'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
+  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'star'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
   const before = h.contents.get(h.node('b').path);
   h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.b], color: 'pink' }] }), request.context);
   h.open(); h.type('make it pink'); await h.view.sendMapChat();
   await until(() => !h.view.chat.isBusy);
   const outline = JSON.parse(h.control.requests[0].context.json).outline;
   const card = id => outline.find(n => n.id === id);
-  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['flag-blue']); eq(card(h.ids.a).formats, ['bold']);
+  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['star']); eq(card(h.ids.a).formats, ['bold']);
   assert.equal(['color', 'markers', 'formats'].some(key => key in card(h.ids.b)), false);
   assert.equal(h.contents.get(h.node('b').path), before);
   assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
@@ -6723,7 +6725,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 32 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 33 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

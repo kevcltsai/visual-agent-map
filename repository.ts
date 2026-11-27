@@ -115,7 +115,6 @@ import { linkSpans, RenameRepairWatch } from "./core/rename-repair";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
-  readRelevance,
   readAiLocked,
   readAiCard,
   readAiRun,
@@ -127,8 +126,7 @@ import {
   resolveHypothesisWrite,
   type HypothesisStrength,
   type HypothesisLeaning,
-  type TopicKind,
-  type NoteRelevance
+  type TopicKind
 } from "./note-values";
 import {
   MAP_SOURCES_KEY,
@@ -793,7 +791,6 @@ export class Repository {
     );
     const preview = previewSection(content),
       contentLanguage = noteContentLanguage(fm),
-      relevance = readRelevance(fm),
       bookSettings = readBookSettings(fm),
       topicKind = readTopicKind(fm),
       markers = readTopicMarkers(fm),
@@ -875,7 +872,6 @@ export class Repository {
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(contentLanguage ? { contentLanguage } : {}),
-      ...(relevance ? { relevance } : {}),
       ...(readAiLocked(fm) || managedNodeIds(map).has(this.nodeAtPath(path, map, ctx)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
@@ -1654,23 +1650,6 @@ export class Repository {
         ...(next.strength !== current.strength ? { "hypothesis-strength": next.strength } : {})
       });
     });
-  }
-
-  /**
-   * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
-   * `relevance-reason` that older versions wrote). An AI grade writes the tier and removes the manual flag; a tier set by
-   * hand (`manual`) writes the tier and `relevance-manual: true`; null removes the keys. Every write removes
-   * `relevance-reason`. The body
-   * and every other key stay as they were, and `updated` is not bumped: grading is not an edit of the note.
-   */
-  async writeRelevance(path: string, value: NoteRelevance | null): Promise<void> {
-    await this.app.vault.process(this.file(path), content =>
-      setFrontmatterKeys(content, {
-        "relevance-tier": value ? value.tier : null,
-        "relevance-reason": null,
-        "relevance-manual": value?.manual ? true : null
-      })
-    );
   }
 
   async saveMap(

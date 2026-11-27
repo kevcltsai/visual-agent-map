@@ -471,3 +471,55 @@ S.integrationTest('privacy: research started from the chat and map-level file so
   assert.deepEqual(leaks(JSON.stringify(out.groups), foreign), []);
   assert.ok(JSON.stringify(out.groups).includes('FOREIGN-FINDINGS'));
 });
+
+// A damaged region (lone end, lone begin, duplicate) still has to keep holds and ownership out of every reader of note text.
+const { livingNoteWithoutManaged, LIVING_NODE_BEGIN: BEGIN, LIVING_NODE_END: END } = S.load('core/living-node-region.ts', { obsidian: S.obsidian });
+const hex = ch => ch.repeat(64);
+const damageFm = '---\nagent-map-node: true\nliving-node-ownership:\n  - ["r1","' + hex('b') + '"]\n"living-node-region-hash": ' + hex('c') + '\nai-card: true\n---\n';
+const damageRegion = BEGIN + '\n### Records\n- x\n### Suppression\n- ID: legacy-tombstone-1\n- Suppression v2: abc@v2:' + hex('a') + '\n' + END;
+const damageNotes = {
+  healthy: damageFm + '# T\n\n## Detail\n\nuser text\n\n' + damageRegion + '\n\n## Prompt\np\n',
+  loneEnd: damageFm + '# T\n\n## Detail\n\nuser text\n\n' + damageRegion.replace(BEGIN, '') + '\n\n## Prompt\np\n',
+  loneBegin: damageFm + '# T\n\n## Detail\n\nuser text\n\n' + damageRegion.replace(END, '') + '\n\n## Prompt\np\n',
+  duplicate: damageFm + '# T\n\n## Detail\n\nuser text\n\n' + damageRegion + '\n' + damageRegion + '\n\n## Prompt\np\n'
+};
+const damageLeaks = text => [/Suppression/.test(text) && 'Suppression', /@v2/.test(text) && '@v2', /[0-9a-f]{64}/.test(text) && '64-hex', /legacy-tombstone/.test(text) && 'legacy id', /living-node-/.test(text) && 'frontmatter'].filter(Boolean);
+
+S.integrationTest('privacy: Note.detail and Note.prompt of a damaged Living Node note carry no holds, ownership or hash; a healthy note keeps its text', async () => {
+  const f = S.fixture();
+  for (const [name, content] of Object.entries(damageNotes)) {
+    await f.app.vault.create(name + '.md', content);
+    const note = await f.repo.readNote(name + '.md');
+    assert.deepEqual(damageLeaks(note.detail + '\n' + note.prompt + '\n' + note.rules), [], name);
+    // A lone end is cut from the start of the note up to the marker (fail closed), so the text before it goes too.
+    if (name !== 'loneEnd') assert.ok(note.detail.includes('user text'), name + ' keeps the user text');
+    // A lone begin is cut to the end of the note, so a Prompt after it goes too.
+    assert.equal(note.prompt, name === 'loneBegin' ? '' : 'p', name);
+  }
+});
+
+S.integrationTest('privacy: the sanitiser output of every damage shape has no hold, legacy tombstone or 64-hex string', async () => {
+  for (const [name, content] of Object.entries(damageNotes)) assert.deepEqual(damageLeaks(livingNoteWithoutManaged(content)), [], name);
+});
+
+S.integrationTest('privacy: a leading byte-order mark does not hide the living-node-* frontmatter keys', async () => {
+  const out = livingNoteWithoutManaged('﻿' + damageNotes.healthy);
+  assert.deepEqual(damageLeaks(out), []);
+  assert.ok(out.includes('user text'));
+});
+
+S.integrationTest('privacy: a file in an external folder that is a Living Node note is delivered as its model view', async () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const foreign = await foreignLivingNote();
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-ext-')));
+  try {
+    const home = path.join(tmp, 'home'), vault = path.join(home, 'Vault'), docs = path.join(home, 'ext', 'docs');
+    fs.mkdirSync(vault, { recursive: true }); fs.mkdirSync(docs, { recursive: true });
+    fs.writeFileSync(path.join(docs, 'live.md'), foreign);
+    const f = S.fixture();
+    const out = await resolveMapSources({ app: f.app, readMap: p => f.repo.readMap(p), external: { sources: [{ path: docs, label: 'docs' }], scope: { vaultBase: vault, home } } }, [], 'Cur/Map.md', new AbortController().signal);
+    const sent = JSON.stringify(out.groups);
+    assert.ok(sent.includes('FOREIGN-FINDINGS'), 'the output still reaches the model');
+    assert.deepEqual(leaks(sent, foreign), []);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});

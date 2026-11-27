@@ -54,6 +54,7 @@ import {
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import {
   hasLivingCommitMetadata,
+  livingNoteWithoutManaged,
   isLivingNodeNote,
   keepsLivingBodyAndMetadata,
   livingConfigurationStamp,
@@ -786,8 +787,10 @@ export class Repository {
   /** Parses already-read note content; `readNote` reads the file once and calls this. */
   private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
-      content = decodeCalloutSections(upgradeLegacyAimText(raw)),
-      fm = frontmatter(content);
+      decoded = decodeCalloutSections(upgradeLegacyAimText(raw)),
+      fm = frontmatter(decoded),
+      // A torn or duplicated region is cut out before sections are read, so it cannot leak into Detail or Prompt; a paired region already ends its section.
+      content = livingMarkerState(decoded) === "corrupt" ? livingNoteWithoutManaged(decoded) : decoded;
     const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
     const modelSource = this.modelSourceOf(fm);

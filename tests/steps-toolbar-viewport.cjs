@@ -458,13 +458,15 @@ test('the empty-map hint ignores pointer events but its Topic button receives th
 
 test('the selection bar joins names with the localized list separator and reads each name direction-aware', () => {
   const titles = new Map([['a', { title: 'Alpha' }], ['b', { title: 'שלום' }], ['c', { title: 'C' }]]);
-  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: titles, map: { nodes: [] } });
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: titles, map: { nodes: [] }, path: 'Map.md' });
   view.selection.replaceMulti(['a', 'b', 'c']);
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const bar = view.renderSelectionBar(fakeEl());
   const names = bar.children[0];
-  assert.ok(names.text.includes('Alpha, שלום'), names.text);
-  assert.ok(!names.text.includes('、'));
+  // B09: the bar reads "3 selected"; the names moved to the aria-label.
+  assert.equal(names.text, '3 selected');
+  assert.ok(names.attrs['aria-label'].includes('Alpha, שלום'), names.attrs['aria-label']);
+  assert.ok(!names.attrs['aria-label'].includes('、'));
   const { translate } = load('i18n.ts');
   assert.equal(translate('en', 'ui.list_separator'), ', ');
   assert.equal(translate('zh-TW', 'ui.list_separator'), '、');
@@ -509,7 +511,7 @@ test('a very long word in the hover preview title wraps instead of clipping', ()
   assert.match(rule('.vam-hover-card strong'), /overflow-wrap: anywhere/);
 });
 
-test('the selection bar is a narrow strip along the canvas bottom, names ellipsised, and select mode draws no hint', () => {
+test('the selection bar is a narrow strip along the canvas bottom, count ellipsised, and select mode draws no hint', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const bar = css.split('\n').find(line => line.startsWith('.vam-selection-bar {'));
   assert.ok(bar && /bottom: 0; left: 0; right: 0/.test(bar) && /min-height: 44px/.test(bar), 'full width along the bottom');
@@ -520,8 +522,8 @@ test('the selection bar is a narrow strip along the canvas bottom, names ellipsi
 });
 
 
-test('bar children keep the same order and fixed labels at counts 1-3 (names span first); no card picked draws nothing', () => {
-  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A very long title '.repeat(8) }], ['b', { title: 'B' }], ['c', { title: 'C' }]]), map: { nodes: [] } });
+test('bar children keep the same order and fixed labels at counts 1-3 (count span first); no card picked draws nothing', () => {
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A very long title '.repeat(8) }], ['b', { title: 'B' }], ['c', { title: 'C' }]]), map: { nodes: [] }, path: 'Map.md' });
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const shapes = [];
   setSelection(view, false, []);
@@ -884,7 +886,7 @@ test('card tools: four labelled buttons (Research, Add, Note, More) in the selec
   assert.match(view, /private openSelectionMoreMenu\(/, 'the selection bar keeps its More');
   assert.match(view, /alignCardTools\(card: HTMLElement\)[\s\S]*placeCardTools\(card, tools/);
   const { translate } = load('i18n.ts');
-  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_more', 'ui.selection_more_hint', 'ui.selection_help_hint']) {
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_more', 'ui.selection_more_hint', 'ui.selection_help_item', 'ui.selection_more', 'ui.selected_count_0']) {
     assert.notEqual(translate(lang, key), key, `${lang} ${key}`);
   }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -902,7 +904,7 @@ test('card tools: four labelled buttons (Research, Add, Note, More) in the selec
   assert.match(css, /is-side-right::after \{ content: ""; position: absolute;[^}]*width: calc\(var\(--vam-tools-gap, 4px\) \+ 6px\)/);
 });
 test('selection bar: nothing before the first card is picked; then a narrow bottom bar whose main button follows the count', () => {
-  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] } });
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] }, path: 'Map.md' });
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const host = () => { const el = fakeEl(); el.toggleClass = (name, on) => (on ? el.classes.add(name) : el.classes.delete(name)); return el; };
   setSelection(view, true, []);
@@ -912,7 +914,7 @@ test('selection bar: nothing before the first card is picked; then a narrow bott
   const labels = bar => bar.children.filter(c => c.tag === 'button').map(c => c.text);
   setSelection(view, true, ['a']);
   const one = host(); const oneBar = view.renderSelectionBar(one);
-  assert.deepEqual(labels(oneBar), ['Merge', 'Research', 'Move to…', '⋯ More', '?', 'Done selecting']);
+  assert.deepEqual(labels(oneBar), ['Move to…', 'Merge', 'Research', '⋯', 'Done selecting'], 'B09: no "?" (it is the ⋯ menu\'s last row)');
   assert.ok(one.classes.has('has-selection-bar'));
   assert.ok(oneBar.children.find(c => c.text === 'Research').classes.has('mod-cta'));
   assert.equal(oneBar.children.find(c => c.text === 'Merge').classes.has('mod-cta'), false);
@@ -921,11 +923,35 @@ test('selection bar: nothing before the first card is picked; then a narrow bott
   assert.ok(two.children.find(c => c.text === 'Merge').classes.has('mod-cta'));
   assert.equal(two.children.find(c => c.text === 'Research').classes.has('mod-cta'), false);
   for (const button of two.children.filter(c => c.tag === 'button')) assert.ok(button.attrs['aria-label'] || button.text, 'every button is named');
-  for (const name of ['more', 'help']) assert.ok(two.children.find(c => c.classes.has('vam-selection-' + name)).attrs['aria-label']);
+  assert.ok(two.children.find(c => c.classes.has('vam-selection-more')).attrs['aria-label']);
+  assert.equal(two.children.find(c => c.classes.has('vam-selection-help')), undefined);
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^\.vam-selection-bar \{[^}]*bottom: 0; left: 0; right: 0;/m);
   assert.match(css, /^\.vam-selection-bar\.is-empty \{ display: none; \}/m);
   assert.match(css, /^\.vam-canvas\.has-selection-bar \{ padding-bottom: 44px;/m);
+});
+
+test('selection bar (B09): an action that cannot run keeps its button (aria-disabled, never natively disabled) and the reason is one line under the row; "Selected N" reads in every language', () => {
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] }, path: 'Map.md' });
+  view.multiResearchKey = () => 'k';
+  const host = () => { const el = fakeEl(); el.toggleClass = (name, on) => (on ? el.classes.add(name) : el.classes.delete(name)); return el; };
+  const { translate } = load('i18n.ts');
+  view.mergeCheck = () => ({ ok: false, reason: 'ui.merge_needs_two' });
+  setSelection(view, true, ['a']);
+  const workspace = host(); const off = view.renderSelectionBar(workspace);
+  const merge = off.children.find(c => c.text === 'Merge');
+  assert.equal(merge.disabled, false); assert.equal(merge.attrs['aria-disabled'], 'true'); assert.equal(merge.attrs.title, translate('en', 'ui.merge_needs_two'));
+  const why = off.children.filter(c => c.tag === 'span' && c.text === translate('en', 'ui.merge_needs_two'));
+  assert.equal(why.length, 1); assert.equal(why[0].text, translate('en', 'ui.merge_needs_two'));
+  assert.equal(off.children.at(-1), why[0], 'the reason line is below the row'); assert.ok(off.classes.has('has-why')); assert.ok(workspace.classes.has('has-selection-why'));
+  view.mergeCheck = () => ({ ok: true });
+  setSelection(view, true, ['a', 'b']);
+  const okWorkspace = host(); const on = view.renderSelectionBar(okWorkspace);
+  assert.equal(on.children.filter(c => c.tag === 'span').length, 1, 'only the count span: no reason line'); assert.equal(okWorkspace.classes.has('has-selection-why'), false);
+  assert.equal(on.children.find(c => c.text === 'Merge').attrs['aria-disabled'], undefined);
+  assert.equal(translate('zh-TW', 'ui.selected_count_0', 3), '已選 3 張'); assert.equal(translate('en', 'ui.selected_count_0', 3), '3 selected');
+  assert.equal(translate('zh-TW', 'ui.selection_help_item'), '操作說明');
+  assert.equal(translate('zh-TW', 'ui.card_action_off_no_lockable'), '選取的卡都不能鎖定');
 });
 
 // F13b: Show all with a card selected whose tool row can only sit beside it (docked chat, canvas 640 wide at left 384).

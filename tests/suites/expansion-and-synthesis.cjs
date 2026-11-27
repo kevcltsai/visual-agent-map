@@ -1468,7 +1468,8 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   h.view.selection.selectSubtopics([h.nodes[0].id]); // enters selection mode like the user's own pick
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
   assert.equal(h.view.selection.state.multiSelectMode, false); assert.equal(h.view.selection.state.multiSelected.size, 0);
-  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
+  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, false, 'B09: stays focusable'); assert.equal(research().attrs['aria-disabled'], 'true');
+  assert.ok(items.find(i => i.cls === 'vam-selection-why' && i.text.includes('A multi-topic research is already running on this map.')), 'the reason is written under the row');
   assert.equal(items.find(i => i.text === 'Researching: 0 of 1 done'), undefined);
   items = toolbar();
   assert.ok(items.find(i => i.tag === 'span' && i.text === `Researching: 0 of 1 done · ${h.nodes[0].id}`), items.map(i => i.text).join('|'));

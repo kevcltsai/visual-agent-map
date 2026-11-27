@@ -866,7 +866,7 @@ integrationTest('persona 11: Alt+arrow on a focused card reorders it among its s
   press('b', { key: 'ArrowDown', altKey: true });
   assert.equal(calls.length, 3, 'select mode: no reordering');
 });
-integrationTest('select mode: the narrow bar names Merge / Research by count, keeps More for the rest and announces the topic count to screen readers', () => {
+integrationTest('select mode: the narrow bar names Merge / Research by count, keeps More for the rest (ending with the help) and announces the topic count to screen readers', () => {
   const fixture = selectionView(load); const { view } = fixture;
   view.selection.toggleMultiSelect(); fixture.build();
   const labels = ids => {
@@ -875,15 +875,19 @@ integrationTest('select mode: the narrow bar names Merge / Research by count, ke
     return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled, button.attrs['aria-label']]);
   };
   assert.deepEqual(labels([]), [], 'no card picked: the bar is empty');
-  assert.deepEqual(labels(['a']).slice(0, 2), [['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
-  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 2), [['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
+  // B09: Move to…, Merge, Research, ⋯, Done selecting (the "?" is the last row of ⋯).
+  assert.deepEqual(labels(['a']).slice(0, 3), [['Move to…', false, undefined], ['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 3), [['Move to…', false, undefined], ['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).map(([text]) => text), ['Move to…', 'Merge', 'Research', '⋯', 'Done selecting']);
+  const countBar = view.renderSelectionBar(selectionDom()('div'));
+  assert.equal(countBar.children[0].text, '3 selected'); assert.match(countBar.children[0].attrs['aria-label'], /^Selected 3: /, 'the names moved to the aria-label');
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.synthesize_0_topics', 3), '整合 3 個議題'); assert.equal(translate('zh-TW', 'ui.research_0_topics', 3), '研究 3 個議題');
   // Everything the old panel had that the bar does not show is in More.
   view.applySelectionChange(view.selection.replaceMulti(['a', 'b', 'c']));
   const bar = view.renderSelectionBar(selectionDom()('div'));
   const entries = recordMenus(view)(bar.children.find(child => child.classes.has('vam-selection-more')));
-  assert.deepEqual(entries.map(entry => entry.title), ['Synthesize 3 topics', 'Copy to…', 'Add frame', 'Add summary bracket', 'Lock from AI', 'Clear', 'Remove']);
+  assert.deepEqual(entries.map(entry => entry.title), ['Synthesize 3 topics', 'Copy to…', 'Add frame', 'Add summary bracket', 'Lock from AI', 'Clear', 'Remove', 'Selection help']);
   view.applySelectionChange(view.selection.replaceMulti(['a']));
   const single = recordMenus(view)(view.renderSelectionBar(selectionDom()('div')).children.find(child => child.classes.has('vam-selection-more')));
   assert.equal(single.find(entry => entry.title === 'Synthesize').disabled, true, 'integration needs two topics');

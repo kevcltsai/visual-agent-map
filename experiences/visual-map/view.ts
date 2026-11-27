@@ -606,7 +606,14 @@ import {
   type PromptNoteRef,
   type PromptRunEntry
 } from "./prompt-run";
-import type { CardActionContext, CardActionHost } from "./card-actions";
+import {
+  actionsFor,
+  CARD_ACTION_REASONS,
+  titleKeyFor,
+  type CardActionContext,
+  type CardActionHost,
+  type CardAvailability
+} from "./card-actions";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
   BookSettingsViewModal,
@@ -19514,91 +19521,101 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
-   * The narrow bar along the canvas bottom: nothing until a card is picked, then the names, Merge / Research, Move to…,
-   * More (everything else), the gesture help and Done. The canvas keeps its height free (see `has-selection-bar`).
+   * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card
+   * action registry (Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
+   * cannot run stays focusable (aria-disabled) and its reason is written on a line below the row. The canvas keeps its height
+   * free (see `has-selection-bar`).
    */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     const selection = workspace.createDiv("vam-selection-bar");
     const count = this.selection.state.multiSelected.size;
     workspace.toggleClass?.("has-selection-bar", count > 0);
+    workspace.toggleClass?.("has-selection-why", false);
     if (!count) {
       selection.addClass("is-empty");
       return selection;
     }
     const names = [...this.selection.state.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
-    selection.createSpan({
-      attr: { dir: "auto" },
-      text: t("ui.selected_0_1_2", count, names.slice(0, 2).join(t("ui.list_separator")), names.length > 2 ? "…" : "")
-    });
-    // The main action follows the count: Merge for two or more, Research for one.
-    // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
+    const countLabel = selection.createSpan({ text: t("ui.selected_count_0", count) });
+    countLabel.setAttr("dir", "auto");
+    countLabel.setAttr("role", "status");
+    countLabel.setAttr(
+      "aria-label",
+      t("ui.selected_0_1_2", count, names.slice(0, 2).join(t("ui.list_separator")), names.length > 2 ? "…" : "")
+    );
+    const context = this.cardActionContext([...this.selection.state.multiSelected]);
     // A picture-book run that owns the map takes the AI actions away, and while it plans or writes also Move to (bookLock).
-    const bookLock = this.bookLock();
-    if (!bookLock.ai) {
-      const check = this.mergeCheck(),
-        merge = this.button(selection, t("ui.merge"), () => this.openMerge());
-      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
-      if (count > 1) merge.addClass("mod-cta");
-      if (!check.ok) {
-        merge.setAttr("aria-disabled", "true");
-        merge.setAttr("title", t(check.reason));
+    const entries = actionsFor("toolbar", context).filter(entry => !this.offForBook(entry.availability));
+    const reasons: string[] = [];
+    const addMore = (): void => {
+      const more = this.button(selection, t("ui.selection_more"), () => {});
+      more.setAttr("aria-label", t("ui.selection_more_hint"));
+      more.setAttr("aria-haspopup", "menu");
+      more.addClass("vam-selection-more");
+      more.addEventListener("click", event => this.openSelectionMoreMenu(event, count));
+    };
+    for (const { action, availability } of entries) {
+      if (action.id === "finish-selection") addMore();
+      // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
+      const reasonText = availability.ok ? "" : t(availability.reasonKey);
+      const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
+        if (reasonText) new Notice(reasonText);
+        else action.run(context, {});
+      });
+      if (reasonText) {
+        button.setAttr("aria-disabled", "true");
+        button.setAttr("title", reasonText);
+        if (!reasons.includes(reasonText)) reasons.push(reasonText);
       }
-      const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
-      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
-      research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
-      if (count === 1) research.addClass("mod-cta");
+      // The main action follows the count: Merge for two or more, Research for one.
+      if (action.id === "merge") {
+        if (count > 1) button.setAttr("aria-label", t("ui.merge_0_topics", count));
+        if (count > 1) button.addClass("mod-cta");
+      } else if (action.id === "multi-research") {
+        button.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+        if (count === 1) button.addClass("mod-cta");
+      }
     }
-    if (!bookLock.structure) this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
-    const more = this.button(selection, t("ui.card_more"), () => {});
-    more.setAttr("aria-label", t("ui.selection_more_hint"));
-    more.setAttr("aria-haspopup", "menu");
-    more.addClass("vam-selection-more");
-    more.addEventListener("click", event => this.openSelectionMoreMenu(event, count));
-    const help = this.button(
-      selection,
-      t("ui.selection_help"),
-      () => new Notice(t("ui.drag_to_select_topics_hint"), 12000)
-    );
-    help.setAttr("aria-label", t("ui.selection_help_hint"));
-    help.setAttr("title", t("ui.selection_help_hint"));
-    help.addClass("vam-selection-help");
-    this.button(selection, t("ui.finish_topic_selection"), () =>
-      this.applySelectionChange(this.selection.toggleMultiSelect())
-    );
+    if (reasons.length) {
+      selection.addClass("has-why");
+      selection.createSpan({ cls: "vam-selection-why", text: reasons.join(" ") });
+      workspace.toggleClass?.("has-selection-why", true);
+    }
     return selection;
   }
-  /** What the narrow selection bar has no room for: Synthesize, Copy to…, frame, summary bracket, AI lock, Clear, Remove. */
+  /** The action is off because a picture-book run owns the map: the bar and its More leave such an action out. */
+  private offForBook(availability: CardAvailability): boolean {
+    return !availability.ok && availability.reasonKey === CARD_ACTION_REASONS.bookLock;
+  }
+  /** What the narrow selection bar has no room for: Synthesize, Copy to…, frame, summary bracket, AI lock, Clear, Remove, the help. */
   private openSelectionMoreMenu(event: MouseEvent, count: number): void {
     const menu = this.newMenu();
-    const add = (title: string, icon: string, action: () => void, disabled = false): void => {
-      menu.addItem(item => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
-    };
-    const bookLock = this.bookLock();
-    if (!bookLock.ai)
-      add(
-        count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
-        "git-merge",
-        () => this.integrateSelected(),
-        count < 2
-      );
-    if (!bookLock.structure) add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
-    add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
-    add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
-    const nodes = [...this.selection.state.multiSelected]
+    const context = this.cardActionContext([...this.selection.state.multiSelected]);
+    const entries = actionsFor("more", context).filter(entry => !this.offForBook(entry.availability));
+    const lockable = [...this.selection.state.multiSelected]
       .map(id => this.map?.nodes.find(node => node.id === id))
       .filter((node): node is MapNode => !!node && !this.isArgumentCard(node.id) && !!this.notes.get(node.id));
-    const all = nodes.length > 0 && nodes.every(node => this.notes.get(node.id)?.aiLocked === true);
-    const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
-    // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
-    add(
-      `${t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle")}${locked && !all ? ` (${t("ui.ai_locked_some_0_1", locked, nodes.length)})` : ""}`,
-      all ? "unlock" : "lock",
-      () => this.enqueue(() => this.setAiLock(nodes, !all)),
-      !nodes.length
-    );
-    menu.addSeparator();
-    add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
-    if (!bookLock.structure) add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
+    const locked = lockable.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
+    entries.forEach(({ action, availability }, index) => {
+      if (index && entries[index - 1].action.group !== action.group) menu.addSeparator();
+      let title = t(titleKeyFor(action, "more", context), count);
+      // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
+      if (action.id === "ai-lock-selected" && locked && locked < lockable.length)
+        title += ` (${t("ui.ai_locked_some_0_1", locked, lockable.length)})`;
+      menu.addItem(item => {
+        item
+          .setTitle(title)
+          .setIcon(action.iconFor?.(context) ?? action.icon)
+          .setDisabled(!availability.ok)
+          .onClick(() => action.run(context, {}));
+        if (!availability.ok) {
+          // The reason goes under the greyed row (a menu item has no subtitle of its own).
+          const dom = (item as unknown as { dom?: HTMLElement }).dom;
+          dom?.setAttr?.("title", t(availability.reasonKey));
+          dom?.createDiv?.({ cls: "vam-menu-item-why", text: t(availability.reasonKey) });
+        }
+      });
+    });
     menu.showAtMouseEvent(event);
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */

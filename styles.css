@@ -2149,3 +2149,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-empty-add-ai { padding: 0 var(--vam-space-3); border-radius: var(--vam-radius-control); border: 1px dashed var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); cursor: pointer; }
 .vam-empty-add-ai:hover { background: var(--vam-accent); color: var(--vam-surface); }
 .vam-empty-add-ai:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }
+
+/* B09: the selection bar's reason line (V3.3 P1.8f) and the reason under a greyed row of its ⋯ menu. */
+.vam-selection-bar.has-why { flex-wrap: wrap; row-gap: var(--vam-space-1); }
+.vam-selection-bar > .vam-selection-why { flex: 1 0 100%; order: 1; overflow: visible; white-space: normal; color: var(--vam-muted); }
+.vam-canvas.has-selection-bar.has-selection-why { padding-bottom: 68px; }
+.vam-canvas.has-selection-bar.has-selection-why .vam-zoom-controls, .vam-canvas.has-selection-bar.has-selection-why .vam-canvas-hint { margin-bottom: 68px; }
+.vam-menu-item-why { font-size: var(--font-ui-smaller); color: var(--vam-muted); white-space: normal; }

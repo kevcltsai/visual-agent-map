@@ -195,7 +195,7 @@ async function harness(spec, { confirm = true } = {}) {
     repo, settings: { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', cliReasoning: 'low' }, running: new Set(), logs: { appendLog() {} },
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, relevanceGrades: new Map(), expansionBatches: new Map(),
     recordFailure: (_l, e) => String(e?.message ?? e), views: () => [], mutate: async work => work(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
-    invalidateLivingTrial() {}, restoreLivingOfficial: async () => {}, showLivingTrial: async () => {},
+    openDetails: async () => {}, invalidateLivingTrial() {}, restoreLivingOfficial: async () => {}, showLivingTrial: async () => {},
     confirmAiUsage: async (model, run) => { usage.push(model); if (!confirm) return false; await run(); return true; },
     askModel: async (_c, _m, _r, signal, _x, accepted) => {
       accepted?.();
@@ -610,7 +610,7 @@ test('save path: existing AI card is one undoable configuration edit; source IDs
   const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['N', null, { noAi: true }]]);
   const before = h.raw('A');
   const past = h.view.history.past.length;
-  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: ['N'], keepOld: true });
+  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: ['N'], keepOld: true }, 'Old', undefined, () => true);
   assert.equal(h.view.history.past.length, past + 1);
   assert.match(h.raw('A'), /^ai-card: true$/m);
   assert.ok(h.raw('A').includes('card:' + h.node('N').id));
@@ -623,7 +623,7 @@ test('save path: existing AI card is one undoable configuration edit; source IDs
 test('save path: blank prompt is refused; explicit conversion retains configuration and knowledge', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Old question' }]]);
   const before = h.raw('A');
-  await assert.rejects(() => h.view.writeAiCard(h.node('A'), { title: '', question: '', sources: [], keepOld: true }), /empty-prompt/);
+  await assert.rejects(() => h.view.writeAiCard(h.node('A'), { title: '', question: '', sources: [], keepOld: true }, 'Old question', undefined, () => true), /empty-prompt/);
   assert.equal(h.raw('A'), before);
   await h.repo.writeAiCard(h.node('A').path, false);
   assert.match(h.raw('A'), /Old question/);

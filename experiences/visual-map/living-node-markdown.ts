@@ -5,6 +5,7 @@ import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
   livingEventFingerprint,
+  livingEventScopeFingerprint,
   livingEventTombstone,
   parseLivingEventTombstone,
   type LivingChangeContext,
@@ -279,7 +280,7 @@ function outputHash(output: LivingKnowledge["output"]): string {
 interface OwnershipIndex {
   output: string;
   records: Map<string, string>;
-  events: Map<string, string>;
+  events: Map<string, { fingerprint: string; scope?: string; unknownTime?: boolean }>;
   suppressed: Set<string>;
 }
 
@@ -287,7 +288,7 @@ interface OwnershipIndex {
 function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
-    ...knowledge.records.map(record => JSON.stringify(["record", record.id, recordHash(record), livingEventFingerprint(record)])),
+    ...knowledge.records.map(record => JSON.stringify(["record", record.id, recordHash(record), livingEventFingerprint(record), livingEventScopeFingerprint(record), record.eventTime === null])),
     ...knowledge.suppressed.map(id => JSON.stringify(["suppressed", id]))
   ];
 }
@@ -305,13 +306,16 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
       index.output = value[1];
     } else if (
       value[0] === "record" &&
-      (value.length === 3 || (value.length === 4 && validHash(value[3]))) &&
+      (value.length === 3 || (value.length === 4 && validHash(value[3])) ||
+        (value.length === 6 && validHash(value[3]) && validHash(value[4]) && typeof value[5] === "boolean")) &&
       typeof value[1] === "string" &&
       validHash(value[2]) &&
       !index.records.has(value[1])
     ) {
       index.records.set(value[1], value[2]);
-      if (value.length === 4) index.events.set(value[1], value[3]);
+      if (value.length >= 4) index.events.set(value[1], {
+        fingerprint: value[3], ...(value.length === 6 ? { scope: value[4], unknownTime: value[5] } : {})
+      });
     } else if (value[0] === "suppressed" && value.length === 2 && typeof value[1] === "string") {
       index.suppressed.add(value[1]);
     } else throw new Error("invalid-ownership-index");
@@ -327,8 +331,8 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
   for (const id of index.records.keys()) {
     if (ids.has(id)) continue;
     suppressed.add(id);
-    const fingerprint = index.events.get(id);
-    if (fingerprint) suppressed.add(livingEventTombstone(id, fingerprint));
+    const event = index.events.get(id);
+    if (event) suppressed.add(livingEventTombstone(id, event.fingerprint, event.scope, event.unknownTime));
   }
   const records = current.records.map(record => {
     if (suppressed.has(record.id)) {

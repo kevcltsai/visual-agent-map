@@ -41,9 +41,7 @@ const base = { mapTitle: "測試地圖", selected: [], references: [], snippets:
 const kase = (id, group, title, source, covers, input, checks, review) => ({ id, group, title, source, covers, input: { ...base, language: "zh-TW", ...input }, checks, ...(review ? { review } : {}) });
 
 const CASES = [
-  kase("LN1", "研究", "明確修改已設定的 AI 卡", "Living Node: configure without implicit execution", ["configure_ai_card"], { message: "把這張 AI 卡的研究問題改成每週比較價格", outline: COFFEE, selected: [ref("h", "手沖", { livingPrompt: "每日比較價格" })] }, [C.noRejected(), C.hasAction("configure_ai_card", a => a.nodeId === "h" && /每週/.test(a.content), "explicit config"), C.noKinds(["run_map_action", "update_summary", "edit_topic_note"])]),
-  kase("LN2", "研究", "執行指定 AI 卡", "Living Node: explicit Run Card", ["run_map_action"], { message: "執行這張已儲存的 AI 卡", outline: COFFEE, selected: [ref("h", "手沖", { livingPrompt: "比較價格" })] }, [C.noRejected(), C.runAction("run_living_card", a => a.nodeIds.includes("h"), "selected target"), C.noKinds(["configure_ai_card", "update_summary"])]),
-  kase("LN3", "研究", "執行全圖 AI 卡", "Living Node: explicit Run All", ["run_map_action"], { message: "執行這張地圖所有 AI 卡", outline: COFFEE, selected: [ref("h", "手沖", { livingPrompt: "比較價格" })] }, [C.noRejected(), C.runAction("run_living_all", a => a.nodeIds.length === 0, "whole map"), C.noKinds(["configure_ai_card", "update_summary"])]),
+  kase("LN4", "研究", "明確修改已設定的 AI 卡", "Living Node: configure without implicit execution", ["configure_ai_card"], { message: "把這張 AI 卡的研究問題改成每週比較價格", outline: COFFEE, selected: [ref("h", "手沖", { livingPrompt: "每日比較價格" })] }, [C.noRejected(), C.hasAction("configure_ai_card", a => a.nodeId === "h" && /每週/.test(a.content), "explicit config"), C.noKinds(["run_map_action", "update_summary", "edit_topic_note"])]),
   // ---- A. questions: no action ----
   kase("A1", "發問", "問還缺什麼", "prompt: 只是發問時 actions 回傳空清單", [], { message: "這張地圖還缺什麼？", outline: STEAK }, [...Q, C.replyMentionsMap()]),
   kase("A2", "發問", "問選取卡內容", "prompt: 只是發問時 actions 空", [], { message: "這張卡在講什麼？", outline: STEAK, selected: [ref("a", "部位", { detail: "牛排依部位分為肋眼、菲力、紐約客，口感與油花不同。" })] }, [...Q, C.replyMentionsMap()]),

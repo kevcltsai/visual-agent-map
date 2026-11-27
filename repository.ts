@@ -54,6 +54,7 @@ import {
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import {
   hasLivingCommitMetadata,
+  livingRewriteIsReformatOnly,
   livingNoteWithoutManaged,
   isLivingNodeNote,
   keepsLivingBodyAndMetadata,
@@ -2338,9 +2339,10 @@ export class Repository {
       // so an edit made after this read is not replaced by stale text.
       const cached = await this.app.vault.cachedRead(file),
         derived = this.derivedNoteContent(file, cached, ownership, topics);
-      if (derived === null || derived === cached) continue;
+      if (derived === null || derived === cached || livingRewriteIsReformatOnly(cached, derived, frontmatter)) continue;
       await this.app.vault.process(file, content => {
         const next = this.derivedNoteContent(file, content, ownership, topics) ?? content;
+        if (livingRewriteIsReformatOnly(content, next, frontmatter)) return content;
         if (next !== content && typeof scope === "object") scope.onWrite?.(file.path, content, next);
         return next;
       });

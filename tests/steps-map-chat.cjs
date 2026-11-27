@@ -2192,6 +2192,20 @@ test('Living Node chat: raw edits and creates cannot introduce execution metadat
   assert.equal(edit('x.md', '# ordinary', '# updated').ok, true);
 });
 
+test('Living Node chat: the older structural guard codes keep precedence over living_node_protected', () => {
+  const card = 'ai-card: true\n';
+  // create: a map marker or a topic identity key is reserved_frontmatter, even when the text is also a Living Node card.
+  assert.equal(code(create('x.md', `---\nvisual-agent-map: true\n${card}---\n# x`)), 'reserved_frontmatter');
+  assert.equal(code(create('x.md', `---\ntopic-id: m\n${card}---\n# x`)), 'reserved_frontmatter');
+  // edit: each structural refusal wins over the protected-card refusal.
+  const map = MAP_TEXT.replace(/^/, `---\n${card}---\n`);
+  assert.equal(code(edit('x.md', map, `${map}\n`)), 'map_file');
+  assert.equal(code(edit('x.md', `---\nnode-id: a\nnode-id: b\n${card}---\n`, `---\nnode-id: a\nnode-id: b\n${card}---\nx`)), 'duplicate_identity_key');
+  assert.equal(code(edit('x.md', '# a', `---\nnode-id: a\n${card}---\n# a`)), 'reserved_frontmatter');
+  assert.equal(code(edit('x.md', `---\nnode-id: a\n---\n`, `---\nnode-id: b\n${card}---\n`)), 'topic_identity_changed');
+  assert.equal(code(edit('x.md', '---\nhypothesis-leaning: supported\n---\n', `---\nhypothesis-leaning: refuted\n${card}---\n`)), 'hypothesis_frontmatter_changed');
+});
+
 test('Living Node chat: the saved prompt baseline is only granted to a fully shown card', () => {
   const selected = topic('a', { livingPrompt: 'Research X', livingConfigRevision: 'v1' });
   const shown = context({ selected: [selected] });

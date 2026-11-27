@@ -14062,36 +14062,24 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map?.nodes.some(item => item.path === path);
   }
   /**
-   * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
+   * Brings an outline topic into view: selects its card and centers it. Never writes collapse or the map file.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
+   * A card inside a collapsed branch is not drawn: the camera goes to its nearest visible ancestor instead.
+   * P1.6b's view-only temporary expand replaces this fallback.
    */
   async revealPath(path: string): Promise<boolean> {
     const node = this.map?.nodes.find(item => item.path === path);
     if (!this.map || !node) return false;
-    const collapsed: string[] = [];
+    let visible: MapNode = node;
     for (let parent = node.parentId; parent;) {
       const ancestor = this.map.nodes.find(item => item.id === parent);
       if (!ancestor) break;
-      if (ancestor.collapsed) collapsed.push(ancestor.id);
+      if (ancestor.collapsed) visible = ancestor;
       parent = ancestor.parentId;
     }
-    if (collapsed.length) {
-      await this.plugin.mutate(() =>
-        this.mapChange(map => {
-          for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
-        })
-      );
-    }
-    const current = this.map?.nodes.find(item => item.id === node.id);
-    if (!current) return false;
-    if (!this.selection.state.multiSelectMode) {
-      // Opening collapsed ancestors already rendered; a plain reveal only moves the selection.
-      if (collapsed.length) {
-        this.selection.click(current.id);
-        this.render();
-      } else this.applySelectionChange(this.selection.click(current.id));
-    } else this.render();
-    this.focusNode(current);
+    if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
+    // Centering is the camera only: it is not saved, so an outline click never writes the map file.
+    this.focusNode(visible, false);
     return true;
   }
   private selectMapNode(node: MapNode): void {

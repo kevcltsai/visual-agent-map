@@ -173,13 +173,30 @@ test('A39 live: a deleted price re-proposed with another subject and reworded cl
   // A different value, period or scope is a different fact.
   assert.equal(apply(b, { ...op, claim: 'Team plan costs $15 per user' }).records.length, 1);
   assert.equal(apply(b, { ...op, eventTime: '2026-11-02' }).records.length, 1);
-  assert.equal(apply(b, { ...op, scope: 'Orion support' }).records.length, 1);
+  assert.equal(apply(b, { ...op, scope: 'Orion support', claim: 'Team plan costs 12 seats' }).records.length, 1);
   // Legacy v2 entries without a value hash keep their old matching only (legacy bytes unchanged).
   const parts = JSON.parse(entry.slice(4));
   const legacy = '@v2:' + JSON.stringify(parts.slice(0, 5));
   assert.equal(parseLivingSuppressionV2(legacy).valueKey, undefined);
   assert.equal(livingSuppressionV2Entry(parseLivingSuppressionV2(legacy)), legacy);
   assert.equal(apply(base({ records: [], suppressed: ['r1', legacy] }), op).records.length, 1);
+});
+
+test('A39 live payloads: a deleted fact re-proposed with another subject AND scope stays suppressed; other value or unrelated fact does not', () => {
+  const deleted = record({ id: 'orion-team-plan-price', subject: 'Orion Team plan', scope: 'pricing', granularity: 'day', eventTime: '2026-10-15', claim: 'The Orion Team plan costs $12 per user per month.' });
+  const entry = livingSuppressionV2Entry(livingSuppressionV2(deleted));
+  assert.equal(JSON.parse(entry.slice(4)).length, 7);
+  const b = base({ records: [], suppressed: ['orion-team-plan-price', entry] });
+  const op = { kind: 'append', id: 'fact-1', subject: 'Orion', scope: 'product facts', granularity: 'day', eventTime: '2026-10-15', claim: 'The Orion Team plan costs $12 per user per month.', evidence: ['e2'] };
+  assert.throws(() => apply(b, op), /suppressed-record/);
+  assert.equal(livingAppendSuppressed(b, op), true);
+  assert.equal(apply(b, { ...op, claim: 'The Orion Team plan costs $14 per user per month.' }).records.length, 1);
+  assert.equal(apply(b, { ...op, subject: 'Zeta', scope: 'headcount', claim: '12 employees joined' }).records.length, 1);
+  assert.equal(apply(b, { ...op, eventTime: '2026-10-16' }).records.length, 1);
+  // Older 6-field entries keep the old rule only (not recomputed).
+  const old = '@v2:' + JSON.stringify(JSON.parse(entry.slice(4)).slice(0, 6));
+  assert.equal(apply(base({ records: [], suppressed: ['x', old] }), op).records.length, 1);
+  assert.throws(() => apply(base({ records: [], suppressed: ['x', old] }), { ...op, subject: 'Orion Team plan', scope: 'pricing' }), /suppressed-record/);
 });
 
 test('A08: re-querying an already recorded change observation under a new ID is a no-op, not a fifth record', () => {

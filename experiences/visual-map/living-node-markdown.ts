@@ -18,6 +18,8 @@ import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingComm
 
 import {
   hasLivingCommitMetadata,
+  livingFenceAfterCommit,
+  readLivingFence,
   LIVING_NODE_BEGIN as BEGIN,
   LIVING_NODE_END as END
 } from "../../core/living-node-region";
@@ -401,6 +403,7 @@ function readLivingData(content: string) {
   // is not a fresh/legacy card. Lost ownership cannot be reconstructed from
   // diagnostics, so refuse automatic integration rather than resurrecting data.
   if (!region && !index && hasLivingCommitMetadata(fm)) throw new Error("unknown-ownership");
+  readLivingFence(fm);
   const current = region ? decodeRegion(region, livingSnapshotRevision(region.text)) : emptyKnowledge();
   if (!index) return { region, knowledge: current };
   if (!region) {
@@ -414,6 +417,33 @@ function readLivingData(content: string) {
 export function readLivingMarkdown(content: string): LivingKnowledge {
   return readLivingData(content).knowledge;
 }
+
+/**
+ * Why a Living Node note cannot be read. "rebuildable": the managed region still decodes exactly, only its hash, ownership
+ * index or replay metadata is missing or inconsistent. "unrecoverable": the region is missing, torn or not in this
+ * version's format. Null when the note reads normally. Reading never writes either way.
+ */
+export function livingDamageKind(content: string): "rebuildable" | "unrecoverable" | null {
+  try {
+    readLivingData(content);
+    return null;
+  } catch {
+    const start = content.indexOf(BEGIN);
+    const end = content.indexOf(END);
+    if (start < 0 || end < start || content.indexOf(BEGIN, start + 1) >= 0 || content.indexOf(END, end + 1) >= 0)
+      return "unrecoverable";
+    try {
+      const text = content.slice(start, end + END.length);
+      decodeRegion({ start, end: end + END.length, text }, livingSnapshotRevision(text));
+      return "rebuildable";
+    } catch {
+      return "unrecoverable";
+    }
+  }
+}
+
+/** Replay-fence generation stored in the note (0 for a note written before the fence existed). */
+export const livingGeneration = (content: string): number => readLivingFence(frontmatter(content)).generation;
 
 export interface LivingMarkdownPort {
   /** The existing Repository.updateNoteRawGuarded port; its transform runs inside vault.process. */
@@ -429,6 +459,8 @@ export interface LivingMarkdownCommit {
   expectedContent: string;
   candidate: LivingCandidateIdentity;
   base: LivingKnowledge;
+  /** Replay-fence generation of the note the base was read from (livingGeneration of that content). */
+  baseGeneration: number;
   proposal: unknown;
   context: LivingChangeContext;
   signal: AbortSignal;
@@ -462,10 +494,13 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   if (signal.aborted || !request.isCurrent()) return "discarded";
   if (candidate.baseRevision !== livingSnapshotRevision(expectedContent)) throw new Error("stale-base");
   const fm = validateNoteIdentity(expectedContent, candidate);
-  if (fm[COMMIT_KEY] === candidate.executionId) return "discarded";
+  const fence = readLivingFence(fm);
+  if (fence.receipts.includes(candidate.executionId)) return "discarded";
   const { region, knowledge: stored } = readLivingData(expectedContent);
   const matches = request.base.revision === stored.revision && renderRegion(request.base) === renderRegion(stored);
   if (!matches) throw new Error("base-mismatch");
+  // The same knowledge under another generation means a commit, undo or redo happened since the base was read.
+  if (request.baseGeneration !== fence.generation) throw new Error("stale-generation");
   const next = applyLivingChanges(stored, request.proposal, context);
   if (stored.revision === "empty" && !next.records.length && !next.output.text)
     throw new Error("missing-formal-result");
@@ -479,7 +514,9 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
     request.path,
     content => {
       const live = validateNoteIdentity(content, candidate);
-      if (live[COMMIT_KEY] === candidate.executionId) return content;
+      const liveFence = readLivingFence(live);
+      if (liveFence.receipts.includes(candidate.executionId) || liveFence.generation !== fence.generation)
+        return content;
       const replaced = changed
         ? region
           ? content.slice(0, region.start) + managed + content.slice(region.end)
@@ -489,6 +526,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         [HASH_KEY]: livingSnapshotRevision(managed),
         [OWNERSHIP_KEY]: ownership(nextKnowledge),
         [COMMIT_KEY]: candidate.executionId,
+        ...livingFenceAfterCommit(liveFence, candidate.executionId),
         "living-node-last-attempt": context.at,
         "living-node-last-successful-check": context.at,
         "living-node-outcome": "ok",

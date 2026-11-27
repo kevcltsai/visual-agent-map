@@ -99,7 +99,7 @@ async function liveNote(claimText) {
   const claim = claimText ?? 'See https://s3.example.com/f?X-Goog-Signature=GSECRET and /srv/vaults/Main Vault/Private/a.md and ![[Private/Diary]]';
   const base = { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
   const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: living.livingSnapshotRevision(initial), inputRevision: 'i1', viewSession: 'v1' };
-  await commitLivingMarkdown(f.repo, { path: 'card.md', expectedContent: initial, base, proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: claim, evidence: [] }] },
+  await commitLivingMarkdown(f.repo, { path: 'card.md', expectedContent: initial, base, baseGeneration: 0, proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: claim, evidence: [] }] },
     context: { at: '2026-11-27T04:00:00+08:00', evidence: [] }, signal: new AbortController().signal, isCurrent: () => true, candidate,
     inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
   return { note: await f.repo.readNote('card.md'), f };

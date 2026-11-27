@@ -9,7 +9,7 @@ export function frontmatter(content: string): Record<string, unknown> {
 }
 
 /** A frontmatter value the relevance writers set: a string, a list of strings, true, or null to remove the key. */
-type FrontmatterValue = string | string[] | boolean | null;
+type FrontmatterValue = string | string[] | boolean | number | null;
 /**
  * Sets or removes top-level frontmatter keys and leaves every other line, and the body, exactly as it was. A key that
  * is already there keeps its place; new keys go at the end. Strings are written as JSON strings, which are valid YAML
@@ -17,8 +17,8 @@ type FrontmatterValue = string | string[] | boolean | null;
  */
 export function setFrontmatterKeys(content: string, values: Record<string, FrontmatterValue>): string {
   const eol = content.includes("\r\n") ? "\r\n" : "\n";
-  const render = (key: string, value: string | string[] | boolean): string[] =>
-    typeof value === "boolean"
+  const render = (key: string, value: string | string[] | boolean | number): string[] =>
+    typeof value === "boolean" || typeof value === "number"
       ? [`${key}: ${value}`]
       : Array.isArray(value)
         ? value.length

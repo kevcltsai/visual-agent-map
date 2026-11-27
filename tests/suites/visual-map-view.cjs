@@ -5069,9 +5069,9 @@ test('map sources: the removed task-dialog picker, its styles and its dead keys 
   assert.match(zh, /"ui\.map_sources_title": "這張心智圖的資料來源"/); assert.match(zh, /"ui\.map_sources_unreadable_description_0": "\{0\} 份讀不到"/);
   assert.equal(/"ui\.map_sources_[^"]*": "[^"]*地圖/.test(zh), false);
 });
-integrationTest('Living Node A29: a committed run is one undo step; undo and redo restore exact bytes and refuse after a later external edit', async () => {
+integrationTest('Living Node A29: a committed run is one undo step; undo and redo restore the knowledge under a new generation and refuse after a later external edit', async () => {
   const { fixture } = require('../support.cjs');
-  const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian });
+  const { commitLivingMarkdown, livingGeneration, livingSnapshotRevision, readLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian });
   const f = fixture('en');
   const path = 'card.md';
   const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Card\n\n## Detail\n\nManual notes.\n';
@@ -5082,7 +5082,7 @@ integrationTest('Living Node A29: a committed run is one undo step; undo and red
   const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(initial), inputRevision: 'i', viewSession: 'v' };
   const ctx = { at: 't1', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
   const commit = (before, base, id, text) => commitLivingMarkdown(f.repo, {
-    path, expectedContent: before, candidate: { ...candidate, executionId: id, baseRevision: livingSnapshotRevision(before) }, base,
+    path, expectedContent: before, candidate: { ...candidate, executionId: id, baseRevision: livingSnapshotRevision(before) }, base, baseGeneration: livingGeneration(before),
     proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] }, context: ctx, signal: new AbortController().signal,
     isCurrent: () => true, inspect: async () => ({ ...candidate, executionId: id, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }),
     onCommit: (p, before, after) => view.recordLivingCommit(p, before, after)
@@ -5091,12 +5091,16 @@ integrationTest('Living Node A29: a committed run is one undo step; undo and red
   const first = f.contents.get(path);
   assert.equal(pushed.length, 1);
   await pushed[0].undo();
-  assert.equal(f.contents.get(path), initial, 'undo restores the exact original bytes: knowledge and metadata together');
+  const withoutFence = content => content.replace(/living-node-generation: \d+\n/, '').replace(/living-node-receipts:\n(  - ".*"\n)+/, '');
+  assert.equal(withoutFence(f.contents.get(path)), initial, 'undo restores the original knowledge and metadata; only the replay fence moves on');
+  assert.equal(livingGeneration(f.contents.get(path)), 2, 'undo is a new generation, not the old one');
+  assert.ok(f.contents.get(path).includes('"e1"'), 'undo keeps the receipt of the run it undid');
   assert.equal(readLivingMarkdown(f.contents.get(path)).revision, 'empty');
   await pushed[0].redo();
-  assert.equal(f.contents.get(path), first, 'redo restores the exact committed bytes');
+  assert.equal(withoutFence(f.contents.get(path)), withoutFence(first), 'redo restores the committed knowledge and metadata');
+  assert.equal(livingGeneration(f.contents.get(path)), 3, 'redo is yet another generation');
   // A later external edit must not be overwritten by undo.
-  const edited = first + '\nOwner typed after the run.\n';
+  const edited = f.contents.get(path) + '\nOwner typed after the run.\n';
   await f.app.vault.process(f.files.get(path), () => edited);
   await assert.rejects(() => pushed[0].undo());
   assert.equal(f.contents.get(path), edited);

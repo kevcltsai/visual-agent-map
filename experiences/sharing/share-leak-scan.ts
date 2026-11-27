@@ -51,6 +51,8 @@ export const INTERNAL_FIELD_NAMES = [
   "living-node-region-hash",
   "living-node-ownership",
   "living-node-last-execution",
+  "living-node-generation",
+  "living-node-receipts",
   "living-node-input-revision",
   "living-node-success-knowledge",
   "living-node-last-attempt",

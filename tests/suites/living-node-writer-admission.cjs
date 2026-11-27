@@ -101,6 +101,20 @@ for (const [name, tail] of Object.entries(corrupt)) for (const flag of [true, fa
   });
 }
 
+for (const [name, tail] of Object.entries(corrupt)) {
+  S.integrationTest(`writer admission: ${name}: a raw write that disguises a Living Node metadata change is refused, bytes unchanged`, async () => {
+    const listHead = head().replace('living-node-outcome: "ok"\n', 'living-node-outcome: "ok"\nliving-node-sources:\n  - "one"\n  - "two"\n');
+    const f = await setup(listHead + tail);
+    const before = f.contents.get(path);
+    // Swapping the continuation lines keeps the sorted line set but changes the list value.
+    await assert.rejects(() => f.repo.updateNoteRawGuarded(path, c => c.replace('  - "one"\n  - "two"', '  - "two"\n  - "one"')), message);
+    assert.equal(f.contents.get(path), before);
+    // An escaped duplicate key hides from a raw-text key match but still parses as a Living Node key.
+    await assert.rejects(() => f.repo.updateNoteRawGuarded(path, c => c.replace('custom-key: keep', 'custom-key: keep\n"living\\x2dnode-outcome": "failed"')), message);
+    assert.equal(f.contents.get(path), before);
+  });
+}
+
 S.integrationTest('writer admission: the damaged-markers message exists in every language and never claims a repair', () => {
   for (const id of S.languageIds()) {
     const m = S.i18nSource(id).match(/"error\.living_node_markers_damaged":\s*"([^"]+)"/)?.[1];

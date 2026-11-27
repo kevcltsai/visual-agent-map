@@ -15304,26 +15304,38 @@ export class VisualAgentMapView extends ItemView {
     const mapCurrent = this.captureMapSession();
     const current = (): boolean => mapCurrent() && editorCurrent();
     let saved: LivingConfigSave | undefined;
+    // A refusal is reported once, below, in plain words: it is kept out of mutate(), whose own notice would show the raw code first.
+    let refused: Error | undefined;
     try {
       await this.plugin.mutate(async () => {
-        if (!current()) return;
-        if (!node) {
-          const name = values.title || aiCardTitle(values.question);
-          const found = parent ? this.mapNodeById(parent.id) : null;
-          if (parent && !found) throw new Error("changed-target-identity");
-          await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
-            prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
-            current,
-            onSaved: result => {
-              saved = result;
-            }
-          });
-          return;
+        try {
+          if (!current()) return;
+          if (!node) {
+            const name = values.title || aiCardTitle(values.question);
+            const found = parent ? this.mapNodeById(parent.id) : null;
+            if (parent && !found) throw new Error("changed-target-identity");
+            await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
+              prompt: joinPrompt(
+                values.question,
+                values.sources,
+                t("ui.ai_sources_label"),
+                t("ui.ai_sources_separator")
+              ),
+              current,
+              onSaved: result => {
+                saved = result;
+              }
+            });
+            return;
+          }
+          const target = this.mapNodeById(node.id);
+          if (!target || !current()) return;
+          saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
+        } catch (error) {
+          refused = error instanceof Error ? error : new Error(String(error));
         }
-        const target = this.mapNodeById(node.id);
-        if (!target || !current()) return;
-        saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
       });
+      if (refused) throw refused;
       if (saved && !node && current()) this.closeAiCardPopover();
       return saved;
     } catch (error) {

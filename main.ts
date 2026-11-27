@@ -1263,7 +1263,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       isManagedNote: notePath => this.repo.isArgumentManagedNote(notePath),
-      saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
+      saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name),
+      processNote: (file, edit) => this.repo.app.vault.process(file, edit)
     }));
     this.addChild(markdownSelectionAi);
     // Tag reading-view blocks with their source lines so an action on a rendered image finds its embed.

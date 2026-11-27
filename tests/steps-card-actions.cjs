@@ -49,6 +49,7 @@ function ctxFor(target, state, extra = {}) {
     multiSelect: state === 'multiSelect' || Array.isArray(target),
     bookLock: { ai: state === 'bookAi', structure: state === 'bookStructure' },
     hasViewport: true,
+    managedMap: true,
     note: id => notes[id],
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
@@ -88,6 +89,10 @@ const TABLE = [
   ['add-child', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'], // if (!bookLock.structure)
   ['open-note', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'],
   ['add-summary-field', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'], // the addSummary argument
+  // Edge "+ Topic card" (paintCardEdgeEntries, V3.3 A6): drawn while cardTextEditable (not loading, presenting or picking) and
+  // !bookLock.structure; the click goes through whenEditing. It reads neither merging nor the AI locks.
+  ['edge-add-topic', 'edge', 'a', 'ok ro ok ok pr ms ok bk'],
+  ['edge-add-topic', 'edge', 'ai', 'ok ro ok ok pr ms ok bk'],
   // ⋯ (openCardMoreMenu): returns while presenting; opened from the toolbar (no selection mode); whenEditing; canEditSummary.
   ['card-settings', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   ['run-card', 'more', 'ai', 'ok ro ok al pr ms bk ok'], // isAiCard && !aiLocked && !bookLock.ai
@@ -315,4 +320,33 @@ test('card actions: the view builds the context next to mapCommand, and no entry
   assert.ok(at > view.indexOf('  mapCommand(action: MapCommandAction'), 'cardActionContext follows mapCommand');
   assert.ok(at < view.indexOf('  openKeyboardShortcuts(): void'));
   assert.equal((view.match(/actionsFor\(|CARD_ACTIONS/g) ?? []).length, 0, 'entries migrate in B05–B10');
+});
+
+test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  // Drawn on a card with a note (ordinary or AI) on a managed map; it is the edge's only entry.
+  eq(ids('edge', ctxFor('a', 'normal')), ['edge-add-topic']);
+  eq(ids('edge', ctxFor('ai', 'normal')), ['edge-add-topic']);
+  eq(ids('edge', ctxFor('a', 'normal', { note: () => undefined })), []);
+  eq(ids('edge', ctxFor('a', 'normal', { managedMap: false })), []);
+  // Never on a selection or the map, and no other surface offers it.
+  eq(ids('edge', ctxFor(['a', 'd'], 'normal')), []);
+  eq(ids('edge', ctxFor(null, 'normal')), []);
+  for (const surface of ['toolbar', 'more', 'context', 'command', 'key']) assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('edge-add-topic'), surface);
+  assert.ok(!ruleMoreSet('card').includes('edge-add-topic') && !ruleContextSet('card').includes('edge-add-topic'));
+  // Names as the entry draws them, in all three languages.
+  const edge = action('edge-add-topic');
+  assert.equal(titleKeyFor(edge, 'edge', ctxFor('a', 'normal')), 'ui.card_edge_add');
+  assert.equal(edge.ariaLabelKey, 'ui.card_edge_add_label');
+  for (const dictionary of [en, zhTW, zhCN]) for (const key of [edge.titleKey, edge.ariaLabelKey]) assert.ok(dictionary[key]?.trim(), key);
+  assert.equal(zhTW['ui.card_edge_add'], '＋ 議題卡片');
+  // One click runs addTopicFromEdge (its pending flag keeps a second click from adding another topic).
+  const { calls, host } = recorder();
+  edge.run({ ...ctxFor('a', 'normal'), host, surface: 'edge' });
+  eq(calls.map(([name, node]) => [name, node.id]), [['addTopicFromEdge', 'a']]);
+  // The source gates the registry mirrors: cardTextEditable, the structure lock, a managed map, a card with a note.
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /private paintCardEdgeEntries[\s\S]{0,200}!this\.cardTextEditable\(\) \|\|\s*this\.bookLock\(\)\.structure \|\|\s*!this\.plugin\.settings \|\|\s*!isManagedMapPath\(this\.plugin\.settings, this\.path\)/);
+  assert.match(view, /if \(note\) this\.paintCardEdgeEntries\(card, node\);/);
+  assert.match(view, /private addTopicFromEdge\(node: MapNode\): void \{\s*if \(this\.edgeAddPending \|\| this\.inlineName\?\.created\) return;\s*this\.whenEditing\(/);
 });

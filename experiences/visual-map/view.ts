@@ -11876,6 +11876,7 @@ export class VisualAgentMapView extends ItemView {
     this.cardActionHost ??= {
       addTopic: () => this.enqueue(() => this.addNode(null)),
       addChild: card => this.enqueue(() => this.addNode(card)),
+      addTopicFromEdge: card => this.addTopicFromEdge(card),
       addSibling: card =>
         this.enqueue(() => this.addNode(this.map?.nodes.find(item => item.id === card.parentId) ?? null)),
       research: (card, opener) => this.openTopicChat(card, opener),
@@ -11921,6 +11922,7 @@ export class VisualAgentMapView extends ItemView {
       multiSelect: this.selection.state.multiSelectMode,
       bookLock: this.bookLock(),
       hasViewport: !!this.viewportEl,
+      managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
       isArgumentCard: id => this.isArgumentCard(id),

@@ -13,6 +13,7 @@ import { isAiCard, type PromptNoteRef } from "./prompt-run";
 export type CardActionId =
   | "add-topic"
   | "add-child"
+  | "edge-add-topic"
   | "add-sibling"
   | "research"
   | "toggle-collapse"
@@ -45,8 +46,11 @@ export type CardActionId =
   | "remove-selected"
   | "selection-help"
   | "finish-selection";
-/** Where an action is offered: the card toolbar or the selection bar, their ⋯ lists, the right-click menu, the command palette, a key. */
-export type CardSurface = "toolbar" | "more" | "context" | "command" | "key";
+/**
+ * Where an action is offered: the card toolbar or the selection bar, their ⋯ lists, the right-click menu, the command palette, a
+ * key, or the selected card's edge entries (V3.3 A6, card-edge-entry.ts).
+ */
+export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge";
 /** What an action acts on: an ordinary card, an AI card, a topic selection, or the map itself. */
 export type CardScope = "card" | "ai-card" | "multi" | "map";
 export type CardAvailability = { ok: true } | { ok: false; reasonKey: TranslationKey };
@@ -65,6 +69,8 @@ export const CARD_ACTION_REASONS = {
 export interface CardActionHost {
   addTopic(): void;
   addChild(node: MapNode): void;
+  /** The edge entry's add: one topic per click (addTopicFromEdge's pending flag). */
+  addTopicFromEdge(node: MapNode): void;
   addSibling(node: MapNode): void;
   research(node: MapNode, opener?: HTMLElement): void;
   rename(node: MapNode): void;
@@ -114,6 +120,8 @@ export interface CardActionContext {
   multiSelect: boolean;
   bookLock: { ai: boolean; structure: boolean };
   hasViewport: boolean;
+  /** The map is a managed map (isManagedMapPath): the edge entries are drawn only there. */
+  managedMap: boolean;
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
   isArgumentCard(id: string): boolean;
@@ -139,6 +147,8 @@ export interface CardAction {
   titleKey: TranslationKey;
   /** The entries that name the action their own way today (the palette's command names among them). */
   titles?: Partial<Record<CardSurface, TranslationKey>>;
+  /** An aria-label that says more than the visible name (the edge entry's). */
+  ariaLabelKey?: TranslationKey;
   /** A name that follows the card (Expand / Collapse, Edit / Make it an AI card, …). */
   titleFor?(ctx: CardActionContext): TranslationKey;
   icon: string;
@@ -221,6 +231,20 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 1,
     available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : [...CARD, "bookStructure"]),
     run: ctx => ctx.host.addChild(card(ctx))
+  },
+  {
+    id: "edge-add-topic",
+    titleKey: "ui.card_edge_add",
+    ariaLabelKey: "ui.card_edge_add_label",
+    icon: "plus",
+    scope: ["card", "ai-card"],
+    surfaces: ["edge"],
+    order: 25,
+    group: 1,
+    // paintCardEdgeEntries: a card with a note on a managed map; drawn while cardTextEditable and no structure lock, clicked through whenEditing.
+    applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.managedMap,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: ctx => ctx.host.addTopicFromEdge(card(ctx))
   },
   {
     id: "add-sibling",

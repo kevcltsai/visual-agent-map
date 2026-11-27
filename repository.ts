@@ -110,6 +110,7 @@ import { readOnce, type NoteReadContext } from "./core/note-read-context";
 import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
+import { keepFrontmatterFormatting, linksToRenamed } from "./core/rename-link-guard";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
@@ -967,6 +968,7 @@ export class Repository {
   ): Promise<"written" | "discarded"> {
     const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
+    await this.applyDeferredRewrite(path);
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))) {
         outcome = "discarded";
@@ -996,6 +998,7 @@ export class Repository {
   ): Promise<"written" | "discarded"> {
     const { expectedContent, authorize, rejectAiCard } = options;
     let outcome: "written" | "discarded" = "written";
+    await this.applyDeferredRewrite(path);
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
         outcome = "discarded";
@@ -1184,7 +1187,7 @@ export class Repository {
       withReferenceLinks(body, fm, language),
       writtenHeadingSet(content, this.headingsFor(textLanguage))
     );
-    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}${trailing ? `${trailing}\n` : "\n"}` : ""}`;
+    return `---\n${keepFrontmatterFormatting(content, stringifyYaml(fm))}---\n${rendered}${separated.region ? `\n${separated.region}${trailing ? `${trailing}\n` : "\n"}` : ""}`;
   }
 
   async createNote(
@@ -2168,6 +2171,8 @@ export class Repository {
     );
   }
 
+  private readonly deferredRewrites = new Map<string, RenamePair[]>();
+
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
     await this.replaceSourcePaths([[oldPath, newPath]]);
   }
@@ -2178,54 +2183,45 @@ export class Repository {
    */
   async replaceSourcePaths(pairs: readonly RenamePair[]): Promise<void> {
     if (!pairs.some(([from, to]) => from !== to)) return;
-    const rebase = chainRebase(pairs);
+    // A note whose rewrite is waiting follows the note when that is renamed.
+    for (const [from, to] of pairs) {
+      const waiting = this.deferredRewrites.get(from);
+      if (waiting && from !== to) {
+        this.deferredRewrites.delete(from);
+        this.deferredRewrites.set(to, [...(this.deferredRewrites.get(to) ?? []), ...waiting]);
+      }
+    }
     const failures: unknown[] = [];
     for (const file of await this.markedFiles("agent-map-node")) {
       try {
+        const waiting = this.deferredRewrites.get(file.path);
+        const all: RenamePair[] = waiting ? [...waiting, ...pairs] : [...pairs];
         // Keep the indexed candidate filter. The actual rewrite uses the current file, not the earlier note snapshot.
         const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (
           cached &&
+          !waiting &&
           ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)) &&
-          !rebaseLivingNoteReferences(cached["living-node-refs"], rebase)
+          !rebaseLivingNoteReferences(cached["living-node-refs"], chainRebase(pairs))
         )
           continue;
         const raw = await this.app.vault.read(file);
         const metadata = frontmatter(raw);
         if (!marker(metadata["agent-map-node"])) continue;
         const note = await this.parseNote(file.path, raw);
-        const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
-        const sourcePaths = rebasePathList(note.sourcePaths, pairs);
+        const rebase = chainRebase(all);
+        const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, all);
+        const sourcePaths = rebasePathList(note.sourcePaths, all);
         // The Living Node reference list is separate from the legacy citation lists.
         const livingRefs = rebaseLivingNoteReferences(metadata["living-node-refs"], rebase);
         if (!referencePaths && !sourcePaths && !livingRefs) continue;
-        await this.app.vault.process(file, content => {
-          const fm = frontmatter(content);
-          if (!marker(fm["agent-map-node"])) return content;
-          const paths = (key: string): string[] => {
-            const list = fm[key];
-            return Array.isArray(list)
-              ? list.filter((value): value is string => typeof value === "string" && Boolean(value))
-              : [];
-          };
-          const references = rebasePathList(paths("reference-materials"), pairs);
-          const sources = rebasePathList(paths("source-notes"), pairs);
-          const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
-          if (!references && !sources && !living) return content;
-          const next =
-            references || sources
-              ? this.patchedNote(
-                  file.path,
-                  content,
-                  {
-                    ...(references ? { referencePaths: references } : {}),
-                    ...(sources ? { sourcePaths: sources } : {})
-                  },
-                  {}
-                )
-              : content;
-          return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
-        });
+        // Obsidian may still apply its own link update to this note with positions taken before the rename; a write
+        // now would move the text under those positions. Wait until Obsidian wrote the note (or VAM next writes it).
+        if (waiting || (this.obsidianMayUpdateLinks() && linksToRenamed(raw, pairs))) {
+          this.deferredRewrites.set(file.path, all);
+          continue;
+        }
+        await this.rewriteNotePaths(file, all);
       } catch (error) {
         // One unreadable or unwritable note must not prevent later candidates from following the rename.
         failures.push(error);
@@ -2237,6 +2233,67 @@ export class Repository {
         failures,
         failures.map(error => (error instanceof Error ? error.message : String(error))).join("; ")
       );
+  }
+
+  /** Whether Obsidian asks before updating links on a rename (setting "Automatically update internal links" off). */
+  private obsidianMayUpdateLinks(): boolean {
+    const vault = this.app.vault as unknown as { getConfig?: (key: string) => unknown };
+    return typeof vault.getConfig === "function" && vault.getConfig("alwaysUpdateLinks") !== true;
+  }
+
+  hasDeferredRewrite(path: string): boolean {
+    return this.deferredRewrites.has(path);
+  }
+
+  /**
+   * Applies the source-path rewrite that was held back for `path`, on the note's fresh content. Called when Obsidian
+   * modified the note (its link update is done) and before VAM's own next write of the note; with "Do not update"
+   * nothing modifies the note, so the next write is what applies it.
+   */
+  async applyDeferredRewrite(path: string): Promise<void> {
+    const pairs = this.deferredRewrites.get(path);
+    if (!pairs) return;
+    this.deferredRewrites.delete(path);
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    try {
+      await this.rewriteNotePaths(file, pairs);
+    } catch (error) {
+      this.deferredRewrites.set(path, [...pairs, ...(this.deferredRewrites.get(path) ?? [])]);
+      throw error;
+    }
+  }
+
+  /** Rewrites one managed note's path lists through `pairs`, inside one `vault.process` on the current content. */
+  private async rewriteNotePaths(file: TFile, pairs: readonly RenamePair[]): Promise<void> {
+    const rebase = chainRebase(pairs);
+    await this.app.vault.process(file, content => {
+      const fm = frontmatter(content);
+      if (!marker(fm["agent-map-node"])) return content;
+      const paths = (key: string): string[] => {
+        const list = fm[key];
+        return Array.isArray(list)
+          ? list.filter((value): value is string => typeof value === "string" && Boolean(value))
+          : [];
+      };
+      const references = rebasePathList(paths("reference-materials"), pairs);
+      const sources = rebasePathList(paths("source-notes"), pairs);
+      const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
+      if (!references && !sources && !living) return content;
+      const next =
+        references || sources
+          ? this.patchedNote(
+              file.path,
+              content,
+              {
+                ...(references ? { referencePaths: references } : {}),
+                ...(sources ? { sourcePaths: sources } : {})
+              },
+              {}
+            )
+          : content;
+      return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
+    });
   }
 
   /** Rebases one managed note's current citation lists and records the exact before/after bytes inside the write. */

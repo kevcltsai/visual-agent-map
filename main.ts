@@ -1755,6 +1755,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     // Renames are queued even while VAM is writing (handling is idempotent), so a user rename during a write is not lost.
     // A folder rename reports every file inside it: the first event queues a batch at once (where a single handler was
     // queued before), and every event that arrives before that batch starts joins it (perf ticket 10).
+    // Obsidian's own link update of a renamed file's referrers is done once it modified the note: VAM's held-back path
+    // rewrite of that note goes on top of the fresh content now (see Repository.replaceSourcePaths).
+    this.registerEvent(
+      this.app.vault.on("modify", file => {
+        if (file instanceof TFile && this.repo.hasDeferredRewrite(file.path))
+          this.runMutation(() => this.repo.applyDeferredRewrite(file.path));
+      })
+    );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         if (file instanceof TFile) this.collectUnsynced(oldPath, file.path);

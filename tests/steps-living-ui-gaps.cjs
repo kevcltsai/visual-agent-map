@@ -46,6 +46,38 @@ test('reader: a line that is not in the written format is left alone; without a 
   assert.equal(javascript.includes('](<'), false, 'only an allowed web address becomes a link');
 });
 
+test('reader: the Suppression section and its hold lines are hidden; the note file text is not changed', () => {
+  const hold = '- Suppression v2: "abc@v2:' + 'a'.repeat(64) + '"';
+  const note = [BEGIN, '### AI latest', '- Ownership: "ai"', '', '### Suppression', '- ID: "recD"', hold, '', END, '', 'after'].join('\n');
+  const shown = markdown.localizeLivingReader(note, labels);
+  for (const word of ['Suppression', '@v2', 'recD', 'Ownership']) assert.equal(shown.includes(word), false, word);
+  assert.ok(shown.includes('AI 最新成果') && shown.endsWith('\n\nafter'));
+  const preview = markdown.localizeLivingReader(['### AI latest', '', '### Suppression', '- ID: "recD"'].join('\n'), labels, true);
+  assert.equal(/Suppression|recD/.test(preview), false, 'a trial preview too');
+});
+
+test('reader view: a language change repaints the tab labels', async () => {
+  const sourceView = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => '' } }; } }, MarkdownRenderer: { render: async () => {} } } });
+  sourceView.setUiLanguage('en');
+  try {
+    const view = new sourceView.LivingReaderView({});
+    await view.show({ path: 'a.md' }, 'preview', 'owner');
+    const tabs = () => findAll(view.contentEl, i => i.tag === 'button' && i.attrs?.role === 'tab').map(i => i.text);
+    eq2(tabs(), ['Official', 'Trial']);
+    sourceView.setUiLanguage('zh-TW');
+    view.refreshLanguage();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    eq2(tabs(), ['正式內容', '試跑']);
+  } finally { sourceView.setUiLanguage('en'); }
+  // The plugin tells every open reader when the language changes.
+  const main = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main.ts'), 'utf8');
+  assert.match(main, /refreshLocalizedEntrypoints\(\): void \{[\s\S]*?getLeavesOfType\(LIVING_READER_VIEW\)[\s\S]*?refreshLanguage\(\)/);
+});
+const eq2 = (actual, expected) => assert.deepEqual(plain(actual), expected);
+
 test('reader: a trial preview has no markers and is localized whole', () => {
   const preview = '### AI latest\n' + sourceLine('https://example.com/x', '2026-02-03T00:00:00Z');
   const shown = markdown.localizeLivingReader(preview, labels, true);

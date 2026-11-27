@@ -354,6 +354,7 @@ export function localizeLivingReader(markdown: string, labels: LivingReaderLabel
   const [from, to] = whole ? [0, markdown.length] : [start, end];
   const region = relabel(markdown.slice(from, to), labels.aiLatest)
     .replace(/^- Ownership: ".*"\r?\n/gm, "")
+    .replace(/(^|\n)### Suppression\r?\n(?:- (?:ID|Suppression v2): ".*"(?:\r?\n|$))*/g, "$1")
     .replace(/^- Source: (\[.*\])$/gm, (line, raw: string) => "- " + (readableSource(raw, labels) ?? line.slice(2)))
     .replace(/^- Generated: (".*")$/gm, (line, raw: string) => {
       try {

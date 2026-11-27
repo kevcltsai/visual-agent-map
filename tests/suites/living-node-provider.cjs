@@ -457,6 +457,37 @@ S.integrationTest('privacy: chat context (attached file, active note, own file) 
   }
 });
 
+S.integrationTest('chat: a Living Node note in the chat context carries its output and AI latest text, none of the managed parts', async () => {
+  const { livingNoteForModel } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+  // The user edits the AI's output (it becomes theirs); a new AI result then lands in AI latest.
+  const f = await runtimeFixture({ count: 3, prompt: 'seed' });
+  const commit = async (text, before) => {
+    const base = readLivingMarkdown(before);
+    const candidate = { executionId: 'x' + text, cardId: 'parent', mapId: 'map', baseRevision: livingSnapshotRevision(before), inputRevision: 'i', viewSession: 'v' };
+    assert.equal(await commitLivingMarkdown(f.repo, { path: 'parent.md', expectedContent: before, candidate, base, baseGeneration: livingGeneration(before),
+      proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] }, context: SEED_AT, signal: new AbortController().signal, isCurrent: () => true,
+      inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) }), 'written');
+    return f.contents.get('parent.md');
+  };
+  const trimmed = f.contents.get('parent.md').replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get('parent.md'), () => trimmed);
+  const first = await commit('OUTPUT-FIRST', trimmed);
+  const edited = first.replace('OUTPUT-FIRST', 'OUTPUT-BY-USER').replace('### Current output\n- Ownership: "ai"', '### Current output\n- Ownership: "user"');
+  await f.app.vault.process(f.files.get('parent.md'), () => edited);
+  const note = await commit('AI-LATEST-TEXT', edited);
+  assert.ok(readLivingMarkdown(note).aiLatest?.text.includes('AI-LATEST-TEXT'), 'the card has an AI latest');
+  for (const input of [{ files: [{ path: 'F.md', content: note }] }, { activeFile: { path: 'A.md', content: note } }, { ownFiles: [{ path: 'O.md', content: note }] }]) {
+    const sent = JSON.stringify(buildMapChatContext({ ...chatBase, ...input, noteForModel: livingNoteForModel }));
+    const name = Object.keys(input)[0];
+    assert.ok(sent.includes('OUTPUT-FIRST') && sent.includes('AI-LATEST-TEXT'), name + ' carries the output and AI latest');
+    assert.deepEqual(leaks(sent, note), [], name);
+    assert.equal(/- ID:|[0-9a-f]{64}/.test(sent.replace(/revision\\*":\\*"[0-9a-f]{64}/g, '').replace(/"contentHash":"[^"]*"/g, '')), false, name + ': no tombstone ids or hashes');
+  }
+  // Without the view the note still goes out with its managed parts removed.
+  const plain = JSON.stringify(buildMapChatContext({ ...chatBase, files: [{ path: 'F.md', content: note }] }));
+  assert.deepEqual(leaks(plain, note), []);
+});
+
 const { chatResearchReferenceGroups } = S.load('experiences/visual-map/chat-research-sources.ts', { obsidian: S.obsidian });
 const { resolveMapSources } = S.load('experiences/visual-map/map-sources.ts', { obsidian: S.obsidian });
 S.integrationTest('privacy: research started from the chat and map-level file sources get the model view of a Living Node note', async () => {

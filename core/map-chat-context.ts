@@ -253,6 +253,11 @@ export interface MapChatContinuationInput {
 }
 
 export interface MapChatContextInput {
+  /**
+   * How a file's text is shown to the model (the Living Node model view lives outside core). Absent: a note's managed Living Node
+   * parts are simply removed. The content hash always stays that of the real file.
+   */
+  noteForModel?: (content: string) => string;
   mapTitle: string;
   /** Vault folder that holds this map (its topic root); a new file the user gives no location for goes under it. Omitted or empty sends none. */
   mapFolder?: string;
@@ -666,8 +671,9 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
   // A file cut to its beginning was not read whole: no content hash (it cannot be edited) and it is not a basis of new cards.
   // Everything below sends the text with a Living Node note's managed parts removed (suppression holds, ownership index); the
   // contentHash stays the hash of the real file, so an edit of such a note is refused against the baseline.
+  const noteText = input.noteForModel ?? livingNoteWithoutManaged;
   const files = input.files.map(file => {
-    const text = livingNoteWithoutManaged(file.content);
+    const text = noteText(file.content);
     const sent = head(text, shrink.fileChars);
     if (sent.cut) {
       shortened = true;
@@ -688,7 +694,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         const key = normalizeVaultPath(input.activeFile.path);
         const duplicate = key !== null && input.files.some(file => normalizeVaultPath(file.path) === key);
         if (duplicate) return { path: input.activeFile.path, sameAsListedFile: true };
-        const text = livingNoteWithoutManaged(input.activeFile.content);
+        const text = noteText(input.activeFile.content);
         const sent = head(text, shrink.fileChars);
         if (sent.cut) {
           shortened = true;
@@ -728,7 +734,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
   for (const file of input.ownFiles ?? []) {
     const key = normalizeVaultPath(file.path);
     if (key === null) continue;
-    const text = livingNoteWithoutManaged(file.content);
+    const text = noteText(file.content);
     const chars = text.length;
     // A requested file the read allowance cannot hold still gets the ordinary budget, so a read is not lost to the allowance alone.
     const fromRead = !!file.requested && chars <= readLeft;

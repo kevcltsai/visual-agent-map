@@ -789,7 +789,8 @@ export function begin(deps: TransactionDeps): Transaction {
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
       const authorize = (): void => {
-        if (options.authorize && !options.authorize()) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+        if (options.authorize && !options.authorize())
+          throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
       authorize();
       for (const note of noteOps)

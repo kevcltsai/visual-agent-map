@@ -751,8 +751,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     readCard: path => this.readBookCard(path),
     writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
     writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
-    updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
-    updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
+    updateNoteGuarded: (path, patch, options) =>
+      this.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
+    updateNoteRawGuarded: (path, transform, options) =>
+      this.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
     editBookStructure: (mapPath, work) =>
       createBookStructurePort({ repo: this.repo, rebuildDerivedData: () => this.rebuildDerivedData() })(mapPath, work),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),

@@ -43,16 +43,28 @@ export function hasLivingCommitMetadata(metadata: Record<string, unknown>): bool
 /** Copy only formal knowledge and configuration. Run diagnostics belong to the original node. */
 export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): void {
   // Resetting diagnostics must not erase the only evidence of damaged ownership.
-  if (hasLivingCommitMetadata(metadata) && metadata["living-node-region-hash"] === undefined &&
-      metadata["living-node-ownership"] === undefined) throw new Error("unknown-ownership");
+  if (
+    hasLivingCommitMetadata(metadata) &&
+    metadata["living-node-region-hash"] === undefined &&
+    metadata["living-node-ownership"] === undefined
+  )
+    throw new Error("unknown-ownership");
   if (metadata["ai-run-result"] === "ok" || metadata["living-node-copy-snapshot"] === true)
     metadata["living-node-copy-snapshot"] = true;
   for (const key of [
-    "ai-run-at", "ai-run-result", "ai-run-input",
-    "living-node-last-execution", "living-node-last-attempt", "living-node-last-successful-check",
-    "living-node-last-content-change", "living-node-outcome", "living-node-input-revision",
-    "living-node-success-knowledge", "last-error"
-  ]) delete metadata[key];
+    "ai-run-at",
+    "ai-run-result",
+    "ai-run-input",
+    "living-node-last-execution",
+    "living-node-last-attempt",
+    "living-node-last-successful-check",
+    "living-node-last-content-change",
+    "living-node-outcome",
+    "living-node-input-revision",
+    "living-node-success-knowledge",
+    "last-error"
+  ])
+    delete metadata[key];
   if (metadata.status === "running") metadata.status = "idea";
 }
 
@@ -75,12 +87,11 @@ export function remapLivingCopyCardReferences(
   });
 }
 
-
 /** Canonical file references follow actual Vault renames, never basename guesses.
  * Legacy note aliases and stable card IDs are untouched. Invalid lists are not repaired silently. */
 export function rebaseLivingNoteReferences(raw: unknown, rebase: (path: string) => string): string[] | null {
   if (!Array.isArray(raw) || raw.some(value => typeof value !== "string")) return null;
   const refs = raw as string[];
-  const next = refs.map(ref => ref.startsWith("note-path:") ? "note-path:" + rebase(ref.slice(10)) : ref);
+  const next = refs.map(ref => (ref.startsWith("note-path:") ? "note-path:" + rebase(ref.slice(10)) : ref));
   return next.some((ref, index) => ref !== refs[index]) ? next : null;
 }

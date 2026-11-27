@@ -43,7 +43,8 @@
               "read_md_file",
               "edit_book_plan",
               "edit_book_thread",
-              "place_image"
+              "place_image",
+              "configure_ai_card"
             ]
           },
           "nodeId": {
@@ -103,6 +104,8 @@
               "rate_by_goal",
               "merge",
               "find_images",
+              "run_living_card",
+              "run_living_all",
               ""
             ]
           },

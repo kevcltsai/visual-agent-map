@@ -85,7 +85,10 @@ export class AiCardPopover {
     this.questionEl.value = host.initial.question;
     this.on(this.questionEl, "input", () => this.changed());
     this.chipsEl = this.el.createDiv("vam-ai-card-pop-sources");
-    this.statusEl = this.el.createDiv({ cls: "vam-living-editor-status", attr: { role: "status", "aria-live": "polite" } });
+    this.statusEl = this.el.createDiv({
+      cls: "vam-living-editor-status",
+      attr: { role: "status", "aria-live": "polite" }
+    });
     const foot = this.el.createDiv("vam-ai-card-pop-foot");
     this.trialEl = foot.createEl("button", { text: t("ui.living_node_try_prompt"), attr: { type: "button" } });
     this.stopTrialEl = foot.createEl("button", { text: t("ui.topic_chat_stop"), attr: { type: "button" } });
@@ -110,7 +113,10 @@ export class AiCardPopover {
     this.closeChoices.hidden = true;
     this.closeChoices.createSpan({ text: t("ui.living_node_dirty") });
     const saveClose = this.closeChoices.createEl("button", { text: t("ui.ai_card_save"), attr: { type: "button" } });
-    const discard = this.closeChoices.createEl("button", { text: t("ui.living_node_discard"), attr: { type: "button" } });
+    const discard = this.closeChoices.createEl("button", {
+      text: t("ui.living_node_discard"),
+      attr: { type: "button" }
+    });
     const back = this.closeChoices.createEl("button", { text: t("ui.living_node_return"), attr: { type: "button" } });
     this.on(saveClose, "click", () => void this.save(true));
     this.on(discard, "click", () => this.host.cancel());
@@ -191,9 +197,7 @@ export class AiCardPopover {
     this.stopTrialEl.disabled = !this.trialRunning;
     this.adoptEl.disabled = !this.preview || this.busy || this.dirty() || !this.host.adopt;
     this.questionEl.disabled = this.busy;
-    this.statusEl.setText(
-      this.busy ? t("ui.ai_running") : this.dirty() ? t("ui.living_node_dirty") : ""
-    );
+    this.statusEl.setText(this.busy ? t("ui.ai_running") : this.dirty() ? t("ui.living_node_dirty") : "");
   }
 
   private async save(close = false): Promise<void> {

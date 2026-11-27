@@ -127,7 +127,10 @@ export class LivingTrial {
   acceptSave(before: string, after: string): void {
     const ready = this.candidate;
     if (!ready || this.status !== "ready") return;
-    if (before !== ready.snapshot.expectedContent || readLivingMarkdown(after).revision !== ready.snapshot.base.revision) {
+    if (
+      before !== ready.snapshot.expectedContent ||
+      readLivingMarkdown(after).revision !== ready.snapshot.base.revision
+    ) {
       this.invalidate();
       return;
     }

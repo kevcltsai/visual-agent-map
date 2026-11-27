@@ -13,7 +13,10 @@ export class NodeDetailsSidebar {
   /** Serialize transitions of the single shared right pane; the newest selection wins. */
   private enqueue<T>(run: () => Promise<T>): Promise<T> {
     const next = this.pending.then(run);
-    this.pending = next.then(() => {}, () => {});
+    this.pending = next.then(
+      () => {},
+      () => {}
+    );
     return next;
   }
 
@@ -96,7 +99,8 @@ export class NodeDetailsSidebar {
       if (!current()) return false;
       const leaf = this.detailsLeaf;
       if (!leaf) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-      if (!(leaf.view instanceof LivingReaderView)) await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
+      if (!(leaf.view instanceof LivingReaderView))
+        await leaf.setViewState({ type: LIVING_READER_VIEW, active: false });
       if (!current() || this.detailsLeaf !== leaf) {
         // Stop during view creation must not leave an empty preview pane. A newer
         // selection has its own queued transition and must never be replaced here.

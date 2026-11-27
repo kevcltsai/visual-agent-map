@@ -15,7 +15,11 @@ import {
 } from "./living-node-changes";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
-import { hasLivingCommitMetadata, LIVING_NODE_BEGIN as BEGIN, LIVING_NODE_END as END } from "../../core/living-node-region";
+import {
+  hasLivingCommitMetadata,
+  LIVING_NODE_BEGIN as BEGIN,
+  LIVING_NODE_END as END
+} from "../../core/living-node-region";
 const HASH_KEY = "living-node-region-hash";
 const OWNERSHIP_KEY = "living-node-ownership";
 const COMMIT_KEY = "living-node-last-execution";
@@ -246,18 +250,26 @@ export function renderLivingPreview(knowledge: LivingKnowledge): string {
  * local source paths, signed/query-bearing URLs, ownership or suppression data. */
 export function renderLivingShareKnowledge(knowledge: LivingKnowledge): string {
   const sections: string[] = [];
-  const publicEvidence = (evidence: readonly LivingEvidence[]): string[] => [...new Set(evidence.flatMap(entry => {
-    const url = allowedUrl(entry.source);
-    if (!url || url.search || url.hash || entry.id !== "web:" + livingSnapshotRevision(url.toString())) return [];
-    return [url.toString()];
-  }))];
+  const publicEvidence = (evidence: readonly LivingEvidence[]): string[] => [
+    ...new Set(
+      evidence.flatMap(entry => {
+        const url = allowedUrl(entry.source);
+        if (!url || url.search || url.hash || entry.id !== "web:" + livingSnapshotRevision(url.toString())) return [];
+        return [url.toString()];
+      })
+    )
+  ];
   const append = (text: string, evidence: readonly LivingEvidence[]): void => {
     if (text.trim()) sections.push(quote([text, ...publicEvidence(evidence)].join("\n")));
   };
   append(knowledge.output.text, knowledge.output.evidence);
   for (const record of knowledge.records) {
-    append([record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n"), record.evidence);
-    for (const item of record.history) append([item.at, item.claim, item.reason].join("\n"), [...item.previousEvidence, ...item.evidence]);
+    append(
+      [record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n"),
+      record.evidence
+    );
+    for (const item of record.history)
+      append([item.at, item.claim, item.reason].join("\n"), [...item.previousEvidence, ...item.evidence]);
   }
   return sections.join("\n\n");
 }
@@ -288,7 +300,16 @@ interface OwnershipIndex {
 function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
-    ...knowledge.records.map(record => JSON.stringify(["record", record.id, recordHash(record), livingEventFingerprint(record), livingEventScopeFingerprint(record), record.eventTime === null])),
+    ...knowledge.records.map(record =>
+      JSON.stringify([
+        "record",
+        record.id,
+        recordHash(record),
+        livingEventFingerprint(record),
+        livingEventScopeFingerprint(record),
+        record.eventTime === null
+      ])
+    ),
     ...knowledge.suppressed.map(id => JSON.stringify(["suppressed", id]))
   ];
 }
@@ -306,7 +327,8 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
       index.output = value[1];
     } else if (
       value[0] === "record" &&
-      (value.length === 3 || (value.length === 4 && validHash(value[3])) ||
+      (value.length === 3 ||
+        (value.length === 4 && validHash(value[3])) ||
         (value.length === 6 && validHash(value[3]) && validHash(value[4]) && typeof value[5] === "boolean")) &&
       typeof value[1] === "string" &&
       validHash(value[2]) &&
@@ -317,7 +339,8 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
         const scope = value[4] as unknown;
         const unknownTime = value[5] as unknown;
         index.events.set(value[1], {
-          fingerprint: value[3], ...(validHash(scope) && typeof unknownTime === "boolean" ? { scope, unknownTime } : {})
+          fingerprint: value[3],
+          ...(validHash(scope) && typeof unknownTime === "boolean" ? { scope, unknownTime } : {})
         });
       }
     } else if (value[0] === "suppressed" && value.length === 2 && typeof value[1] === "string") {
@@ -347,9 +370,7 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
       }
       return { ...record, owner: "user" as const };
     }
-    return index.records.get(record.id) === recordHash(record)
-      ? record
-      : { ...record, owner: "user" as const };
+    return index.records.get(record.id) === recordHash(record) ? record : { ...record, owner: "user" as const };
   });
   const output =
     index.output === outputHash(current.output) ? current.output : { ...current.output, owner: "user" as const };
@@ -431,7 +452,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   const matches = request.base.revision === stored.revision && renderRegion(request.base) === renderRegion(stored);
   if (!matches) throw new Error("base-mismatch");
   const next = applyLivingChanges(stored, request.proposal, context);
-  if (stored.revision === "empty" && !next.records.length && !next.output.text) throw new Error("missing-formal-result");
+  if (stored.revision === "empty" && !next.records.length && !next.output.text)
+    throw new Error("missing-formal-result");
   const nextKnowledge = { ...stored, records: next.records, output: next.output };
   const managed = renderRegion(nextKnowledge);
   const changed = !region || region.text !== managed;

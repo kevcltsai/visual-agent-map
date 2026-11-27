@@ -43,9 +43,18 @@ export type LivingWebPolicy = "forbidden" | "optional" | "required";
 
 export function livingWebPolicy(prompt: string): LivingWebPolicy {
   // Date words alone do not require the web: a task can analyze today's local notes.
-  const explicitSearch = /(?:上網|上网|網路搜尋|网络搜索|搜尋網路|搜索网络|\bsearch the web\b|\bweb research\b|\bbrowse the web\b)/i.test(prompt);
-  const currentPublicData = /(?:即時|即时|最新|今天|今日|現在|现在|當前|当前|today|latest|live|current)[\s\S]{0,16}(?:股價|股价|行情|新聞|新闻|市場價格|市场价格|stock price|market data|market quote|news headlines)/i.test(prompt);
-  const offline = /(?:不要上網|不要上网|禁止上網|禁止上网|只(?:用|讀|读)本地|only (?:use|read) local|do not (?:browse|search the web)|no web search)/i.test(prompt);
+  const explicitSearch =
+    /(?:上網|上网|網路搜尋|网络搜索|搜尋網路|搜索网络|\bsearch the web\b|\bweb research\b|\bbrowse the web\b)/i.test(
+      prompt
+    );
+  const currentPublicData =
+    /(?:即時|即时|最新|今天|今日|現在|现在|當前|当前|today|latest|live|current)[\s\S]{0,16}(?:股價|股价|行情|新聞|新闻|市場價格|市场价格|stock price|market data|market quote|news headlines)/i.test(
+      prompt
+    );
+  const offline =
+    /(?:不要上網|不要上网|禁止上網|禁止上网|只(?:用|讀|读)本地|only (?:use|read) local|do not (?:browse|search the web)|no web search)/i.test(
+      prompt
+    );
   return offline ? "forbidden" : explicitSearch || currentPublicData ? "required" : "optional";
 }
 
@@ -54,7 +63,14 @@ export function explicitlyRequiresLivingWeb(prompt: string): boolean {
 }
 
 /** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
-export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string, requiresWeb = false, forbidWeb = false) {
+export function normalizeLivingProposal(
+  raw: unknown,
+  opened: readonly string[],
+  local: readonly LivingEvidence[],
+  at: string,
+  requiresWeb = false,
+  forbidWeb = false
+) {
   const envelope = object(raw);
   if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb", "checkedWeb"].includes(key)))
     throw new Error("invalid-proposal-field");
@@ -71,20 +87,22 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
   if ((requiresWeb || envelope.requiresWeb) && !byUrl.size) throw new Error("required-web-unavailable");
   if (requiresWeb && !envelope.requiresWeb) throw new Error("required-web-decision-conflict");
   if (!Array.isArray(envelope.operations)) throw new Error("invalid-operations");
-  const operations = (envelope.operations as unknown[]).map((value): Record<string, unknown> & { evidence: string[] } => {
-    const operation = object(value);
-    if (!Array.isArray(operation.evidence)) throw new Error("invalid-evidence");
-    const evidence = (operation.evidence as unknown[]).map(item => {
-      if (typeof item !== "string") throw new Error("invalid-evidence");
-      const url = allowedUrl(item);
-      if (!url) return item;
-      url.hash = "";
-      const known = byUrl.get(url.toString());
-      if (!known) throw new Error("unauthorized-evidence");
-      return known.id;
-    });
-    return { ...operation, evidence };
-  });
+  const operations = (envelope.operations as unknown[]).map(
+    (value): Record<string, unknown> & { evidence: string[] } => {
+      const operation = object(value);
+      if (!Array.isArray(operation.evidence)) throw new Error("invalid-evidence");
+      const evidence = (operation.evidence as unknown[]).map(item => {
+        if (typeof item !== "string") throw new Error("invalid-evidence");
+        const url = allowedUrl(item);
+        if (!url) return item;
+        url.hash = "";
+        const known = byUrl.get(url.toString());
+        if (!known) throw new Error("unauthorized-evidence");
+        return known.id;
+      });
+      return { ...operation, evidence };
+    }
+  );
   // A changed answer requiring current web information must cite at least
   // one actually opened source. A genuine no-change check can have no operations.
   if (envelope.requiresWeb) {
@@ -104,8 +122,7 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
       throw new Error("required-web-evidence-missing");
     // A mixed proposal may include independent local observations, but any replaced
     // current result of a live research task must itself cite a checked web source.
-    if (operations.some(operation => operation.kind === "output" &&
-        !operation.evidence.some(id => checked.has(id))))
+    if (operations.some(operation => operation.kind === "output" && !operation.evidence.some(id => checked.has(id))))
       throw new Error("required-web-output-evidence-missing");
   } else if (envelope.checkedWeb !== undefined && (!Array.isArray(envelope.checkedWeb) || envelope.checkedWeb.length)) {
     throw new Error("unexpected-web-check");

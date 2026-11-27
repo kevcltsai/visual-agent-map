@@ -11,14 +11,16 @@ import type { MapDocument } from "../../map-model";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
 import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
-import { readLivingReferences, reconcileLivingDraftReferences, sameLivingTarget, type LivingSourceRef, type resolveLivingSources } from "./living-node-sources";
+import {
+  readLivingReferences,
+  reconcileLivingDraftReferences,
+  sameLivingTarget,
+  type LivingSourceRef,
+  type resolveLivingSources
+} from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
-import {
-  commitLivingMarkdown,
-  livingSnapshotRevision,
-  readLivingMarkdown
-} from "./living-node-markdown";
+import { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
@@ -41,7 +43,9 @@ export interface LivingMapContext {
 }
 type LivingMapSources = ReferenceGroup[] | LivingMapContext;
 
-async function readLivingMapContext(port: Pick<LivingRoundPort, "mapSources" | "signal" | "current">): Promise<LivingMapContext> {
+async function readLivingMapContext(
+  port: Pick<LivingRoundPort, "mapSources" | "signal" | "current">
+): Promise<LivingMapContext> {
   try {
     const result = await port.mapSources(port.signal);
     if (port.signal.aborted || !port.current()) throw new Error("cancelled");
@@ -92,37 +96,57 @@ function readableMarkdown(raw: string): string {
 }
 
 function ownKnowledge(note: Note, includeTitle = true): string {
-  return [includeTitle ? note.title : "", note.thinkingOrigin, note.summary, note.preview, note.detail, note.newFindings]
+  return [
+    includeTitle ? note.title : "",
+    note.thinkingOrigin,
+    note.summary,
+    note.preview,
+    note.detail,
+    note.newFindings
+  ]
     .filter(value => value && value.trim() && !isPlaceholder(value))
     .join("\n\n");
 }
 
 function usableKnowledge(snapshot: Snapshot): boolean {
   const base = readLivingMarkdown(snapshot.content);
-  return hasLivingResult(base) ||
-    (base.revision === "empty" && base.output.owner === "ai" &&
+  return (
+    hasLivingResult(base) ||
+    (base.revision === "empty" &&
+      base.output.owner === "ai" &&
       (snapshot.note.aiRun?.result === "ok" || frontmatter(snapshot.content)["living-node-copy-snapshot"] === true) &&
-      !!ownKnowledge(snapshot.note, false));
+      !!ownKnowledge(snapshot.note, false))
+  );
 }
 
 function refs(snapshot: Snapshot): LivingSourceRef[] {
-  return readLivingReferences(frontmatter(snapshot.content)["living-node-refs"], promptSourceLinks(snapshot.note.prompt));
+  return readLivingReferences(
+    frontmatter(snapshot.content)["living-node-refs"],
+    promptSourceLinks(snapshot.note.prompt)
+  );
 }
 
 function allowedLivingNotePath(app: App, path: string): boolean {
   const key = normalizeVaultPath(path);
   const config = normalizeVaultPath(app.vault.configDir);
-  return !!key && key === path && !!config &&
+  return (
+    !!key &&
+    key === path &&
+    !!config &&
     key.toLowerCase() !== config.toLowerCase() &&
     !key.toLowerCase().startsWith(config.toLowerCase() + "/") &&
-    key.toLowerCase().endsWith(".md");
+    key.toLowerCase().endsWith(".md")
+  );
 }
 
 function sourceResolver(app: App) {
   return {
     resolveAuthorized(link: string, fromPath: string, _role?: "explicit" | "map", exact?: true) {
-      const file = exact ? app.vault.getAbstractFileByPath(link) : app.metadataCache.getFirstLinkpathDest(link, fromPath);
-      return file instanceof TFile && allowedLivingNotePath(app, file.path) &&
+      const file = exact
+        ? app.vault.getAbstractFileByPath(link)
+        : app.metadataCache.getFirstLinkpathDest(link, fromPath);
+      return file instanceof TFile &&
+        allowedLivingNotePath(app, file.path) &&
         app.vault.getAbstractFileByPath(file.path) === file
         ? { identity: file.path, path: file.path }
         : undefined;
@@ -136,7 +160,10 @@ function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<
   const children = map.nodes.filter(item => item.parentId === id).map(item => item.id);
   return livingSnapshotRevision(
     JSON.stringify([
-      livingConfigRevision(snapshot.note.prompt, refs(snapshot).map(ref => JSON.stringify(ref))),
+      livingConfigRevision(
+        snapshot.note.prompt,
+        refs(snapshot).map(ref => JSON.stringify(ref))
+      ),
       node.path,
       [...children].sort(),
       snapshot.note.aiCard === true,
@@ -197,11 +224,16 @@ export async function livingRemovalConsumers(
   if (!removed.size) return [];
   const { cards } = await prepareMap({ repo, app }, map);
   const planned = planLivingMap(cards, [], sourceResolver(app));
-  return cards.filter(card => !removed.has(card.id) && isAiCard(card) &&
-    planned.sources.get(card.id)?.sources.some(source =>
-      !!source.cardId && removed.has(source.cardId) && source.roles.includes("explicit")
+  return cards
+    .filter(
+      card =>
+        !removed.has(card.id) &&
+        isAiCard(card) &&
+        planned.sources
+          .get(card.id)
+          ?.sources.some(source => !!source.cardId && removed.has(source.cardId) && source.roles.includes("explicit"))
     )
-  ).map(card => card.id);
+    .map(card => card.id);
 }
 
 /** Preserve the original file and stable node ID when cutting a Living Node
@@ -218,19 +250,24 @@ export async function livingCrossCut(
 ): Promise<{ preserveIdentity: boolean; affected: string[] }> {
   const { cards, snapshots } = await prepareMap({ repo, app }, source);
   const planned = planLivingMap(cards, [], sourceResolver(app));
-  const affected = cards.filter(card => isAiCard(card) && (
-    moved.has(card.id)
-      ? planned.sources.get(card.id)?.sources.some(input => input.cardId && !moved.has(input.cardId))
-      : planned.sources.get(card.id)?.sources.some(input => input.cardId && moved.has(input.cardId))
-  )).map(card => card.id);
+  const affected = cards
+    .filter(
+      card =>
+        isAiCard(card) &&
+        (moved.has(card.id)
+          ? planned.sources.get(card.id)?.sources.some(input => input.cardId && !moved.has(input.cardId))
+          : planned.sources.get(card.id)?.sources.some(input => input.cardId && moved.has(input.cardId)))
+    )
+    .map(card => card.id);
   const destinationParent = destination.nodes.find(node => node.id === destinationParentId);
-  const destinationNote = destinationParent && await repo.readNoteSnapshot(destinationParent.path, destination);
-  const preserveIdentity = !!destinationNote?.note.aiCard || affected.length > 0 || cards.some(card => moved.has(card.id) &&
-    (card.aiCard || snapshots.get(card.id)?.note.livingNode));
+  const destinationNote = destinationParent && (await repo.readNoteSnapshot(destinationParent.path, destination));
+  const preserveIdentity =
+    !!destinationNote?.note.aiCard ||
+    affected.length > 0 ||
+    cards.some(card => moved.has(card.id) && (card.aiCard || snapshots.get(card.id)?.note.livingNode));
   if (!preserveIdentity) return { preserveIdentity, affected };
   const destinationIds = new Set(destination.nodes.map(node => node.id));
-  if (source.nodes.some(node => destinationIds.has(node.id)))
-    throw new Error("ambiguous-card-identity");
+  if (source.nodes.some(node => destinationIds.has(node.id))) throw new Error("ambiguous-card-identity");
   for (const card of cards) {
     if (!moved.has(card.id)) continue;
     if (!snapshots.has(card.id) || card.sourceUnavailable) throw new Error("invalid-source");
@@ -250,16 +287,19 @@ export async function validateLivingStructure(
   before: MapDocument,
   after: MapDocument
 ): Promise<void> {
-  const parentGraph = (map: MapDocument): string => JSON.stringify(
-    map.nodes.map(node => [node.id, node.parentId ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
-  );
+  const parentGraph = (map: MapDocument): string =>
+    JSON.stringify(
+      map.nodes.map(node => [node.id, node.parentId ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    );
   if (parentGraph(before) === parentGraph(after)) return;
   const { cards } = await prepareMap({ repo, app }, after);
   const oldById = new Map(before.nodes.map(node => [node.id, node]));
-  const oldCards = cards.filter(card => oldById.has(card.id)).map(card => ({
-    ...card,
-    parentId: oldById.get(card.id)!.parentId
-  }));
+  const oldCards = cards
+    .filter(card => oldById.has(card.id))
+    .map(card => ({
+      ...card,
+      parentId: oldById.get(card.id)!.parentId
+    }));
   if (introducesLivingCycle(oldCards, cards, sourceResolver(app))) throw new Error("living-node-cycle");
 }
 
@@ -277,11 +317,16 @@ async function readInputs(
   const evidence: LivingEvidence[] = [];
   const documents: { id: string; title: string; scope: string; text: string; revision: string }[] = [];
   const seen = new Set<string>();
-  const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
+  const warnings = [
+    ...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason),
+    ...additionalWarnings
+  ];
   let characters = 0;
   const at = new Date().toISOString();
   const prompt = splitPrompt(snapshot.note.prompt).question;
-  const full = /full (?:text|content|history)|complete (?:text|history)|全文|完整內容|完整内容|歷史紀錄|历史记录/i.test(prompt);
+  const full = /full (?:text|content|history)|complete (?:text|history)|全文|完整內容|完整内容|歷史紀錄|历史记录/i.test(
+    prompt
+  );
   const add = (identity: string, title: string, content: string, summary?: string, optional = false): void => {
     if (seen.has(identity)) return;
     seen.add(identity);
@@ -324,7 +369,13 @@ async function readInputs(
     for (const document of group.documents) {
       if (document.external) {
         // External paths require the existing scrubbed gateway identity, never a new direct file read.
-        add("map:" + (document.key ?? document.path), document.path, readableMarkdown(document.content), undefined, true);
+        add(
+          "map:" + (document.key ?? document.path),
+          document.path,
+          readableMarkdown(document.content),
+          undefined,
+          true
+        );
         continue;
       }
       if (document.path === map.nodes.find(node => node.id === id)?.path) continue;
@@ -373,7 +424,13 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     if (!current() || map.id !== initialMap.id) throw new Error("cancelled");
     const path = pathOf(id);
     const original = initialMap.nodes.find(node => node.id === id);
-    if (!original || !sameLivingTarget(original, map.nodes.find(node => node.id === id)))
+    if (
+      !original ||
+      !sameLivingTarget(
+        original,
+        map.nodes.find(node => node.id === id)
+      )
+    )
       throw new Error("changed-target-identity");
     const snapshot = await port.repo.readNoteSnapshot(path, map);
     const unchanged = config.get(id) === configKey(snapshot, map, id, port);
@@ -419,10 +476,15 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
         // Do not overwrite the last surviving evidence of a damaged formal commit.
         // A failed diagnostic write must not turn corrupt ownership into a fresh card.
         readLivingMarkdown(checked.snapshot.content);
-        await port.repo.updateNoteRawGuarded(pathOf(id), content => setFrontmatterKeys(content, {
-          "living-node-last-attempt": new Date().toISOString(),
-          "living-node-outcome": outcome
-        }), { expectedContent: checked.snapshot.content, authorize: current });
+        await port.repo.updateNoteRawGuarded(
+          pathOf(id),
+          content =>
+            setFrontmatterKeys(content, {
+              "living-node-last-attempt": new Date().toISOString(),
+              "living-node-outcome": outcome
+            }),
+          { expectedContent: checked.snapshot.content, authorize: current }
+        );
       } catch {
         // A missing or edited target cannot safely accept a diagnostic write.
       }
@@ -469,16 +531,20 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
             inputRevision: input.inputRevision
           };
           try {
-            const generated = await generateLivingProposal(port.calls, {
-              model: snapshot.note.model,
-              reasoning: snapshot.note.reasoning ?? "auto",
-              language: port.language(initialMap, snapshot.note),
-              prompt: input.prompt,
-              base: input.base,
-              context: input.context,
-              evidence: input.evidence,
-              mapPath: port.mapPath
-            }, signal);
+            const generated = await generateLivingProposal(
+              port.calls,
+              {
+                model: snapshot.note.model,
+                reasoning: snapshot.note.reasoning ?? "auto",
+                language: port.language(initialMap, snapshot.note),
+                prompt: input.prompt,
+                base: input.base,
+                context: input.context,
+                evidence: input.evidence,
+                mapPath: port.mapPath
+              },
+              signal
+            );
             const changes = applyLivingChanges(input.base, generated.proposal, generated.context);
             const outcome = await commitLivingMarkdown(port.repo, {
               path: pathOf(id),
@@ -547,9 +613,10 @@ function resolveDraft(
   const raw = frontmatter(saved.content)["living-node-refs"];
   // A corrupt saved list can be repaired by explicitly removing all old
   // links, but an unchanged display alias must never rebind a lost identity.
-  const persisted = raw === undefined || !nextLinks.some(link => previousLinks.includes(link))
-    ? undefined
-    : readLivingReferences(raw, previousLinks);
+  const persisted =
+    raw === undefined || !nextLinks.some(link => previousLinks.includes(link))
+      ? undefined
+      : readLivingReferences(raw, previousLinks);
   const explicit = reconcileLivingDraftReferences(previousLinks, persisted, nextLinks, link => {
     const note = resolver.resolveAuthorized(link, target.path);
     if (!note) throw new Error("missing-source");
@@ -561,8 +628,9 @@ function resolveDraft(
   });
   // Keep one saved identity for each distinct display link. The resolver
   // deduplicates actual sources, while positional aliases remain editable.
-  const encoded = explicit.map(ref => ref.kind === "card" ? "card:" + ref.id :
-    (ref.exact ? "note-path:" : "note:") + ref.link);
+  const encoded = explicit.map(ref =>
+    ref.kind === "card" ? "card:" + ref.id : (ref.exact ? "note-path:" : "note:") + ref.link
+  );
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
@@ -570,10 +638,13 @@ function resolveDraft(
   if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
   if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
     throw new Error("living-node-cycle");
-  const sourceRevision = livingSnapshotRevision(JSON.stringify(
-    (next.sources.get(target.id)?.sources ?? []).filter(source => source.roles.includes("explicit"))
-      .map(source => source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path])
-  ));
+  const sourceRevision = livingSnapshotRevision(
+    JSON.stringify(
+      (next.sources.get(target.id)?.sources ?? [])
+        .filter(source => source.roles.includes("explicit"))
+        .map(source => (source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path]))
+    )
+  );
   return { encoded, proposed, sourceRevision };
 }
 
@@ -608,8 +679,10 @@ export async function saveLivingConfig(
   if (!snapshot || !target) throw new Error("missing-target");
   if (snapshot.note.aiLocked) throw new Error("locked-target");
   if (expectedPrompt !== undefined && snapshot.note.prompt !== expectedPrompt) throw new Error("changed-configuration");
-  if (expectedConfigRevision !== undefined &&
-      livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision)
+  if (
+    expectedConfigRevision !== undefined &&
+    livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision
+  )
     throw new Error("changed-configuration");
   const { encoded, sourceRevision } = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
   if (expectedSourceRevision !== undefined && sourceRevision !== expectedSourceRevision)
@@ -638,8 +711,10 @@ export async function saveLivingConfig(
       finalize: content => {
         saved = setFrontmatterKeys(content, { "ai-card": true, "living-node-refs": encoded });
         const savedMetadata = frontmatter(saved);
-        if (savedMetadata["ai-card"] !== true ||
-            JSON.stringify(savedMetadata["living-node-refs"]) !== JSON.stringify(encoded))
+        if (
+          savedMetadata["ai-card"] !== true ||
+          JSON.stringify(savedMetadata["living-node-refs"]) !== JSON.stringify(encoded)
+        )
           return null;
         savedRevision = livingConfigurationStamp(prompt, savedMetadata);
         return saved;
@@ -718,12 +793,14 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       }
     }
     if (!port.current() || port.signal.aborted) throw new Error("cancelled");
-    const frozen = planned.plan.frozen.length > 0 || sources.sources.some(source =>
-      source.cardId && cards.some(card => card.id === source.cardId && isAiCard(card) && card.aiLocked)
-    );
+    const frozen =
+      planned.plan.frozen.length > 0 ||
+      sources.sources.some(
+        source => source.cardId && cards.some(card => card.id === source.cardId && isAiCard(card) && card.aiLocked)
+      );
     const warnings = [
-      ...(!dependenciesReady ? ["upstream-stale"] as const : []),
-      ...(frozen ? ["frozen-source"] as const : [])
+      ...(!dependenciesReady ? (["upstream-stale"] as const) : []),
+      ...(frozen ? (["frozen-source"] as const) : [])
     ];
     const input = await readInputs(readPort, map, id, snapshot, sources, warnings);
     return { saved, snapshot, input, dependenciesReady, warnings: input.warnings };
@@ -744,16 +821,20 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     base: prepared.input.base,
     context: { at: new Date().toISOString(), evidence: prepared.input.evidence },
     generate: async signal => {
-      const result = await generateLivingProposal(port.calls, {
-        model: prepared.snapshot.note.model,
-        reasoning: prepared.snapshot.note.reasoning ?? "auto",
-        language: port.language(initialMap, prepared.snapshot.note),
-        prompt: prepared.input.prompt,
-        base: prepared.input.base,
-        context: prepared.input.context,
-        evidence: prepared.input.evidence,
-        mapPath: port.mapPath
-      }, signal);
+      const result = await generateLivingProposal(
+        port.calls,
+        {
+          model: prepared.snapshot.note.model,
+          reasoning: prepared.snapshot.note.reasoning ?? "auto",
+          language: port.language(initialMap, prepared.snapshot.note),
+          prompt: prepared.input.prompt,
+          base: prepared.input.base,
+          context: prepared.input.context,
+          evidence: prepared.input.evidence,
+          mapPath: port.mapPath
+        },
+        signal
+      );
       return result;
     },
     stillCurrent: async () => {
@@ -811,8 +892,11 @@ export async function inspectLivingValidity(port: LivingTrialPort) {
       const pending = (planned.plan.dependencies.get(item.id) ?? []).some(id => validity.get(id) !== "valid");
       validity.set(
         item.id,
-        !pending && fm["living-node-input-revision"] === data.inputRevision &&
-        fm["living-node-success-knowledge"] === data.base.revision ? "valid" : "stale"
+        !pending &&
+          fm["living-node-input-revision"] === data.inputRevision &&
+          fm["living-node-success-knowledge"] === data.base.revision
+          ? "valid"
+          : "stale"
       );
     } catch {
       validity.set(item.id, cards.find(card => card.id === item.id)?.hasKnowledge ? "stale" : "none");

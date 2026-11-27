@@ -130,9 +130,13 @@ function protectedLivingMarkdown(content: string, parse?: MapChatWriteCheck["par
   if (/(?:ai-card|ai-locked|ai-update-mode|ai-run-[\w-]+|living-node-[\w-]+)["']?\s*:/i.test(block)) return true;
   if (!parse) return false;
   try {
-    return Object.keys(parse(content)).some(key =>
-      key === "ai-card" || key === "ai-locked" || key === "ai-update-mode" ||
-      key.startsWith("ai-run-") || key.startsWith("living-node-")
+    return Object.keys(parse(content)).some(
+      key =>
+        key === "ai-card" ||
+        key === "ai-locked" ||
+        key === "ai-update-mode" ||
+        key.startsWith("ai-run-") ||
+        key.startsWith("living-node-")
     );
   } catch {
     // An unparseable frontmatter cannot establish that a raw write is safe.
@@ -161,7 +165,8 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
       topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0
     )
       return { ok: false, code: "reserved_frontmatter" };
-    if (protectedLivingMarkdown(check.newContent, check.parseFrontmatter)) return { ok: false, code: "living_node_protected" };
+    if (protectedLivingMarkdown(check.newContent, check.parseFrontmatter))
+      return { ok: false, code: "living_node_protected" };
     return { ok: true };
   }
   const baseline = check.knownHashes ?? {};
@@ -190,7 +195,10 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
     hypothesisLines(frontmatterBlock(check.newContent)).join("\n")
   )
     return { ok: false, code: "hypothesis_frontmatter_changed" };
-  if (protectedLivingMarkdown(before, check.parseFrontmatter) || protectedLivingMarkdown(check.newContent, check.parseFrontmatter))
+  if (
+    protectedLivingMarkdown(before, check.parseFrontmatter) ||
+    protectedLivingMarkdown(check.newContent, check.parseFrontmatter)
+  )
     return { ok: false, code: "living_node_protected" };
   return { ok: true };
 }

@@ -92,8 +92,11 @@ export const CHAIN_SAFE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAct
 const CHAIN_SAFE_RUN: ReadonlySet<string> = new Set(["research_standard", "expand"]);
 /** True when the kind of action may be part of an automatic round without a plan (its targets are judged by {@link isChainSafeFor}). */
 export const isChainSafe = (action: MapChatAction): boolean =>
-  action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) :
-    action.kind === "add_child" && action.livingPrompt ? false : CHAIN_SAFE.has(action.kind);
+  action.kind === "run_map_action"
+    ? CHAIN_SAFE_RUN.has(action.action)
+    : action.kind === "add_child" && action.livingPrompt
+      ? false
+      : CHAIN_SAFE.has(action.kind);
 
 /** The cards a reply that read web research text may rewrite or research without a plan (decision #14). */
 export interface MapChatTrusted {
@@ -226,8 +229,10 @@ export function estimateChatCalls(
         case "run_living_all":
           // Dependency planning happens at execution. The whole map is an upper
           // bound, including new cards created by this reply.
-          calls += Math.max(action.nodeIds.length, Object.keys(context.parents ?? {}).length +
-            actions.filter(item => item.kind === "add_child").length);
+          calls += Math.max(
+            action.nodeIds.length,
+            Object.keys(context.parents ?? {}).length + actions.filter(item => item.kind === "add_child").length
+          );
           break;
         case "research_standard":
           // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
@@ -356,9 +361,15 @@ export function planFor(
   if (!auto && research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
     reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
-  if (actions.some(action => action.kind === "configure_ai_card" ||
-      (action.kind === "add_child" && !!action.livingPrompt) ||
-      (action.kind === "run_map_action" && (action.action === "run_living_card" || action.action === "run_living_all"))))
+  if (
+    actions.some(
+      action =>
+        action.kind === "configure_ai_card" ||
+        (action.kind === "add_child" && !!action.livingPrompt) ||
+        (action.kind === "run_map_action" &&
+          (action.action === "run_living_card" || action.action === "run_living_all"))
+    )
+  )
     reasons.push("living_node_confirm");
   if (
     actions.some(

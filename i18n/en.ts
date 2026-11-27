@@ -934,7 +934,8 @@ export const en = {
   "ui.merge_target_changed": "The merged topic was edited after the merge, so Undo or Redo was not applied.",
   "ui.merge_busy": "An AI task is running on a selected topic; merge after it finishes",
   "ui.merge_missing_note": "A selected topic's note is missing, so it cannot be merged",
-  "ui.merge_living_node_convert": "Convert the AI cards to ordinary cards before merging them; their saved knowledge is kept.",
+  "ui.merge_living_node_convert":
+    "Convert the AI cards to ordinary cards before merging them; their saved knowledge is kept.",
   "ui.merge_title_label": "Name of the merged topic",
   "ui.merge_ai_untitled": "(AI names the merged topic)",
   "ui.merge_confirm_desc":
@@ -1238,16 +1239,20 @@ export const en = {
   "ui.living_node_run_card": "Run card",
   "ui.living_node_chat_configure_0": "Configure AI card: {0}",
   "ui.living_node_chat_plan_confirm": "Review the saved AI-card configuration and execution targets before applying.",
-  "ui.living_node_chat_existing_only": "Chat may configure a newly created card or an existing AI card only; convert ordinary cards yourself.",
+  "ui.living_node_chat_existing_only":
+    "Chat may configure a newly created card or an existing AI card only; convert ordinary cards yourself.",
   "ui.living_node_chat_source_refused": "This source was not authorized for the chat configuration.",
   "ui.living_node_last_success": "Last successful check",
   "ui.living_node_last_attempt": "Last attempt",
   "ui.living_node_trial": "Trial",
   "ui.living_node_official": "Official",
   "ui.living_node_trial_unsaved": "Trial · not saved",
-  "ui.living_node_removed_source_0": "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",
-  "ui.living_node_optional_source_unavailable": "Some optional map sources could not be read. Results use available material only.",
-  "ui.living_node_trial_stale_sources": "The preview uses existing upstream knowledge that needs updating. Run Card before adoption.",
+  "ui.living_node_removed_source_0":
+    "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",
+  "ui.living_node_optional_source_unavailable":
+    "Some optional map sources could not be read. Results use available material only.",
+  "ui.living_node_trial_stale_sources":
+    "The preview uses existing upstream knowledge that needs updating. Run Card before adoption.",
   "ui.living_node_trial_frozen_sources": "The preview uses locked upstream knowledge; its information may be old.",
   "ui.living_node_trial_invalid": "Trial · invalidated",
   "ui.living_node_try_prompt": "Try prompt",

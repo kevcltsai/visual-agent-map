@@ -630,7 +630,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         basis.read.push({ id: ref.id, path: ref.path, title: ref.title });
       }
     }
-    const withLivingPrompt = withDetail && ref.livingPrompt !== undefined && ref.livingPrompt.length <= 8_000 && !!ref.livingConfigRevision;
+    const withLivingPrompt =
+      withDetail && ref.livingPrompt !== undefined && ref.livingPrompt.length <= 8_000 && !!ref.livingConfigRevision;
     topicHashes[ref.id] = {
       title: ref.title,
       parentId: node?.parentId ?? null,

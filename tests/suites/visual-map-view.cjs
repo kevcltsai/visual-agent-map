@@ -126,20 +126,23 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   card = view.stageEl.children[0];
   assert.equal(card.dataset.status, 'idea'); assert.equal(all(card, item => item.cls === 'vam-status vam-status-queued').length, 0);
 });
-integrationTest('outline reveal expands collapsed ancestors, centers and selects the topic, and reports unknown paths', async () => {
+// B15 (P1.6c): an outline reveal is read-only navigation, like a search hit (V3.3 decision #7): it never writes collapse.
+integrationTest('outline reveal selects the topic without writing collapse, centers on the top collapsed ancestor, and reports unknown paths', async () => {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const root = node('root'), child = node('child'), leaf = node('leaf');
   child.parentId = root.id; leaf.parentId = child.id; root.collapsed = true; child.collapsed = true;
   const doc = map([root, child, leaf]); doc.viewport = { x: 0, y: 0, zoom: 1 }; leaf.x = 1000; leaf.y = 400;
-  const view = new VisualAgentMapView({ app: {} }, { mutate: work => work(), expansionBatches: new Map() });
+  const active = [];
+  const view = new VisualAgentMapView({ app: {} }, { mutate: work => work(), expansionBatches: new Map(), setOutlineActive: path => active.push(path) });
   view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600 };
-  let renders = 0; view.render = () => { renders++; }; view.transform = () => {}; view.saveViewport = () => {};
-  view.mapChange = async change => { change(view.map); };
+  let saves = 0, changes = 0; view.render = () => {}; view.transform = () => {}; view.saveViewport = () => { saves++; };
+  view.mapChange = async change => { changes++; change(view.map); };
   view.selection.replaceMulti(['root']);
   assert.equal(await view.revealPath('leaf.md'), true);
-  assert.equal(root.collapsed, false); assert.equal(child.collapsed, false);
-  assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0); assert.ok(renders > 0);
-  assert.deepEqual(plain(doc.viewport), { x: 400 - 1140, y: 300 - 480, zoom: 1 });
+  assert.equal(root.collapsed, true, 'collapse is not written'); assert.equal(child.collapsed, true, 'collapse is not written');
+  assert.equal(changes, 0, 'no map change'); assert.equal(saves, 0, 'the camera move is not saved');
+  assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0);
+  assert.deepEqual(plain(doc.viewport), { x: 400 - (root.x + 140), y: 300 - (root.y + 80), zoom: 1 }, 'centered on the top collapsed ancestor');
   view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');
   assert.deepEqual([...view.selection.state.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selection.state.selected, null);

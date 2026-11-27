@@ -407,6 +407,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* Research frame: open questions read as an unfinished frontier, concluded topics as settled ground. */
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
+/* The ordinary card's visible hover (V3.3 P1.2). 0,3,0 like the idea frame just above, so placed after it wins; the typed-card frames below are 0,3,0 too and come later, so they keep theirs. Selected and queued/running/error cards keep their own frames. */
+.vam-node:not([data-aim-kind], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover { border-color: color-mix(in srgb, var(--vam-muted) 75%, var(--background-modifier-border-hover)); }
 .vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }
 .vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }
 /* Unsaved summary preview under a multi-select synthesis or merge status bar (plain text, outside the live region). */
@@ -2132,3 +2134,14 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-outline-row.is-drop-after { box-shadow: 0 2px 0 0 var(--interactive-accent); }
 .vam-outline-row.is-drop-into { background: var(--background-modifier-hover); outline: 1px solid var(--interactive-accent); outline-offset: -1px; }
 .vam-outline-reason { padding: 6px 12px; color: var(--text-error); font-size: var(--font-ui-small); }
+
+/* V3.3 A6: the selected card's edge entries ("+ Topic card"), on the side its child cards grow toward. Outside the card's layout box; shown with the card's toolbar rules. A second entry (A7) stacks in the same container. */
+.vam-node > .vam-card-edge { position: absolute; display: flex; gap: var(--vam-space-2); z-index: 2; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.12s ease; }
+.vam-node > .vam-card-edge.is-edge-right { left: 100%; top: 50%; flex-direction: column; align-items: flex-start; transform: translate(var(--vam-space-1), -50%); }
+.vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%); }
+.vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1)); }
+.vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1))); }
+.vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node:focus-within > .vam-card-edge, .vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node.is-selected > .vam-card-edge { opacity: 1; visibility: visible; pointer-events: auto; }
+.vam-card-edge .vam-card-edge-button { height: 22px /* A2 mockup */; padding: 0 var(--vam-space-2); border-radius: 999px /* pill, A2 */; border: 1px solid var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
+.vam-card-edge .vam-card-edge-button:hover { background: var(--vam-accent); color: var(--vam-surface); }
+.vam-card-edge .vam-card-edge-button:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }

@@ -2077,7 +2077,7 @@ export class Repository {
         const raw = await this.app.vault.read(file);
         const metadata = frontmatter(raw);
         if (!marker(metadata["agent-map-node"])) continue;
-        const note = this.parseNote(file.path, raw);
+        const note = await this.parseNote(file.path, raw);
         const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
         const sourcePaths = rebasePathList(note.sourcePaths, pairs);
         // The Living Node reference list is separate from the legacy citation lists.

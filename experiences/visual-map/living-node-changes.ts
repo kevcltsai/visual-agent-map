@@ -42,6 +42,8 @@ export interface LivingChangeContext {
   /** Evidence collected by the trusted source resolver, not IDs invented by the model. */
   evidence: readonly LivingEvidence[];
   at: string;
+  /** Web activity observed during the run (never model text): a page opened or a search made, and when. */
+  checked?: readonly { url?: string; query?: string; at: string }[];
 }
 
 type ObjectValue = Record<string, unknown>;

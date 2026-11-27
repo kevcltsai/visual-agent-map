@@ -24,9 +24,15 @@ import {
 } from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
-import { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } from "./living-node-markdown";
+import {
+  commitLivingMarkdown,
+  livingGeneration,
+  livingSnapshotRevision,
+  readLivingMarkdown
+} from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
+import { fitLivingContext, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import {
   applyLivingChanges,
@@ -388,13 +394,34 @@ async function readInputs(
   const full = /full (?:text|content|history)|complete (?:text|history)|全文|完整內容|完整内容|歷史紀錄|历史记录/i.test(
     prompt
   );
-  const add = (identity: string, title: string, content: string, summary?: string, optional = false): void => {
+  const selectors = parseLivingSelectors(
+    prompt,
+    base.records.map(record => record.id)
+  );
+  const candidates: {
+    identity: string;
+    title: string;
+    content: string;
+    scoped: string;
+    scope: string;
+    revision: string;
+    evidenceId: string;
+    optional: boolean;
+  }[] = [];
+  const add = (
+    identity: string,
+    title: string,
+    content: string,
+    summary?: string,
+    optional = false,
+    selected?: string
+  ): void => {
     if (seen.has(identity)) return;
     seen.add(identity);
     const revision = livingSnapshotRevision(content);
-    const scoped = !full && summary?.trim() && !isPlaceholder(summary) ? summary : content;
-    const scope = scoped === content ? "full" : "summary";
-    if (documents.length >= 100 || characters + scoped.length > 60_000) {
+    const scoped = selected ?? (!full && summary?.trim() && !isPlaceholder(summary) ? summary : content);
+    const scope = selected !== undefined ? "section" : scoped === content ? "full" : "summary";
+    if (candidates.length >= 100 || characters + scoped.length > 60_000) {
       if (!optional) throw new Error("living-node-context-too-large");
       // Do not grant a citation handle to context that the model never receives.
       warnings.push("map-source-budget-omitted: " + title);
@@ -402,9 +429,16 @@ async function readInputs(
     }
     characters += scoped.length;
     const evidenceId = "note:" + livingSnapshotRevision(identity + ":" + revision);
-    reads.push({ id: identity, revision, scope });
-    if (scoped.trim()) evidence.push({ id: evidenceId, source: title, retrievedAt: at });
-    documents.push({ id: evidenceId, title, scope, text: scoped, revision });
+    candidates.push({ identity, title, content, scoped, scope, revision, evidenceId, optional });
+  };
+  /** A quoted `Note > H2 > H3` path whose note is this source delivers exactly that section; none or several fail closed. */
+  const sectionTitles = new Set<string>();
+  const sections = (title: string, text: string): string | undefined => {
+    sectionTitles.add(title);
+    const picked = selectors.paths
+      .filter(path => path[0] === title)
+      .map(path => resolveLivingSection(text, path.slice(1), path));
+    return picked.length ? picked.join("\n\n") : undefined;
   };
   // Own user material participates in the input revision independently from AI-generated records.
   add("self:" + id, snapshot.note.title, ownKnowledge(snapshot.note));
@@ -424,9 +458,12 @@ async function readInputs(
       const text = port.noteReads
         ? await readOnce(port.noteReads, file.path, () => port.app.vault.read(file))
         : await port.app.vault.read(file);
-      add(source.identity, file.basename, readableMarkdown(text));
+      const readable = readableMarkdown(text);
+      add(source.identity, file.basename, readable, undefined, false, sections(file.basename, readable));
     }
   }
+  for (const path of selectors.paths)
+    if (!sectionTitles.has(path[0])) warnings.push("section-path-no-source: " + path.join(" > "));
   const mapContext = await readLivingMapContext(port);
   if (mapContext.unavailable > 0) warnings.push("map-source-unavailable");
   for (const group of mapContext.groups) {
@@ -451,6 +488,39 @@ async function readInputs(
       add("map:" + document.path, document.path, readableMarkdown(document.content), undefined, true);
     }
   }
+  // One budget for the whole prompt: shell, required sources, required range, recent records, then optional sources.
+  const size = (item: (typeof candidates)[number]): number =>
+    JSON.stringify({
+      id: item.evidenceId,
+      title: item.title,
+      scope: item.scope,
+      text: item.scoped,
+      revision: item.revision
+    }).length + 1;
+  const kept = fitLivingContext({
+    prompt,
+    language: port.language(map, snapshot.note),
+    base,
+    documents: candidates.map(item => ({ size: size(item), optional: item.optional })),
+    warningRoom:
+      candidates.reduce((sum, item) => sum + (item.optional ? item.title.length + 40 : 0), 0) +
+      warnings.reduce((sum, item) => sum + item.length + 4, 0)
+  });
+  candidates.forEach((item, index) => {
+    if (item.optional && !kept.has(index)) {
+      warnings.push("map-source-budget-omitted: " + item.title);
+      return;
+    }
+    reads.push({ id: item.identity, revision: item.revision, scope: item.scope });
+    if (item.scoped.trim()) evidence.push({ id: item.evidenceId, source: item.title, retrievedAt: at });
+    documents.push({
+      id: item.evidenceId,
+      title: item.title,
+      scope: item.scope,
+      text: item.scoped,
+      revision: item.revision
+    });
+  });
   const inputRevision = livingInputRevision({
     configRevision: configKey(snapshot, map, id, port),
     model: snapshot.note.model,
@@ -599,7 +669,16 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
               validity: usableKnowledge(checked.snapshot) ? "stale" : "none"
             };
           if (!checked.unchanged) return { current: false, locked: false, validity: "stale" };
-          const value = await read(id);
+          // An input that cannot fit or select exactly is reported with its reason (range, path), then fails closed.
+          const value = await read(id).catch((error: unknown) => {
+            if (
+              /^(?:living-range-too-large|living-section-ambiguous|living-node-context-too-large)/.test(
+                String((error as Error)?.message)
+              )
+            )
+              port.onFailure(id, error);
+            throw error;
+          });
           cache.set(id, value);
           const fm = frontmatter(value.snapshot.content);
           const validity = !usableKnowledge(value.snapshot)
@@ -650,6 +729,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
               expectedContent: snapshot.content,
               candidate,
               base: input.base,
+              baseGeneration: livingGeneration(snapshot.content),
               proposal: generated.proposal,
               context: generated.context,
               signal,

@@ -1666,3 +1666,29 @@ S.integrationTest('Living Node A26: unknown ids, foreign cards, unknown fields a
     assert.equal(task.webSearchOnly, true);
   }
 });
+
+S.integrationTest('Living Node: user text typed after the managed region survives Detail writes, with the AI card on or off', async () => {
+  for (const aiCardOn of [true, false]) {
+    const f = await setup();
+    assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+    f.contents.set(path, f.contents.get(path) + '\nUSER TRAILING NOTE\n');
+    await f.repo.writeAiCard(path, aiCardOn);
+    const note = await f.repo.readNote(path);
+    await f.repo.updateNote(path, { detail: `${note.detail}\n\nresearch addition` });
+    const after = f.contents.get(path);
+    assert.ok(after.includes('USER TRAILING NOTE'), `trailing text kept (aiCard ${aiCardOn})`);
+    assert.ok(after.includes('research addition'));
+    assert.equal((after.match(/vam-living-node:begin/g) ?? []).length, 1);
+    assert.ok(after.indexOf('USER TRAILING NOTE') > after.indexOf('vam-living-node:end'), 'trailing text stays after the region');
+  }
+});
+
+S.integrationTest('Living Node: a Detail write without text after the region leaves the region and its end unchanged', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  await f.repo.updateNote(path, { detail: 'New detail' });
+  const first = f.contents.get(path);
+  assert.ok(first.endsWith('<!-- vam-living-node:end v1 -->\n'));
+  await f.repo.updateNote(path, { detail: 'New detail' });
+  assert.equal(f.contents.get(path).replace(/updated: .*\n/, ''), first.replace(/updated: .*\n/, ''));
+});

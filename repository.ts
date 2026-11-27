@@ -1015,7 +1015,22 @@ export class Repository {
     if (patch.sourcePaths !== undefined)
       patch.sourcePaths.length ? (fm["source-notes"] = patch.sourcePaths) : delete fm["source-notes"];
     fm.updated = new Date().toISOString();
-    const separated = splitLivingNodeRegion(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    const withoutFrontmatter = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+    const separated = splitLivingNodeRegion(withoutFrontmatter);
+    // Text typed right after the region (before any `## ` heading) is no part of Detail on read, so a Detail write keeps it, after the region.
+    let trailing = "";
+    if (separated.region) {
+      const afterRegion = withoutFrontmatter.slice(
+        withoutFrontmatter.indexOf(separated.region) + separated.region.length
+      );
+      const nextHeading = afterRegion.search(/^## /m);
+      const candidate = nextHeading < 0 ? afterRegion : afterRegion.slice(0, nextHeading);
+      if (candidate.trim()) {
+        trailing = candidate.replace(/\s+$/, "");
+        separated.body =
+          separated.body.slice(0, separated.body.length - afterRegion.length) + afterRegion.slice(candidate.length);
+      }
+    }
     let body = decodeCalloutSections(separated.body);
     // AIM notes carry their content language; every other note keeps following the interface language.
     const textLanguage = options.contentLanguage ?? noteContentLanguage(fm) ?? language;
@@ -1088,7 +1103,7 @@ export class Repository {
       withReferenceLinks(body, fm, language),
       writtenHeadingSet(content, this.headingsFor(textLanguage))
     );
-    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}\n` : ""}`;
+    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}${trailing ? `${trailing}\n` : "\n"}` : ""}`;
   }
 
   async createNote(

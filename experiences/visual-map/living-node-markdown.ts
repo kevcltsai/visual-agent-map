@@ -4,10 +4,11 @@ import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatt
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
-  livingEventFingerprint,
-  livingEventScopeFingerprint,
   livingEventTombstone,
+  livingSuppressionV2,
+  livingSuppressionV2Entry,
   parseLivingEventTombstone,
+  parseLivingSuppressionV2,
   type LivingChangeContext,
   type LivingEvidence,
   type LivingKnowledge,
@@ -121,7 +122,7 @@ function renderRegion(knowledge: LivingKnowledge): string {
     }
   }
   lines.push("", "### Suppression");
-  for (const id of knowledge.suppressed) lines.push(field("ID", id));
+  for (const id of knowledge.suppressed) lines.push(field(parseLivingSuppressionV2(id) ? "Suppression v2" : "ID", id));
   lines.push("", END);
   return lines.join("\n");
 }
@@ -229,9 +230,10 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
   expect("");
   expect("### Suppression");
   const suppressed: string[] = [];
-  while (lines[at]?.startsWith("- ID: ")) {
-    const id = text(readField("ID"));
-    if (!id || ids.has(id)) fail();
+  while (lines[at]?.startsWith("- ID: ") || lines[at]?.startsWith("- Suppression v2: ")) {
+    const v2 = lines[at].startsWith("- Suppression v2: ");
+    const id = text(readField(v2 ? "Suppression v2" : "ID"));
+    if (!id || ids.has(id) || !!parseLivingSuppressionV2(id) !== v2) fail();
     ids.add(id);
     suppressed.push(id);
   }
@@ -293,6 +295,8 @@ interface OwnershipIndex {
   output: string;
   records: Map<string, string>;
   events: Map<string, { fingerprint: string; scope?: string; unknownTime?: boolean }>;
+  /** Suppression v2 entry (as stored string) for records written by this version. */
+  v2: Map<string, string>;
   suppressed: Set<string>;
 }
 
@@ -301,14 +305,7 @@ function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
     ...knowledge.records.map(record =>
-      JSON.stringify([
-        "record",
-        record.id,
-        recordHash(record),
-        livingEventFingerprint(record),
-        livingEventScopeFingerprint(record),
-        record.eventTime === null
-      ])
+      JSON.stringify(["record", record.id, recordHash(record), livingSuppressionV2Entry(livingSuppressionV2(record))])
     ),
     ...knowledge.suppressed.map(id => JSON.stringify(["suppressed", id]))
   ];
@@ -317,7 +314,13 @@ function ownership(knowledge: LivingKnowledge): string[] {
 function readOwnership(raw: unknown): OwnershipIndex | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) throw new Error("invalid-ownership-index");
-  const index: OwnershipIndex = { output: "", records: new Map(), events: new Map(), suppressed: new Set() };
+  const index: OwnershipIndex = {
+    output: "",
+    records: new Map(),
+    events: new Map(),
+    v2: new Map(),
+    suppressed: new Set()
+  };
   const validHash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
   for (const line of raw as unknown[]) {
     if (typeof line !== "string") throw new Error("invalid-ownership-index");
@@ -328,14 +331,17 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
     } else if (
       value[0] === "record" &&
       (value.length === 3 ||
-        (value.length === 4 && validHash(value[3])) ||
+        (value.length === 4 && (validHash(value[3]) || typeof value[3] === "string")) ||
         (value.length === 6 && validHash(value[3]) && validHash(value[4]) && typeof value[5] === "boolean")) &&
       typeof value[1] === "string" &&
       validHash(value[2]) &&
       !index.records.has(value[1])
     ) {
       index.records.set(value[1], value[2]);
-      if (validHash(value[3])) {
+      if (value.length === 4 && typeof value[3] === "string" && !validHash(value[3])) {
+        if (!parseLivingSuppressionV2(value[3])) throw new Error("invalid-ownership-index");
+        index.v2.set(value[1], value[3]);
+      } else if (validHash(value[3])) {
         const scope = value[4] as unknown;
         const unknownTime = value[5] as unknown;
         index.events.set(value[1], {
@@ -354,14 +360,24 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
 /** Reconcile only recognizable complete records; an unparseable region fails closed, byte for byte. */
 function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): LivingKnowledge {
   const suppressed = new Set([...current.suppressed, ...index.suppressed]);
+  const stored = new Set(suppressed);
   const ids = new Set(current.records.map(record => record.id));
   for (const id of index.records.keys()) {
     if (ids.has(id)) continue;
     suppressed.add(id);
+    const v2 = index.v2.get(id);
+    if (v2) suppressed.add(v2);
     const event = index.events.get(id);
     if (event) suppressed.add(livingEventTombstone(id, event.fingerprint, event.scope, event.unknownTime));
   }
   const records = current.records.map(record => {
+    const v2 = livingSuppressionV2Entry(livingSuppressionV2(record));
+    // A record matching a hold already stored in the region was added back by a human: lift the hold and protect it.
+    // Holds created by this very read (a sibling deleted just now) never lift.
+    if (stored.has(v2)) {
+      suppressed.delete(v2);
+      return { ...record, owner: "user" as const };
+    }
     if (suppressed.has(record.id)) {
       // An explicit human re-add of the record is protected and releases its tombstone.
       suppressed.delete(record.id);

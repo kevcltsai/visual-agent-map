@@ -1184,6 +1184,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial_unsaved": "试跑・尚未保存",
   "ui.living_node_removed_source_0": "已移除下列 AI 卡片引用的来源：{0}。原引用仍保留，请修复来源或撤销。",
   "ui.living_node_omitted_edits_skipped": "部分对较旧记录的修改已略过，因为那些记录未发送给 AI。",
+  "ui.living_node_suppressed_dropped_0": "已略过 {0} 条你先前删除过的观察。",
   "ui.living_node_optional_source_unavailable": "部分地图级可选来源无法读取；本次结果仅使用可取得的资料。",
   "ui.living_node_trial_stale_sources": "此试跑使用仍需更新的上游知识；请先正式执行卡片，再采用结果。",
   "ui.living_node_trial_frozen_sources": "此试跑使用已锁定的上游知识，信息可能不是最新。",

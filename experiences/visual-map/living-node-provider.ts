@@ -3,7 +3,12 @@ import { allowedUrl, openedUrlsFromEvents } from "../../core/argument-map/source
 import { stepEffort } from "../../core/provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../core/step-runner";
 import type { ModelChoice } from "../../ai/model-resolution";
-import { applyLivingChanges, type LivingEvidence, type LivingKnowledge } from "./living-node-changes";
+import {
+  applyLivingChanges,
+  livingAppendSuppressed,
+  type LivingEvidence,
+  type LivingKnowledge
+} from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
 import { livingNodeChangeSetTemplate as promptTemplate } from "./steps/fragments";
 
@@ -24,7 +29,13 @@ function eventMillis(record: LivingKnowledge["records"][number]): number | undef
   return Number.isNaN(time) ? undefined : time;
 }
 
-/** Deterministic bounded view of the card's own store: revision, output and suppressed IDs always, then the
+/** What the model may see of the card's store. Deleted-observation holds stay local: they are enforced by
+ * validation and never sent, so a deleted observation cannot leak back out through the prompt. */
+function modelView(base: LivingKnowledge) {
+  return { revision: base.revision, records: base.records, output: base.output };
+}
+
+/** Deterministic bounded view of the card's own store: revision and output always, then the
  * most recent records (event time, then insertion order) that fit the remaining prompt budget. Validation
  * still runs against the full base; omitted records are only hidden from the model. */
 function projectKnowledge(base: LivingKnowledge, budget: number): { text: string; omitted: Set<string> } {
@@ -45,7 +56,7 @@ function projectKnowledge(base: LivingKnowledge, budget: number): { text: string
     keep.add(index);
   }
   const omitted = new Set(base.records.filter((_, index) => !keep.has(index)).map(record => record.id));
-  if (!omitted.size) return { text: JSON.stringify(base), omitted };
+  if (!omitted.size) return { text: JSON.stringify(modelView(base)), omitted };
   const shown = base.records.filter((_, index) => keep.has(index));
   const times = shown.flatMap(record => (eventMillis(record) === undefined ? [] : [record.eventTime as string]));
   const oldest = times.sort((a, b) => Date.parse(a) - Date.parse(b))[0];
@@ -54,14 +65,13 @@ function projectKnowledge(base: LivingKnowledge, budget: number): { text: string
     records: shown,
     omittedOlderRecords: omitted.size,
     ...(oldest ? { oldestShownEventTime: oldest } : {}),
-    suppressed: base.suppressed,
     output: base.output
   });
   return { text, omitted };
 }
 
 function projectionFor(input: LivingProviderInput) {
-  const full = JSON.stringify(input.base);
+  const full = JSON.stringify(modelView(input.base));
   const whole = renderPrompt(input, full);
   if (whole.length <= MAX_PROMPT_CHARS) return { prompt: whole, omitted: new Set<string>() };
   // Worst-case shell: both projection fields at their longest possible value, so the prompt never exceeds the cap.
@@ -77,7 +87,6 @@ function projectionFor(input: LivingProviderInput) {
       records: [],
       omittedOlderRecords: input.base.records.length,
       oldestShownEventTime: longest,
-      suppressed: input.base.suppressed,
       output: input.base.output
     })
   ).length;
@@ -250,12 +259,18 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         omitted.has(String(operation.id));
       const droppedOperations = normalized.proposal.operations.filter(blind).length;
       normalized.proposal.operations = normalized.proposal.operations.filter(operation => !blind(operation));
+      // Appends that deleted-observation holds reject are dropped locally and counted, not sent back or failed.
+      const before = normalized.proposal.operations.length;
+      normalized.proposal.operations = normalized.proposal.operations.filter(
+        operation => !livingAppendSuppressed(input.base, operation)
+      );
+      const suppressedDropped = before - normalized.proposal.operations.length;
       // The model's echoed revision is not trusted: context documents carry their own revision fields and models
       // confuse them. Real staleness is fenced at commit by the expected file content and snapshot revision.
       normalized.proposal.baseRevision = input.base.revision;
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();
-      return { ...normalized, droppedOperations };
+      return { ...normalized, droppedOperations, suppressedDropped };
     }
   );
 }

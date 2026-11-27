@@ -143,6 +143,70 @@ export function livingEventFingerprint(record: LivingRecord): string {
   return fingerprint([livingEventScopeFingerprint(record), granularityKey(record.granularity), time]);
 }
 
+/** Suppression v2 entry. Legacy v1 tombstones stay as stored strings and are never recomputed. */
+export interface LivingSuppressionV2 {
+  v: 2;
+  type: "event";
+  scopeKey: string;
+  periodKey: string | null;
+  fp2: string;
+}
+
+const V2_PREFIX = "@v2:";
+
+/** Scope identity ignores case, width, punctuation and spacing so a reworded scope label still matches. */
+function scopeWords(value: string): string {
+  return normalized(value)
+    .replace(/[\p{P}\p{S}\s]+/gu, " ")
+    .trim();
+}
+
+/** The time truncated to its observation period, so a date, a timestamp and an offset form of one day agree. */
+function periodKey(record: LivingRecord): string | null {
+  const time = timeKey(record.eventTime);
+  if (time === null) return null;
+  const granularity = granularityKey(record.granularity);
+  const iso = /^(\d{4})-(\d\d)(?:-(\d\d))?(?:T(\d\d))?/.exec(time);
+  if (!iso) return time;
+  if (granularity === "day") return iso[3] ? iso[1] + "-" + iso[2] + "-" + iso[3] : time;
+  if (granularity === "hour") return iso[3] && iso[4] ? iso[1] + "-" + iso[2] + "-" + iso[3] + "T" + iso[4] : time;
+  if (granularity === "month") return iso[1] + "-" + iso[2];
+  if (granularity === "year") return iso[1];
+  return time;
+}
+
+export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {
+  const scopeKey = fingerprint(["v2", scopeWords(record.subject), scopeWords(record.scope)]);
+  const period = periodKey(record);
+  return {
+    v: 2,
+    type: "event",
+    scopeKey,
+    periodKey: period,
+    fp2: fingerprint([scopeKey, granularityKey(record.granularity), period])
+  };
+}
+
+export function livingSuppressionV2Entry(entry: LivingSuppressionV2): string {
+  return V2_PREFIX + JSON.stringify([entry.v, entry.type, entry.scopeKey, entry.periodKey, entry.fp2]);
+}
+
+export function parseLivingSuppressionV2(value: string): LivingSuppressionV2 | undefined {
+  if (!value.startsWith(V2_PREFIX)) return undefined;
+  try {
+    const raw: unknown = JSON.parse(value.slice(V2_PREFIX.length));
+    if (!Array.isArray(raw) || raw.length !== 5) return undefined;
+    const [v, type, scopeKey, period, fp2] = raw as unknown[];
+    const hash = (x: unknown): x is string => typeof x === "string" && /^[a-f0-9]{64}$/.test(x);
+    if (v !== 2 || type !== "event" || !hash(scopeKey) || !hash(fp2)) return undefined;
+    if (period !== null && (typeof period !== "string" || !period || period.length > 100)) return undefined;
+    const entry: LivingSuppressionV2 = { v: 2, type: "event", scopeKey, periodKey: period as string | null, fp2 };
+    return livingSuppressionV2Entry(entry) === value ? entry : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function livingEventTombstone(recordId: string, event: string, scope?: string, unknownTime = false): string {
   return scope
     ? "@event:" + event + ":" + scope + ":" + (unknownTime ? "u" : "k") + ":" + recordId
@@ -215,6 +279,73 @@ function duplicateRecord(
   return undefined;
 }
 
+interface SuppressionIndex {
+  /** Record IDs held by legacy ID-only or v1 tombstones: only that same ID is blocked. */
+  ids: Set<string>;
+  v1: ReturnType<typeof parseLivingEventTombstone>[];
+  v2: LivingSuppressionV2[];
+}
+
+function suppressionIndex(base: Pick<LivingKnowledge, "suppressed">): SuppressionIndex {
+  const index: SuppressionIndex = { ids: new Set(), v1: [], v2: [] };
+  for (const value of base.suppressed) {
+    const v2 = parseLivingSuppressionV2(value);
+    if (v2) {
+      index.v2.push(v2);
+      continue;
+    }
+    const event = parseLivingEventTombstone(value);
+    if (event) {
+      index.v1.push(event);
+      index.ids.add(event.recordId);
+    } else index.ids.add(value);
+  }
+  return index;
+}
+
+function suppressionVerdict(index: SuppressionIndex, candidate: LivingRecord): string | undefined {
+  const v1 = livingEventFingerprint(candidate);
+  const v2 = livingSuppressionV2(candidate);
+  if (index.v1.some(event => event?.fingerprint === v1) || index.v2.some(entry => entry.fp2 === v2.fp2))
+    return "suppressed-record";
+  const scope = livingEventScopeFingerprint(candidate);
+  if (
+    index.v1.some(event => event?.scope === scope && (event.unknownTime || candidate.eventTime === null)) ||
+    index.v2.some(entry => entry.scopeKey === v2.scopeKey && (entry.periodKey === null || candidate.eventTime === null))
+  )
+    return "ambiguous-suppression";
+  return undefined;
+}
+
+/** An append that existing suppression would reject. The provider drops these locally and counts them. */
+export function livingAppendSuppressed(base: Pick<LivingKnowledge, "suppressed">, raw: unknown): boolean {
+  try {
+    const op = object(raw);
+    if (op.kind !== "append") return false;
+    const index = suppressionIndex(base);
+    if (index.ids.has(id(op.id))) return true;
+    return !!suppressionVerdict(index, {
+      id: id(op.id),
+      subject: string(op.subject, 500),
+      scope: string(op.scope, 500),
+      granularity: string(op.granularity, 100),
+      eventTime: op.eventTime === null ? null : string(op.eventTime, 100),
+      claim: "",
+      evidence: [],
+      validity: "active",
+      owner: "ai",
+      history: []
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** Legacy ID-only entries, listed for diagnostics. */
+export function livingLegacySuppressionIds(base: Pick<LivingKnowledge, "suppressed">): string[] {
+  return base.suppressed.filter(value => !parseLivingSuppressionV2(value) && !parseLivingEventTombstone(value));
+}
+
 /** No file I/O and no arbitrary Markdown rewriting: a bad operation rejects the entire proposal. */
 export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context: LivingChangeContext) {
   const proposal = object(raw);
@@ -223,16 +354,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   if (!Array.isArray(proposal.operations) || proposal.operations.length > 200) throw new Error("invalid-operations");
   const records = new Map(base.records.map(record => [record.id, record]));
   if (records.size !== base.records.length) throw new Error("duplicate-record");
-  const suppressed = new Set(base.suppressed);
-  const events = base.suppressed.flatMap(value => {
-    const event = parseLivingEventTombstone(value);
-    return event ? [event] : [];
-  });
-  const knownSuppression = new Set(events.map(event => event.recordId));
-  const suppressedFingerprints = new Set(events.map(event => event.fingerprint));
-  const ambiguousSuppression = base.suppressed.some(
-    value => !parseLivingEventTombstone(value) && !knownSuppression.has(value)
-  );
+  const suppression = suppressionIndex(base);
   const allowed = new Map(context.evidence.map(entry => [entry.id, entry]));
   // Retained evidence can be selected explicitly for a new conclusion. It is
   // already formal knowledge, not a new retrieval or an invented source.
@@ -266,7 +388,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
       continue;
     }
     const recordId = id(operation.id);
-    if (suppressed.has(recordId) || knownSuppression.has(recordId)) throw new Error("suppressed-record");
+    if (suppression.ids.has(recordId)) throw new Error("suppressed-record");
     const old = records.get(recordId);
     if (kind === "append") {
       exactKeys(operation, ["kind", "id", "subject", "scope", "granularity", "eventTime", "claim", "evidence"]);
@@ -284,18 +406,9 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         owner: "ai",
         history: []
       };
-      if (suppressedFingerprints.has(livingEventFingerprint(candidate))) throw new Error("suppressed-record");
-      if (
-        events.some(
-          event =>
-            event.scope === livingEventScopeFingerprint(candidate) &&
-            (event.unknownTime || candidate.eventTime === null)
-        )
-      )
-        throw new Error("ambiguous-suppression");
+      const blocked = suppressionVerdict(suppression, candidate);
+      if (blocked) throw new Error(blocked);
       const duplicate = duplicateRecord(records, candidate);
-      // A legacy ID-only tombstone cannot prove an unknown new record is safe.
-      if (!duplicate && ambiguousSuppression) throw new Error("ambiguous-suppression");
       if (duplicate) {
         if (duplicate.owner !== "ai") throw new Error("protected-record");
         if (duplicate.validity !== "active") throw new Error("inactive-record-requires-resolution");

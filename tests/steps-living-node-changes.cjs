@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyLivingChanges, hasLivingResult, livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
+const { applyLivingChanges, hasLivingResult, livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone, livingSuppressionV2, livingSuppressionV2Entry, parseLivingSuppressionV2, livingAppendSuppressed, livingLegacySuppressionIds } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
 const e = (id, retrievedAt = 't1') => ({ id, source: 'source:' + id, retrievedAt });
 const context = { at: 't2', evidence: [e('e1', 't2'), e('e2')] };
 const record = (extra = {}) => ({ id: 'r1', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: [e('e1')], validity: 'active', owner: 'ai', history: [], ...extra });
@@ -155,7 +155,6 @@ test('change set: suppression survives new record ID, value and day alias; unrel
   assert.throws(() => apply(b, { ...op, eventTime: null }), /ambiguous-suppression/);
   assert.equal(apply(b, { ...op, eventTime: '2026-11-27' }).records.length, 1);
   assert.equal(apply(b, { ...op, scope: 'dividend' }).records.length, 1);
-  assert.throws(() => apply(base({ records: [], suppressed: ['legacy-id'] }), op), /ambiguous-suppression/);
   const unknown = record({ eventTime: null, granularity: 'event' });
   const ub = base({ records: [], suppressed: ['r1', livingEventTombstone(unknown.id, livingEventFingerprint(unknown), livingEventScopeFingerprint(unknown), true)] });
   assert.throws(() => apply(ub, { ...op, eventTime: '2026-11-27' }), /ambiguous-suppression/);
@@ -168,4 +167,59 @@ test('A08: re-querying an already recorded change observation under a new ID is 
   assert.equal(again.changed, false);
   assert.equal(again.records.length, 2);
   assert.deepEqual(plain(again.records), plain(first.records));
+});
+
+const v2 = r => livingSuppressionV2Entry(livingSuppressionV2(r));
+const appendOp = (extra = {}) => ({ kind: 'append', id: 'r2', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '105', evidence: ['e2'], ...extra });
+
+test('A39 suppression v2: same event under a new id, wording, scope punctuation, time form or source stays suppressed', () => {
+  const b = base({ records: [], suppressed: [v2(record())] });
+  for (const extra of [{}, { id: 'brand-new' }, { claim: 'reworded' }, { evidence: ['e1'] }, { subject: 'STOCK', scope: 'Price.' }, { scope: '  price  ' }, { granularity: 'day' }, { eventTime: '2026-11-26T09:30:00+08:00' }, { eventTime: '2026-11-26T20:00:00Z' }])
+    assert.throws(() => apply(b, appendOp(extra)), /suppressed-record/, JSON.stringify(extra));
+  assert.equal(apply(b, appendOp({ eventTime: '2026-11-27' })).records.length, 1);
+  assert.equal(apply(b, appendOp({ scope: 'dividend' })).records.length, 1);
+  assert.throws(() => apply(b, appendOp({ eventTime: null })), /ambiguous-suppression/);
+});
+
+test('A39 suppression v2: unknown-time hold blocks the whole scope, a month period matches any day in it', () => {
+  const unknown = record({ eventTime: null, granularity: 'event' });
+  assert.throws(() => apply(base({ records: [], suppressed: [v2(unknown)] }), appendOp({ eventTime: '2026-11-27' })), /ambiguous-suppression/);
+  const month = record({ granularity: 'monthly', eventTime: '2026-11-01' });
+  const b = base({ records: [], suppressed: [v2(month)] });
+  assert.throws(() => apply(b, appendOp({ granularity: 'month', eventTime: '2026-11-30' })), /suppressed-record/);
+  assert.equal(apply(b, appendOp({ granularity: 'month', eventTime: '2026-12-01' })).records.length, 1);
+});
+
+test('A39 suppression v2: entries are strict, canonical and carry no claim text', () => {
+  const entry = v2(record());
+  assert.deepEqual(plain(parseLivingSuppressionV2(entry)), plain(livingSuppressionV2(record())));
+  assert.equal(entry.includes('100'), false);
+  for (const bad of ['@v2:', '@v2:[2,"event"]', entry.replace('[2,', '[3,'), entry + ' ', '@v2:[2,"event","x","2026",null]'])
+    assert.equal(parseLivingSuppressionV2(bad), undefined, bad);
+});
+
+test('A39 legacy: id-only tombstone matches only its own id, unrelated append works and is listed for diagnostics', () => {
+  const b = base({ records: [], suppressed: ['legacy-id'] });
+  assert.equal(apply(b, appendOp()).records.length, 1);
+  assert.throws(() => apply(b, appendOp({ id: 'legacy-id' })), /suppressed-record/);
+  assert.deepEqual(plain(livingLegacySuppressionIds(b)), ['legacy-id']);
+});
+
+test('A39 legacy: v1 fingerprints are dual-read and v1 and v2 entries coexist byte-identical', () => {
+  const old = record();
+  const tombstone = livingEventTombstone(old.id, livingEventFingerprint(old), livingEventScopeFingerprint(old), false);
+  const other = record({ id: 'r9', scope: 'dividend' });
+  const b = base({ records: [], suppressed: ['r1', tombstone, v2(other)] });
+  assert.throws(() => apply(b, appendOp({ subject: 'Stock', granularity: 'day' })), /suppressed-record/);
+  assert.throws(() => apply(b, appendOp({ scope: 'dividend' })), /suppressed-record/);
+  assert.equal(apply(b, appendOp({ eventTime: '2026-11-27' })).records.length, 1);
+  assert.deepEqual(plain(b.suppressed), ['r1', tombstone, v2(other)]);
+});
+
+test('A39: livingAppendSuppressed reports only appends the holds reject', () => {
+  const b = base({ records: [], suppressed: [v2(record())] });
+  assert.equal(livingAppendSuppressed(b, appendOp()), true);
+  assert.equal(livingAppendSuppressed(b, appendOp({ eventTime: '2026-11-27' })), false);
+  assert.equal(livingAppendSuppressed(b, { kind: 'supplement', id: 'r1', evidence: ['e1'] }), false);
+  assert.equal(livingAppendSuppressed(b, { kind: 'append' }), false);
 });

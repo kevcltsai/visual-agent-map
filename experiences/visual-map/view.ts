@@ -15580,15 +15580,17 @@ export class VisualAgentMapView extends ItemView {
                 }
                 this.aiCardOpen.adoption = prepared.adoption;
                 const warnings = prepared.warnings.map(warning =>
-                  t(
-                    warning === "upstream-stale"
-                      ? "ui.living_node_trial_stale_sources"
-                      : warning === "frozen-source"
-                        ? "ui.living_node_trial_frozen_sources"
-                        : warning === "omitted-edits-skipped"
-                          ? "ui.living_node_omitted_edits_skipped"
-                          : "ui.living_node_optional_source_unavailable"
-                  )
+                  warning.startsWith("suppressed-dropped:")
+                    ? t("ui.living_node_suppressed_dropped_0", Number(warning.slice(19)))
+                    : t(
+                        warning === "upstream-stale"
+                          ? "ui.living_node_trial_stale_sources"
+                          : warning === "frozen-source"
+                            ? "ui.living_node_trial_frozen_sources"
+                            : warning === "omitted-edits-skipped"
+                              ? "ui.living_node_omitted_edits_skipped"
+                              : "ui.living_node_optional_source_unavailable"
+                      )
                 );
                 const shown = await this.plugin.showLivingTrial(
                   this.plugin.repo.file(node.path),
@@ -20407,6 +20409,9 @@ export class VisualAgentMapView extends ItemView {
           },
           onOmittedEditsSkipped: () => {
             if (current()) new Notice(t("ui.living_node_omitted_edits_skipped"));
+          },
+          onSuppressedDropped: (_id, count) => {
+            if (current()) new Notice(t("ui.living_node_suppressed_dropped_0", count));
           },
           confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
           onStart: total => {

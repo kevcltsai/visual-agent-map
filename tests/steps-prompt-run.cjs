@@ -606,6 +606,16 @@ test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its q
   assert.equal(h.question().value, '');
 });
 
+test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const restored = [];
+  h.view.restoreMapFocusSoon = id => restored.push(id);
+  h.view.openAiCardPopover(h.node('A'));
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  eq(restored, [h.node('A').id]);
+});
+
 test('save path: existing AI card is one undoable configuration edit; source IDs and manual content are preserved', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['N', null, { noAi: true }]]);
   const before = h.raw('A');

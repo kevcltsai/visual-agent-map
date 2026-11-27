@@ -36,7 +36,7 @@ async function harness() {
   class Modal extends dom.makeModal() { open() { super.open(); this.close(); } }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
-    repo: spy, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo: spy, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); }, confirmAiUsage: async (model, run) => { await run(); return true; }
   });
   const view = new VisualAgentMapView({ app }, plugin);

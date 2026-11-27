@@ -65,7 +65,7 @@ async function real({ relations = () => [], items = () => [], titles = {} } = {}
   const { VisualAgentMapView } = loadMain('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: InputSuggest, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg });
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
   });
   const view = new VisualAgentMapView({ app }, plugin);

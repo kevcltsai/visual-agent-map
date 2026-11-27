@@ -12,7 +12,6 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     readOnly: text("share.viewer_read_only"),
     madeWithVam: text("share.viewer_made_with"),
     install: text("share.viewer_install"),
-    goal: text("share.viewer_goal_0"),
     hint: text("share.viewer_hint"),
     layout: text("ui.layout"),
     collapseAll: text("ui.collapse_all"),

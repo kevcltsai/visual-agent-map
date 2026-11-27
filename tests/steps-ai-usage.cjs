@@ -351,8 +351,6 @@ export { prepareStep } from "./core/step-runner";
 export { AiCalls } from "./core/ai-calls";
 export { aiRuntimeForModel } from "./core/ai-runtime-service";
 export { outlineGenerateStep } from "./core/steps/outline-generate/step";
-export { providerGoalRecommendRunner, buildGoalRecommendPrompt } from "./core/goal-recommend-service";
-export { goalRecommendStep } from "./core/steps/goal-recommend/step";
 `, { obsidian: S.obsidian });
 
 function sharedCalls(reply, { report, records }) {
@@ -371,18 +369,6 @@ test('a provider-step call (outline) is recorded exactly once, under its map pat
   await shared.providerOutlineRunner(calls)(request, new AbortController().signal, shared.prepareStep(shared.outlineGenerateStep, request));
   assert.equal(records.length, 1, 'one call, one entry');
   same([records[0].action, records[0].mapPath, records[0].inputTokens, records[0].outputTokens, records[0].estimated, records[0].provider], ['other', 'A/map.vam', 70, 9, false, 'claude']);
-});
-
-test('a goal-recommend call is recorded under its map path, and the path never reaches the prompt', async () => {
-  const records = [];
-  const calls = sharedCalls('{"items":[],"suggestions":[]}', { report: { usage: { inputTokens: 30, outputTokens: 4 } }, records });
-  const request = { goal: 'Sleep better', nodes: [{ id: 'n1', title: 'Root', summary: '', status: 'open', parentId: null, depth: 0 }], language: 'en', model: 'claude:sonnet', reasoning: 'low', scope: 'all', usageMapPath: 'SECRET/PATH/map.vam' };
-  const prepared = shared.prepareStep(shared.goalRecommendStep, request);
-  await shared.providerGoalRecommendRunner(calls)(request, new AbortController().signal, prepared);
-  assert.equal(records.length, 1);
-  same([records[0].action, records[0].mapPath, records[0].inputTokens], ['other', 'SECRET/PATH/map.vam', 30]);
-  assert.equal(shared.buildGoalRecommendPrompt(request).includes('SECRET/PATH'), false);
-  assert.equal(prepared.prompt.includes('SECRET/PATH'), false);
 });
 
 test('an AiTaskService task goes through AiCalls and is still recorded exactly once', async () => {

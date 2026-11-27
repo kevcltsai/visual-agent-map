@@ -233,8 +233,7 @@ const EXCHANGE_WRITE = /exchanges(?:\(\))?\??\.(?:begin|sent|received|parsed|com
 const ACTIVE_TASKS_SET = /\bactiveTasks\s*\.\s*set\(/g;
 const PROVIDER_FOR_MODEL_ALLOWED = [
   { file: 'ai/providers/provider.ts', count: 2, reason: 'definition and providerModelId' },
-  { file: 'core/ai-runtime-service.ts', count: 2, reason: 'import and aiRuntimeForModel' },
-  { file: 'core/steps/goal-recommend/step.ts', count: 2, reason: 'import and the one prompt branch (tools and output wording follow the provider; changing it changes the prompt input)' }
+  { file: 'core/ai-runtime-service.ts', count: 2, reason: 'import and aiRuntimeForModel' }
 ];
 const CLAUDE_PREFIX_ALLOWED = [{ file: 'ai/providers/provider.ts', count: 1, reason: 'the one place that knows the claude: model prefix' }];
 const ENTRY_END_ALLOWED = [

@@ -71,7 +71,7 @@ async function harness() {
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: Base, Notice: dom.makeNotice([]), setTooltip() {} } }, globalWin, { banner: { js: 'var createDiv = c => window.makeDiv(c);' } });
   const plugin = withExpansionCoordinator({
     availableModels: () => ['gpt-6-luna'], modelLabel: m => m, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async () => {},
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     syncOutline() {}, mutate: async work => { await work(); }
   });
   const view = new VisualAgentMapView({ app, setViewState() {} }, plugin);
@@ -95,14 +95,14 @@ async function harness() {
       view.cardEls.set(node.id, card);
     },
     renderCanvasItems() {}, setupPan() { log.push('setupPan'); }, setupCanvasImageInput() {}, applyInitialViewport() { log.push('applyInitialViewport'); }, transform() { log.push('transform'); }, applyStageTransform() {},
-    syncStatusBarClearance() { log.push('syncStatusBarClearance'); }, releaseCovers() {}, fillEmptyMap() {}, mountMapChat() {}, removeGoalBar() {}, lockWhileLoading() {}, settleCardHeights() {}, drawEdges() { log.push('drawEdges'); }
+    syncStatusBarClearance() { log.push('syncStatusBarClearance'); }, releaseCovers() {}, fillEmptyMap() {}, mountMapChat() {}, lockWhileLoading() {}, settleCardHeights() {}, drawEdges() { log.push('drawEdges'); }
   });
   for (const name of ['lockWhileLoading', 'settleCardHeights']) view[name] = () => { log.push(name); };
   const proto = VisualAgentMapView.prototype;
   // Spies call the real method and log it; a restorer it returns logs under its own name when it runs.
   const spy = (name, label) => { view[name] = function (...args) { log.push(name); const r = proto[name].apply(view, args); return typeof r === 'function' ? () => { log.push(label); return r(); } : r; }; };
-  for (const [name, label] of [['holdMapFocus', 'keepMapFocus'], ['keepRelevanceBarFocus', 'restoreRelevance'], ['keepArgumentBarFocus', 'restoreArgument'], ['detachMapChat', 'restoreChat'], ['holdMapSearch', 'restoreSearch']]) spy(name, label);
-  for (const name of ['detachTopicChat', 'captureGoalEdit', 'remountTopicChat', 'focusInlineName', 'focusInlineSummary', 'focusGoalEdit', 'applyPresentationMarks', 'applySearchMarks']) spy(name, name);
+  for (const [name, label] of [['holdMapFocus', 'keepMapFocus'], ['keepArgumentBarFocus', 'restoreArgument'], ['detachMapChat', 'restoreChat'], ['holdMapSearch', 'restoreSearch']]) spy(name, label);
+  for (const name of ['detachTopicChat', 'remountTopicChat', 'focusInlineName', 'focusInlineSummary', 'applyPresentationMarks', 'applySearchMarks']) spy(name, name);
   view.anchorDragCancel = arg => { log.push('anchorDragCancel(' + arg + ')'); };
   const emptyOnce = contentEl.empty.bind(contentEl); contentEl.empty = () => { log.push('contentEl.empty'); emptyOnce(); };
   const focused = [];
@@ -126,11 +126,10 @@ test('P1 C1: paint runs its phases in this order (holds, empty, rebuild, restore
   leafCard(h).focus(); // a focused card, so paint's card handoff (cardFocus) is part of the sequence
   h.log.length = 0;
   h.view.render();
-  // The second captureGoalEdit is mountGoalBar's own redraw, inside the rebuild (observed, not in paint's own list).
   assert.deepEqual(h.log, [
-    'anchorDragCancel(false)', 'holdMapFocus', 'keepRelevanceBarFocus', 'keepArgumentBarFocus', 'detachMapChat', 'detachTopicChat', 'holdMapSearch', 'captureGoalEdit',
-    'contentEl.empty', 'captureGoalEdit', 'cardFocus', 'setupPan', 'applyInitialViewport', 'transform', 'drawEdges',
-    'restoreRelevance', 'restoreArgument', 'restoreChat', 'remountTopicChat', 'keepMapFocus', 'focusInlineName', 'focusInlineSummary', 'focusGoalEdit',
+    'anchorDragCancel(false)', 'holdMapFocus', 'keepArgumentBarFocus', 'detachMapChat', 'detachTopicChat', 'holdMapSearch',
+    'contentEl.empty', 'cardFocus', 'setupPan', 'applyInitialViewport', 'transform', 'drawEdges',
+    'restoreArgument', 'restoreChat', 'remountTopicChat', 'keepMapFocus', 'focusInlineName', 'focusInlineSummary',
     'syncStatusBarClearance', 'applyPresentationMarks', 'restoreSearch', 'lockWhileLoading', 'settleCardHeights'
   ]);
 });
@@ -215,14 +214,6 @@ function starts(h) {
     'search input': {
       setup: () => { h.view.mapSearch = { query: 'le', currentId: null, announceTimer: null }; },
       pick: () => { const i = h.view.mapSearchBar.input; i.setSelectionRange(2, 4); return i; }
-    },
-    'goal edit field': {
-      setup: () => { h.view.goalEdit = { path: MAP, goal: 'sleep', context: '', showContext: false, caret: 2, contextCaret: null, field: 'goal', refocus: true, warmed: false }; },
-      pick: () => h.view.goalEditInput
-    },
-    'relevance bar button': {
-      setup: () => { h.plugin.relevanceGrades.set(MAP, { status: 'failed', message: 'x' }); },
-      pick: () => h.contentEl.querySelector('.vam-relevance-statusbar').querySelector('button')
     }
   };
 }
@@ -343,7 +334,7 @@ test('P1 C12b: a focused card removed from map.nodes leaves focus on the body; r
 
 // Observed inconsistency, recorded as-is: only some restore paths consult mapWindowIsActive. The card handoff in paint reads
 // activeDocument (not the gate), so when activeDocument is still the map's document but activeWindow is another window, an external
-// refresh still takes focus for the card, which the gated paths (title button, search, goal edit, chat) would not.
+// refresh still takes focus for the card, which the gated paths (title button, search, chat) would not.
 test('P1 observed: the card handoff is not gated by mapWindowIsActive (title button is)', async () => {
   const h = await harness();
   h.view.render();
@@ -356,21 +347,3 @@ test('P1 observed: the card handoff is not gated by mapWindowIsActive (title but
   assert.ok(h.active() === h.doc.body, 'gated: the title button did not');
 });
 
-test('relevance height cache keeps folded cards only within their map and never imports old DOM measurements into a new map', async () => {
-  const h = await harness();
-  h.view.render();
-  Object.defineProperty(leafCard(h), 'offsetHeight', { value: 310, configurable: true });
-  h.view.render();
-  assert.equal(h.view.sortHeightOf(h.ids.leaf), 310);
-  h.view.map = { ...h.view.map, id: 'another-map', nodes: h.view.map.nodes.map(node =>
-    node.id === h.ids.leaf ? { ...node, height: 140 } : node
-  ) };
-  assert.equal(h.view.sortHeightOf(h.ids.leaf), 140, 'stale cache ignored even before the new paint');
-  h.view.render();
-  assert.equal(h.view.sortHeightOf(h.ids.leaf), 140, 'old map DOM was not measured into the new cache');
-  h.view.render();
-  assert.equal(h.view.sortHeightOf(h.ids.leaf), 50, 'next paint can use new DOM heights');
-  h.view.map = { ...h.view.map, nodes: h.view.map.nodes.filter(node => node.id !== h.ids.leaf) };
-  h.view.render();
-  assert.equal(h.view.drawnHeights.has(h.ids.leaf), false, 'deleted card cannot retain a cached height');
-});

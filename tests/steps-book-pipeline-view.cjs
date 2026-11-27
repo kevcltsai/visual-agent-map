@@ -321,7 +321,7 @@ async function harness({ book, stages = {}, issue, phase }) {
   const entries = [];
   const ctl = { calls: [], saves: [], impl: async () => ({}) };
   const plugin = support.withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => Promise.resolve().then(work),
     getBookPipelineProgress: () => undefined,
     argumentRuns: { isRunning: () => false },

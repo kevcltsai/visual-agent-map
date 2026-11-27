@@ -38,7 +38,7 @@ async function harness({ argument }) {
   const createSvg = dom.createSvg;
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = support.withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => Promise.resolve().then(work)
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -99,11 +99,10 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   // 23 before the subtree chain; it checks the AI lock before each step (one more call site, same guard, no new AI entry).
   // The two goal-suggest guards (show filter, stale check) moved to goal-suggest.ts behind the lockedParent port: 24 - 2 + 1.
   // Living Node replaces runPromptItem with the guarded formal/trial runtime. Retain the editor guard and assert the new write boundary separately.
-  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 24);
+  // P1.10a removed goal-suggest with its two lockedParent ports in view.ts: 24 - 2.
+  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 22);
   const runtime = fs.readFileSync(path.join(root, 'experiences/visual-map/living-node-markdown.ts'), 'utf8');
   assert.match(runtime, /!readAiCard\(fm\)\s*\|\|\s*readAiLocked\(fm\)/);
-  const goalSuggest = fs.readFileSync(path.join(root, 'experiences/visual-map/goal-suggest.ts'), 'utf8');
-  assert.equal(goalSuggest.split('\n').filter(line => line.includes('this.ports.lockedParent(')).length, 2);
 });
 
 test('lock panel: a managed card shows a pill with the managed text and no button or More item; a free card keeps the lock item', async () => {

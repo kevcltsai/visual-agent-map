@@ -87,7 +87,6 @@ export const MAP_RUN_ACTIONS = [
   "research_standard",
   "expand",
   "synthesize",
-  "rate_by_goal",
   "merge",
   "find_images",
   "run_living_card",
@@ -162,8 +161,6 @@ export type MapChatAction =
       nodeIds: string[];
       /** merge: title of the merged card. */
       title: string;
-      /** rate_by_goal: the learner goal. */
-      goal: string;
       /** expand: optional direction. research_standard: extra requirements for the research. find_images: the search words ("" = the target card's title, decided by the view). */
       direction: string;
       /** research_standard: the mode the user asked for; "" = not named (the view uses the map's remembered mode). Ignored by every other action. */
@@ -368,7 +365,6 @@ export const MAP_CHAT_SCHEMA = {
           all: { type: "boolean" },
           branch: { type: "boolean" },
           action: { type: "string", enum: [...MAP_RUN_ACTIONS, ""] },
-          goal: STRING,
           direction: STRING,
           mode: { type: "string", enum: [...MAP_CHAT_RESEARCH_MODES, ""] },
           images: { type: "boolean" },
@@ -437,7 +433,6 @@ export const MAP_CHAT_SCHEMA = {
           "all",
           "branch",
           "action",
-          "goal",
           "direction",
           "mode",
           "images",
@@ -868,10 +863,8 @@ export function parseMapChat(
           if (action === "run_living_all" && nodeIds.length) throw new Dropped("bad_value");
           if ((action === "run_living_card" || action === "run_living_all") && (context.bookPlan || context.aim))
             throw new Dropped("bad_value");
-          const title = text("title", false),
-            goal = text("goal", false);
+          const title = text("title", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");
-          if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
           // find_images: one or more cards (an existing card or a `new:<ref>`); empty means every selected card (the view checks).
           // mode and images only mean something to a research; every other action ignores them. A reply of version 5 or earlier
           // has `depth` instead of `mode`: a named depth reads as Standard, an empty one as not named.
@@ -890,7 +883,6 @@ export function parseMapChat(
             action: action as MapRunAction,
             nodeIds,
             title,
-            goal,
             direction: text("direction", false),
             mode,
             images: research && mode !== "quick" && flag("images"),
@@ -1108,7 +1100,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 31,
+  version: 32,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

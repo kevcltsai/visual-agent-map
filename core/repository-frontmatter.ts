@@ -8,7 +8,7 @@ export function frontmatter(content: string): Record<string, unknown> {
   return yaml ? ((parseYaml(yaml) ?? {}) as Record<string, unknown>) : {};
 }
 
-/** A frontmatter value the relevance writers set: a string, a list of strings, true, or null to remove the key. */
+/** A frontmatter value a writer sets: a string, a list of strings, true, or null to remove the key. */
 type FrontmatterValue = string | string[] | boolean | number | null;
 /**
  * Sets or removes top-level frontmatter keys and leaves every other line, and the body, exactly as it was. A key that

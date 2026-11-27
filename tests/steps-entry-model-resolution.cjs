@@ -1,4 +1,4 @@
-// MS-05 P5b: manual add-topic, AI outline generation, structure review and relevance grading take their model from the one
+// MS-05 P5b: manual add-topic, AI outline generation and structure review take their model from the one
 // resolution (plugin.currentModelChoice(), or repo.resolveTopicModel for a topic with a parent), never from settings directly.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -15,12 +15,11 @@ async function harness() {
   repo.settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'settings-model-not-used', cliReasoning: 'low' };
   const doc = { id: 'map-a', title: 'A', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
-  const calls = { prewarm: [], confirm: [], outline: [] };
+  const calls = { confirm: [], outline: [] };
   const plugin = withExpansionCoordinator({
     repo, settings: repo.settings, running: new Set(), mutate: async work => work(), releaseOutline() {},
     currentModelChoice: () => ({ ...CURRENT }),
     confirmAiUsage: async (model, run) => { calls.confirm.push(model); await run(); return true; },
-    prewarmClaudeStep: (...args) => calls.prewarm.push(args),
     outlineGeneration: { generate: async request => { calls.outline.push(request); return { markdown: '# T\n', nodes: [] }; } }
   });
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -63,23 +62,12 @@ test('the AI outline generator sends the resolved model and reasoning', async ()
   assert.deepEqual(h.calls.confirm, [CURRENT.model], 'the usage notice is asked for the same model');
 });
 
-test('relevance prewarm starts the resolved model and reasoning', async () => {
-  const h = await harness();
-  h.view.prewarmRelevance('grade');
-  assert.equal(h.calls.prewarm[0][0], CURRENT.model);
-  assert.equal(h.calls.prewarm[0][1], CURRENT.reasoning);
-});
-
-test('structure review and relevance grading read the one resolution (no direct settings model in those functions)', () => {
+test('structure review reads the one resolution (no direct settings model in those functions)', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const body = (start, end, text = source) => { const from = text.indexOf(start); assert.ok(from >= 0, start); const to = text.indexOf(end, from); assert.ok(to > from, end); return text.slice(from, to); };
   const structure = body('  openStructureReview(scopeId', '  private reopenStructureReview(');
   assert.match(structure, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
   assert.doesNotMatch(structure, /settings\.cliModel|settings\.cliReasoning/);
-  const grade = body('  async start(', '  async apply(', fs.readFileSync(path.resolve(__dirname, '..', 'experiences/visual-map/relevance-grade-run.ts'), 'utf8'));
-  assert.match(grade, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
-  assert.doesNotMatch(grade, /settings\.cliModel|settings\.cliReasoning/);
-  assert.match(grade, /\n\s+model,\n\s+reasoning,\n/, 'the request carries the resolved model and reasoning');
 });
 
 test('share translation defaults to the one resolution (#27)', () => {

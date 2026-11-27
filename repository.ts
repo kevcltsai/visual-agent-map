@@ -332,7 +332,7 @@ function guardWrites<T extends object>(
                     ? damagedMarkers()
                     : error;
                 }
-                if (next === current || keepsLivingBodyAndMetadata(current, next)) return next;
+                if (next === current || keepsLivingBodyAndMetadata(current, next, frontmatter)) return next;
                 throw damagedMarkers();
               };
             }

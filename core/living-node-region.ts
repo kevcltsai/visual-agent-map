@@ -54,6 +54,24 @@ export function isLivingNodeNote(content: string, fm: Record<string, unknown>): 
   );
 }
 
+/**
+ * The refusal an editor-side AI writer (selection panel, image translate) must honour on the text it is about to replace:
+ * damaged markers first, then any Living Node (markers, metadata or the flag). Null means the write may go ahead.
+ */
+export function livingEditorRefusal(content: string, parse: (yaml: string) => unknown): "damaged" | "living" | null {
+  if (livingMarkerState(content) === "corrupt") return "damaged";
+  const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1] ?? "";
+  let fm: Record<string, unknown> = {};
+  try {
+    const parsed = block ? parse(block) : {};
+    if (parsed && typeof parsed === "object") fm = parsed as Record<string, unknown>;
+  } catch {
+    // Unreadable frontmatter: fail closed when it names a Living Node key.
+    return /(?:ai-card|living-node-[\w-]+)["']?\s*:/.test(block) ? "living" : null;
+  }
+  return isLivingNodeNote(content, fm) ? "living" : null;
+}
+
 const withoutFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
 
 /** The frontmatter lines of every `living-node-*` key, with their continuation lines, compared as raw text. */
@@ -65,12 +83,32 @@ function livingMetadata(content: string): string {
     if (/^[^\s#-]|^-\S/.test(line) || /^["']/.test(line)) inLiving = /^["']?living-node-/.test(line);
     if (inLiving) kept.push(line);
   }
-  return kept.sort().join("\n");
+  return kept.join("\n");
 }
 
 /** Proof that a write left the body bytes and every `living-node-*` metadata value as they were (frontmatter-only). */
-export function keepsLivingBodyAndMetadata(before: string, after: string): boolean {
-  return withoutFrontmatter(before) === withoutFrontmatter(after) && livingMetadata(before) === livingMetadata(after);
+export function keepsLivingBodyAndMetadata(
+  before: string,
+  after: string,
+  readFrontmatter: (content: string) => Record<string, unknown>
+): boolean {
+  if (withoutFrontmatter(before) !== withoutFrontmatter(after) || livingMetadata(before) !== livingMetadata(after))
+    return false;
+  // The byte check can be fooled by quoted/escaped keys or reordered continuation lines; the parsed values must match too.
+  try {
+    const parsed = (content: string): string => {
+      const fm = readFrontmatter(content);
+      return JSON.stringify(
+        Object.keys(fm)
+          .filter(key => key.startsWith("living-node-"))
+          .sort()
+          .map(key => [key, fm[key]])
+      );
+    };
+    return parsed(before) === parsed(after);
+  } catch {
+    return false;
+  }
 }
 
 /** A successful formal commit leaves evidence distinct from a failed first attempt or V2 stamps. */

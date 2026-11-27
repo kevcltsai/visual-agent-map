@@ -3349,8 +3349,8 @@ integrationTest('B1 ui: Escape on any control of the window folds it; the view\'
 integrationTest('B1 ui: Tab order follows the document: the reference chips, then the message field, then Send', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
   const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
-  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : i.text === 'Off' || i.text === 'On' ? 'switch' : 'other');
-  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'switch', 'switch', 'input', 'model', 'send'], 'the auto-apply Off/On row sits above the field; the model menu is in the composer, between the field and Send');
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : hasClass(i, 'vam-map-chat-resume-open') ? 'resume' : i.tag === 'select' ? 'model' : i.text === 'Off' || i.text === 'On' ? 'switch' : 'other');
+  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'switch', 'switch', 'resume', 'input', 'model', 'send'], 'the auto-apply Off/On row sits above the field; the resume-summary button (P4.8) is just above the field; the model menu is in the composer, between the field and Send');
   assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
 });
 

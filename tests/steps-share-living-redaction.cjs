@@ -89,21 +89,52 @@ test('redactLivingShareText: scheme-less www addresses lose their query too, and
 });
 
 // The producer redacts once; the OPML/FreeMind export, the share summary and body and the clipboard text all read these two fields.
-const { commitLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian });
-test('Repository.readNote: Living Node shareMarkdown and summary leave no signed URL, local path or note embed', async () => {
+const living = load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian });
+const { commitLivingMarkdown } = living;
+async function liveNote() {
   const f = support.fixture();
   f.app.vault.adapter.getBasePath = () => '/srv/vaults/Main Vault';
   const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Title\n\n## Detail\n\nBody.\n';
   await f.app.vault.create('card.md', initial);
   const claim = 'See https://s3.example.com/f?X-Goog-Signature=GSECRET and /srv/vaults/Main Vault/Private/a.md and ![[Private/Diary]]';
   const base = { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
-  const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian }).livingSnapshotRevision(initial), inputRevision: 'i1', viewSession: 'v1' };
+  const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: living.livingSnapshotRevision(initial), inputRevision: 'i1', viewSession: 'v1' };
   await commitLivingMarkdown(f.repo, { path: 'card.md', expectedContent: initial, base, proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: claim, evidence: [] }] },
     context: { at: '2026-11-27T04:00:00+08:00', evidence: [] }, signal: new AbortController().signal, isCurrent: () => true, candidate,
     inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
-  const note = await f.repo.readNote('card.md');
+  return { note: await f.repo.readNote('card.md'), f };
+}
+const LEAKS = ['GSECRET', 'X-Goog', '/srv/vaults', 'Private', '![['];
+const assertClean = (text, where) => { for (const leak of LEAKS) assert.ok(!text.includes(leak), `${where}: ${leak}`); };
+
+test('Repository.readNote: Living Node shareMarkdown and summary leave no signed URL, local path or note embed', async () => {
+  const { note } = await liveNote();
   for (const field of [note.livingNode.shareMarkdown, note.livingNode.summary]) {
     assert.ok(field.length > 0);
-    for (const leak of ['GSECRET', '?X-Goog', '/srv/vaults', 'Private', '![[']) assert.ok(!field.includes(leak), leak);
+    assertClean(field, 'field');
   }
+});
+
+test('consumer: OPML and FreeMind export of a Repository-read Living Node carries no signed URL, local path or embed', async () => {
+  const { note, f } = await liveNote();
+  const io = load('experiences/visual-map/outline-exchange-io.ts', { obsidian: support.obsidian });
+  for (const folder of ['Agent Workspace', 'Agent Workspace/Topics', 'Agent Workspace/Topics/map-x']) await f.app.vault.createFolder(folder);
+  for (const format of ['opml', 'freemind']) {
+    const out = await io.exportMapExchange(f.app.vault, { mapPath: 'Agent Workspace/Topics/map-x/Map.md', map: { title: 'Map', nodes: [{ id: 'r', parentId: null }] }, notes: new Map([['r', note]]), format });
+    const text = f.contents.get(out);
+    assert.ok(text.includes('See https://s3.example.com/f'), format);
+    assertClean(text, format);
+  }
+});
+
+test('consumer: the share export payload summary and body of a Repository-read Living Node carry no signed URL, local path or embed', async () => {
+  const { note } = await liveNote();
+  class FileSystemAdapter { getBasePath() { return '/srv/vaults/Main Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...support.obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }] };
+  const run = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes: new Map([['a', note]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' })
+    .assemble({ includeDetail: false, includeImages: false });
+  assert.deepEqual(support.plain(run.leakCategories), []);
+  assert.ok(run.payload.nodes[0].summary.includes('See https://s3.example.com/f'));
+  assertClean(JSON.stringify(run.payload), 'payload');
 });

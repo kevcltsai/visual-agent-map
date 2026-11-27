@@ -2408,3 +2408,55 @@ S.integrationTest('Living Node privacy: an upstream card reaches a downstream pr
       assert.ok(!text.includes(secret), 'downstream prompt leaks ' + secret);
   }
 });
+
+async function livingCardInMap() {
+  const f = S.fixture('en');
+  const mapPath = 'Agent Workspace/Topics/m/Map.md';
+  const doc = { id: 'm', title: 'M', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await f.repo.ensureTopicFolders('Agent Workspace/Topics/m');
+  await f.app.vault.create(mapPath, S.core.serializeMap(doc));
+  const node = await f.repo.createNote('Beta', 'm1', doc, mapPath, 'workspace');
+  doc.nodes.push(node);
+  await f.repo.saveMap(mapPath, doc);
+  await f.app.vault.process(f.files.get(node.path), c => c.replace('\n---\n', '\nai-card: true\n---\n'));
+  await f.repo.rebuildDerivedData();
+  const expectedContent = f.contents.get(node.path);
+  const candidate = { executionId: 'e1', cardId: node.id, mapId: 'm', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i1', viewSession: 'v1' };
+  const outcome = await commitLivingMarkdown(f.repo, {
+    path: node.path, expectedContent, base: empty(), baseGeneration: livingGeneration(expectedContent),
+    proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Result', evidence: ['e1'] }] },
+    context: { at: '2026-11-27T04:00:00Z', evidence: [{ id: 'e1', source: 'Beta', retrievedAt: 't1' }] },
+    signal: new AbortController().signal, isCurrent: () => true, candidate,
+    inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false })
+  });
+  assert.equal(outcome, 'written');
+  return { f, mapPath, doc, node };
+}
+
+S.integrationTest('Living Node copy: a map rebuild after Copy to… leaves a committed Living card byte for byte as it was, and the copy is valid', async () => {
+  const { f, mapPath, doc, node } = await livingCardInMap();
+  const original = f.contents.get(node.path);
+  const copy = await f.repo.duplicateNote(node.path, doc, mapPath, {});
+  await f.repo.rewriteCopiedNoteLinks([{ from: node.path, to: copy.path }]);
+  doc.nodes.push(copy);
+  await f.repo.saveMap(mapPath, doc);
+  await f.repo.rebuildDerivedData({ roots: ['Agent Workspace/Topics/m'] });
+  assert.equal(f.contents.get(node.path), original, 'the original card was rewritten by the rebuild');
+  assert.equal(readLivingMarkdown(f.contents.get(node.path)).output.text, 'Result');
+  const copied = f.contents.get(copy.path);
+  assert.equal(readLivingMarkdown(copied).output.text, 'Result');
+  assert.equal(readLivingFence(S.obsidian.parseYaml(copied.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])).receipts.length, 0);
+  assert.equal(copied.includes('living-node-last-execution'), false);
+});
+
+S.integrationTest('Living Node rebuild: a Living card whose derived fields really change is still updated and stays readable', async () => {
+  const { f, mapPath, doc, node } = await livingCardInMap();
+  const child = await f.repo.createNote('Child', 'm1', doc, mapPath, 'workspace');
+  child.parentId = node.id;
+  doc.nodes.push(child);
+  await f.repo.saveMap(mapPath, doc);
+  await f.repo.rebuildDerivedData();
+  const after = f.contents.get(node.path);
+  assert.match(after, /Child topics: .*\[\[.*Child\]\]/);
+  assert.equal(readLivingMarkdown(after).output.text, 'Result');
+});

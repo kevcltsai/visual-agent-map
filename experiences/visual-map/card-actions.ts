@@ -11,6 +11,7 @@ import { isAiCard, type PromptNoteRef } from "./prompt-run";
  * the entries move onto this list one by one (B05–B10).
  */
 export type CardActionId =
+  | "stop-run-all"
   | "add-topic"
   | "add-child"
   | "edge-add-topic"
@@ -67,6 +68,7 @@ export const CARD_ACTION_REASONS = {
 
 /** The view methods an action runs through (VisualAgentMapView.cardActionContext supplies them). */
 export interface CardActionHost {
+  stopRunAll(): void;
   addTopic(): void;
   addChild(node: MapNode): void;
   /** The edge entry's add: one topic per click (addTopicFromEdge's pending flag). */
@@ -132,6 +134,8 @@ export interface CardActionContext {
   /** Why the selection cannot be merged (mergeCheck), or null. */
   mergeBlock(): TranslationKey | null;
   multiResearchRunning(): boolean;
+  /** Run all is working on this card now (the batch runs and its entry for the card is running). */
+  runAllWorking(id: string): boolean;
   host: CardActionHost;
 }
 /** What one click adds to the context: the button (focus returns to it), Cmd/Ctrl, the menu to fill, the Alt+arrow direction. */
@@ -208,6 +212,20 @@ function lockState(ctx: CardActionContext): { nodes: MapNode[]; all: boolean } {
 }
 
 export const CARD_ACTIONS: readonly CardAction[] = [
+  {
+    id: "stop-run-all",
+    titleKey: "ui.card_tool_stop",
+    icon: "square",
+    scope: ["ai-card"],
+    surfaces: ["toolbar"],
+    order: 5,
+    group: 1,
+    // paintPromptState (V3.3 A5): first in the AI card's toolbar while Run all works on it; not while picking topics or
+    // presenting. A plain button (no whenEditing), so loading and the locks do not stop it. The right-click never has it.
+    applies: ctx => !!ctx.node && ctx.runAllWorking(ctx.node.id),
+    available: ctx => gate(ctx, ["presentation", "multiSelect"]),
+    run: ctx => ctx.host.stopRunAll()
+  },
   {
     id: "add-topic",
     titleKey: "ui.command_map_add_topic",
@@ -297,8 +315,11 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["toolbar", "context", "command"],
     order: 60,
     group: 3,
-    // The command opens the details whenever a card is selected, presenting or picking topics included.
-    available: ctx => (ctx.surface === "command" ? OK : gate(ctx, CARD)),
+    // The command opens the details whenever a card is selected, presenting or picking topics included. The toolbar's Note
+    // only reads, so it works while loading and presenting (V3.3 A5); the toolbar is not drawn while picking topics.
+    // B05: while the notes load the toolbar hides Research, Add, Add summary and ⋯ (not drawn) instead of refusing a click.
+    available: ctx =>
+      ctx.surface === "command" ? OK : ctx.surface === "toolbar" ? gate(ctx, ["multiSelect"]) : gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openNote(card(ctx), options?.newTab ?? false)
   },
   {
@@ -661,10 +682,14 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   }
 ];
 
-/** The toolbar sets, in their order: the card toolbar (ordinary and AI card; B08 fills the AI card's own) and the selection bar. */
+/**
+ * The toolbar sets, in their order: the card toolbar, the AI card's (Run all's Stop first; B08 fills the rest of its own) and the
+ * selection bar.
+ */
+const CARD_TOOLBAR_SET: readonly CardActionId[] = ["research", "add-child", "open-note", "add-summary-field"];
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
-  card: ["research", "add-child", "open-note", "add-summary-field"],
-  "ai-card": ["research", "add-child", "open-note", "add-summary-field"],
+  card: CARD_TOOLBAR_SET,
+  "ai-card": ["stop-run-all", ...CARD_TOOLBAR_SET],
   multi: ["merge", "multi-research", "move-to", "selection-help", "finish-selection"]
 };
 
@@ -727,7 +752,9 @@ export function ruleMoreSet(kind: "card" | "ai-card"): CardActionId[] {
   ).map(action => action.id);
 }
 
-/** The right-click rule the entries move to (B07): the toolbar set, a separator, then the ⋯ set. */
+/** Toolbar actions the right-click menu never repeats (Run all's Stop belongs to the running card's toolbar only). */
+const TOOLBAR_ONLY: readonly CardActionId[] = ["stop-run-all"];
+/** The right-click rule the entries move to (B07): the toolbar set (minus TOOLBAR_ONLY), a separator, then the ⋯ set. */
 export function ruleContextSet(kind: "card" | "ai-card"): (CardActionId | "separator")[] {
-  return [...CARD_TOOLBAR[kind], "separator", ...ruleMoreSet(kind)];
+  return [...CARD_TOOLBAR[kind].filter(id => !TOOLBAR_ONLY.includes(id)), "separator", ...ruleMoreSet(kind)];
 }

@@ -57,6 +57,7 @@ function ctxFor(target, state, extra = {}) {
     bookMenu: () => true,
     mergeBlock: () => null,
     multiResearchRunning: () => false,
+    runAllWorking: () => false,
     host: recorder().host,
     ...extra
   };
@@ -87,7 +88,10 @@ const TABLE = [
   // Card toolbar (paintCardToolbar): drawn only outside topic selection; every button runs through whenEditing (presentation, notesLoading).
   ['research', 'toolbar', 'a', 'ok ro ok ok pr ms bk ok'], // if (!bookLock.ai)
   ['add-child', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'], // if (!bookLock.structure)
-  ['open-note', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'],
+  // Note: a plain button since V3.3 A5 (no whenEditing): it works while loading and presenting.
+  ['open-note', 'toolbar', 'a', 'ok ok ok ok ok ms ok ok'],
+  // Run all's Stop (paintPromptState, V3.3 A5): on the AI card Run all is working on; hidden while picking topics or presenting.
+  ['stop-run-all', 'toolbar', 'ai', 'ok ok ok ok pr ms ok ok', { runAllWorking: id => id === 'ai' }],
   ['add-summary-field', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'], // the addSummary argument
   // Edge "+ Topic card" (paintCardEdgeEntries, V3.3 A6): drawn while cardTextEditable (not loading, presenting or picking) and
   // !bookLock.structure; the click goes through whenEditing. It reads neither merging nor the AI locks.
@@ -139,10 +143,10 @@ const TABLE = [
 ];
 
 test('card actions: available matches every current entry under each context', () => {
-  for (const [id, surface, target, expected] of TABLE) {
+  for (const [id, surface, target, expected, extra] of TABLE) {
     const codes = expected.split(' ');
     CONTEXTS.forEach((state, index) =>
-      eq(availability(id, surface, ctxFor(target, state)), CODE[codes[index]], `${id} on ${surface} (${state})`)
+      eq(availability(id, surface, ctxFor(target, state, extra)), CODE[codes[index]], `${id} on ${surface} (${state})`)
     );
   }
 });
@@ -151,9 +155,9 @@ test('card actions: the table covers every action, and every unavailable answer 
   const covered = new Set(TABLE.map(([id]) => id));
   eq(CARD_ACTIONS.map(item => item.id).filter(id => !covered.has(id)), []);
   const reasons = new Set();
-  for (const [id, surface, target] of TABLE)
+  for (const [id, surface, target, , extra] of TABLE)
     for (const state of CONTEXTS) {
-      const result = availability(id, surface, ctxFor(target, state));
+      const result = availability(id, surface, ctxFor(target, state, extra));
       if (!result.ok) reasons.add(result.reasonKey);
     }
   reasons.add('ui.select_at_least_two_topics').add('ui.multi_research_already_running');
@@ -217,7 +221,9 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   assert.equal(new Set(CARD_ACTIONS.map(item => item.id)).size, CARD_ACTIONS.length);
   // paintCardToolbar: Research, Add, Note, Add summary (then ⋯).
   eq(ids('toolbar', ctxFor('a', 'normal')), ['research', 'add-child', 'open-note', 'add-summary-field']);
-  eq(CARD_TOOLBAR.card, CARD_TOOLBAR['ai-card']);
+  // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
+  eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
+  eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
   // openCardMoreMenu: settings, run, AI card, select subtopics, summary bracket, note style | add another type.
   eq(ids('more', ctxFor('ai', 'normal')), ['card-settings', 'run-card', 'ai-card', 'summary-add', 'note-style', 'add-other']);
   eq(ids('more', ctxFor('a', 'normal')), ['card-settings', 'ai-card', 'select-subtopics', 'summary-add', 'note-style', 'add-other']);
@@ -232,7 +238,7 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   for (const kind of ['card', 'ai-card']) {
     const more = ruleMoreSet(kind);
     assert.ok(more.every(id => !CARD_TOOLBAR[kind].includes(id)));
-    eq(ruleContextSet(kind), [...CARD_TOOLBAR[kind], 'separator', ...more]);
+    eq(ruleContextSet(kind), [...CARD_TOOLBAR[kind].filter(id => id !== 'stop-run-all'), 'separator', ...more]);
   }
   assert.ok(ruleMoreSet('ai-card').includes('run-card') && !ruleMoreSet('card').includes('run-card'));
 });
@@ -349,4 +355,23 @@ test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries an
   assert.match(view, /private paintCardEdgeEntries[\s\S]{0,200}!this\.cardTextEditable\(\) \|\|\s*this\.bookLock\(\)\.structure \|\|\s*!this\.plugin\.settings \|\|\s*!isManagedMapPath\(this\.plugin\.settings, this\.path\)/);
   assert.match(view, /if \(note\) this\.paintCardEdgeEntries\(card, node\);/);
   assert.match(view, /private addTopicFromEdge\(node: MapNode\): void \{\s*if \(this\.edgeAddPending \|\| this\.inlineName\?\.created\) return;\s*this\.whenEditing\(/);
+});
+
+test('card actions: Run all Stop (V3.3 A5) only on the AI card Run all is working on, and never in the right-click', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const working = { runAllWorking: id => id === 'ai' };
+  // Not running in Run all (its own run has its Stop in the header): no toolbar Stop.
+  assert.ok(!ids('toolbar', ctxFor('ai', 'normal')).includes('stop-run-all'));
+  // An ordinary card never has it, even if asked.
+  assert.ok(!ids('toolbar', ctxFor('a', 'normal', { runAllWorking: () => true })).includes('stop-run-all'));
+  for (const surface of ['more', 'context', 'command', 'key', 'edge']) assert.ok(!ids(surface, ctxFor('ai', 'normal', working)).includes('stop-run-all'), surface);
+  assert.ok(!ruleContextSet('ai-card').includes('stop-run-all') && !ruleMoreSet('ai-card').includes('stop-run-all'));
+  assert.equal(titleKeyFor(action('stop-run-all'), 'toolbar', ctxFor('ai', 'normal', working)), 'ui.card_tool_stop');
+  const { calls, host } = recorder();
+  action('stop-run-all').run({ ...ctxFor('ai', 'normal', working), host, surface: 'toolbar' });
+  eq(calls, [['stopRunAll']]);
+  // The source condition and the plain Note button the registry mirrors.
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /status === "running" &&\s*tools &&\s*this\.promptRunning\(\) &&\s*this\.promptEntryOf\(node\.id\)\?\.status === "running" &&\s*!this\.selection\.state\.multiSelectMode &&\s*!this\.presentation\s*\) \{\s*const stop = this\.button\(tools, t\("ui\.card_tool_stop"\), \(\) => this\.stopPromptBatch\(\)\);/);
+  assert.match(view, /const note = this\.button\(tools, t\("ui\.card_tool_note"\), \(\) => \{\}\);\s*note\.addEventListener\("click", event =>\s*event\.metaKey \|\| event\.ctrlKey/);
 });

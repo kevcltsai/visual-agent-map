@@ -11874,6 +11874,7 @@ export class VisualAgentMapView extends ItemView {
   cardActionContext(target: MapNode | readonly string[] | null): CardActionContext {
     const node = target && "id" in target ? target : null;
     this.cardActionHost ??= {
+      stopRunAll: () => this.stopPromptBatch(),
       addTopic: () => this.enqueue(() => this.addNode(null)),
       addChild: card => this.enqueue(() => this.addNode(card)),
       addTopicFromEdge: card => this.addTopicFromEdge(card),
@@ -11945,6 +11946,9 @@ export class VisualAgentMapView extends ItemView {
         return check.ok ? null : check.reason;
       },
       multiResearchRunning: () => this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running",
+      // paintPromptState's Stop condition.
+      runAllWorking: id =>
+        this.aiStatusOf(id) === "running" && this.promptRunning() && this.promptEntryOf(id)?.status === "running",
       host: this.cardActionHost
     };
   }

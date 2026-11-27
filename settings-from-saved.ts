@@ -108,6 +108,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     ...(normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe)
       ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe) }
       : {}),
+    ...(Array.isArray(saved?.livingSourceIdentity) ? { livingSourceIdentity: saved.livingSourceIdentity } : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
       : {}),

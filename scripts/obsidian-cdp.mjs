@@ -163,6 +163,8 @@ export async function connectCdp(vault) {
   if (rendersInBackground(vault)) await send("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
   return {
     ...createInput(send),
+    // Raw protocol call, for input the helpers above do not cover (drag moves, wheel).
+    send,
     async evaluate(expression) {
       const result = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
       if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);

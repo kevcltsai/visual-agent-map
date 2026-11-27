@@ -605,6 +605,7 @@ export const zhTW: Record<TranslationKey, string> = {
     "只移除心智圖檔案，保留所有議題筆記；可在這次 Obsidian 工作階段還原。",
   "ui.review": "檢視",
   "ui.more_mind_map_actions": "更多心智圖操作",
+  "ui.reader_toggle": "閱讀器",
   "ui.additional_map_management_actions": "低頻的管理操作集中在這裡。",
   "ui.rename_mind_map": "重新命名心智圖",
   "ui.delete_mind_map": "刪除心智圖",

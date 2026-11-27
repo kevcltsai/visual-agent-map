@@ -494,6 +494,10 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-outcome": "ok",
         "living-node-input-revision": candidate.inputRevision,
         "living-node-success-knowledge": livingSnapshotRevision(managed),
+        // What this run observably checked on the web; cleared when it checked nothing, so it is never stale.
+        "living-node-checked": context.checked?.length
+          ? context.checked.map(item => item.at + " " + (item.url ?? "search: " + item.query))
+          : null,
         ...(changed ? { "living-node-last-content-change": context.at } : {})
       });
       return committedContent;

@@ -47,7 +47,7 @@ S.integrationTest('Living Node A33: a card over 100k chars of records makes one 
   assert.equal(sent.length, 1);
   assert.ok(sent[0].length <= 100_000);
   assert.ok(sent[0].includes('"id":"r319"') && !sent[0].includes('"id":"r0"'));
-  assert.match(sent[0], /"omittedOlderRecords":\d+/);
+  assert.match(sent[0], /"omitted":\{"count":\d+,"oldest":"20\d\d-\d\d-\d\d","newest":"20\d\d-\d\d-\d\d"\}/);
   assert.equal(await commit(f, base, generated.proposal.operations), 'written');
   const after = readLivingMarkdown(f.contents.get(path));
   assert.equal(after.records.length, 321);
@@ -69,28 +69,33 @@ S.integrationTest('Living Node A33: an unknown record is refused, a shown one is
   assert.equal(again.records.length, 320);
 });
 
-S.integrationTest('Living Node A33: ops on omitted records do not fail the round: supplement passes, correct is dropped with a count, other ops still commit', async () => {
+S.integrationTest('Living Node A33/A43: every non-append op on an omitted record (supplement included) is refused and counted; the rest of the round still commits', async () => {
   const f = await bigCard(320);
   const base = readLivingMarkdown(f.contents.get(path));
   const supp = await round(f, [{ kind: 'supplement', id: 'r0', evidence: ['e1'] }]);
-  assert.equal(supp.generated.droppedOperations, 0);
-  assert.equal(supp.generated.proposal.operations.length, 1);
-  const mixed = await round(f, [{ kind: 'correct', id: 'r0', claim: 'rewritten', reason: 'why', evidence: ['e1'] }, { kind: 'dispute', id: 'r1', claim: 'c', reason: 'why', evidence: ['e1'] }, append(1000)]);
-  assert.equal(mixed.generated.droppedOperations, 2);
+  assert.equal(supp.generated.droppedOperations, 1);
+  assert.equal(supp.generated.proposal.operations.length, 0);
+  const mixed = await round(f, [{ kind: 'correct', id: 'r0', claim: 'rewritten', reason: 'why', evidence: ['e1'] }, { kind: 'dispute', id: 'r1', claim: 'c', reason: 'why', evidence: ['e1'] },
+    { kind: 'invalidate', id: 'r2', reason: 'why', evidence: ['e1'] }, { kind: 'supplement', id: 'r3', evidence: ['e1'] }, append(1000)]);
+  assert.equal(mixed.generated.droppedOperations, 4);
   assert.deepEqual(S.plain(mixed.generated.proposal.operations.map(o => o.kind)), ['append']);
   assert.equal(await commit(f, base, mixed.generated.proposal.operations), 'written');
   assert.equal(readLivingMarkdown(f.contents.get(path)).records.length, 321);
+  // Safely omitted (above, counted) is separate from rejected: an id the card never had rejects the whole proposal.
+  await assert.rejects(() => round(f, [{ kind: 'supplement', id: 'r0', evidence: ['e1'] }, { kind: 'supplement', id: 'ghost', evidence: ['e1'] }]), /unknown-record/);
 });
 
-S.integrationTest('Living Node A33: a recent record with no parseable time stays shown; the time boundary appears only when omitting', async () => {
+S.integrationTest('Living Node A33: a record with no parseable time is ranked last; the omitted boundary appears only when omitting', async () => {
   const f = await bigCard(320);
   const base = readLivingMarkdown(f.contents.get(path));
   await commit(f, base, [{ ...append(5000), id: 'undated', eventTime: null }]);
   const { sent } = await round(f, []);
-  assert.ok(sent[0].includes('"id":"undated"'));
-  assert.match(sent[0], /"oldestShownEventTime":"20\d\d-\d\d-\d\d"/);
+  assert.ok(!sent[0].includes('"id":"undated"'), 'untimed records come after every timed record that fits');
+  assert.match(sent[0], /"omitted":\{"count":\d+,"oldest":"20\d\d-\d\d-\d\d"/);
   const small = await bigCard(3);
-  assert.ok(!(await round(small, [])).sent[0].includes('oldestShownEventTime":'));
+  await commit(small, readLivingMarkdown(small.contents.get(path)), [{ ...append(5000), id: 'undated', eventTime: null }]);
+  const whole = (await round(small, [])).sent[0];
+  assert.ok(whole.includes('"id":"undated"') && !whole.includes('"omitted"'));
 });
 
 const memBase = (count, mutate = () => ({})) => ({ revision: 'rev', suppressed: [], output: { text: '', owner: 'ai', evidence: [] },
@@ -111,15 +116,23 @@ S.integrationTest('Living Node A33: the projected prompt never exceeds 100,000 c
   }
 });
 
-S.integrationTest('Living Node A33: untimed records rank newest, then time descending, then insertion descending', async () => {
+S.integrationTest('Living Node A33/A43: projection order is timed newest first, then untimed last; ties break by record id', async () => {
   const base = memBase(330, n => (n % 3 === 0 ? { eventTime: null } : {}));
   const shown = [...(await sendOnce(base))[0].matchAll(/"id":"r(\d+)"/g)].map(m => Number(m[1]));
   const untimed = Array.from({ length: 330 }, (_, n) => n).filter(n => n % 3 === 0);
-  assert.ok(untimed.every(n => shown.includes(n)), 'all untimed shown ' + shown.length + ' ' + shown.slice(0, 5));
+  const timed = Array.from({ length: 330 }, (_, n) => n).filter(n => n % 3 !== 0);
   const timedShown = shown.filter(n => n % 3 !== 0);
-  assert.ok(timedShown.length > 0 && timedShown.length < 220);
+  assert.ok(timedShown.length > 0 && timedShown.length < timed.length, 'budget omits some timed records');
+  assert.ok(!shown.some(n => n % 3 === 0), 'no untimed record is shown while a timed one is omitted');
   const cutoff = Math.min(...timedShown);
-  assert.ok(Array.from({ length: 330 - cutoff }, (_, i) => cutoff + i).filter(n => n % 3 !== 0).every(n => shown.includes(n)), 'timed shown form a newest suffix');
+  assert.ok(timed.filter(n => n >= cutoff).every(n => shown.includes(n)), 'timed shown form a newest suffix');
+  assert.equal(untimed.length, 110);
+  // Same event time: the lower id ranks first, whatever the insertion order.
+  const tie = memBase(330, () => ({ eventTime: '2020-01-01T00:00:00.000Z' }));
+  tie.records.reverse();
+  const tied = [...(await sendOnce(tie))[0].matchAll(/"id":"r(\d+)"/g)].map(m => Number(m[1]));
+  const lowest = Array.from({ length: 330 }, (_, n) => 'r' + n).sort().slice(0, tied.length).map(id => Number(id.slice(1))).sort((a, b) => a - b);
+  assert.deepEqual([...tied].sort((a, b) => a - b), lowest);
 });
 
 S.integrationTest('Living Node A33: a wrong echoed baseRevision (a document hash) no longer fails the round, while a real concurrent edit is still refused', async () => {
@@ -150,4 +163,173 @@ S.integrationTest('A39 suppression v2: deleted-observation holds are never sent 
   const out = await generateLivingProposal(calls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't' }], mapPath: 'map.md' }, new AbortController().signal);
   assert.equal(out.suppressedDropped, 1);
   assert.deepEqual(S.plain(out.proposal.operations.map(o => o.id)), ['fresh']);
+});
+
+// ---- T05: exact retrieval and one budget (A07, A43) ----
+const { parseLivingSelectors, resolveLivingSection, projectLivingRecords } = S.load('experiences/visual-map/living-node-retrieval.ts', { obsidian: S.obsidian });
+const { LivingCoordinator } = S.load('experiences/visual-map/living-node-coordinator.ts');
+const { runLivingRound, saveLivingConfig, prepareLivingTrial } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+
+S.test('A43 grammar: YYYY, YYYY-MM, YYYY-MM-DD, a day range, Qn YYYY and known record ids are the only selectors', () => {
+  const range = prompt => S.plain(parseLivingSelectors(prompt, ['r5', 'evt:9']).ranges.map(r => [r.start, r.end]));
+  assert.deepEqual(range('look at 2024'), [['2024-01-01', '2024-12-31']]);
+  assert.deepEqual(range('look at 2024-02'), [['2024-02-01', '2024-02-29']]);
+  assert.deepEqual(range('on 2024-03-05.'), [['2024-03-05', '2024-03-05']]);
+  assert.deepEqual(range('2024-03-05..2024-03-09 only'), [['2024-03-05', '2024-03-09']]);
+  assert.deepEqual(range('Q2 2024 and q4 2023'), [['2024-04-01', '2024-06-30'], ['2023-10-01', '2023-12-31']]);
+  assert.deepEqual(range('2023-12-30..2024-01-02'), [['2023-12-30', '2024-01-02']]);
+  assert.deepEqual(range('Q5 2024 Q0 2023'), [['2024-01-01', '2024-12-31'], ['2023-01-01', '2023-12-31']], 'an impossible quarter is plain text; the bare year after it still reads as a year');
+  // Not selectors: impossible dates, a reversed range, digits inside words, quarters 0 and 5, plain numbers.
+  for (const text of ['2024-13', '2024-02-30', '2024-03-09..2024-03-05', 'v12024', 'id2024-03', 'price 12345', 'build 2024x'])
+    assert.deepEqual(range(text), [], text);
+  assert.deepEqual(S.plain(parseLivingSelectors('compare r5 with evt:9, not r6 or r50.', ['r5', 'evt:9']).ids), ['r5', 'evt:9']);
+  assert.deepEqual(S.plain(parseLivingSelectors('Use "Notes > Plan > Risks" and 「Notes > Plan」 but not "no path" or "a > "', []).paths), [['Notes', 'Plan', 'Risks'], ['Notes', 'Plan']]);
+});
+
+S.test('A43 heading path: it must resolve to exactly one section; duplicate, missing and the shared Observation heading fail closed', () => {
+  const note = '# Note\nintro\n## A\nalpha\n### X\nx-one\n```\n### X\nnot a heading\n```\n## B\nbeta\n### X\nx-two\n### Observation\nshared\n## C\n### Observation\nshared too\n';
+  assert.equal(resolveLivingSection(note, ['A', 'X']), '### X\nx-one\n```\n### X\nnot a heading\n```');
+  assert.equal(resolveLivingSection(note, ['Note', 'B', 'X']), '### X\nx-two\n### Observation\nshared'.split('\n### Observation')[0]);
+  assert.match(resolveLivingSection(note, ['B']), /^## B\nbeta[\s\S]*### X\nx-two[\s\S]*### Observation/);
+  for (const path of [['X'], ['Z'], ['B', 'Z'], ['B', 'Observation'], ['C', 'Observation'], ['Observation'], []])
+    assert.throws(() => resolveLivingSection(note, path), /^Error: living-section-ambiguous: /, path.join(' > '));
+  assert.throws(() => resolveLivingSection(note, ['B', 'Observation']), /living-section-ambiguous: B > Observation/);
+});
+
+S.test('A43 projection: range records first (oldest to newest), then timed newest first, untimed last; required overflow throws with the range', () => {
+  const rec = (id, eventTime) => ({ id, subject: 's', scope: 'sc', granularity: 'day', eventTime, claim: 'c'.repeat(100), evidence: [], validity: 'active', owner: 'ai', history: [] });
+  const base = { records: [rec('a', '2020-01-01'), rec('b', '2020-01-02'), rec('c', '2020-01-03'), rec('d', null), rec('e', '2020-01-03'), rec('f', '2020-02-01')] };
+  const one = JSON.stringify(base.records[0]).length + 1;
+  const sel = parseLivingSelectors('2020-01-02', []);
+  const out = projectLivingRecords(base, sel, one * 3);
+  assert.deepEqual(S.plain(out.required.map(r => r.id)), ['b']);
+  assert.deepEqual([...out.shown].sort(), ['b', 'f', 'c'].sort(), 'required b, then newest timed f, then c (tie with e broken by id)');
+  const all = projectLivingRecords(base, parseLivingSelectors('track', []), one * 6);
+  assert.equal(all.omitted.length, 0);
+  const noUntimed = projectLivingRecords(base, parseLivingSelectors('track', []), one * 5);
+  assert.deepEqual(S.plain(noUntimed.omitted.map(r => r.id)), ['d']);
+  assert.throws(() => projectLivingRecords(base, parseLivingSelectors('2020', []), one * 2), /living-range-too-large: 2020/);
+  assert.throws(() => projectLivingRecords(base, parseLivingSelectors('2020-01-01..2020-01-03', []), one * 2), /living-range-too-large: 2020-01-01\.\.2020-01-03/);
+  const byId = projectLivingRecords(base, parseLivingSelectors('see d', ['d']), one * 3);
+  assert.deepEqual(S.plain(byId.required.map(r => r.id)), ['d']);
+});
+
+const SEED_AT = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
+async function runtimeFixture({ count, prompt, notes = {}, reply, mapSources } ) {
+  const f = S.fixture();
+  const map = S.map([S.node('parent')]);
+  f.repo.readMap = async () => map;
+  await f.app.vault.create('parent.md', '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: map\nnode-id: parent\nai-card: true\n---\n# parent\n\n## Prompt\n\n' + prompt + '\n');
+  for (const [name, text] of Object.entries(notes)) await f.app.vault.create(name + '.md', text);
+  for (let from = 0; from < count; from += 100) {
+    const expectedContent = f.contents.get('parent.md');
+    const base = readLivingMarkdown(expectedContent);
+    const operations = Array.from({ length: Math.min(100, count - from) }, (_, i) => append(from + i));
+    const candidate = { executionId: 'seed' + from, cardId: 'parent', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
+    assert.equal(await commitLivingMarkdown(f.repo, { path: 'parent.md', expectedContent, candidate, base, proposal: { baseRevision: base.revision, operations }, context: SEED_AT,
+      signal: new AbortController().signal, isCurrent: () => true, inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) }), 'written');
+  }
+  await saveLivingConfig(f.app, f.repo, map, 'parent', prompt);
+  const prompts = [];
+  const failures = [];
+  const port = { app: f.app, repo: f.repo, mapPath: 'Map.md', viewSession: 'view', signal: new AbortController().signal, coordinator: new LivingCoordinator(), current: () => true, busy: () => false,
+    language: () => 'English', mapSources: mapSources ?? (async () => []), confirm: async (_m, run) => { await run(); return true; }, onStart() {}, onRunning() {}, onSettled() {}, onFailure: (_id, error) => failures.push(String(error.message)),
+    calls: { run: async (prepared, options, finish) => { prompts.push(prepared.prompt);
+      return finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: reply ? reply(prepared) : [] }), { signal: options.signal, parsed() {} }); } } };
+  return { ...f, map, port, prompts, failures };
+}
+
+S.integrationTest('A43: a 600-record history answers an exact old date in one call: range record shown, bounded prompt, timing and call count measured', async () => {
+  const f = await runtimeFixture({ count: 600, prompt: 'What did we record on 2020-03-05?' });
+  assert.equal(readLivingMarkdown(f.contents.get('parent.md')).records.length, 600);
+  const small = await runtimeFixture({ count: 6, prompt: 'What did we record on 2020-01-05?' });
+  const warm = performance.now();
+  await runLivingRound(small.port, ['parent']);
+  const baseline = Math.max(1, Math.round(performance.now() - warm));
+  const started = performance.now();
+  const result = await runLivingRound(f.port, ['parent']);
+  const elapsed = Math.round(performance.now() - started);
+  console.log('A43 600 records vs 6-record baseline ' + baseline + ' ms: 1 round, ' + f.prompts.length + ' provider call, ' + elapsed + ' ms, prompt ' + f.prompts[0]?.length + ' chars');
+  assert.equal(result.get('parent'), 'no-change');
+  assert.equal(f.prompts.length, 1);
+  assert.ok(f.prompts[0].length <= 100_000);
+  assert.ok(f.prompts[0].includes('"id":"r64"') && f.prompts[0].includes('2020-03-05'), 'the record of the asked date is shown');
+  assert.ok(!f.prompts[0].includes('"id":"r0"') && f.prompts[0].includes('"id":"r599"'), 'the rest is newest first');
+  assert.match(f.prompts[0], /"omitted":\{"count":\d+/);
+  assert.ok(elapsed < baseline * 40 + 1000, 'a 600-record round costs about a small one, not a scan per record (' + elapsed + ' vs ' + baseline + ' ms)');
+});
+
+S.integrationTest('A43: a required range that cannot fit fails closed before any call and leaves every byte unchanged', async () => {
+  const f = await runtimeFixture({ count: 600, prompt: 'Summarize 2020' });
+  const before = readLivingMarkdown(f.contents.get('parent.md'));
+  const result = await runLivingRound(f.port, ['parent']);
+  assert.equal(result.get('parent'), 'failed');
+  assert.equal(f.prompts.length, 0);
+  const after = readLivingMarkdown(f.contents.get('parent.md'));
+  assert.equal(after.revision, before.revision, 'no knowledge write');
+  assert.equal(after.records.length, 600);
+  assert.match(f.failures.join('|'), /living-range-too-large: 2020/);
+});
+
+S.integrationTest('A43: one budget, in priority order: recent records come before optional sources, which are omitted with disclosure', async () => {
+  const optional = async () => ({ unavailable: 0, groups: [{ documents: [{ path: 'Other.md', content: 'OPTIONAL-MAP-TEXT ' + 'y'.repeat(5000) }] }] });
+  const small = await runtimeFixture({ count: 3, prompt: 'track things', notes: { 'Other': 'OPTIONAL-MAP-TEXT' }, mapSources: optional });
+  await small.app.vault.create('Other.md', 'OPTIONAL-MAP-TEXT').catch(() => {});
+  await runLivingRound(small.port, ['parent']);
+  assert.ok(small.prompts[0].includes('OPTIONAL-MAP-TEXT'), 'room left: the optional source is delivered');
+  const big = await runtimeFixture({ count: 600, prompt: 'track things', notes: { 'Other': 'OPTIONAL-MAP-TEXT' }, mapSources: optional });
+  await runLivingRound(big.port, ['parent']);
+  assert.ok(!big.prompts[0].includes('OPTIONAL-MAP-TEXT'), 'history fills the budget first');
+  assert.ok(big.prompts[0].includes('map-source-budget-omitted: Other.md'), 'the omission is disclosed');
+  assert.ok(big.prompts[0].length <= 100_000);
+});
+
+S.integrationTest('A43/B2: a quoted heading path delivers exactly that section of a Markdown source; duplicate, missing and Observation fail closed', async () => {
+  const note = '# Note\n## A\nalpha-text\n### X\nx-one-text\n## B\nbeta-text\n### X\nx-two-text\n### Observation\nshared-text\n';
+  const run = async question => {
+    const f = await runtimeFixture({ count: 0, prompt: question + '\n\nSources: [[Note]]', notes: { Note: note } });
+    const result = await runLivingRound(f.port, ['parent']);
+    return { f, result, text: f.failures.join('|') };
+  };
+  const ok = await run('Check "Note > A > X"');
+  assert.equal(ok.f.prompts.length, 1);
+  const documents = JSON.parse(ok.f.prompts[0].slice(ok.f.prompts[0].indexOf('{"documents"'), ok.f.prompts[0].indexOf('\n\nDo not access'))).documents;
+  const delivered = documents.find(d => d.title === 'Note');
+  assert.equal(delivered.scope, 'section');
+  assert.ok(delivered.text.includes('x-one-text') && !delivered.text.includes('x-two-text') && !delivered.text.includes('beta-text'));
+  for (const [question, label] of [['Check "Note > X"', 'Note > X'], ['Check "Note > Z"', 'Note > Z'], ['Check "Note > B > Observation"', 'Note > B > Observation']]) {
+    const bad = await run(question);
+    assert.equal(bad.f.prompts.length, 0, label);
+    assert.match(bad.text, new RegExp('living-section-ambiguous: ' + label.replace(/>/g, '>')), label);
+  }
+});
+
+S.integrationTest('T04 follow-up: the checked artifact comes from observed web activity, not model text, and a no-change run records it', async () => {
+  const url = 'https://example.com/current';
+  const opened = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url } } } };
+  const searched = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search', query: 'latest price' } } } };
+  const f = S.fixture();
+  await f.app.vault.create(path, initial);
+  const generate = async (events, answer, base = readLivingMarkdown(f.contents.get(path))) => generateLivingProposal({ run: async (prepared, options, finish) => {
+    for (const event of events) options.task.onWebSearchEvent(event);
+    return finish(JSON.stringify({ baseRevision: base.revision, requiresWeb: false, ...answer, operations: [append(1)] }), { signal: options.signal, parsed() {} });
+  } }, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: context.evidence, mapPath: 'map.md' }, new AbortController().signal);
+  // The model says nothing about web (requiresWeb false, no checkedWeb), yet the opened page and the search are recorded, deduplicated.
+  const seen = await generate([opened, searched, opened], {});
+  assert.deepEqual(S.plain(seen.checked.map(c => c.url ?? 'search: ' + c.query)), [url, 'search: latest price']);
+  assert.ok(seen.checked.every(c => /^20\d\d-\d\d-\d\dT/.test(c.at)));
+  assert.deepEqual(S.plain(seen.context.checked), S.plain(seen.checked));
+  const expectedContent = f.contents.get(path);
+  const candidate = { executionId: 'w1', cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
+  const save = async (generated, id) => commitLivingMarkdown(f.repo, { path, expectedContent: f.contents.get(path), candidate: { ...candidate, executionId: id, baseRevision: livingSnapshotRevision(f.contents.get(path)) },
+    base: readLivingMarkdown(f.contents.get(path)), proposal: generated.proposal, context: generated.context, signal: new AbortController().signal, isCurrent: () => true,
+    inspect: async () => ({ ...candidate, executionId: id, baseRevision: livingSnapshotRevision(f.contents.get(path)), locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
+  assert.equal(await save(seen, 'w1'), 'written');
+  const written = f.contents.get(path);
+  assert.match(written, /living-node-checked:\n  - "20[^"]* https:\/\/example\.com\/current"\n  - "20[^"]* search: latest price"/);
+  // A later run that touched no web clears it instead of leaving a stale proof.
+  const none = await generate([], {});
+  none.proposal.operations = [];
+  assert.equal(await save(none, 'w2'), 'written');
+  assert.ok(!f.contents.get(path).includes('living-node-checked'));
 });

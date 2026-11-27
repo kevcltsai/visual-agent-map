@@ -1,16 +1,17 @@
 import type { AiCalls } from "../../core/ai-calls";
-import { allowedUrl, openedUrlsFromEvents } from "../../core/argument-map/source-proof";
+import { allowedUrl, openedUrlsFromEvents, searchQueriesFromEvents } from "../../core/argument-map/source-proof";
 import { stepEffort } from "../../core/provider-step-runner";
-import { prepareStep, renderTemplate, type StepDefinition } from "../../core/step-runner";
+import { prepareStep, type StepDefinition } from "../../core/step-runner";
 import type { ModelChoice } from "../../ai/model-resolution";
 import {
   applyLivingChanges,
   livingAppendSuppressed,
+  type LivingChangeContext,
   type LivingEvidence,
   type LivingKnowledge
 } from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
-import { livingNodeChangeSetTemplate as promptTemplate } from "./steps/fragments";
+import { buildLivingPrompt, LIVING_PROMPT_BUDGET } from "./living-node-retrieval";
 
 export interface LivingProviderInput extends ModelChoice {
   prompt: string;
@@ -21,91 +22,13 @@ export interface LivingProviderInput extends ModelChoice {
   mapPath: string;
 }
 
-const MAX_PROMPT_CHARS = 100_000;
+const MAX_PROMPT_CHARS = LIVING_PROMPT_BUDGET;
 
-/** Records without a parseable event time have no ordering evidence: they rank by insertion alone. */
-function eventMillis(record: LivingKnowledge["records"][number]): number | undefined {
-  const time = record.eventTime ? Date.parse(record.eventTime) : NaN;
-  return Number.isNaN(time) ? undefined : time;
-}
-
-/** What the model may see of the card's store. Deleted-observation holds stay local: they are enforced by
- * validation and never sent, so a deleted observation cannot leak back out through the prompt. */
-function modelView(base: LivingKnowledge) {
-  return { revision: base.revision, records: base.records, output: base.output };
-}
-
-/** Deterministic bounded view of the card's own store: revision and output always, then the
- * most recent records (event time, then insertion order) that fit the remaining prompt budget. Validation
- * still runs against the full base; omitted records are only hidden from the model. */
-function projectKnowledge(base: LivingKnowledge, budget: number): { text: string; omitted: Set<string> } {
-  const recent = base.records
-    .map((record, index) => ({ record, index, time: eventMillis(record) }))
-    // Total order: untimed records rank newest, then event time descending, then insertion index descending.
-    .sort((a, b) => {
-      const ta = a.time ?? Number.POSITIVE_INFINITY;
-      const tb = b.time ?? Number.POSITIVE_INFINITY;
-      return ta === tb ? b.index - a.index : ta > tb ? -1 : 1;
-    });
-  const keep = new Set<number>();
-  let used = 0;
-  for (const { record, index } of recent) {
-    const size = JSON.stringify(record).length + 1;
-    if (used + size > budget) break;
-    used += size;
-    keep.add(index);
-  }
-  const omitted = new Set(base.records.filter((_, index) => !keep.has(index)).map(record => record.id));
-  if (!omitted.size) return { text: JSON.stringify(modelView(base)), omitted };
-  const shown = base.records.filter((_, index) => keep.has(index));
-  const times = shown.flatMap(record => (eventMillis(record) === undefined ? [] : [record.eventTime as string]));
-  const oldest = times.sort((a, b) => Date.parse(a) - Date.parse(b))[0];
-  const text = JSON.stringify({
-    revision: base.revision,
-    records: shown,
-    omittedOlderRecords: omitted.size,
-    ...(oldest ? { oldestShownEventTime: oldest } : {}),
-    output: base.output
-  });
-  return { text, omitted };
-}
-
-function projectionFor(input: LivingProviderInput) {
-  const full = JSON.stringify(modelView(input.base));
-  const whole = renderPrompt(input, full);
-  if (whole.length <= MAX_PROMPT_CHARS) return { prompt: whole, omitted: new Set<string>() };
-  // Worst-case shell: both projection fields at their longest possible value, so the prompt never exceeds the cap.
-  const longest = input.base.records.reduce(
-    (best, record) =>
-      JSON.stringify(record.eventTime ?? "").length > JSON.stringify(best).length ? record.eventTime! : best,
-    ""
-  );
-  const shell = renderPrompt(
-    input,
-    JSON.stringify({
-      revision: input.base.revision,
-      records: [],
-      omittedOlderRecords: input.base.records.length,
-      oldestShownEventTime: longest,
-      output: input.base.output
-    })
-  ).length;
-  const projected = projectKnowledge(input.base, MAX_PROMPT_CHARS - shell);
-  return { prompt: renderPrompt(input, projected.text), omitted: projected.omitted };
-}
-
-function renderPrompt(input: LivingProviderInput, knowledge: string): string {
-  return renderTemplate(promptTemplate, {
-    prompt: JSON.stringify(input.prompt),
-    language: JSON.stringify(input.language),
-    knowledge,
-    context: input.context
-  });
-}
+const projectionFor = (input: LivingProviderInput) => buildLivingPrompt(input);
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 3,
+  version: 4,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
@@ -259,6 +182,8 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
   const policy = livingWebPolicy(input.prompt);
   const prepared = prepareStep(step, input);
   const events: unknown[] = [];
+  // What the run actually did on the web, stamped when each event arrived (never taken from model text).
+  const activity: { url?: string; query?: string; at: string }[] = [];
   const { omitted } = projectionFor(input);
   return calls.run(
     prepared,
@@ -278,7 +203,12 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         optionalWebSearch: policy === "optional",
         searchBudget: policy === "forbidden" ? 0 : 8,
         timeoutMs: 300_000,
-        onWebSearchEvent: event => events.push(event)
+        onWebSearchEvent: event => {
+          events.push(event);
+          const at = new Date().toISOString();
+          for (const url of openedUrlsFromEvents([event])) activity.push({ url, at });
+          for (const query of searchQueriesFromEvents([event])) activity.push({ query, at });
+        }
       }
     },
     (raw, exchange) => {
@@ -291,13 +221,11 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         policy === "required",
         policy === "forbidden"
       );
-      // The model never saw omitted records: drop its edits to them (the rest of the round still runs) instead
-      // of failing every run. supplement and a re-reported append are still decided by applyLivingChanges.
+      // The model never saw omitted records: every non-append edit of one (supplement included) is refused and
+      // counted, and the rest of the round still runs. These are safely omitted, unlike an unknown or unauthorised id,
+      // which rejects the whole proposal in applyLivingChanges. A re-reported append is decided there too.
       const blind = (operation: Record<string, unknown>) =>
-        operation.kind !== "append" &&
-        operation.kind !== "output" &&
-        operation.kind !== "supplement" &&
-        omitted.has(String(operation.id));
+        operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id));
       const droppedOperations = normalized.proposal.operations.filter(blind).length;
       normalized.proposal.operations = normalized.proposal.operations.filter(operation => !blind(operation));
       // Appends that deleted-observation holds reject are dropped locally and counted, not sent back or failed.
@@ -311,7 +239,12 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
       normalized.proposal.baseRevision = input.base.revision;
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();
-      return { ...normalized, droppedOperations, suppressedDropped };
+      // The checked artifact is what the provider was observed doing, deduplicated per URL or query (latest time).
+      const seen = new Map<string, { url?: string; query?: string; at: string }>();
+      for (const item of activity) seen.set((item.url ? "u:" : "q:") + (item.url ?? item.query), item);
+      const observed = [...seen.values()].slice(-20);
+      const context: LivingChangeContext = { ...normalized.context, checked: observed };
+      return { ...normalized, context, checked: observed, droppedOperations, suppressedDropped };
     }
   );
 }

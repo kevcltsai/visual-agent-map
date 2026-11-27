@@ -183,3 +183,36 @@ test('B13-7: undoing a map rename while focused writes the pre-focus viewport', 
   assert.deepEqual(JSON.parse(JSON.stringify(onDisk.viewport)), { x: 12, y: 34, zoom: 0.9 });
   assert.equal(onDisk.title, 'Focus', 'the undo did restore the title');
 });
+
+// B13 blocker: real edit entries (mapChange) while focused must not store the focused camera in Map.md.
+const focusedEdit = async (edit) => {
+  const h = await harness();
+  h.view.map.viewport = { x: 12, y: 34, zoom: 0.9 };
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.enterBranchFocus(h.ids.branch);
+  h.view.map.viewport = { x: 700, y: 700, zoom: 2.5 };
+  await edit(h);
+  await timers(30);
+  const onDisk = await h.repo.readMap(MAP);
+  return { h, onDisk };
+};
+const vp = v => JSON.parse(JSON.stringify(v));
+
+test('B13-8: collapsing a card while focused keeps the pre-focus viewport in Map.md', async () => {
+  const { h, onDisk } = await focusedEdit(async h => {
+    const node = h.view.map.nodes.find(n => n.id === h.ids.deep);
+    h.view.toggleCollapsed(node);
+  });
+  assert.equal(onDisk.nodes.find(n => n.id === h.ids.deep).collapsed, false, 'the edit really reached disk');
+  assert.deepEqual(vp(onDisk.viewport), { x: 12, y: 34, zoom: 0.9 });
+  assert.deepEqual(vp(h.view.map.viewport), { x: 700, y: 700, zoom: 2.5 }, 'the screen keeps the focused camera');
+});
+
+test('B13-9: adding a child while focused keeps the pre-focus viewport in Map.md', async () => {
+  const { h, onDisk } = await focusedEdit(async h => {
+    await h.view.addNode(h.view.map.nodes.find(n => n.id === h.ids.branch), 'Fresh');
+  });
+  console.log('DBG', onDisk.nodes.map(n=>n.title), JSON.stringify(onDisk.viewport));
+  assert.equal(onDisk.nodes.length, 6, 'the edit really reached disk (5 cards + the new child)');
+  assert.deepEqual(vp(onDisk.viewport), { x: 12, y: 34, zoom: 0.9 });
+});

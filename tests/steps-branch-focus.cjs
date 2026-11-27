@@ -154,3 +154,18 @@ test('B13-5: focus, pan and leave write Map.md zero times', async () => {
   await timers(400);
   assert.deepEqual(writes, []);
 });
+
+test('B13-6: an edit written while focused (persist) keeps the pre-focus viewport in Map.md', async () => {
+  const h = await harness();
+  h.view.map.viewport = { x: 12, y: 34, zoom: 0.9 };
+  h.view.enterBranchFocus(h.ids.branch);
+  h.view.map.viewport = { x: 700, y: 700, zoom: 2.5 };
+  h.view.map.nodes.find(n => n.id === h.ids.other).x += 10;
+  await h.view.persist();
+  const onDisk = await h.repo.readMap(MAP);
+  assert.deepEqual(JSON.parse(JSON.stringify(onDisk.viewport)), { x: 12, y: 34, zoom: 0.9 });
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.viewport)), { x: 700, y: 700, zoom: 2.5 }, 'the screen keeps the focused camera');
+  h.view.exitBranchFocus();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.viewport)), { x: 12, y: 34, zoom: 0.9 });
+});
+

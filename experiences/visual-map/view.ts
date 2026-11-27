@@ -3508,7 +3508,10 @@ export class VisualAgentMapView extends ItemView {
     })().catch(error => errorNotice(error));
   }
   private async persist(): Promise<void> {
-    if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
+    if (!this.map || !this.path) return;
+    // One branch shown alone is view-only: Map.md keeps the camera from before the focus.
+    const map = this.branchFocus ? { ...this.map, viewport: { ...this.branchFocus.viewport } } : this.map;
+    await this.plugin.repo.saveMap(this.path, map);
   }
   private captureViewSession(): () => boolean {
     const path = this.path;

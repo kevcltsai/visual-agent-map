@@ -1811,8 +1811,6 @@ export class VisualAgentMapView extends ItemView {
     draft: string;
     fresh: boolean;
     created: boolean;
-    /** A new topic from the edge entry: a blank name cancels it (other entries keep the default name). */
-    cancelBlank?: boolean;
     /** For a new topic: the history step that made it. Esc in its name field takes exactly this step back. */
     createdStep?: TransactionEntry;
     /** Where the caret goes on the next focus (a click in the text puts it there); cleared by typing. */
@@ -3084,8 +3082,8 @@ export class VisualAgentMapView extends ItemView {
         this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
-      // A topic made from the edge entry and left with a blank name (Enter or leaving) is cancelled the same way: no card, no note.
-      if (value !== null && !value.trim() && edit?.created && edit.cancelBlank && edit.createdStep) {
+      // A new topic left with a blank name (V3.3 P1.3) (Enter or leaving) is cancelled the same way: no card, no note.
+      if (value !== null && !value.trim() && edit?.created && edit.createdStep) {
         this.discardNewTopic(edit.createdStep);
         return;
       }
@@ -3098,7 +3096,6 @@ export class VisualAgentMapView extends ItemView {
           draft: value ?? "",
           fresh: false,
           created: edit?.created ?? false,
-          cancelBlank: edit?.cancelBlank,
           createdStep: edit?.createdStep,
           caret: null
         };
@@ -18284,8 +18281,7 @@ export class VisualAgentMapView extends ItemView {
           id: node.id,
           draft: this.notes.get(node.id)?.title ?? defaultName,
           fresh: true,
-          created: true,
-          ...(this.edgeAddPending ? { cancelBlank: true } : {})
+          created: true
         };
       await this.mapChangeSnapshots(
         map => {

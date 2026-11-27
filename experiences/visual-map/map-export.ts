@@ -229,7 +229,7 @@ export function buildMapSvg(scene: MapScene): string {
     const placed = titleX !== null && titleY !== null;
     // The title's top plus its first baseline (14), the same 22 below a cover's bottom as before (8 margin + 14).
     const top = placed ? titleY + 14 : (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
-    const left = placed ? titleX : box[0] + 14;
+    const left = placed ? titleX : box[0] + 12;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);
     if (card.clipped === true && shown.length) shown[shown.length - 1] += "…";

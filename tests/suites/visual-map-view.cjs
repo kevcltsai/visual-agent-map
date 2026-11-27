@@ -2590,7 +2590,7 @@ integrationTest('hypothesis-evidence: styles.css clamps an atomic title to two l
   assert.match(css, /^\[data-topic-kind="action"\]\.vam-node:not\(\[data-aim-kind\]\) \{ border-radius: 3px;/m);
   assert.match(css, /^\.vam-kind-shape \{[^}]*pointer-events: none;/m);
   // An ordinary topic is not styled by any of this: its own rules are unchanged.
-  assert.match(css, /^\.vam-node \{ --vam-card-bg: var\(--background-primary\); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var\(--background-modifier-border\); border-radius: 12px;/m);
+  assert.match(css, /^\.vam-node \{ --vam-card-bg: var\(--vam-surface\); position: absolute; box-sizing: border-box; width: 280px; padding: var\(--vam-card-padding\); border: 1px solid var\(--vam-border\); border-radius: var\(--vam-radius-card\);/m);
 });
 integrationTest('hypothesis-evidence: every type rule starts with the data-topic-kind attribute or vam-kind-shape, so the share viewer picks none of them up', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -3103,7 +3103,7 @@ integrationTest('hypothesis-evidence: the polish rules start with a selector the
   for (const chunk of mine) assert.equal(viewer.includes(chunk.text), false, `not in the viewer: ${chunk.prelude.slice(0, 60)}`);
   assert.doesNotMatch(viewer, /data-parent-line|:where\(|vam-hypothesis-tag|vam-relation/);
   assert.match(viewer, /^\.vam-edge \{ fill: none; stroke: var\(--interactive-accent\); stroke-width: 2; opacity: 1; \}$/m, 'the viewer still draws the accent edge');
-  assert.match(viewer, /^\.vam-node \{[^}]*border: 1px solid var\(--background-modifier-border\); border-radius: 12px;/m, 'and the unchanged card frame');
+  assert.match(viewer, /^\.vam-node \{[^}]*border: 1px solid var\(--vam-border\); border-radius: var\(--vam-radius-card\);/m, 'and the unchanged card frame (V3.3 spec sets the radius to the token)');
 });
 integrationTest('hypothesis-evidence: relation labels are muted and medium weight with a canvas halo; semantic lines mix the text colour with the canvas; an ordinary card frame uses the hover border token, below status and selection rules (A2, A3, B3)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');

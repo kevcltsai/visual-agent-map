@@ -67,8 +67,29 @@ export function findScanFlags(css, file = "input.css") {
   return found;
 }
 
+// VAM design tokens (V3.3 P1.1). They may only be declared on the VAM roots, never on :root/body or a card selector, so they cannot leak into Obsidian.
+export const TOKENS = [
+  "--vam-space-1", "--vam-space-2", "--vam-space-3", "--vam-space-4", "--vam-space-5",
+  "--vam-card-padding", "--vam-radius-card", "--vam-radius-control",
+  "--vam-surface", "--vam-text", "--vam-muted", "--vam-border", "--vam-accent", "--vam-focus", "--vam-selected", "--vam-error", "--vam-warning",
+  "--vam-card-title-size", "--vam-card-summary-size",
+];
+const TOKEN_ROOTS = new Set([".vam-view", ".vam-stage", ".vam-card-frame-stage"]);
+
+export function findUnscopedTokens(css, file = "input.css") {
+  const found = [];
+  postcss.parse(css, { from: file }).walkDecls((decl) => {
+    if (!TOKENS.includes(decl.prop)) return;
+    const rule = decl.parent;
+    const selectors = rule.type === "rule" ? rule.selectors.map((s) => s.trim().replace(/^\.theme-dark\s+/, "")) : [];
+    if (!selectors.length || !selectors.every((s) => TOKEN_ROOTS.has(s)))
+      found.push({ line: decl.source.start.line, message: `${decl.prop} may only be declared on .vam-view, .vam-stage or .vam-card-frame-stage (got "${selectors.join(", ") || rule.type}").` });
+  });
+  return found;
+}
+
 export async function checkCss(css, file) {
-  return [...findImportant(css), ...findScanFlags(css, file), ...(await findUnsupported(css, file))].sort((a, b) => a.line - b.line);
+  return [...findImportant(css), ...findScanFlags(css, file), ...findUnscopedTokens(css, file), ...(await findUnsupported(css, file))].sort((a, b) => a.line - b.line);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

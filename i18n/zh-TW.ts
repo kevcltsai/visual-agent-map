@@ -1185,6 +1185,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_trial": "試跑",
   "ui.living_node_official": "正式內容",
   "ui.living_node_ai_latest": "AI 最新成果",
+  "ui.living_node_ai_latest_user_edited": "你改過 AI 最新成果，這次沒有更新它；要讓 AI 再更新，請清空該段內容",
+  "ui.living_node_ai_latest_deleted": "你刪除了 AI 最新成果，所以相同的結果不會寫回；不同的結果才會出現。",
   "ui.living_node_trial_unsaved": "試跑・尚未儲存",
   "ui.living_node_removed_source_0": "已移除下列 AI 卡片引用的來源：{0}。原引用仍保留，請修復來源或復原。",
   "ui.living_node_omitted_edits_skipped": "部分對較舊紀錄的修改已略過，因為那些紀錄未送給 AI。",

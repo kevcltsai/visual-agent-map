@@ -1249,6 +1249,10 @@ export const en = {
   "ui.living_node_trial": "Trial",
   "ui.living_node_official": "Official",
   "ui.living_node_ai_latest": "AI latest",
+  "ui.living_node_ai_latest_user_edited":
+    "You edited the AI latest result, so it was not updated this time. Clear that section's text to let the AI update it again.",
+  "ui.living_node_ai_latest_deleted":
+    "You deleted the AI latest result, so an identical result is not written back. A different result will appear.",
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_removed_source_0":
     "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",

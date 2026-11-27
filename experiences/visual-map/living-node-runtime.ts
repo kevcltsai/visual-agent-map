@@ -84,6 +84,8 @@ export interface LivingRoundPort {
   /** The model edited records it was not sent (a large card history); those edits were skipped. */
   onOmittedEditsSkipped?(id: string, count: number): void;
   onSuppressedDropped?(id: string, count: number): void;
+  /** An AI result was not written because the owner edited or deleted the AI latest section. */
+  onAiLatestDropped?(id: string, reason: string): void;
   log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
   onStart(total: number): void;
@@ -718,6 +720,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
             );
             if (generated.droppedOperations) port.onOmittedEditsSkipped?.(id, generated.droppedOperations);
             if (generated.suppressedDropped) port.onSuppressedDropped?.(id, generated.suppressedDropped);
+            if (generated.aiLatestDropped) port.onAiLatestDropped?.(id, generated.aiLatestDropped);
             const changes = applyLivingChanges(input.base, generated.proposal, generated.context);
             const outcome = await commitLivingMarkdown(port.repo, {
               path: pathOf(id),
@@ -1015,6 +1018,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       );
       if (result.droppedOperations) prepared.warnings.push("omitted-edits-skipped");
       if (result.suppressedDropped) prepared.warnings.push("suppressed-dropped:" + result.suppressedDropped);
+      if (result.aiLatestDropped) prepared.warnings.push(result.aiLatestDropped);
       return result;
     },
     stillCurrent: async () => {

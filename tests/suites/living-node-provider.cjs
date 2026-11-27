@@ -165,6 +165,15 @@ S.integrationTest('A39 suppression v2: deleted-observation holds are never sent 
   assert.deepEqual(S.plain(out.proposal.operations.map(o => o.id)), ['fresh']);
 });
 
+S.integrationTest('T06: an AI output op blocked by a user-edited AI latest is dropped and disclosed; the other operations still run', async () => {
+  const base = { ...memBase(3), output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'edited', owner: 'user', at: 't0', evidence: [] } };
+  const operations = [{ kind: 'output', text: 'AI text', evidence: ['e1'] }, { kind: 'append', id: 'fresh', subject: 'a', scope: 'b', granularity: 'day', eventTime: '2026-11-27', claim: 'c', evidence: ['e1'] }];
+  const calls = { run: async (prepared, options, finish) => finish(JSON.stringify({ baseRevision: base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} }) };
+  const out = await generateLivingProposal(calls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't' }], mapPath: 'map.md' }, new AbortController().signal);
+  assert.equal(out.aiLatestDropped, 'ai-latest-user-edited');
+  assert.equal(out.proposal.operations.length, 2);
+});
+
 // ---- T05: exact retrieval and one budget (A07, A43) ----
 const { parseLivingSelectors, resolveLivingSection, projectLivingRecords } = S.load('experiences/visual-map/living-node-retrieval.ts', { obsidian: S.obsidian });
 const { LivingCoordinator } = S.load('experiences/visual-map/living-node-coordinator.ts');

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyLivingChanges, hasLivingResult, livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone, livingSuppressionV2, livingSuppressionV2Entry, parseLivingSuppressionV2, livingAppendSuppressed, livingLegacySuppressionIds } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
+const { applyLivingChanges, hasLivingResult, livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone, livingSuppressionV2, livingSuppressionV2Entry, parseLivingSuppressionV2, livingAppendSuppressed, livingLegacySuppressionIds, livingAiLatestBlocked } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
 const e = (id, retrievedAt = 't1') => ({ id, source: 'source:' + id, retrievedAt });
 const context = { at: 't2', evidence: [e('e1', 't2'), e('e2')] };
 const record = (extra = {}) => ({ id: 'r1', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: [e('e1')], validity: 'active', owner: 'ai', history: [], ...extra });
@@ -257,14 +257,19 @@ test('T06: with a user-owned output an output op updates aiLatest, never the use
   assert.equal(user.aiLatest, undefined);
 });
 
-test('T06: aiLatest is replaced as a unit, an identical result is a no-op that keeps its time, an edited one is protected', () => {
+test('T06: aiLatest is replaced as a unit, an identical result is a no-op that keeps its time, an edited one is dropped with a warning and never rejects the proposal', () => {
   const user = base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'old', owner: 'ai', at: 't0', evidence: [e('e1', 't0')] } });
   const same = apply(user, { kind: 'output', text: 'old', evidence: ['e1'] });
   assert.equal(same.changed, false);
   assert.equal(same.aiLatest.at, 't0');
   const next = apply(user, { kind: 'output', text: 'new', evidence: ['e2'] });
   assert.deepEqual(plain(next.aiLatest), { text: 'new', owner: 'ai', at: 't2', evidence: [e('e2')] });
-  assert.throws(() => apply(base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'edited', owner: 'user', at: 't0', evidence: [] } }), { kind: 'output', text: 'x', evidence: [] }), /protected-output/);
+  const edited = base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'edited', owner: 'user', at: 't0', evidence: [] } });
+  const dropped = apply(edited, { kind: 'output', text: 'x', evidence: [] }, { kind: 'supplement', id: 'r1', evidence: ['e2'] });
+  assert.deepEqual(plain(dropped.warnings), ['ai-latest-user-edited']);
+  assert.equal(dropped.aiLatest.text, 'edited');
+  assert.equal(dropped.records[0].evidence.length, 2);
+  assert.equal(apply(edited, { kind: 'output', text: 'x', evidence: [] }).changed, false);
 });
 
 test('T06: an owner:ai output is replaced in place and no aiLatest appears; aiLatest alone counts as a result', () => {
@@ -273,4 +278,19 @@ test('T06: an owner:ai output is replaced in place and no aiLatest appears; aiLa
   assert.equal(result.aiLatest, undefined);
   assert.equal(hasLivingResult({ records: [], output: { text: '', owner: 'user', evidence: [] }, aiLatest: { text: 'x', owner: 'ai', at: 't', evidence: [] } }), true);
   assert.equal(hasLivingResult({ records: [], output: { text: '', owner: 'user', evidence: [] } }), false);
+});
+
+test('T06: an AI latest the owner deleted is not rewritten with the same text; a different text creates it and clears the memory', () => {
+  const sha = require('node:crypto').createHash('sha256').update('same text').digest('hex');
+  const gone = base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatestDeleted: sha });
+  const same = apply(gone, { kind: 'output', text: 'same text', evidence: ['e1'] });
+  assert.deepEqual(plain(same.warnings), ['ai-latest-deleted']);
+  assert.equal(same.aiLatest, undefined);
+  assert.equal(same.aiLatestDeleted, sha);
+  assert.equal(same.changed, false);
+  const other = apply(gone, { kind: 'output', text: 'other text', evidence: ['e1'] });
+  assert.equal(other.aiLatest.text, 'other text');
+  assert.equal(other.aiLatestDeleted, undefined);
+  assert.deepEqual(plain(other.warnings), []);
+  assert.deepEqual(plain(livingAiLatestBlocked(gone, 'same text')), 'ai-latest-deleted');
 });

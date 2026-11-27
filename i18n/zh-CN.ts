@@ -1184,6 +1184,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial": "试跑",
   "ui.living_node_official": "正式内容",
   "ui.living_node_ai_latest": "AI 最新成果",
+  "ui.living_node_ai_latest_user_edited": "你改过 AI 最新成果，这次没有更新它；要让 AI 再更新，请清空该段内容",
+  "ui.living_node_ai_latest_deleted": "你删除了 AI 最新成果，所以相同的结果不会写回；不同的结果才会出现。",
   "ui.living_node_trial_unsaved": "试跑・尚未保存",
   "ui.living_node_removed_source_0": "已移除下列 AI 卡片引用的来源：{0}。原引用仍保留，请修复来源或撤销。",
   "ui.living_node_omitted_edits_skipped": "部分对较旧记录的修改已略过，因为那些记录未发送给 AI。",

@@ -28,7 +28,7 @@ const projectionFor = (input: LivingProviderInput) => buildLivingPrompt(input);
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 4,
+  version: 5,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
@@ -237,14 +237,15 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
       // The model's echoed revision is not trusted: context documents carry their own revision fields and models
       // confuse them. Real staleness is fenced at commit by the expected file content and snapshot revision.
       normalized.proposal.baseRevision = input.base.revision;
-      applyLivingChanges(input.base, normalized.proposal, normalized.context);
+      // An AI output the owner's edit or deletion blocks is dropped by applyLivingChanges; it is disclosed, not failed.
+      const aiLatestDropped = applyLivingChanges(input.base, normalized.proposal, normalized.context).warnings[0];
       exchange.parsed();
       // The checked artifact is what the provider was observed doing, deduplicated per URL or query (latest time).
       const seen = new Map<string, { url?: string; query?: string; at: string }>();
       for (const item of activity) seen.set((item.url ? "u:" : "q:") + (item.url ?? item.query), item);
       const observed = [...seen.values()].slice(-20);
       const context: LivingChangeContext = { ...normalized.context, checked: observed };
-      return { ...normalized, context, checked: observed, droppedOperations, suppressedDropped };
+      return { ...normalized, context, checked: observed, droppedOperations, suppressedDropped, aiLatestDropped };
     }
   );
 }

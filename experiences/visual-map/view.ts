@@ -15599,7 +15599,11 @@ export class VisualAgentMapView extends ItemView {
                             ? "ui.living_node_trial_frozen_sources"
                             : warning === "omitted-edits-skipped"
                               ? "ui.living_node_omitted_edits_skipped"
-                              : "ui.living_node_optional_source_unavailable"
+                              : warning === "ai-latest-user-edited"
+                                ? "ui.living_node_ai_latest_user_edited"
+                                : warning === "ai-latest-deleted"
+                                  ? "ui.living_node_ai_latest_deleted"
+                                  : "ui.living_node_optional_source_unavailable"
                       )
                 );
                 const shown = await this.plugin.showLivingTrial(
@@ -20500,6 +20504,16 @@ export class VisualAgentMapView extends ItemView {
             log: (level, message) => this.plugin.logs.appendLog(level, message),
             onSuppressedDropped: (_id, count) => {
               if (current()) new Notice(t("ui.living_node_suppressed_dropped_0", count));
+            },
+            onAiLatestDropped: (_id, reason) => {
+              if (current())
+                new Notice(
+                  t(
+                    reason === "ai-latest-deleted"
+                      ? "ui.living_node_ai_latest_deleted"
+                      : "ui.living_node_ai_latest_user_edited"
+                  )
+                );
             },
             confirm: (model, work) => this.plugin.confirmAiUsage(model, work),
             onStart: total => run.emit({ kind: "start", total }),

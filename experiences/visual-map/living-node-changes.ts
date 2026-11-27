@@ -42,6 +42,22 @@ export interface LivingKnowledge {
   output: { text: string; owner: "ai" | "user"; evidence: readonly LivingEvidence[] };
   /** Absent until the AI writes a result while `output` is user-owned. */
   aiLatest?: LivingAiLatest;
+  /** Hash of an AI latest text the owner deleted (never the text). The same text is not written back. */
+  aiLatestDeleted?: string;
+}
+
+export const livingTextHash = (text: string): string => createHash("sha256").update(text.trim()).digest("hex");
+
+export type LivingAiLatestBlock = "ai-latest-user-edited" | "ai-latest-deleted";
+
+/** Why an AI output operation must not write the separate AI result slot, or undefined when it may. */
+export function livingAiLatestBlocked(
+  base: Pick<LivingKnowledge, "output" | "aiLatest" | "aiLatestDeleted">,
+  text: string
+): LivingAiLatestBlock | undefined {
+  if (base.output.owner === "ai") return undefined;
+  if (base.aiLatest) return base.aiLatest.owner === "user" ? "ai-latest-user-edited" : undefined;
+  return base.aiLatestDeleted && base.aiLatestDeleted === livingTextHash(text) ? "ai-latest-deleted" : undefined;
 }
 
 /** Readable formal knowledge is required for a successful check; metadata alone is not a result. */
@@ -396,16 +412,22 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   );
   let output = base.output;
   let aiLatest = base.aiLatest;
+  const warnings: LivingAiLatestBlock[] = [];
   let changed = false;
   for (const rawOperation of proposal.operations as unknown[]) {
     const operation = object(rawOperation);
     const kind = operation.kind;
     if (kind === "output") {
       exactKeys(operation, ["kind", "text", "evidence"]);
-      // A user-owned output is never touched: the AI result goes to its own slot. That slot is protected once edited.
-      const slot = output.owner === "ai" ? output : (aiLatest ?? { text: "", owner: "ai" as const, evidence: [] });
-      if (slot.owner !== "ai") throw new Error("protected-output");
       const text = string(operation.text);
+      // A user-owned output is never touched: the AI result goes to its own slot. An edited or deleted slot is the
+      // owner's decision: this operation is dropped and disclosed, and the rest of the proposal still applies.
+      const blocked = livingAiLatestBlocked({ output, aiLatest, aiLatestDeleted: base.aiLatestDeleted }, text);
+      if (blocked) {
+        if (!warnings.includes(blocked)) warnings.push(blocked);
+        continue;
+      }
+      const slot = output.owner === "ai" ? output : (aiLatest ?? { text: "", owner: "ai" as const, evidence: [] });
       // Evidence for a replaced conclusion must be explicitly selected, not
       // inherited from a different claim. Preserve retrieval stamps for retained IDs.
       const selected = evidenceFor(operation.evidence, outputEvidence);
@@ -510,5 +532,12 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   }
   if (!hasLivingResult({ records: [...records.values()], output, aiLatest })) throw new Error("missing-formal-result");
   // Revision is assigned by the actual Markdown commit, not by model output.
-  return { changed, records: [...records.values()], output, aiLatest };
+  return {
+    changed,
+    records: [...records.values()],
+    output,
+    aiLatest,
+    aiLatestDeleted: aiLatest ? undefined : base.aiLatestDeleted,
+    warnings
+  };
 }

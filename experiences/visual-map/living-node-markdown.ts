@@ -5,6 +5,7 @@ import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
   livingEventTombstone,
+  livingTextHash,
   livingSuppressionV2,
   livingSuppressionV2Entry,
   parseLivingEventTombstone,
@@ -100,7 +101,8 @@ function renderRegion(knowledge: LivingKnowledge): string {
       field("Ownership", knowledge.aiLatest.owner),
       field("Generated", knowledge.aiLatest.at),
       "",
-      quote(knowledge.aiLatest.text),
+      // An emptied section (heading kept) hands the slot back to the AI and has no quote line.
+      ...(knowledge.aiLatest.text ? [quote(knowledge.aiLatest.text)] : []),
       "",
       "#### Evidence",
       ...sourceLines(knowledge.aiLatest.evidence)
@@ -204,7 +206,10 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
     const latestOwner = owner();
     const generated = text(readField("Generated"));
     expect("");
-    const latestText = prose();
+    // The owner may clear the text; a bare ">" or "> " line left behind counts as empty.
+    const quoted: string[] = [];
+    while (lines[at] !== undefined && /^>( |$)/.test(lines[at])) quoted.push(unquote(lines[at++].slice(2)));
+    const latestText = quoted.every(line => !line.trim()) ? "" : quoted.join("\n");
     expect("");
     expect("#### Evidence");
     aiLatest = { text: latestText, owner: latestOwner, at: generated, evidence: evidence() };
@@ -270,18 +275,28 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
   expect("");
   expect(END);
   const result = { revision, records, output, suppressed, ...(aiLatest ? { aiLatest } : {}) };
-  if (at !== lines.length || renderRegion(result) !== region.text) fail();
+  // A cleared AI latest may keep a bare quote marker; that is the only text accepted in place of the exact rendering.
+  const exact = aiLatest?.text
+    ? region.text
+    : region.text.replace(/(\n- Generated: [^\n]*\n\n)>[ \t]*\n(\n#### Evidence)/, "$1$2");
+  if (at !== lines.length || renderRegion(result) !== exact) fail();
   return result;
 }
 
 /** The note keeps the English heading; a view shows the localized label. User text is quoted, so it never matches. */
+const relabel = (markdown: string, label: string): string => markdown.replace(/^### AI latest$/m, () => "### " + label);
+
+/** Only the heading inside the managed region is relabeled; the same line elsewhere in the note is the owner's. */
 export function localizeAiLatestHeading(markdown: string, label: string): string {
-  return markdown.replace(/^### AI latest$/m, () => "### " + label);
+  const start = markdown.indexOf(BEGIN);
+  const end = markdown.indexOf(END);
+  if (start < 0 || end < start) return markdown;
+  return markdown.slice(0, start) + relabel(markdown.slice(start, end), label) + markdown.slice(end);
 }
 
 export function renderLivingPreview(knowledge: LivingKnowledge, aiLatestLabel?: string): string {
   const text = renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
-  return aiLatestLabel ? localizeAiLatestHeading(text, aiLatestLabel) : text;
+  return aiLatestLabel ? relabel(text, aiLatestLabel) : text;
 }
 
 /** Share committed knowledge and verified public evidence only. No internal IDs,
@@ -334,7 +349,8 @@ function aiLatestHash(aiLatest: LivingAiLatest): string {
 
 interface OwnershipIndex {
   output: string;
-  aiLatest?: string;
+  aiLatest?: { hash: string; text: string };
+  aiLatestDeleted?: string;
   records: Map<string, string>;
   events: Map<string, { fingerprint: string; scope?: string; unknownTime?: boolean }>;
   /** Suppression v2 entry (as stored string) for records written by this version. */
@@ -346,7 +362,11 @@ interface OwnershipIndex {
 function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
-    ...(knowledge.aiLatest ? [JSON.stringify(["aiLatest", aiLatestHash(knowledge.aiLatest)])] : []),
+    ...(knowledge.aiLatest
+      ? [JSON.stringify(["aiLatest", aiLatestHash(knowledge.aiLatest), livingTextHash(knowledge.aiLatest.text)])]
+      : knowledge.aiLatestDeleted
+        ? [JSON.stringify(["aiLatestDeleted", knowledge.aiLatestDeleted])]
+        : []),
     ...knowledge.records.map(record =>
       JSON.stringify(["record", record.id, recordHash(record), livingSuppressionV2Entry(livingSuppressionV2(record))])
     ),
@@ -371,8 +391,16 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
     if (!Array.isArray(value)) throw new Error("invalid-ownership-index");
     if (value[0] === "output" && value.length === 2 && validHash(value[1]) && !index.output) {
       index.output = value[1];
-    } else if (value[0] === "aiLatest" && value.length === 2 && validHash(value[1]) && !index.aiLatest) {
-      index.aiLatest = value[1];
+    } else if (
+      value[0] === "aiLatest" &&
+      value.length === 3 &&
+      validHash(value[1]) &&
+      validHash(value[2]) &&
+      !index.aiLatest
+    ) {
+      index.aiLatest = { hash: value[1], text: value[2] };
+    } else if (value[0] === "aiLatestDeleted" && value.length === 2 && validHash(value[1]) && !index.aiLatestDeleted) {
+      index.aiLatestDeleted = value[1];
     } else if (
       value[0] === "record" &&
       (value.length === 3 ||
@@ -434,12 +462,25 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
   });
   const output =
     index.output === outputHash(current.output) ? current.output : { ...current.output, owner: "user" as const };
-  // An AI result the index does not vouch for (typed in, or edited) is user text and is never overwritten.
-  const aiLatest =
-    current.aiLatest && index.aiLatest !== aiLatestHash(current.aiLatest)
-      ? { ...current.aiLatest, owner: "user" as const }
-      : current.aiLatest;
-  const next = { ...current, records, output, suppressed: [...suppressed], ...(aiLatest ? { aiLatest } : {}) };
+  // An AI result the index does not vouch for (typed in, or edited) is user text and is never overwritten. A cleared
+  // section (heading kept, no text) goes back to the AI.
+  const aiLatest = !current.aiLatest
+    ? undefined
+    : !current.aiLatest.text.trim()
+      ? { ...current.aiLatest, owner: "ai" as const }
+      : index.aiLatest?.hash !== aiLatestHash(current.aiLatest)
+        ? { ...current.aiLatest, owner: "user" as const }
+        : current.aiLatest;
+  // A section the index knows but the region no longer has was deleted by the owner: remember only its text hash.
+  const aiLatestDeleted = aiLatest ? undefined : (index.aiLatest?.text ?? index.aiLatestDeleted);
+  const next = {
+    ...current,
+    records,
+    output,
+    suppressed: [...suppressed],
+    ...(aiLatest ? { aiLatest } : {}),
+    ...(aiLatestDeleted ? { aiLatestDeleted } : {})
+  };
   return { ...next, revision: livingSnapshotRevision(renderRegion(next)) };
 }
 
@@ -523,7 +564,8 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
     ...stored,
     records: next.records,
     output: next.output,
-    ...(next.aiLatest ? { aiLatest: next.aiLatest } : {})
+    ...(next.aiLatest ? { aiLatest: next.aiLatest } : {}),
+    ...(next.aiLatestDeleted ? { aiLatestDeleted: next.aiLatestDeleted } : {})
   };
   const managed = renderRegion(nextKnowledge);
   const changed = !region || region.text !== managed;

@@ -172,8 +172,6 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* An ordinary card's frame was invisible on the dotted canvas: use the hover token, one step deeper on hover. The typed cards' own border rules are more specific and keep winning. :where keeps the specificity of the rules above and below (status, selected, relevance) so they still win. */
 :where([data-node-id]).vam-node:where(:not([data-aim-kind])) { border-color: color-mix(in srgb, var(--text-muted) 45%, var(--background-modifier-border-hover)); }
 :where([data-node-id]).vam-node:where(:not([data-aim-kind], .is-selected)):hover { border-color: color-mix(in srgb, var(--vam-muted) 75%, var(--background-modifier-border-hover)); }
-/* The :where() hover above is covered by .vam-node:hover and the idea card frame (0,3,0); this one (0,4,0) is the ordinary, unselected, not-busy card's visible hover (V3.3 P1.2). Typed, argument, AIM and queued/running/error cards keep their own frames. */
-.vam-node[data-node-id]:not([data-aim-kind], [data-topic-kind], [data-argument-role], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover { border-color: color-mix(in srgb, var(--vam-muted) 75%, var(--background-modifier-border-hover)); }
 /* AIM was removed: an old AIM map's cards carry .vam-aim-hidden and take the ordinary card's frame, topic colour and topic style. The AIM-on card does not carry it, so its rules above are unchanged; the share viewer leaves these rules out (the name says aim). */
 :where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]) { border-color: color-mix(in srgb, var(--text-muted) 45%, var(--background-modifier-border-hover)); }
 :where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]:not(.is-selected)):hover { border-color: color-mix(in srgb, var(--vam-muted) 75%, var(--background-modifier-border-hover)); }
@@ -418,6 +416,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* Research frame: open questions read as an unfinished frontier, concluded topics as settled ground. */
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
+/* The ordinary card's visible hover (V3.3 P1.2). 0,3,0 like the idea frame just above, so placed after it wins; the typed-card frames below are 0,3,0 too and come later, so they keep theirs. Selected and queued/running/error cards keep their own frames. */
+.vam-node:not([data-aim-kind], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover { border-color: color-mix(in srgb, var(--vam-muted) 75%, var(--background-modifier-border-hover)); }
 .vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }
 .vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }
 /* Unsaved summary preview under a multi-select synthesis or merge status bar (plain text, outside the live region). */

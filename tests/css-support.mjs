@@ -113,14 +113,17 @@ test("hover deepens an unselected card's border (V3.3 P1.2: hover changes only t
 
 // The :where() rules above keep a low specificity so the typed cards' own frames win, which also lets `.vam-node:hover` and the
 // idea card's dashed frame (`.vam-node:not([data-aim-kind])[data-status="idea"]`, 0,3,0) cover the ordinary card's hover. This
-// rule (0,4,0) is the ordinary, unselected, not-busy card's hover; typed, argument, AIM and queued/running/error cards keep theirs.
-const ORDINARY_HOVER = '.vam-node[data-node-id]:not([data-aim-kind], [data-topic-kind], [data-argument-role], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover';
+// rule (0,3,0, placed after the idea frame and before the typed-card frames) is the ordinary, unselected, not-busy card's hover.
+const ORDINARY_HOVER = '.vam-node:not([data-aim-kind], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover';
 test("an ordinary unselected card's hover outranks the idea card frame and .vam-node:hover (V3.3 P1.2)", () => {
   const css = readFileSync(resolve(root, "styles.css"), "utf8");
   let value;
   postcss.parse(css).walkRules((rule) => { if (rule.selector === ORDINARY_HOVER) rule.walkDecls("border-color", (d) => { value = d.value; }); });
   assert.ok(value, "the ordinary card hover rule exists");
   assert.match(value, /color-mix\(in srgb, var\(--vam-muted\) 75%, var\(--background-modifier-border-hover\)\)/);
+  const lines = css.split("\n"), at = (start) => lines.findIndex((line) => line.startsWith(start));
+  const hover = at(ORDINARY_HOVER), idea = at('.vam-node:not([data-aim-kind])[data-status="idea"] {'), typed = at('[data-topic-kind="action"].vam-node:not([data-aim-kind]) {');
+  assert.ok(idea >= 0 && typed >= 0 && idea < hover && hover < typed, "after the idea frame (same specificity, later wins), before the typed frames (they keep theirs)");
 });
 
 test('A5: a locked card is not dimmed; it says "locked" in words instead (V3.3 P1.2)', () => {

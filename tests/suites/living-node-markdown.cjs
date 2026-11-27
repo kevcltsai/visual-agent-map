@@ -150,6 +150,40 @@ S.integrationTest('Living Node: readback refuses tampered Markdown or ownership 
   assert.throws(() => readLivingMarkdown(saved.replace('<!-- vam-living-node:end v1 -->', '')), /unknown-ownership/);
 });
 
+S.integrationTest('Living Node migration: legacy fresh and run stamps remain readable and untouched until explicit formal commit', async () => {
+  const f = await setup();
+  const legacy = initial.replace('custom-key: keep', 'custom-key: keep\nai-update-mode: fresh\nai-run-at: "2026-11-26T12:00:00Z"\nai-run-result: ok\nai-run-input: old-revision');
+  await f.app.vault.process(f.files.get(path), () => legacy);
+  assert.equal(readLivingMarkdown(legacy).revision, 'empty');
+  await f.repo.readNote(path);
+  assert.equal(f.contents.get(path), legacy);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const after = f.contents.get(path);
+  for (const key of ['custom-key: keep', 'ai-update-mode: fresh', 'ai-run-result: ok', 'ai-run-input: old-revision', 'Manual notes, never replace.'])
+    assert.ok(after.includes(key), key);
+  assert.equal(readLivingMarkdown(after).output.text, 'Current findings');
+});
+
+S.integrationTest('Living Node recovery: orphaned successful diagnostics cannot turn lost knowledge into a fresh card', async () => {
+  for (const key of ['living-node-last-execution', 'living-node-success-knowledge', 'living-node-last-successful-check', 'living-node-last-content-change']) {
+    const f = await setup();
+    const damaged = initial.replace('custom-key: keep', 'custom-key: keep\n' + key + ': "old"');
+    await f.app.vault.process(f.files.get(path), () => damaged);
+    assert.throws(() => readLivingMarkdown(damaged), /unknown-ownership/);
+    await assert.rejects(() => commitLivingMarkdown(f.repo, request(f)), /unknown-ownership/);
+    assert.equal(f.contents.get(path), damaged);
+  }
+});
+
+S.integrationTest('Living Node recovery: a failed first attempt is not an orphaned successful commit', async () => {
+  const f = await setup();
+  const failed = initial.replace('custom-key: keep', 'custom-key: keep\nliving-node-outcome: failed\nliving-node-last-attempt: "old"');
+  await f.app.vault.process(f.files.get(path), () => failed);
+  assert.equal(readLivingMarkdown(failed).revision, 'empty');
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
+});
+
 S.integrationTest('Living Node: source text cannot inject managed-region markers', async () => {
   const f = await setup();
   const source = '<!-- vam-living-node:begin v1 -->';

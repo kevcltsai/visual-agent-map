@@ -161,6 +161,27 @@ test('change set: suppression survives new record ID, value and day alias; unrel
   assert.throws(() => apply(ub, { ...op, eventTime: '2026-11-27' }), /ambiguous-suppression/);
 });
 
+test('A39 live: a deleted price re-proposed with another subject and reworded claim stays suppressed by period + value', () => {
+  const deleted = record({ subject: 'Orion Team plan', scope: 'Orion pricing', granularity: 'day', eventTime: '2026-10-15', claim: 'Team plan costs $12 per user per month' });
+  const entry = livingSuppressionV2Entry(livingSuppressionV2(deleted));
+  assert.equal(parseLivingSuppressionV2(entry).valueKey.length, 64);
+  assert.ok(!/orion|team|\$/i.test(entry), 'only hashes are stored');
+  const b = base({ records: [], suppressed: ['r1', entry] });
+  const op = { kind: 'append', id: 'fact-1', subject: 'Orion', scope: 'Orion pricing', granularity: 'day', eventTime: '2026-10-15', claim: 'The Orion Team plan costs USD 12.00 per user per month.', evidence: ['e2'] };
+  assert.throws(() => apply(b, op), /suppressed-record/);
+  assert.equal(livingAppendSuppressed(b, op), true);
+  // A different value, period or scope is a different fact.
+  assert.equal(apply(b, { ...op, claim: 'Team plan costs $15 per user' }).records.length, 1);
+  assert.equal(apply(b, { ...op, eventTime: '2026-11-02' }).records.length, 1);
+  assert.equal(apply(b, { ...op, scope: 'Orion support' }).records.length, 1);
+  // Legacy v2 entries without a value hash keep their old matching only (legacy bytes unchanged).
+  const parts = JSON.parse(entry.slice(4));
+  const legacy = '@v2:' + JSON.stringify(parts.slice(0, 5));
+  assert.equal(parseLivingSuppressionV2(legacy).valueKey, undefined);
+  assert.equal(livingSuppressionV2Entry(parseLivingSuppressionV2(legacy)), legacy);
+  assert.equal(apply(base({ records: [], suppressed: ['r1', legacy] }), op).records.length, 1);
+});
+
 test('A08: re-querying an already recorded change observation under a new ID is a no-op, not a fifth record', () => {
   const op = (id, time, claim) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'change', eventTime: '2026-11-26T' + time + ':00+08:00', claim, evidence: ['e1'] });
   const first = apply(base({ records: [] }), op('c0', '09:00', '100'), op('c1', '11:00', '105'));

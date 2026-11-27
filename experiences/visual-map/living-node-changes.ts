@@ -185,6 +185,8 @@ export interface LivingSuppressionV2 {
   scopeKey: string;
   periodKey: string | null;
   fp2: string;
+  /** Hash of scope words + period + normalised value (no text); absent when the claim has no number. */
+  valueKey?: string;
 }
 
 const V2_PREFIX = "@v2:";
@@ -221,32 +223,79 @@ function periodKey(record: LivingRecord): string | null {
   return timeKey(raw);
 }
 
+const CURRENCIES: Record<string, string> = {
+  $: "usd",
+  usd: "usd",
+  US$: "usd",
+  "€": "eur",
+  eur: "eur",
+  "£": "gbp",
+  gbp: "gbp",
+  "¥": "jpy",
+  jpy: "jpy",
+  NT$: "twd",
+  twd: "twd",
+  nt: "twd"
+};
+
+/** The first amount of a claim as "currency|number" (commas and trailing zeros normalised), or null without a number. */
+function claimValue(claim: string): string | null {
+  const text = claim.replace(/\d{4}-\d\d-\d\d(?:T[\d:.]+Z?)?/g, " ").replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const match =
+    /(NT\$|US\$|[$€£¥]|\b(?:usd|eur|gbp|jpy|twd)\b)?\s*(\d+(?:\.\d+)?)\s*(%|\b(?:usd|eur|gbp|jpy|twd)\b)?/i.exec(text);
+  if (!match) return null;
+  const currency = CURRENCIES[(match[1] ?? match[3] ?? "").toLowerCase()] ?? CURRENCIES[match[1] ?? ""] ?? "";
+  const percent = match[3] === "%" ? "%" : "";
+  return currency + percent + "|" + String(Number(match[2]));
+}
+
 export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {
   const scopeKey = fingerprint(["v2", scopeWords(record.subject), scopeWords(record.scope)]);
   const period = periodKey(record);
+  const value = claimValue(record.claim);
   return {
     v: 2,
     type: "event",
     scopeKey,
     periodKey: period,
-    fp2: fingerprint([scopeKey, granularityKey(record.granularity), period])
+    fp2: fingerprint([scopeKey, granularityKey(record.granularity), period]),
+    ...(period !== null && value !== null
+      ? { valueKey: fingerprint(["v2value", scopeWords(record.scope), period, value]) }
+      : {})
   };
 }
 
 export function livingSuppressionV2Entry(entry: LivingSuppressionV2): string {
-  return V2_PREFIX + JSON.stringify([entry.v, entry.type, entry.scopeKey, entry.periodKey, entry.fp2]);
+  const parts: unknown[] = [entry.v, entry.type, entry.scopeKey, entry.periodKey, entry.fp2];
+  if (entry.valueKey) parts.push(entry.valueKey);
+  return V2_PREFIX + JSON.stringify(parts);
+}
+
+/** Both stored forms of a record's entry: with the value hash and the legacy one without (older notes). */
+export function livingSuppressionV2Forms(record: LivingRecord): string[] {
+  const entry = livingSuppressionV2(record);
+  const { valueKey: _valueKey, ...legacy } = entry;
+  return [...new Set([livingSuppressionV2Entry(entry), livingSuppressionV2Entry(legacy)])];
 }
 
 export function parseLivingSuppressionV2(value: string): LivingSuppressionV2 | undefined {
   if (!value.startsWith(V2_PREFIX)) return undefined;
   try {
     const raw: unknown = JSON.parse(value.slice(V2_PREFIX.length));
-    if (!Array.isArray(raw) || raw.length !== 5) return undefined;
-    const [v, type, scopeKey, period, fp2] = raw as unknown[];
+    if (!Array.isArray(raw) || (raw.length !== 5 && raw.length !== 6)) return undefined;
+    const [v, type, scopeKey, period, fp2, valueKey] = raw as unknown[];
     const hash = (x: unknown): x is string => typeof x === "string" && /^[a-f0-9]{64}$/.test(x);
     if (v !== 2 || type !== "event" || !hash(scopeKey) || !hash(fp2)) return undefined;
     if (period !== null && (typeof period !== "string" || !period || period.length > 100)) return undefined;
-    const entry: LivingSuppressionV2 = { v: 2, type: "event", scopeKey, periodKey: period, fp2 };
+    if (raw.length === 6 && !hash(valueKey)) return undefined;
+    const entry: LivingSuppressionV2 = {
+      v: 2,
+      type: "event",
+      scopeKey,
+      periodKey: period,
+      fp2,
+      ...(raw.length === 6 ? { valueKey: valueKey as string } : {})
+    };
     return livingSuppressionV2Entry(entry) === value ? entry : undefined;
   } catch {
     return undefined;
@@ -352,7 +401,10 @@ function suppressionIndex(base: Pick<LivingKnowledge, "suppressed">): Suppressio
 function suppressionVerdict(index: SuppressionIndex, candidate: LivingRecord): string | undefined {
   const v1 = livingEventFingerprint(candidate);
   const v2 = livingSuppressionV2(candidate);
-  if (index.v1.some(event => event?.fingerprint === v1) || index.v2.some(entry => entry.fp2 === v2.fp2))
+  if (
+    index.v1.some(event => event?.fingerprint === v1) ||
+    index.v2.some(entry => entry.fp2 === v2.fp2 || (!!v2.valueKey && entry.valueKey === v2.valueKey))
+  )
     return "suppressed-record";
   const scope = livingEventScopeFingerprint(candidate);
   if (
@@ -376,7 +428,7 @@ export function livingAppendSuppressed(base: Pick<LivingKnowledge, "suppressed">
       scope: string(op.scope, 500),
       granularity: string(op.granularity, 100),
       eventTime: op.eventTime === null ? null : string(op.eventTime, 100),
-      claim: "",
+      claim: typeof op.claim === "string" ? op.claim : "",
       evidence: [],
       validity: "active",
       owner: "ai",

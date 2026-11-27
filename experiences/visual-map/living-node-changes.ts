@@ -452,6 +452,15 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     );
     const evidence = evidenceFor(operation.evidence, allowed);
     if (!evidence.length) throw new Error("missing-evidence");
+    // A web excerpt is the model's summary, never verified page text: it cannot alone replace or retract a claim.
+    // Unchanged old evidence of the record does not count as new support: a correction needs a non-web id that
+    // the record did not already cite.
+    if (
+      kind !== "dispute" &&
+      evidence.some(entry => entry.id.startsWith("web:")) &&
+      !evidence.some(entry => !entry.id.startsWith("web:") && !old.evidence.some(e => e.id === entry.id))
+    )
+      throw new Error("unverified-web-correction");
     const reason = string(operation.reason);
     const claim = kind === "invalidate" ? old.claim : string(operation.claim);
     if (kind === "correct" && sameClaim(old, { ...old, claim })) throw new Error("unchanged-correction");

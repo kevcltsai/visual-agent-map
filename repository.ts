@@ -827,13 +827,13 @@ export class Repository {
         const knowledge = readLivingMarkdown(raw);
         shareMarkdown = redactLivingShareText(renderLivingShareKnowledge(knowledge), basePath);
         knowledgeRevision = knowledge.revision;
-        summary =
+        const firstLine =
           knowledge.output.text
             .split(/\r?\n/)
             .find(line => line.trim())
-            ?.trim()
-            .slice(0, 180) ?? "";
-        shareSummary = redactLivingShareText(summary, basePath);
+            ?.trim() ?? "";
+        summary = firstLine.slice(0, 180);
+        shareSummary = redactLivingShareText(firstLine, basePath).slice(0, 180);
       } catch {
         damaged = true;
       }

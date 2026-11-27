@@ -91,12 +91,12 @@ test('redactLivingShareText: scheme-less www addresses lose their query too, and
 // The producer redacts once; the OPML/FreeMind export, the share summary and body and the clipboard text all read these two fields.
 const living = load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian });
 const { commitLivingMarkdown } = living;
-async function liveNote() {
+async function liveNote(claimText) {
   const f = support.fixture();
   f.app.vault.adapter.getBasePath = () => '/srv/vaults/Main Vault';
   const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Title\n\n## Detail\n\nBody.\n';
   await f.app.vault.create('card.md', initial);
-  const claim = 'See https://s3.example.com/f?X-Goog-Signature=GSECRET and /srv/vaults/Main Vault/Private/a.md and ![[Private/Diary]]';
+  const claim = claimText ?? 'See https://s3.example.com/f?X-Goog-Signature=GSECRET and /srv/vaults/Main Vault/Private/a.md and ![[Private/Diary]]';
   const base = { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
   const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: living.livingSnapshotRevision(initial), inputRevision: 'i1', viewSession: 'v1' };
   await commitLivingMarkdown(f.repo, { path: 'card.md', expectedContent: initial, base, proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: claim, evidence: [] }] },
@@ -139,4 +139,18 @@ test('consumer: the share export payload summary and body of a Repository-read L
   assert.deepEqual(support.plain(run.leakCategories), []);
   assert.ok(run.payload.nodes[0].summary.includes('See https://s3.example.com/f'));
   assertClean(JSON.stringify(run.payload), 'payload');
+});
+
+test('Repository.readNote: a vault path straddling the 180-character summary cut is redacted before the cut', async () => {
+  const { note } = await liveNote(`${'x'.repeat(170)} /srv/vaults/Main Vault/Private/a.md`);
+  const summary = note.livingNode.shareSummary;
+  assert.ok(summary.startsWith('xxxx'));
+  assert.ok(!summary.includes('/srv') && !summary.includes('/sr'), summary.slice(150));
+});
+
+test('redactLivingShareText: Markdown-link embeds lose the leading bang everywhere, including code', () => {
+  const out = red.redactLivingShareText('> ![alt](note.md) and ![](Private/x.png)\n> ```\n> ![code](a.md)\n> ```');
+  assert.ok(!out.includes('!['), out);
+  assert.ok(out.includes('[alt](note.md)') && out.includes('[code](a.md)'));
+  assert.equal(red.redactLivingShareText(out), out);
 });

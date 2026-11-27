@@ -10,8 +10,7 @@ const LOCAL_PATH =
   /file:\/\/[^\s<>"'`)\]]*|(?:[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\s<>"'`)\]]*|(?<![\w.:/-])\/(?:Users|home|Volumes|private|var|tmp|mnt|root)\/[^\s<>"'`)\]]*)/g;
 const REGION = /<!--\s*vam-living-node:begin[\s\S]*?<!--\s*vam-living-node:end[^>]*-->/gi;
 const MARKER = /<!--\s*vam-living-node:[\s\S]*?-->/gi;
-const BOOKKEEPING_LINE =
-  /^[ \t>*+-]*["']?(?:living-node-[\w-]+|ownership|suppress\w*|draft\w*)["']?[ \t]*[:=].*$/gim;
+const BOOKKEEPING_LINE = /^[ \t>*+-]*["']?(?:living-node-[\w-]+|ownership|suppress\w*|draft\w*)["']?[ \t]*[:=].*$/gim;
 
 /** Drops secret query parameters (signed-URL fields, tokens, keys, expiry); other parameters and the address stay. */
 function stripSecretParams(text: string): string {
@@ -32,7 +31,10 @@ function decodeName(name: string): string {
 /** The Living Node share projection with private paths, secrets, bookkeeping and markers taken out. */
 export function redactLivingShareText(text: string): string {
   if (!text) return text;
-  let out = text.replace(REGION, "").replace(MARKER, "").replace(/<!--\s*vam-living-node:[^\n]*$/gim, "");
+  let out = text
+    .replace(REGION, "")
+    .replace(MARKER, "")
+    .replace(/<!--\s*vam-living-node:[^\n]*$/gim, "");
   out = out.replace(BOOKKEEPING_LINE, "");
   out = stripSecretParams(out);
   out = out.replace(LOCAL_PATH, "");

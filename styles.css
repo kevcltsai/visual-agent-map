@@ -2161,3 +2161,17 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-outline-row.is-drop-after { box-shadow: 0 2px 0 0 var(--interactive-accent); }
 .vam-outline-row.is-drop-into { background: var(--background-modifier-hover); outline: 1px solid var(--interactive-accent); outline-offset: -1px; }
 .vam-outline-reason { padding: 6px 12px; color: var(--text-error); font-size: var(--font-ui-small); }
+.vam-map-chat-resume-open { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-map-chat-resume-open:hover { color: var(--text-normal); }
+.vam-map-chat-resume-open:focus-visible, .vam-map-chat-resume-close:focus-visible, .vam-map-chat-resume-locate:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-resume-icon .svg-icon { width: 14px; height: 14px; }
+.vam-map-chat-resume { padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
+.vam-map-chat-resume[hidden] { display: none; }
+.vam-map-chat-resume-head { display: flex; align-items: center; justify-content: space-between; font-weight: var(--font-semibold); }
+.vam-map-chat-resume-note, .vam-map-chat-resume-empty, .vam-map-chat-resume-record, .vam-map-chat-resume-gone { color: var(--text-muted); }
+.vam-map-chat-resume-list { margin: 4px 0 0; padding: 0; list-style: none; }
+.vam-map-chat-resume-item { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; padding: 4px 0; border-top: 1px solid var(--background-modifier-border); }
+.vam-map-chat-resume-text { flex: 1 1 60%; min-width: 0; overflow-wrap: anywhere; }
+.vam-map-chat-resume-record { flex-basis: 100%; }
+.vam-map-chat-resume-record[hidden] { display: none; }
+.vam-map-chat-resume-locate { padding: 0 8px; height: 24px; font-size: var(--font-ui-smaller); cursor: pointer; }

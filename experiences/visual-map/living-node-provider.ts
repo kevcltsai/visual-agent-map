@@ -5,7 +5,7 @@ import { prepareStep, renderTemplate, type StepDefinition } from "../../core/ste
 import type { ModelChoice } from "../../ai/model-resolution";
 import { applyLivingChanges, type LivingEvidence, type LivingKnowledge } from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
-import promptTemplate from "./steps/living-node-change-set.md";
+import { livingNodeChangeSetTemplate as promptTemplate } from "./steps/fragments";
 
 export interface LivingProviderInput extends ModelChoice {
   prompt: string;

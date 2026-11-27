@@ -30,6 +30,36 @@ S.integrationTest('Living Node: first commit uses real Repository guard and pres
   assert.equal((actual.match(/vam-living-node:begin/g) ?? []).length, 1);
 });
 
+S.integrationTest('Living Node write boundary: unsupported AI writers cannot overwrite even flag-only cards; manual and formal writes remain possible', async () => {
+  const f = await setup();
+  const before = f.contents.get(path);
+  for (const options of [{ rejectAiCard: true }, { newVisualReferences: true }]) {
+    await assert.rejects(() => f.repo.updateNoteGuarded(path, { detail: 'Unsupported AI rewrite' }, options));
+    assert.equal(f.contents.get(path), before);
+  }
+  let invoked = false;
+  await assert.rejects(() => f.repo.updateNoteRawGuarded(path, () => { invoked = true; return 'Unsupported raw rewrite'; }, { rejectAiCard: true }));
+  assert.equal(invoked, false);
+  assert.equal(f.contents.get(path), before);
+  assert.equal(await f.repo.updateNoteGuarded(path, { detail: 'Owner edited legacy detail' }), 'written');
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
+  await f.repo.writeAiCard(path, false);
+  assert.equal(await f.repo.updateNoteGuarded(path, { detail: 'Ordinary research' }, { rejectAiCard: true }), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
+});
+
+S.integrationTest('Living Node write boundary: card activation after an AI writer reads its base discards the stale candidate', async () => {
+  const f = await setup();
+  await f.repo.writeAiCard(path, false);
+  const old = f.contents.get(path);
+  await f.repo.writeAiCard(path, true);
+  const active = f.contents.get(path);
+  assert.equal(await f.repo.updateNoteGuarded(path, { summary: 'Late AI' }, { expectedContent: old, rejectAiCard: true }), 'discarded');
+  assert.equal(await f.repo.updateNoteRawGuarded(path, () => 'Late raw AI', { expectedContent: old, rejectAiCard: true }), 'discarded');
+  assert.equal(f.contents.get(path), active);
+});
+
 S.integrationTest('Living Node: a Repository-created AI card can commit using its real map and node identity', async () => {
   const f = S.fixture('en');
   const mapPath = await f.repo.createMap('Living Node map');

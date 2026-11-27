@@ -11992,6 +11992,7 @@ export class VisualAgentMapView extends ItemView {
       addTopic: () => this.enqueue(() => this.addNode(null)),
       addChild: card => this.enqueue(() => this.addNode(card)),
       addTopicFromEdge: card => this.addTopicFromEdge(card),
+      setupAiCard: parent => this.openAiCardPopover(null, parent),
       addSibling: card =>
         this.enqueue(() => this.addNode(this.map?.nodes.find(item => item.id === card.parentId) ?? null)),
       research: (card, opener) => this.openTopicChat(card, opener),
@@ -12038,6 +12039,7 @@ export class VisualAgentMapView extends ItemView {
       bookLock: this.bookLock(),
       hasViewport: !!this.viewportEl,
       managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
+      emptyCanvas: !!this.map && !this.map.nodes.length && this.emptyCanvasState() === "idle",
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
       isArgumentCard: id => this.isArgumentCard(id),

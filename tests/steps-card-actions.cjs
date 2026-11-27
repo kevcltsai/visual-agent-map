@@ -50,6 +50,7 @@ function ctxFor(target, state, extra = {}) {
     bookLock: { ai: state === 'bookAi', structure: state === 'bookStructure' },
     hasViewport: true,
     managedMap: true,
+    emptyCanvas: false,
     note: id => notes[id],
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
@@ -97,6 +98,11 @@ const TABLE = [
   // !bookLock.structure; the click goes through whenEditing. It reads neither merging nor the AI locks.
   ['edge-add-topic', 'edge', 'a', 'ok ro ok ok pr ms ok bk'],
   ['edge-add-topic', 'edge', 'ai', 'ok ro ok ok pr ms ok bk'],
+  // Edge "✦ AI card" (V3.3 A7): the edge's gates plus !bookLock().ai; the click goes through whenEditing.
+  ['edge-ai-card', 'edge', 'a', 'ok ro ok ok pr ms bk bk'],
+  ['edge-ai-card', 'edge', 'ai', 'ok ro ok ok pr ms bk bk'],
+  // Empty canvas "✦ AI root" (fillEmptyMap, V3.3 A7): cardTextEditable && !bookLock().ai && a managed map; whenEditing.
+  ['ai-root', 'canvas', null, 'ok ro ok ok pr ms bk ok', { emptyCanvas: true }],
   // ⋯ (openCardMoreMenu): returns while presenting; opened from the toolbar (no selection mode); whenEditing; canEditSummary.
   ['card-settings', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   ['run-card', 'more', 'ai', 'ok ro ok al pr ms bk ok'], // isAiCard && !aiLocked && !bookLock.ai
@@ -330,9 +336,9 @@ test('card actions: the view builds the context next to mapCommand, and no entry
 
 test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {
   const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
-  // Drawn on a card with a note (ordinary or AI) on a managed map; it is the edge's only entry.
-  eq(ids('edge', ctxFor('a', 'normal')), ['edge-add-topic']);
-  eq(ids('edge', ctxFor('ai', 'normal')), ['edge-add-topic']);
+  // Drawn on a card with a note (ordinary or AI) on a managed map; the edge's first entry (A7's ✦ AI card follows it).
+  eq(ids('edge', ctxFor('a', 'normal')), ['edge-add-topic', 'edge-ai-card']);
+  eq(ids('edge', ctxFor('ai', 'normal')), ['edge-add-topic', 'edge-ai-card']);
   eq(ids('edge', ctxFor('a', 'normal', { note: () => undefined })), []);
   eq(ids('edge', ctxFor('a', 'normal', { managedMap: false })), []);
   // Never on a selection or the map, and no other surface offers it.
@@ -374,4 +380,40 @@ test('card actions: Run all Stop (V3.3 A5) only on the AI card Run all is workin
   const view = read('experiences/visual-map/view.ts');
   assert.match(view, /status === "running" &&\s*tools &&\s*this\.promptRunning\(\) &&\s*this\.promptEntryOf\(node\.id\)\?\.status === "running" &&\s*!this\.selection\.state\.multiSelectMode &&\s*!this\.presentation\s*\) \{\s*const stop = this\.button\(tools, t\("ui\.card_tool_stop"\), \(\) => this\.stopPromptBatch\(\)\);/);
   assert.match(view, /const note = this\.button\(tools, t\("ui\.card_tool_note"\), \(\) => \{\}\);\s*note\.addEventListener\("click", event =>\s*event\.metaKey \|\| event\.ctrlKey/);
+});
+
+test('card actions: the A7 AI entries, edge "✦ AI card" and empty-canvas "✦ AI root", as the view draws and runs them', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  // The edge lists + Topic card, then ✦ AI card; neither without a note or off a managed map.
+  eq(ids('edge', ctxFor('a', 'normal')), ['edge-add-topic', 'edge-ai-card']);
+  eq(ids('edge', ctxFor('a', 'normal', { managedMap: false })), []);
+  eq(ids('edge', ctxFor('a', 'normal', { note: () => undefined })), []);
+  // The AI root only on the idle empty canvas of a managed map, and nowhere else.
+  eq(ids('canvas', ctxFor(null, 'normal', { emptyCanvas: true })), ['ai-root']);
+  eq(ids('canvas', ctxFor(null, 'normal')), []);
+  eq(ids('canvas', ctxFor(null, 'normal', { emptyCanvas: true, managedMap: false })), []);
+  for (const surface of ['toolbar', 'more', 'context', 'command', 'key', 'edge'])
+    assert.ok(!ids(surface, ctxFor(null, 'normal', { emptyCanvas: true })).includes('ai-root'), surface);
+  for (const surface of ['toolbar', 'more', 'context', 'command', 'key', 'canvas'])
+    assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('edge-ai-card'), surface);
+  assert.ok(!ruleContextSet('card').includes('edge-ai-card') && !ruleMoreSet('card').includes('edge-ai-card'));
+  // Names and aria-labels in all three languages.
+  for (const [id, title, aria] of [['edge-ai-card', 'ui.card_edge_ai', 'ui.card_edge_ai_label'], ['ai-root', 'ui.empty_add_ai_root', 'ui.empty_add_ai_root_label']]) {
+    const item = action(id);
+    assert.equal(item.titleKey, title);
+    assert.equal(item.ariaLabelKey, aria);
+    for (const dictionary of [en, zhTW, zhCN]) for (const key of [title, aria]) assert.ok(dictionary[key]?.trim(), `${key}`);
+  }
+  // Both open the AI card setup: under the card, or as a root.
+  const run = (id, target, surface, extra) => {
+    const { calls, host } = recorder();
+    action(id).run({ ...ctxFor(target, 'normal', extra), host, surface });
+    return calls.map(([name, node]) => [name, node ? node.id : node]);
+  };
+  eq(run('edge-ai-card', 'a', 'edge'), [['setupAiCard', 'a']]);
+  eq(run('ai-root', null, 'canvas', { emptyCanvas: true }), [['setupAiCard', null]]);
+  // The source gates the registry mirrors.
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /if \(!this\.bookLock\(\)\.ai\)\s*entries\.push\(\{\s*kind: "ai",[\s\S]{0,160}onClick: \(\) => this\.whenEditing\(\(\) => this\.openAiCardPopover\(null, node\)\)/);
+  assert.match(view, /if \(this\.cardTextEditable\(\) && !this\.bookLock\(\)\.ai && isManagedMapPath\(this\.plugin\.settings, this\.path\)\) \{\s*const ai = box\.createEl\("button", \{ cls: "vam-empty-add-ai"[\s\S]{0,200}this\.whenEditing\(\(\) => this\.openAiCardPopover\(null, null\)\)/);
 });

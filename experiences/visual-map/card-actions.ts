@@ -13,8 +13,10 @@ import { isAiCard, type PromptNoteRef } from "./prompt-run";
 export type CardActionId =
   | "stop-run-all"
   | "add-topic"
+  | "ai-root"
   | "add-child"
   | "edge-add-topic"
+  | "edge-ai-card"
   | "add-sibling"
   | "research"
   | "toggle-collapse"
@@ -49,9 +51,9 @@ export type CardActionId =
   | "finish-selection";
 /**
  * Where an action is offered: the card toolbar or the selection bar, their ⋯ lists, the right-click menu, the command palette, a
- * key, or the selected card's edge entries (V3.3 A6, card-edge-entry.ts).
+ * key, the selected card's edge entries (V3.3 A6, card-edge-entry.ts), or the empty canvas's buttons (fillEmptyMap, V3.3 A7).
  */
-export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge";
+export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge" | "canvas";
 /** What an action acts on: an ordinary card, an AI card, a topic selection, or the map itself. */
 export type CardScope = "card" | "ai-card" | "multi" | "map";
 export type CardAvailability = { ok: true } | { ok: false; reasonKey: TranslationKey };
@@ -73,6 +75,8 @@ export interface CardActionHost {
   addChild(node: MapNode): void;
   /** The edge entry's add: one topic per click (addTopicFromEdge's pending flag). */
   addTopicFromEdge(node: MapNode): void;
+  /** The AI card setup (openAiCardPopover) for a new AI card under `parent`, or a root when null; saving makes the card. */
+  setupAiCard(parent: MapNode | null): void;
   addSibling(node: MapNode): void;
   research(node: MapNode, opener?: HTMLElement): void;
   rename(node: MapNode): void;
@@ -124,6 +128,8 @@ export interface CardActionContext {
   hasViewport: boolean;
   /** The map is a managed map (isManagedMapPath): the edge entries are drawn only there. */
   managedMap: boolean;
+  /** The empty canvas offers its buttons: the map has no topics and the map chat is not building, planning or asking. */
+  emptyCanvas: boolean;
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
   isArgumentCard(id: string): boolean;
@@ -238,6 +244,21 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: ctx => ctx.host.addTopic()
   },
   {
+    id: "ai-root",
+    titleKey: "ui.empty_add_ai_root",
+    ariaLabelKey: "ui.empty_add_ai_root_label",
+    icon: "sparkles",
+    scope: ["map"],
+    surfaces: ["canvas"],
+    order: 15,
+    group: 1,
+    // fillEmptyMap (V3.3 A7): beside "Add first topic" on a managed map; drawn while cardTextEditable and no AI lock, clicked
+    // through whenEditing.
+    applies: ctx => ctx.emptyCanvas && ctx.managedMap,
+    available: ctx => gate(ctx, [...CARD, "bookAi"]),
+    run: ctx => ctx.host.setupAiCard(null)
+  },
+  {
     id: "add-child",
     titleKey: "ui.card_menu_add_child",
     titles: { toolbar: "ui.card_tool_add", command: "ui.command_map_add_subtopic" },
@@ -263,6 +284,20 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.managedMap,
     available: ctx => gate(ctx, [...CARD, "bookStructure"]),
     run: ctx => ctx.host.addTopicFromEdge(card(ctx))
+  },
+  {
+    id: "edge-ai-card",
+    titleKey: "ui.card_edge_ai",
+    ariaLabelKey: "ui.card_edge_ai_label",
+    icon: "sparkles",
+    scope: ["card", "ai-card"],
+    surfaces: ["edge"],
+    order: 27,
+    group: 1,
+    // paintCardEdgeEntries (V3.3 A7): after "+ Topic card" under the same gates, and not under the picture-book AI lock.
+    applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.managedMap,
+    available: ctx => gate(ctx, [...CARD, "bookAi", "bookStructure"]),
+    run: ctx => ctx.host.setupAiCard(card(ctx))
   },
   {
     id: "add-sibling",

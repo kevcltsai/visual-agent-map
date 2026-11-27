@@ -2611,6 +2611,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     this.markdownSelectionAi?.refreshLanguage();
+    for (const leaf of this.app.workspace.getLeavesOfType(LIVING_READER_VIEW))
+      if (leaf.view instanceof LivingReaderView) leaf.view.refreshLanguage();
     for (const { command, key } of this.localizedCommands)
       command.name = `${this.manifest?.name ?? "Visual Agent Map"}: ${translate(this.settings.language, key)}`;
   }

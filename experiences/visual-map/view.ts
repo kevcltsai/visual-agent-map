@@ -3045,9 +3045,16 @@ export class VisualAgentMapView extends ItemView {
     field.setAttr("aria-labelledby", id);
   }
   /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
-  private discardNewTopic(step: TransactionEntry): void {
+  private discardNewTopic(step: TransactionEntry, parentId: string | null): void {
+    // The keyboard goes back to the parent card, so the next key (F2, arrows) still has somewhere to land.
+    const handBackFocus = (): void => {
+      if (!parentId) return;
+      this.focusNodeId = parentId;
+      this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
+    };
     if (this.history.undoEntry !== step) {
       // Something else was recorded since the topic was made: it stays (no silent undo of another change).
+      handBackFocus();
       this.render();
       return;
     }
@@ -3061,6 +3068,7 @@ export class VisualAgentMapView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file instanceof TFile) await this.app.fileManager.trashFile(file);
       }
+      handBackFocus();
       this.render();
     });
   }
@@ -3070,7 +3078,7 @@ export class VisualAgentMapView extends ItemView {
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
       // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
       if (value === null && edit?.created && edit.createdStep) {
-        this.discardNewTopic(edit.createdStep);
+        this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
       // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.
@@ -13875,7 +13883,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
-      if (event.key === "F2" && note && !this.selection.state.multiSelectMode) {
+      if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
         if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
         this.startCardTitleEdit(node, { select: true });
@@ -17151,6 +17159,8 @@ export class VisualAgentMapView extends ItemView {
   /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
   private async addRelation(fromId: string, toId: string, kind: TopicRelationKind): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
+    // A refused link never enters mapChange, so it leaves no empty undo step (the check below re-runs on the map being edited).
+    if (!relationAllowed(this.map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
     await this.mapChange(map => {
       if (!relationAllowed(map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
       setTopicRelations(map, [...(map.topicRelations ?? []), { kind, from: fromId, to: toId }]);
@@ -25824,7 +25834,8 @@ export class VisualAgentMapView extends ItemView {
       if (
         (event.target as Element).closest("button, .vam-card-title-input, .vam-card-summary-input") ||
         event.button !== 0 ||
-        !this.map
+        !this.map ||
+        this.presentation
       )
         return;
       // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.

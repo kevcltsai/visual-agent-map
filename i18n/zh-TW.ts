@@ -947,6 +947,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.tidy_branch_preview": "整理此分支：{0} 張卡會移動",
   "ui.tidy_bracket_limit": "摘要括號不會跟著移動，可能和卡片對不上。",
   "ui.tidy_whole_only": "這種排列方式會整張圖重排，整理此分支也會動到分支外的卡。",
+  "ui.tidy_relevance_off": "相關性排序開著時無法預覽整理，請先關閉排序。",
   "ui.branch_layout": "分支排列",
   "ui.branch_layout_follow": "跟隨心智圖",
   "ui.layout_spacing_compact": "緊密間距",

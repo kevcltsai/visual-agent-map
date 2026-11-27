@@ -3784,6 +3784,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.path = path;
     this.map = map;
+    this.clearTidy(false);
     this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
@@ -5903,21 +5904,22 @@ export class VisualAgentMapView extends ItemView {
   }
   private openTidyPreview(branchId?: string): void {
     // The relevance sort draws its own column, so a preview of the stored positions would show nothing true.
-    if (!this.map || this.presentation || this.notesLoading() || this.relevanceSortOn()) return;
+    if (!this.map || this.presentation || this.notesLoading()) return;
+    if (this.relevanceSortOn()) {
+      new Notice(t("ui.tidy_relevance_off"));
+      return;
+    }
     this.clearTidy(false);
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
       const target = event.target as HTMLElement | null;
-      if (event.key === "Escape") {
+      const inField = !!target?.closest?.("button, input, textarea, [contenteditable]");
+      if (event.key === "Escape" && !event.isComposing && !inField) {
         event.preventDefault();
         event.stopPropagation();
         this.clearTidy();
-      } else if (
-        event.key === "Enter" &&
-        !event.isComposing &&
-        !target?.closest?.("button, input, textarea, [contenteditable]")
-      ) {
+      } else if (event.key === "Enter" && !event.isComposing && !inField && this.tidy?.positions.size) {
         event.preventDefault();
         event.stopPropagation();
         this.applyTidy();
@@ -6971,6 +6973,7 @@ export class VisualAgentMapView extends ItemView {
     authorize?: () => boolean
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
+    this.clearTidy(false);
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.

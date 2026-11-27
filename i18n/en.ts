@@ -1002,6 +1002,7 @@ export const en = {
   "ui.tidy_branch_preview": "Tidy branch: {0} cards will move",
   "ui.tidy_bracket_limit": "Summary brackets stay where they are and may no longer line up with their cards.",
   "ui.tidy_whole_only": "This layout arranges the whole map, so tidying a branch moves cards outside it too.",
+  "ui.tidy_relevance_off": "Tidy preview is unavailable while relevance sort is on. Turn the sort off first.",
   "ui.branch_layout": "Branch layout",
   "ui.branch_layout_follow": "Follow the map",
   "ui.layout_spacing_compact": "Compact spacing",

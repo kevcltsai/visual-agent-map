@@ -75,3 +75,66 @@ test('A10: a card the preview does not know keeps its own position; shown() over
   assert.deepEqual(snap(out), [['r', 1, 2], ['k', 30, 40]]);
   assert.deepEqual(snap(nodes), [['r', 1, 2], ['k', 3, 4]]);
 });
+
+// A10 review: the view clears the preview on any map change, leaves Esc inside inputs alone, and ignores Enter with nothing to move.
+const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const { VisualAgentMapView } = load(
+  'experiences/visual-map/view.ts',
+  { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } },
+  { window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o) }
+);
+function tidyView(moves) {
+  const view = Object.create(VisualAgentMapView.prototype);
+  const listeners = [];
+  view.contentEl = { addEventListener: (_t, fn) => listeners.push(fn), removeEventListener: (_t, fn) => listeners.splice(listeners.indexOf(fn), 1) };
+  view.map = mapOf('right');
+  view.presentation = false;
+  view.notesLoading = () => false;
+  view.relevanceSortOn = () => false;
+  view.render = () => {};
+  view.closed = false;
+  view.tidyArrange = copy => { if (moves) copy.nodes[1].x += 50; };
+  view.applied = 0;
+  view.applyTidy = () => { view.applied++; };
+  view.openTidyPreview();
+  return { view, listeners };
+}
+const key = (k, target) => { const ev = { key: k, target, isComposing: false, stopped: false, prevented: false }; ev.stopPropagation = () => { ev.stopped = true; }; ev.preventDefault = () => { ev.prevented = true; }; return ev; };
+const inInput = tag => ({ closest: sel => (sel.includes(tag) ? {} : null) });
+const plain = { closest: () => null };
+
+test('A10 review: any mapChange (title, summary, cover) clears the preview, not only moves', async () => {
+  const { view } = tidyView(true);
+  assert.ok(view.tidy);
+  view.beginMapTransaction = () => { throw new Error('stop'); };
+  await view.mapChange(map => { map.title = 'renamed'; }).catch(() => {});
+  assert.equal(view.tidy, null);
+});
+
+test('A10 review: Esc inside an input is not intercepted; Esc elsewhere cancels the preview', () => {
+  const { view, listeners } = tidyView(true);
+  const inside = key('Escape', inInput('input'));
+  listeners[0](inside);
+  assert.equal(inside.stopped, false);
+  assert.equal(inside.prevented, false);
+  assert.ok(view.tidy);
+  const composing = key('Escape', plain);
+  composing.isComposing = true;
+  listeners[0](composing);
+  assert.ok(view.tidy);
+  const outside = key('Escape', plain);
+  listeners[0](outside);
+  assert.equal(outside.stopped, true);
+  assert.equal(view.tidy, null);
+});
+
+test('A10 review: Enter with an empty preview does not apply', () => {
+  const { view, listeners } = tidyView(false);
+  assert.equal(view.tidy.positions.size, 0);
+  listeners[0](key('Enter', plain));
+  assert.equal(view.applied, 0);
+  const moving = tidyView(true);
+  moving.listeners[0](key('Enter', plain));
+  assert.equal(moving.view.applied, 1);
+});

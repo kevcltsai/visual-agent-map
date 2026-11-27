@@ -946,6 +946,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.tidy_branch_preview": "整理此分支：{0} 张卡会移动",
   "ui.tidy_bracket_limit": "摘要括号不会跟着移动，可能和卡片对不上。",
   "ui.tidy_whole_only": "这种排列方式会整张图重排，整理此分支也会动到分支外的卡。",
+  "ui.tidy_relevance_off": "相关性排序开着时无法预览整理，请先关闭排序。",
   "ui.branch_layout": "分支排列",
   "ui.branch_layout_follow": "跟随心智图",
   "ui.layout_spacing_compact": "紧密间距",

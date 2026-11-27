@@ -411,6 +411,9 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
         const attempted = cache.get(id)?.snapshot.content;
         if (!checked.unchanged || checked.snapshot.note.aiLocked || !isAiCard(checked.snapshot.note)) return;
         if (attempted !== undefined && attempted !== checked.snapshot.content) return;
+        // Do not overwrite the last surviving evidence of a damaged formal commit.
+        // A failed diagnostic write must not turn corrupt ownership into a fresh card.
+        readLivingMarkdown(checked.snapshot.content);
         await port.repo.updateNoteRawGuarded(pathOf(id), content => setFrontmatterKeys(content, {
           "living-node-last-attempt": new Date().toISOString(),
           "living-node-outcome": outcome

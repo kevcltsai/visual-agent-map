@@ -1954,17 +1954,6 @@ integrationTest('relevance frontmatter reads when valid, is absent when missing 
   await repo.updateNote(n.path, { status: 'completed' });
   assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side' });
 });
-integrationTest('relevance goal reads from map file frontmatter and is absent when missing or blank', async () => {
-  const { repo, contents } = fixture(); const n = await topicNote(repo, 'Goal host');
-  const original = contents.get(n.path);
-  assert.equal(await repo.readRelevanceGoal(n.path), undefined);
-  contents.set(n.path, original.replace('---\n', '---\nrelevance-goal: "Learn: the basics"\n'));
-  assert.equal(await repo.readRelevanceGoal(n.path), 'Learn: the basics');
-  contents.set(n.path, original.replace('---\n', '---\nrelevance-goal: "  "\n'));
-  assert.equal(await repo.readRelevanceGoal(n.path), undefined);
-  contents.set(n.path, original.replace('---\n', '---\nrelevance-goal: 5\n'));
-  assert.equal(await repo.readRelevanceGoal(n.path), undefined);
-});
 // ---- Phase 3: relevance writers (frontmatter only; other keys, the body and `updated` stay as they were) ----
 integrationTest('relevance writer sets, replaces and removes only its two keys; body and other frontmatter are untouched', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Graded');
@@ -2005,63 +1994,27 @@ integrationTest('relevance writer keeps CRLF files CRLF and drops a stale multi-
   assert.doesNotMatch(text, /folded old/);
   assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support' });
 });
-async function mapFile(language = 'en') {
-  const { repo, app, contents } = fixture(language);
-  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
-  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
-  const mapDoc = { id: 'map-a', title: 'Cooking', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
-  await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  return { repo, contents, mapPath, mapDoc };
-}
-integrationTest('relevance goal writer sets the goal and appends one dated history entry only when the goal changes', async () => {
-  const { repo, contents, mapPath } = await mapFile();
-  const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const first = await repo.writeRelevanceGoal(mapPath, '  Cook a\n steak  ');
-  assert.equal(first.changed, true); assert.deepEqual(plain(first.previous), {});
-  assert.equal(await repo.readRelevanceGoal(mapPath), 'Cook a steak');
-  assert.match(contents.get(mapPath), new RegExp(`relevance-goal-history:\\n  - "${date}: Cook a steak"`));
-  const same = await repo.writeRelevanceGoal(mapPath, 'Cook a steak');
-  assert.equal(same.changed, false, 'the same goal is not a new history entry');
-  assert.equal(contents.get(mapPath).match(/relevance-goal-history/g).length, 1); assert.equal(contents.get(mapPath).match(/- "/g).length, 1);
-  const second = await repo.writeRelevanceGoal(mapPath, 'Cook a steak for guests');
-  assert.equal(second.changed, true);
-  assert.equal(await repo.readRelevanceGoal(mapPath), 'Cook a steak for guests');
-  assert.equal(contents.get(mapPath).match(/- "/g).length, 2, 'history only grows, oldest first');
-  assert.match(contents.get(mapPath), /relevance-goal-history:\n  - "[\d-]+: Cook a steak"\n  - "[\d-]+: Cook a steak for guests"/);
-  assert.equal(contents.get(mapPath).startsWith('---\nvisual-agent-map: true\n'), true);
-  // Restoring the state it found puts the file back exactly (the goal undo).
-  await repo.restoreRelevanceGoal(mapPath, second.previous);
-  assert.equal(await repo.readRelevanceGoal(mapPath), 'Cook a steak'); assert.equal(contents.get(mapPath).match(/- "/g).length, 1);
-  await repo.restoreRelevanceGoal(mapPath, first.previous);
-  assert.equal(await repo.readRelevanceGoal(mapPath), undefined); assert.doesNotMatch(contents.get(mapPath), /relevance-goal/);
-  await assert.rejects(repo.writeRelevanceGoal(mapPath, ' \n '), /goal/);
-});
-integrationTest('relevance goal writer never reads, writes or removes an old relevance-level key; only the goal or context counts as a setup change', async () => {
-  const { repo, contents, mapPath } = await mapFile();
-  contents.set(mapPath, contents.get(mapPath).replace(/^---\n/, '---\nrelevance-level: "beginner"\n'));
-  assert.deepEqual(plain(await repo.readRelevanceSetup(mapPath)), {}, 'the level is not part of the setup');
-  const first = await repo.writeRelevanceGoal(mapPath, 'Cook a steak', 'on a grill');
-  assert.equal(first.setupChanged, true); assert.equal('level' in first.previous, false); assert.equal('level' in first.next, false);
-  assert.match(contents.get(mapPath), /^relevance-level: "beginner"$/m);
-  contents.set(mapPath, contents.get(mapPath).replace('relevance-level: "beginner"', 'relevance-level: "familiar"'));
-  const same = await repo.writeRelevanceGoal(mapPath, 'Cook a steak', 'on a grill');
-  assert.equal(same.setupChanged, false, 'only the old level differs: no setup change'); assert.equal(same.changed, false);
-  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m);
-  await repo.restoreRelevanceGoal(mapPath, first.previous);
-  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m, 'restore leaves it');
-  assert.doesNotMatch(contents.get(mapPath), /relevance-(goal|context)/);
-  await repo.restoreRelevanceGoal(mapPath, first.next);
-  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m);
-});
-integrationTest('relevance goal keys survive every later map save (writeMapContent keeps the frontmatter)', async () => {
-  const { repo, contents, mapPath } = await mapFile();
-  await repo.writeRelevanceGoal(mapPath, 'Goal one'); await repo.writeRelevanceGoal(mapPath, 'Goal two');
-  const map = await repo.readMap(mapPath); map.viewport = { x: 5, y: 6, zoom: 2 };
-  await repo.saveMap(mapPath, map);
-  await repo.updateMap(mapPath, doc => { doc.title = 'Cooking again'; });
-  assert.equal(await repo.readRelevanceGoal(mapPath), 'Goal two');
-  assert.equal(contents.get(mapPath).match(/- "/g).length, 2);
-  assert.equal((await repo.readMap(mapPath)).title, 'Cooking again');
+// P1.10a removed the goal and AI grading, but maps written by older versions keep their keys: every save leaves them as they were.
+integrationTest('legacy goal, relevance and marker keys survive a topic rename, a summary edit and a map save', async () => {
+  const { repo, contents } = fixture('en');
+  const fm = text => obsidian.parseYaml(text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+  const mapPath = await repo.createMap('Cooking'), map = await repo.readMap(mapPath);
+  const note = await repo.createNote('Sear', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(note); await repo.saveMap(mapPath, map);
+  const mapKeys = { 'relevance-goal': 'Cook a steak', 'relevance-goal-history': ['2025-01-02: Cook a steak'], 'relevance-context': 'on a grill', 'relevance-level': 'beginner', 'x-custom': 'keep' };
+  const noteKeys = { 'relevance-tier': 'core', 'relevance-manual': true, 'relevance-reason': 'Old reason', 'topic-markers': ['done', 'priority-2', 'progress-50', 'flag-red', 'smile', 'question'], 'x-custom': 'keep' };
+  contents.set(mapPath, contents.get(mapPath).replace(/^---\n/, '---\nrelevance-goal: "Cook a steak"\nrelevance-goal-history:\n  - "2025-01-02: Cook a steak"\nrelevance-context: "on a grill"\nrelevance-level: "beginner"\nx-custom: keep\n'));
+  contents.set(note.path, contents.get(note.path).replace(/^---\n/, '---\nrelevance-tier: core\nrelevance-manual: true\nrelevance-reason: "Old reason"\ntopic-markers:\n  - done\n  - priority-2\n  - progress-50\n  - flag-red\n  - smile\n  - question\nx-custom: keep\n'));
+  const renamed = await repo.renameNote(note.path, 'Sear hard');
+  await repo.updateNote(renamed, { summary: 'Hot pan, dry meat' });
+  const opened = await repo.readMap(mapPath);
+  opened.nodes[0] = { ...opened.nodes[0], path: renamed, x: 320, y: 140 };
+  await repo.saveMap(mapPath, opened);
+  const reopened = await repo.readMap(mapPath), reread = await repo.readNote(renamed);
+  assert.equal(reopened.nodes[0].path, renamed); assert.equal(reopened.nodes[0].x, 320); assert.equal(reread.title, 'Sear hard'); assert.equal(reread.summary, 'Hot pan, dry meat');
+  const mapFm = fm(contents.get(mapPath)), noteFm = fm(contents.get(renamed));
+  for (const [key, value] of Object.entries(mapKeys)) assert.deepEqual(mapFm[key], value, `Map.md ${key}`);
+  for (const [key, value] of Object.entries(noteKeys)) assert.deepEqual(noteFm[key], value, `Topic Note ${key}`);
 });
 integrationTest('math repair rewrites note bodies only, skips changed notes, and is idempotent', async () => {
   const { repo, contents, files, app } = fixture();

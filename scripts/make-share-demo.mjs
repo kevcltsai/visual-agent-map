@@ -61,7 +61,7 @@ if (translate.length) {
   const pieces = translate.map(language => ({
     language,
     piece: {
-      top: { title: `[${language}] ${payload.title}`, ...(payload.goal ? { goal: `[${language}] ${payload.goal}` } : {}) },
+      top: { title: `[${language}] ${payload.title}` },
       nodes: Object.fromEntries(
         payload.nodes.map(node => [
           node.id,

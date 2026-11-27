@@ -45,10 +45,10 @@ const options = overrides => ({ includeDetail: true, includeImages: true, langua
 
 test('sharing: payload has only the Spec fields and the 7 content kinds survive cleaning', () => {
   const { notesById } = cleanedNotes();
-  const payload = format.buildSharePayload(fixtureMap(), notesById, options({ goal: 'Learn it' }));
+  const payload = format.buildSharePayload(fixtureMap(), notesById, options());
   assert.equal(payload.format, 'vam-share');
   assert.equal(payload.version, 1);
-  assert.deepEqual(plain(Object.keys(payload).sort()), ['assets', 'exportedAt', 'format', 'goal', 'language', 'nodes', 'source', 'title', 'version', 'viewport']);
+  assert.deepEqual(plain(Object.keys(payload).sort()), ['assets', 'exportedAt', 'format', 'language', 'nodes', 'source', 'title', 'version', 'viewport']);
   assert.deepEqual(plain(payload.source), { vamVersion: '0.25.0', mapId: 'share-fixture' });
   const rich = payload.nodes.find(n => n.id === 'rich');
   assert.deepEqual(plain(Object.keys(rich).sort()), ['collapsed', 'detailHtml', 'id', 'manual', 'parentId', 'status', 'summary', 'tier', 'title', 'x', 'y']);

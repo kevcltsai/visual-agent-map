@@ -84,7 +84,6 @@ export interface ShareNodeTranslation {
 /** The map-level text in a translated language. */
 export interface ShareMapTranslation {
   title: string;
-  goal?: string;
 }
 
 /** Size thresholds (bytes) for the preview warning and the "leave the images out" suggestion. */
@@ -235,7 +234,6 @@ export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
   title: string;
-  goal?: string;
   language: ShareLanguage;
   exportedAt: string;
   source: { vamVersion: string; mapId: string };
@@ -296,7 +294,6 @@ export interface ShareOptions {
   language: ShareLanguage;
   vamVersion: string;
   exportedAt: string;
-  goal?: string;
   /** name -> data URL, embedded only when includeImages is true. */
   assets?: Record<string, string>;
   /** Files the notes embed (name, file name, byte size); `assets[name]` holds the bytes when they travel. Kept only with includeDetail. */
@@ -622,7 +619,6 @@ export function buildSharePayload(
     if (cover) out.cover = cover;
     return out;
   });
-  const goal = optionalText(options.goal);
   const textNodes = shareTextNodes(map);
   // Only a follower whose text block is in the payload on the same parent keeps the link; anything else is a direct child.
   const textParent = new Map(textNodes.map(text => [text.id, text.parentId]));
@@ -653,7 +649,6 @@ export function buildSharePayload(
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
     title: map.title,
-    ...(goal ? { goal } : {}),
     language: options.language,
     exportedAt: options.exportedAt,
     source: { vamVersion: options.vamVersion, mapId: map.id },

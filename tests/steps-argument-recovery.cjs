@@ -39,7 +39,7 @@ async function harness({ withKey = true, running = true, phase, stacked = false 
   let owners = new Set();
   const calls = { provider: 0 };
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), pendingSuggestions: new Map(),
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), pendingSuggestions: new Map(),
     releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false, closeStaleDetails() {}, releaseWarmClaude() {},
     askModel: async () => { calls.provider++; throw new Error('no provider call expected'); },
     argumentRuns: { isRunning: p => owners.has(p) },

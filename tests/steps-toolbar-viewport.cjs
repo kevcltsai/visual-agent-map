@@ -87,7 +87,6 @@ function makeView() {
   });
   view.selection.setSelected('a');
   view.cardEls.set('b', { getBoundingClientRect: () => ({ left: 400, right: 680, top: 2000, bottom: 2180 }), focus() {} });
-  view.relevanceSortOn = () => false;
   view.canvasNodes = () => nodes;
   view.transform = () => {};
   view.selectMapNode = node => { view.selection.setSelected(node.id); };

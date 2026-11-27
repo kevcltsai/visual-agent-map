@@ -165,16 +165,13 @@ test('output languages: ja task prompt equals the en prompt except the language 
   assert.equal(/日本語|日文/.test(ja), false);
 });
 
-test('output languages: ja outline, structure-review and goal-recommend prompts equal the en prompts except the language name', () => {
+test('output languages: ja outline and structure-review prompts equal the en prompts except the language name', () => {
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
   const { buildStructureReviewPrompt } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
-  const { buildGoalRecommendPrompt } = support.load('core/goal-recommend-service.ts', { obsidian: support.obsidian });
   const nodes = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', status: 'completed', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', status: 'idea', parentId: 'n1', depth: 1 }];
   const calls = {
     outline: contentLanguage => buildOutlineGeneratePrompt({ language: 'en', contentLanguage, topic: 'Topic under study', presetText: 'Build a knowledge tree for {Enter research topic} in three levels.', model: 'm', reasoning: 'low' }),
-    structure: contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' }),
-    // The recommend step writes new card titles and summaries, so it names the output language (the tiers carry no prose).
-    recommend: contentLanguage => buildGoalRecommendPrompt({ language: 'en', contentLanguage, goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low', scope: 'all' })
+    structure: contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' })
   };
   for (const [name, build] of Object.entries(calls)) {
     const en = build('en'), ja = build('ja');
@@ -601,7 +598,7 @@ test('card output language call sites use cardOutputLanguage with the map title'
   assert.equal((view.match(/cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, (?:note|latest)\.title\)/g) ?? []).length, 1, 'rerunStandard; the old dialog call site is gone');
   assert.equal((view.match(/cardOutputLanguage\(\s*languageSource \?\? (?:this\.)?map,\s*this\.plugin\.settings\.language,\s*note\.title\s*\)/g) ?? []).length, 1, 'researchChild uses the batch snapshot; Living Node now resolves language from its live map');
   assert.equal((view.match(/language: \((?:live|map), note\) => cardOutputLanguage\((?:live|map), this\.plugin\.settings\.language, note\.title\)/g) ?? []).length, 3, 'formal, trial and validity consumers resolve the card language from the map');
-  assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 5, 'the topic chat request adds one map-level use');
+  assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 4, 'the topic chat request adds one map-level use; P1.10a removed the goal-grading port\'s use');
   assert.equal((view.match(/defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*this\.outputLanguageMemory\(\)\.outputLanguage,\s*this\.map\?\.title\s*\)/g) ?? []).length, 3, 'both chat-expand calls and the topic chat turn pass the map title');
   assert.equal((view.match(/defaultOutputLanguage\(\s*settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*remembered,\s*map\.title\s*\)/g) ?? []).length, 1, 'chat synthesis passes the map title');
   assert.match(view, /outputLanguageMemory\(\): OutputLanguageMemory \{[^]*?\.\.\.\(this\.map\?\.title \? \{ mapTitle: this\.map\.title \} : \{\}\)/, 'the dialog memory carries the map title');

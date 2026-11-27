@@ -8,6 +8,7 @@ import {
   livingDeletedTextHash,
   livingSuppressionV2,
   livingSuppressionV2Entry,
+  livingSuppressionV2Forms,
   parseLivingEventTombstone,
   parseLivingSuppressionV2,
   type LivingAiLatest,
@@ -517,13 +518,14 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
     if (event) suppressed.add(livingEventTombstone(id, event.fingerprint, event.scope, event.unknownTime));
   }
   const records = current.records.map(record => {
-    const v2 = livingSuppressionV2Entry(livingSuppressionV2(record));
+    const forms = livingSuppressionV2Forms(record);
+    const held = forms.some(form => stored.has(form));
     // Only an id the ownership index does not know (typed or pasted back by the user) lifts a hold. A known id whose
     // text changed just becomes user-owned below and never lifts one, so an edited AI sibling cannot free a deleted
     // event. A hold created by this very read never lifts either.
     const added = !index.records.has(record.id);
-    if (added && stored.has(v2)) suppressed.delete(v2);
-    if (suppressed.has(record.id) || (added && stored.has(v2))) {
+    if (added && held) for (const form of forms) suppressed.delete(form);
+    if (suppressed.has(record.id) || (added && held)) {
       // An explicit human re-add of the record is protected and releases its id-only and v1 holds too.
       suppressed.delete(record.id);
       for (const value of suppressed) {

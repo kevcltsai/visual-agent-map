@@ -311,7 +311,6 @@ import {
   ringMemberIds,
   ringFixedLines,
   ringOutwardDirections,
-  ringTreeIds,
   solveRings,
   type TextWidthOf
 } from "../../map-layout-text";
@@ -431,10 +430,6 @@ import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai
 import { placeHoverPreview, previewMetrics, shrinkHoverPreview } from "../../ui/preview-utils";
 import { fitImageForInput } from "../../ui/fit-image-input";
 import {
-  normalizeRelevanceContext,
-  normalizeRelevanceGoal,
-  RELEVANCE_CONTEXT_MAX_LENGTH,
-  RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_LEANINGS,
   HYPOTHESIS_STRENGTHS,
   TOPIC_KINDS,
@@ -445,7 +440,6 @@ import {
 } from "../../note-values";
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { hypothesisTagText, LEANING_LABEL, renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
-import { relevanceDisplayNodes } from "./relevance-order";
 import {
   bottomInsetFromRects,
   FLOATING_LAYER_SELECTORS,
@@ -466,8 +460,6 @@ import {
   type ScreenRect,
   statusBarClearance
 } from "./viewport-inset";
-import { RelevanceSummaryModal } from "./relevance-summary-modal";
-import { gradingUndone, RelevanceGradeRun } from "./relevance-grade-run";
 import {
   MapChatPanel,
   type MapChatChip,
@@ -570,8 +562,6 @@ import {
   type ChatBatchRequest
 } from "../../core/map-chat-batch";
 import { chatDockedWidth, chatOverlayWidth, clampMapChatWidth, isChatNarrow } from "../../core/map-chat-layout";
-import { GoalSuggest } from "./goal-suggest";
-import type { RelevancePin } from "./relevance-pins";
 import {
   addOutlineToMap,
   applyOutlineSummaries,
@@ -635,12 +625,6 @@ import {
   type StructureReviewResult,
   type StructureSuggestion
 } from "../../core/structure-review-service";
-import type {
-  GoalRecommendOutcome,
-  GoalRecommendRun,
-  GoalRecommendSuggestion
-} from "../../core/goal-recommend-service";
-import { GOAL_RECOMMEND_SCHEMA } from "../../core/goal-recommend-service";
 import { ancestorTrail, createCardSearchField, type CardSearchSource } from "../../ui/card-search-field";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -834,10 +818,9 @@ const cardImageRelationMarks = new WeakMap<HTMLElement, HTMLElement>();
 const cardLinkButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** The AI lock button of each locked card, so a repaint replaces it instead of adding a second. */
 const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
-let relevancePanelSeq = 0;
-type GoalIcon = "target" | "spark" | "sort" | "select";
-/** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
-function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
+let mapSourcesPanelSeq = 0;
+/** The select tool's inline icon (drawn like the approved mock-up); colour follows `currentColor`. */
+function appendSelectSvg(parent: HTMLElement): void {
   const svg = createSvg("svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
@@ -848,45 +831,21 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
     svg.appendChild(el);
   };
   const line = { fill: "none", stroke: "currentColor", "stroke-width": "2" };
-  if (kind === "target") {
-    add("circle", { ...line, cx: "12", cy: "12", r: "9" });
-    add("circle", { ...line, cx: "12", cy: "12", r: "5" });
-    add("circle", { ...line, cx: "12", cy: "12", r: "1.5", fill: "currentColor" });
-  } else if (kind === "spark")
-    add("path", {
-      fill: "currentColor",
-      d: [
-        "M12 2l1.8 6.2L20 10l-6.2 1.8L12 18",
-        "l-1.8-6.2L4 10l6.2-1.8z",
-        "M19 15l.9 2.1L22 18l-2.1.9L19 21",
-        "l-.9-2.1L16 18l2.1-.9z"
-      ].join("")
-    });
-  else if (kind === "sort")
-    add("path", {
-      ...line,
-      "stroke-linecap": "round",
-      d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
-    });
-  else {
-    // The multi-select icon of the approved mock-up: a ticked box and a dashed one.
-    add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
-    add("rect", {
-      ...line,
-      "stroke-linejoin": "round",
-      "stroke-dasharray": "3 2",
-      x: "13",
-      y: "13",
-      width: "8",
-      height: "8",
-      rx: "1.5"
-    });
-    add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
-  }
+  // The multi-select icon of the approved mock-up: a ticked box and a dashed one.
+  add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
+  add("rect", {
+    ...line,
+    "stroke-linejoin": "round",
+    "stroke-dasharray": "3 2",
+    x: "13",
+    y: "13",
+    width: "8",
+    height: "8",
+    rx: "1.5"
+  });
+  add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
   parent.appendChild(svg);
 }
-/** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
-const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
 /**
  * A text block's x after its width changed from `from` to `to`: the edge or center facing its topic stays where it was
@@ -1059,8 +1018,8 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
 const CHAT_TOOLS_GAP = 12;
-/** The suggestion card hangs this far under the goal bar (styles.css: top calc(100% + 6px)). */
-const GOAL_SUGGEST_GAP = 6;
+/** The sources panel hangs this far under the tool group. */
+const SOURCES_PANEL_GAP = 6;
 /**
  * A found picture's title as it is written into a note: letters, digits, spaces and plain punctuation only. Nothing a Markdown
  * or Dataview reader would act on (a backtick, `%%`, `$=`, an embed, a table bar, a heading) survives; the rest becomes a space.
@@ -1097,29 +1056,6 @@ export type MapCommandAction =
   | "zoom-reset"
   | "search"
   | "shortcuts";
-/**
- * The goal being edited in place. The state is the edit; the DOM is drawn from it, so a repaint rebuilds the fields from here
- * (draft and caret kept). `warmed`: the Claude CLI was pre-started for the grade this edit would run.
- */
-interface GoalEditState {
-  path: string;
-  goal: string;
-  context: string;
-  showContext: boolean;
-  caret: number | null;
-  contextCaret: number | null;
-  field: "goal" | "context";
-  /** The keyboard was in the editor when it was last drawn: give it back to the new field. */
-  refocus: boolean;
-  warmed: boolean;
-}
-
-/** What takes a click: the strip toward the floating goal icons must not lie over any of it. */
-/** Presses here are not "elsewhere" for the goal edit: Obsidian's menus, dialogs and command palette, and the buttons that open a menu. */
-const NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(
-  ", "
-);
-const CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 /** How long a map open reads before the cards are drawn ahead of their notes. */
 const NOTE_LOAD_FRAME_DELAY_MS = 150;
 /** The state of one map open that reads notes one by one (see VisualAgentMapView.noteLoad). */
@@ -1196,85 +1132,16 @@ export class VisualAgentMapView extends ItemView {
   }
   private path = "";
   private notes = new Map<string, Note>();
-  /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
-  private relevanceGoal: string | undefined;
-  private relevanceContext: string | undefined;
   /** The selection rules and state (selected topic, ticked topics, multi-select mode, selected relation line, tab stop). */
   private selection = new TopicSelection();
   /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
   private structureHighlight = new Set<string>();
   /** How many times the map was repainted; a run compares it to repaint once, not twice. */
   private paintCount = 0;
-  private relevanceRun = new RelevanceGradeRun(this, {
-    plugin: () => this.plugin,
-    path: () => this.path,
-    closed: () => this.closed,
-    map: () => this.map,
-    notes: () => this.notes,
-    history: () => this.history,
-    paintCount: () => this.paintCount,
-    gradeable: () => this.relevanceGradeable(),
-    notesLoading: () => this.notesLoading(),
-    dropGoalSuggest: () => this.goalSuggest.dismiss(),
-    setGoal: (goal, context) => {
-      this.relevanceGoal = goal;
-      this.relevanceContext = context;
-    },
-    aiGrades: () => this.relevanceAiGrades(),
-    pins: () => this.relevancePinList(),
-    describe: id => this.describeForReview(id),
-    usageMapField: () => this.usageMapField(),
-    contentLanguage: language => outputLanguageForMap(this.map, language, this.map?.title),
-    lockedParent: parentId => !!this.aiLockReason("addChild", [parentId]),
-    refresh: focusBar => this.refreshRelevance(focusBar),
-    paintReceived: run => this.paintGoalRecommendReceived(run),
-    updateHistoryButtons: () => this.updateHistoryButtons(),
-    openRecommendations: (run, mapPath, suggestions) => this.openRecommendations(run, mapPath, suggestions),
-    notice: message => new Notice(message)
-  });
-  private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
-  /** The goal being edited in place (null when the goal is just shown). Changes only through startGoalEdit / closeGoalEdit. */
-  private goalEdit: GoalEditState | null = null;
-  private goalEditInput: HTMLTextAreaElement | null = null;
-  private goalEditContextInput: HTMLInputElement | null = null;
-  private goalEditChip: HTMLButtonElement | null = null;
-  private goalEditActions: HTMLElement | null = null;
-  /** Removes the document listeners of the open edit (a press outside it saves). */
-  private goalEditCleanup: (() => void) | null = null;
-  /** True while a goal save started by a press elsewhere or Tab runs: the grading must not take the keyboard from where the user went. */
-  private holdFocusOnGrade = false;
-  private relevanceBarEl: HTMLElement | null = null;
-  /** The element the bar was last drawn into (the header row or the toolbar); redrawing in place needs it. */
-  private goalBarHost: HTMLElement | null = null;
-  /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
-  private goalHostEl: HTMLElement | null = null;
-  /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
-  private goalSuggest = new GoalSuggest({
-    plugin: () => this.plugin,
-    path: () => this.path,
-    closed: () => this.closed,
-    map: () => this.map,
-    notes: () => this.notes,
-    history: () => this.history,
-    contentEl: () => this.contentEl,
-    render: () => this.render(),
-    placeMapTools: () => this.placeMapTools(),
-    focusGoalReturn: () => this.focusGoalReturn(),
-    whenEditing: action => this.whenEditing(action),
-    lockedParent: (parentId, fresh) => !!this.aiLockReason("addChild", [parentId], fresh),
-    isMerging: id => this.isMerging(id),
-    describe: id => this.describeForReview(id),
-    freshNotesOf: ids => this.freshNotesOf(ids),
-    addNode: (parent, title) => this.addNode(parent, title, false, false),
-    restoreRelevance: (changes, direction) => this.relevanceRun.restore(changes, direction),
-    updateHistoryButtons: () => this.updateHistoryButtons(),
-    announce: text => this.announcer?.setText(text),
-    notice: message => new Notice(message)
-  });
   /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
   private chatTurnReferences: ReferenceGroup[] = [];
   private readonly mapSourcesControl = new MapSourcesControl(
-    `vam-map-sources-panel-${++relevancePanelSeq}`,
+    `vam-map-sources-panel-${++mapSourcesPanelSeq}`,
     this.mapSourcesControlPorts()
   );
   private history = new History<Action>();
@@ -1656,8 +1523,6 @@ export class VisualAgentMapView extends ItemView {
   private bookAuthoring = new Map<string, number>();
   /** The picture-book start card while it is open (closed with the view). */
   private bookStartModal: BookStartModal | null = null;
-  /** The status bar's "N of M received" text of the running grade; painted in place, never by a repaint. */
-  private relevanceReceivedEl: HTMLElement | null = null;
   private researchRenderTimer: number | null = null;
   /** Persistent, visually hidden live region for research stage changes; outside contentEl so a render never rebuilds it. */
   private announcer: HTMLElement | null = null;
@@ -1746,12 +1611,6 @@ export class VisualAgentMapView extends ItemView {
     (this.isTextId(id)
       ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
-  /** Card heights as drawn by the last render; the relevance sort reads these so every `canvasNodes()` call of one render agrees. */
-  private drawnHeights = new Map<string, number>();
-  private drawnHeightsMap: string | null = null;
-  private sortHeightOf = (id: string): number | undefined =>
-    (this.drawnHeightsMap === this.map?.id ? this.drawnHeights.get(id) : undefined) ||
-    this.map?.nodes.find(node => node.id === id)?.height;
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -2194,10 +2053,6 @@ export class VisualAgentMapView extends ItemView {
         if (!button.closest?.(keep) || button.classList?.contains("vam-layout-button")) button.disabled = true;
     };
     lock(this.contentEl);
-    lock(this.relevanceBarEl);
-    // The goal title is a div with role=button, not a <button>: mark it off too.
-    for (const el of Array.from(this.relevanceBarEl?.querySelectorAll?.<HTMLElement>(".vam-goal-text") ?? []))
-      el.setAttr?.("aria-disabled", "true");
     this.contentEl.addClass?.("is-notes-loading");
     this.syncLoadStatus();
   }
@@ -2270,7 +2125,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Whether replacing this tab's map now would stop something: closing or switching a map aborts these (see
-   * {@link dropMapBackground}, abortRelevanceGrade, abortMapChat and the map-change branch of the chat mount).
+   * {@link dropMapBackground}, abortMapChat and the map-change branch of the chat mount).
    */
   hasRunningWork(): boolean {
     if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
@@ -2278,8 +2133,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
-    if (this.goalSuggest.task || this.structureReviewTask || this.outlineDraftTask) return true;
-    if (this.relevanceRun.isRunning()) return true;
+    if (this.structureReviewTask || this.outlineDraftTask) return true;
     const runs = this.plugin.topicRuns,
       batches = this.plugin.expansionCoordinator;
     return (this.map?.nodes ?? []).some(
@@ -2431,14 +2285,6 @@ export class VisualAgentMapView extends ItemView {
     // A menu that this very key just closed is already gone from the page, so its hide is remembered for the rest of the key event.
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
-    // An open suggestion list closes first, wherever the focus is (it is the topmost thing on the canvas).
-    const suggest = this.goalSuggest.task;
-    if (event.key === "Escape" && suggest && suggest.state === "ready") {
-      event.preventDefault();
-      event.stopPropagation();
-      this.goalSuggest.end(suggest, { refocus: true });
-      return;
-    }
     if (event.key === "Escape" && this.menuClosedByKey) {
       // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
       event.preventDefault();
@@ -3059,9 +2905,16 @@ export class VisualAgentMapView extends ItemView {
     field.setAttr("aria-labelledby", id);
   }
   /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
-  private discardNewTopic(step: TransactionEntry): void {
+  private discardNewTopic(step: TransactionEntry, parentId: string | null): void {
+    // The keyboard goes back to the parent card, so the next key (F2, arrows) still has somewhere to land.
+    const handBackFocus = (): void => {
+      if (!parentId) return;
+      this.focusNodeId = parentId;
+      this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
+    };
     if (this.history.undoEntry !== step) {
       // Something else was recorded since the topic was made: it stays (no silent undo of another change).
+      handBackFocus();
       this.render();
       return;
     }
@@ -3075,6 +2928,7 @@ export class VisualAgentMapView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file instanceof TFile) await this.app.fileManager.trashFile(file);
       }
+      handBackFocus();
       this.render();
     });
   }
@@ -3084,7 +2938,7 @@ export class VisualAgentMapView extends ItemView {
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
       // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
       if (value === null && edit?.created && edit.createdStep) {
-        this.discardNewTopic(edit.createdStep);
+        this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
       // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.
@@ -3275,16 +3129,13 @@ export class VisualAgentMapView extends ItemView {
     this.pendingSummary = null;
     this.summaryEditDraft = null;
     this.releaseCovers();
-    this.drawnHeights.clear();
-    this.drawnHeightsMap = null;
     this.unbindClipboard?.();
     this.unbindClipboard = null;
     this.statusBarObserver?.disconnect();
     this.statusBarObserver = null;
-    this.goalBarObserver?.disconnect();
-    this.goalBarObserver = null;
-    this.goalBarObserved = [];
-    this.removeGoalBar();
+    this.toolPlacementObserver?.disconnect();
+    this.toolPlacementObserver = null;
+    this.toolPlacementObserved = [];
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
@@ -3310,11 +3161,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeChatRecords();
     this.abortMapChat();
     this.chat?.dispose();
-    this.goalSuggest.releaseListener();
     this.mapSourcesControl?.dispose();
-    // An open goal edit pre-started the CLI for a grade that will never be sent: it is dropped, nothing is saved.
-    this.dropGoalEdit();
-    this.abortRelevanceGrade();
     this.plugin.topicRuns.dropSyntheses(this);
     this.mergeDrafts.stopAll();
     this.dropMapBackground();
@@ -3352,7 +3199,7 @@ export class VisualAgentMapView extends ItemView {
     if (
       !doc ||
       !current ||
-      !(this.contentEl.contains(current) || !!this.relevanceBarEl?.contains?.(current)) ||
+      !this.contentEl.contains(current) ||
       this.chat?.isInput(current) ||
       current.closest(".vam-text-node")
     ) {
@@ -3407,10 +3254,7 @@ export class VisualAgentMapView extends ItemView {
     return { card: id => this.cardEls.get(id), text: id => this.textEls.get(id) };
   }
   private describeMapFocus(el: Element | null): MapFocusAnchor | null {
-    // The goal bar lives outside contentEl (in the header row), so a control inside it is described against the bar itself.
-    const bar = this.relevanceBarEl;
-    const root = el && bar?.contains?.(el) && !this.contentEl.contains(el) ? bar : this.contentEl;
-    return describeFocus(el, root, id => {
+    return describeFocus(el, this.contentEl, id => {
       const text = (this.map?.canvasItems ?? []).find(
         (item): item is TextItem => item.kind === "text" && item.id === id
       );
@@ -3418,14 +3262,9 @@ export class VisualAgentMapView extends ItemView {
       return text ? text.parentId : this.lastMapFocus?.itemId === id ? this.lastMapFocus.parentId : null;
     });
   }
-  /** The element that now stands for the anchor: found in the view first, else in the goal bar (which sits outside contentEl). */
+  /** The element that now stands for the anchor in the view. */
   private resolveMapFocus(anchor: MapFocusAnchor): HTMLElement | null {
-    const lookup = this.mapFocusLookup();
-    const bar = this.relevanceBarEl;
-    return (
-      resolveFocus(anchor, this.contentEl, lookup) ??
-      (bar && anchor.key && !anchor.nodeId && !anchor.itemId ? resolveFocus(anchor, bar, lookup) : null)
-    );
+    return resolveFocus(anchor, this.contentEl, this.mapFocusLookup());
   }
   /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
   private trackMapFocus(target: EventTarget | null): void {
@@ -3632,28 +3471,20 @@ export class VisualAgentMapView extends ItemView {
   private async hydrate(
     isCurrent: () => boolean = () => true,
     onRead?: (index: number, note: Note | undefined) => void,
-    meta?: { goal: string | undefined; context: string | undefined; sources: MapSource[] }
+    meta?: { sources: MapSource[] }
   ): Promise<{ failedPaths: string[] }> {
     const current = this.captureViewSession();
     const map = this.map;
     const path = this.path;
     const alive = () => current() && this.map === map && isCurrent();
     if (!alive()) return { failedPaths: [] };
-    let goal: string | undefined;
-    let context: string | undefined;
     let sources: MapSource[] = [];
     // One context per hydrate: each ancestor note is read once however many notes inherit from it.
     const ctx = createNoteReadContext(map ?? undefined);
     if (meta) {
-      // The caller already read Map.md once (synchronize); the goal and sources are not read again.
-      if (path && !map?.aim) ({ goal, context, sources } = meta);
+      // The caller already read Map.md once (synchronize); the sources are not read again.
+      if (path && !map?.aim) ({ sources } = meta);
     } else if (path && !map?.aim) {
-      try {
-        ({ goal, context } = await this.plugin.repo.readRelevanceSetup(path));
-      } catch {
-        /* An unreadable goal is simply not shown. */
-      }
-      if (!alive()) return { failedPaths: [] };
       try {
         sources = await this.plugin.repo.readMapSources(path);
       } catch {
@@ -3685,8 +3516,6 @@ export class VisualAgentMapView extends ItemView {
       if (note) loaded.set(node.id, note);
     });
     this.notes = loaded;
-    this.relevanceGoal = goal;
-    this.relevanceContext = context;
     this.mapSourcesControl?.loadForMap(sources);
     this.livingValidity.clear();
     if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
@@ -3737,8 +3566,6 @@ export class VisualAgentMapView extends ItemView {
     this.outlineStarting = null;
     this.startingTasks.clear();
     this.startingExpand.clear();
-    this.goalSuggest.drop();
-    this.abortRelevanceGrade();
     preparing?.abort();
     for (const controller of starting) controller.abort();
     review?.controller.abort();
@@ -3769,8 +3596,6 @@ export class VisualAgentMapView extends ItemView {
     if (path !== this.path) {
       this.cameraWhenShown = null;
       this.mapSourcesControl.mapSourcesOpen = false;
-      this.dropGoalEdit();
-      this.abortRelevanceGrade();
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
@@ -3804,8 +3629,6 @@ export class VisualAgentMapView extends ItemView {
     if (progressive) {
       // Nothing of the map before this one may show or be used while this one is read.
       this.notes = new Map();
-      this.relevanceGoal = undefined;
-      this.relevanceContext = undefined;
       this.mapSourcesControl?.reset();
       const state: NoteLoadState = {
         epoch: openEpoch,
@@ -4556,543 +4379,9 @@ export class VisualAgentMapView extends ItemView {
       this.cardEls.get(id)?.toggleClass("vam-structure-suggested", next.has(id));
     this.structureHighlight = next;
   }
-  // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
-  /** Mind maps only: goal grading stays off for an old AIM map (it has no visible UI there). */
-  private relevanceGradeable(): boolean {
-    return !!this.map && !this.map.aim && !!this.path;
-  }
-  /**
-   * The goal bar: the goal as a title in the middle of the row above the map (Obsidian's header row, or the toolbar when
-   * that row is hidden). It wraps and is never cut off; the three icons (suggest topics, recalibrate, sort) show on hover or
-   * keyboard focus. A click on the goal turns it into a field in the same place (see startGoalEdit); no icons are drawn while
-   * it is edited. `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
-   */
-  private renderGoalBar(host: HTMLElement, before?: HTMLElement | null): void {
-    // A repaint drops the old DOM: the draft in its fields is kept in the edit state first, and the fields are drawn again from it.
-    this.captureGoalEdit();
-    this.goalSuggest.detach();
-    // The map changed under the edit, or a grading started (the chat can start one): there is nothing left to save.
-    if (
-      this.goalEdit &&
-      (this.goalEdit.path !== this.path || this.plugin.relevanceGrades.get(this.path)?.status === "running")
-    )
-      this.dropGoalEdit();
-    this.goalBarHost = host;
-    const bar = host.createDiv({
-      cls: "vam-goal-bar",
-      attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
-    });
-    if (before && before.parentElement === host) host.insertBefore(bar, before);
-    // Keyboard focus inside the bar (:focus-visible on what got focus) is a class, so the narrow layout can show the icons for it without
-    // `:has`. The stylesheet pairs it with :focus-within, so the mark left after focus moves out does nothing and needs no clearing.
-    bar.addEventListener("focusin", event =>
-      bar.toggleClass("is-focus-visible", (event.target as Element | null)?.matches?.(":focus-visible") === true)
-    );
-    // The bar is outside contentEl, which carries the map's Esc handling: an open suggestion list closes here too.
-    bar.addEventListener("keydown", event => {
-      const suggest = this.goalSuggest.task;
-      if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
-      if (suggest.state !== "ready") return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.goalSuggest.end(suggest, { refocus: true });
-    });
-    // The group's name comes from a hidden label, not aria-label: Obsidian turns every aria-label into a hover tooltip,
-    // and the whole bar must not show one.
-    bar.createSpan({
-      cls: "vam-sr-only",
-      text: t("ui.relevance_goal_label"),
-      attr: { id: `${this.relevancePanelId}-name` }
-    });
-    this.relevanceBarEl = bar;
-    this.drawGoalBar(bar);
-    this.goalSuggest.draw(bar);
-  }
-  /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
-  private relevanceSortOn(): boolean {
-    return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
-  }
-  private drawGoalBar(bar: HTMLElement): void {
-    const goal = this.relevanceGoal;
-    const sorted = this.relevanceSortOn();
-    const running = this.plugin.relevanceGrades.get(this.path)?.status === "running";
-    bar.toggleClass("is-empty", !goal);
-    const target = bar.createSpan("vam-goal-target");
-    target.setAttr("aria-hidden", "true");
-    appendGoalSvg(target, "target");
-    if (this.goalEdit) {
-      bar.addClass("is-editing");
-      this.drawGoalEdit(bar, this.goalEdit);
-      return;
-    }
-    // The text is the bar's one tab stop (always visible, so focus can always return to it). A click, Enter or Space turns
-    // it into a field in the same place. Its name is a hidden label, not aria-label (that would show as a tooltip).
-    const textName = `${this.relevancePanelId}-text`;
-    const text = bar.createDiv({
-      cls: "vam-goal-text",
-      attr: { role: "button", tabindex: "0", "aria-labelledby": textName }
-    });
-    text.setText(goal ?? t("ui.relevance_goal_placeholder"));
-    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
-    bar.createSpan({
-      cls: "vam-sr-only",
-      text: sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label,
-      attr: { id: textName }
-    });
-    text.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    text.addEventListener("click", event =>
-      this.startGoalEdit({ caret: this.caretOffsetAt(text, event.clientX, event.clientY) })
-    );
-    text.addEventListener("keydown", event => {
-      if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
-        event.preventDefault();
-        event.stopPropagation();
-        this.startGoalEdit({});
-      }
-    });
-    const actions = bar.createDiv({ cls: "vam-goal-actions" });
-    const icon = (kind: GoalIcon, name: string, run: () => void, disabled: boolean): HTMLButtonElement => {
-      const button = actions.createEl("button", { cls: "vam-goal-icon" });
-      appendGoalSvg(button, kind);
-      setTooltip(button, name);
-      // The tooltip helper may replace the accessible name; keep the full action name for screen readers.
-      button.setAttr("aria-label", name);
-      button.disabled = disabled;
-      button.addEventListener("click", event => {
-        event.stopPropagation();
-        run();
-      });
-      return button;
-    };
-    // Busy (writing the added cards): the icons are off. A shown list leaves them on; the spark then closes it.
-    const suggestTask = this.goalSuggest.task;
-    const busy = !!suggestTask && suggestTask.state !== "ready";
-    const spark = icon(
-      "spark",
-      t("ui.goal_recommend"),
-      () => {
-        // A shown list: the button only closes it (no AI call). Otherwise one request recommends cards and rates the map.
-        if (this.goalSuggest.task?.state === "ready") this.goalSuggest.end(this.goalSuggest.task, { refocus: true });
-        else if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
-      },
-      running || !goal || busy
-    );
-    spark.setAttr("data-goal-action", "recommend");
-    const sort = icon(
-      "sort",
-      t("ui.relevance_sort"),
-      () => {
-        // The sort icon: display only, an in-memory Set, no file write and no refit (a refit saves the viewport into Map.md).
-        if (sorted) relevanceSortedMaps.delete(this.path);
-        else relevanceSortedMaps.add(this.path);
-        this.renderPreservingFocus();
-      },
-      running || busy
-    );
-    sort.setAttr("aria-pressed", String(sorted));
-    sort.toggleClass("on", sorted);
-  }
-  // ---- Goal: edit in place ---------------------------------------------------------------------------------------
-  /**
-   * The goal editor, drawn into the bar in place of the goal text. What saves is decided here and only here: Enter (not while
-   * an IME composes), a press outside the bar (saved once the press ends, so the thing pressed still gets its click), and Tab
-   * leaving the last field (or Shift+Tab the first). Esc cancels. Nothing else saves: not a window or focus change, not a repaint,
-   * not opening a menu or dialog. Unchanged or empty never reaches the AI.
-   */
-  private drawGoalEdit(bar: HTMLElement, edit: GoalEditState): void {
-    const area = bar.createEl("textarea", { cls: "vam-goal-input" });
-    area.setAttr("rows", "1");
-    area.setAttr("dir", "auto");
-    area.setAttr("aria-labelledby", `${this.relevancePanelId}-name`);
-    area.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
-    area.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
-    area.value = edit.goal;
-    this.goalEditInput = area;
-    // The one slot icons use: "+ Context" while the goal has text and the context row is closed.
-    const actions = bar.createDiv({ cls: "vam-goal-actions" });
-    this.goalEditActions = actions;
-    this.goalEditChip = null;
-    this.goalEditContextInput = null;
-    if (!edit.showContext) {
-      const chip = actions.createEl("button", { cls: "vam-goal-add-context", text: t("ui.goal_add_context") });
-      chip.setAttr("aria-expanded", "false");
-      // Pressing it must not take the keyboard out of the goal field.
-      chip.addEventListener("mousedown", event => event.preventDefault());
-      chip.addEventListener("click", event => {
-        event.stopPropagation();
-        this.showGoalContext();
-      });
-      chip.addEventListener("keydown", event => this.goalEditKeys(event, false));
-      this.goalEditChip = chip;
-    }
-    this.syncGoalChip();
-    if (edit.showContext) {
-      const box = bar.createDiv({ cls: "vam-goal-context vam-goal-attachment" });
-      const labelId = `${this.relevancePanelId}-context`;
-      box.createSpan({ cls: "vam-sr-only", text: t("ui.relevance_context_label"), attr: { id: labelId } });
-      const context = box.createEl("input", { cls: "vam-goal-context-input", type: "text" });
-      context.setAttr("aria-labelledby", labelId);
-      context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
-      context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
-      context.value = edit.context;
-      context.addEventListener("input", () => {
-        edit.context = context.value;
-        this.warmGoalEdit(edit);
-      });
-      context.addEventListener("keydown", event => this.goalEditKeys(event, true));
-      this.goalEditContextInput = context;
-    }
-    area.addEventListener("input", () => {
-      // Pasted line breaks become spaces (a goal is one line); the caret stays where it was.
-      if (/[\r\n]/.test(area.value)) {
-        const at = area.selectionStart ?? area.value.length;
-        const kept = area.value.slice(0, at).replace(/[\r\n]+/g, " ").length;
-        area.value = area.value.replace(/[\r\n]+/g, " ");
-        area.setSelectionRange?.(kept, kept);
-      }
-      edit.goal = area.value;
-      this.growGoalInput(area);
-      this.syncGoalChip();
-      this.warmGoalEdit(edit);
-    });
-    area.addEventListener("keydown", event => this.goalEditKeys(event, true));
-    // A press on the bar that is not a field must not take the keyboard out of the field either.
-    bar.addEventListener("mousedown", event => {
-      if (event.target !== this.goalEditInput && event.target !== this.goalEditContextInput) event.preventDefault();
-    });
-    this.growGoalInput(area);
-  }
-  /** The field grows with its text: a goal wraps like the shown one and the row grows with it. */
-  private growGoalInput(area: HTMLTextAreaElement): void {
-    area.setCssProps?.({ "--vam-goal-edit-height": "auto" });
-    area.setCssProps?.({ "--vam-goal-edit-height": `${area.scrollHeight}px` });
-  }
-  /** "+ Context" is there once the goal has text and the context row is closed; otherwise its slot stays, empty. */
-  private syncGoalChip(): void {
-    const show = !!this.goalEditChip && !!normalizeRelevanceGoal(this.goalEditInput?.value ?? "");
-    this.goalEditActions?.toggleClass("is-vacant", !show);
-  }
-  /** The setup the editor would save: normalised the way the repository stores it, and whether it differs from what is saved. */
-  private goalEditSetup(edit: GoalEditState): { goal: string; context: string | undefined; changed: boolean } {
-    const goal = normalizeRelevanceGoal(this.goalEditInput?.value ?? edit.goal);
-    const context = normalizeRelevanceContext(this.goalEditContextInput?.value ?? edit.context);
-    const changed =
-      !!goal &&
-      (goal !== normalizeRelevanceGoal(this.relevanceGoal ?? "") ||
-        context !== normalizeRelevanceContext(this.relevanceContext ?? ""));
-    return { goal, context, changed };
-  }
-  /** Pre-starts the CLI once the text really differs from the saved setup (a click on the goal alone starts nothing). */
-  private warmGoalEdit(edit: GoalEditState): void {
-    if (edit.warmed || !this.relevanceGradeable() || !this.goalEditSetup(edit).changed) return;
-    edit.warmed = true;
-    this.prewarmRelevance();
-  }
-  /** Reads the fields back into the edit state, ahead of a repaint that drops them; remembers whether the keyboard was in them. */
-  private captureGoalEdit(): void {
-    const edit = this.goalEdit;
-    const goal = this.goalEditInput;
-    const context = this.goalEditContextInput;
-    this.goalEditInput = null;
-    this.goalEditContextInput = null;
-    this.goalEditChip = null;
-    this.goalEditActions = null;
-    if (!edit) return;
-    const active = this.goalLayerRoot()?.ownerDocument?.activeElement ?? null;
-    if (goal) {
-      edit.goal = goal.value;
-      edit.caret = goal.selectionStart ?? edit.caret;
-      if (active && active === goal) {
-        edit.field = "goal";
-        edit.refocus = true;
-      }
-    }
-    if (context) {
-      edit.context = context.value;
-      edit.contextCaret = context.selectionStart ?? edit.contextCaret;
-      if (active && active === context) {
-        edit.field = "context";
-        edit.refocus = true;
-      }
-    }
-  }
-  /** After a repaint or a redraw: the field the keyboard was in takes it back, caret where it was (the end when it is not known). */
-  private focusGoalEdit(): void {
-    const edit = this.goalEdit;
-    if (!edit?.refocus || this.closed || !this.mapWindowIsActive()) return;
-    const goal = this.goalEditInput;
-    const context = this.goalEditContextInput;
-    const field = edit.field === "context" && context ? context : goal;
-    if (!field) return;
-    edit.refocus = false;
-    field.focus({ preventScroll: true });
-    const caret = field === context ? edit.contextCaret : edit.caret;
-    const at = Math.min(caret ?? field.value.length, field.value.length);
-    field.setSelectionRange?.(at, at);
-  }
-  /** Draws the bar again in the same row from the current state (an edit opened, closed, or got its context row). */
-  private redrawGoalBar(): void {
-    const old = this.relevanceBarEl;
-    const host = this.goalBarHost;
-    if (this.closed || !old || !host) return;
-    this.captureGoalEdit();
-    const target = this.goalHostTarget();
-    const before = target && target.host === host ? target.before : null;
-    old.remove();
-    this.renderGoalBar(host, before);
-    this.placeMapTools();
-    this.focusGoalEdit();
-  }
-  /** The goal text becomes a field, caret where it was clicked (the end for the keyboard). */
-  private startGoalEdit(at: { caret?: number | null }): void {
-    if (
-      this.closed ||
-      this.notesLoading() ||
-      this.goalEdit ||
-      !this.relevanceGradeable() ||
-      !this.relevanceBarEl ||
-      !this.goalBarHost
-    )
-      return;
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
-      new Notice(t("ui.relevance_goal_unavailable_grading"));
-      return;
-    }
-    // The suggestions and the editor share the spot under the bar: opening the editor closes them.
-    this.goalSuggest.dismiss();
-    const context = this.relevanceContext ?? "";
-    this.goalEdit = {
-      path: this.path,
-      goal: this.relevanceGoal ?? "",
-      context,
-      showContext: !!context,
-      caret: at.caret ?? null,
-      contextCaret: null,
-      field: "goal",
-      refocus: true,
-      warmed: false
-    };
-    this.bindGoalEditOutside();
-    this.redrawGoalBar();
-  }
-  /** The "+ Context" slot: a second row appears under the goal and takes the keyboard. */
-  private showGoalContext(): void {
-    const edit = this.goalEdit;
-    if (!edit || edit.showContext) return;
-    this.captureGoalEdit();
-    edit.showContext = true;
-    edit.field = "context";
-    edit.refocus = true;
-    this.redrawGoalBar();
-  }
-  /**
-   * Closes the edit without saving what is typed (Esc, a map switch, closing the view, a grading that started elsewhere) or after
-   * its draft was handed over (`keepWarm`: the grade takes the pre-started CLI). A CLI started for a grade that will never be sent is stopped.
-   */
-  private closeGoalEdit(options: { keepWarm?: boolean; refocus?: boolean; redraw?: boolean } = {}): void {
-    const edit = this.goalEdit;
-    if (!edit) return;
-    this.goalEdit = null;
-    this.goalEditCleanup?.();
-    this.goalEditCleanup = null;
-    this.goalEditInput = null;
-    this.goalEditContextInput = null;
-    this.goalEditChip = null;
-    this.goalEditActions = null;
-    if (edit.warmed && !options.keepWarm) this.plugin.releaseWarmClaude?.();
-    if (options.redraw !== false) this.redrawGoalBar();
-    if (options.refocus) this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
-  }
-  /** Drops the edit where a repaint follows anyway (or nothing is shown any more). */
-  private dropGoalEdit(): void {
-    this.closeGoalEdit({ redraw: false });
-  }
-  /**
-   * Saves or cancels, by what the editor holds against what is saved. Empty: cancelled, the goal stays. Unchanged: cancelled,
-   * no file written and no AI. Changed: the edit hands its draft over and closes first (so a second Enter finds nothing to
-   * save), then the usual grade runs. Checked again when it runs: the view still open, still on the map the edit was opened on.
-   */
-  private commitGoalEdit(how: "enter" | "outside" | "tab"): void {
-    const edit = this.goalEdit;
-    if (!edit) return;
-    // Reading: the goal is not saved or graded from partial notes; the draft is dropped.
-    if (this.notesLoading()) {
-      this.closeGoalEdit({ redraw: false });
-      return;
-    }
-    // The view closed or moved to another map since the edit began: the draft is not this map's, so the edit ends without saving.
-    if (this.closed || edit.path !== this.path) {
-      this.closeGoalEdit({ redraw: false });
-      return;
-    }
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
-      this.closeGoalEdit();
-      return;
-    }
-    const setup = this.goalEditSetup(edit);
-    if (!setup.changed) {
-      this.closeGoalEdit({ refocus: how === "enter" });
-      return;
-    }
-    this.closeGoalEdit({ keepWarm: true, redraw: false });
-    // A save started by a press elsewhere or Tab leaves the keyboard where the user went; Enter sends it to the Stop button.
-    this.holdFocusOnGrade = how !== "enter";
-    try {
-      void this.submitRelevanceGoal(setup.goal, setup.context ?? "");
-    } finally {
-      this.holdFocusOnGrade = false;
-    }
-    // Nothing started (the grade refused): the bar must not keep showing the closed editor.
-    if (!this.goalEdit && this.relevanceBarEl?.hasClass?.("is-editing")) this.redrawGoalBar();
-  }
-  private goalEditKeys(event: KeyboardEvent, enterSaves: boolean): void {
-    event.stopPropagation();
-    if (event.key === "Enter" && enterSaves) {
-      // Enter that confirms an IME composition (Chinese input) is not the field's Enter.
-      if (event.isComposing) return;
-      event.preventDefault();
-      this.commitGoalEdit("enter");
-    } else if (event.key === "Escape") {
-      if (event.isComposing) return;
-      event.preventDefault();
-      this.closeGoalEdit({ refocus: true });
-    } else if (event.key === "Tab") {
-      const chip = this.goalEditActions?.hasClass("is-vacant") ? null : this.goalEditChip;
-      const stops: HTMLElement[] = [this.goalEditInput, chip, this.goalEditContextInput].flatMap(el =>
-        el ? [el] : []
-      );
-      const at = stops.indexOf(event.target as HTMLElement);
-      const leaving = !stops.length || (event.shiftKey ? at === 0 : at === stops.length - 1);
-      if (!leaving) return;
-      // The browser moves the keyboard first; the save follows.
-      const edit = this.goalEdit;
-      window.setTimeout(() => {
-        if (this.goalEdit === edit) this.commitGoalEdit("tab");
-      }, 0);
-    }
-  }
-  /**
-   * A press outside the bar saves, but only once the press is over (pointerup, or pointercancel) and the click it makes has been
-   * delivered: saving at pointerdown would repaint the map under the pointer and the card pressed would never get its click.
-   * Presses on Obsidian's menus, dialogs and command palette are not "elsewhere". Another press starts over; if the window is
-   * left before the press ends, nothing saves. The edit may be gone by then (closed, map switched): the check is made again.
-   */
-  private bindGoalEditOutside(): void {
-    this.goalEditCleanup?.();
-    this.goalEditCleanup = null;
-    const edit = this.goalEdit;
-    const doc = this.goalLayerRoot()?.ownerDocument;
-    if (!edit || !doc?.addEventListener) return;
-    let disarm: (() => void) | null = null;
-    const pressStarted = (event: PointerEvent): void => {
-      // Only the primary button counts as "elsewhere" (a right-click opens a menu); neither does a press on the map actions button or an Obsidian view action in the tab header (its "More options" opens one).
-      if (event.button !== 0 && event.button !== undefined) return;
-      const target = event.target as Element | null;
-      if (!target || this.relevanceBarEl?.contains?.(target)) return;
-      if (target.closest?.(NOT_ELSEWHERE_SELECTOR)) return;
-      disarm?.();
-      const pressEnded = (): void => {
-        disarm?.();
-        window.setTimeout(() => {
-          if (this.goalEdit === edit) this.commitGoalEdit("outside");
-        }, 0);
-      };
-      doc.addEventListener("pointerup", pressEnded, true);
-      doc.addEventListener("pointercancel", pressEnded, true);
-      disarm = () => {
-        doc.removeEventListener("pointerup", pressEnded, true);
-        doc.removeEventListener("pointercancel", pressEnded, true);
-        disarm = null;
-      };
-    };
-    doc.addEventListener("pointerdown", pressStarted, true);
-    this.goalEditCleanup = () => {
-      disarm?.();
-      doc.removeEventListener("pointerdown", pressStarted, true);
-    };
-  }
-  // ---- Suggest new topics for the goal --------------------------------------------------------------------------
-  /** Focus goes back to the recommend button; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
-  private focusGoalReturn(): void {
-    const root = this.goalLayerRoot();
-    const spark = root?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="recommend"]') ?? null;
-    const usable = spark && !(spark as HTMLButtonElement).disabled && spark.offsetParent !== null;
-    if (usable) spark.focus();
-    else root?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
-  }
-  /**
-   * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
-   * very same command the run uses, so sending only has to write the prompt.
-   */
-  private prewarmRelevance(): void {
-    const { model, reasoning } = this.plugin.currentModelChoice();
-    this.plugin.prewarmClaudeStep?.(model, reasoning, GOAL_RECOMMEND_SCHEMA);
-  }
-  /** Where an outside folder is judged from: this vault's real location (absent on a vault the plugin cannot locate). */
-  private externalScope(): ExternalScope {
-    const adapter = this.app.vault.adapter;
-    return { vaultBase: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined };
-  }
-  private submitRelevanceGoal(raw: string, contextRaw?: string): Promise<void> {
-    return this.relevanceRun.start(raw, contextRaw);
-  }
-  private abortRelevanceGrade(mapPath = this.path): void {
-    this.relevanceRun.abort(mapPath);
-  }
-  /**
-   * Call before a repaint: when the keyboard is inside the relevance status bar, the returned function (call it after
-   * the repaint) moves focus to what is left of it (its first button, else the goal chip) so it never falls to the page.
-   */
-  private keepRelevanceBarFocus(): () => void {
-    const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar");
-    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
-    if (!bar || !active || !bar.contains?.(active)) return () => {};
-    return () => {
-      if (!this.mapWindowIsActive()) return;
-      // The repaint may have opened the recommendation list and put the keyboard on its first box: that stays.
-      const now = this.contentEl?.ownerDocument?.activeElement ?? null;
-      if (now && this.goalSuggest.holdsFocus(now)) return;
-      const target =
-        this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
-        this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text");
-      target?.focus();
-    };
-  }
-  /** Repaints the map and keeps the keyboard in the status bar when it had it (its buttons come and go). */
-  private refreshRelevance(focusBar = false): void {
-    if (this.closed) return;
-    const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar");
-    const hadFocus = !!bar && !!bar.contains?.(this.contentEl.ownerDocument?.activeElement ?? null);
-    this.render();
-    if ((focusBar && !this.holdFocusOnGrade) || hadFocus)
-      this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
-  }
-  /**
-   * Hands the recommended cards to the list once the run has written its tiers. Only the view that started the run, still
-   * on the same map, opens it; a stopped, failed or late run, a closed view or another map opens nothing. The keyboard
-   * moves to the list only when it was on the status bar, the goal bar or the page itself.
-   */
-  private openRecommendations(run: GoalRecommendRun, mapPath: string, suggestions: GoalRecommendSuggestion[]): void {
-    if (!suggestions.length) return;
-    if (this.closed || this.path !== mapPath || run.owner !== this || run.status !== "done") return;
-    if (this.plugin.relevanceGrades.get(mapPath) !== run || run.controller.signal.aborted) return;
-    if (this.goalSuggest.task || this.presentation) return;
-    this.goalSuggest.open(mapPath, suggestions, this.focusIsFreeForList());
-  }
-  /** True when the keyboard is on the status bar, the goal bar or the page body: the list may take it. */
-  private focusIsFreeForList(): boolean {
-    const doc = this.contentEl?.ownerDocument;
-    const active = doc?.activeElement ?? null;
-    if (!active || active === doc?.body) return true;
-    const inside = (selector: string): boolean => !!this.contentEl?.querySelector?.(selector)?.contains?.(active);
-    return inside(".vam-relevance-statusbar") || inside(".vam-goal-bar");
-  }
-  /**
-   * The tag's menu: the three tiers (a check on the current one) and Clear grade. Disabled while a grading run is
-   * in progress for this map, as the tag itself is.
-   */
+  // ---- Relevance tag: the card's tier menu ---------------------------------------------------------------------
+  /** The tag's menu: the three tiers (a check on the current one) and Clear grade. */
   private openRelevanceMenu(node: MapNode, current: RelevanceTier, anchor: HTMLElement): void {
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
     const menu = this.newMenu();
     for (const tier of ["core", "support", "side"] as const)
       menu.addItem(item =>
@@ -5113,156 +4402,12 @@ export class VisualAgentMapView extends ItemView {
     const rect = anchor.getBoundingClientRect();
     menu.showAtPosition({ x: rect.left, y: rect.bottom });
   }
-  /** The gradable cards whose tier the learner set by hand (pinned), in map order, from the notes this view holds. */
-  private relevancePinList(): RelevancePin[] {
-    const pins: RelevancePin[] = [];
-    for (const node of this.map?.nodes ?? []) {
-      const relevance = node.parentId === null ? undefined : this.notes.get(node.id)?.relevance;
-      if (relevance?.manual) pins.push({ id: node.id, tier: relevance.tier });
-    }
-    return pins;
-  }
-  /** The gradable cards with an AI tier (not pinned): what a recalibration starts from. */
-  private relevanceAiGrades(): RelevancePin[] {
-    const grades: RelevancePin[] = [];
-    for (const node of this.map?.nodes ?? []) {
-      const relevance = node.parentId === null ? undefined : this.notes.get(node.id)?.relevance;
-      if (relevance && !relevance.manual) grades.push({ id: node.id, tier: relevance.tier });
-    }
-    return grades;
-  }
-  /**
-   * Hands every pinned card back to the AI: the three relevance keys go, one mutation, one undo step. Undo puts the
-   * pins back on cards that are still ungraded.
-   */
-  private unpinAllRelevance(): void {
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    const paths = new Map((this.map?.nodes ?? []).map(node => [node.id, node.path]));
-    const entries = this.relevancePinList().flatMap(pin => {
-      const path = paths.get(pin.id);
-      return path ? [{ path, tier: pin.tier }] : [];
-    });
-    if (!entries.length) return;
-    this.plugin.runMutation(async () => {
-      const repo = this.plugin.repo;
-      for (const entry of entries) await repo.writeRelevance(entry.path, null);
-      this.history.push({
-        label: t("ui.relevance_unpin_all_history_label"),
-        undo: async () => {
-          for (const entry of entries)
-            if (!(await repo.readNote(entry.path)).relevance)
-              await repo.writeRelevance(entry.path, { tier: entry.tier, manual: true });
-        },
-        redo: async () => {
-          for (const entry of entries) {
-            const latest = (await repo.readNote(entry.path)).relevance;
-            if (latest?.manual && latest.tier === entry.tier) await repo.writeRelevance(entry.path, null);
-          }
-        }
-      });
-      this.updateHistoryButtons();
-    });
-  }
   /**
    * Sets a card's tier by hand (or clears it) in the note's frontmatter and repaints in place. No AI call, no parent-
    * child check, no viewport or Map.md write: only the three relevance keys of that one note change.
    */
   private setManualRelevance(node: MapNode, tier: RelevanceTier | null): void {
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
     this.plugin.runMutation(() => this.plugin.repo.writeRelevance(node.path, tier ? { tier, manual: true } : null));
-  }
-  /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
-  private renderRelevanceStatus(parent: HTMLElement): void {
-    const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run || gradingUndone(run)) return;
-    const running = run.status === "running";
-    const bar = parent.createDiv(`vam-aim-statusbar vam-relevance-statusbar${running ? " is-active" : ""}`);
-    bar.setAttr("aria-live", "polite");
-    bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.relevance_history_label") });
-    const outcome = run.outcome;
-    const text = running
-      ? t(run.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running")
-      : run.status === "done" && outcome
-        ? [
-            this.relevanceDoneText(outcome),
-            outcome.pinned && outcome.scope !== "current" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
-            outcome.failed ? t("ui.relevance_write_failed_0", outcome.failed) : ""
-          ]
-            .filter(Boolean)
-            .join(" ")
-        : (run.message ?? "");
-    const tone = running
-      ? " vam-status-running"
-      : run.status === "failed" || outcome?.failed
-        ? " vam-status-error"
-        : "";
-    bar.createSpan({ cls: `vam-aim-status-value${tone}`, text });
-    this.relevanceReceivedEl = null;
-    if (running && !run.awaitingUsage && !run.writing) {
-      // Both are hidden from screen readers (the bar is a live region and they change every few hundred ms or second).
-      const received = bar.createSpan({ cls: "vam-relevance-received" });
-      received.setAttr("aria-hidden", "true");
-      this.relevanceReceivedEl = received;
-      this.paintGoalRecommendReceived(run);
-      if (run.startedAt !== undefined) {
-        const elapsed = bar.createSpan({
-          cls: "vam-research-elapsed vam-relevance-elapsed",
-          text: this.researchElapsedText(run.startedAt)
-        });
-        elapsed.setAttr("aria-hidden", "true");
-        this.trackResearchElapsed(elapsed, run.startedAt);
-      }
-    }
-    if (running) {
-      if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
-      return;
-    }
-    if (outcome?.changes.length || outcome?.conflicts?.length) {
-      this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run));
-      if (this.history.undoEntry && this.history.undoEntry === run.historyEntry)
-        this.button(bar, t("ui.undo"), () => this.enqueue(() => this.travel(false)));
-    }
-    this.iconButton(bar, "x", t("ui.dismiss"), () => {
-      this.plugin.relevanceGrades.delete(this.path);
-      this.render();
-      this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
-    });
-  }
-  /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
-  private paintGoalRecommendReceived(run: GoalRecommendRun): void {
-    const element = this.relevanceReceivedEl;
-    if (!element) return;
-    const progress = run.received;
-    const text = progress
-      ? progress.total === undefined
-        ? t("ui.relevance_received_changes_0", progress.received)
-        : t("ui.relevance_received_0_1", progress.received, progress.total)
-      : "";
-    element.setText(text ? t("ui.aim_stage_with_elapsed_0_1", "", text) : "");
-  }
-  /** The status line of a finished run: the cards whose tier changed (raised parents included), then the new cards offered. */
-  private relevanceDoneText(outcome: GoalRecommendOutcome): string {
-    return [
-      t("ui.relevance_updated_0", outcome.changes.length),
-      outcome.recommended ? t("ui.relevance_recommended_0", outcome.recommended) : ""
-    ]
-      .filter(Boolean)
-      .join(", ");
-  }
-  private openRelevanceSummary(run: GoalRecommendRun): void {
-    const outcome = run.outcome;
-    new RelevanceSummaryModal(this.app, {
-      rows: (outcome?.changes ?? []).map(change => ({
-        id: change.id,
-        title: change.title,
-        before: change.before,
-        after: change.after,
-        ...(change.anchor ? { anchor: change.anchor } : {})
-      })),
-      pins: outcome?.pins ?? [],
-      conflicts: outcome?.conflicts ?? [],
-      highlight: ids => this.highlightStructure(ids)
-    }).open();
   }
   /**
    * Applies one structure suggestion as one undo step, after checking again that it still fits the map. Remove and
@@ -7007,7 +6152,6 @@ export class VisualAgentMapView extends ItemView {
     const batch = this.plugin.expansionBatches?.get(this.multiResearchKey()),
       task = this.plugin.topicRuns.syntheses(this).selection;
     return !!(
-      this.plugin.relevanceGrades?.get(this.path)?.status === "running" ||
       this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.plugin.topicRuns.hasTask(node.path) ||
@@ -12585,10 +11729,6 @@ export class VisualAgentMapView extends ItemView {
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     }
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
-    // Hand every hand-set tier back to the AI: only for a gradable map that has pins, and not while it is being graded.
-    const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
-    if (pins > 0 && this.plugin.relevanceGrades.get(this.path)?.status !== "running")
-      add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
     this.showMenuUnder(menu, event);
@@ -12894,14 +12034,11 @@ export class VisualAgentMapView extends ItemView {
       } else this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     }
     const keepMapFocus = this.holdMapFocus();
-    const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreArgumentFocus = this.keepArgumentBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const topicChatHeld = this.detachTopicChat();
     const aiCardHeld = this.detachAiCardPopover();
     const restoreSearch = this.holdMapSearch();
-    // The goal editor's fields go with the repaint: their draft, caret and keyboard are kept in the edit state, which draws them again.
-    this.captureGoalEdit();
     this.mapSourcesControl?.detach();
     // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
     this.suspendInlineName?.();
@@ -12913,25 +12050,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.inlineSummary && !this.map?.nodes.some(node => node.id === this.inlineSummary?.id))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
-    // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
-    const mapId = this.map?.id ?? null;
-    if (this.drawnHeightsMap !== mapId) {
-      // The DOM still belongs to the previous map. Never use its heights for ids reused in this map.
-      this.drawnHeights.clear();
-      this.drawnHeightsMap = mapId;
-    } else {
-      const live = new Set(this.map?.nodes.map(node => node.id) ?? []);
-      for (const id of this.drawnHeights.keys()) if (!live.has(id)) this.drawnHeights.delete(id);
-      for (const [id, card] of this.cardEls) {
-        if (!live.has(id)) continue;
-        const height = card.offsetHeight;
-        if (height > 0) this.drawnHeights.set(id, height);
-      }
-    }
     // The link menu's document listener outlives its DOM unless it is explicitly closed.
     this.closeTopicLinkMenu();
-    // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
-    this.removeGoalBar();
     this.contentEl.empty();
     this.contentEl.removeClass?.("is-notes-loading");
     this.contentEl.toggleClass("is-focus-mode", this.focusMode && !!this.map);
@@ -13081,13 +12201,9 @@ export class VisualAgentMapView extends ItemView {
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (this.deletedMap?.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
-      // Nothing to grade: an edit left open belongs to the map that is gone.
-      this.dropGoalEdit();
       return;
     }
     this.renderMultiResearchStatus(this.contentEl);
-    // Goal grading stays off for an old AIM map (a source-text test pins this condition).
-    if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     this.renderBackgroundBars(this.contentEl);
     this.renderArgumentRunBar(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
@@ -13110,16 +12226,8 @@ export class VisualAgentMapView extends ItemView {
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
-    // The goal bar sits in the header row (or the toolbar when that row is hidden), not over the canvas. A mind map only,
-    // and only once it has topics: an empty map cannot be graded or sorted, so it shows no bar.
-    if (this.relevanceGradeable() && this.map.nodes.length) this.mountGoalBar();
-    else {
-      this.relevanceBarEl = null;
-      this.dropGoalEdit();
-    }
     this.mountMapChat(workspace, overlay);
     this.applyBookBarFocus();
-    this.placeGoalBar();
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
     // An empty map shows no gesture hint either: there is nothing to pan to or open yet.
@@ -13237,7 +12345,6 @@ export class VisualAgentMapView extends ItemView {
     this.applyInitialViewport();
     this.transform();
     this.drawEdges();
-    restoreRelevanceFocus();
     restoreArgumentFocus();
     restoreChatFocus();
     this.remountTopicChat(topicChatHeld);
@@ -13245,7 +12352,6 @@ export class VisualAgentMapView extends ItemView {
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
-    this.focusGoalEdit();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -13303,7 +12409,7 @@ export class VisualAgentMapView extends ItemView {
    * The floating tools over the canvas: once the map has topics, one faint "Select several topics" icon that opens into its
    * label on hover or keyboard focus (and stays open while selecting). Adding a topic is not here: the card "+", the context
    * menus, the keys and the command palette do it, and an empty map has its own button (fillEmptyMap). An empty map has nothing
-   * to select, so the control is left out rather than disabled. An AIM map has none. The goal lives in its own bar (renderGoalBar).
+   * to select, so the control is left out rather than disabled. An AIM map has none.
    */
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
@@ -13334,7 +12440,7 @@ export class VisualAgentMapView extends ItemView {
     if (selecting) integrate.addClass("is-active");
     const icon = integrate.createSpan("vam-tools-select-icon");
     icon.setAttr("aria-hidden", "true");
-    appendGoalSvg(icon, "select");
+    appendSelectSvg(icon);
     integrate.addEventListener("click", event => {
       event.stopPropagation();
       this.applySelectionChange(this.selection.toggleMultiSelect());
@@ -13347,7 +12453,6 @@ export class VisualAgentMapView extends ItemView {
     box.empty();
     this.fillEmptyMap(box);
   }
-  /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   private renderNode(shownNode: MapNode, cut: ReadonlySet<string> = this.cutIds()): void {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
@@ -13591,7 +12696,7 @@ export class VisualAgentMapView extends ItemView {
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         button => this.openRelevanceMenu(node, relevance.tier, button),
-        this.plugin.relevanceGrades.get(this.path)?.status === "running"
+        false
       );
       // An AI grade carries no explanation; only a hand-set tier says where it came from.
       if (relevance.manual) {
@@ -13911,7 +13016,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
-      if (event.key === "F2" && note && !this.selection.state.multiSelectMode) {
+      if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
         if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
         this.startCardTitleEdit(node, { select: true });
@@ -14068,18 +13173,7 @@ export class VisualAgentMapView extends ItemView {
       superseded.size || byAnchor?.size
         ? shown.filter(node => !superseded.has(node.id) && !byAnchor?.has(node.id))
         : shown;
-    // A view only: these copies carry display positions and must never be written back to the map.
-    if (!this.relevanceSortOn()) return nodes;
-    // Ring members and their branches keep the coordinates they have; the sort never folds them into the column.
-    const trees = ringTreeIds(this.map.nodes, this.map.canvasItems ?? []);
-    const kept = trees.size ? new Set([...superseded, ...trees]) : superseded;
-    return relevanceDisplayNodes(
-      nodes,
-      id => this.notes.get(id)?.relevance?.tier,
-      kept,
-      layoutOf(this.map),
-      this.sortHeightOf
-    );
+    return nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   private keyboardNeighbor(node: MapNode, key: string): MapNode | undefined {
@@ -14207,10 +13301,7 @@ export class VisualAgentMapView extends ItemView {
   private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
     const rects = [];
     for (const selector of FLOATING_LAYER_SELECTORS) {
-      const el = this.goalLayerRoot()?.querySelector?.<HTMLElement>(selector);
-      // A layer that is invisible (the goal's icons while the pointer is elsewhere) covers nothing: cards need not avoid it.
-      if (selector === ".vam-goal-actions" && el?.ownerDocument?.defaultView?.getComputedStyle?.(el)?.opacity === "0")
-        continue;
+      const el = (this.containerEl ?? this.contentEl)?.querySelector?.<HTMLElement>(selector);
       const rect = el?.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
     }
@@ -14925,7 +14016,6 @@ export class VisualAgentMapView extends ItemView {
         covers: Map<string, string>;
         coverLooks: Map<string, { frame: CoverFrame | null; size: number; position: CoverPosition }>;
         ringHeights?: Map<string, number>;
-        goal?: string;
         mapPath: string;
       }
     | "none"
@@ -14965,7 +14055,6 @@ export class VisualAgentMapView extends ItemView {
       covers,
       coverLooks,
       ...(ringHeights.size ? { ringHeights } : {}),
-      ...(this.relevanceGoal ? { goal: this.relevanceGoal } : {}),
       mapPath: this.path
     };
   }
@@ -15198,6 +14287,11 @@ export class VisualAgentMapView extends ItemView {
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, this.shapeKindOf(node.id));
     if (redrawEdges) this.drawEdges();
+  }
+  /** Where an outside folder is judged from: this vault's real location (absent on a vault the plugin cannot locate). */
+  private externalScope(): ExternalScope {
+    const adapter = this.app.vault.adapter;
+    return { vaultBase: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined };
   }
   /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */
   private taskSourceSettings(): TaskSourceSettings {
@@ -17205,6 +16299,8 @@ export class VisualAgentMapView extends ItemView {
   /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
   private async addRelation(fromId: string, toId: string, kind: TopicRelationKind): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
+    // A refused link never enters mapChange, so it leaves no empty undo step (the check below re-runs on the map being edited).
+    if (!relationAllowed(this.map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
     await this.mapChange(map => {
       if (!relationAllowed(map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
       setTopicRelations(map, [...(map.topicRelations ?? []), { kind, from: fromId, to: toId }]);
@@ -18187,7 +17283,7 @@ export class VisualAgentMapView extends ItemView {
     const creationMapPath = this.path;
     const creationMapId = this.map.id;
     const typed = kind !== "topic" && this.relationsEnabled();
-    // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
+    // Saved coordinates come from the node in the map, not from the caller's copy.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
     // No name given (the "+", the toolbar, the keys): the card appears with a default name and its title opens for typing.
     const interactive = suggestedTitle === undefined;
@@ -21528,7 +20624,7 @@ export class VisualAgentMapView extends ItemView {
   private topsUnderToolbar(zoomHint: number): number[] {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
     if (!this.map || !canvas) return [];
-    // Only the tool group floats over the canvas top: the goal bar is in the row above it.
+    // Only the tool group floats over the canvas top.
     const bars = [".vam-map-tools"].flatMap(selector => {
       const rect = this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
       return rect && rect.bottom > rect.top
@@ -21566,11 +20662,9 @@ export class VisualAgentMapView extends ItemView {
       })
     )
       return;
-    // Centre on where the card is drawn, which differs from its saved position while sorted by relevance.
-    const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
       this.map.viewport,
-      { x: node.x + (node.width ?? CARD_WIDTH) / 2, y: node.y + 80 },
+      { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 },
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
       this.canvasInsets()
     );
@@ -21907,102 +21001,23 @@ export class VisualAgentMapView extends ItemView {
    * so it moves to the window's right edge, as it sits beside a docked window.
    */
   private placeMapTools(): void {
-    const bar = this.placeGoalBar();
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
+    this.watchToolPlacement();
     if (!tools) return;
     // The canvas starts after the 44px edge the laid-over window leaves in place.
     const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
-    // The goal field follows its width (a wrap changes its height); the stack below reads the result.
-    if (this.goalEditInput?.isConnected) this.growGoalInput(this.goalEditInput);
-    // Last: the stack reads where the bar and the tools are horizontally.
-    this.layoutTopStack(bar);
+    // Last: the stack reads where the tools are horizontally.
+    this.layoutTopStack();
   }
   /**
-   * Keeps the goal bar in the right row and returns it (null without one); layoutTopStack then places everything that hangs
-   * below it. The row can change without any event (the user hides or shows Obsidian's header row), so every layout pass
-   * looks again and moves the bar when its row changed.
+   * Every layer that decides the stack is watched: tools, sources panel, canvas, zoom bar and hint (a collapsing sidebar
+   * changes the canvas without any chat event). The watch is dropped when the view closes.
    */
-  private placeGoalBar(): HTMLElement | null {
-    const bar = this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-bar") ?? null;
-    if (bar) {
-      const target = this.goalHostTarget();
-      if (target && bar.parentElement !== target.host) {
-        // Moving the field to the other row takes the keyboard out of it; it goes back in (draft and caret stay with the field).
-        const active = bar.ownerDocument?.activeElement ?? null;
-        const held = this.goalEdit && active && bar.contains?.(active) ? (active as HTMLElement) : null;
-        target.host.insertBefore(bar, target.before);
-        this.markGoalHost(target.host);
-        this.goalBarHost = target.host;
-        held?.focus?.({ preventScroll: true });
-      }
-    }
-    this.watchToolPlacement(bar);
-    return bar;
-  }
-  /** What holds the goal bar's layers: the container (it has the header row), else the view's own element. */
-  private goalLayerRoot(): HTMLElement {
-    return this.containerEl ?? this.contentEl;
-  }
-  /** Obsidian's header row of this view, whether or not it is shown. */
-  private goalHeaderEl(): HTMLElement | null {
-    return this.containerEl?.querySelector?.<HTMLElement>(":scope > .view-header") ?? null;
-  }
-  /**
-   * Where the goal bar goes: Obsidian's header row (in front of its action group) while that row is shown, else the middle
-   * of the toolbar (in front of the toolbar's actions). Shown is read from the row's own computed display, not its height:
-   * a tab hidden behind another has no height either. Null when the toolbar is not there yet.
-   */
-  private goalHostTarget(): { host: HTMLElement; before: HTMLElement | null } | null {
-    const header = this.goalHeaderEl();
-    const win = header?.ownerDocument?.defaultView;
-    if (header && win && win.getComputedStyle(header).display !== "none") {
-      return { host: header, before: header.querySelector<HTMLElement>(":scope > .view-actions") };
-    }
-    const toolbar = this.contentEl?.querySelector?.<HTMLElement>(".vam-toolbar");
-    return toolbar
-      ? { host: toolbar, before: toolbar.querySelector<HTMLElement>(":scope > .vam-toolbar-actions") }
-      : null;
-  }
-  /** Draws the goal bar into its row. */
-  private mountGoalBar(): void {
-    const target = this.goalHostTarget();
-    if (!target) return;
-    this.renderGoalBar(target.host, target.before);
-    this.markGoalHost(target.host);
-  }
-  /** The one z rule and the container live on the host (styles.css `.vam-goal-host`); it moves with the bar. */
-  private markGoalHost(host: HTMLElement): void {
-    if (this.goalHostEl && this.goalHostEl !== host) this.goalHostEl.removeClass?.("vam-goal-host");
-    this.goalHostEl = host;
-    host.addClass?.("vam-goal-host");
-  }
-  /** Takes the bar out of its row and clears the host mark: before a repaint empties the view, and when it closes. */
-  private removeGoalBar(): void {
-    this.relevanceBarEl?.remove?.();
-    this.relevanceBarEl = null;
-    for (const stray of Array.from(this.goalLayerRoot()?.querySelectorAll?.<HTMLElement>(".vam-goal-bar") ?? []))
-      stray.remove();
-    this.goalHostEl?.removeClass?.("vam-goal-host");
-    this.goalHostEl = null;
-  }
-  /** The panel hanging under the goal bar (the suggestion list), if it is on screen. */
-  private goalAttachmentEl(): HTMLElement | null {
-    const el = this.relevanceBarEl?.querySelector<HTMLElement>(".vam-goal-attachment") ?? null;
-    return el && el.isConnected !== false ? el : null;
-  }
-  /**
-   * Every layer that decides the stack is watched: bar, the header row (hiding it changes its size), attachment, tools,
-   * sources panel, canvas, zoom bar and hint (a collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
-   */
-  private watchToolPlacement(bar: HTMLElement | null): void {
+  private watchToolPlacement(): void {
     const q = (selector: string) => this.contentEl?.querySelector?.<HTMLElement>(selector) ?? null;
     const sources = this.mapSourcesControl?.mapSourcesPanelEl;
     const targets = [
-      bar,
-      this.goalHeaderEl(),
-      this.goalAttachmentEl(),
-      q(".vam-relevance-statusbar"),
       q(".vam-map-tools"),
       sources?.isConnected === false ? null : sources,
       this.viewportEl,
@@ -22010,62 +21025,29 @@ export class VisualAgentMapView extends ItemView {
       q(".vam-canvas-hint")
     ].filter((el): el is HTMLElement => !!el);
     const same =
-      targets.length === this.goalBarObserved.length && targets.every((el, i) => el === this.goalBarObserved[i]);
+      targets.length === this.toolPlacementObserved.length &&
+      targets.every((el, i) => el === this.toolPlacementObserved[i]);
     if (same) return;
-    this.goalBarObserver?.disconnect();
-    this.goalBarObserver = null;
-    this.goalBarObserved = targets;
+    this.toolPlacementObserver?.disconnect();
+    this.toolPlacementObserver = null;
+    this.toolPlacementObserved = targets;
     const win = (targets[0]?.ownerDocument ?? this.contentEl?.ownerDocument)?.defaultView as
       (Window & { ResizeObserver?: typeof ResizeObserver }) | null | undefined;
     if (!targets.length || this.closed || typeof win?.ResizeObserver !== "function") return;
-    this.goalBarObserver = new win.ResizeObserver(() => {
+    this.toolPlacementObserver = new win.ResizeObserver(() => {
       if (!this.closed) this.placeMapTools();
     });
-    for (const el of targets) this.goalBarObserver.observe(el);
+    for (const el of targets) this.toolPlacementObserver.observe(el);
   }
-  private goalBarObserver: ResizeObserver | null = null;
-  private goalBarObserved: HTMLElement[] = [];
+  private toolPlacementObserver: ResizeObserver | null = null;
+  private toolPlacementObserved: HTMLElement[] = [];
   /**
-   * The one place that stacks what hangs off the top of the canvas: the panel hanging under the goal bar (height limited, it
-   * scrolls; it may cover the toolbar and the canvas while open), and the sources panel hanging from the tool group (height
+   * The one place that stacks what hangs off the top of the canvas: the sources panel hanging from the tool group (height
    * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
-  private layoutTopStack(bar: HTMLElement | null): void {
+  private layoutTopStack(): void {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     if (!tools?.style) return;
-    const attachment = bar ? this.goalAttachmentEl() : null;
-    // An open panel keeps the floating icons shown (display only; no z-index), so the panel never leaves a gap above it.
-    bar?.toggleClass?.("has-attachment", !!attachment);
-    const actions = bar?.querySelector?.<HTMLElement>(".vam-goal-actions") ?? null;
-    const actionsRect = actions?.getBoundingClientRect?.();
-    if (bar && attachment) {
-      // The panel hangs from the box it is positioned in (the bar, or the whole row on a narrow pane). Icons that float below
-      // that box (narrow pane) push the panel down by the part that hangs out; measured, so no breakpoint or constant is kept.
-      const box: Element = attachment.offsetParent ?? bar;
-      const boxBottom = box.getBoundingClientRect?.()?.bottom ?? 0;
-      let clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
-      // The suggestion list never covers the status bar (its View changes / Undo / Dismiss stay clickable): it starts below it.
-      // Measured, like the icons above; the context box keeps its place.
-      if (attachment.hasClass?.("vam-goal-suggest")) {
-        const status = this.contentEl?.querySelector<HTMLElement>(".vam-relevance-statusbar");
-        const statusBottom = status?.getBoundingClientRect?.()?.bottom;
-        // The list's top is boxBottom + gap + clear; it must be at least gap below the status bar.
-        if (typeof statusBottom === "number" && statusBottom > 0) clear = Math.max(clear, statusBottom - boxBottom);
-      }
-      if (typeof attachment.style?.setProperty === "function") {
-        attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
-        const room = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);
-        if (room !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room}px`);
-      }
-    }
-    this.layoutGoalBridge(bar, actions, actionsRect);
-    // Icons floating over the tool group's row: the group gives up the width they take (it wraps) instead of sliding under them.
-    const toolsRect = tools.getBoundingClientRect?.();
-    if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
-      tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
-    } else {
-      tools.style.removeProperty("--vam-tools-max");
-    }
     const sources = this.mapSourcesControl?.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
     tools.toggleClass?.("has-panel", open);
@@ -22075,42 +21057,6 @@ export class VisualAgentMapView extends ItemView {
     if (room !== null && typeof sources.style?.setProperty === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
-  }
-  /**
-   * The strip that lets the pointer go from the goal down to the floating icons (they are invisible and take no pointer until the
-   * goal is hovered, so a gap between them would drop the hover). The bar owns it (a pseudo-element, so it counts as the bar), it
-   * spans exactly the measured gap from the bar's bottom to the icons' top, as wide as the icons. Where something clickable lies in
-   * that gap (the info row between a goal and icons that float below the toolbar) there is no strip: it would block those clicks.
-   */
-  private layoutGoalBridge(
-    bar: HTMLElement | null,
-    actions: HTMLElement | null,
-    actionsRect: DOMRect | undefined
-  ): void {
-    const style = bar?.style;
-    if (!bar || typeof style?.setProperty !== "function") return;
-    const names = ["top", "left", "width", "height"].map(name => `--vam-goal-bridge-${name}`);
-    const box = actions?.offsetParent;
-    const barRect = bar.getBoundingClientRect?.();
-    const strip =
-      actions && box && actionsRect && barRect && actionsRect.width > 0 && actionsRect.top > barRect.bottom
-        ? { left: actionsRect.left, right: actionsRect.right, top: barRect.bottom, bottom: actionsRect.top }
-        : null;
-    const boxRect = strip ? box?.getBoundingClientRect?.() : undefined;
-    const blocked =
-      !!strip &&
-      Array.from(box?.querySelectorAll?.<HTMLElement>(CLICKABLE_SELECTOR) ?? []).some(el => {
-        const rect = bar.contains(el) ? null : el.getBoundingClientRect?.();
-        return !!rect && rectsIntersect(rect, strip);
-      });
-    if (!strip || !box || !boxRect || blocked) {
-      for (const name of names) style.removeProperty(name);
-      return;
-    }
-    style.setProperty(names[0], `${strip.top - boxRect.top - box.clientTop}px`);
-    style.setProperty(names[1], `${strip.left - boxRect.left - box.clientLeft}px`);
-    style.setProperty(names[2], `${strip.right - strip.left}px`);
-    style.setProperty(names[3], `${strip.bottom - strip.top}px`);
   }
   /** Screen y the panels under the top stack must stay above: the zoom bar (with the status bar) or the hint, INSET_GAP clear. */
   private bottomLimit(overlay: HTMLElement | null | undefined, canvasHeight: number): number {
@@ -22124,24 +21070,13 @@ export class VisualAgentMapView extends ItemView {
     );
     return (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
   }
-  /**
-   * Height the panel under the goal bar may take: from `top` (screen y where the panel starts) down to the top of the lowest
-   * bottom control, kept INSET_GAP clear. Measured on screen (the bar is in another element than the canvas). Null when the
-   * canvas is not laid out. The panel's own rect is not read: its entry animation moves it a few px for a moment.
-   */
-  private attachRoom(top: number): number | null {
-    const overlay = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay");
-    const canvasHeight = overlay?.clientHeight ?? 0;
-    if (!(canvasHeight > 0)) return null;
-    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - top);
-  }
   /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
   private sourcesRoom(tools: HTMLElement): number | null {
     const overlay = tools.parentElement;
     const canvasHeight = overlay?.clientHeight ?? 0;
     const toolsRect = tools.getBoundingClientRect?.();
     if (!(canvasHeight > 0) || !toolsRect) return null;
-    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - toolsRect.bottom - GOAL_SUGGEST_GAP);
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - toolsRect.bottom - SOURCES_PANEL_GAP);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
@@ -23332,8 +22267,6 @@ export class VisualAgentMapView extends ItemView {
               this.chatModelSuffix(ids.length > 1 && models.length > 1 ? [this.currentModelId()] : models)
             );
           }
-          case "rate_by_goal":
-            return t("ui.map_chat_do_rate_0", action.goal) + this.chatModelSuffix([this.currentModelId()]);
           case "merge":
             return t("ui.map_chat_do_merge_0", action.title);
           case "find_images": {
@@ -23921,7 +22854,7 @@ export class VisualAgentMapView extends ItemView {
               options.work &&
               outcome.status === "done" &&
               resolved?.action.kind === "run_map_action" &&
-              ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action)
+              ["synthesize", "merge"].includes(resolved.action.action)
             )
               options.work.otherBackground = true;
             // A merge that did not happen leaves the cards where they are: they get the colour after all.
@@ -24592,9 +23525,6 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
-    const launch = (work: unknown): void => {
-      void Promise.resolve(work).catch(error => errorNotice(error));
-    };
     const known = (ids: string[]): string[] => ids.filter(id => this.map?.nodes.some(node => node.id === id));
     if (action.kind === "select_topics") {
       if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
@@ -24828,12 +23758,6 @@ export class VisualAgentMapView extends ItemView {
       }
       case "synthesize":
         return this.chatSynthesize(targets.length ? targets : this.chatTargetIds(), message);
-      case "rate_by_goal": {
-        const goal = action.goal.trim();
-        if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
-        launch(this.submitRelevanceGoal(goal));
-        return { status: "done" };
-      }
       case "merge": {
         if (targets.length) this.chatSelect(targets);
         const title = action.title.trim();
@@ -25875,7 +24799,8 @@ export class VisualAgentMapView extends ItemView {
       if (
         (event.target as Element).closest("button, .vam-card-title-input, .vam-card-summary-input") ||
         event.button !== 0 ||
-        !this.map
+        !this.map ||
+        this.presentation
       )
         return;
       // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.
@@ -25980,7 +24905,7 @@ export class VisualAgentMapView extends ItemView {
         this.chat?.setDropHighlight(overChat);
         if (selecting) {
           travelled ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
-          if (!group || !travelled || this.relevanceSortOn()) return;
+          if (!group || !travelled) return;
           // A locked group neither moves nor changes parent; otherwise a card under the pointer is the new parent.
           setHover(locked || overChat ? null : targetAt(e));
           if (locked || (timelineBlocked && !hover)) {
@@ -25994,8 +24919,6 @@ export class VisualAgentMapView extends ItemView {
           this.dragFrame ??= window.requestAnimationFrame(paint);
           return;
         }
-        // While sorted the card sits at a display position; saving a drag would write that, so cards stay put.
-        if (this.relevanceSortOn()) return;
         moved ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
         if (moved && locked) {
           if (!warned) new Notice(t("ui.merge_locked"));
@@ -26091,10 +25014,6 @@ export class VisualAgentMapView extends ItemView {
         }
         if (selecting) {
           if (!group) return;
-          if (this.relevanceSortOn()) {
-            putBack();
-            return;
-          }
           if (landed) {
             // On a card: the picked branches become its children (same rule and write as "Move to...").
             putBack();

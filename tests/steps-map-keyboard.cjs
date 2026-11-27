@@ -53,7 +53,7 @@ async function harness({ language = 'en' } = {}) {
   const Notice = dom.makeNotice(notices);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -414,6 +414,9 @@ test('21: Esc in the name field of a new topic takes the add back: no card, no M
   assert.equal(trashed.length, 1, 'only the new note is trashed');
   assert.match(trashed[0], /\/Unassigned\//, 'it is the note undo had parked in Unassigned');
   assert.equal(h.view.inlineName, null);
+  // The keyboard goes back to the parent card (stand-in DOM: the render's focus target is the parent id).
+  assert.equal(h.view.focusNodeId, h.ids.leaf, 'focus is handed back to the parent card');
+  assert.equal(h.view.keepCanvasOnFieldRestore, true, 'the repaint does not pan');
 });
 
 test('21: Enter while an input method is composing does not end the edit', async () => {
@@ -532,4 +535,29 @@ test('36 R1 F1: the structure review "strengthen" apply adds the card without ta
   assert.equal(make.last, last, 'no card took DOM focus');
   assert.equal(h.view.contentEl.ownerDocument.activeElement, leaf, 'activeElement unchanged');
   assert.equal(h.cameraMoves.length, 1, 'the camera still moved to the new card');
+});
+
+// The card handler checks isComposing for Delete/Enter; F2 (and the edit it starts) is not covered by that check.
+test('A8 gap K2: F2 on the card during IME composition does not open the title field', async () => {
+  const h = await harness();
+  const card = h.card('leaf');
+  card.handlers.get('keydown')({ key: 'F2', target: card, isComposing: true, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, defaultPrevented: false, preventDefault() {} });
+  await tick();
+  assert.equal(h.view.inlineName, null, 'no title edit started during composition');
+});
+
+// Delete on a branch was only tested up to the dialog; the chosen removal must be one undoable step.
+test('A8 coverage K3: Delete on a branch, "remove only this node": one history entry, the child becomes a root, Undo restores it', async () => {
+  const h = await harness();
+  const before = h.view.history.past.length;
+  send(h, 'branch', 'Delete');
+  const modal = h.modals.at(-1); assert.equal(modal.constructor.name, 'ChoiceModal');
+  const buttons = findAll(modal.contentEl, () => true).flatMap(e => e.choiceButtons ?? []);
+  assert.ok(buttons.length >= 2, 'the dialog offers both removals');
+  buttons[0].run();
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.branch)); await tick(); await tick();
+  assert.equal(h.view.history.past.length, before + 1, 'one history entry');
+  assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId ?? null, null, 'the child became a root');
+  await h.view.travel(false); await tick();
+  assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId, h.ids.branch, 'Undo restores the child under the branch');
 });

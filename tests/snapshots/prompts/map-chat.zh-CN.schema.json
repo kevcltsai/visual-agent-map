@@ -101,16 +101,12 @@
               "research_standard",
               "expand",
               "synthesize",
-              "rate_by_goal",
               "merge",
               "find_images",
               "run_living_card",
               "run_living_all",
               ""
             ]
-          },
-          "goal": {
-            "type": "string"
           },
           "direction": {
             "type": "string"
@@ -382,7 +378,6 @@
           "all",
           "branch",
           "action",
-          "goal",
           "direction",
           "mode",
           "images",

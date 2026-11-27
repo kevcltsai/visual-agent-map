@@ -125,7 +125,7 @@ async function viewHarness({ aim }) {
   await app.vault.create(MAP_PATH, core.serializeMap(mapDoc));
   const ItemView = class { constructor(leaf) { this.app = leaf.app; } onPaneMenu() {} };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...stubbed, ItemView, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
-  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), logs: { appendLog() {} }, relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map() });
+  const plugin = withExpansionCoordinator({ repo, settings, running: new Set(), logs: { appendLog() {} }, expansionBatches: new Map(), pendingSuggestions: new Map() });
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = MAP_PATH; view.map = await repo.readMap(MAP_PATH);
   if (aim) view.map.aim = { version: 1 }; // read-only in the view; never serialized here

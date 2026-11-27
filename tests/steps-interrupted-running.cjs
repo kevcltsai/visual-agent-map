@@ -33,7 +33,7 @@ async function harness({ count = 1 } = {}) {
   await repo.rebuildDerivedData();
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), pendingSuggestions: new Map(),
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), pendingSuggestions: new Map(),
     releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false, closeStaleDetails() {}, releaseWarmClaude() {},
     mutate: work => (pending = Promise.resolve().then(work))
   });

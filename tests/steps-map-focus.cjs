@@ -36,7 +36,7 @@ async function harness() {
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), Setting, setTooltip() {} } }, globalWin);
   const plugin = withExpansionCoordinator({
     availableModels: () => ['gpt-6-luna'], modelLabel: model => model, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async () => {},
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -121,39 +121,6 @@ test('08: a repaint keeps focus on the same toolbar control even when the contro
   assert.ok(h.active().classes.has('vam-layout-button'), 'the new Layout button, not whatever sits at the old index');
 });
 
-test('goal header P1: the goal bar sits in Obsidian\'s header row, outside contentEl; a repaint that rebuilds it still gives focus back to the icon (or the goal text) that had it', async () => {
-  const h = await harness();
-  const header = h.doc.body.add('div', { cls: 'view-header' });
-  const paintBar = () => {
-    if (h.view.relevanceBarEl) h.view.relevanceBarEl.remove();
-    const bar = header.add('div', { cls: 'vam-goal-bar' });
-    bar.add('button', { cls: 'vam-goal-text', text: 'Sleep better' });
-    const actions = bar.add('div', { cls: 'vam-goal-actions' });
-    actions.add('button', { cls: 'vam-goal-icon', label: 'Suggest new topics' }); actions.add('button', { cls: 'vam-goal-icon', label: 'Sort by relevance' });
-    h.view.relevanceBarEl = bar;
-    return bar;
-  };
-  paintBar();
-  h.view.containerEl = h.doc.body;
-  h.view.render = () => { const keep = h.view.holdMapFocus?.() ?? (() => {}); h.build(); paintBar(); keep(); };
-  for (const label of ['Sort by relevance', 'Suggest new topics']) {
-    const icon = h.view.relevanceBarEl.querySelectorAll('button').find(b => b.attrs['aria-label'] === label);
-    icon.focus();
-    assert.ok(!h.contentEl.contains(icon), 'the icon is outside contentEl');
-    assert.ok(h.view.describeMapFocus(icon), `${label}: a bar control gets a focus anchor`);
-    h.view.renderPreservingFocus();
-    const now = h.active();
-    assert.ok(header.contains(now) && now !== icon && now.attrs['aria-label'] === label, `${label}: the repaint gave focus back to the new icon in the header row`);
-  }
-  const text = h.view.relevanceBarEl.querySelector('.vam-goal-text'); text.focus();
-  h.view.renderPreservingFocus();
-  assert.ok(h.active().classes.has('vam-goal-text') && header.contains(h.active()), 'the goal text keeps focus too');
-  // A control inside the map is still described against the map.
-  const layout = h.contentEl.querySelector('.vam-layout-button'); layout.focus();
-  h.view.renderPreservingFocus();
-  assert.ok(h.active().classes.has('vam-layout-button') && h.contentEl.contains(h.active()), 'toolbar focus is unchanged');
-});
-
 // Other windows are expressed only through Obsidian's activeWindow; the main document's activeElement stays a map element or the body.
 function inactive(h, { mapIsPopout = false } = {}) {
   const mapWin = { name: mapIsPopout ? 'popout' : 'main' }, other = { name: mapIsPopout ? 'main' : 'popout' };
@@ -223,7 +190,7 @@ test('#18: a text editor reopened while another window was active gets the focus
   assert.equal(h.active(), elsewhere, 'focus that is not lost is not taken');
 });
 
-test('#18: the repaint restorers for the chat field, the search field and the relevance bar keep still during an external refresh while another window is active', async () => {
+test('#18: the repaint restorers for the chat field and the search field keep still during an external refresh while another window is active', async () => {
   const h = await harness();
   const w = inactive(h);
   try {
@@ -232,8 +199,7 @@ test('#18: the repaint restorers for the chat field, the search field and the re
     const search = h.contentEl.add('input', { cls: 'vam-map-search-input' }); search.setSelectionRange = () => {}; search.selectionStart = 0; search.selectionEnd = 0;
     h.view.mapSearch = { query: '' }; h.view.mapSearchBar = { input: search };
     h.view.mountMapSearch = () => { h.view.mapSearchBar = { input: search }; }; h.view.applySearchMarks = () => {};
-    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-goal-text' });
-    for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()], ['relevance bar', barButton, () => h.view.keepRelevanceBarFocus()]]) {
+    for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()]]) {
       // The repaint: hold, the page is rebuilt (focus drops to the body), then the restorer runs.
       h.view.render = () => { const restore = hold(); h.doc.activeElement = h.doc.body; restore(); };
       element.focus();

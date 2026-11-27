@@ -42,6 +42,8 @@ export interface OpenNoteView {
 export interface NoteWritePorts {
   /** Every markdown view that has this note open right now (a note open in two panes has two). */
   openViews(path: string): OpenNoteView[];
+  /** Check the live editor/file bytes, not the last saved snapshot. */
+  canWrite?(content: string): boolean;
   /** `updateNoteRawGuarded`: `authorize` runs inside the write on the text it is given; false writes nothing and answers "discarded". */
   rawGuarded(
     path: string,
@@ -156,7 +158,7 @@ export function createNoteWriter(
 ): (path: string, transform: (text: string) => string) => Promise<NoteWriteResult> {
   const viaEditor = (views: OpenNoteView[], transform: (text: string) => string): NoteWriteResult => {
     const texts = views.map(view => view.text());
-    if (texts.some(text => text !== texts[0])) return "refused";
+    if (texts.some(text => text !== texts[0]) || ports.canWrite?.(texts[0]) === false) return "refused";
     const next = transform(texts[0]);
     if (next === texts[0]) return "unchanged";
     return views[0].replace(next) ? "written" : "refused";
@@ -166,9 +168,14 @@ export function createNoteWriter(
     if (views.length) return viaEditor(views, transform);
     let opened = false;
     let same = false;
+    let refused = false;
     const outcome = await ports.rawGuarded(
       path,
       content => {
+        if (ports.canWrite?.(content) === false) {
+          refused = true;
+          return content;
+        }
         const next = transform(content);
         same = next === content;
         return next;
@@ -180,6 +187,7 @@ export function createNoteWriter(
         }
       }
     );
+    if (refused) return "refused";
     if (outcome === "written") return same ? "unchanged" : "written";
     if (!opened) return "refused";
     const now = ports.openViews(path);

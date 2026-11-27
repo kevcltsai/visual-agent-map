@@ -881,3 +881,12 @@ S.integrationTest('Living Node web: forbidden policy disables the tool at dispat
   const result = await generateLivingProposal(calls, { prompt: '不要上網，只用本地筆記', language: 'zh-TW', model: undefined, base: empty(), context: '{"documents":[],"warnings":[]}', evidence: [], mapPath: 'Map.md' }, new AbortController().signal);
   assert.equal(result.proposal.operations[0].text, 'Local result');
 });
+
+S.integrationTest('Living Node share: Repository.readNote derives shareMarkdown from committed Markdown only', async () => {
+  const f = await setup();
+  assert.equal((await f.repo.readNote(path)).livingNode?.shareMarkdown ?? '', '');
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const note = await f.repo.readNote(path);
+  assert.equal(note.livingNode.shareMarkdown, '> Current findings');
+  assert.ok(!note.livingNode.shareMarkdown.includes('e1'));
+});

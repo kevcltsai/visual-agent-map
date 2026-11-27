@@ -28,7 +28,7 @@ const projectionFor = (input: LivingProviderInput) => buildLivingPrompt(input);
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 5,
+  version: 6,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
@@ -83,7 +83,8 @@ export function normalizeLivingProposal(
   local: readonly LivingEvidence[],
   at: string,
   requiresWeb = false,
-  forbidWeb = false
+  forbidWeb = false,
+  searched = false
 ) {
   const envelope = object(raw);
   if (
@@ -101,7 +102,16 @@ export function normalizeLivingProposal(
     parsed.hash = "";
     openedUrls.add(parsed.toString());
   }
-  if ((requiresWeb || envelope.requiresWeb) && !openedUrls.size) throw new Error("required-web-unavailable");
+  // A scoped no-match (an output-only proposal) is honest when the run really searched, even if no page was opened.
+  const noMatch =
+    searched &&
+    Array.isArray(envelope.operations) &&
+    envelope.operations.length > 0 &&
+    (envelope.operations as unknown[]).every(
+      value => !!value && typeof value === "object" && (value as { kind?: unknown }).kind === "output"
+    );
+  if ((requiresWeb || envelope.requiresWeb) && !openedUrls.size && !noMatch)
+    throw new Error("required-web-unavailable");
   // Evidence exists per opened URL only once the model supplied an excerpt for it. The excerpt is validated model text
   // and never part of the id (id = hash(URL), as before), so a re-check with different wording adds no duplicate.
   const byUrl = new Map<string, LivingEvidence>();
@@ -114,8 +124,9 @@ export function normalizeLivingProposal(
     if (!parsed || typeof entry.excerpt !== "string") throw new Error("invalid-web-excerpt");
     parsed.hash = "";
     const source = parsed.toString();
-    const excerpt = normalizeExcerpt(entry.excerpt);
-    if (!excerpt || excerpt.length > MAX_EXCERPT) throw new Error("invalid-web-excerpt");
+    // Excerpts are validation-only and never persisted, so an over-long one is cut instead of failing the round.
+    const excerpt = normalizeExcerpt(entry.excerpt).slice(0, MAX_EXCERPT).trim();
+    if (!excerpt) throw new Error("invalid-web-excerpt");
     if (!openedUrls.has(source)) throw new Error("unauthorized-web-excerpt");
     byUrl.set(source, {
       id: "web:" + livingSnapshotRevision(source),
@@ -147,7 +158,11 @@ export function normalizeLivingProposal(
   // one actually opened source. A genuine no-change check can have no operations.
   const checkedUrls: string[] = [];
   if (envelope.requiresWeb) {
-    if (!Array.isArray(envelope.checkedWeb) || !envelope.checkedWeb.length || envelope.checkedWeb.length > 100)
+    if (
+      !Array.isArray(envelope.checkedWeb) ||
+      (!envelope.checkedWeb.length && !(noMatch && !openedUrls.size)) ||
+      envelope.checkedWeb.length > 100
+    )
       throw new Error("required-web-check-missing");
     const checked = new Set<string>();
     for (const value of envelope.checkedWeb as unknown[]) {
@@ -161,11 +176,16 @@ export function normalizeLivingProposal(
       const entry = byUrl.get(source);
       if (entry) checked.add(entry.id);
     }
-    if (operations.length && !operations.some(operation => operation.evidence.some(id => checked.has(id))))
+    if (noMatch && !checked.size) {
+      // No page was cited: the observed search itself is the basis (the caller verified a query was seen).
+    } else if (operations.length && !operations.some(operation => operation.evidence.some(id => checked.has(id))))
       throw new Error("required-web-evidence-missing");
     // A mixed proposal may include independent local observations, but any replaced
     // current result of a live research task must itself cite a checked web source.
-    if (operations.some(operation => operation.kind === "output" && !operation.evidence.some(id => checked.has(id))))
+    if (
+      !(noMatch && !checked.size) &&
+      operations.some(operation => operation.kind === "output" && !operation.evidence.some(id => checked.has(id)))
+    )
       throw new Error("required-web-output-evidence-missing");
   } else if (envelope.checkedWeb !== undefined && (!Array.isArray(envelope.checkedWeb) || envelope.checkedWeb.length)) {
     throw new Error("unexpected-web-check");
@@ -219,7 +239,8 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         input.evidence,
         new Date().toISOString(),
         policy === "required",
-        policy === "forbidden"
+        policy === "forbidden",
+        activity.some(item => !!item.query)
       );
       // The model never saw omitted records: every non-append edit of one (supplement included) is refused and
       // counted, and the rest of the round still runs. These are safely omitted, unlike an unknown or unauthorised id,

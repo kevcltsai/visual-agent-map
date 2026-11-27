@@ -377,7 +377,11 @@ test('the summary field reads like the summary text: same font size and line hei
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8');
   const rule = selector => css.split('\n').find(line => line.startsWith(selector)) ?? '';
   const field = rule('.vam-view .vam-node .vam-card-summary-input'), text = rule('.vam-card-summary {');
-  for (const decl of ['font-size: var(--font-ui-small)', 'line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
+  // V3.3 P1.1 moved the summary size onto a token: the field must use the same size as the text, whichever it is.
+  const size = rule => /font-size: ([^;]+);/.exec(rule)?.[1];
+  assert.ok(size(text), 'summary has a font size');
+  assert.equal(size(field), size(text), 'field and summary share one font size');
+  for (const decl of ['line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
   assert.ok(!/font:\s*inherit/.test(field), 'not the editor font');
 });
 // UI audit bugfix-2 P2: a card title with [[ ]] or a fence is refused with its reason (never rewritten), and a map that is open in another pane is brought forward.

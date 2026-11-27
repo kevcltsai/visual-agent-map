@@ -140,7 +140,8 @@
 .vam-boundary:focus-visible::before, .vam-boundary.is-selected::before { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-boundary-label { position: absolute; z-index: 2; left: 12px; top: -10px; max-width: calc(100% - 24px); padding: 1px 8px; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; pointer-events: auto; cursor: pointer; user-select: none; }
 .vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
-.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
+.vam-view, .vam-stage, .vam-tokens { --vam-space-1: var(--size-4-1, 4px); --vam-space-2: var(--size-4-2, 8px); --vam-space-3: var(--size-4-3, 12px); --vam-space-4: var(--size-4-4, 16px); --vam-space-5: var(--size-4-6, 24px); --vam-card-padding: var(--vam-space-3); --vam-radius-card: 8px; --vam-radius-control: 6px; --vam-surface: var(--background-primary); --vam-text: var(--text-normal); --vam-muted: var(--text-muted); --vam-border: var(--background-modifier-border); --vam-accent: var(--interactive-accent); --vam-focus: var(--interactive-accent); --vam-selected: var(--interactive-accent); --vam-error: var(--text-error); --vam-warning: var(--color-orange); --vam-card-title-size: var(--font-ui-medium, 15px); --vam-card-summary-size: var(--font-ui-small, 13px); }
+.vam-node { --vam-card-bg: var(--vam-surface); position: absolute; box-sizing: border-box; width: 280px; padding: var(--vam-card-padding); border: 1px solid var(--vam-border); border-radius: var(--vam-radius-card); background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
 /* Fixed-height cards (card-height). Obsidian's review forbids clip-path (scripts/check-css.mjs), and overflow on the card itself would also cut what is drawn outside its box (the tool row above it, the "+", the handles, the scan line, the shape outline). So a card whose content does not fit (.is-clipped, set by the view and the share viewer after layout, measured with the class off) becomes a flex column and its content children shrink and cut themselves; nothing else changes. The fade and the ellipsis are real elements because ::after is the scan line. */
 .vam-node.is-clipped { display: flex; flex-direction: column; }
@@ -152,7 +153,7 @@
 /* Side layouts (topic-cover-position left / right): the picture column and the text column sit in one .vam-card-side row. A short card cuts that row at its own bottom, so each column is cut from its bottom: the picture from its bottom edge, and in the text column the summary (lower) before the title. The row shrinks like the cover (weight 100), after anything below it in the card. */
 .vam-node.is-clipped > .vam-card-side { flex: 0 100 auto; min-height: 0; overflow: hidden; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
-.vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
+.vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 calc(var(--vam-radius-card) - 1px) calc(var(--vam-radius-card) - 1px); background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
 [data-topic-kind="atomic"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="evidence"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="conclusion"].vam-node.is-clipped > .vam-card-fade { display: none; }
 /* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused. The share viewer's stylesheet carries these rules too (the vam-card- prefix is collected) but the viewer never builds the handles. */
@@ -283,19 +284,19 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node:active { cursor: grabbing; }
 /* Export reads the saved border colour: no transition while the highlight class is taken off for that read. */
 .vam-view .vam-node.vam-export-measure, .vam-view .vam-text-node.vam-export-measure { transition: none; }
-.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-node.is-selected { border-color: var(--vam-selected); outline: 2px solid var(--vam-selected); outline-offset: 2px; }
 /* Keyboard focus is a separate signal from selection: a dashed ring further out. */
-.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }
+.vam-node:focus-visible { outline: 2px dashed var(--vam-focus); outline-offset: 5px; }
 .vam-view:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus); }
-.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vam-space-1) var(--vam-space-2); }
 .vam-node-header:empty { display: none; }
-.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }
+.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: var(--vam-space-1) var(--vam-space-2); }
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 /* Secondary tools wait for intent (hover, keyboard focus or selection) in a toolbar over the card's top edge: they take
    no space in the card, so showing or hiding them never moves its content. */
-.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 120ms ease-out 180ms, transform 120ms ease-out 180ms, visibility 0s linear 300ms; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
+.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: var(--vam-space-1); padding: var(--vam-space-1); border: 1px solid var(--vam-border); border-radius: var(--vam-radius-control); background: var(--vam-surface); box-shadow: var(--shadow-s); opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 120ms ease-out 180ms, transform 120ms ease-out 180ms, visibility 0s linear 300ms; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
-.vam-node > .vam-node-tools { --vam-tools-inset: 0px; --vam-tools-gap: 4px; }
+.vam-node > .vam-node-tools { --vam-tools-inset: 0px; --vam-tools-gap: var(--vam-space-1); }
 .vam-node > .vam-node-tools.is-below { bottom: auto; top: calc(100% - 6px - var(--vam-tools-inset, 0px)); transform-origin: right top; transform: translateY(-4px); }
 .vam-node > .vam-node-tools.is-below.is-align-left { transform-origin: left top; }
 .vam-node > .vam-node-tools:not(.is-below):not(.is-side-left):not(.is-side-right) { bottom: calc(100% - 6px - var(--vam-tools-inset, 0px)); }
@@ -311,11 +312,11 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */
 /* With several cards selected only the hovered or focused one shows its row. Zoomed out the rows stay shown and clickable (a row that shows must always be clickable). */
 .vam-viewport.is-multi-selected:not(.is-selecting) .vam-node.is-selected:not(:focus-within) > .vam-node-tools { opacity: 0; visibility: hidden; transform: translateY(4px); }
-.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
+.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: var(--vam-space-1) var(--vam-space-2); }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-ai-explore { background: color-mix(in srgb, var(--interactive-accent) 80%, black); color: var(--text-on-accent); font-weight: 600; }
 .vam-node-tools > .vam-ai-explore:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 80%, black); }
-.vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: 6px; padding-right: 6px; }
+.vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: var(--vam-space-2); padding-right: var(--vam-space-2); }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
@@ -387,8 +388,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-stage .vam-card-summary.is-editable:empty::before { content: attr(data-placeholder); color: #888; font-style: italic; }
 .vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
-.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
-.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.vam-card-title { color: var(--vam-text); font-size: var(--vam-card-title-size); font-weight: 650; line-height: 1.4; margin: var(--vam-space-2) 0 var(--vam-space-1); overflow-wrap: anywhere; }
+.vam-card-summary { margin: 0; color: var(--vam-muted); font-size: var(--vam-card-summary-size); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .vam-card-summary.vam-book-points { display: block; -webkit-line-clamp: unset; padding-left: 1.3em; list-style: disc; }
 .vam-card-error-details { margin: 4px 0 0; font-size: var(--font-ui-smaller); }
 .vam-card-error-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; user-select: text; }
@@ -1848,7 +1849,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-topic-link-item:hover { background: var(--background-modifier-hover); }
 .vam-view .vam-node .vam-card-title-input { box-sizing: border-box; width: 100%; font: inherit; font-weight: 650; user-select: text; pointer-events: auto; }
 .vam-view .vam-node .vam-card-summary.is-inline-editable { cursor: text; }
-.vam-view .vam-node .vam-card-summary-input { box-sizing: border-box; display: block; width: 100%; min-height: 0; padding: 2px 6px; margin: 0; font-family: inherit; font-size: var(--font-ui-small); line-height: 1.55; color: var(--text-normal); height: var(--vam-summary-height, auto); resize: none; overflow: hidden; user-select: text; pointer-events: auto; }
+.vam-view .vam-node .vam-card-summary-input { box-sizing: border-box; display: block; width: 100%; min-height: 0; padding: 2px 6px; margin: 0; font-family: inherit; font-size: var(--vam-card-summary-size); line-height: 1.55; color: var(--text-normal); height: var(--vam-summary-height, auto); resize: none; overflow: hidden; user-select: text; pointer-events: auto; }
 .vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
 .vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }

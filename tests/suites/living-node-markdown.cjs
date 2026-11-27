@@ -328,6 +328,17 @@ S.integrationTest('Living Node trial: exact configuration-only save permits adop
   assert.equal(other.contents.get(path), edited);
 });
 
+S.integrationTest('Living Node trial: adoption check keeps its own receiver when the commit inspects', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  const r = trialRequest(f, async () => proposal);
+  assert.equal(await trial.run(r), true);
+  const base = r.inspect;
+  const check = { inspected: 0, isCurrent: () => true, async inspect() { this.inspected++; return base(); } };
+  assert.equal(await trial.adopt(f.repo, check), 'written');
+  assert.ok(check.inspected > 0);
+});
+
 S.integrationTest('Living Node: ordinary Repository note edits preserve the managed region byte for byte', async () => {
   const f = await setup();
   assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');

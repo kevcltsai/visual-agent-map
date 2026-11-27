@@ -3209,7 +3209,7 @@ integrationTest('UX B10: "Create an empty mind map" clears the draft typed on th
   const box = element('div'); h.view.fillEmptyMap(box);
   assert.match(visibleText(box), /This mind map has no topics yet\./); assert.doesNotMatch(visibleText(box), /＋ Topic|\+ Topic/, 'no pointer to the removed toolbar button');
   const addButtons = findAll(box, i => i.tag === 'button');
-  assert.equal(addButtons.length, 1, 'the empty canvas has exactly one add button'); assert.equal(addButtons[0].text, '+ Add first topic');
+  assert.deepEqual(addButtons.map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the empty canvas has the one "Add first topic" button and, since V3.3 A7, the secondary "✦ AI root" after it');
   const opened = []; h.view.openAddMenu = (event, parent) => opened.push([event, parent]);
   addButtons[0].click(); assert.equal(opened.length, 1); assert.equal(opened[0][1], null, 'the button adds a top-level topic');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -3623,7 +3623,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 1, 'the idle empty canvas has the one "Add first topic" button');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.deepEqual(findAll(box, i => i.tag === 'button').map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the idle empty canvas has "Add first topic" and the V3.3 A7 "✦ AI root"');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');

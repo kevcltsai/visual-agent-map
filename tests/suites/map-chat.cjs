@@ -10338,3 +10338,45 @@ integrationTest('map chat: configure_ai_card on an existing AI card applies when
   eq(unseen.map(l => l.status), ['skipped']); assert.match(unseen[0].text, /was not shown/);
   assert.equal(h3.contents.get(path3), before3);
 });
+
+// ---- P4.8 resume summary: the panel's local, read-only block (no message, no turn, no record) ------------------------------------
+const summaryItem = (extra = {}) => ({ kind: 'research', subject: 'Competitor prices', nodeId: 'a', recordId: '20261126-100000-bbbbbb', turn: 1, at: '2026-11-26T10:00:00.000Z', ...extra });
+const summaryBlock = f => find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume'));
+const summaryButtons = f => findAll(summaryBlock(f), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-resume-locate'));
+function summaryFixture(summary, extra = {}) {
+  const located = []; const calls = { summary: 0 };
+  const f = panelFixture({ resumeSummary: async () => { calls.summary++; return summary; }, locateTopic: id => { located.push(id); return id !== 'gone'; }, ...extra });
+  f.panel.setOpen(true);
+  return { f, located, calls, open: async () => { find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')).click(); await tick(); } };
+}
+test('P4.8 resume: the entry shows each item with a Locate button; Locate centres the card and adds no message', async () => {
+  const { f, located, open } = summaryFixture({ state: 'items', items: [summaryItem(), summaryItem({ kind: 'unfinished', subject: 'Company C', nodeId: 'b' })] });
+  await open();
+  assert.equal(summaryBlock(f).hidden, false);
+  assert.match(visibleText(summaryBlock(f)), /Resume summary \(read only\)/); assert.match(visibleText(summaryBlock(f)), /Researched “Competitor prices”/); assert.match(visibleText(summaryBlock(f)), /Not finished: “Company C”/);
+  summaryButtons(f)[1].click(); eq(located, ['b']);
+  assert.equal(f.panel.hasMessages, false, 'the summary is not a message'); eq(f.panel.completedTurns(), []);
+});
+test('P4.8 resume: a deleted card says it cannot be located and has no button; an item with no card shows its record under it', async () => {
+  const { f, open } = summaryFixture({ state: 'items', items: [summaryItem({ nodeId: 'deleted-card' }), summaryItem({ kind: 'recent', subject: 'Summarise', nodeId: undefined })] }, {});
+  await open();
+  const text = visibleText(summaryBlock(f));
+  assert.match(text, /Cannot locate/); assert.equal(summaryButtons(f).length, 1, 'only the item that can be located has a button');
+  const record = find(findAll(summaryBlock(f), i => i.tag === 'li')[1], i => hasClass(i, 'vam-map-chat-resume-record')); assert.match(record.text, /20261126-100000-bbbbbb/);
+  assert.equal(record.hidden, true); summaryButtons(f)[0].click(); assert.equal(record.hidden, false);
+});
+test('P4.8 resume: no records says there is not enough data; closing, a new conversation and a late answer leave nothing behind', async () => {
+  const { f, open, calls } = summaryFixture({ state: 'empty', items: [] });
+  await open(); assert.match(visibleText(summaryBlock(f)), /Not enough data/); assert.equal(summaryButtons(f).length, 0);
+  findAll(summaryBlock(f), i => hasClass(i, 'vam-map-chat-resume-close'))[0].click(); assert.equal(summaryBlock(f).hidden, true);
+  await open(); assert.equal(summaryBlock(f).hidden, false); f.panel.reset(); assert.equal(summaryBlock(f).hidden, true);
+  let release; const slow = summaryFixture({ state: 'empty', items: [] }, { resumeSummary: () => new Promise(resolve => { release = () => resolve({ state: 'empty', items: [] }); }) });
+  find(slow.f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')).click(); slow.f.panel.reset(); release(); await tick();
+  assert.equal(summaryBlock(slow.f).hidden, true, 'a summary that arrives after the reset is not shown'); assert.equal(calls.summary, 2);
+});
+test('P4.8 resume: a host without the summary has no entry; the words follow the interface language', async () => {
+  const bare = panelFixture(); assert.equal(find(bare.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')), undefined);
+  const { f, open } = summaryFixture({ state: 'empty', items: [] });
+  f.setLanguage('zh-TW'); f.panel.relabel(); await open(); assert.match(visibleText(summaryBlock(f)), /資料不足，沒有可恢復的紀錄/); assert.match(visibleText(find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open'))), /恢復摘要/);
+  f.setLanguage('en');
+});

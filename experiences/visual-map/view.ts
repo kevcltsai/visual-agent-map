@@ -523,6 +523,7 @@ import {
   type RecordEventKind,
   type RecordTurnStatus
 } from "../../core/map-chat-records";
+import { buildResumeSummary, type ResumeSummary } from "../../core/map-chat-resume";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
@@ -21695,7 +21696,9 @@ export class VisualAgentMapView extends ItemView {
       recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
       autoApply: () => this.chatAutoApply,
       setAutoApply: on => this.setChatAutoApply(on),
-      newConversation: () => this.newChatConversation()
+      newConversation: () => this.newChatConversation(),
+      resumeSummary: () => this.chatResumeSummary(),
+      locateTopic: id => this.locateChatTopic(id)
     };
   }
   /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
@@ -22460,6 +22463,26 @@ export class VisualAgentMapView extends ItemView {
     chat.addOpening(text);
     if (this.plugin.settings.mapChatRecords === true && isManagedMapPath(this.plugin.settings, this.path))
       this.chatRecordSession.openingSaid(key, text);
+  }
+  /** "Resume summary": built from this map's saved records only; nothing is written, no provider is called. */
+  private async chatResumeSummary(): Promise<ResumeSummary> {
+    const map = this.map;
+    if (!map || this.plugin.settings.mapChatRecords !== true || !isManagedMapPath(this.plugin.settings, this.path))
+      return { state: "empty", items: [] };
+    try {
+      const files = await this.chatRecordSession.readAll(this.plugin.repo.topicRoot(this.path));
+      return buildResumeSummary(files, map.id);
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat resume: ${errorMessage(error)}`);
+      return { state: "empty", items: [] };
+    }
+  }
+  /** "Locate" on a resume item: centres the card (the camera moves in memory only, the viewport is not saved). */
+  private locateChatTopic(id: string): boolean {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!node) return false;
+    this.focusNode(node, false);
+    return true;
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {

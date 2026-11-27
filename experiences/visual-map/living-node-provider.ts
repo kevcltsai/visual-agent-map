@@ -39,20 +39,27 @@ function object(value: unknown): Record<string, unknown> {
 
 /** Explicit current-data wording is a conservative requirement floor; broader task semantics
  * still require the model's declared decision and semantic acceptance fixtures. */
-export function explicitlyRequiresLivingWeb(prompt: string): boolean {
+export type LivingWebPolicy = "forbidden" | "optional" | "required";
+
+export function livingWebPolicy(prompt: string): LivingWebPolicy {
   // Date words alone do not require the web: a task can analyze today's local notes.
   const explicitSearch = /(?:上網|上网|網路搜尋|网络搜索|搜尋網路|搜索网络|\bsearch the web\b|\bweb research\b|\bbrowse the web\b)/i.test(prompt);
   const currentPublicData = /(?:即時|即时|最新|今天|今日|現在|现在|當前|当前|today|latest|live|current)[\s\S]{0,16}(?:股價|股价|行情|新聞|新闻|市場價格|市场价格|stock price|market data|market quote|news headlines)/i.test(prompt);
   const offline = /(?:不要上網|不要上网|禁止上網|禁止上网|只(?:用|讀|读)本地|only (?:use|read) local|do not (?:browse|search the web)|no web search)/i.test(prompt);
-  return !offline && (explicitSearch || currentPublicData);
+  return offline ? "forbidden" : explicitSearch || currentPublicData ? "required" : "optional";
+}
+
+export function explicitlyRequiresLivingWeb(prompt: string): boolean {
+  return livingWebPolicy(prompt) === "required";
 }
 
 /** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
-export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string, requiresWeb = false) {
+export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string, requiresWeb = false, forbidWeb = false) {
   const envelope = object(raw);
   if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb", "checkedWeb"].includes(key)))
     throw new Error("invalid-proposal-field");
   if (typeof envelope.requiresWeb !== "boolean") throw new Error("missing-search-decision");
+  if (forbidWeb && (envelope.requiresWeb || opened.length)) throw new Error("forbidden-web-search");
   const byUrl = new Map<string, LivingEvidence>();
   for (const url of opened) {
     const parsed = allowedUrl(url);
@@ -64,7 +71,7 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
   if ((requiresWeb || envelope.requiresWeb) && !byUrl.size) throw new Error("required-web-unavailable");
   if (requiresWeb && !envelope.requiresWeb) throw new Error("required-web-decision-conflict");
   if (!Array.isArray(envelope.operations)) throw new Error("invalid-operations");
-  const operations = (envelope.operations as unknown[]).map(value => {
+  const operations = (envelope.operations as unknown[]).map((value): Record<string, unknown> & { evidence: string[] } => {
     const operation = object(value);
     if (!Array.isArray(operation.evidence)) throw new Error("invalid-evidence");
     const evidence = (operation.evidence as unknown[]).map(item => {
@@ -110,6 +117,7 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
 }
 
 export async function generateLivingProposal(calls: AiCalls, input: LivingProviderInput, signal: AbortSignal) {
+  const policy = livingWebPolicy(input.prompt);
   const prepared = prepareStep(step, input);
   const events: unknown[] = [];
   return calls.run(
@@ -124,10 +132,11 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
       noContentLog: true,
       usage: { mapPath: input.mapPath },
       task: {
-        webSearch: true,
-        webSearchOnly: true,
-        optionalWebSearch: true,
-        searchBudget: 8,
+        webSearch: policy !== "forbidden",
+        webSearchOnly: policy !== "forbidden",
+        textOnly: policy === "forbidden",
+        optionalWebSearch: policy === "optional",
+        searchBudget: policy === "forbidden" ? 0 : 8,
         timeoutMs: 300_000,
         onWebSearchEvent: event => events.push(event)
       }
@@ -139,7 +148,8 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         openedUrlsFromEvents(events),
         input.evidence,
         new Date().toISOString(),
-        explicitlyRequiresLivingWeb(input.prompt)
+        policy === "required",
+        policy === "forbidden"
       );
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();

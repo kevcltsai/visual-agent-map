@@ -91,7 +91,6 @@ function tidyView(moves) {
   view.map = mapOf('right');
   view.presentation = false;
   view.notesLoading = () => false;
-  view.relevanceSortOn = () => false;
   view.render = () => {};
   view.closed = false;
   view.tidyArrange = copy => { if (moves) copy.nodes[1].x += 50; };

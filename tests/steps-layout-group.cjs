@@ -1178,7 +1178,7 @@ async function harness(spec, extra = {}, layouts = {}) {
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   let pending = Promise.resolve();
   const plugin = support.withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -1224,7 +1224,7 @@ test('V1: choosing Lay out downward is one write and one undo step; the field is
 test('V1b: the menu lists the eight arrangements and the three spacings after the original items and checks the current ones', async () => {
   const h = await harness(tree4);
   h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', DOWN, UP, BALANCED, RADIAL, TIMELINE, FISHBONE, '---', COMPACT, STANDARD, SPACIOUS, 'Auto layout']);
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', DOWN, UP, BALANCED, RADIAL, TIMELINE, FISHBONE, '---', COMPACT, STANDARD, SPACIOUS, 'Tidy map']); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   const checked = () => h.menus.at(-1).items.filter(item => item.checked).map(item => item.title);
   assert.deepEqual(checked(), ['Lay out to the right', STANDARD]);
   await h.choose(DOWN);
@@ -1312,7 +1312,7 @@ test('V4b: a branch with its own direction draws its edges by the parent card\'s
 });
 
 test('V5: an AIM map has none of the new menu items', async () => {
-  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
+  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Tidy map']; // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   const h = await harness(tree4);
   h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   h.view.openLayoutMenu({});
@@ -1393,7 +1393,9 @@ test('PV2-V7: dragging a first-level topic in a right map, or a detail in a time
 
 test('PV2-V8: a branch set to down then back to Follow the map loses the field and returns to the map default; each is one undo step', async () => {
   const h = await harness(tree4);
-  await h.choose('Auto layout');
+  // A10：P1.4 整理全圖取代 Auto layout（先預覽）: choosing it only previews; Apply writes.
+  await h.choose('Tidy map');
+  h.view.applyTidy(); await h.settled(); await h.settled();
   const base = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
   const writes = h.view.history.past.length;
   await branchPanel(h, 'A').press('Lay out downward');

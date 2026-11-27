@@ -87,7 +87,6 @@ function makeView() {
   });
   view.selection.setSelected('a');
   view.cardEls.set('b', { getBoundingClientRect: () => ({ left: 400, right: 680, top: 2000, bottom: 2180 }), focus() {} });
-  view.relevanceSortOn = () => false;
   view.canvasNodes = () => nodes;
   view.transform = () => {};
   view.selectMapNode = node => { view.selection.setSelected(node.id); };
@@ -384,6 +383,8 @@ test('Bug bash E #13: in a narrow pane the toolbar actions wrap inside the pane 
 
 test('Bug bash E #35: opening another map in the same tab asks the workspace to refresh the window title; the same map or no file does not', async () => {
   const { view } = makeView();
+  // B16 (V3.3 P1.7): setState opens a new tab when this tab's map has running work; these fixtures have none, so the swap stays in this tab.
+  view.hasRunningWork = () => false;
   const opened = [];
   view.openMap = async file => { opened.push(file); view.path = file; };
   const swap = { history: true };
@@ -429,6 +430,8 @@ test('Bug bash E #35 (follow-up): through the real paint() and a leaf that behav
   Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, paintCount: 0, plugin: { syncOutline() {} }, notes: new Map(), aiStatusMemo: new Map() });
   // the switcher / openMap path: the other map is read, then painted
   view.openMap = async file => { view.path = file; view.map = maps[file]; try { view.paint(); } catch (error) { if (error !== stop) throw error; } };
+  // B16 (V3.3 P1.7): setState opens a new tab when this tab's map has running work; these fixtures have none, so the swap stays in this tab.
+  view.hasRunningWork = () => false;
   const settle = () => new Promise(resolve => setTimeout(resolve, 60));
   await leaf.setViewState({ type: 'visual-agent-map', state: { file: 'B.md' } });
   assert.deepEqual(titles, ['Map B'], 'the switch itself refreshes the window title, after the new map is the display text');
@@ -874,7 +877,7 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
 });
 test('card tools: four labelled buttons (Research, Add, Note, More) in the selected card toolbar; the icon-only hover tools and the + circle are gone', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\)/);
+  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode, addSummary = false\)/);
   assert.match(view, /private openCardMoreMenu\(button: HTMLElement, node: MapNode\)/, 'the toolbar More menu');
   for (const cls of ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']) assert.match(view, new RegExp(`"${cls}"`), `${cls} button`);
   assert.doesNotMatch(view, /"vam-node-tool"|"vam-fold-tool"|"vam-structure-tool"|"vam-select-subtopics-tool"|"vam-add-child"/, 'no icon-only hover tools, no + circle');

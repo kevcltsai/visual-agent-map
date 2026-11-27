@@ -2359,6 +2359,7 @@ function fakeCardDom() {
     setText(v) { this.kids = []; this.text = v; }
     createEl(_tag, o = {}) { const e = new El(o.cls); e.text = o.text ?? ''; e.parent = this; this.kids.push(e); return e; }
     createSpan(o = {}) { return this.createEl('span', o); }
+    prepend(e) { if (e.parent) e.parent.kids = e.parent.kids.filter(k => k !== e); e.parent = this; this.kids.unshift(e); }
     after(e) { this.parent.kids = this.parent.kids.filter(k => k !== e); this.parent.kids.splice(this.parent.kids.indexOf(this) + 1, 0, e); e.parent = this.parent; }
     remove() { this.parent.kids = this.parent.kids.filter(k => k !== this); }
     querySelector(sel) { const c = sel.slice(1); for (const k of this.kids) { if (k.cls.has(c)) return k; const d = k.querySelector(sel); if (d) return d; } return null; }
@@ -2373,7 +2374,7 @@ test('S5: the card itself shows the unsaved summary preview as plain text, never
   const view = new VisualAgentMapView({ app: {} }, attachTopicRuns({ settings: { ...DEFAULT_SETTINGS, language: 'en' } }));
   const store = new ResearchProgressStore();
   view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' } };
-  const card = new El('vam-node'); const title = card.createEl('h3', { cls: 'vam-card-title', text: 'T' });
+  const card = new El('vam-node'); const header = card.createEl('div', { cls: 'vam-node-header' }); const title = card.createEl('h3', { cls: 'vam-card-title', text: 'T' });
   const stored = card.createEl('p', { cls: 'vam-card-summary', text: 'Stored summary' });
   view.map = { nodes: [{ id: 'n1', path: 'a.md' }] }; view.cardEls = new Map([['n1', card]]); view.notes = new Map([['n1', { summary: 'Stored summary' }]]);
   let renders = 0; view.render = () => { renders++; }; view.renderPreservingFocus = () => { renders++; };
@@ -2383,16 +2384,21 @@ test('S5: the card itself shows the unsaved summary preview as plain text, never
   const shown = card.querySelector('.vam-card-summary');
   assert.equal(shown, stored, 'same element is reused: text only, no re-render');
   assert.ok(shown.hasClass('is-preview'));
-  assert.equal(shown.querySelector('.vam-card-preview-label').text, 'Preview (not saved yet)');
+  // V3.3 P1.2: the "not saved yet" label sits in the header as a state label, not inside the summary text
+  assert.equal(shown.querySelector('.vam-card-preview-label'), null, 'no label inside the summary');
+  assert.equal(header.querySelector('.vam-status-preview').text, 'Preview · not saved yet');
+  assert.ok(header.querySelector('.vam-status-preview').hasClass('vam-status'));
   assert.equal(shown.querySelector('.vam-card-preview-text').text, '**raw** streaming');
   assert.equal(shown.querySelector('.vam-card-preview-text').text.includes('Stored'), false);
   // a longer preview only changes the text
   store.preview('a.md', 'x1', { summary: '**raw** streaming more' }); view.paintCardPreview('a.md');
   assert.equal(shown.querySelector('.vam-card-preview-text').text, '**raw** streaming more');
+  assert.equal(header.kids.filter(k => k.hasClass('vam-status-preview')).length, 1, 'one header label while streaming');
   assert.equal(renders, 0, 'no render() for preview text');
   // retraction / failure: preview gone, the stored summary is back
   store.preview('a.md', 'x1', {}); view.paintCardPreview('a.md');
   assert.equal(shown.hasClass('is-preview'), false); assert.equal(shown.text, 'Stored summary');
+  assert.equal(header.querySelector('.vam-status-preview'), null, 'the header label goes with the preview');
   // a card without a stored summary (placeholder) gets one only while previewing
   view.notes = new Map([['n1', { summary: 'No conclusion yet' }]]);
   const bare = new El('vam-node'); bare.createEl('h3', { cls: 'vam-card-title', text: 'T' }); view.cardEls = new Map([['n1', bare]]);

@@ -247,7 +247,7 @@ test('entry merge: an AI merge with a managed source is refused before the AI an
   assert.equal(h.contents.get(MAP), mapBefore);
 });
 
-// ---- structure suggestion and goal grading -----------------------------------------------------------------------------
+// ---- structure suggestion ---------------------------------------------------------------------------------------------
 test('entry structure suggestion: suggestions touching managed topics are dropped; applying one refuses', async () => {
   const h = await harness();
   const [a, f] = [h.nodes[H], h.nodes[F]];
@@ -261,23 +261,6 @@ test('entry structure suggestion: suggestions touching managed topics are droppe
   const count = h.view.map.nodes.length;
   await assert.rejects(h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: a.id, basis }, 'New', () => null), LOCKED_NOTICE);
   assert.equal(h.view.map.nodes.length, count);
-});
-
-test('entry goal grading: a managed card keeps its tier and is counted as skipped', async () => {
-  const h = await harness();
-  const [root, a, f] = [h.nodes[P], h.nodes[H], h.nodes[F]];
-  await h.repo.writeRelevance(a.path, { tier: 'side' });
-  for (const node of [a, f]) for (const list of [h.nodes, h.view.map.nodes]) list.find(n => n.id === node.id).parentId = root.id;
-  const run = { token: 1, owner: h.view, controller: new AbortController(), goal: 'g', status: 'running' };
-  h.host.relevanceGrades = new Map([[MAP, run]]);
-  h.host.logs = { appendLog() {} };
-  await h.view.hydrate();
-  const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: n.parentId ?? null }));
-  const before = h.raw(a);
-  await h.view.relevanceRun.apply(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: f.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
-  assert.equal(h.raw(a), before);
-  assert.equal((await h.repo.readNote(f.path)).relevance.tier, 'core');
-  assert.equal(run.outcome.skipped, 1);
 });
 
 // ---- map chat ----------------------------------------------------------------------------------------------------------

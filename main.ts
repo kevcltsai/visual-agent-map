@@ -137,8 +137,6 @@ import {
   type Settings
 } from "./repository";
 import { effectiveReasoningLevel } from "./ai/task-policy";
-import { stepEffort } from "./core/provider-step-runner";
-import type { ReasoningLevel } from "./ai/types";
 import { resolveTaskModel, type ModelChoice } from "./ai/model-resolution";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { fitImageForInput } from "./ui/fit-image-input";
@@ -178,11 +176,6 @@ import { localizedResponseSchema } from "./core/steps/task/schemas";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
 import { StructureReviewService, providerStructureReviewRunner } from "./core/structure-review-service";
 import { MapChatService, providerMapChatRunner } from "./core/map-chat-service";
-import {
-  GoalRecommendService,
-  providerGoalRecommendRunner,
-  type GoalRecommendRun
-} from "./core/goal-recommend-service";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
@@ -1012,12 +1005,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly outlineGeneration = new OutlineGenerationService(providerOutlineRunner(this.aiCalls));
   readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
   readonly mapChat = new MapChatService(providerMapChatRunner(this.aiCalls));
-  readonly goalRecommend = new GoalRecommendService(providerGoalRecommendRunner(this.aiCalls));
   /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */
   readonly shareTranslationCache = new ShareTranslationCache();
   readonly shareTranslate = new ShareTranslateService(providerShareTranslateRunner(this.aiCalls));
-  /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
-  readonly relevanceGrades = new Map<string, GoalRecommendRun>();
   exchanges: AiExchangeLog | null = null;
   /** Token usage of every provider call (`ai-usage.json`); null until onload has the plugin folder. Views query and subscribe to it. */
   usage: AiUsageStore | null = null;
@@ -1372,20 +1362,25 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>
-        new OutlineView(leaf, async path => {
-          try {
-            // The outline moves the map to the topic and opens its note beside it.
-            const view = this.views().find(item => item.hasPath(path));
-            if (view) {
-              // Bring the map tab forward first: a background tab has no size to center in.
-              await this.app.workspace.revealLeaf(view.leaf);
-              await view.revealPath(path);
+        new OutlineView(
+          leaf,
+          async path => {
+            try {
+              // The outline moves the map to the topic and opens its note beside it.
+              const view = this.views().find(item => item.hasPath(path));
+              if (view) {
+                // Bring the map tab forward first: a background tab has no size to center in.
+                await this.app.workspace.revealLeaf(view.leaf);
+                await view.revealPath(path);
+              }
+              await this.openDetails(this.repo.file(path));
+            } catch (error) {
+              new Notice(error instanceof Error ? error.message : String(error));
             }
-            await this.openDetails(this.repo.file(path));
-          } catch (error) {
-            new Notice(error instanceof Error ? error.message : String(error));
-          }
-        })
+          },
+          // Drag and Alt+arrow in the outline move topics of the map it shows, through that view.
+          async (id, to) => (await this.outlineSourceView?.outlineMove(id, to)) ?? null
+        )
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
       void this.activateView().catch(error => new Notice(String(error)));
@@ -3018,18 +3013,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         schema: localizedResponseSchema(this.settings.language),
         webSearch
       });
-    } catch {
-      /* Pre-starting is an optimisation: the run starts the process itself. */
-    }
-  }
-  /**
-   * Starts an idle Claude CLI for a step that has not been sent yet (the relevance panel just opened), with the very
-   * command the step will use: its schema, the effort {@link stepEffort} gives, no web search. No model call happens.
-   */
-  prewarmClaudeStep(model: string, reasoning: ReasoningLevel, schema: unknown): void {
-    if (this.unloaded) return;
-    try {
-      this.aiCalls.prewarm(model, { effort: stepEffort(reasoning), schema, webSearch: false });
     } catch {
       /* Pre-starting is an optimisation: the run starts the process itself. */
     }

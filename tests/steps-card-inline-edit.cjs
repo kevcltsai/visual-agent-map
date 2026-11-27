@@ -59,7 +59,7 @@ async function harness({ language = 'en' } = {}) {
     await lp.changeLanguage(language);
   }
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -377,7 +377,11 @@ test('the summary field reads like the summary text: same font size and line hei
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8');
   const rule = selector => css.split('\n').find(line => line.startsWith(selector)) ?? '';
   const field = rule('.vam-view .vam-node .vam-card-summary-input'), text = rule('.vam-card-summary {');
-  for (const decl of ['font-size: var(--font-ui-small)', 'line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
+  // V3.3 P1.1 moved the summary size onto a token: the field must use the same size as the text, whichever it is.
+  const size = rule => /font-size: ([^;]+);/.exec(rule)?.[1];
+  assert.ok(size(text), 'summary has a font size');
+  assert.equal(size(field), size(text), 'field and summary share one font size');
+  for (const decl of ['line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
   assert.ok(!/font:\s*inherit/.test(field), 'not the editor font');
 });
 // UI audit bugfix-2 P2: a card title with [[ ]] or a fence is refused with its reason (never rewritten), and a map that is open in another pane is brought forward.
@@ -432,10 +436,10 @@ const menuTitles = (h, fill) => {
   const menu = () => { const list = []; const m = { list, addItem(cb) { const e = entry(); cb(e.chain); list.push(e.it); return m; }, addSeparator() { list.push({ title: '—' }); return m; }, showAtPosition() {}, showAtMouseEvent() {} }; return m; };
   const root = menu(); fill(root); items.push(...root.list); return items;
 };
-test('a selected card shows four labelled buttons: Research, Add, Note, More; Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
+test('a selected card shows labelled buttons: Research, Add, Note, More (and Add summary on an empty-summary card); Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
   const h = await harness();
   const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-card-tool'));
-  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', '⋯']);
+  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', 'Add summary', '⋯']);
   assert.ok(tools.every(i => (i.text && i.text !== '⋯') || i.attrs['aria-label']), 'every button has a name');
   assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-add-child') || i.classes.has('vam-node-tool')).length, 0, 'no hover icons and no + circle');
   h.view.whenEditing = run => run();

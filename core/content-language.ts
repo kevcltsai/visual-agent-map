@@ -269,7 +269,7 @@ export function resolveMapOutputLanguage(
 }
 
 /**
- * The language for a map-level AI run with no dialog (outline draft, structure review, relevance grading): the map's
+ * The language for a map-level AI run with no dialog (outline draft, structure review): the map's
  * remembered choice (D-2026-10-88), else detected from the user's own text in `sources`, else the interface language.
  */
 export function outputLanguageForMap(

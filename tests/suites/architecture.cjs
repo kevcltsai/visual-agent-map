@@ -11,8 +11,7 @@ test('product architecture keeps shell, core, and experiences separated', () => 
   // Existing shared feature imports predate this recursive guard. Pin the exact paths.
   const existing = new Map([
     ['core/steps/map-chat/step.ts', '../../../experiences/visual-map/canvas-items'],
-    ['core/steps/outline-generate/step.ts', '../../../experiences/visual-map/outline-import'],
-    ['core/steps/goal-recommend/step.ts', '../../../experiences/visual-map/relevance-pins']
+    ['core/steps/outline-generate/step.ts', '../../../experiences/visual-map/outline-import']
   ]);
   const coreFiles = repoFiles(root, { from: 'core' }).filter(name => name.endsWith('.ts'));
   for (const name of coreFiles) {

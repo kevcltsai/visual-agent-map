@@ -53,7 +53,7 @@ async function harness({ language = 'en' } = {}) {
   const Notice = dom.makeNotice(notices);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -388,15 +388,26 @@ test('21: typing in the field and Enter renames the card (one more undo step); t
   assert.equal(nameField(h, fresh.id), undefined);
 });
 
-// A blank name is not a cancel: it keeps the default name and the card (unchanged).
-test('21: a blank name keeps the default name and adds no empty card', async () => {
-  const h = await harness(); realAdd(h);
-  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
-  const fresh = freshCard(h), past = h.view.history.past.length, notes = noteCount(h);
-  const field = nameField(h, fresh.id); field.value = '   '; press(field, 'Enter'); await tick(); await tick();
-  assert.equal(h.view.notes.get(fresh.id).title, 'New topic', 'the default name stays');
-  assert.equal(h.map().nodes.length, 5); assert.equal(noteCount(h), notes); assert.equal(h.view.history.past.length, past, 'no history entry for the ended edit');
-  assert.equal(h.view.inlineName, null); assert.equal(nameField(h, fresh.id), undefined);
+// V3.3 P1.3 / A6 spec change (was: "a blank name keeps the default name"): a blank name on a new card cancels it, like Esc,
+// for every way of adding (Mod+Enter, Shift+Enter, toolbar, edge entry). Enter and leaving (blur) both count.
+test('21 (V3.3 P1.3): a blank name on a new card, by Enter or by blur, takes the add back: no card, no Map.md node, no note, no redo', async () => {
+  for (const how of ['Enter', 'blur']) {
+    const h = await harness(); realAdd(h);
+    await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+    const fresh = freshCard(h), notes = noteCount(h);
+    const trashFile = h.app.fileManager.trashFile;
+    h.app.fileManager.trashFile = async file => { await trashFile(file); h.contents.delete(file.path); };
+    const field = nameField(h, fresh.id); field.value = '   ';
+    if (how === 'Enter') press(field, 'Enter'); else field.handlers.get('blur')();
+    await until(() => h.map().nodes.length === 4); await tick(); await tick();
+    assert.equal(h.view.notes.get(fresh.id), undefined, `${how}: the card is gone`);
+    assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, `${how}: no node in the map`);
+    assert.equal((await h.saved()).nodes.some(n => n.id === fresh.id), false, `${how}: no node in Map.md`);
+    assert.equal(noteCount(h), notes - 1, `${how}: the note is gone`);
+    assert.equal(h.view.history.canRedo, false, `${how}: no redo`);
+    assert.equal(h.view.inlineName, null);
+    assert.equal(h.view.focusNodeId, h.ids.leaf, `${how}: focus is handed back to the parent card, as Esc does`);
+  }
 });
 
 // UI audit bugfix-2 (add-topic-esc-keeps-card): Esc cancels the add, so the new topic leaves the map and its note is gone.
@@ -414,6 +425,9 @@ test('21: Esc in the name field of a new topic takes the add back: no card, no M
   assert.equal(trashed.length, 1, 'only the new note is trashed');
   assert.match(trashed[0], /\/Unassigned\//, 'it is the note undo had parked in Unassigned');
   assert.equal(h.view.inlineName, null);
+  // The keyboard goes back to the parent card (stand-in DOM: the render's focus target is the parent id).
+  assert.equal(h.view.focusNodeId, h.ids.leaf, 'focus is handed back to the parent card');
+  assert.equal(h.view.keepCanvasOnFieldRestore, true, 'the repaint does not pan');
 });
 
 test('21: Enter while an input method is composing does not end the edit', async () => {
@@ -532,4 +546,29 @@ test('36 R1 F1: the structure review "strengthen" apply adds the card without ta
   assert.equal(make.last, last, 'no card took DOM focus');
   assert.equal(h.view.contentEl.ownerDocument.activeElement, leaf, 'activeElement unchanged');
   assert.equal(h.cameraMoves.length, 1, 'the camera still moved to the new card');
+});
+
+// The card handler checks isComposing for Delete/Enter; F2 (and the edit it starts) is not covered by that check.
+test('A8 gap K2: F2 on the card during IME composition does not open the title field', async () => {
+  const h = await harness();
+  const card = h.card('leaf');
+  card.handlers.get('keydown')({ key: 'F2', target: card, isComposing: true, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, defaultPrevented: false, preventDefault() {} });
+  await tick();
+  assert.equal(h.view.inlineName, null, 'no title edit started during composition');
+});
+
+// Delete on a branch was only tested up to the dialog; the chosen removal must be one undoable step.
+test('A8 coverage K3: Delete on a branch, "remove only this node": one history entry, the child becomes a root, Undo restores it', async () => {
+  const h = await harness();
+  const before = h.view.history.past.length;
+  send(h, 'branch', 'Delete');
+  const modal = h.modals.at(-1); assert.equal(modal.constructor.name, 'ChoiceModal');
+  const buttons = findAll(modal.contentEl, () => true).flatMap(e => e.choiceButtons ?? []);
+  assert.ok(buttons.length >= 2, 'the dialog offers both removals');
+  buttons[0].run();
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.branch)); await tick(); await tick();
+  assert.equal(h.view.history.past.length, before + 1, 'one history entry');
+  assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId ?? null, null, 'the child became a root');
+  await h.view.travel(false); await tick();
+  assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId, h.ids.branch, 'Undo restores the child under the branch');
 });

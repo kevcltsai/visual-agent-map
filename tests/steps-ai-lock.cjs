@@ -588,25 +588,6 @@ test('06 outline: an AI outline under a locked topic is refused and says how man
   assert.equal(h.view.map.nodes.length, count + 2, 'a user outline is the user\'s own edit');
 });
 
-test('06 grade by goal: a locked card keeps its tier and is counted as skipped', async () => {
-  const h = await harness(['Root', 'A', 'B']);
-  const [root, a, b] = h.nodes;
-  await h.repo.writeRelevance(a.path, { tier: 'side' });
-  await h.view.setAiLock([a], true);
-  // The run rates the cards below the top level; the top-level card is only context.
-  for (const node of [a, b]) for (const list of [h.nodes, h.view.map.nodes]) list.find(n => n.id === node.id).parentId = root.id;
-  const run = { token: 1, owner: h.view, controller: new AbortController(), goal: 'g', status: 'running' };
-  h.host.relevanceGrades = new Map([[MAP, run]]);
-  h.host.logs = { appendLog() {} };
-  const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: n.parentId ?? null }));
-  const before = h.raw(a);
-  await h.view.relevanceRun.apply(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
-  assert.equal(h.raw(a), before, 'the locked tier is unchanged');
-  assert.equal((await h.repo.readNote(b.path)).relevance.tier, 'core');
-  assert.equal(run.outcome.skipped, 1);
-  assert.equal(run.outcome.graded, 1);
-});
-
 test('06 structure: suggestions touching a locked topic are dropped and counted; applying one refuses at write time', async () => {
   const h = await harness(['A', 'B', 'C']);
   const [a, b, c] = h.nodes;
@@ -1009,4 +990,20 @@ test('busy: a chat expand while the same parent is still reading its sources for
   assert.match(h.notices.join('\n'), /AI|執行中|running/i);
   h.host.activeTasks.get(p.path)?.abort();
   await batch.catch(() => {});
+});
+
+test('A5: a locked card says "Locked" in words next to the lock icon; an unlocked AI card does not (V3.3 P1.2)', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  const header = dom.element('div'), card = dom.element('div');
+  h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: true });
+  h.view.paintAiLock(card, header, a);
+  const label = () => dom.findAll(header, i => dom.hasCls(i, 'vam-card-ai-lock-label'));
+  assert.equal(label().length, 1);
+  assert.equal(label()[0].text, t('ui.card_state_locked'));
+  h.view.paintAiLock(card, header, a);
+  assert.equal(label().length, 1, 'a redraw keeps one label');
+  h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: false, aiCard: true, aiStatus: 'done' });
+  h.view.paintAiLock(card, header, a);
+  assert.equal(label().length, 0, 'unlocked: no label');
 });

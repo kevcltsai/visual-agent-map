@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 31);
+  assert.equal(mapChatStep.version, 32);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });
@@ -121,7 +121,7 @@ const UNSAFE = [
   { kind: 'rename_topic', nodeId: 'a', title: 't' }, { kind: 'move_topic', nodeId: 'a', newParentId: 'b' }, { kind: 'reorder_topics', parentId: 'r', nodeIds: ['a', 'b'] },
   { kind: 'create_md_file', path: 'n.md', content: 'c' }, { kind: 'open_map', title: 'M' }, { kind: 'create_map', title: 'M' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'atomic' },
   { kind: 'remove_relation', fromId: 'a', toId: 'b' }, { kind: 'add_anchor', imageId: 'i', ref: 'p1', x: 0, y: 0, note: '' },
-  run('merge'), run('synthesize'), run('rate_by_goal', { goal: 'g' }), run('find_images')
+  run('merge'), run('synthesize'), run('find_images')
 ];
 test('A9 plan: CHAIN_SAFE is exactly the safe kinds, and run_map_action is judged by its action', () => {
   for (const action of SAFE) assert.equal(isChainSafe(action), true, `${action.kind} ${action.action ?? ''}`);

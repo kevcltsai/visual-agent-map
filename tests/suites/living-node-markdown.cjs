@@ -888,6 +888,25 @@ S.integrationTest('Living Node web: actual checked source is required even for n
   assert.throws(() => normalize({ ...envelope, operations: [{ kind: 'supplement', id: 'r1', evidence: [url] }, { ...op, evidence: [] }] }), /required-web-output-evidence-missing/);
 });
 
+S.integrationTest('A41 live: a scoped no-match that only searched is allowed; no-change and answers still need an opened page', () => {
+  const url = 'https://example.com/current';
+  const noMatch = { baseRevision: 'base', requiresWeb: true, checkedWeb: [], webExcerpts: [], operations: [{ kind: 'output', text: 'No match found for this company.', evidence: [] }] };
+  const norm = (raw, opened, searched) => normalizeLivingProposal(raw, opened, [], 't1', true, false, searched);
+  assert.equal(norm(noMatch, [], true).proposal.operations.length, 1);
+  assert.throws(() => norm(noMatch, [], false), /required-web-unavailable/);
+  assert.throws(() => norm({ ...noMatch, operations: [] }, [], true), /required-web-unavailable/);
+  assert.throws(() => norm({ ...noMatch, operations: [{ kind: 'append', id: 'a', subject: 's', scope: 'c', granularity: 'day', eventTime: null, claim: 'x', evidence: [] }] }, [], true), /required-web-unavailable/);
+  // With a page opened the old rules stay: an uncited output or an empty checked list is still rejected.
+  assert.throws(() => norm(noMatch, [url], true), /required-web-check-missing/);
+  assert.throws(() => norm({ ...noMatch, checkedWeb: [url], webExcerpts: [{ url, excerpt: 'page' }] }, [url], true), /required-web-evidence-missing/);
+});
+
+S.integrationTest('A48 live: validation failures map to the validation line, not the web-required line', () => {
+  const { livingFailureCode } = S.load('experiences/visual-map/living-node-state.ts', { obsidian: S.obsidian });
+  for (const code of ['invalid-web-excerpt', 'web-excerpt-missing', 'unauthorized-web-excerpt']) assert.equal(livingFailureCode(new Error(code)), 'validation-rejected', code);
+  for (const code of ['required-web-unavailable', 'required-web-evidence-missing', 'unauthorized-web-check']) assert.equal(livingFailureCode(new Error(code)), 'web-required', code);
+});
+
 S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; the id is version-bound and cannot verify a correction (spike branch b)', () => {
   const { applyLivingChanges } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
   const url = 'https://example.com/price';
@@ -896,7 +915,9 @@ S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; t
   // Missing, blank, over-long excerpt, or an excerpt for a URL that was never opened: rejected.
   assert.throws(() => norm({ operations: [{ kind: 'output', text: 'Price', evidence: [url] }] }), /web-excerpt-missing/);
   assert.throws(() => norm(out('   ')), /invalid-web-excerpt/);
-  assert.throws(() => norm(out('x'.repeat(301))), /invalid-web-excerpt/);
+  // An over-long excerpt is cut to 300 characters (validation-only, never persisted) instead of failing the round.
+  assert.equal(norm(out('x'.repeat(362))).context.evidence.length, 1);
+  assert.throws(() => norm(out('\u00a0 ')), /invalid-web-excerpt/);
   assert.throws(() => norm({ webExcerpts: [{ url: 'https://example.com/never', excerpt: 'q' }], operations: [] }), /unauthorized-web-excerpt/);
   // The id is the pre-V1.1 web id (URL only): the excerpt is validated model text, never part of the id.
   const id = envelope => norm(envelope).context.evidence.find(e => e.source === url).id;
@@ -2386,4 +2407,56 @@ S.integrationTest('Living Node privacy: an upstream card reaches a downstream pr
     for (const secret of [...hashes, '@v2', 'suppressed', 'aiLatestDeleted', 'SECRET-DELETED-TEXT', 'SECRET-AI-LATEST'])
       assert.ok(!text.includes(secret), 'downstream prompt leaks ' + secret);
   }
+});
+
+async function livingCardInMap() {
+  const f = S.fixture('en');
+  const mapPath = 'Agent Workspace/Topics/m/Map.md';
+  const doc = { id: 'm', title: 'M', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await f.repo.ensureTopicFolders('Agent Workspace/Topics/m');
+  await f.app.vault.create(mapPath, S.core.serializeMap(doc));
+  const node = await f.repo.createNote('Beta', 'm1', doc, mapPath, 'workspace');
+  doc.nodes.push(node);
+  await f.repo.saveMap(mapPath, doc);
+  await f.app.vault.process(f.files.get(node.path), c => c.replace('\n---\n', '\nai-card: true\n---\n'));
+  await f.repo.rebuildDerivedData();
+  const expectedContent = f.contents.get(node.path);
+  const candidate = { executionId: 'e1', cardId: node.id, mapId: 'm', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i1', viewSession: 'v1' };
+  const outcome = await commitLivingMarkdown(f.repo, {
+    path: node.path, expectedContent, base: empty(), baseGeneration: livingGeneration(expectedContent),
+    proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Result', evidence: ['e1'] }] },
+    context: { at: '2026-11-27T04:00:00Z', evidence: [{ id: 'e1', source: 'Beta', retrievedAt: 't1' }] },
+    signal: new AbortController().signal, isCurrent: () => true, candidate,
+    inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false })
+  });
+  assert.equal(outcome, 'written');
+  return { f, mapPath, doc, node };
+}
+
+S.integrationTest('Living Node copy: a map rebuild after Copy to… leaves a committed Living card byte for byte as it was, and the copy is valid', async () => {
+  const { f, mapPath, doc, node } = await livingCardInMap();
+  const original = f.contents.get(node.path);
+  const copy = await f.repo.duplicateNote(node.path, doc, mapPath, {});
+  await f.repo.rewriteCopiedNoteLinks([{ from: node.path, to: copy.path }]);
+  doc.nodes.push(copy);
+  await f.repo.saveMap(mapPath, doc);
+  await f.repo.rebuildDerivedData({ roots: ['Agent Workspace/Topics/m'] });
+  assert.equal(f.contents.get(node.path), original, 'the original card was rewritten by the rebuild');
+  assert.equal(readLivingMarkdown(f.contents.get(node.path)).output.text, 'Result');
+  const copied = f.contents.get(copy.path);
+  assert.equal(readLivingMarkdown(copied).output.text, 'Result');
+  assert.equal(readLivingFence(S.obsidian.parseYaml(copied.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])).receipts.length, 0);
+  assert.equal(copied.includes('living-node-last-execution'), false);
+});
+
+S.integrationTest('Living Node rebuild: a Living card whose derived fields really change is still updated and stays readable', async () => {
+  const { f, mapPath, doc, node } = await livingCardInMap();
+  const child = await f.repo.createNote('Child', 'm1', doc, mapPath, 'workspace');
+  child.parentId = node.id;
+  doc.nodes.push(child);
+  await f.repo.saveMap(mapPath, doc);
+  await f.repo.rebuildDerivedData();
+  const after = f.contents.get(node.path);
+  assert.match(after, /Child topics: .*\[\[.*Child\]\]/);
+  assert.equal(readLivingMarkdown(after).output.text, 'Result');
 });

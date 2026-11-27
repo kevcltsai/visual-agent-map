@@ -554,3 +554,10 @@ S.integrationTest('privacy: a file in an external folder that is a Living Node n
     assert.deepEqual(leaks(sent, foreign), []);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+
+S.integrationTest('A11 live: the change-set step tells the model to correct or invalidate a superseded old record', async () => {
+  const f = S.fixture();
+  await f.app.vault.create(path, initial);
+  const { sent } = await round(f, [append(1)]);
+  assert.match(sent[0], /newer observation supersedes an older current-state fact of the same subject and scope[^.]*`correct` or `invalidate` the old record/);
+});

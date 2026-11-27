@@ -50,7 +50,7 @@ test('sharing viewer: stylesheet rules are copied from styles.css unchanged and 
   const known = tools.allRuleTexts(styles);
   assert.ok(rules.length > 40, 'the extraction keeps the card, canvas and panel rules');
   for (const item of rules) for (const rule of item.rules) assert.ok(known.has(rule), `not a rule of styles.css: ${rule.slice(0, 80)}`);
-  const wanted = ['.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
+  const wanted = ['.vam-view, .vam-stage, .vam-tokens {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
   const flat = rules.flatMap(item => item.rules);
   for (const start of wanted) assert.ok(flat.some(rule => rule.startsWith(start)), `${start} must be taken from styles.css`);
   // The rules appear in the shipped stylesheet byte for byte.
@@ -82,7 +82,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['core/social-video.ts', 'experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['core/social-video.ts', 'experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/push.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -228,7 +228,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
     for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
-    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
+    for (const key of ['expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
   for (const lang of ['zh-TW', 'zh-CN']) for (const key of ['install', 'madeWithVam', 'readOnly', 'tierCore', 'topicDetails']) assert.notEqual(text.shareViewerUiFor(lang)[key], english[key], `${lang}.${key} is translated`);
@@ -356,7 +356,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
     for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
-    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
+    for (const key of ['expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
   assert.match(read('experiences/sharing/share-viewer-dictionaries.ts'), /NOT[\s*]+native-reviewed/);
@@ -524,6 +524,28 @@ test('sharing viewer fit: the first view and Show all include a free text block 
     });
     assert.equal(report.first, true, 'the first view shows the free block');
     assert.equal(report.again, true, 'Show all brings the free block back into view');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('P1.10a: a file exported by an older version, with a top-level goal and node tier and manual, opens with every card and no goal chip (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-old-goal-'));
+  try {
+    const data = payload();
+    data.goal = 'Pass the cook certification exam';
+    Object.assign(data.nodes.find(node => node.id === 'water'), { tier: 'side', manual: true });
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'old.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: `(() => ({ cards: document.querySelectorAll('.vam-node').length, water: document.querySelector('.vam-node[data-node-id="water"]')?.getAttribute('data-relevance') ?? null, goal: document.querySelectorAll('.vam-goal, .vam-goal-text, .vam-map-tools').length, goalText: document.getElementById('vam-app').textContent.includes('Pass the cook certification exam') }))()`, returnByValue: true })).result.value);
+    assert.equal(report.cards, data.nodes.length, 'every topic is drawn');
+    assert.equal(report.water, 'side', 'the node tier still drives the card');
+    assert.equal(report.goal, 0, 'no goal chip or tools container');
+    assert.equal(report.goalText, false, 'the old goal text is not shown anywhere');
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
@@ -760,7 +782,7 @@ test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps 
       const result = {};
       result.items = await evaluate(`Array.from(document.querySelectorAll('.vam-outline [role="treeitem"]')).map(r => [r.dataset.outlineId, Number(r.getAttribute('aria-level')), r.getAttribute('aria-expanded'), r.querySelector('.vam-outline-title')?.textContent, r.querySelector('.vam-outline-title')?.title])`);
       result.structure = await evaluate(`(() => { const n = document.querySelector('nav.vam-outline'); const b = document.querySelector('${TOGGLE}'); return { role: n.querySelector('[role="tree"]') ? 'tree' : null, label: n.getAttribute('aria-label'), hidden: n.hidden, width: n.getBoundingClientRect().width, toggleFirst: document.querySelector('.vam-toolbar').firstElementChild === b, toggleLabel: b.getAttribute('aria-label'), toggleTitle: b.title, expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls') === n.id && !!n.id, tabbable: n.querySelectorAll('[role="treeitem"][tabindex="0"]').length }; })()`);
-      result.layout = await evaluate(`(() => { const o = document.querySelector('.vam-outline').getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const ov = document.querySelector('.vam-canvas-overlay').getBoundingClientRect(); const g = document.querySelector('.vam-map-tools').getBoundingClientRect(); const h = document.querySelector('.vam-canvas-hint').getBoundingClientRect(); return { viewportLeft: v.left, outlineRight: o.right, overlayLeft: ov.left, goalLeft: g.left, hintLeft: h.left }; })()`);
+      result.layout = await evaluate(`(() => { const o = document.querySelector('.vam-outline').getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const ov = document.querySelector('.vam-canvas-overlay').getBoundingClientRect(); const h = document.querySelector('.vam-canvas-hint').getBoundingClientRect(); return { viewportLeft: v.left, outlineRight: o.right, overlayLeft: ov.left, hintLeft: h.left }; })()`);
       result.visibleAtStart = (await visibleRows()).length;
       result.cardsAtStart = await cardCount();
       // The arrow folds only the outline.
@@ -840,8 +862,8 @@ test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps 
     }
     assert.deepEqual(report.structure, { role: 'tree', label: 'Outline', hidden: false, width: 260, toggleFirst: true, toggleLabel: 'Outline', toggleTitle: 'Outline', expanded: 'true', controls: true, tabbable: 1 });
     assert.equal(report.layout.viewportLeft, report.layout.outlineRight, 'the map sits beside the outline, not under it');
-    assert.equal(report.layout.overlayLeft, report.layout.outlineRight, 'the goal, hint and zoom bar make way for the outline');
-    assert.ok(report.layout.goalLeft > report.layout.outlineRight && report.layout.hintLeft > report.layout.outlineRight);
+    assert.equal(report.layout.overlayLeft, report.layout.outlineRight, 'the hint and zoom bar make way for the outline');
+    assert.ok(report.layout.hintLeft > report.layout.outlineRight);
     assert.equal(report.visibleAtStart, 12);
     assert.equal(report.cardsAtStart, 4);
     assert.deepEqual(report.folded.rows, ['root', 'heat', 'water', 'a1', 'a2', 'salt', 's1']);
@@ -1006,8 +1028,7 @@ const CONTRAST_PROBE = `(() => {
     sideTag: '.vam-node[data-relevance="side"] .vam-relevance-tag',
     idea: '.vam-status-idea',
     hint: '.vam-canvas-hint',
-    zoom: '.vam-zoom',
-    goal: '.vam-goal-text'
+    zoom: '.vam-zoom'
   };
   for (const [name, selector] of Object.entries(text)) out[name] = worst(selector);
   out.twist = worst('.vam-outline-twist');
@@ -1497,16 +1518,30 @@ test('sharing viewer images: image-data keeps only what a viewer may draw (asset
   assert.equal(read([{ ...base, asset: 'web' }])[0].free, false, 'an old picture with no anchors, links or note stays annotated');
 });
 
+// A .vam-view rule that declares nothing but --vam-* custom properties (the V3.3 design-token rule) is allowed through; decided by the rule's content, not by its selector text.
+const onlyVamCustomProperties = rule => {
+  const decls = rule.slice(rule.indexOf('{') + 1, rule.lastIndexOf('}')).split(';').map(item => item.trim()).filter(Boolean);
+  return decls.length > 0 && decls.every(item => /^--vam-[a-z0-9-]+\s*:/.test(item));
+};
+
+test('sharing viewer images: the --vam-* only exception does not let an ordinary .vam-view declaration through', () => {
+  assert.equal(onlyVamCustomProperties('.vam-view, .vam-stage { --vam-space-1: 4px; --vam-surface: var(--background-primary); }'), true);
+  assert.equal(onlyVamCustomProperties('.vam-view, .vam-stage { --vam-space-1: 4px; color: red; }'), false);
+  assert.equal(onlyVamCustomProperties('.vam-view { color: red; }'), false);
+  assert.equal(onlyVamCustomProperties('.vam-view { --other-token: 1px; }'), false);
+});
+
 test('sharing viewer images: only the picture, bar and anchor rules of the map are taken from .vam-view; the viewer stylesheet lets a press pan', async () => {
   const tools = await cssTools;
   const styles = read('styles.css');
   const rules = tools.extractViewerRules(styles).flatMap(item => item.rules);
   const viewRules = rules.filter(rule => /^(?:\.theme-dark\s+)?\.vam-view\b/.test(rule));
   assert.ok(viewRules.length >= 10, 'the annotated image, bar and anchor rules are in');
-  for (const rule of viewRules) assert.match(rule, /^(?:\.theme-dark\s+)?\.vam-view\s+\.(?:vam-canvas-image|vam-annotated|vam-anchor)/, `an unrelated .vam-view rule was taken: ${rule.slice(0, 80)}`);
+  for (const rule of viewRules.filter(rule => !onlyVamCustomProperties(rule))) assert.match(rule, /^(?:\.theme-dark\s+)?\.vam-view\s+\.(?:vam-canvas-image|vam-annotated|vam-anchor)/, `an unrelated .vam-view rule was taken: ${rule.slice(0, 80)}`);
   for (const start of ['.vam-view .vam-canvas-image.is-annotated {', '.vam-view .vam-annotated-bar {', '.vam-view .vam-anchor {', '.vam-view .vam-anchor.is-linked {']) assert.ok(viewRules.some(rule => rule.startsWith(start)), `${start} must be taken`);
   // No rule that begins with another .vam-view descendant (placing mode, crosshair of the editor) is taken, and every card rule is still the same text.
   assert.ok(!rules.some(rule => /\.vam-view\s+\.is-placing/.test(rule)));
+  // The one other .vam-view rule is the design-token rule (V3.3 P1.1): its .vam-stage selector is how the viewer gets the tokens.
   const css = read('experiences/sharing/viewer/viewer.css');
   assert.match(css, /\.vam-view \.vam-canvas-image \{[^}]*cursor: inherit/);
   assert.match(css, /\.vam-view \.vam-canvas-image img \{ pointer-events: none/);

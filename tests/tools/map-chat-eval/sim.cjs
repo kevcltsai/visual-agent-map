@@ -9,7 +9,7 @@
 // assignment. Everything else (move_topic, set_topic_kind, add/remove_relation, merge) is this file's own re-implementation: a flow
 // that uses one is labelled "simulator-only" and kept out of the pass counts. Merge has no exported pure product function (it is
 // view code, and a merge with content starts a background AI); other view-bound behaviour (selection after an add) is not modelled.
-// Actions that need a real run (research, expand, synthesize, find_images, rate_by_goal) are recorded in `skipped`.
+// Actions that need a real run (research, expand, synthesize, find_images) are recorded in `skipped`.
 const { load } = require("../../support-replay.cjs");
 
 let productFns = null;

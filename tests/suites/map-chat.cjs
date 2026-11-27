@@ -392,7 +392,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false, activeTasks: new Map(), quickExpandPending: new Set(), recordFailure: error => String(error?.message ?? error),
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
@@ -1039,33 +1039,30 @@ integrationTest('map chat: control - the same nested mutate really does hang whe
   assert.equal(h.control.nested, 1, 'the harness counts the nested call, so a nested write would also fail the other tests');
 });
 
-integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; rate_by_goal and merge start their own task', async () => {
+integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; merge starts its own task', async () => {
   const h = await harness(); await h.view.hydrate();
   const opened = []; h.view.openSelectionSynthesis = pending => opened.push(pending);
   const starts = []; h.view.startSelectionSynthesis = async (nodes, options, direction, failed, accepted) => { starts.push({ ids: nodes.map(n => n.id).sort(), options, direction, failed: typeof failed, depth: h.control.depth }); accepted(); };
-  const goals = []; h.view.relevanceGradeable = () => true; h.view.submitRelevanceGoal = async goal => { goals.push(goal); };
   const merges = []; h.view.mergeSelected = async (title, snapshot) => { merges.push([title, snapshot.sources.map(s => s.id).sort(), h.control.depth]); };
   const lines = await withTimeout(h.view.applyMapChatActions({ message: 'Compare them', rejected: [], actions: [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' },
-    { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: ' Sleep better ', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Body and mind', goal: '', direction: '' }
   ] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
-  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(opened, [], 'B2: no dialog opens'); eq(goals, ['Sleep better']);
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done'], JSON.stringify(lines)); await tick();
+  eq(opened, [], 'B2: no dialog opens');
   assert.equal(starts.length, 1); eq(starts[0].ids, [h.ids.a, h.ids.b].sort()); assert.equal(starts[0].direction, 'Compare them', 'the user\'s message is the direction'); assert.equal(starts[0].depth, 0, 'not inside a mutate');
   eq(merges, [['Body and mind', [h.ids.a, h.ids.b].sort(), 1]], 'merge runs in its own mutate, after every write');
 });
 
 integrationTest('map chat: run actions are skipped, not guessed, when the map cannot take them', async () => {
   const plain = await harness(); await plain.view.hydrate();
-  plain.view.relevanceGradeable = () => false; plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
+  plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
   const result = await apply(plain, [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.b], title: '', goal: '', direction: '' },
-    { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'x', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'research_standard', nodeIds: ['nope'], title: '', goal: '', direction: '' }
   ]);
-  eq(result.map(l => l.status), ['skipped', 'skipped', 'skipped', 'skipped']);
+  eq(result.map(l => l.status), ['skipped', 'skipped', 'skipped']);
 });
 
 integrationTest('map chat: invalid items the parser dropped are counted in the chat', async () => {
@@ -1339,15 +1336,6 @@ integrationTest('map chat: a click on a card (no drag) is still a click and adds
   const d = await dragHarness();
   d.down(); d.up();
   assert.equal(d.chat.attachments().length, 0); assert.equal(d.changes.length, 0); assert.equal(d.view.selection.state.selected, d.ids.a, 'the card was selected as usual');
-});
-
-integrationTest('map chat: while the map is sorted by relevance a card dropped on the panel is still a reference', async () => {
-  const d = await dragHarness();
-  d.view.relevanceSortOn = () => true;
-  d.down(); d.move(100, 400); assert.ok(hasClass(d.chat.el, 'is-drop')); d.up();
-  eq(d.chat.attachments(), [{ kind: 'topic', id: d.ids.a }]); assert.equal(d.changes.length, 0);
-  const out = await dragHarness(); out.view.relevanceSortOn = () => true;
-  out.down(); out.move(520, 150); out.up(); assert.equal(out.chat.attachments().length, 0, 'sorted cards still stay put outside the panel'); assert.equal(out.changes.length, 0);
 });
 
 integrationTest('map chat: a merging card dropped on the panel is a reference too, and cancelling the drag leaves nothing highlighted', async () => {
@@ -2756,6 +2744,31 @@ integrationTest('B1 map: open_map with several matches lists them and opens noth
   h.type('open wine'); await h.view.sendMapChat();
   assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
 });
+integrationTest('B16 map: open_map in its own turn with no other work switches this tab; the reply and the running turn are kept', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push(path); return null; };
+  let aborted = null;
+  h.control.reply = async (_request, signal) => { aborted = signal; return { reply: 'Switching now.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] }; };
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [], 'the turn itself does not send the map to a new tab'); assert.equal(h.view.path, coffee);
+  assert.equal(aborted.aborted, false, 'the turn was not stopped'); assert.equal(chat.isBusy, false);
+  assert.equal(chat.transcript().at(-1).text, 'Switching now.', 'the reply is kept'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+});
+integrationTest('B16 map: open_map while other AI work runs on this map opens it in a new tab after the write queue; the chat stays here', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  h.view.startingExpand.add(h.ids.a);
+  // Like the real one: the new tab opens its map through mutate, so a call made inside a write would never finish.
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push([path, h.control.depth]); await h.plugin.mutate(async () => {}); return {}; };
+  h.control.reply = async () => ({ reply: 'Opening it.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [[coffee, 0]], 'one new tab, outside the write queue'); assert.equal(h.view.path, MAP, 'this tab keeps its map');
+  assert.equal(h.view.startingExpand.has(h.ids.a), true, 'the running work is not dropped');
+  assert.equal(chat.transcript().at(-1).text, 'Opening it.');
+  const line = chat.transcript().at(-1).lines[0];
+  assert.equal(line.status, 'done'); assert.match(line.text, /This map still has AI running; opened “Coffee industry” in a new tab/);
+});
 
 integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
@@ -3209,8 +3222,8 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
     const idle = findAll(draw(h, method), i => i.tag === 'button');
-    // The ordinary toolbar keeps the always-visible 「Data sources」 button; the hidden-AIM one has nothing while idle.
-    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), method === 'renderMapTools' ? [true] : [], `${method}: no select icon while idle`);
+    // B17: 「Data sources」 moved to the header, so neither canvas toolbar has anything while idle.
+    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), [], `${method}: no select icon while idle`);
     assert.equal(findAll(draw(h, method), i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
     h.view.selection.toggleMultiSelect();
     assert.equal(h.view.selection.state.multiSelectMode, true);
@@ -3231,10 +3244,7 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   assert.doesNotMatch(css, /vam-tools-select-label/, 'the select label rules are gone');
   assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
   assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar keeps its own z-index');
-  const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));
-  assert.doesNotMatch(goal, /z-index|position: absolute|--vam-goal-inset/, 'the goal bar is a row item now: no z-index of its own, not floating, no chat-window inset');
-  assert.match(goal, /max-width: 460px/, 'at most 460px, centred in its row by auto margins'); assert.doesNotMatch(goal, /108px/, 'the old side reservation is gone');
-  assert.match(css, /^\.vam-goal-host \{[^}]*z-index: 20;/m, 'the one z rule is on the host');
+  assert.doesNotMatch(css, /\.vam-goal-bar|\.vam-goal-host/, 'P1.10a: the goal bar and its host rules are gone');
 });
 integrationTest('goal banner P3: the empty canvas button opens the add menu and the keyboard goes to it after "Create an empty mind map"', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();
@@ -3293,16 +3303,14 @@ test('map chat composer: the styles put the keys inside the box with theme varia
   for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
 });
 
-integrationTest('UX B9: an empty map leaves out "Select several topics", the goal bar and the gesture hint; a map with topics has them', async () => {
-  // The goal bar has its own suite (relevance-grade) and is drawn in the overlay, not the toolbar; its guard is pinned from the source below.
+integrationTest('UX B9: an empty map leaves out "Select several topics" and the gesture hint; a map with topics has them', async () => {
   const tools = h => { const box = element('div'); h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  assert.deepEqual(all, [], 'select several is in the header ⋯ menu; data sources is a header button (B17)'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.mountGoalBar\(\);/, 'no goal bar on an empty or AIM map');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
 });
 
@@ -3489,7 +3497,7 @@ test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only
   assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
   assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
   assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
-  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/, 'B17: the folded chat edge is 28px');
 });
 
 test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay), and the selection bar lives in the canvas', () => {
@@ -3767,8 +3775,8 @@ integrationTest('B1 fix 26: after create_map re-mounts the conversation in the n
 integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px of it; the tool group moves to the window\'s right edge and comes back; the hover preview is under the window', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const tools = h.rootEl.createDiv('vam-map-tools'); h.plugin.settings.mapChatWidth = 340;
   h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isNarrow, true); assert.equal(tools.style.left ?? '', '', 'folded: the group stays at the canvas corner');
-  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 44 + 12}px`, 'beside the window, like a docked one');
-  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 44 + 12}px`);
+  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 28 + 12}px`, 'beside the window, like a docked one');
+  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 28 + 12}px`);
   h.rootEl.clientWidth = 500; h.view.onResize(); assert.equal(chat.el.style.width, '340px');
   chat.collapseOverlay(); assert.equal(tools.style.left, '', 'folded again: the group goes back');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const z = selector => Number(css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*z-index: (\\d+)`))[1]);
@@ -5328,7 +5336,6 @@ integrationTest('MS-03: result rows end with the model label(s) of the task; sev
   assert.equal(label('expand', { ids: [h.ids.a, h.ids.b] }), 'Expand subtopics for 2 topics (label(gpt-x), label(claude:sonnet))');
   assert.equal(label('expand', { ids: [h.ids.root, h.ids.b] }), 'Expand subtopics for 2 topics (label(claude:sonnet))', 'the same model is named once');
   assert.match(label('research_standard', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/);
-  assert.equal(label('rate_by_goal', { fields: { goal: 'Sleep' } }), 'Recommend new cards and update the tiers by the goal “Sleep” (label(claude:sonnet))', 'recommending uses the current model');
   assert.match(label('find_images', { ids: [h.ids.a], fields: { direction: 'x' } }), /^Start looking for pictures for “Body” \(label\(gpt-x\)\)$/);
   assert.match(label('synthesize', { ids: [h.ids.a, h.ids.b] }), / \(label\(claude:sonnet\)\)$/, 'several cards, only one override: the current model');
   assert.match(label('synthesize', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/, 'a single card: its own model');
@@ -6741,7 +6748,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 31 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 32 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

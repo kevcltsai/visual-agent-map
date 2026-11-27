@@ -30,8 +30,6 @@ const suites = [
   'map-ai-dialog.cjs',
   'map-structure.cjs',
   'map-transaction.cjs',
-  'relevance-grade.cjs',
-  'goal-topic-suggest.cjs',
   'shell-entrances.cjs',
   'reframing.cjs',
   'legacy-aim-map.cjs',
@@ -66,7 +64,7 @@ assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs'))
 const shard = process.argv.find(value => value.startsWith('--shard='))?.split('=')[1];
 const layerWeights = {
   unit: { 'sharing-viewer.cjs': 51, 'heavy-lock.cjs': 20, 'map-chat.cjs': 13, 'test-affected.cjs': 5, 'map-view-color.cjs': 4, 'i18n.cjs': 3 },
-  integration: { 'map-chat.cjs': 60, 'relevance-grade.cjs': 18, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'reframing.cjs': 5, 'map-structure.cjs': 5 }
+  integration: { 'map-chat.cjs': 60, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'reframing.cjs': 5, 'map-structure.cjs': 5 }
 };
 const weights = layerWeights[process.argv.find(value => value.startsWith('--layer='))?.split('=')[1]] ?? layerWeights.integration;
 function shardOf(index, count) {

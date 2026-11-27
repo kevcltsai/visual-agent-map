@@ -244,7 +244,8 @@ test('card-height overlap checks use real heights plus the gap', () => {
   const branch = layout.arrangeNewBranch(base, 'root', new Set(['fresh']), heightOf);
   assert.equal(branch[2].y, 400 + LAYOUT_GAP, 'the new card clears the tall card by exactly the gap');
   const close = layout.arrangeNewBranch(base.map(item => (item.id === 'old' ? { ...item, y: 500 } : item)), 'root', new Set(['fresh']), heightOf);
-  assert.equal(close[2].y, 0 + 60 / 2 - 60 / 2, 'no push when the cards already clear each other');
+  // A9: P1.4 new rule - a new card goes right after its previous sibling (old 500 + its height 400 + gap), not centred on the parent; the old centred value 0 is gone.
+  assert.equal(close[2].y, 500 + 400 + LAYOUT_GAP, 'the new card lands after its previous sibling');
   const fixed = [{ ...node('r'), x: 80, y: 80 }, { ...node('low', 'r'), x: 440, y: 500 }, { ...node('n'), x: 0, y: 0 }];
   const tree = layout.arrangeNewTree(fixed, 'n', new Set(['n']), id => (id === 'low' ? 250 : 60));
   assert.equal(tree[2].y, 500 + 250 + LAYOUT_GAP, 'a new tree starts below the lowest real card bottom plus the gap');

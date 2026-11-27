@@ -134,3 +134,20 @@ S.integrationTest('Living Node A33: a wrong echoed baseRevision (a document hash
   assert.notEqual(outcome, 'written');
   assert.ok(!f.contents.get(path).includes('r1000'));
 });
+
+S.integrationTest('A39 suppression v2: deleted-observation holds are never sent to the model; suppressed appends are dropped and counted', async () => {
+  const { livingSuppressionV2, livingSuppressionV2Entry } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
+  const gone = { id: 'gone', subject: 'stock', scope: 'price', granularity: 'day', eventTime: '2026-11-26', claim: 'SECRET-DELETED-TEXT', evidence: [], validity: 'active', owner: 'ai', history: [] };
+  const base = { ...memBase(3), suppressed: ['legacy-only-id', livingSuppressionV2Entry(livingSuppressionV2(gone))] };
+  for (const size of [3, 330]) {
+    const b = size === 3 ? base : { ...memBase(330), suppressed: base.suppressed };
+    const sent = (await sendOnce(b))[0];
+    assert.ok(!/suppress|@v2|@event|legacy-only-id|SECRET-DELETED-TEXT/i.test(sent.replace(/Preserve|Deleted observations are held back locally[^.]*\./g, '')), 'size ' + size);
+  }
+  const alias = { kind: 'append', id: 'again', subject: 'Stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26T08:00:00+08:00', claim: 'reworded', evidence: ['e1'] };
+  const fresh = { ...alias, id: 'fresh', eventTime: '2026-11-27' };
+  const calls = { run: async (prepared, options, finish) => finish(JSON.stringify({ baseRevision: base.revision, requiresWeb: false, operations: [alias, fresh] }), { signal: options.signal, parsed() {} }) };
+  const out = await generateLivingProposal(calls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't' }], mapPath: 'map.md' }, new AbortController().signal);
+  assert.equal(out.suppressedDropped, 1);
+  assert.deepEqual(S.plain(out.proposal.operations.map(o => o.id)), ['fresh']);
+});

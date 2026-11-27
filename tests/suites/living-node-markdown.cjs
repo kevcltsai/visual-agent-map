@@ -482,7 +482,7 @@ S.integrationTest('Living Node ownership: protect an edited output and append an
   assert.equal(base.records.length, 0);
   assert.equal(base.suppressed[0], 'r1');
   assert.equal(base.suppressed.length, 2);
-  assert.match(base.suppressed[1], /^@event:[a-f0-9]{64}:[a-f0-9]{64}:k:r1$/);
+  assert.match(base.suppressed[1], /^@v2:\[2,"event","[a-f0-9]{64}","2026-11-26","[a-f0-9]{64}"\]$/);
   const append = { kind: 'append', id: 'r2', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-27', claim: 'New information', evidence: ['e1'] };
   const req = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [append] } });
   assert.equal(await commitLivingMarkdown(f.repo, req), 'written');
@@ -1784,4 +1784,128 @@ S.integrationTest('Living Node T01: a structural edit reads a note whose metadat
   const { validateLivingStructure } = S.load('experiences/visual-map/living-node-runtime.ts',
     { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
   await assert.rejects(() => validateLivingStructure(port.app, port.repo, before, map), /living-node-cycle/);
+});
+
+S.integrationTest('A39 suppression v2: a deletion writes v2 only, survives a reread byte-identical, and a human re-add lifts it', async () => {
+  const f = await setup();
+  const op = { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'Observed 100', evidence: ['e1'] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Findings', evidence: ['e1'] }, op] } })), 'written');
+  const saved = f.contents.get(path);
+  assert.equal(/@event|"suppressed"/.test(saved), false);
+  assert.match(saved, /living-node-ownership:[\s\S]*@v2:/);
+  const edited = saved.replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base = readLivingMarkdown(edited);
+  assert.equal(base.suppressed.length, 2);
+  assert.ok(base.suppressed.some(v => v.startsWith('@v2:')) && !base.suppressed.some(v => v.startsWith('@event')));
+  const next = { kind: 'output', text: 'Findings 2', evidence: ['e1'] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [next] } })), 'written');
+  const after = f.contents.get(path);
+  assert.match(after, /- Suppression v2: /);
+  const again = readLivingMarkdown(after);
+  assert.deepEqual(S.plain(again.suppressed), S.plain(base.suppressed));
+  const alias = { ...op, id: 'alias', claim: 'Different value', eventTime: '2026-11-26T09:00:00+08:00' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: again, candidate: { executionId: 'e3' }, proposal: { baseRevision: again.revision, operations: [alias] } })), /suppressed-record/);
+  // A human types the observation back: the hold lifts and the record is theirs.
+  const block = saved.match(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/)[0].replace('- ID: "r1"', '- ID: "human-1"');
+  const readded = after.replace('\n### Suppression', block + '\n### Suppression');
+  const back = readLivingMarkdown(readded);
+  assert.equal(back.records.length, 1);
+  assert.equal(back.records[0].owner, 'user');
+  assert.equal(back.suppressed.some(v => v.startsWith('@v2:')), false);
+});
+
+S.integrationTest('A39 legacy: a v1 region and ownership index keep their suppression bytes through a v2 commit, and v1 deletions still suppress', async () => {
+  const { livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
+  const f = await setup();
+  const op = { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'Observed 100', evidence: ['e1'] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Findings', evidence: ['e1'] }, op] } })), 'written');
+  const saved = f.contents.get(path);
+  const rec = readLivingMarkdown(saved).records[0];
+  const tomb = livingEventTombstone('r0', livingEventFingerprint(rec), livingEventScopeFingerprint(rec), false);
+  // Rewrite the note the way a V1 build stored it: v1 suppression lines and a v1 ownership record line.
+  const v1Record = JSON.stringify(['record', 'r1', saved.match(/\\"record\\",\\"r1\\",\\"([a-f0-9]{64})\\"/)[1], livingEventFingerprint(rec), livingEventScopeFingerprint(rec), false]);
+  const legacy = saved
+    .replace('\n### Suppression\n', '\n### Suppression\n- ID: "old-id"\n- ID: ' + JSON.stringify(tomb) + '\n')
+    .replace(/(living-node-ownership:\n[\s\S]*?)- ".*record.*r1.*"\n/, (_, head) => head + '- ' + JSON.stringify(v1Record) + '\n');
+  assert.notEqual(legacy, saved);
+  await f.app.vault.process(f.files.get(path), () => legacy);
+  const base = readLivingMarkdown(legacy);
+  assert.deepEqual(S.plain(base.suppressed), ['old-id', tomb]);
+  assert.equal(base.records[0].owner, 'ai');
+  const next = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'Findings 2', evidence: ['e1'] }] } });
+  assert.equal(await commitLivingMarkdown(f.repo, next), 'written');
+  const after = f.contents.get(path);
+  assert.ok(after.includes('- ID: "old-id"\n- ID: ' + JSON.stringify(tomb)));
+  assert.deepEqual(S.plain(readLivingMarkdown(after).suppressed), ['old-id', tomb]);
+  const same = { ...op, id: 'r9' };
+  const again = readLivingMarkdown(after);
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: again, candidate: { executionId: 'e3' }, proposal: { baseRevision: again.revision, operations: [{ ...same, scope: 'x', subject: 'y', eventTime: '2026-12-01' }, { ...same, id: 'old-id', scope: 'z' }] } })), /suppressed-record/);
+});
+
+S.integrationTest('A39 no downgrade: a region holding a v2 hold is not a V1-readable region (V1 accepts only "- ID:" lines) and a corrupted v2 line fails closed with bytes unchanged', async () => {
+  const f = await setup();
+  const op = { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'Observed 100', evidence: ['e1'] };
+  await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Findings', evidence: ['e1'] }, op] } }));
+  const saved = f.contents.get(path);
+  await f.app.vault.process(f.files.get(path), () => saved.replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, ''));
+  const base = readLivingMarkdown(f.contents.get(path));
+  await commitLivingMarkdown(f.repo, request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'Findings 2', evidence: ['e1'] }] } }));
+  const v2note = f.contents.get(path);
+  const lines = v2note.split('### Suppression')[1].split('\n- ').slice(1);
+  assert.ok(lines.length && lines.every(l => l.startsWith('ID: ') || l.startsWith('Suppression v2: ')) && lines.some(l => l.startsWith('Suppression v2: ')));
+  const broken = v2note.replace('- Suppression v2: "@v2:[2,', '- Suppression v2: "@v2:[9,');
+  assert.notEqual(broken, v2note);
+  assert.throws(() => readLivingMarkdown(broken), /invalid-managed-region|invalid-ownership-index/);
+  await f.app.vault.process(f.files.get(path), () => broken);
+  const bytes = f.contents.get(path);
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base, expectedContent: bytes, candidate: { executionId: 'e3' }, proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'x', evidence: ['e1'] }] } })));
+  assert.equal(f.contents.get(path), bytes);
+});
+
+S.integrationTest('A39 resurrection: deleting one of two same-period AI records keeps its hold; the AI sibling is not turned into a user record and the deleted event cannot be re-appended', async () => {
+  const f = await setup();
+  const a = { kind: 'append', id: 'r1', subject: 'acme', scope: 'news', granularity: 'event', eventTime: '2026-11-26', claim: 'Acme recalls product', evidence: ['e1'] };
+  const b = { ...a, id: 'r2', claim: 'Acme CEO resigns' };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'F', evidence: ['e1'] }, a, b] } })), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.split('\n### Observation\n').filter((x, i) => !(i > 0 && x.includes('"r1"'))).join('\n### Observation\n');
+  assert.notEqual(edited, saved);
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base1 = readLivingMarkdown(edited);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base: base1, candidate: { executionId: 'e2' }, proposal: { baseRevision: base1.revision, operations: [{ kind: 'output', text: 'F2', evidence: ['e1'] }] } })), 'written');
+  const base2 = readLivingMarkdown(f.contents.get(path));
+  assert.deepEqual(S.plain(base2.records.map(r => r.id + ':' + r.owner)), ['r2:ai']);
+  assert.ok(base2.suppressed.some(v => v.startsWith('@v2:')));
+  const again = { ...a, id: 'r1-again' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: base2, candidate: { executionId: 'e3' }, proposal: { baseRevision: base2.revision, operations: [again] } })), /suppressed-record/);
+});
+
+S.integrationTest('A39 resurrection: a user edit of an AI sibling keeps the hold (known id never lifts); pasting the deleted record back under its own id lifts both its v2 and id-only holds', async () => {
+  const f = await setup();
+  const a = { kind: 'append', id: 'r1', subject: 'acme', scope: 'news', granularity: 'event', eventTime: '2026-11-26', claim: 'Acme recalls product', evidence: ['e1'] };
+  const b = { ...a, id: 'r2', claim: 'Acme CEO resigns' };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'F', evidence: ['e1'] }, a, b] } })), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.split('\n### Observation\n').filter((x, i) => !(i > 0 && x.includes('"r1"'))).join('\n### Observation\n');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base1 = readLivingMarkdown(edited);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base: base1, candidate: { executionId: 'e2' }, proposal: { baseRevision: base1.revision, operations: [{ kind: 'output', text: 'F2', evidence: ['e1'] }] } })), 'written');
+  const committed = f.contents.get(path);
+  const mid = committed.replace('Acme CEO resigns', 'Acme CEO resigns (confirmed)');
+  assert.notEqual(mid, committed);
+  await f.app.vault.process(f.files.get(path), () => mid);
+  const base2 = readLivingMarkdown(mid);
+  assert.deepEqual(S.plain(base2.records.map(r => r.id + ':' + r.owner)), ['r2:user']);
+  assert.ok(base2.suppressed.some(v => v.startsWith('@v2:')));
+  const again = { ...a, id: 'r1-again' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: base2, candidate: { executionId: 'e3' }, proposal: { baseRevision: base2.revision, operations: [again] } })), /suppressed-record/);
+  // The user pastes the deleted block back under its own id and drops its suppression line.
+  const block = saved.match(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/)[0].split('\n### Observation\n').find(x => x.includes('"r1"'));
+  const pasted = committed.replace('\n### Suppression', '\n### Observation\n' + block.replace(/\n*$/, '\n') + '\n### Suppression').replace('### Suppression\n- ID: "r1"\n', '### Suppression\n');
+  assert.notEqual(pasted, committed);
+  const back = readLivingMarkdown(pasted);
+  assert.equal(back.records.find(r => r.id === 'r1').owner, 'user');
+  assert.equal(back.suppressed.some(v => v.startsWith('@v2:')), false);
+  assert.equal(back.suppressed.includes('r1'), false);
 });

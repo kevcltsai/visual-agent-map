@@ -9,6 +9,7 @@ import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/merma
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
+import { LivingIdentityStore, setLivingIdentityStore } from "./experiences/visual-map/living-node-sources";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
@@ -1560,7 +1561,62 @@ export default class VisualAgentMapPlugin extends Plugin {
       void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
     });
     this.registerVaultEvents();
+    this.registerLivingIdentity();
     this.registerAppExitStop();
+  }
+  /**
+   * Keeps the identity state of the notes AI cards reference. Vault events are reduced into it as they happen and it is
+   * saved with the settings; after a restart it is checked once against the files that are there. Events before the
+   * layout is ready (Obsidian's initial create events) are not changes and are ignored.
+   */
+  private registerLivingIdentity(): void {
+    let saving = false;
+    const store = new LivingIdentityStore(this.settings.livingSourceIdentity, () => {
+      if (saving) return;
+      saving = true;
+      void Promise.resolve().then(async () => {
+        saving = false;
+        this.settings.livingSourceIdentity = store.entries();
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.logs.appendLog("warn", `Living Node source identity was not saved: ${String(error)}`);
+        }
+      });
+    });
+    setLivingIdentityStore(this.app, store);
+    this.register(() => setLivingIdentityStore(this.app, undefined));
+    let ready = false;
+    const statOf = (path: string) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      return file instanceof TFile ? { ctime: file.stat.ctime, size: file.stat.size } : undefined;
+    };
+    this.app.workspace.onLayoutReady(() => {
+      store.revalidate(statOf);
+      ready = true;
+    });
+    this.registerEvent(
+      this.app.vault.on("create", file => {
+        const stat = ready && file instanceof TFile ? statOf(file.path) : undefined;
+        if (stat) store.created(file.path, stat);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("modify", file => {
+        const stat = ready && file instanceof TFile ? statOf(file.path) : undefined;
+        if (stat) store.modified(file.path, stat);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", file => {
+        if (ready && file instanceof TFile) store.deleted(file.path);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (ready && file instanceof TFile) store.renamed(oldPath, file.path);
+      })
+    );
   }
   /** Quitting Obsidian does not call onunload: stop running AI calls here too, so no provider process outlives the app. */
   registerAppExitStop(): void {

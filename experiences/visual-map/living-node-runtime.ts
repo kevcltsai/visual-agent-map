@@ -14,6 +14,8 @@ import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
 import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
 import {
   readLivingReferences,
+  livingConfigRef,
+  livingIdentityStore,
   reconcileLivingDraftReferences,
   sameLivingTarget,
   type LivingSourceRef,
@@ -26,6 +28,8 @@ import { livingConfigRevision, livingInputRevision, type LivingRead } from "./li
 import { generateLivingProposal } from "./living-node-provider";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import { applyLivingChanges, hasLivingResult, type LivingEvidence } from "./living-node-changes";
+
+export { setLivingIdentityStore } from "./living-node-sources";
 
 const coordinators = new WeakMap<object, LivingCoordinator>();
 export function livingCoordinator(owner: object): LivingCoordinator {
@@ -145,22 +149,38 @@ function allowedLivingNotePath(app: App, path: string): boolean {
   );
 }
 
-function sourceResolver(app: App) {
+/** The persisted identity of the note at `path`, bound on first sight. Without a store the path is the identity. */
+function noteIdentity(app: App, file: TFile) {
+  const store = livingIdentityStore(app);
+  if (!store) return { identity: file.path, resolved: true };
+  const entry = store.observe(file.path, { ctime: file.stat.ctime, size: file.stat.size });
+  return { identity: entry.refId, resolved: entry.state === "resolved" };
+}
+
+export function sourceResolver(app: App) {
   return {
     resolveAuthorized(link: string, fromPath: string, _role?: "explicit" | "map", exact?: true) {
       const file = exact
         ? app.vault.getAbstractFileByPath(link)
         : app.metadataCache.getFirstLinkpathDest(link, fromPath);
-      return file instanceof TFile &&
-        allowedLivingNotePath(app, file.path) &&
-        app.vault.getAbstractFileByPath(file.path) === file
-        ? { identity: file.path, path: file.path }
-        : undefined;
+      if (
+        !(file instanceof TFile) ||
+        !allowedLivingNotePath(app, file.path) ||
+        app.vault.getAbstractFileByPath(file.path) !== file
+      )
+        return undefined;
+      const { identity, resolved } = noteIdentity(app, file);
+      return { identity, path: file.path, ...(resolved ? {} : { unresolved: true as const }) };
     }
   };
 }
 
-function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<LivingRoundPort, "language">): string {
+function configKey(
+  snapshot: Snapshot,
+  map: MapDocument,
+  id: string,
+  port: Pick<LivingRoundPort, "language" | "app">
+): string {
   const node = map.nodes.find(item => item.id === id);
   if (!node) return "";
   const children = map.nodes.filter(item => item.parentId === id).map(item => item.id);
@@ -168,7 +188,12 @@ function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<
     JSON.stringify([
       livingConfigRevision(
         snapshot.note.prompt,
-        refs(snapshot).map(ref => JSON.stringify(ref))
+        refs(snapshot).map(ref =>
+          livingConfigRef(ref, path => {
+            const file = port.app.vault.getAbstractFileByPath(path);
+            return file instanceof TFile ? noteIdentity(port.app, file).identity : undefined;
+          })
+        )
       ),
       node.path,
       [...children].sort(),
@@ -645,6 +670,11 @@ function resolveDraft(
   const explicit = reconcileLivingDraftReferences(previousLinks, persisted, nextLinks, link => {
     const note = resolver.resolveAuthorized(link, target.path);
     if (!note) throw new Error("missing-source");
+    // Choosing the link again is the user's explicit confirmation of an unresolved source.
+    if (note.unresolved) {
+      const file = app.vault.getAbstractFileByPath(note.path);
+      if (file instanceof TFile) livingIdentityStore(app)?.reconfirm(file.path, file.stat);
+    }
     if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
     if (note.path === target.path) throw new Error("self-reference");
     const matches = cards.filter(card => card.path === note.path);

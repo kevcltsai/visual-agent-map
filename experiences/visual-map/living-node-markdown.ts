@@ -313,9 +313,13 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
       !index.records.has(value[1])
     ) {
       index.records.set(value[1], value[2]);
-      if (value.length >= 4) index.events.set(value[1], {
-        fingerprint: value[3], ...(value.length === 6 ? { scope: value[4], unknownTime: value[5] } : {})
-      });
+      if (validHash(value[3])) {
+        const scope = value[4] as unknown;
+        const unknownTime = value[5] as unknown;
+        index.events.set(value[1], {
+          fingerprint: value[3], ...(validHash(scope) && typeof unknownTime === "boolean" ? { scope, unknownTime } : {})
+        });
+      }
     } else if (value[0] === "suppressed" && value.length === 2 && typeof value[1] === "string") {
       index.suppressed.add(value[1]);
     } else throw new Error("invalid-ownership-index");

@@ -636,3 +636,34 @@ integrationTest('map transaction: structural replay preflight refuses a newly in
   await assert.rejects(step.redo(), /injected dependency cycle/);
   assert.deepEqual(h.snapshot(), undone);
 });
+
+integrationTest('map transaction: undoing a saved configuration after a Living run was undone is allowed, keeps the replay fence moving forward, and still refuses any other edit', async () => {
+  const { livingRestoreSnapshot, livingWithoutFence, livingGeneration } = load('experiences/visual-map/living-node-markdown.ts', { obsidian });
+  for (const external of [false, true]) {
+    const h = await harness();
+    const path = h.notes[0], file = h.app.vault.getAbstractFileByPath(path);
+    const original = h.contents.get(path);
+    const entry = await begin(h.deps)
+      .rewriteNote(path, async p => { await h.repo.updateNoteRawGuarded(p, text => text + '\nSAVED-CONFIG\n'); })
+      .editMap(MAP, map => { map.title = 'Config step'; }).commit();
+    const configured = h.contents.get(path);
+    const ran = livingRestoreSnapshot(configured, configured + 'RUN-RESULT\n');
+    await h.app.vault.process(file, () => ran);
+    // Undo of the run restores the earlier bytes under a new fence, as the view's Living undo does.
+    const undoneRun = livingRestoreSnapshot(ran, configured);
+    await h.app.vault.process(file, () => undoneRun);
+    assert.ok(livingGeneration(undoneRun) > livingGeneration(ran));
+    if (external) {
+      await h.app.vault.process(file, text => text + 'EXTERNAL-EDIT\n');
+      const error = await rejected(entry.undo());
+      assert.equal(error.kind, 'guard', 'any other edit is refused');
+      assert.ok(h.contents.get(path).includes('EXTERNAL-EDIT'));
+      continue;
+    }
+    await entry.undo();
+    const restored = h.contents.get(path);
+    assert.ok(!restored.includes('SAVED-CONFIG') && !restored.includes('RUN-RESULT'), 'the configuration is undone');
+    assert.equal(stable(livingWithoutFence(restored)), stable(livingWithoutFence(original)));
+    assert.ok(livingGeneration(restored) > livingGeneration(undoneRun), 'the replay fence never moves back');
+  }
+});

@@ -224,10 +224,14 @@ function knowledgeOverhead(base: LivingKnowledge): number {
   }).length;
 }
 
+/** The only fields of a card's knowledge any model may see: never suppression or ownership/deletion hashes. */
+export function livingModelView(base: LivingKnowledge) {
+  return { revision: base.revision, records: base.records, output: base.output, aiLatest: base.aiLatest };
+}
+
 /** The model's view of the store: all records when they fit, else the projection with a disclosed omitted boundary. */
 export function livingKnowledgeText(base: LivingKnowledge, projection: LivingProjection): string {
-  const view = { revision: base.revision, records: base.records, output: base.output, aiLatest: base.aiLatest };
-  if (!projection.omitted.length) return JSON.stringify(view);
+  if (!projection.omitted.length) return JSON.stringify(livingModelView(base));
   const times = projection.omitted.flatMap(record =>
     eventMillis(record) === undefined ? [] : [record.eventTime as string]
   );

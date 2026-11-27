@@ -1262,7 +1262,8 @@ export const en = {
   "ui.living_node_trial_run_refused": "This card is being tried out. Finish or close the trial first.",
   "ui.living_node_trial_skipped": "Being tried out, skipped",
   "ui.living_node_upstream_trial": "An upstream card is being tried out",
-  "ui.living_node_trial_boundary": "Cards being tried out are skipped. Their valid knowledge is used as is; otherwise the cards that depend on them are blocked.",
+  "ui.living_node_trial_boundary":
+    "Cards being tried out are skipped. Their valid knowledge is used as is; otherwise the cards that depend on them are blocked.",
   "ui.living_node_run_joined": "This map is already running. Showing its progress.",
   "ui.living_node_trial_formal_busy": "This map is running. Try the card again when it finishes.",
   "ui.living_node_try_prompt": "Try prompt",

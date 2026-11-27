@@ -2354,3 +2354,36 @@ S.integrationTest('A46 copy keeps the generation and leaves the original executi
   assert.equal(readLivingMarkdown(copied).output.text, 'two');
   assert.deepEqual(receiptIds(f.contents.get(path)), ['e1', 'e2']);
 });
+
+S.integrationTest('Living Node privacy: an upstream card reaches a downstream provider prompt only as the model view, never its suppression or deletion hashes', async () => {
+  const f = await roundFixture([['parent'], ['child', 'parent']]);
+  const prompts = [];
+  const run = f.port.calls.run;
+  f.port.calls.run = (prepared, options, finish) => { prompts.push(prepared.prompt); return run(prepared, options, finish); };
+  const seed = async (operations, executionId) => {
+    const expectedContent = f.contents.get('child.md');
+    const base = readLivingMarkdown(expectedContent);
+    const candidate = { executionId, cardId: 'child', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
+    assert.equal(await commitLivingMarkdown(f.repo, { path: 'child.md', expectedContent, candidate, base, baseGeneration: livingGeneration(expectedContent), proposal: { baseRevision: base.revision, operations },
+      context: { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] },
+      signal: new AbortController().signal, isCurrent: () => true, inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) }), 'written');
+  };
+  const edit = async change => { await f.app.vault.process(f.files.get('child.md'), text => change(text)); };
+  await seed([{ kind: 'output', text: 'Upstream findings', evidence: ['e1'] },
+    { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'SECRET-DELETED-TEXT', evidence: ['e1'] }], 's1');
+  await edit(text => text.replace('> Upstream findings', '> Owner findings').replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, ''));
+  await seed([{ kind: 'output', text: 'SECRET-AI-LATEST', evidence: ['e1'] }], 's2');
+  await edit(text => text.replace(/\n### AI latest\n[\s\S]*?(?=\n### Suppression)/, ''));
+  await edit(text => text.replace('ai-card: true\n', 'ai-card: true\nai-locked: true\n'));
+  const upstream = readLivingMarkdown(f.contents.get('child.md'));
+  assert.ok(upstream.suppressed.length >= 2 && upstream.aiLatestDeleted, 'fixture: upstream holds suppression and a deleted-text hash');
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Research parent, full text\n\nSources: [[child]]');
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(prompts.length, 1, 'only the downstream card ran');
+  const hashes = [...upstream.suppressed, upstream.aiLatestDeleted].filter(value => value.length > 8);
+  for (const text of prompts) {
+    assert.ok(text.includes('Owner findings') && text.includes('"revision"'), 'the upstream knowledge is still delivered');
+    for (const secret of [...hashes, '@v2', 'suppressed', 'aiLatestDeleted', 'SECRET-DELETED-TEXT', 'SECRET-AI-LATEST'])
+      assert.ok(!text.includes(secret), 'downstream prompt leaks ' + secret);
+  }
+});

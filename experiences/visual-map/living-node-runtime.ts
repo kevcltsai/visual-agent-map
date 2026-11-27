@@ -32,7 +32,12 @@ import {
 } from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
-import { fitLivingContext, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
+import {
+  fitLivingContext,
+  livingModelView,
+  parseLivingSelectors,
+  resolveLivingSection
+} from "./living-node-retrieval";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import {
   applyLivingChanges,
@@ -452,7 +457,7 @@ async function readInputs(
       if (isAiCard(data.note) && !usableKnowledge(data)) throw new Error("missing-ai-knowledge");
       const knowledge = readLivingMarkdown(data.content);
       const current = knowledge.output.text || data.note.summary;
-      const text = [ownKnowledge(data.note), JSON.stringify(knowledge)].filter(Boolean).join("\n\n");
+      const text = [ownKnowledge(data.note), JSON.stringify(livingModelView(knowledge))].filter(Boolean).join("\n\n");
       add(source.identity, data.note.title, text, current);
     } else {
       const file = port.app.vault.getAbstractFileByPath(source.path);

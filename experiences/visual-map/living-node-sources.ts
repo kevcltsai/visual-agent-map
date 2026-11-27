@@ -393,6 +393,17 @@ export function livingIdentityStore(app: object): LivingIdentityStore | undefine
   return stores.get(app);
 }
 
+/**
+ * The Prompt as the configuration revision sees it: a `[[link]]` that resolves to a bound note is `[[note:<refId>]]`, so the
+ * link text Obsidian rewrites after a rename of that note does not change the revision. Other text and unresolved links stay.
+ */
+export function livingConfigPrompt(prompt: string, idOf: (link: string) => string | undefined): string {
+  return prompt.replace(/\[\[([^\]|#\n]+)([|#][^\]\n]*)?\]\]/g, (whole, target: string, rest?: string) => {
+    const id = idOf(target.trim());
+    return id ? "[[note:" + id + (rest ?? "") + "]]" : whole;
+  });
+}
+
 /** The configuration identity of a reference: a bound note is its persisted id, so renaming the file does not change it. */
 export function livingConfigRef(ref: LivingSourceRef, idOf: (path: string) => string | undefined): string {
   if (ref.kind === "note" && ref.exact) {

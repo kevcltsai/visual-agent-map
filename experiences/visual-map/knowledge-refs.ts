@@ -116,7 +116,7 @@ export function moveKnowledgeRef(map: { knowledgeRefs?: unknown }, id: string, x
  * entry whose resolved path is known and differs gets the new hint. An ordinary save never calls this.
  */
 export function refreshPathHints(map: { knowledgeRefs?: unknown }, paths: ReadonlyMap<string, string>): void {
-  if (!paths.size) return;
+  if (!paths.size || !Array.isArray(map.knowledgeRefs)) return;
   map.knowledgeRefs = rawKnowledgeRefs(map).map(entry => {
     if (!isRecord(entry) || typeof entry.id !== "string") return entry;
     const path = paths.get(entry.id);
@@ -252,4 +252,24 @@ export function referenceTitle(resolution: RefResolution | undefined): string | 
   if (!resolution?.ok) return null;
   const title = resolution.title.replace(/\s+/g, " ").trim();
   return title || null;
+}
+
+/** Reference lines an outline export adds: one virtual child per visible reference, titled "<prefix> <title>". Titles only. */
+export interface ReferenceOutline {
+  nodes: { id: string; parentId: string }[];
+  /** virtual node id -> the line text. */
+  titles: Map<string, string>;
+}
+export function referenceOutline(
+  map: RefHost,
+  titles: ReadonlyMap<string, string | null>,
+  text: { prefix: string; unavailable: string }
+): ReferenceOutline {
+  const out: ReferenceOutline = { nodes: [], titles: new Map() };
+  for (const ref of visibleKnowledgeRefs(map)) {
+    const id = `vam-ref:${ref.id}`;
+    out.nodes.push({ id, parentId: ref.parentId });
+    out.titles.set(id, `${text.prefix} ${titles.get(ref.id) || text.unavailable}`);
+  }
+  return out;
 }

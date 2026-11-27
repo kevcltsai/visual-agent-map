@@ -46,6 +46,10 @@ export interface ShareViewerUi {
   attachmentDownload: string;
   /** Shown on a file card whose file is not in the shared file (too big, images off, or not found). */
   attachmentNotIncluded: string;
+  /** Mark on a card that points at a card of another map (the card shows its title only). */
+  refLabel: string;
+  /** Shown in place of a reference whose original card could not be used. */
+  refUnavailable: string;
   resizePanel: string;
   /** Label of the outline (the topic tree on the left) and of its toggle button. */
   outline: string;
@@ -144,6 +148,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   imageSource: "Source: {0}",
   attachmentDownload: "Download ({0})",
   attachmentNotIncluded: "Not included",
+  refLabel: "Reference",
+  refUnavailable: "Unavailable reference",
   resizePanel: "Resize the side panel",
   outline: "Outline",
   untitledMap: "Untitled map",

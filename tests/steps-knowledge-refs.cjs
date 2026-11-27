@@ -120,6 +120,14 @@ test('10: moving a reference sets its offset only; an offset that is not a numbe
   assert.deepEqual(plain(kr.readKnowledgeRefs(map).map(item => [item.id, item.x, item.y])), [['ref-1', 320, 10], ['ref-2', 300, 0]]);
 });
 
+test('refreshPathHints never brings the key back after the last reference was removed', () => {
+  const map = baseDoc();
+  kr.appendKnowledgeRef(map, ref());
+  kr.removeKnowledgeRef(map, 'ref-1');
+  kr.refreshPathHints(map, new Map([['ref-9', 'x.md']]));
+  assert.equal('knowledgeRefs' in map, false);
+});
+
 test('refreshPathHints only changes hints it was told about', () => {
   const map = baseDoc({ knowledgeRefs: [ref(), ref({ id: 'ref-2', nodeId: 'n2' }), 'junk'] });
   kr.refreshPathHints(map, new Map([['ref-1', 'New/Map.md']]));

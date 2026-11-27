@@ -303,6 +303,25 @@ export function startViewer(doc: Document): void {
       });
     }
   }
+  // Knowledge references: a title and a "reference" mark, or the unavailable mark when there is no title. Never a path or text.
+  const refs: Array<{ id: string; parentId: string; title: string | null; dx: number; dy: number }> = [];
+  if (Array.isArray(data.refs)) {
+    const seenRef = new Set<string>();
+    for (const item of data.refs) {
+      if (!item || typeof item.id !== "string" || seenRef.has(item.id) || typeof item.parentId !== "string") continue;
+      const parent = byId.get(item.parentId);
+      if (!parent || !Number.isFinite(item.x) || !Number.isFinite(item.y)) continue;
+      seenRef.add(item.id);
+      refs.push({
+        id: item.id,
+        parentId: parent.id,
+        title: typeof item.title === "string" && item.title.trim() ? item.title : null,
+        dx: item.x - parent.x,
+        dy: item.y - parent.y
+      });
+    }
+  }
+  const refEls = new Map<string, HTMLElement>();
   const textById = new Map(texts.map(text => [text.id, text]));
   const textsByParent = new Map<string, typeof texts>();
   for (const text of texts) {
@@ -1038,6 +1057,12 @@ export function startViewer(doc: Document): void {
     if (node.width) card.style.width = `${node.width}px`;
     if (node.height) card.style.height = `${node.height}px`;
     placeTexts(id);
+    for (const ref of refs) {
+      const el = ref.parentId === id ? refEls.get(ref.id) : undefined;
+      if (!el) continue;
+      el.style.left = `${node.x + ref.dx}px`;
+      el.style.top = `${node.y + ref.dy}px`;
+    }
   };
   const placeTexts = (parentId: string): void => {
     const parent = byId.get(parentId);
@@ -1063,6 +1088,28 @@ export function startViewer(doc: Document): void {
       el.style.top = `${(parent?.y ?? 0) + text.dy}px`;
       stage.append(el);
       textEls.set(text.id, el);
+    }
+  }
+  function renderRefs(): void {
+    for (const el of refEls.values()) el.remove();
+    refEls.clear();
+    for (const ref of refs) {
+      const parent = byId.get(ref.parentId);
+      if (!parent || !cards.has(ref.parentId) || parent.collapsed) continue;
+      const el = make("div", `vam-ref-node${ref.title === null ? " is-unavailable" : ""}`);
+      el.setAttribute("role", "note");
+      if (ref.title === null) el.textContent = ui.refUnavailable;
+      else {
+        const mark = make("span", "vam-ref-mark");
+        mark.textContent = ui.refLabel;
+        const title = make("span", "vam-ref-title");
+        title.textContent = ref.title;
+        el.append(mark, title);
+      }
+      el.style.left = `${parent.x + ref.dx}px`;
+      el.style.top = `${parent.y + ref.dy}px`;
+      stage.append(el);
+      refEls.set(ref.id, el);
     }
   }
   function renderCards(): void {
@@ -1174,6 +1221,7 @@ export function startViewer(doc: Document): void {
       place(node.id);
     }
     renderTexts();
+    renderRefs();
     if (imageLayer) stage.append(imageLayer);
     markClipped();
   }

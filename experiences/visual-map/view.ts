@@ -12034,6 +12034,8 @@ export class VisualAgentMapView extends ItemView {
       toggleCollapse: (card, byKey) => (byKey ? this.collapseByKey(card) : this.toggleCollapsed(card)),
       reorderSibling: (card, offset) => this.enqueue(() => this.shiftSiblingByKey(card, offset)),
       remove: card => this.removeByKey(card),
+      enterBranchFocus: card => void this.enterBranchFocus(card.id),
+      exitBranchFocus: () => void this.exitBranchFocus(),
       zoomFit: () => this.fit(),
       zoomReset: () => {
         if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
@@ -12064,6 +12066,7 @@ export class VisualAgentMapView extends ItemView {
       hasViewport: !!this.viewportEl,
       managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
       emptyCanvas: !!this.map && !this.map.nodes.length && this.emptyCanvasState() === "idle",
+      branchFocused: !!this.branchFocus,
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
       isArgumentCard: id => this.isArgumentCard(id),

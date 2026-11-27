@@ -51,6 +51,7 @@ function ctxFor(target, state, extra = {}) {
     hasViewport: true,
     managedMap: true,
     emptyCanvas: false,
+    branchFocused: false,
     note: id => notes[id],
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
@@ -82,6 +83,8 @@ const TABLE = [
   ['rename', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
   ['open-note', 'command', 'a', 'ok ok ok ok ok ok ok ok'], // open-details: run(!!selected)
   ['toggle-collapse', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
+  ['focus-branch', 'context', 'a', 'ok ok ok ok pr ms ok ok'], // enterBranchFocus refuses presenting; B13
+  ['leave-focus', 'command', null, 'ok ok ok ok ok ok ok ok', { branchFocused: true }],
   ['zoom-fit', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(!!this.viewportEl)
   ['zoom-reset', 'command', null, 'ok ok ok ok ok ok ok ok'],
   ['search', 'command', null, 'ok ok ok ok pr ok ok ok'], // run(!this.presentation)
@@ -232,10 +235,10 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
   // openCardMoreMenu: settings, run, AI card, select subtopics, summary bracket, note style | add another type.
   eq(ids('more', ctxFor('ai', 'normal')), ['card-settings', 'run-card', 'ai-card', 'summary-add', 'note-style', 'add-other']);
-  eq(ids('more', ctxFor('a', 'normal')), ['card-settings', 'ai-card', 'select-subtopics', 'summary-add', 'note-style', 'add-other']);
+  eq(ids('more', ctxFor('a', 'normal')), ['focus-branch', 'card-settings', 'ai-card', 'select-subtopics', 'summary-add', 'note-style', 'add-other']);
   // addCardMenuActions then Remove: add child, sibling | research, fold | open note, settings, run, AI card, book | remove.
   const context = actionsFor('context', ctxFor('a', 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(context, ['1:add-child', '1:add-sibling', '2:research', '2:toggle-collapse', '3:open-note', '3:card-settings', '3:ai-card', '3:book', '5:remove']);
+  eq(context, ['1:add-child', '1:add-sibling', '2:research', '2:toggle-collapse', '2:focus-branch', '3:open-note', '3:card-settings', '3:ai-card', '3:book', '5:remove']);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
   // renderSelectionBar: Merge, Research, Move to (⋯) ?, Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove.
   eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['merge', 'multi-research', 'move-to', 'selection-help', 'finish-selection']);
@@ -324,6 +327,37 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('remove-selected', ['a', 'd'], 'more'), [['removeSelected']]);
   eq(run('selection-help', ['a', 'd'], 'toolbar'), [['selectionHelp']]);
   eq(run('finish-selection', ['a', 'd'], 'toolbar'), [['finishSelection']]);
+});
+
+test('card actions: B13 focus this branch (card) and leave focus (map) as enterBranchFocus / exitBranchFocus have them', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const focus = action('focus-branch');
+  const leave = action('leave-focus');
+  assert.ok(focus && leave, 'both registered');
+  // Focus: a card with subtopics, not while already focused; the ⋯, the right-click and the palette offer it.
+  for (const surface of ['more', 'context', 'command']) assert.ok(ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
+  assert.ok(!ids('context', ctxFor('b', 'normal')).includes('focus-branch'), 'a leaf has no branch');
+  assert.ok(!ids('context', ctxFor('a', 'normal', { branchFocused: true })).includes('focus-branch'), 'hidden while focused');
+  for (const surface of ['toolbar', 'key', 'edge', 'canvas']) assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
+  assert.ok(ruleMoreSet('card').includes('focus-branch') && ruleContextSet('card').includes('focus-branch'));
+  // enterBranchFocus refuses while presenting; picking topics has no card entries.
+  assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'normal'))), CODE.ok);
+  assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'presentation'))), CODE.pr);
+  assert.deepEqual(S.plain(availability('focus-branch', 'command', ctxFor('a', 'multiSelect'))), CODE.ms);
+  // Leave: map scope, only while focused.
+  eq(ids('command', ctxFor(null, 'normal')).filter(id => id === 'leave-focus'), []);
+  eq(ids('command', ctxFor(null, 'normal', { branchFocused: true })).filter(id => id === 'leave-focus'), ['leave-focus']);
+  assert.deepEqual(S.plain(availability('leave-focus', 'command', ctxFor(null, 'normal', { branchFocused: true }))), CODE.ok);
+  // Runs.
+  const first = recorder();
+  focus.run({ ...ctxFor('a', 'normal'), host: first.host, surface: 'context' });
+  eq(first.calls.map(([name, node]) => [name, node.id]), [['enterBranchFocus', 'a']]);
+  const second = recorder();
+  leave.run({ ...ctxFor(null, 'normal', { branchFocused: true }), host: second.host, surface: 'command' });
+  eq(second.calls, [['exitBranchFocus']]);
+  // Names in three languages.
+  assert.equal(titleKeyFor(leave, 'command', ctxFor(null, 'normal')), 'ui.exit_branch_focus');
+  for (const dictionary of [en, zhTW, zhCN]) for (const key of [focus.titleKey, leave.titleKey]) assert.ok(dictionary[key]?.trim(), key);
 });
 
 test('card actions: the view builds the context next to mapCommand, and no entry uses the registry yet', () => {

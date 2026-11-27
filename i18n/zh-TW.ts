@@ -792,6 +792,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.exit_focus_mode": "離開專注模式",
   "ui.branch_focus_label": "聚焦：{0}",
   "ui.exit_branch_focus": "離開聚焦",
+  "ui.focus_branch": "聚焦此分支",
   "ui.export_saved": "已將 {0} 存進 Vault。",
   "ui.export_downloaded": "已下載 {0}。",
   "ui.export_scaled": "這張心智圖很大，圖片已縮小到 {0} px 以內。",

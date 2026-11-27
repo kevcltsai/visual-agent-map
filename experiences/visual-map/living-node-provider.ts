@@ -16,18 +16,64 @@ export interface LivingProviderInput extends ModelChoice {
   mapPath: string;
 }
 
+const MAX_PROMPT_CHARS = 100_000;
+
+function eventMillis(record: LivingKnowledge["records"][number]): number {
+  const time = record.eventTime ? Date.parse(record.eventTime) : NaN;
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+/** Deterministic bounded view of the card's own store: revision, output and suppressed IDs always, then the
+ * most recent records (event time, then insertion order) that fit the remaining prompt budget. Validation
+ * still runs against the full base; omitted records are only hidden from the model. */
+function projectKnowledge(base: LivingKnowledge, budget: number): { text: string; omitted: Set<string> } {
+  const recent = base.records
+    .map((record, index) => ({ record, index, time: eventMillis(record) }))
+    .sort((a, b) => (a.time === b.time ? b.index - a.index : b.time > a.time ? 1 : -1));
+  const keep = new Set<number>();
+  let used = 0;
+  for (const { record, index } of recent) {
+    const size = JSON.stringify(record).length + 1;
+    if (used + size > budget) break;
+    used += size;
+    keep.add(index);
+  }
+  const omitted = new Set(base.records.filter((_, index) => !keep.has(index)).map(record => record.id));
+  if (!omitted.size) return { text: JSON.stringify(base), omitted };
+  const text = JSON.stringify({
+    revision: base.revision,
+    records: base.records.filter((_, index) => keep.has(index)),
+    omittedOlderRecords: omitted.size,
+    suppressed: base.suppressed,
+    output: base.output
+  });
+  return { text, omitted };
+}
+
+function projectionFor(input: LivingProviderInput) {
+  const full = JSON.stringify(input.base);
+  const whole = renderPrompt(input, full);
+  if (whole.length <= MAX_PROMPT_CHARS) return { prompt: whole, omitted: new Set<string>() };
+  const shell = renderPrompt(input, projectKnowledge({ ...input.base, records: [] }, 0).text).length;
+  const projected = projectKnowledge(input.base, MAX_PROMPT_CHARS - shell - 40);
+  return { prompt: renderPrompt(input, projected.text), omitted: projected.omitted };
+}
+
+function renderPrompt(input: LivingProviderInput, knowledge: string): string {
+  return renderTemplate(promptTemplate, {
+    prompt: JSON.stringify(input.prompt),
+    language: JSON.stringify(input.language),
+    knowledge,
+    context: input.context
+  });
+}
+
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
   version: 1,
-  render: input =>
-    renderTemplate(promptTemplate, {
-      prompt: JSON.stringify(input.prompt),
-      language: JSON.stringify(input.language),
-      knowledge: JSON.stringify(input.base),
-      context: input.context
-    }),
+  render: input => projectionFor(input).prompt,
   policy: text => {
-    if (text.length > 100_000) throw new Error("living-node-context-too-large");
+    if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
   },
   parse: raw => JSON.parse(raw.trim()) as unknown
 };
@@ -137,6 +183,7 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
   const policy = livingWebPolicy(input.prompt);
   const prepared = prepareStep(step, input);
   const events: unknown[] = [];
+  const { omitted } = projectionFor(input);
   return calls.run(
     prepared,
     {
@@ -168,6 +215,11 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         policy === "required",
         policy === "forbidden"
       );
+      // The model never saw omitted records, so it cannot be editing them knowingly. A re-reported old
+      // observation (append) is still de-duplicated by applyLivingChanges against the full store.
+      for (const operation of normalized.proposal.operations)
+        if (operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id)))
+          throw new Error("omitted-record-reference");
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();
       return normalized;

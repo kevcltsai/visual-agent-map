@@ -1971,6 +1971,63 @@ integrationTest('hypothesis-evidence: switching the type is one undoable step; u
   await view.changeTopicKind(view.map.nodes[1], 'topic');
   assert.equal(pushed.length, 2, 'choosing the current type does nothing');
 });
+integrationTest('V3.3 P1.2: type, AI card, colour, cover and size changes keep the note body byte for byte and leave unrelated frontmatter lines alone', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const crypto = require('node:crypto');
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-p/Map.md';
+  const doc = { id: 'map-p', title: 'p', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-p');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const created = await repo.createNote('Owned', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(created);
+  await repo.saveMap(MAP, doc);
+  // The owner's own text: a heading, a list and a wiki link after what VAM wrote, plus a frontmatter line VAM does not own.
+  const human = '\n## My notes\n\n- first point\n- second point with [[Some Other Note|alias]]\n\n> quoted line\n';
+  contents.set(created.path, contents.get(created.path).replace(/^---\r?\n/, '---\nowner-field: keep me\n') + human);
+  const split = text => { const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text); return { fm: m ? m[1].split(/\r?\n/) : [], body: m ? text.slice(m[0].length) : text }; };
+  const sha = text => crypto.createHash('sha256').update(text).digest('hex');
+  // The AI step adds only its Prompt callout (and its own frontmatter keys); everything else stays byte for byte.
+  const withoutPrompt = body => body.replace(/^> \[!info\]- Prompt\n(?:>.*\n)*\n?/m, '');
+  const { view } = heFixture({ topics: [created] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.app = repo.app; view.plugin.repo = repo; view.plugin.mutate = work => work(); view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.plugin.recordFailure = (_, error) => { throw error; };
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  view.history = { push() {} }; view.render = () => {};
+  await view.refreshAfterSavedChange();
+  const card = () => view.map.nodes[0];
+  const start = split(contents.get(created.path));
+  const ownerLine = start.fm.find(line => line.startsWith('owner-field'));
+  assert.equal(ownerLine, 'owner-field: keep me');
+  const keepsBody = (label, strip = body => body) => {
+    const now = split(contents.get(created.path));
+    assert.equal(sha(strip(now.body)), sha(strip(start.body)), `${label}: the body is unchanged`);
+    assert.ok(now.body.includes(human.trim()), `${label}: the owner's text is still there`);
+    assert.ok(now.fm.includes(ownerLine), `${label}: the owner's frontmatter line is untouched`);
+  };
+  await view.changeTopicKind(card(), 'evidence');
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-kind:\s*"?evidence/.test(line)));
+  keepsBody('type');
+  const aiSaved = await view.saveAiCard(card(), null, undefined, { question: 'What changed?', sources: [] }, undefined, undefined, () => true);
+  assert.ok(aiSaved, 'the AI card was saved');
+  assert.ok(contents.get(created.path).includes('What changed?'), 'the question was written');
+  keepsBody('AI card', withoutPrompt);
+  await view.changeTopicColor(card(), 'red');
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-color:\s*"?red/.test(line)));
+  keepsBody('colour', withoutPrompt);
+  await view.changeTopicCover(card());
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-cover:\s*"?none/.test(line)));
+  keepsBody('cover', withoutPrompt);
+  const noteBytes = contents.get(created.path), mapBytes = contents.get(MAP);
+  await view.resizeCard(card().id, { width: 360 });
+  assert.equal(contents.get(created.path), noteBytes, 'size: the note is not written at all');
+  assert.notEqual(contents.get(MAP), mapBytes, 'size: only Map.md changes');
+  assert.equal((await repo.readMap(MAP)).nodes[0].width, 360);
+});
 integrationTest('hypothesis-leaning: changeHypothesisLeaning is one history entry; the leaning and the lifted strength undo and redo together, updated and other lines untouched', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
   const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });

@@ -156,6 +156,9 @@ import {
 } from "../../topic-colors";
 import {
   appendImageEmbed,
+  COVER_POSITION_KEY,
+  declaredCoverMissing,
+  parseCoverPosition,
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
@@ -788,6 +791,15 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement; position: CoverPosition }>();
+/** A card's "picture not found" placeholder (a declared cover that is missing, or a picture that failed to load). */
+const missingCovers = new WeakMap<HTMLElement, HTMLElement>();
+/** The dashed placeholder with the same height as a cover frame; the file name says what is missing. Nothing is written. */
+function missingCoverFrame(path: string): HTMLElement {
+  const name = path.split("/").pop() || path;
+  const frame = createDiv({ cls: "vam-card-cover is-missing", text: t("ui.card_cover_missing_0", name) });
+  frame.setAttr("title", path);
+  return frame;
+}
 /** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
 /** Map-only states a copied card must not carry into the dialog. */
 const CARD_EDITOR_STATES = [
@@ -14594,6 +14606,8 @@ export class VisualAgentMapView extends ItemView {
       this.releaseCardCover(card);
       old.frame.remove();
     }
+    missingCovers.get(card)?.remove();
+    missingCovers.delete(card);
     const placed = this.paintCoverFrame(card, notePath);
     // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
     arrangeCover(card, placed?.frame ?? null, placed?.position ?? "top");
@@ -14607,9 +14621,16 @@ export class VisualAgentMapView extends ItemView {
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return null;
-      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
-        this.app.metadataCache.getFirstLinkpathDest(link, notePath)
-      );
+      const cache = this.app.metadataCache.getFileCache(file);
+      const resolve = (link: string) => this.app.metadataCache.getFirstLinkpathDest(link, notePath);
+      // A declared cover whose file is gone keeps its place as a placeholder, so the card does not jump or hide the problem.
+      const missing = declaredCoverMissing(cache, resolve);
+      if (missing) {
+        const frame = missingCoverFrame(missing);
+        missingCovers.set(card, frame);
+        return { frame, position: parseCoverPosition(cache?.frontmatter?.[COVER_POSITION_KEY]) };
+      }
+      const cover = resolveCoverWithFrame(cache, resolve);
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
@@ -14637,12 +14658,14 @@ export class VisualAgentMapView extends ItemView {
     const generation = this.coverGeneration;
     const current = (): boolean =>
       !this.closed && generation === this.coverGeneration && cardCovers.get(card)?.img === img;
-    // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
+    // A file that cannot be decoded turns into the "picture not found" placeholder in the same place.
     img.addEventListener("error", () => {
       if (!current()) return;
       this.releaseCardCover(card);
       frame.remove();
-      arrangeCover(card, null, "top");
+      const placeholder = missingCoverFrame(imagePath);
+      missingCovers.set(card, placeholder);
+      arrangeCover(card, placeholder, position);
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
@@ -20736,7 +20759,7 @@ export class VisualAgentMapView extends ItemView {
       setIcon(star, "sparkles");
       title.prepend(star);
       parts.push(star);
-      if (status !== "done" && note.aiLocked !== true) {
+      if (status === "pending" && note.aiLocked !== true) {
         const glyph = createSpan({ cls: `vam-ai-glyph vam-ai-glyph-${status}` });
         glyph.setAttr("title", this.aiStatusTip(node, note, status));
         title.appendChild(glyph);
@@ -20776,6 +20799,30 @@ export class VisualAgentMapView extends ItemView {
         (questionLine ?? title).after(line);
         parts.push(line);
       }
+    }
+    // Running, stale and failed say so in the header with a mark and words, never by colour alone (the lock label takes the place when locked).
+    if ((status === "running" || status === "stale" || status === "failed") && note.aiLocked !== true) {
+      const chip = createSpan({ cls: `vam-status vam-status-${status}`, text: t(`ui.ai_card_status_${status}`) });
+      chip.setAttr("title", this.aiStatusTip(node, note, status));
+      const check = header.querySelector<HTMLElement>(":scope > input");
+      if (check) check.after(chip);
+      else header.prepend(chip);
+      parts.push(chip);
+    }
+    // Stop for a card Run all is working on: in the toolbar, so it shows with the selection (a card's own run has its Stop in the header).
+    const tools = cardToolbars.get(card) ?? card.querySelector<HTMLElement>(".vam-node-tools");
+    if (
+      status === "running" &&
+      tools &&
+      this.promptRunning() &&
+      this.promptEntryOf(node.id)?.status === "running" &&
+      !this.selection.state.multiSelectMode &&
+      !this.presentation
+    ) {
+      const stop = this.button(tools, t("ui.card_tool_stop"), () => this.stopPromptBatch());
+      stop.addClass("vam-card-tool", "vam-card-tool-stop");
+      tools.prepend(stop);
+      parts.push(stop);
     }
     promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;

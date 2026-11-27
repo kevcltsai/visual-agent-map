@@ -71,6 +71,19 @@ export function resolveCover(cache: CoverCache | null | undefined, resolve: Cove
   return null;
 }
 
+/**
+ * The link path a `topic-cover` names when it is a local link that does not resolve (the card shows a "picture not found"
+ * placeholder for it); null when there is no such key, it is `none`, a URL, or it resolves to a file.
+ */
+export function declaredCoverMissing(cache: CoverCache | null | undefined, resolve: CoverResolve): string | null {
+  const declared = cache?.frontmatter?.[COVER_KEY];
+  if (typeof declared === "string" && declared.trim().toLowerCase() === "none") return null;
+  const linkpath = linkpathOf(declared);
+  if (!linkpath) return null;
+  const file = resolve(linkpath);
+  return file && typeof file.path === "string" ? null : linkpath;
+}
+
 const FRAME_NUMBER = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
 const FRAME_EPSILON = 1e-9;
 

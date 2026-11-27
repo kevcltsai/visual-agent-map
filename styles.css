@@ -329,6 +329,11 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
 .vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
 .vam-status-error::before { background: var(--color-red); }
+/* V3.3 P1.2: an AI card that needs a rerun (orange dot) or did not finish (red ×): a mark plus words, never colour alone. */
+.vam-status-stale { color: color-mix(in srgb, var(--vam-warning) 80%, var(--vam-text)); }
+.vam-status-stale::before { background: var(--vam-warning); }
+.vam-status-failed { color: color-mix(in srgb, var(--vam-error) 80%, var(--vam-text)); }
+.vam-status-failed::before { content: "\00d7"; width: auto; height: auto; border-radius: 0; background: none; color: var(--vam-error); font-weight: 700; vertical-align: 0; }
 .vam-node-header .vam-aim-question-status { padding: 3px 9px; border: 1px solid var(--background-modifier-border); border-radius: 20px; font-weight: 650; }
 .vam-badge-new { padding: 2px 8px; border-radius: 20px; font-size: var(--font-ui-smaller); background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
@@ -338,6 +343,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* The cover shows the whole picture (never cropped): as wide as the card's content, as tall as the picture's shape asks (the view sets aspect-ratio = width / height, held at 2 / 3 so it is at most 1.5 times as tall as wide); a taller picture is scaled down inside and the sides keep the frame colour. Until the shape is known the frame is a 96 px placeholder. */
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
+/* A declared cover whose file is missing, or a picture that failed to load: same height as the placeholder frame, dashed, with the file name. */
+.vam-card-cover.is-missing { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: var(--vam-space-2); border: 1px dashed var(--vam-border); background: transparent; color: var(--vam-muted); font-size: var(--font-ui-smaller); text-align: center; overflow-wrap: anywhere; }
 .vam-card-cover.is-framed { position: relative; }
 /* A picture size below 100% (topic-cover-size): the view sets the width; the box stays centred in the card. */
 .vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }

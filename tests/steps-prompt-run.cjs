@@ -596,6 +596,57 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
+test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  const face = () => {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }), title = card.createEl('h3', { cls: 'vam-card-title' }), tools = card.createDiv({ cls: 'vam-node-tools' });
+    return { card, header, title, tools };
+  };
+  const paint = (status, extra = {}) => {
+    const f = face();
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(f.card, f.header, node, { ...h.view.notes.get(node.id), ...extra });
+    return f;
+  };
+  const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+    const f = paint(status);
+    const [chip, ...rest] = chips(f.header);
+    assert.equal(rest.length, 0, `${status}: one label`);
+    assert.ok(chip?.cls.includes(cls), `${status}: ${chip?.cls}`);
+    assert.equal(chip.text, text, `${status}: words, not only a colour`);
+    assert.equal(findAll(f.title, i => i.cls?.includes('vam-ai-glyph')).length, 0, `${status}: the header label replaces the title glyph`);
+    h.view.paintPromptState(f.card, f.header, node, h.view.notes.get(node.id));
+    assert.equal(chips(f.header).length, 1, `${status}: repainting does not stack labels`);
+  }
+  for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
+  assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+});
+
+test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  const paint = status => {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }); card.createEl('h3', { cls: 'vam-card-title' }); const tools = card.createDiv({ cls: 'vam-node-tools' });
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    return { card, header, tools };
+  };
+  let stopped = 0; h.view.stopPromptBatch = () => { stopped++; };
+  h.view.promptBatch = { outcome: null, controller: new AbortController() };
+  h.view.promptEntryOf = () => ({ status: 'running' });
+  const running = paint('running');
+  const stop = find(running.tools, i => i.tag === 'button' && i.text === 'Stop');
+  assert.ok(stop, 'Stop in the toolbar');
+  stop.click();
+  assert.equal(stopped, 1);
+  h.view.paintPromptState(running.card, running.header, node, h.view.notes.get(node.id));
+  assert.equal(findAll(running.tools, i => i.tag === 'button' && i.text === 'Stop').length, 1, 'repainting keeps one Stop');
+  assert.equal(find(paint('stale').tools, i => i.tag === 'button' && i.text === 'Stop'), undefined);
+  h.view.promptBatch = null;
+});
+
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
 test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
   const h = await harness([['Y', null], ['X', null]]);

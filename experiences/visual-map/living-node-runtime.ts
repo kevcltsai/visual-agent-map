@@ -32,12 +32,7 @@ import {
 } from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
-import {
-  fitLivingContext,
-  livingModelView,
-  parseLivingSelectors,
-  resolveLivingSection
-} from "./living-node-retrieval";
+import { fitLivingContext, livingModelView, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import {
   applyLivingChanges,

@@ -108,14 +108,6 @@ test('a target that is merging is refused with the existing Notice', () => {
   assert.equal(h.changes.length, 0); assert.deepEqual(h.notes, ['Merging; try again when it finishes']);
 });
 
-test('relevance sort keeps every card where it is', () => {
-  const h = harness();
-  h.view.relevanceSortOn = () => true; h.view.commitSelection = () => {}; // the drop falls through to a plain click
-  h.drag('d', 450, 250); assert.deepEqual(h.lit(), []);
-  h.drop('d', 450, 250);
-  assert.equal(h.changes.length, 0);
-});
-
 test('the highlight is removed on pointercancel and lostpointercapture, and nothing is written', () => {
   for (const ending of ['pointercancel', 'lostpointercapture']) {
     const h = harness();
@@ -209,4 +201,26 @@ test('counter-example: a card dragged and released WITHOUT Esc still saves its n
   assert.equal(h.changes.length, 1, 'the drop is one change');
   assert.equal(h.saved().d.x, 690, 'the new x is saved');
   assert.equal(h.saved().d.y, 640, 'the new y is saved');
+});
+
+// A presentation is read-only ("Map.md is never written by it"); the other card gestures check it, the card drag does not.
+test('A8 gap D1: a card dragged and released during a presentation writes nothing (move and reparent)', async () => {
+  for (const [x, y] of [[700, 650], [450, 250]]) {
+    const h = harness();
+    h.view.presentation = { index: 0, order: ['d'] };
+    h.drag('d', x, y); h.drop('d', x, y);
+    await Promise.resolve();
+    assert.equal(h.changes.length, 0, `release at ${x},${y} during a presentation saves nothing`);
+  }
+});
+
+// Coverage: nothing is written while the pointer is down and moving; the release writes exactly one change.
+test('A8 coverage D2: moves while the pointer is down write nothing; the release commits exactly once, and a second release adds nothing', async () => {
+  const h = harness();
+  h.drag('d', 500, 500); h.fire('d', 'pointermove', 600, 600);
+  assert.equal(h.changes.length, 0, 'no write during the drag');
+  h.drop('d', 600, 600); await Promise.resolve();
+  assert.equal(h.changes.length, 1, 'one change at release');
+  h.drop('d', 600, 600); await Promise.resolve();
+  assert.equal(h.changes.length, 1, 'a stray second pointerup writes nothing');
 });

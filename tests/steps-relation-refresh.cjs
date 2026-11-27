@@ -36,7 +36,7 @@ async function harness() {
   const plugin = withExpansionCoordinator({
     repo, settings: repo.settings, running: new Set(), logs: { appendLog() {} },
     rebuildDerivedData: scope => { rebuilds.push(scope); return repo.rebuildDerivedData(scope ? { roots: [], paths: scope } : undefined); },
-    relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
+    expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
   });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -157,4 +157,17 @@ test('S6: without refreshNotes (an older caller) the transaction still commits; 
   failing.saveMap = async (...args) => { if (++saves === 1) { await h.repo.saveMap(...args); throw new Error('injected saveMap'); } return h.repo.saveMap(...args); };
   await assert.rejects(begin({ ...withRefresh, repo: failing }).editMap(h.mapPath, map => { delete map.topicRelations; }).commit({ deferRebuild: true }), /injected saveMap/);
   for (const key of ['a', 'b', 'c']) assert.equal(h.contents.get(h.paths[key]), before.get(h.paths[key]), `${key} is as before the failed step`);
+});
+
+// A refused link (itself, a second link on a pair, a cycle) must write nothing: no Map.md change and no empty undo step.
+test('A8 gap R1: a refused relation (self, duplicate pair, prerequisite cycle) adds no history entry and leaves Map.md byte for byte', async () => {
+  const h = await harness();
+  await h.view.addRelation(h.ids.a, h.ids.b, 'prerequisite');
+  await h.view.addRelation(h.ids.b, h.ids.c, 'prerequisite');
+  const mapBytes = h.contents.get(h.mapPath), past = h.view.history.past.length;
+  const refused = [[h.ids.a, h.ids.a, 'related'], [h.ids.b, h.ids.a, 'supports'], [h.ids.c, h.ids.a, 'prerequisite']];
+  for (const [from, to, kind] of refused) await h.view.addRelation(from, to, kind);
+  assert.equal(h.view.map.topicRelations.length, 2, 'no refused link was stored');
+  assert.equal(h.contents.get(h.mapPath), mapBytes, 'Map.md is byte for byte the same');
+  assert.equal(h.view.history.past.length, past, 'no empty undo step per refused link');
 });

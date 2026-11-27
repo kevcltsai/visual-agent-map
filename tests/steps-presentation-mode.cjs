@@ -48,7 +48,7 @@ async function harness() {
   const hoverTimers = { capture: false, fns: [] };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices), setTooltip() {}, MarkdownRenderer: { render() { return Promise.resolve(); } } } }, { createFragment: dom.createFragment, setTimeout: (fn, ms) => (hoverTimers.capture && ms === 700 ? (hoverTimers.fns.push(fn), 0) : setTimeout(fn, ms)) });
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, closeStaleDetails() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, closeStaleDetails() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);

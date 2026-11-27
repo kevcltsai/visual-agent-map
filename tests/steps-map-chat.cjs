@@ -78,12 +78,23 @@ test('parser drops an item that misses a field its kind needs (add_child without
     item('create_md_file', { path: 'y.md' }),
     item('select_topics'),
     item('run_map_action', { action: 'merge' }),
-    item('run_map_action', { action: 'rate_by_goal' }),
     item('rename_topic', { title: 'T' })
   ));
   assert.equal(result.actions.length, 0);
   assert.ok(result.rejected.every(entry => entry.code === 'missing_field' || entry.code === 'unknown_node'), JSON.stringify(result.rejected));
-  assert.equal(result.rejected.length, 8);
+  assert.equal(result.rejected.length, 7);
+});
+test('P1.10a: a rate_by_goal run action from an older reply is dropped as bad_value; the other actions of the reply are kept and carry no goal', () => {
+  const result = parse(reply(
+    item('run_map_action', { action: 'rate_by_goal', goal: 'Sleep better' }),
+    item('rename_topic', { nodeId: 'a', title: 'Renamed' }),
+    item('run_map_action', { action: 'expand', nodeIds: ['a'], goal: 'ignored' })
+  ));
+  assert.deepEqual(codes(result), ['0:bad_value']);
+  assert.deepEqual(result.actions.map(action => action.kind), ['rename_topic', 'run_map_action']);
+  assert.equal(result.actions[1].action, 'expand');
+  assert.equal('goal' in result.actions[1], false, 'the parsed run action has no goal field');
+  assert.equal(plain(MAP_RUN_ACTIONS).includes('rate_by_goal'), false);
 });
 test('parser keeps edit_topic_note with an empty detail (clearing a note) but still drops a missing or non-string detail', () => {
   const ctx = context({ selected: [topic('a')] });
@@ -538,7 +549,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 31);
+  assert.equal(mapChatStep.version, 32);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -792,13 +803,12 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })], 0, { mapAiMode: 'quick', diagrams: false }), 1, 'needsWeb with diagrams off: no diagram call');
   assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 4, 'expand: two outline calls per card (the ask-again when a summary is missing is counted, R1 L3)');
   assert.equal(estimate([run('expand')], 4), 8, 'no targets = the selection');
-  assert.equal(estimate([run('rate_by_goal')]), 1);
   assert.equal(estimate([run('merge')]), 1);
   assert.equal(estimate([run('synthesize')]), 2, 'B2: an integration starts at once, so it is a call (and its diagram call), not 0');
   assert.equal(estimate([run('synthesize', { nodeIds: ['x', 'y'] })]), 2, 'several cards are still one integration');
   assert.equal(estimate([run('synthesize')], 0, { diagrams: false }), 1);
   assert.equal(estimate([{ kind: 'collapse_topic', nodeId: 'x' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'x' }, { kind: 'rename_topic', nodeId: 'x', title: 'T' }]), 0);
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 8);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('merge')], 0, standard), 7);
 });
 test('B1 open_map matching: exact first, then contains; case, spacing and Traditional/Simplified are ignored; none, one and many are told apart', () => {
   const maps = [{ title: 'Coffee industry' }, { title: '咖啡產業' }, { title: 'Coffee' }, { title: 'Tea' }];
@@ -850,7 +860,7 @@ const legacyReply = fields => JSON.stringify({ reply: 'ok', actions: [{ kind: 'r
 test('B2 parser compatibility: a step-v3 reply without depth and images still parses, and reads as not named, images off', () => {
   const result = parse(legacyReply({}));
   assert.deepEqual(result.rejected, []);
-  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: '', images: false });
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', direction: '', mode: '', images: false });
 });
 test('D-231 counterexample (old data): a step-v4 reply with depth "deep", "normal", "fast" reads as Standard, depth "" as not named', () => {
   for (const depth of ['deep', 'normal', 'fast']) {
@@ -937,7 +947,7 @@ test('B2 prompt: research options, "research only when asked", headless integrat
 });
 test('B2 structure tidy: no action kind or run action opens the structure-review window', () => {
   for (const name of [...MAP_CHAT_ACTION_KINDS, ...MAP_RUN_ACTIONS]) assert.doesNotMatch(name, /structure|review|suggest/i, name);
-  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'rate_by_goal', 'merge', 'find_images', 'run_living_card', 'run_living_all']);
+  assert.deepEqual(plain(MAP_RUN_ACTIONS), ['research_standard', 'expand', 'synthesize', 'merge', 'find_images', 'run_living_card', 'run_living_all']);
 });
 
 
@@ -947,7 +957,7 @@ test('B3 find_images: the strict schema lists it and the parser keeps its target
   assert.ok(plain(MAP_CHAT_SCHEMA.properties.actions.items.properties.action.enum).includes('find_images'));
   const result = parse(reply(findImages()));
   assert.deepEqual(result.rejected, []);
-  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: 'espresso beans', mode: '', images: false });
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', direction: 'espresso beans', mode: '', images: false });
 });
 test('B3 find_images: several targets are kept (owner: every selected card gets a picture); an empty list (the selection) and a new: ref are kept', () => {
   const several = parse(reply(findImages({ nodeIds: ['a', 'b'] })));
@@ -970,7 +980,7 @@ test('B3 compat: a step version 4 reply (research depth and images, no find_imag
   const v4 = JSON.stringify({ reply: 'ok', actions: [item('run_map_action', { action: 'research_standard', nodeIds: ['a'], mode: undefined, depth: 'deep', images: true }), item('run_map_action', { action: 'merge', title: 'M', nodeIds: ['a', 'b'] })] });
   const result = parse(v4);
   assert.deepEqual(result.rejected, []);
-  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'standard', images: true }); // step v6: a v4/v5 depth reads as Standard (D-2026-10-231)
+  assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', direction: '', mode: 'standard', images: true }); // step v6: a v4/v5 depth reads as Standard (D-2026-10-231)
   assert.equal(result.actions[1].action, 'merge');
 });
 test('B3 plan: each target card of a find_images is one call, with no per-reply cap', () => {
@@ -981,7 +991,6 @@ test('B3 plan: each target card of a find_images is one call, with no per-reply 
   assert.equal(estimate([run(), run(), run(), run()]), 4, 'no cap: the fourth counts');
   assert.equal(estimate([run({ nodeIds: ['a', 'b', 'c', 'd'] })]), 4, 'one action with four targets is four searches');
   assert.equal(estimate([run({ nodeIds: [] })], 5), 5, 'an empty list is every selected card');
-  assert.equal(estimate([run(), { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'g', direction: '', mode: '', images: false }]), 2);
 });
 test('B3 plan: find_images never asks for a plan by itself (not counted in the action limit, not an "other action")', () => {
   const run = (nodeIds = ['x']) => ({ kind: 'run_map_action', action: 'find_images', nodeIds, title: '', goal: '', direction: '', mode: '', images: false });
@@ -1714,7 +1723,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 31);
+  assert.equal(mapChatStep.version, 32);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [
@@ -1891,7 +1900,7 @@ const ALLOWED = [
   { kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'related' }, { kind: 'remove_relation', fromId: 'a', toId: 'b' }, { kind: 'set_appearance', nodeIds: ['a'] },
   { kind: 'select_topics', nodeIds: ['a'], all: false }, { kind: 'focus_topic', nodeId: 'a' }, { kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' },
   { kind: 'auto_layout' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'concept' },
-  autoRun('research_standard'), autoRun('research_standard', ['a'], { rewrite: true }), autoRun('expand'), autoRun('find_images'), autoRun('synthesize'), autoRun('rate_by_goal', ['a'], { goal: 'g' }),
+  autoRun('research_standard'), autoRun('research_standard', ['a'], { rewrite: true }), autoRun('expand'), autoRun('find_images'), autoRun('synthesize'),
   { kind: 'edit_md_file', path: 'Maps/Steak/Notes/a.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Maps/Steak/Notes/new.md', content: 'c' }
 ];
 const READS = [{ chain: { round: 3, researchSoFar: 0 } }, { chatStartedResearch: true }, { chatReadSources: true }];
@@ -1948,9 +1957,9 @@ test('estimateChatCalls: a place_image is one call, like one find_images target'
   assert.equal(estimateChatCalls([{ kind: 'place_image', direction: 'a' }, { kind: 'place_image', direction: 'b' }], autoCtx), 2);
 });
 test('auto-apply plan (d): estimateChatCalls is what planFor counts; call_budget when callsSoFar + estimate passes 300', () => {
-  const acts = [autoRun('research_standard', ['a', 'b'], { mode: 'standard' }), autoRun('expand', ['a']), autoRun('merge', ['a', 'b']), autoRun('synthesize'), autoRun('rate_by_goal'), autoRun('find_images', ['a', 'b', 'a1'])];
-  assert.equal(estimateChatCalls(acts, autoCtx, {}), 4 + 2 + 1 + 2 + 1 + 3);
-  assert.equal(estimateChatCalls(acts, autoCtx, { diagrams: false }), 2 + 2 + 1 + 1 + 1 + 3);
+  const acts = [autoRun('research_standard', ['a', 'b'], { mode: 'standard' }), autoRun('expand', ['a']), autoRun('merge', ['a', 'b']), autoRun('synthesize'), autoRun('find_images', ['a', 'b', 'a1'])];
+  assert.equal(estimateChatCalls(acts, autoCtx, {}), 4 + 2 + 1 + 2 + 3);
+  assert.equal(estimateChatCalls(acts, autoCtx, { diagrams: false }), 2 + 2 + 1 + 1 + 3);
   assert.equal(estimateChatCalls([{ kind: 'select_topics', nodeIds: ['a', 'b'], all: false }, autoRun('expand', [])], autoCtx), 4, 'selection');
   assert.equal(estimateChatCalls([autoRun('research_standard', [])], { selectedCount: 3 }, { mapAiMode: 'quick' }), 3);
   assert.equal(estimateChatCalls([], autoCtx), 0);

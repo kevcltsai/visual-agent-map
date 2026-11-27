@@ -75,7 +75,6 @@ import { topLevelSvgs } from "./share-translate-segments";
 export interface ShareSource {
   map: MapDocument;
   notes: ReadonlyMap<string, Note>;
-  goal?: string;
   /** topic id -> vault path of the card's cover picture (`topic-cover` or its first embed); the cover is part of what the card shows, so it travels with the note. */
   covers?: ReadonlyMap<string, string>;
   /** topic id -> how the card shows its cover (frame, size, position), for the topics in `covers`. Absent means the default look. */
@@ -1029,7 +1028,6 @@ export class ShareExporter {
     return {
       mapId: this.source.map.id,
       title: payload.title,
-      ...(payload.goal ? { goal: payload.goal } : {}),
       sourceLanguage,
       nodes: payload.nodes.map(node => ({
         id: node.id,
@@ -1118,7 +1116,6 @@ export class ShareExporter {
       language,
       vamVersion: this.config.vamVersion,
       exportedAt: (this.config.now?.() ?? new Date()).toISOString(),
-      goal: this.source.goal,
       assets,
       attachments,
       covers,

@@ -440,22 +440,6 @@ test('legacy-aim-map: E3 the canvas leaves out the interim results supersededAim
   assert.ok(doc.nodes.some(item => item.id === 'interim'), 'the map keeps the node');
 });
 
-integrationTest('legacy-aim-map: B1 map chat rate_by_goal on an old AIM map is skipped: no AI call, no goal, no write', async () => {
-  const { doc } = aimDoc();
-  let asked = 0, writes = 0;
-  const grades = new Map();
-  const view = viewOf(doc, { relevanceGrades: grades, askModel: async () => { asked++; throw new Error('no AI call'); }, mutate: async work => { writes++; return work(); } });
-  view.refreshRelevance = () => {};
-  const action = { kind: 'run_map_action', action: 'rate_by_goal', goal: 'Find the best option', nodeIds: [], title: '', direction: '', mode: '', images: false };
-  const outcome = await view.runChatSelection(action);
-  await new Promise(resolve => setTimeout(resolve, 20));
-  assert.equal(outcome.status, 'skipped', 'goal grading is off for a map with an aim block');
-  assert.equal(view.relevanceGradeable(), false);
-  assert.equal(asked, 0, 'no AI call');
-  assert.equal(writes, 0, 'no frontmatter or map write');
-  assert.equal(grades.size, 0, 'no grading run started');
-});
-
 test('legacy-aim-map: M1 an AIM card paints its colour and style choices', () => {
   const { doc, conclusion } = aimDoc();
   const calls = [], view = viewOf(doc);
@@ -594,7 +578,7 @@ function paintedNotices(doc) {
   const dom = require('../support-dom.cjs');
   const stop = new Error('the paint ends here: only the header and its notice line are under test');
   const { VisualAgentMapView } = loadHidden('main.ts', { obsidian: { ...obsidian, Notice: class {} } }, { activeDocument: { activeElement: null }, createSvg: () => dom.element('svg'), CSS: { escape: value => value } });
-  const view = new VisualAgentMapView({ app: {} }, { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), quickExpandPending: new Set(), pendingSuggestions: new Map(), relevanceGrades: new Map(), syncOutline() {}, detailsShown: () => false });
+  const view = new VisualAgentMapView({ app: {} }, { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), quickExpandPending: new Set(), pendingSuggestions: new Map(), syncOutline() {}, detailsShown: () => false });
   view.map = doc; view.path = 'Agent Workspace/AIM/Old/Map.md';
   view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
   view.contentEl = dom.element('div');

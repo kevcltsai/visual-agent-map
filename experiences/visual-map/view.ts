@@ -2152,9 +2152,17 @@ export class VisualAgentMapView extends ItemView {
    * {@link dropMapBackground}, abortMapChat and the map-change branch of the chat mount).
    */
   hasRunningWork(): boolean {
-    if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
+    if (this.chatController || this.chatApplying) return true;
     // The chat's preparing stage (before its controller exists) is stopped by a map change too.
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
+    return this.hasRunningWorkBesideChatTurn();
+  }
+  /**
+   * {@link hasRunningWork} without the chat turn itself: inside its own turn the chat always counts as running, so a chat
+   * open_map asks this to know whether switching would stop anything else.
+   */
+  private hasRunningWorkBesideChatTurn(): boolean {
+    if (this.chatImageFinder.isRunning()) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
     if (this.structureReviewTask || this.outlineDraftTask) return true;
@@ -2169,7 +2177,12 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   async setState(state: Record<string, unknown>, result: { history: boolean; layout?: boolean }): Promise<void> {
-    if (typeof state.file === "string" && state.file !== this.path) {
+    if (typeof state.file === "string" && state.file !== this.path && this.path && this.hasRunningWork()) {
+      // Swapping this tab's map would stop its running work (as in switchToMap): the map opens in a new tab instead. Deferred,
+      // so the new tab is made the active leaf after Obsidian's own activation of this one.
+      const path = state.file;
+      window.setTimeout(() => void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error)), 0);
+    } else if (typeof state.file === "string" && state.file !== this.path) {
       this.requestedFile = state.file;
       try {
         await this.openMap(state.file);
@@ -16464,8 +16477,7 @@ export class VisualAgentMapView extends ItemView {
           new ChoiceModal(this.app, topic.title, t("ui.rebuild_a_map_from_notes_as_root_nodes_or_relink_an_existing"), [
             {
               label: t("ui.rebuild_from_notes"),
-              action: () =>
-                this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.rebuildMissingMap(topic.root)))
+              action: () => this.openRepairedMap(() => this.plugin.repo.rebuildMissingMap(topic.root))
             },
             {
               label: t("ui.relink_existing_map"),
@@ -16480,10 +16492,7 @@ export class VisualAgentMapView extends ItemView {
                     t("ui.move_the_selected_map_into_this_topic_and_rebuild_node_paths"),
                     candidates.map(file => ({
                       label: file.path,
-                      action: () =>
-                        this.enqueue(async () =>
-                          this.openMapInMutation(await this.plugin.repo.relinkMissingMap(topic.root, file.path))
-                        )
+                      action: () => this.openRepairedMap(() => this.plugin.repo.relinkMissingMap(topic.root, file.path))
                     }))
                   ).open();
                 })
@@ -16492,6 +16501,23 @@ export class VisualAgentMapView extends ItemView {
         }
       }))
     ).open();
+  }
+  /**
+   * Repair rebuild / relink: `write` runs in the queue; the map it gives replaces this tab's map, or (while this tab has running
+   * work) opens in a new tab once the queue is left (openMapInNewTab inside mutate would never finish).
+   */
+  private openRepairedMap(write: () => Promise<string>): void {
+    let later = "";
+    void this.plugin
+      .mutate(async () => {
+        const path = await write();
+        if (path !== this.path && this.hasRunningWork()) later = path;
+        else await this.openMapInMutation(path);
+      })
+      .then(
+        () => (later ? this.plugin.openMapInNewTab(later).catch(error => errorNotice(error)) : undefined),
+        () => {}
+      );
   }
   /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
   private async changeHypothesisStrength(node: MapNode, strength: HypothesisStrength): Promise<void> {
@@ -23320,6 +23346,10 @@ export class VisualAgentMapView extends ItemView {
       });
       return skipped("ui.map_chat_skip_map_choose");
     }
+    if (match.map.mapPath !== this.path && this.hasRunningWorkBesideChatTurn()) {
+      if (!same()) return skipped("ui.map_chat_skip_map_changed");
+      return this.chatOpenMapInNewTab(match.map);
+    }
     let opened = "";
     await this.plugin.mutate(async () => {
       if (!same()) return;
@@ -23327,19 +23357,36 @@ export class VisualAgentMapView extends ItemView {
     });
     return opened ? { status: "done" } : skipped("ui.map_chat_skip_map_changed");
   }
+  /**
+   * open_map while other AI work runs on this map: the map opens in a new tab and the conversation stays here. Never called
+   * inside mutate (the new tab opens its map through it).
+   */
+  private async chatOpenMapInNewTab(topic: { title: string; mapPath: string }): Promise<ChatOutcome> {
+    const view = await this.plugin.openMapInNewTab(topic.mapPath);
+    return view
+      ? { status: "done", label: t("ui.map_chat_open_map_new_tab_0", topic.title) }
+      : skipped("ui.map_chat_skip_map_changed");
+  }
   /** The user picked one of several maps the reply named. */
   private async chatPickMap(topic: { title: string; mapPath: string }): Promise<void> {
     const chat = this.chat;
     if (!chat || this.closed || chat.isBusy || this.chatApplying) return;
     this.chatApplying = true;
     try {
+      // While other AI work runs on this map the picked map opens in a new tab and the conversation stays here.
+      const newTab = topic.mapPath !== this.path && this.hasRunningWorkBesideChatTurn();
       let opened = "";
-      await this.plugin.mutate(async () => {
-        if (!this.closed) opened = await this.chatSwitchTo(topic.mapPath, { path: this.path, id: this.map?.id });
-      });
+      if (newTab) opened = (await this.plugin.openMapInNewTab(topic.mapPath)) ? topic.mapPath : "";
+      else
+        await this.plugin.mutate(async () => {
+          if (!this.closed) opened = await this.chatSwitchTo(topic.mapPath, { path: this.path, id: this.map?.id });
+        });
       this.chat?.appendLines([
         opened
-          ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) }
+          ? {
+              status: "done",
+              text: t(newTab ? "ui.map_chat_open_map_new_tab_0" : "ui.map_chat_choose_opened_0", topic.title)
+            }
           : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {

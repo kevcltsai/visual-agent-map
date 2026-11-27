@@ -2744,6 +2744,31 @@ integrationTest('B1 map: open_map with several matches lists them and opens noth
   h.type('open wine'); await h.view.sendMapChat();
   assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
 });
+integrationTest('B16 map: open_map in its own turn with no other work switches this tab; the reply and the running turn are kept', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push(path); return null; };
+  let aborted = null;
+  h.control.reply = async (_request, signal) => { aborted = signal; return { reply: 'Switching now.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] }; };
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [], 'the turn itself does not send the map to a new tab'); assert.equal(h.view.path, coffee);
+  assert.equal(aborted.aborted, false, 'the turn was not stopped'); assert.equal(chat.isBusy, false);
+  assert.equal(chat.transcript().at(-1).text, 'Switching now.', 'the reply is kept'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+});
+integrationTest('B16 map: open_map while other AI work runs on this map opens it in a new tab after the write queue; the chat stays here', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  h.view.startingExpand.add(h.ids.a);
+  // Like the real one: the new tab opens its map through mutate, so a call made inside a write would never finish.
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push([path, h.control.depth]); await h.plugin.mutate(async () => {}); return {}; };
+  h.control.reply = async () => ({ reply: 'Opening it.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [[coffee, 0]], 'one new tab, outside the write queue'); assert.equal(h.view.path, MAP, 'this tab keeps its map');
+  assert.equal(h.view.startingExpand.has(h.ids.a), true, 'the running work is not dropped');
+  assert.equal(chat.transcript().at(-1).text, 'Opening it.');
+  const line = chat.transcript().at(-1).lines[0];
+  assert.equal(line.status, 'done'); assert.match(line.text, /This map still has AI running; opened “Coffee industry” in a new tab/);
+});
 
 integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();

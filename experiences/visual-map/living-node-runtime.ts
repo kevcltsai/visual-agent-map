@@ -893,6 +893,16 @@ function resolveDraft(
   };
 }
 
+/** Confirms now, or hands the confirmation to the caller to run once its own transaction committed. */
+function confirmation(
+  draft: { confirm: () => string; sourceRevision: string },
+  defer: boolean
+): Pick<LivingConfigSave, "sourceRevision" | "confirm"> {
+  return defer
+    ? { sourceRevision: draft.sourceRevision, confirm: () => draft.confirm() }
+    : { sourceRevision: draft.confirm() };
+}
+
 export interface LivingConfigSave {
   outcome: "written" | "unchanged";
   before: string;
@@ -900,6 +910,8 @@ export interface LivingConfigSave {
   configRevision: string;
   /** Exact resolved explicit source identities, kept only by the undo/redo entry. */
   sourceRevision: string;
+  /** Only with `deferConfirm`: records the explicit confirmations (call after the surrounding transaction committed) and returns the revision under them. */
+  confirm?: () => string;
 }
 
 /** Shared saved-configuration command: a stable same-map ID replaces the display link at the persistence boundary. */
@@ -914,7 +926,8 @@ export async function saveLivingConfig(
   isCurrent: () => boolean = () => true,
   allowNewSource?: (path: string) => boolean,
   expectedSourceRevision?: string,
-  reconfirm?: readonly string[]
+  reconfirm?: readonly string[],
+  deferConfirm = false
 ): Promise<LivingConfigSave> {
   const authorized = (): boolean => !repo.isDisposed() && isCurrent();
   if (!authorized()) throw new Error("changed-configuration");
@@ -953,7 +966,7 @@ export async function saveLivingConfig(
       before: snapshot.content,
       after: snapshot.content,
       configRevision: livingConfigurationStamp(prompt, fm),
-      sourceRevision: draft.confirm()
+      ...confirmation(draft, deferConfirm)
     };
   let saved = "";
   let savedRevision = "";
@@ -982,7 +995,7 @@ export async function saveLivingConfig(
     before: snapshot.content,
     after: saved,
     configRevision: savedRevision,
-    sourceRevision: draft.confirm()
+    ...confirmation(draft, deferConfirm)
   };
 }
 

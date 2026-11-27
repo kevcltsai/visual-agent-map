@@ -211,7 +211,7 @@ async function harness(spec, { confirm = true } = {}) {
     addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; }
   }
   const Modal = dom.makeModal();
-  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value), requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
+  const { VisualAgentMapView, setLivingIdentityStore: setViewIdentityStore } = S.load('tests/support-view-identity-entry.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Modal, Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createEl: (tag, value) => element(tag, value), createSpan: value => element('span', typeof value === 'string' ? { cls: value } : value), requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   view.armHighlightFade = () => {};
   const hydrate = async () => { view.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
@@ -273,7 +273,7 @@ async function harness(spec, { confirm = true } = {}) {
   const status = key => view.promptRuns.get(MAP)?.get(node(key).id)?.status;
   const done = () => until(() => view.promptBatch?.outcome);
   const runAll = async () => { view.startPromptRun(); };
-  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort, runtime };
+  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort, runtime, setViewIdentityStore };
 }
 
 // root -> mid -> leaf1, leaf2 ; root -> side
@@ -612,8 +612,8 @@ test('two batches: a card not yet reached by batch 2 is not shown done from batc
   h.view.stopPromptBatch(); await h.done();
 });
 
-const popoverHarness = async spec => {
-  const h = await harness(spec);
+const popoverHarness = async (spec, options) => {
+  const h = await harness(spec, options);
   const overlay = element('div', { cls: 'vam-canvas-overlay' });
   overlay.ownerDocument = element('div');
   h.view.contentEl.appendChild(overlay);
@@ -917,6 +917,7 @@ const sourcesMod = S.load('experiences/visual-map/living-node-sources.ts');
 function watchedSource(h, path, ctime) {
   const store = new sourcesMod.LivingIdentityStore(undefined, () => {}, (() => { let n = 0; return () => 'id' + ++n; })());
   h.runtime.setLivingIdentityStore(h.app, store);
+  h.setViewIdentityStore(h.app, store);
   const stamp = c => { h.app.vault.getAbstractFileByPath(path).stat = { ctime: c, mtime: 1, size: 5 }; };
   stamp(ctime);
   return { store, stamp };
@@ -1046,4 +1047,59 @@ test('reconfirm: choosing the link again re-resolves it even when the list is un
   const out = sourcesMod.reconcileLivingDraftReferences(same, refs, same, resolveNew, new Set(['B']));
   eq(resolved, ['B']);
   eq(out, [refs[0], { kind: 'note', link: 'B#new', exact: true }]);
+});
+
+test('reconfirm through the card editor: a transaction that fails or reverts leaves the identity alone; a committed one confirms it', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+  const { store, stamp } = watchedSource(h, 'Notes/Ref.md', 10);
+  await h.roundPort().run();
+  const prompt = 'Find facts\nSources: [[Ref]]';
+  await h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, prompt);
+  store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stamp(99);
+  assert.equal(store.at('Notes/Ref.md').state, 'dangling');
+  const values = { title: '', question: 'Find facts again', sources: ['Ref'], keepOld: true, reconfirm: ['Ref'] };
+  const saveMap = h.repo.saveMap;
+  h.repo.saveMap = async () => { throw new Error('map changed meanwhile'); };
+  await assert.rejects(h.view.writeAiCard(h.node('solo'), values, prompt, undefined, () => true), /map changed meanwhile/);
+  h.repo.saveMap = saveMap;
+  assert.equal(store.at('Notes/Ref.md').state, 'dangling', 'a reverted transaction did not record the confirmation');
+  const saved = await h.view.writeAiCard(h.node('solo'), values, prompt, undefined, () => true);
+  assert.ok(saved);
+  assert.equal(store.at('Notes/Ref.md').state, 'resolved', 'the committed save confirms it');
+  assert.ok(saved.sourceRevision, 'the revision under the confirmed identity is kept for redo');
+});
+
+test('trial cancel: declining the usage confirmation or pressing Stop shows no failure box and keeps the focus; a real failure still does', async () => {
+  const declined = await popoverHarness([['A', null, { prompt: 'Why?' }]], { confirm: false });
+  const box = h => find(h.pop(), i => i.attrs?.role === 'alert');
+  const tryButton = h => find(h.pop(), i => i.tag === 'button' && i.text === 'Try prompt');
+  const stopButton = h => find(h.pop(), i => i.tag === 'button' && i.text === 'Stop');
+  declined.view.openAiCardPopover(declined.node('A'));
+  declined.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  const keep = declined.question();
+  keep.focus();
+  tryButton(declined).click();
+  await until(() => declined.usage.length === 1);
+  await dom.tick(); await dom.tick();
+  assert.equal(declined.usage.length, 1, 'the user was asked');
+  assert.equal(box(declined).hidden, true, 'declining is not a failure');
+  assert.equal(declined.notices.some(n => /did not finish|沒有完成/.test(String(n.message ?? n))), false);
+  assert.notEqual(dom.focusedNow(), find(box(declined), i => i.tag === 'button'), 'the focus did not jump to a retry');
+  const stopped = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  stopped.plan.hang.add('A');
+  stopped.view.openAiCardPopover(stopped.node('A'));
+  stopped.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  tryButton(stopped).click();
+  await until(() => stopped.calls.length === 1);
+  stopButton(stopped).click();
+  await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(box(stopped).hidden, true, 'Stop is not a failure');
+  const failed = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  failed.view.openAiCardPopover(failed.node('A'));
+  failed.plan.fail.add('A');
+  failed.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  tryButton(failed).click();
+  await until(() => box(failed).hidden === false);
+  assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
 });

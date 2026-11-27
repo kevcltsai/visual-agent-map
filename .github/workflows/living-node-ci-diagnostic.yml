@@ -1,0 +1,82 @@
+name: Living Node CI repair diagnostics
+
+on:
+  push:
+    branches:
+      - diagnostic/living-node-ci-09b7884
+    paths:
+      - .github/workflows/living-node-ci-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format using repository formatter
+        run: npm run format
+      - name: Regenerate prompt snapshots using the repository harness
+        id: snapshots
+        continue-on-error: true
+        run: UPDATE_PROMPT_SNAPSHOTS=1 node --test tests/prompt-snapshots.cjs
+      - name: Run production build
+        id: build
+        continue-on-error: true
+        run: npm run build
+      - name: Save generated diff and outcomes
+        if: always()
+        env:
+          SNAPSHOTS: ${{ steps.snapshots.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-repair"
+          printf 'snapshot=%s\nbuild=%s\n' "$SNAPSHOTS" "$BUILD" > "$RUNNER_TEMP/ci-repair/outcomes.txt"
+          git diff --binary HEAD -- '*.ts' 'tests/snapshots/prompts' main.js > "$RUNNER_TEMP/ci-repair/generated.patch"
+          git diff --stat HEAD -- '*.ts' 'tests/snapshots/prompts' main.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-repair-generated
+          path: ${{ runner.temp }}/ci-repair
+          if-no-files-found: error
+          retention-days: 3
+
+  publish-diagnostic:
+    needs: generate
+    if: ${{ !cancelled() && needs.generate.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-repair-generated
+          path: ${{ runner.temp }}/ci-repair
+      - name: Publish only generated files to the isolated diagnostic branch
+        run: |
+          test "$GITHUB_REF" = refs/heads/diagnostic/living-node-ci-09b7884
+          patch="$RUNNER_TEMP/ci-repair/generated.patch"
+          cat "$RUNNER_TEMP/ci-repair/outcomes.txt"
+          if [ ! -s "$patch" ]; then exit 0; fi
+          git apply --check --index "$patch"
+          git apply --index "$patch"
+          git diff --cached --name-only -z | python3 -c 'import sys; paths=sys.stdin.buffer.read().split(b"\0"); assert all(not p or (not p.startswith(b".github/") and (p.endswith(b".ts") or p.startswith(b"tests/snapshots/prompts/") or p == b"main.js")) for p in paths)'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "diagnostic: generate formatted sources, snapshots and bundle"
+          git push origin HEAD:refs/heads/diagnostic/living-node-ci-09b7884

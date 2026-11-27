@@ -2223,7 +2223,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%); }
 .vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1)); }
 .vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1))); }
-.vam-node:focus-within > .vam-card-edge, .vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node.is-selected > .vam-card-edge { opacity: 1; visibility: visible; pointer-events: auto; }
+.vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node:focus-within > .vam-card-edge, .vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node.is-selected > .vam-card-edge { opacity: 1; visibility: visible; pointer-events: auto; }
 .vam-card-edge .vam-card-edge-button { height: 22px /* A2 mockup */; padding: 0 var(--vam-space-2); border-radius: 999px /* pill, A2 */; border: 1px solid var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
 .vam-card-edge .vam-card-edge-button:hover { background: var(--vam-accent); color: var(--vam-surface); }
 .vam-card-edge .vam-card-edge-button:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }

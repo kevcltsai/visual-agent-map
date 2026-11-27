@@ -34,7 +34,13 @@ export class LivingReaderView extends ItemView {
     return this.owner === owner;
   }
 
-  async show(file: TFile, preview: string, owner: string, warnings: readonly string[] = [], invalid = false): Promise<void> {
+  async show(
+    file: TFile,
+    preview: string,
+    owner: string,
+    warnings: readonly string[] = [],
+    invalid = false
+  ): Promise<void> {
     this.file = file;
     this.owner = owner;
     this.preview = preview;
@@ -86,7 +92,10 @@ export class LivingReaderView extends ItemView {
       });
     }
     if (this.tab === "trial") {
-      host.createDiv({ cls: "vam-living-reader-banner", text: t(this.invalid ? "ui.living_node_trial_invalid" : "ui.living_node_trial_unsaved") });
+      host.createDiv({
+        cls: "vam-living-reader-banner",
+        text: t(this.invalid ? "ui.living_node_trial_invalid" : "ui.living_node_trial_unsaved")
+      });
       for (const warning of this.warnings)
         host.createDiv({ cls: "vam-living-reader-banner", text: warning, attr: { role: "status" } });
     }
@@ -95,7 +104,9 @@ export class LivingReaderView extends ItemView {
     try {
       let markdown = this.preview;
       if (this.tab === "official") {
-        markdown = decodeCalloutSections((await this.app.vault.read(file)).replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+        markdown = decodeCalloutSections(
+          (await this.app.vault.read(file)).replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")
+        );
         markdown = removeSection(markdown, "Prompt");
         markdown = removeSection(markdown, "Rules");
       }

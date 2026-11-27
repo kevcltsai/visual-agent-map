@@ -52,7 +52,14 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
-import { hasLivingCommitMetadata, livingConfigurationStamp, rebaseLivingNoteReferences, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
+import {
+  hasLivingCommitMetadata,
+  livingConfigurationStamp,
+  rebaseLivingNoteReferences,
+  remapLivingCopyCardReferences,
+  resetLivingCopyDiagnostics,
+  splitLivingNodeRegion
+} from "./core/living-node-region";
 import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -760,8 +767,12 @@ export class Repository {
       color = readTopicColor(fm),
       style = readTopicStyle(fm);
     let livingNode: Note["livingNode"];
-    if (readAiCard(fm) || fm["living-node-region-hash"] !== undefined ||
-        fm["living-node-ownership"] !== undefined || hasLivingCommitMetadata(fm)) {
+    if (
+      readAiCard(fm) ||
+      fm["living-node-region-hash"] !== undefined ||
+      fm["living-node-ownership"] !== undefined ||
+      hasLivingCommitMetadata(fm)
+    ) {
       let knowledgeRevision = "empty";
       let summary = "";
       let damaged = false;
@@ -770,14 +781,18 @@ export class Repository {
         const knowledge = readLivingMarkdown(raw);
         shareMarkdown = renderLivingShareKnowledge(knowledge);
         knowledgeRevision = knowledge.revision;
-        summary = knowledge.output.text.split(/\r?\n/).find(line => line.trim())?.trim().slice(0, 180) ?? "";
+        summary =
+          knowledge.output.text
+            .split(/\r?\n/)
+            .find(line => line.trim())
+            ?.trim()
+            .slice(0, 180) ?? "";
       } catch {
         damaged = true;
       }
       const value = fm["living-node-outcome"];
-      const outcome = value === "ok" || value === "failed" || value === "blocked" || value === "cancelled"
-        ? value
-        : "never";
+      const outcome =
+        value === "ok" || value === "failed" || value === "blocked" || value === "cancelled" ? value : "never";
       livingNode = {
         summary,
         shareMarkdown,
@@ -1069,7 +1084,10 @@ export class Repository {
       isBookCardFrontmatter(fm)
     );
     // Headings stay in the language the note was written in: a language switch never relabels an existing note.
-    const rendered = localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)));
+    const rendered = localizeHeadings(
+      withReferenceLinks(body, fm, language),
+      writtenHeadingSet(content, this.headingsFor(textLanguage))
+    );
     return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}\n` : ""}`;
   }
 
@@ -1166,8 +1184,12 @@ export class Repository {
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
-    if (readAiCard(metadata) || metadata["living-node-region-hash"] !== undefined ||
-        metadata["living-node-ownership"] !== undefined || hasLivingCommitMetadata(metadata))
+    if (
+      readAiCard(metadata) ||
+      metadata["living-node-region-hash"] !== undefined ||
+      metadata["living-node-ownership"] !== undefined ||
+      hasLivingCommitMetadata(metadata)
+    )
       resetLivingCopyDiagnostics(metadata);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle
@@ -1434,9 +1456,7 @@ export class Repository {
    */
   async writeAiCard(path: string, on: boolean): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
-      readAiCard(frontmatter(content)) === on
-        ? content
-        : setFrontmatterKeys(content, { "ai-card": on ? true : null })
+      readAiCard(frontmatter(content)) === on ? content : setFrontmatterKeys(content, { "ai-card": on ? true : null })
     );
   }
 
@@ -2096,12 +2116,18 @@ export class Repository {
           const sources = rebasePathList(paths("source-notes"), pairs);
           const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
           if (!references && !sources && !living) return content;
-          const next = references || sources ? this.patchedNote(
-            file.path,
-            content,
-            { ...(references ? { referencePaths: references } : {}), ...(sources ? { sourcePaths: sources } : {}) },
-            {}
-          ) : content;
+          const next =
+            references || sources
+              ? this.patchedNote(
+                  file.path,
+                  content,
+                  {
+                    ...(references ? { referencePaths: references } : {}),
+                    ...(sources ? { sourcePaths: sources } : {})
+                  },
+                  {}
+                )
+              : content;
           return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
         });
       } catch (error) {

@@ -667,7 +667,10 @@ export function parseMapChat(
       switch (kind as MapChatActionKind) {
         case "add_child": {
           const livingPrompt = text("content", false);
-          if (livingPrompt && (context.bookPlan || context.aim || livingPrompt.length > 8_000 || text("summary", false)))
+          if (
+            livingPrompt &&
+            (context.bookPlan || context.aim || livingPrompt.length > 8_000 || text("summary", false))
+          )
             throw new Dropped("bad_value");
           if (book) {
             // Under a chapter or the book (an existing card); a `new:` parent is not possible here. `note` is the reason.
@@ -724,8 +727,12 @@ export function parseMapChat(
             // Compatibility with the previous protocol's adjacent two-action creation.
             // Fold it before confirmation, never publish an ordinary card then configure it.
             const previous = actions[actions.length - 1];
-            if (previous?.kind !== "add_child" || previous.ref !== nodeId.slice(MAP_CHAT_NEW_PREFIX.length) ||
-                previous.livingPrompt || previous.summary)
+            if (
+              previous?.kind !== "add_child" ||
+              previous.ref !== nodeId.slice(MAP_CHAT_NEW_PREFIX.length) ||
+              previous.livingPrompt ||
+              previous.summary
+            )
               throw new Dropped("bad_ref");
             previous.livingPrompt = content;
           } else {
@@ -859,7 +866,8 @@ export function parseMapChat(
           const nodeIds = list("nodeIds");
           if (action === "run_living_card" && !nodeIds.length) throw new Dropped("missing_field");
           if (action === "run_living_all" && nodeIds.length) throw new Dropped("bad_value");
-          if ((action === "run_living_card" || action === "run_living_all") && (context.bookPlan || context.aim)) throw new Dropped("bad_value");
+          if ((action === "run_living_card" || action === "run_living_all") && (context.bookPlan || context.aim))
+            throw new Dropped("bad_value");
           const title = text("title", false),
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");

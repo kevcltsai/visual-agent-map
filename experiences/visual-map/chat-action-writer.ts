@@ -270,11 +270,18 @@ export class ChatActionWriter {
     // Authorize the actual resolved path, not just a preliminary display alias.
     const allowedLivingSource = (path: string, map: MapDocument | null = this.map): boolean => {
       const key = normalizeVaultPath(path);
-      if (!key || key !== path || key.toLowerCase() === configDir.toLowerCase() ||
-          key.toLowerCase().startsWith(configDir.toLowerCase() + "/")) return false;
-      return !!map?.nodes.some(item => item.path === key) ||
+      if (
+        !key ||
+        key !== path ||
+        key.toLowerCase() === configDir.toLowerCase() ||
+        key.toLowerCase().startsWith(configDir.toLowerCase() + "/")
+      )
+        return false;
+      return (
+        !!map?.nodes.some(item => item.path === key) ||
         Object.prototype.hasOwnProperty.call(hashes, key) ||
-        !!baseline.mapSourcePaths?.includes(key);
+        !!baseline.mapSourcePaths?.includes(key)
+      );
     };
     // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
     const locked = await this.chatLockSkip(action, real);
@@ -343,8 +350,7 @@ export class ChatActionWriter {
         for (const link of promptSourceLinks(action.content)) {
           if (previous.has(link)) continue;
           const dest = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-          if (!dest || !allowedLivingSource(dest.path))
-            return skipped("ui.living_node_chat_source_refused");
+          if (!dest || !allowedLivingSource(dest.path)) return skipped("ui.living_node_chat_source_refused");
         }
         const mapPath = this.path;
         const mapId = this.map.id;
@@ -356,21 +362,36 @@ export class ChatActionWriter {
         const stillCurrent = (): boolean => {
           if (!firstCommit) return true; // redo is guarded by the transaction's own preimage checks
           const live = this.map?.nodes.find(item => item.id === nodeId);
-          return same() && this.path === mapPath && this.map?.id === mapId &&
-            live?.path === nodePath && live?.parentId === parentId;
-        };
-        const entry = await this.ports.beginMapTransaction().rewriteNote(nodePath, async path => {
-          if (!stillCurrent()) throw new Error("changed-target");
-          const liveMap = await repo.readMap(mapPath);
-          const live = liveMap.nodes.find(item => item.id === nodeId);
-          if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
-            throw new Error("changed-target-identity");
-          configured = await saveLivingConfig(
-            this.app, repo, liveMap, nodeId, action.content, current.note.prompt, stamp,
-            stillCurrent, source => allowedLivingSource(source, liveMap),
-            firstCommit ? undefined : configured?.sourceRevision
+          return (
+            same() &&
+            this.path === mapPath &&
+            this.map?.id === mapId &&
+            live?.path === nodePath &&
+            live?.parentId === parentId
           );
-        }).commit({ deferRebuild: true, label: t("ui.ai_card") });
+        };
+        const entry = await this.ports
+          .beginMapTransaction()
+          .rewriteNote(nodePath, async path => {
+            if (!stillCurrent()) throw new Error("changed-target");
+            const liveMap = await repo.readMap(mapPath);
+            const live = liveMap.nodes.find(item => item.id === nodeId);
+            if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
+              throw new Error("changed-target-identity");
+            configured = await saveLivingConfig(
+              this.app,
+              repo,
+              liveMap,
+              nodeId,
+              action.content,
+              current.note.prompt,
+              stamp,
+              stillCurrent,
+              source => allowedLivingSource(source, liveMap),
+              firstCommit ? undefined : configured?.sourceRevision
+            );
+          })
+          .commit({ deferRebuild: true, label: t("ui.ai_card") });
         firstCommit = false;
         this.history.push(entry);
         run.notes?.add(node.id);
@@ -1043,7 +1064,8 @@ export class ChatActionWriter {
       ...(seen.summary !== undefined ? { summary: now.summary } : {}),
       ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {}),
       ...(seen.livingConfigRevision !== undefined && this.notes.get(id)?.livingNode?.configRevision
-        ? { livingConfigRevision: this.notes.get(id)!.livingNode!.configRevision } : {})
+        ? { livingConfigRevision: this.notes.get(id)!.livingNode!.configRevision }
+        : {})
     };
   }
   /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */

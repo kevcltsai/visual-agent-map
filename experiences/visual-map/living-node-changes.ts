@@ -110,7 +110,9 @@ function timeKey(value: string | null): string | null {
 }
 
 function isPeriod(granularity: string): boolean {
-  return /^(?:daily|day|daily close|hourly|hour|weekly|week|monthly|month|quarterly|quarter|yearly|year|每日|每小時|每小时|日|小時|小时|每週|每周|每月|每季|每年)$/.test(normalized(granularity));
+  return /^(?:daily|day|daily close|hourly|hour|weekly|week|monthly|month|quarterly|quarter|yearly|year|每日|每小時|每小时|日|小時|小时|每週|每周|每月|每季|每年)$/.test(
+    normalized(granularity)
+  );
 }
 
 /** Suppression uses stable normalized scope and time, not the old claim.
@@ -142,11 +144,14 @@ export function livingEventFingerprint(record: LivingRecord): string {
 }
 
 export function livingEventTombstone(recordId: string, event: string, scope?: string, unknownTime = false): string {
-  return scope ? "@event:" + event + ":" + scope + ":" + (unknownTime ? "u" : "k") + ":" + recordId
+  return scope
+    ? "@event:" + event + ":" + scope + ":" + (unknownTime ? "u" : "k") + ":" + recordId
     : "@event:" + event + ":" + recordId;
 }
 
-export function parseLivingEventTombstone(value: string): { fingerprint: string; recordId: string; scope?: string; unknownTime?: boolean } | undefined {
+export function parseLivingEventTombstone(
+  value: string
+): { fingerprint: string; recordId: string; scope?: string; unknownTime?: boolean } | undefined {
   const full = /^@event:([a-f0-9]{64}):([a-f0-9]{64}):([uk]):(.+)$/.exec(value);
   if (full) return { fingerprint: full[1], scope: full[2], unknownTime: full[3] === "u", recordId: full[4] };
   const legacy = /^@event:([a-f0-9]{64}):(.+)$/.exec(value);
@@ -154,13 +159,22 @@ export function parseLivingEventTombstone(value: string): { fingerprint: string;
 }
 
 function isChange(granularity: string): boolean {
-  return /^(?:change|change only|on change|price change|變動|变化|變化|每次變動|每次变化)$/.test(normalized(granularity));
+  return /^(?:change|change only|on change|price change|變動|变化|變化|每次變動|每次变化)$/.test(
+    normalized(granularity)
+  );
 }
 
-function duplicateRecord(records: ReadonlyMap<string, LivingRecord>, candidate: LivingRecord): LivingRecord | undefined {
+function duplicateRecord(
+  records: ReadonlyMap<string, LivingRecord>,
+  candidate: LivingRecord
+): LivingRecord | undefined {
   const existing = records.get(candidate.id);
   if (existing) {
-    if (!sameScope(existing, candidate) || timeKey(existing.eventTime) !== timeKey(candidate.eventTime) || !sameClaim(existing, candidate))
+    if (
+      !sameScope(existing, candidate) ||
+      timeKey(existing.eventTime) !== timeKey(candidate.eventTime) ||
+      !sameClaim(existing, candidate)
+    )
       throw new Error("existing-record-conflict");
     return existing;
   }
@@ -178,7 +192,8 @@ function duplicateRecord(records: ReadonlyMap<string, LivingRecord>, candidate: 
     // Compare with the most recent comparable observation at or before this event,
     // not the last inserted record. Do not guess the order of unknown times.
     const comparable = (value: string | null): boolean =>
-      value !== null && time !== null &&
+      value !== null &&
+      time !== null &&
       ((/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) &&
         /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(time)) ||
         (/^\d{4}-\d\d-\d\d$/.test(value) && /^\d{4}-\d\d-\d\d$/.test(time)));
@@ -209,14 +224,25 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   const records = new Map(base.records.map(record => [record.id, record]));
   if (records.size !== base.records.length) throw new Error("duplicate-record");
   const suppressed = new Set(base.suppressed);
-  const events = base.suppressed.flatMap(value => { const event = parseLivingEventTombstone(value); return event ? [event] : []; });
+  const events = base.suppressed.flatMap(value => {
+    const event = parseLivingEventTombstone(value);
+    return event ? [event] : [];
+  });
   const knownSuppression = new Set(events.map(event => event.recordId));
   const suppressedFingerprints = new Set(events.map(event => event.fingerprint));
-  const ambiguousSuppression = base.suppressed.some(value => !parseLivingEventTombstone(value) && !knownSuppression.has(value));
+  const ambiguousSuppression = base.suppressed.some(
+    value => !parseLivingEventTombstone(value) && !knownSuppression.has(value)
+  );
   const allowed = new Map(context.evidence.map(entry => [entry.id, entry]));
   // Retained evidence can be selected explicitly for a new conclusion. It is
   // already formal knowledge, not a new retrieval or an invented source.
-  const outputEvidence = new Map([...base.records.filter(record => record.validity === "active").flatMap(record => record.evidence), ...base.output.evidence, ...context.evidence].map(entry => [entry.id, entry]));
+  const outputEvidence = new Map(
+    [
+      ...base.records.filter(record => record.validity === "active").flatMap(record => record.evidence),
+      ...base.output.evidence,
+      ...context.evidence
+    ].map(entry => [entry.id, entry])
+  );
   let output = base.output;
   let changed = false;
   for (const rawOperation of proposal.operations as unknown[]) {
@@ -229,9 +255,10 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
       // Evidence for a replaced conclusion must be explicitly selected, not
       // inherited from a different claim. Preserve retrieval stamps for retained IDs.
       const selected = evidenceFor(operation.evidence, outputEvidence);
-      const evidence = text === output.text
-        ? mergeEvidence(output.evidence, selected)
-        : selected.map(entry => output.evidence.find(previous => previous.id === entry.id) ?? entry);
+      const evidence =
+        text === output.text
+          ? mergeEvidence(output.evidence, selected)
+          : selected.map(entry => output.evidence.find(previous => previous.id === entry.id) ?? entry);
       if (text !== output.text || evidence.length !== output.evidence.length) {
         output = { text, evidence, owner: "ai" };
         changed = true;
@@ -258,7 +285,13 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         history: []
       };
       if (suppressedFingerprints.has(livingEventFingerprint(candidate))) throw new Error("suppressed-record");
-      if (events.some(event => event.scope === livingEventScopeFingerprint(candidate) && (event.unknownTime || candidate.eventTime === null)))
+      if (
+        events.some(
+          event =>
+            event.scope === livingEventScopeFingerprint(candidate) &&
+            (event.unknownTime || candidate.eventTime === null)
+        )
+      )
         throw new Error("ambiguous-suppression");
       const duplicate = duplicateRecord(records, candidate);
       // A legacy ID-only tombstone cannot prove an unknown new record is safe.

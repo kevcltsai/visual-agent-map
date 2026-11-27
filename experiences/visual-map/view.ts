@@ -1362,13 +1362,22 @@ export class VisualAgentMapView extends ItemView {
     addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
       this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
     createLivingNode: (parent, action, rebuild, current, allowSource) =>
-      this.createNode(parent, action.title, rebuild, false, action.topicKind ?? "topic", false,
-        { leaning: action.leaning, strength: action.strength }, undefined, {
+      this.createNode(
+        parent,
+        action.title,
+        rebuild,
+        false,
+        action.topicKind ?? "topic",
+        false,
+        { leaning: action.leaning, strength: action.strength },
+        undefined,
+        {
           prompt: action.livingPrompt ?? "",
           current,
           allowSource,
           onSaved: () => {}
-        }),
+        }
+      ),
     noteChange: (node, patch) => this.noteChange(node, patch),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
@@ -11054,7 +11063,10 @@ export class VisualAgentMapView extends ItemView {
   }
   private noticeLivingRemoval(consumers: readonly string[]): void {
     if (!consumers.length) return;
-    const names = consumers.slice(0, 5).map(id => this.notes.get(id)?.title ?? id).join(", ");
+    const names = consumers
+      .slice(0, 5)
+      .map(id => this.notes.get(id)?.title ?? id)
+      .join(", ");
     const remaining = consumers.length > 5 ? ` (+${consumers.length - 5})` : "";
     new Notice(t("ui.living_node_removed_source_0", names + remaining));
   }
@@ -11467,7 +11479,14 @@ export class VisualAgentMapView extends ItemView {
       const accepted = await this.acceptCrossCut(payload, record);
       if (!accepted) return;
       const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
-      const living = await livingCrossCut(this.app, this.plugin.repo, sourceMap, map, new Set(record.nodeIds), target?.id);
+      const living = await livingCrossCut(
+        this.app,
+        this.plugin.repo,
+        sourceMap,
+        map,
+        new Set(record.nodeIds),
+        target?.id
+      );
       if (living.preserveIdentity) {
         tops = await this.moveLivingAcrossMaps(accepted, target, payload, record);
         if (tops.length) this.noticeLivingRemoval(living.affected);
@@ -11679,7 +11698,11 @@ export class VisualAgentMapView extends ItemView {
     const problem = cutSourceProblem(sourceMap, record, found);
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path) || livingCoordinator(this.plugin).busy(node.path)))
+    if (
+      found.branch.some(
+        node => this.plugin.topicRuns.isBusy(node.path) || livingCoordinator(this.plugin).busy(node.path)
+      )
+    )
       return refuse("ui.merge_locked");
     return found;
   }
@@ -11693,7 +11716,8 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<MapNode[]> {
     if (!this.map || !this.mergeUnlocked(target ? [target.id] : [])) return [];
     const destination = clone(this.map);
-    const graph = (map: MapDocument): string => JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    const graph = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
     const ids = new Set(source.branch.map(node => node.id));
     const roots = new Set(source.roots.map(node => node.id));
     const cross = this.crossCutOf(payload, record, source.branch, destination.id, target?.id);
@@ -11702,36 +11726,52 @@ export class VisualAgentMapView extends ItemView {
     cross.join(tx);
     const tops: MapNode[] = [];
     try {
-      const entry = await tx.editMap(this.path, (map, resolve) => {
-        if (map.id !== destination.id || graph(map) !== graph(destination) || map.nodes.some(node => ids.has(node.id)))
-          throw new Error("ambiguous-card-identity");
-        const parent = target ? map.nodes.find(node => node.id === target.id) : null;
-        if (target && !parent) throw new Error(t("ui.outline_import_selected_missing"));
-        const moved = source.branch.map(original => {
-          const node = { ...clone(original), path: resolve(original.path) };
-          if (roots.has(node.id)) node.parentId = parent?.id ?? null;
-          delete node.afterTextId;
-          return node;
-        });
-        tops.splice(0, tops.length, ...moved.filter(node => roots.has(node.id)));
-        map.nodes.push(...moved);
-        for (const relation of payload.relations) {
-          const from = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.from)];
-          const to = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.to)];
-          if (!ids.has(from) || !ids.has(to)) continue;
-          const link: TopicRelation = { kind: relation.kind, from, to,
-            ...(relation.description !== undefined ? { description: relation.description } : {}) };
-          if (relationAllowed(map.topicRelations ?? [], link))
-            setTopicRelations(map, [...(map.topicRelations ?? []), link]);
-        }
-        if (parent) {
-          parent.collapsed = false;
-          this.arrangeBranch(map, parent.id, ids, undefined);
-        } else {
-          for (const top of tops) map.nodes = arrangeNewTree(map.nodes, top.id,
-            new Set([top.id, ...descendants(moved, top.id)]), this.cardHeightOf, layoutOf(map));
-        }
-      }).commit();
+      const entry = await tx
+        .editMap(this.path, (map, resolve) => {
+          if (
+            map.id !== destination.id ||
+            graph(map) !== graph(destination) ||
+            map.nodes.some(node => ids.has(node.id))
+          )
+            throw new Error("ambiguous-card-identity");
+          const parent = target ? map.nodes.find(node => node.id === target.id) : null;
+          if (target && !parent) throw new Error(t("ui.outline_import_selected_missing"));
+          const moved = source.branch.map(original => {
+            const node = { ...clone(original), path: resolve(original.path) };
+            if (roots.has(node.id)) node.parentId = parent?.id ?? null;
+            delete node.afterTextId;
+            return node;
+          });
+          tops.splice(0, tops.length, ...moved.filter(node => roots.has(node.id)));
+          map.nodes.push(...moved);
+          for (const relation of payload.relations) {
+            const from = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.from)];
+            const to = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.to)];
+            if (!ids.has(from) || !ids.has(to)) continue;
+            const link: TopicRelation = {
+              kind: relation.kind,
+              from,
+              to,
+              ...(relation.description !== undefined ? { description: relation.description } : {})
+            };
+            if (relationAllowed(map.topicRelations ?? [], link))
+              setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+          }
+          if (parent) {
+            parent.collapsed = false;
+            this.arrangeBranch(map, parent.id, ids, undefined);
+          } else {
+            for (const top of tops)
+              map.nodes = arrangeNewTree(
+                map.nodes,
+                top.id,
+                new Set([top.id, ...descendants(moved, top.id)]),
+                this.cardHeightOf,
+                layoutOf(map)
+              );
+          }
+        })
+        .commit();
       await cross.finish(entry);
     } catch (error) {
       if (!isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {});
@@ -11743,7 +11783,11 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The source side of a cross-map cut: re-check before writing; transfer or park originals. */
   private crossCutOf(
-    payload: ClipboardPayload, record: ClipRecord, branch: MapNode[], destinationId?: string, destinationParentId?: string
+    payload: ClipboardPayload,
+    record: ClipRecord,
+    branch: MapNode[],
+    destinationId?: string,
+    destinationParentId?: string
   ): CrossCut {
     const plugin = this.plugin,
       repo = plugin.repo,
@@ -11773,16 +11817,17 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       },
-      begin: () => this.beginCrossTransaction(from, async () => {
-        const sourceMap = await repo.readMap(from);
-        assertSource(sourceMap);
-        if (branch.some(node => plugin.topicRuns.isBusy(node.path) || livingCoordinator(plugin).busy(node.path)))
-          throw new Error(t("ui.merge_locked"));
-        const destination = await repo.readMap(into);
-        if (destinationId && destination.id !== destinationId) throw new Error("changed-target-identity");
-        const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed, destinationParentId);
-        if (checked.preserveIdentity !== Boolean(destinationId)) throw new Error("changed-source-identity");
-      }),
+      begin: () =>
+        this.beginCrossTransaction(from, async () => {
+          const sourceMap = await repo.readMap(from);
+          assertSource(sourceMap);
+          if (branch.some(node => plugin.topicRuns.isBusy(node.path) || livingCoordinator(plugin).busy(node.path)))
+            throw new Error(t("ui.merge_locked"));
+          const destination = await repo.readMap(into);
+          if (destinationId && destination.id !== destinationId) throw new Error("changed-target-identity");
+          const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed, destinationParentId);
+          if (checked.preserveIdentity !== Boolean(destinationId)) throw new Error("changed-source-identity");
+        }),
       join: tx => {
         const parkFolder = repo.topicFolder(from, "Unassigned");
         for (const node of branch) {
@@ -13708,8 +13753,16 @@ export class VisualAgentMapView extends ItemView {
     } else if (!note || !isPlaceholder(note.livingNode?.summary || note.summary)) {
       const summaryText = card.createEl("p", {
         cls: "vam-card-summary",
-        text: note?.livingNode?.summary || note?.summary || t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: note?.livingNode?.summary || note?.summary || t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text:
+          note?.livingNode?.summary ||
+          note?.summary ||
+          t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: {
+          title:
+            note?.livingNode?.summary ||
+            note?.summary ||
+            t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        }
       });
       if (textEditable) summaryText.addClass("is-inline-editable");
       // Screen-only prefix ("this chapter will cover" / "what it covers"); the note's summary is not changed.
@@ -15449,8 +15502,7 @@ export class VisualAgentMapView extends ItemView {
     const controller = new AbortController();
     const trial = new LivingTrial(livingCoordinator(this.plugin));
     const viewSession = randomUUID();
-    const current = (): boolean =>
-      !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
+    const current = (): boolean => !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
     let activeTrial: AbortController | undefined;
     controller.signal.addEventListener("abort", () => activeTrial?.abort(), { once: true });
     const invalidateTrial = (): void => {
@@ -15471,7 +15523,15 @@ export class VisualAgentMapView extends ItemView {
         },
         pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
         save: async values => {
-          const saved = await this.saveAiCard(node, parent, afterTextId, values, expectedPrompt, expectedConfigRevision, current);
+          const saved = await this.saveAiCard(
+            node,
+            parent,
+            afterTextId,
+            values,
+            expectedPrompt,
+            expectedConfigRevision,
+            current
+          );
           if (!saved) return false;
           if (node) {
             expectedPrompt = promptOf(values);
@@ -15488,17 +15548,21 @@ export class VisualAgentMapView extends ItemView {
               const currentTrial = (): boolean =>
                 current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
               try {
-                const prepared = await prepareLivingTrial({
-                  app: this.app,
-                  repo: this.plugin.repo,
-                  calls: this.plugin.aiCalls,
-                  mapPath,
-                  viewSession,
-                  signal: attempt.signal,
-                  current: currentTrial,
-                  language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
-                  mapSources: signal => this.readLivingMapSourceReport(signal)
-                }, node.id, promptOf(values));
+                const prepared = await prepareLivingTrial(
+                  {
+                    app: this.app,
+                    repo: this.plugin.repo,
+                    calls: this.plugin.aiCalls,
+                    mapPath,
+                    viewSession,
+                    signal: attempt.signal,
+                    current: currentTrial,
+                    language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
+                    mapSources: signal => this.readLivingMapSourceReport(signal)
+                  },
+                  node.id,
+                  promptOf(values)
+                );
                 let ready = false;
                 await this.plugin.confirmAiUsage(prepared.model, async () => {
                   if (currentTrial()) ready = await trial.run(prepared.request);
@@ -15511,13 +15575,21 @@ export class VisualAgentMapView extends ItemView {
                   return false;
                 }
                 this.aiCardOpen.adoption = prepared.adoption;
-                const warnings = prepared.warnings.map(warning => t(
-                  warning === "upstream-stale" ? "ui.living_node_trial_stale_sources" :
-                  warning === "frozen-source" ? "ui.living_node_trial_frozen_sources" :
-                  "ui.living_node_optional_source_unavailable"
-                ));
+                const warnings = prepared.warnings.map(warning =>
+                  t(
+                    warning === "upstream-stale"
+                      ? "ui.living_node_trial_stale_sources"
+                      : warning === "frozen-source"
+                        ? "ui.living_node_trial_frozen_sources"
+                        : "ui.living_node_optional_source_unavailable"
+                  )
+                );
                 const shown = await this.plugin.showLivingTrial(
-                  this.plugin.repo.file(node.path), renderLivingPreview(trial.result), viewSession, currentTrial, warnings
+                  this.plugin.repo.file(node.path),
+                  renderLivingPreview(trial.result),
+                  viewSession,
+                  currentTrial,
+                  warnings
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 return shown && currentTrial();
@@ -15551,25 +15623,26 @@ export class VisualAgentMapView extends ItemView {
               return true;
             }
           : undefined,
-        convert: node && note?.aiCard
-          ? async () => {
-              try {
-                await this.plugin.mutate(async () => {
-                  if (!current()) return;
-                  const entry = await this.beginMapTransaction()
-                    .rewriteNote(node.path, path => this.plugin.repo.writeAiCard(path, false))
-                    .commit({ deferRebuild: true, label: t("ui.living_node_convert") });
-                  this.history.push(entry);
-                  await this.refreshAfterSavedChange();
-                });
-                this.closeAiCardPopover();
-                return true;
-              } catch (error) {
-                new Notice(this.plugin.recordFailure(t("ui.living_node_convert"), error));
-                return false;
+        convert:
+          node && note?.aiCard
+            ? async () => {
+                try {
+                  await this.plugin.mutate(async () => {
+                    if (!current()) return;
+                    const entry = await this.beginMapTransaction()
+                      .rewriteNote(node.path, path => this.plugin.repo.writeAiCard(path, false))
+                      .commit({ deferRebuild: true, label: t("ui.living_node_convert") });
+                    this.history.push(entry);
+                    await this.refreshAfterSavedChange();
+                  });
+                  this.closeAiCardPopover();
+                  return true;
+                } catch (error) {
+                  new Notice(this.plugin.recordFailure(t("ui.living_node_convert"), error));
+                  return false;
+                }
               }
-            }
-          : undefined,
+            : undefined,
         changed: invalidateTrial,
         cancel: () => this.closeAiCardPopover()
       },
@@ -15586,9 +15659,10 @@ export class VisualAgentMapView extends ItemView {
       viewSession
     };
     win.mount(overlay);
-    if (node) void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
-      if (current()) new Notice(error instanceof Error ? error.message : String(error));
-    });
+    if (node)
+      void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
+        if (current()) new Notice(error instanceof Error ? error.message : String(error));
+      });
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
@@ -15598,10 +15672,13 @@ export class VisualAgentMapView extends ItemView {
     open.trial.close();
     open.win.destroy();
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
-    const target = node && !this.closed && !this.plugin.repo.isDisposed()
-      ? this.app.vault.getAbstractFileByPath(node.path)
-      : undefined;
-    void this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true).catch(() => {});
+    const target =
+      node && !this.closed && !this.plugin.repo.isDisposed()
+        ? this.app.vault.getAbstractFileByPath(node.path)
+        : undefined;
+    void this.plugin
+      .restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
+      .catch(() => {});
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
@@ -15638,7 +15715,9 @@ export class VisualAgentMapView extends ItemView {
           await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
             prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
             current,
-            onSaved: result => { saved = result; }
+            onSaved: result => {
+              saved = result;
+            }
           });
           return;
         }
@@ -15673,8 +15752,13 @@ export class VisualAgentMapView extends ItemView {
     const stillCurrent = (): boolean => {
       if (!firstCommit) return true; // redo has its own transaction preimage guard
       const live = this.map?.nodes.find(item => item.id === nodeId);
-      return current() && this.path === mapPath && this.map?.id === mapId &&
-        live?.path === nodePath && live?.parentId === parentId;
+      return (
+        current() &&
+        this.path === mapPath &&
+        this.map?.id === mapId &&
+        live?.path === nodePath &&
+        live?.parentId === parentId
+      );
     };
     let saved: LivingConfigSave | undefined;
     const entry = await this.beginMapTransaction()
@@ -18053,8 +18137,15 @@ export class VisualAgentMapView extends ItemView {
           throw new Error("changed-target-identity");
         configurationGraph = graph(disk);
         configured = await saveLivingConfig(
-          this.app, repo, { ...disk, nodes: [...disk.nodes, node] }, node.id,
-          livingConfig.prompt, undefined, undefined, livingConfig.current, livingConfig.allowSource
+          this.app,
+          repo,
+          { ...disk, nodes: [...disk.nodes, node] },
+          node.id,
+          livingConfig.prompt,
+          undefined,
+          undefined,
+          livingConfig.current,
+          livingConfig.allowSource
         );
         provisionalText = configured.after;
         if (!livingConfig.current()) throw new Error("changed-target");
@@ -18127,18 +18218,30 @@ export class VisualAgentMapView extends ItemView {
       if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
-      if (livingConfig && provisionalFile && provisionalText !== undefined && !isTransactionError(error, "rollback-failed")) {
+      if (
+        livingConfig &&
+        provisionalFile &&
+        provisionalText !== undefined &&
+        !isTransactionError(error, "rollback-failed")
+      ) {
         try {
           const disk = await repo.readMap(creationMapPath);
           // Never remove a published note, a replacement, or a note edited since creation.
-          if (disk.id === creationMapId && !disk.nodes.some(item => item.id === node.id || item.path === node.path) &&
-              this.app.vault.getAbstractFileByPath(node.path) === provisionalFile &&
-              await this.app.vault.read(provisionalFile) === provisionalText &&
-              provisionalFile.path === node.path && !isLinked(this.app, node.path)) {
+          if (
+            disk.id === creationMapId &&
+            !disk.nodes.some(item => item.id === node.id || item.path === node.path) &&
+            this.app.vault.getAbstractFileByPath(node.path) === provisionalFile &&
+            (await this.app.vault.read(provisionalFile)) === provisionalText &&
+            provisionalFile.path === node.path &&
+            !isLinked(this.app, node.path)
+          ) {
             await this.app.fileManager.trashFile(provisionalFile);
           }
-          if (this.path === creationMapPath && this.map?.id === creationMapId &&
-              !disk.nodes.some(item => item.id === node.id)) {
+          if (
+            this.path === creationMapPath &&
+            this.map?.id === creationMapId &&
+            !disk.nodes.some(item => item.id === node.id)
+          ) {
             this.notes.delete(node.id);
             if (this.selection.state.selected === node.id) this.selection.setSelected(previousSelection);
             this.render();
@@ -20256,7 +20359,10 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   private promptRenderQueued = false;
-  private async runLivingBatch(requested?: readonly string[], stop?: AbortSignal): Promise<PromptBatchState["outcome"]> {
+  private async runLivingBatch(
+    requested?: readonly string[],
+    stop?: AbortSignal
+  ): Promise<PromptBatchState["outcome"]> {
     const map = this.map;
     if (!map || !this.path || stop?.aborted || this.promptRunning()) return undefined;
     const mapPath = this.path;
@@ -20270,52 +20376,55 @@ export class VisualAgentMapView extends ItemView {
     let warnedOptionalSources = false;
     const current = (): boolean => session() && !this.plugin.repo.isDisposed() && !controller.signal.aborted;
     try {
-      const result = await runLivingRound({
-        app: this.app,
-        repo: this.plugin.repo,
-        calls: this.plugin.aiCalls,
-        coordinator: livingCoordinator(this.plugin),
-        mapPath,
-        viewSession: randomUUID(),
-        signal: controller.signal,
-        current,
-        busy: path =>
-          this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
-          this.plugin.topicRuns.isBusy(path) ||
-          this.plugin.quickExpandPending.has(path) ||
-          this.plugin.topicRuns.hasTask(path),
-        language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-        mapSources: signal => this.readLivingMapSourceReport(signal),
-        onOptionalSourcesUnavailable: () => {
-          if (!current() || warnedOptionalSources) return;
-          warnedOptionalSources = true;
-          new Notice(t("ui.living_node_optional_source_unavailable"));
+      const result = await runLivingRound(
+        {
+          app: this.app,
+          repo: this.plugin.repo,
+          calls: this.plugin.aiCalls,
+          coordinator: livingCoordinator(this.plugin),
+          mapPath,
+          viewSession: randomUUID(),
+          signal: controller.signal,
+          current,
+          busy: path =>
+            this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
+            this.plugin.topicRuns.isBusy(path) ||
+            this.plugin.quickExpandPending.has(path) ||
+            this.plugin.topicRuns.hasTask(path),
+          language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onOptionalSourcesUnavailable: () => {
+            if (!current() || warnedOptionalSources) return;
+            warnedOptionalSources = true;
+            new Notice(t("ui.living_node_optional_source_unavailable"));
+          },
+          confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
+          onStart: total => {
+            state.total = total;
+            this.promptRuns.delete(mapPath);
+            if (current()) this.render();
+          },
+          onRunning: id => {
+            state.current = this.notes.get(id)?.title ?? id;
+            this.setPromptStatus(mapPath, id, "running");
+          },
+          onSettled: (id, result) => {
+            state.finished = Math.min(state.total, state.finished + 1);
+            const status =
+              result === "changed" || result === "no-change" || result === "reused"
+                ? "done"
+                : result === "failed" || result === "blocked"
+                  ? "blocked"
+                  : "idle";
+            this.setPromptStatus(mapPath, id, status, failureReasons.get(id));
+          },
+          onFailure: (id, error) => {
+            failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
+          },
+          onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
         },
-        confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
-        onStart: total => {
-          state.total = total;
-          this.promptRuns.delete(mapPath);
-          if (current()) this.render();
-        },
-        onRunning: id => {
-          state.current = this.notes.get(id)?.title ?? id;
-          this.setPromptStatus(mapPath, id, "running");
-        },
-        onSettled: (id, result) => {
-          state.finished = Math.min(state.total, state.finished + 1);
-          const status =
-            result === "changed" || result === "no-change" || result === "reused"
-              ? "done"
-              : result === "failed" || result === "blocked"
-                ? "blocked"
-                : "idle";
-          this.setPromptStatus(mapPath, id, status, failureReasons.get(id));
-        },
-        onFailure: (id, error) => {
-          failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
-        },
-        onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
-      }, requested);
+        requested
+      );
       const values = [...(result?.values() ?? [])];
       const outcome = {
         done: values.filter(value => value === "changed" || value === "no-change" || value === "reused").length,
@@ -20405,8 +20514,7 @@ export class VisualAgentMapView extends ItemView {
     const lines = [t(`ui.ai_card_status_${status}`)];
     if (note.livingNode?.lastSuccessfulCheck)
       lines.push(t("ui.living_node_last_success") + ": " + note.livingNode.lastSuccessfulCheck);
-    if (note.livingNode?.lastAttempt)
-      lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
+    if (note.livingNode?.lastAttempt) lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
     if (status === "failed" && this.promptEntryOf(node.id)?.reason) lines.push(this.promptEntryOf(node.id)!.reason!);
     return lines.join("\n");
   }
@@ -22325,10 +22433,12 @@ export class VisualAgentMapView extends ItemView {
             title: titleOf(node),
             summary: summaryOf(id),
             detail: freshDetail.get(id) ?? this.notes.get(id)?.detail ?? "",
-            ...(this.notes.get(id)?.aiCard ? {
-              livingPrompt: this.notes.get(id)?.prompt,
-              livingConfigRevision: this.notes.get(id)?.livingNode?.configRevision
-            } : {}),
+            ...(this.notes.get(id)?.aiCard
+              ? {
+                  livingPrompt: this.notes.get(id)?.prompt,
+                  livingConfigRevision: this.notes.get(id)?.livingNode?.configRevision
+                }
+              : {}),
             path: node.path,
             ...failureOf(id)
           }
@@ -22890,8 +23000,9 @@ export class VisualAgentMapView extends ItemView {
         const label = action.parentId
           ? t("ui.map_chat_do_add_child_0", action.title)
           : t("ui.map_chat_do_add_root_0", action.title);
-        return action.livingPrompt ? label + "\n" + t("ui.living_node_chat_configure_0", action.title) +
-          "\n" + action.livingPrompt : label;
+        return action.livingPrompt
+          ? label + "\n" + t("ui.living_node_chat_configure_0", action.title) + "\n" + action.livingPrompt
+          : label;
       }
       case "configure_ai_card":
         return t("ui.living_node_chat_configure_0", title(action.nodeId)) + "\n" + action.content;
@@ -24296,11 +24407,17 @@ export class VisualAgentMapView extends ItemView {
       case "run_living_all": {
         if (work?.controller.signal.aborted) return skipped("ui.map_chat_skip_stopped");
         if (this.promptRunning()) return skipped("ui.prompt_run_already");
-        if (this.notesLoading() || this.bookLock().ai || this.presentation) return skipped("ui.map_chat_skip_unavailable");
-        const fresh = await this.freshNotesOf(action.action === "run_living_all" ? map.nodes.map(node => node.id) : targets);
+        if (this.notesLoading() || this.bookLock().ai || this.presentation)
+          return skipped("ui.map_chat_skip_unavailable");
+        const fresh = await this.freshNotesOf(
+          action.action === "run_living_all" ? map.nodes.map(node => node.id) : targets
+        );
         if (this.map?.id !== map.id || work?.controller.signal.aborted) return skipped("ui.map_chat_skip_map_changed");
         const ids = action.action === "run_living_all" ? [...fresh.keys()] : targets;
-        if (action.action === "run_living_card" && (ids.length !== action.nodeIds.length || ids.some(id => !isAiCard(fresh.get(id)))))
+        if (
+          action.action === "run_living_card" &&
+          (ids.length !== action.nodeIds.length || ids.some(id => !isAiCard(fresh.get(id))))
+        )
           return skipped("ui.map_chat_skip_unavailable");
         if (action.action === "run_living_card" && ids.some(id => fresh.get(id)?.aiLocked))
           return skipped("ui.ai_locked_notice");
@@ -24308,10 +24425,16 @@ export class VisualAgentMapView extends ItemView {
           return skipped("ui.prompt_run_nothing");
         // Formal Run Card / Run All use the identical planner and per-model usage confirmation.
         if (this.promptRunning()) return skipped("ui.prompt_run_already");
-        const outcome = await this.runLivingBatch(action.action === "run_living_all" ? undefined : ids, work?.controller.signal);
+        const outcome = await this.runLivingBatch(
+          action.action === "run_living_all" ? undefined : ids,
+          work?.controller.signal
+        );
         if (!outcome || outcome.stopped) return skipped("ui.map_chat_skip_stopped");
         if (outcome.failed || outcome.blocked)
-          return { status: "failed", reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked) };
+          return {
+            status: "failed",
+            reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
+          };
         return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
       }
       case "research_standard": {

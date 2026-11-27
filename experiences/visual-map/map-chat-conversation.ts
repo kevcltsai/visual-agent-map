@@ -295,7 +295,9 @@ export class MapChatConversation {
       ...(noApply ? { noApply: true } : {}),
       ...(diff ? { diff, applyLabel: t("ui.map_chat_book_apply"), cancelLabel: t("ui.map_chat_book_cancel") } : {}),
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
-      ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions" || reason === "living_node_confirm")
+      ...(plan.reasons.some(
+        reason => reason === "image_preview" || reason === "image_other_actions" || reason === "living_node_confirm"
+      )
         ? { openGroups: true }
         : {}),
       reasons: plan.reasons.map(reason =>

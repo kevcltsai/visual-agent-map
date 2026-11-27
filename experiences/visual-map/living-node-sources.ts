@@ -15,7 +15,8 @@ export function readLivingReferences(saved: unknown, legacyLinks: readonly strin
   return saved.map(value => {
     if (typeof value !== "string") throw new Error("invalid-source-reference");
     if (value.startsWith("card:") && value.slice(5).trim()) return { kind: "card", id: value.slice(5) };
-    if (value.startsWith("note-path:") && value.slice(10).trim()) return { kind: "note", link: value.slice(10), exact: true };
+    if (value.startsWith("note-path:") && value.slice(10).trim())
+      return { kind: "note", link: value.slice(10), exact: true };
     if (value.startsWith("note:") && value.slice(5).trim()) return { kind: "note", link: value.slice(5) };
     throw new Error("invalid-source-reference");
   });
@@ -25,8 +26,12 @@ export function readLivingReferences(saved: unknown, legacyLinks: readonly strin
  * Parent is a runtime fence, not part of persistent input validity: moving alone does not change its knowledge.
  */
 export function sameLivingTarget(before: LivingSourceNode, after: LivingSourceNode | undefined): boolean {
-  return !!after && before.id === after.id && before.path === after.path &&
-    (before.parentId ?? null) === (after.parentId ?? null);
+  return (
+    !!after &&
+    before.id === after.id &&
+    before.path === after.path &&
+    (before.parentId ?? null) === (after.parentId ?? null)
+  );
 }
 
 /** Editing the question or reordering existing links cannot rebind a stored
@@ -69,7 +74,12 @@ export interface LivingSourceFailure {
 
 /** The Vault adapter must check authorization and provide a unique resolved file identity. */
 export interface LivingSourcePort {
-  resolveAuthorized(link: string, fromPath: string, role: "explicit" | "map", exact?: true): LivingAuthorizedNote | undefined;
+  resolveAuthorized(
+    link: string,
+    fromPath: string,
+    role: "explicit" | "map",
+    exact?: true
+  ): LivingAuthorizedNote | undefined;
 }
 
 export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], port: LivingSourcePort) {

@@ -26,7 +26,8 @@ import {
   livingFenceAfterCommit,
   readLivingFence,
   LIVING_NODE_BEGIN as BEGIN,
-  LIVING_NODE_END as END
+  LIVING_NODE_END as END,
+  livingNoteWithoutManaged
 } from "../../core/living-node-region";
 const HASH_KEY = "living-node-region-hash";
 const OWNERSHIP_KEY = "living-node-ownership";
@@ -566,29 +567,19 @@ export function readLivingMarkdown(content: string): LivingKnowledge {
  * A torn or unreadable region is cut out entirely. A note with neither region nor metadata is returned unchanged.
  */
 export function livingNoteForModel(content: string): string {
-  const keys = Object.keys(frontmatter(content)).filter(key => key.startsWith("living-node-"));
-  if (!keys.length && !content.includes(BEGIN) && !content.includes(END)) return content;
+  const stripped = livingNoteWithoutManaged(content);
+  if (stripped === content) return content;
   let view = "";
   try {
     view = JSON.stringify(livingModelView(readLivingMarkdown(content)));
   } catch {
-    view = "";
+    return stripped;
   }
-  let out = keys.length ? setFrontmatterKeys(content, Object.fromEntries(keys.map(key => [key, null]))) : content;
-  let first = true;
-  for (;;) {
-    const start = out.indexOf(BEGIN);
-    const end = out.indexOf(END, Math.max(start, 0));
-    if (start < 0 || end < 0) break;
-    out = out.slice(0, start) + (first ? view : "") + out.slice(end + END.length);
-    first = false;
-  }
-  // A lone marker means a torn region: fail closed by cutting from (or up to) it.
-  const lone = out.indexOf(BEGIN);
-  if (lone >= 0) out = out.slice(0, lone);
-  const loneEnd = out.indexOf(END);
-  if (loneEnd >= 0) out = out.slice(loneEnd + END.length);
-  return out;
+  const start = content.indexOf(BEGIN);
+  const end = content.indexOf(END, Math.max(start, 0));
+  if (start < 0 || end < 0) return stripped;
+  // The view sits where the region was; the shared helper then drops the metadata and any leftover marker.
+  return livingNoteWithoutManaged(content.slice(0, start) + view + content.slice(end + END.length));
 }
 
 /**

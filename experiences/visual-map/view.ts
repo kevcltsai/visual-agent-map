@@ -221,12 +221,7 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import {
-  livingNoteForModel,
-  livingRestoreSnapshot,
-  livingWithoutFence,
-  renderLivingPreview
-} from "./living-node-markdown";
+import { livingRestoreSnapshot, livingWithoutFence, renderLivingPreview } from "./living-node-markdown";
 import { livingReasonKey } from "./living-node-state";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
@@ -22600,7 +22595,7 @@ export class VisualAgentMapView extends ItemView {
       } else if (chip.kind === "file") {
         const source = await this.readChatFile(chip.path);
         if (source) {
-          files.push({ path: source.file.path, content: livingNoteForModel(source.text) });
+          files.push({ path: source.file.path, content: source.text });
           if (this.chatFiles.noteAttached(source.file.path, source.text))
             this.markOwnFilesRecorded(this.chatLastRecord);
         }
@@ -22613,9 +22608,7 @@ export class VisualAgentMapView extends ItemView {
     // A research this turn starts gets the same attachments (read once, here); a later turn replaces them.
     this.chatTurnReferences = chatResearchReferenceGroups({
       files,
-      activeFile: activeSource
-        ? { path: activeSource.file.path, content: livingNoteForModel(activeSource.text) }
-        : null,
+      activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       snippets
     });
     // Titles let the model tell "make a new map" from "go to that one"; a failure to list them only leaves the list empty.
@@ -22666,9 +22659,7 @@ export class VisualAgentMapView extends ItemView {
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
-      activeFile: activeSource
-        ? { path: activeSource.file.path, content: livingNoteForModel(activeSource.text) }
-        : null,
+      activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),

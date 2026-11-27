@@ -27,6 +27,35 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
   };
 }
 
+/**
+ * A note with every managed Living Node part removed: the `living-node-*` frontmatter keys (ownership index, hashes,
+ * replay metadata) and any region or lone marker (a torn region is cut from or up to its marker). What may reach a
+ * provider when the richer model view is unavailable. A note with none of these is returned unchanged.
+ */
+export function livingNoteWithoutManaged(content: string): string {
+  let out = content;
+  const match = /^(---\r?\n)([\s\S]*?)(\r?\n---(?:\r?\n|$))/.exec(out);
+  if (match && /(^|\n)["']?living-node-/.test(match[2])) {
+    let inLiving = false;
+    const kept = match[2].split(/\r?\n/).filter(line => {
+      if (/^[^\s#-]|^-\S/.test(line) || /^["']/.test(line)) inLiving = /^["']?living-node-/.test(line);
+      return !inLiving;
+    });
+    out = match[1] + kept.join("\n") + match[3] + out.slice(match[0].length);
+  }
+  for (;;) {
+    const start = out.indexOf(LIVING_NODE_BEGIN);
+    const end = start < 0 ? -1 : out.indexOf(LIVING_NODE_END, start);
+    if (end < 0) break;
+    out = out.slice(0, start) + out.slice(end + LIVING_NODE_END.length);
+  }
+  const lone = out.indexOf(LIVING_NODE_BEGIN);
+  if (lone >= 0) out = out.slice(0, lone);
+  const loneEnd = out.indexOf(LIVING_NODE_END);
+  if (loneEnd >= 0) out = out.slice(loneEnd + LIVING_NODE_END.length);
+  return out;
+}
+
 export type LivingMarkerState = "none" | "paired" | "corrupt";
 
 /** Marker presence, not the ai-card flag: exactly one begin then one end is paired; any other use of either marker is corrupt. */

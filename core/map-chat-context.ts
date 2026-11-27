@@ -1,5 +1,6 @@
 import { normalizeVaultPath } from "./map-chat-guard";
 import { contentHash } from "./content-hash";
+import { livingNoteWithoutManaged } from "./living-node-region";
 
 export { contentHash } from "./content-hash";
 import { estimateMapChatTokens } from "./map-chat-tokens";
@@ -663,8 +664,11 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     return key;
   };
   // A file cut to its beginning was not read whole: no content hash (it cannot be edited) and it is not a basis of new cards.
+  // Everything below sends the text with a Living Node note's managed parts removed (suppression holds, ownership index); the
+  // contentHash stays the hash of the real file, so an edit of such a note is refused against the baseline.
   const files = input.files.map(file => {
-    const sent = head(file.content, shrink.fileChars);
+    const text = livingNoteWithoutManaged(file.content);
+    const sent = head(text, shrink.fileChars);
     if (sent.cut) {
       shortened = true;
       return {
@@ -672,19 +676,20 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         contentHash: null,
         content: sent.text,
         truncated: true,
-        totalChars: file.content.length
+        totalChars: text.length
       };
     }
     basis.read.push({ path: file.path, title: noteTitle(file.path) });
     const key = record(file.path, file.content);
-    return { path: file.path, contentHash: key === null ? null : hashes[key], content: file.content };
+    return { path: file.path, contentHash: key === null ? null : hashes[key], content: text };
   });
   const active = input.activeFile
     ? (() => {
         const key = normalizeVaultPath(input.activeFile.path);
         const duplicate = key !== null && input.files.some(file => normalizeVaultPath(file.path) === key);
         if (duplicate) return { path: input.activeFile.path, sameAsListedFile: true };
-        const sent = head(input.activeFile.content, shrink.fileChars);
+        const text = livingNoteWithoutManaged(input.activeFile.content);
+        const sent = head(text, shrink.fileChars);
         if (sent.cut) {
           shortened = true;
           return {
@@ -692,7 +697,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
             contentHash: null,
             content: sent.text,
             truncated: true,
-            totalChars: input.activeFile.content.length
+            totalChars: text.length
           };
         }
         record(input.activeFile.path, input.activeFile.content);
@@ -700,7 +705,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         return {
           path: input.activeFile.path,
           contentHash: key === null ? null : hashes[key],
-          content: input.activeFile.content
+          content: text
         };
       })()
     : null;
@@ -723,7 +728,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
   for (const file of input.ownFiles ?? []) {
     const key = normalizeVaultPath(file.path);
     if (key === null) continue;
-    const chars = file.content.length;
+    const text = livingNoteWithoutManaged(file.content);
+    const chars = text.length;
     // A requested file the read allowance cannot hold still gets the ordinary budget, so a read is not lost to the allowance alone.
     const fromRead = !!file.requested && chars <= readLeft;
     if (chars > MAP_CHAT_FILE_CHAR_LIMIT || (!fromRead && chars > ownLeft)) {
@@ -734,7 +740,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     else ownLeft -= chars;
     basis.read.push({ path: file.path, title: noteTitle(file.path) });
     record(file.path, file.content);
-    ownSent.push({ path: file.path, contentHash: hashes[key], content: file.content });
+    ownSent.push({ path: file.path, contentHash: hashes[key], content: text });
   }
   if (ownDeferred.length) shortened = true;
   const mapTitles = [...new Set((input.mapTitles ?? []).map(title => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(

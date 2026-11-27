@@ -99,6 +99,56 @@ export function isStaleLinkWrite(before: string, after: string, pairs: readonly 
   return walk(0, 0);
 }
 
+const PROTECTED = [
+  /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/g,
+  /<!-- visual-agent-map:references:start -->[\s\S]*?<!-- visual-agent-map:references:end -->/g,
+  /<!-- vam-living-node:begin v1 -->[\s\S]*?<!-- vam-living-node:end v1 -->/g
+];
+
+/**
+ * What Obsidian's link update would have done: links (wiki or markdown) to a renamed note, as written with its old path
+ * or its bare old name, now point at the new one. Frontmatter, the references block and the Living Node region are
+ * VAM's and already followed the rename, so they are left as they are.
+ */
+export function followRenamedLinks(content: string, pairs: readonly RenamePair[]): string {
+  const keep: [number, number][] = [];
+  for (const pattern of PROTECTED)
+    for (const m of content.matchAll(new RegExp(pattern))) keep.push([m.index, m.index + m[0].length]);
+  const inside = (at: number): boolean => keep.some(([start, end]) => at >= start && at < end);
+  const rename = (target: string, encoded: boolean): string => {
+    let decoded = target;
+    if (encoded) {
+      try {
+        decoded = decodeURIComponent(target);
+      } catch {
+        return target;
+      }
+    }
+    const found = bare(decoded);
+    const extension = /\.md$/i.test(decoded) ? ".md" : "";
+    for (const [from, to] of pairs) {
+      const old = bare(from),
+        next = bare(to);
+      let replacement: string | undefined;
+      if (found === old) replacement = next;
+      else if (old.endsWith(`/${found}`)) replacement = next.slice(next.lastIndexOf("/") + 1);
+      if (replacement !== undefined) return encoded ? encodeURI(replacement + extension) : replacement + extension;
+    }
+    return target;
+  };
+  return content
+    .replace(
+      /(!?\[\[)([^\]|#^\n]+)((?:[#^|][^\]\n]*)?\]\])/g,
+      (all, open: string, target: string, rest: string, at: number) =>
+        inside(at) ? all : `${open}${rename(target, false)}${rest}`
+    )
+    .replace(
+      /(!?\[[^\]\n]*\]\(<?)([^)#>\n]+)((?:#[^)\n]*)?>?\))/g,
+      (all, open: string, target: string, rest: string, at: number) =>
+        inside(at) ? all : `${open}${rename(target, true)}${rest}`
+    );
+}
+
 /**
  * Remembers what VAM wrote into a note when it followed a rename. If the note's next modification is exactly an
  * Obsidian link update applied at stale positions that broke the note's structure, VAM's version is put back; any other
@@ -139,12 +189,16 @@ export class RenameRepairWatch {
       return;
     }
     let restored = false;
+    // Obsidian's update was meant for every link to the renamed note, so the user's own links follow it too.
+    const repaired = followRenamedLinks(watch.content, watch.pairs);
     await this.io.process(path, text => {
       if (text !== current) return text;
       restored = true;
-      return watch.content;
+      return repaired;
     });
-    if (restored) log(`rename_stale_link_write_repaired path=${path}`);
-    else this.watched.delete(path);
+    if (restored) {
+      watch.content = repaired;
+      log(`rename_stale_link_write_repaired path=${path}`);
+    } else this.watched.delete(path);
   }
 }

@@ -7,7 +7,7 @@ const { load, fixture, DEFAULT_SETTINGS, obsidian } = require('./support.cjs');
 
 const quiet = { ...obsidian, Notice: class { setMessage() {} hide() {} } };
 const { default: Plugin } = load('main.ts', { obsidian: quiet });
-const { isStaleLinkWrite, structureIsHealthy, markersLost } = load('core/rename-repair.ts');
+const { followRenamedLinks, isStaleLinkWrite, structureIsHealthy, markersLost } = load('core/rename-repair.ts');
 
 const REGION = ['<!-- vam-living-node:begin v1 -->', 'living text', '<!-- vam-living-node:end v1 -->'].join('\n');
 
@@ -166,4 +166,20 @@ test('Always update: Obsidian wrote first, VAM rewrites on the fresh content and
   assert.equal(h.repo.renameWatch.watching(h.note.path), false);
   assertIntact(h.contents.get(h.note.path));
   assert.ok(!h.contents.get(h.note.path).includes('Src0'));
+});
+
+test('after a repair the user\'s own links to the renamed note follow it too, markers intact', async () => {
+  const h = await harness();
+  const withLink = h.contents.get(h.note.path).replace('<!-- visual-agent-map:detail:start -->\n', '<!-- visual-agent-map:detail:start -->\nSee [[Sources/Src0|the source]] and [Src](Sources/Src0.md) and [[Src0]].\n');
+  assert.notEqual(withLink, h.contents.get(h.note.path), 'the Detail marker is in the fixture');
+  h.contents.set(h.note.path, withLink);
+  const stale = obsidianUpdater(h, '[[Sources/Src0]]', '[[S1]]');
+  await rename(h, 'Sources/Src0.md', 'Sources/S1.md');
+  const vam = h.contents.get(h.note.path);
+  await stale();
+  await modified(h);
+  const text = h.contents.get(h.note.path);
+  assertIntact(text);
+  assert.ok(text.includes('See [[Sources/S1|the source]] and [Src](Sources/S1.md) and [[S1]].'), text);
+  assert.equal(text, followRenamedLinks(vam, [['Sources/Src0.md', 'Sources/S1.md']]));
 });

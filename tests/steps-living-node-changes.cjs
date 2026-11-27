@@ -343,3 +343,15 @@ test('T06: the deletion memory also drops trivial variants of the deleted text (
   }
   assert.equal(apply(gone, { kind: 'output', text: 'cafe is open today', evidence: ['e1'] }).aiLatest.text, 'cafe is open today');
 });
+
+test('A08/A09: a daily series appends the next day; a correction stating another period is refused; a period-less plan still corrects', () => {
+  const day = base({ records: [record({ granularity: 'day', eventTime: '2026-11-26', claim: '100' }), record({ id: 'plan', scope: 'plan', granularity: 'event', eventTime: null, claim: 'Starter offered' })] });
+  const next = apply(day, { kind: 'append', id: 'r2', subject: 'stock', scope: 'price', granularity: 'day', eventTime: '2026-11-27', claim: '105', evidence: ['e2'] });
+  assert.equal(next.records.length, 3);
+  assert.equal(next.records.find(r => r.id === 'r1').claim, '100');
+  assert.throws(() => apply(day, { kind: 'correct', id: 'r1', claim: '105', reason: 'newer', evidence: ['e2'], eventTime: '2026-11-27' }), /period-mismatch-correction/);
+  assert.throws(() => apply(day, { kind: 'invalidate', id: 'r1', reason: 'newer', evidence: ['e2'], eventTime: '2026-11-27' }), /period-mismatch-correction/);
+  assert.equal(apply(day, { kind: 'correct', id: 'r1', claim: '101', reason: 'fix', evidence: ['e2'], eventTime: '2026-11-26' }).records.find(r => r.id === 'r1').claim, '101');
+  const gone = apply(day, { kind: 'correct', id: 'plan', claim: 'Starter no longer available', reason: 'discontinued', evidence: ['e2'], eventTime: '2026-11-27' });
+  assert.equal(gone.records.find(r => r.id === 'plan').claim, 'Starter no longer available');
+});

@@ -287,6 +287,19 @@ export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {
   };
 }
 
+/**
+ * A `correct`/`invalidate` that states the period of its observation (`eventTime`) may only touch a record with that
+ * same period, or one without a period: an observation for another period is a new record, never a correction.
+ */
+export function livingSupersedeMismatch(base: Pick<LivingKnowledge, "records">, raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const op = raw as Record<string, unknown>;
+  if ((op.kind !== "correct" && op.kind !== "invalidate") || typeof op.eventTime !== "string") return false;
+  const old = base.records.find(record => record.id === op.id);
+  if (!old || periodKey(old) === null) return false;
+  return periodKey({ ...old, eventTime: op.eventTime }) !== periodKey(old);
+}
+
 export function livingSuppressionV2Entry(entry: LivingSuppressionV2): string {
   const parts: unknown[] = [entry.v, entry.type, entry.scopeKey, entry.periodKey, entry.fp2];
   if (entry.valueKey) parts.push(entry.valueKey);
@@ -579,8 +592,12 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     if (kind !== "correct" && kind !== "dispute" && kind !== "invalidate") throw new Error("unknown-operation");
     exactKeys(
       operation,
-      kind === "invalidate" ? ["kind", "id", "reason", "evidence"] : ["kind", "id", "claim", "reason", "evidence"]
+      kind === "invalidate"
+        ? ["kind", "id", "reason", "evidence", "eventTime"]
+        : ["kind", "id", "claim", "reason", "evidence", "eventTime"]
     );
+    if (livingSupersedeMismatch({ records: [...records.values()] }, operation))
+      throw new Error("period-mismatch-correction");
     const evidence = evidenceFor(operation.evidence, allowed);
     if (!evidence.length) throw new Error("missing-evidence");
     // A web excerpt is the model's summary, never verified page text: it cannot alone replace or retract a claim.

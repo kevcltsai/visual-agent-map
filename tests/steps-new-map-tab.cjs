@@ -110,7 +110,7 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
     view.focusNode = (node, persist) => { log.push(`focus:${node.id}`); proto.focusNode.call(view, node, persist); };
     view.startShallowResearch = async () => { log.push('research'); };
     // Not under test: widths, shapes, status bar, the stage transform and the write queue (writes records what would have been saved).
-    view.syncChatNarrow = view.fitKindShapes = view.syncStatusBarClearance = () => {};
+    view.syncChatNarrow = view.syncHeaderNarrow = view.fitKindShapes = view.syncStatusBarClearance = () => {};
     view.transform = () => { counts.transform++; };
     view.queueViewportWrite = () => { writes.push({ ...view.map.viewport, width: view.viewportEl.clientWidth }); };
     // A stand-in for the pane's element and Obsidian's event helpers: onOpen itself is the real one.
@@ -573,4 +573,28 @@ test('M3 a viewport save scheduled while shown is written even if the tab hides 
   assert.deepEqual(w.writes, [], 'a save asked for while hidden is not scheduled');
   await w.workspace.revealLeaf(leaf); view.saveViewport(); await w.flush();
   assert.equal(w.writes.length, 1); assert.equal(w.writes[0].width, 800);
+});
+
+// B17 (P1.7): every map keeps its own viewport. Switching A → B → A in one tab writes A's pending pan before B is read, and A comes back where it was.
+test('V1 switching maps A → B → A in one tab: A keeps its own viewport, B keeps its own', async () => {
+  const { repo } = fixture('en');
+  await repo.ensureWorkspace();
+  const w = makeWorld({ realRepo: repo });
+  const pathA = await repo.createMap('Map A'), pathB = await repo.createMap('Map B');
+  await repo.updateMap(pathB, map => { map.viewport = { x: -40, y: 12, zoom: 0.5 }; });
+  const { view } = w.makeView(pathA);
+  view.map = await repo.readMap(pathA);
+  const open = w.VisualAgentMapView.prototype.openMapInMutation;
+  Object.assign(view, { hydrate: async () => {}, render: () => {}, reconcileBookNotes: async () => {} });
+  w.plugin.closeStaleDetails = () => {};
+  w.workspace.requestSaveLayout = () => {};
+  // A pan on A that is still waiting for its 250 ms save when the switch starts.
+  view.map.viewport = { x: 210, y: -35, zoom: 1.4 };
+  view.viewportTimer = setTimeout(() => assert.fail('the pending save must be flushed by the switch, not by its timer'), 60000);
+  await w.plugin.mutate(() => open.call(view, pathB));
+  assert.equal(view.viewportTimer, null, 'the switch claimed the pending save');
+  assert.equal(view.path, pathB); assert.deepEqual(plain(view.map.viewport), { x: -40, y: 12, zoom: 0.5 }, 'B opens at its own viewport');
+  await w.plugin.mutate(() => open.call(view, pathA));
+  assert.deepEqual(plain(view.map.viewport), { x: 210, y: -35, zoom: 1.4 }, "A comes back at the viewport it was left at");
+  assert.deepEqual(plain((await repo.readMap(pathB)).viewport), { x: -40, y: 12, zoom: 0.5 }, 'and B on disk was not touched');
 });

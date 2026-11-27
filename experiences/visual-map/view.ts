@@ -235,7 +235,7 @@ import { livingReasonKey } from "./living-node-state";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { livingTrialReason } from "./living-node-trial-reason";
+import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
@@ -15184,7 +15184,11 @@ export class VisualAgentMapView extends ItemView {
       if (saved && !node && current()) this.closeAiCardPopover();
       return saved;
     } catch (error) {
-      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
+      if (current()) {
+        const failure = this.plugin.recordFailure(t("ui.ai_card"), error);
+        const reason = livingSaveReason(error);
+        new Notice(reason ? t("ui.living_node_save_failed_0", t(reason)) : failure);
+      }
       return undefined;
     }
   }

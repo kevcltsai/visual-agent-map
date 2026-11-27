@@ -208,7 +208,11 @@ S.test('A43 projection: range records first (oldest to newest), then timed newes
   assert.equal(all.omitted.length, 0);
   const noUntimed = projectLivingRecords(base, parseLivingSelectors('track', []), one * 5);
   assert.deepEqual(S.plain(noUntimed.omitted.map(r => r.id)), ['d']);
-  assert.throws(() => projectLivingRecords(base, parseLivingSelectors('2020', []), one * 2), /living-range-too-large: 2020/);
+  assert.throws(() => projectLivingRecords(base, parseLivingSelectors('2020-01', []), one * 2), /living-range-too-large: 2020-01/);
+  const pref = projectLivingRecords(base, parseLivingSelectors('track 2020 revenue', []), one * 2);
+  assert.deepEqual(S.plain(pref.required), [], 'a bare year is a preference, not a required range');
+  assert.deepEqual([...pref.shown], ['a', 'b'], 'its records first, oldest to newest, partly omitted');
+  assert.ok(pref.omitted.length > 0);
   assert.throws(() => projectLivingRecords(base, parseLivingSelectors('2020-01-01..2020-01-03', []), one * 2), /living-range-too-large: 2020-01-01\.\.2020-01-03/);
   const byId = projectLivingRecords(base, parseLivingSelectors('see d', ['d']), one * 3);
   assert.deepEqual(S.plain(byId.required.map(r => r.id)), ['d']);
@@ -260,7 +264,7 @@ S.integrationTest('A43: a 600-record history answers an exact old date in one ca
 });
 
 S.integrationTest('A43: a required range that cannot fit fails closed before any call and leaves every byte unchanged', async () => {
-  const f = await runtimeFixture({ count: 600, prompt: 'Summarize 2020' });
+  const f = await runtimeFixture({ count: 600, prompt: 'Summarize 2020-01-01..2020-12-31' });
   const before = readLivingMarkdown(f.contents.get('parent.md'));
   const result = await runLivingRound(f.port, ['parent']);
   assert.equal(result.get('parent'), 'failed');
@@ -268,7 +272,15 @@ S.integrationTest('A43: a required range that cannot fit fails closed before any
   const after = readLivingMarkdown(f.contents.get('parent.md'));
   assert.equal(after.revision, before.revision, 'no knowledge write');
   assert.equal(after.records.length, 600);
-  assert.match(f.failures.join('|'), /living-range-too-large: 2020/);
+  assert.match(f.failures.join('|'), /living-range-too-large: 2020-01-01\.\.2020-12-31/);
+});
+
+S.integrationTest('A43: a bare year in the Prompt is a preference: the card still runs and discloses what was omitted', async () => {
+  const f = await runtimeFixture({ count: 600, prompt: 'track 2020 revenue' });
+  const result = await runLivingRound(f.port, ['parent']);
+  assert.notEqual(result.get('parent'), 'failed', f.failures.join('|'));
+  assert.equal(f.prompts.length, 1);
+  assert.match(f.prompts[0], /"omitted":\{"count":\d+/);
 });
 
 S.integrationTest('A43: one budget, in priority order: recent records come before optional sources, which are omitted with disclosure', async () => {
@@ -302,6 +314,14 @@ S.integrationTest('A43/B2: a quoted heading path delivers exactly that section o
     assert.equal(bad.f.prompts.length, 0, label);
     assert.match(bad.text, new RegExp('living-section-ambiguous: ' + label.replace(/>/g, '>')), label);
   }
+});
+
+S.integrationTest('A43: a heading path whose note is no source warns section-path-no-source and does not fail', async () => {
+  const f = await runtimeFixture({ count: 0, prompt: 'Check "Elsewhere > A"\n\nSources: [[Note]]', notes: { Note: '# Note\n## A\nalpha-text\n' } });
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(f.prompts.length, 1, 'the unmatched path does not stop the call');
+  assert.ok(!f.failures.some(text => /section|range|context/.test(text)), f.failures.join('|'));
+  assert.ok(f.prompts[0].includes('section-path-no-source: Elsewhere > A'));
 });
 
 S.integrationTest('T04 follow-up: the checked artifact comes from observed web activity, not model text, and a no-change run records it', async () => {

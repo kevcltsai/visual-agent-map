@@ -12,6 +12,8 @@ export interface LivingRange {
   /** Inclusive calendar days, YYYY-MM-DD. */
   start: string;
   end: string;
+  /** A bare `YYYY` is only a preference: its records come first but may be partly omitted with disclosure. */
+  preferred?: boolean;
 }
 
 export interface LivingSelectors {
@@ -48,7 +50,7 @@ const RANGE =
   /(?<![\w.-])(?:(\d{4}-\d\d-\d\d)\.\.(\d{4}-\d\d-\d\d)|Q([1-4])\s+((?:19|20)\d\d)|(\d{4}-\d\d-\d\d)|((?:19|20)\d\d-\d\d)|((?:19|20)\d\d))(?![\w-]|\.\.)/gi;
 const QUOTED = /「([^」]+)」|"([^"]+)"|“([^”]+)”/g;
 
-/** The one grammar for what a card prompt may authorise: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`,
+/** The one grammar for what a card prompt may authorise (a bare `YYYY` is only a preference): `YYYY`, `YYYY-MM`, `YYYY-MM-DD`,
  * `YYYY-MM-DD..YYYY-MM-DD`, `Qn YYYY`, record ids already in the card, and quoted heading paths. Anything else is plain text. */
 export function parseLivingSelectors(prompt: string, knownIds: Iterable<string> = []): LivingSelectors {
   const ranges: LivingRange[] = [];
@@ -67,7 +69,7 @@ export function parseLivingSelectors(prompt: string, knownIds: Iterable<string> 
       });
     } else {
       const one = span(text);
-      if (one) ranges.push({ label: text, ...one });
+      if (one) ranges.push({ label: text, ...one, ...(/^\d{4}$/.test(text) ? { preferred: true } : {}) });
     }
   }
   const known = new Set(knownIds);
@@ -141,6 +143,11 @@ function inRange(record: LivingRecord, selectors: LivingSelectors): boolean {
   return !!own && selectors.ranges.some(range => own.start <= range.end && own.end >= range.start);
 }
 
+function inPreferred(record: LivingRecord, selectors: LivingSelectors): boolean {
+  const own = record.eventTime ? span(record.eventTime) : undefined;
+  return !!own && selectors.ranges.some(range => range.preferred && own.start <= range.end && own.end >= range.start);
+}
+
 export interface LivingProjection {
   required: LivingRecord[];
   shown: Set<string>;
@@ -149,28 +156,32 @@ export interface LivingProjection {
   recentSize: number;
 }
 
-/** Which records the model sees: (a) records inside an authorised range or named, oldest first, are required;
+/** Which records the model sees: (a) records inside a required range (not a bare year) or named, oldest first, are required; a bare year's records follow, oldest first, as a preference;
  * then (b) remaining timed records newest first, then (c) untimed records, ties by id. A required overflow fails closed. */
 export function projectLivingRecords(
   base: Pick<LivingKnowledge, "records">,
   selectors: LivingSelectors,
   budget: number
 ): LivingProjection {
-  const required = base.records
-    .filter(record => inRange(record, selectors))
-    .sort((a, b) => (eventMillis(a) ?? 0) - (eventMillis(b) ?? 0) || byId(a, b));
+  const strict: LivingSelectors = { ...selectors, ranges: selectors.ranges.filter(range => !range.preferred) };
+  const byTime = (a: LivingRecord, b: LivingRecord): number =>
+    (eventMillis(a) ?? 0) - (eventMillis(b) ?? 0) || byId(a, b);
+  const required = base.records.filter(record => inRange(record, strict)).sort(byTime);
   const requiredSize = required.reduce((sum, record) => sum + sizeOf(record), 0);
   if (requiredSize > budget)
     throw new Error(
-      "living-range-too-large: " + [...selectors.ranges.map(range => range.label), ...selectors.ids].join(", ")
+      "living-range-too-large: " + [...strict.ranges.map(range => range.label), ...selectors.ids].join(", ")
     );
   const shown = new Set(required.map(record => record.id));
   const rest = base.records.filter(record => !shown.has(record.id));
+  const preferred = rest.filter(record => inPreferred(record, selectors));
+  const others = rest.filter(record => !inPreferred(record, selectors));
   const ranked = [
-    ...rest
+    ...preferred.sort(byTime),
+    ...others
       .filter(record => eventMillis(record) !== undefined)
       .sort((a, b) => eventMillis(b)! - eventMillis(a)! || byId(a, b)),
-    ...rest.filter(record => eventMillis(record) === undefined).sort(byId)
+    ...others.filter(record => eventMillis(record) === undefined).sort(byId)
   ];
   let recentSize = 0;
   for (const record of ranked) {

@@ -427,7 +427,9 @@ async function readInputs(
     candidates.push({ identity, title, content, scoped, scope, revision, evidenceId, optional });
   };
   /** A quoted `Note > H2 > H3` path whose note is this source delivers exactly that section; none or several fail closed. */
+  const sectionTitles = new Set<string>();
   const sections = (title: string, text: string): string | undefined => {
+    sectionTitles.add(title);
     const picked = selectors.paths
       .filter(path => path[0] === title)
       .map(path => resolveLivingSection(text, path.slice(1), path));
@@ -455,6 +457,8 @@ async function readInputs(
       add(source.identity, file.basename, readable, undefined, false, sections(file.basename, readable));
     }
   }
+  for (const path of selectors.paths)
+    if (!sectionTitles.has(path[0])) warnings.push("section-path-no-source: " + path.join(" > "));
   const mapContext = await readLivingMapContext(port);
   if (mapContext.unavailable > 0) warnings.push("map-source-unavailable");
   for (const group of mapContext.groups) {

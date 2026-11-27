@@ -639,6 +639,7 @@ S.integrationTest('Living Node copy: copied formal knowledge keeps ownership and
   const f = await setup();
   const withLinks = { ...proposal, operations: [{ kind: 'output', text: 'Findings from [[Source]]', evidence: ['e1'] }] };
   assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: withLinks })), 'written');
+  await f.app.vault.process(f.files.get(path), c => c.replace(/\n---\r?\n/, '\nliving-node-checked: "t9"\n---\n'));
   const source = f.contents.get(path);
   const mapPath = 'Agent Workspace/Topics/map/Map.md';
   const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -648,6 +649,7 @@ S.integrationTest('Living Node copy: copied formal knowledge keeps ownership and
   const fm = S.obsidian.parseYaml(copied.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
   assert.equal(fm['node-id'], copy.id);
   assert.notEqual(copy.id, 'card');
+  assert.equal(fm['living-node-checked'], undefined, 'living-node-checked');
   assert.equal(fm['topic-id'], 'map');
   for (const key of ['living-node-last-execution', 'living-node-last-successful-check', 'living-node-last-attempt',
     'living-node-last-content-change', 'living-node-outcome', 'living-node-input-revision', 'living-node-success-knowledge'])

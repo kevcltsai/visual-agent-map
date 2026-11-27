@@ -168,7 +168,7 @@ import {
   type CoverLook,
   type CoverPosition
 } from "./card-cover";
-import { paintCardEdge, type CardEdgeSide } from "./card-edge-entry";
+import { paintCardEdge, type CardEdgeEntry, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
@@ -9710,19 +9710,23 @@ export class VisualAgentMapView extends ItemView {
       !isManagedMapPath(this.plugin.settings, this.path)
     )
       return;
-    paintCardEdge(
-      card,
-      [
-        {
-          kind: "add",
-          label: t("ui.card_edge_add"),
-          ariaLabel: t("ui.card_edge_add_label"),
-          onClick: () => this.addTopicFromEdge(node)
-        }
-      ],
-      this.edgeSideOf(node),
-      !this.renderingCard
-    );
+    const entries: CardEdgeEntry[] = [
+      {
+        kind: "add",
+        label: t("ui.card_edge_add"),
+        ariaLabel: t("ui.card_edge_add_label"),
+        onClick: () => this.addTopicFromEdge(node)
+      }
+    ];
+    // The AI card entry opens the usual setup popover; the card is made only when it is saved (V3.3 A7).
+    if (!this.bookLock().ai)
+      entries.push({
+        kind: "ai",
+        label: t("ui.card_edge_ai"),
+        ariaLabel: t("ui.card_edge_ai_label"),
+        onClick: () => this.whenEditing(() => this.openAiCardPopover(null, node))
+      });
+    paintCardEdge(card, entries, this.edgeSideOf(node), !this.renderingCard);
   }
   /** The side child cards grow toward (read from the layout, never changed); other layouts fall back to the right. */
   private edgeSideOf(node: MapNode): CardEdgeSide {
@@ -12549,6 +12553,15 @@ export class VisualAgentMapView extends ItemView {
     // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the top-left corner: a picture
     // placed in the middle of the canvas must stay uncovered.
     const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    // The AI root opens the AI card setup with no parent; the card is made only when it is saved (V3.3 A7).
+    if (this.cardTextEditable() && !this.bookLock().ai && isManagedMapPath(this.plugin.settings, this.path)) {
+      const ai = box.createEl("button", { cls: "vam-empty-add-ai", text: t("ui.empty_add_ai_root") });
+      ai.setAttr("aria-label", t("ui.empty_add_ai_root_label"));
+      ai.addEventListener("click", event => {
+        event.stopPropagation();
+        this.whenEditing(() => this.openAiCardPopover(null, null));
+      });
+    }
     box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
     add.addEventListener("click", event => {
       event.stopPropagation();

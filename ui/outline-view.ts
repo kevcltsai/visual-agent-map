@@ -15,6 +15,11 @@ export class OutlineView extends ItemView {
   private collapsed = new Set<string>();
   /** The fold button of each row in the tree as last drawn, so focus can follow a rebuild. */
   private toggleEls = new Map<string, HTMLElement>();
+  /** Rows of the tree as last drawn, so a fold can change without rebuilding them. */
+  private rowEls = new Map<string, HTMLElement>();
+  private parentOf = new Map<string, string | null>();
+  /** Collapsed rows opened only while the canvas selection sits below them: outline DOM state, never written to the map. */
+  private tempOpen = new Set<string>();
   private query = "";
   private activePath = "";
   constructor(
@@ -48,7 +53,10 @@ export class OutlineView extends ItemView {
     this.titles = titles;
     this.markers = markers;
     this.links = links;
-    if (map) this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
+    if (map) {
+      this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
+      this.tempOpen = new Set([...this.tempOpen].filter(id => this.collapsed.has(id)));
+    }
     this.render();
     if (restoreFocus) {
       const updated = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
@@ -57,16 +65,46 @@ export class OutlineView extends ItemView {
         updated.setSelectionRange(selection[0], selection[1]);
     }
   }
-  /** Moves the active-row marker in place; the tree, its search box and scroll position stay untouched. */
+  /**
+   * Moves the active-row marker in place; the tree, its search box and scroll position stay untouched.
+   * Collapsed ancestors of the active row open for as long as it is active (outline DOM only) and it is scrolled into view.
+   * Nothing here takes focus.
+   */
   setActive(path: string): void {
     if (path === this.activePath) return;
     this.activePath = path;
+    let activeRow: HTMLElement | null = null;
     const rows = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-outline-note"));
     for (const row of rows) {
       const active = !!path && row.getAttribute("data-path") === path;
       row.toggleClass("is-active", active);
-      if (active) row.setAttr("aria-current", "true");
-      else row.removeAttribute("aria-current");
+      if (active) {
+        row.setAttr("aria-current", "true");
+        activeRow = row;
+      } else row.removeAttribute("aria-current");
+    }
+    const open = new Set<string>();
+    const node = path ? this.map?.nodes.find(item => item.path === path) : undefined;
+    for (let id = node ? this.parentOf.get(node.id) : null; id; id = this.parentOf.get(id))
+      if (this.collapsed.has(id)) open.add(id);
+    this.tempOpen = open;
+    this.refreshFolds();
+    activeRow?.scrollIntoView?.({ block: "nearest" });
+  }
+  /** Shows or hides each row and its fold button from the collapsed set (minus the temporary opens), without recreating any row. */
+  private refreshFolds(): void {
+    const query = foldOutlineSearch(this.query.trim());
+    const closed = (id: string): boolean => !query && this.collapsed.has(id) && !this.tempOpen.has(id);
+    for (const [id, row] of this.rowEls) {
+      let folded = false;
+      for (let parent = this.parentOf.get(id); parent && !folded; parent = this.parentOf.get(parent))
+        folded = closed(parent);
+      row.toggleClass("is-folded", folded);
+      const toggle = this.toggleEls.get(id);
+      if (!toggle) continue;
+      toggle.setText(closed(id) ? "▸" : "▾");
+      toggle.setAttr("aria-label", closed(id) ? t("ui.expand") : t("ui.collapse"));
+      toggle.setAttr("aria-expanded", String(!closed(id)));
     }
   }
   private render(): void {
@@ -128,35 +166,43 @@ export class OutlineView extends ItemView {
   private renderTree(): void {
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
+    this.rowEls.clear();
+    this.parentOf.clear();
     if (!this.map) return;
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = new Map<string | null, MapNode[]>();
-    for (const node of this.map.nodes) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+    for (const node of this.map.nodes) {
+      children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+      this.parentOf.set(node.id, node.parentId);
+    }
     const query = foldOutlineSearch(this.query.trim());
     const matches = (node: MapNode): boolean => {
       if (!query) return true;
       if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return true;
       return (children.get(node.id) ?? []).some(matches);
     };
-    const append = (node: MapNode, depth: number): void => {
+    const closed = (id: string): boolean => this.collapsed.has(id) && !this.tempOpen.has(id);
+    const append = (node: MapNode, depth: number, folded: boolean): void => {
       if (!matches(node)) return;
       const descendants = children.get(node.id) ?? [];
-      const row = tree.createDiv("vam-outline-row");
+      const row = tree.createDiv(folded ? "vam-outline-row is-folded" : "vam-outline-row");
       row.style.paddingLeft = `${8 + depth * 16}px`;
+      this.rowEls.set(node.id, row);
       if (descendants.length) {
         const toggle = row.createEl("button", {
-          text: query || !this.collapsed.has(node.id) ? "▾" : "▸",
+          text: query || !closed(node.id) ? "▾" : "▸",
           cls: "vam-outline-toggle"
         });
         toggle.disabled = !!query;
-        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
-        toggle.setAttr("aria-expanded", String(!!query || !this.collapsed.has(node.id)));
+        toggle.setAttr("aria-label", !query && closed(node.id) ? t("ui.expand") : t("ui.collapse"));
+        toggle.setAttr("aria-expanded", String(!!query || !closed(node.id)));
         this.toggleEls.set(node.id, toggle);
         toggle.addEventListener("click", () => {
           // The tree is rebuilt: a toggle that had focus (Space on the keyboard) keeps it on the new button of the same row.
           const hadFocus = (this.contentEl.ownerDocument as Document | undefined)?.activeElement === toggle;
-          if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
+          if (this.collapsed.has(node.id) && !this.tempOpen.has(node.id)) this.collapsed.delete(node.id);
           else this.collapsed.add(node.id);
+          this.tempOpen.delete(node.id);
           this.renderTree();
           if (hadFocus) this.toggleEls.get(node.id)?.focus();
         });
@@ -201,9 +247,10 @@ export class OutlineView extends ItemView {
         this.setActive(node.path);
         void this.openNote(node.path);
       });
-      if (query || !this.collapsed.has(node.id)) for (const child of descendants) append(child, depth + 1);
+      // Collapsed branches stay in the tree but folded away, so the canvas selection can open them without rebuilding rows.
+      for (const child of descendants) append(child, depth + 1, folded || (!query && closed(node.id)));
     };
-    for (const root of children.get(null) ?? []) append(root, 0);
+    for (const root of children.get(null) ?? []) append(root, 0, false);
     if (!tree.childElementCount) {
       tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
       if (query)

@@ -292,6 +292,14 @@ export async function validateLivingStructure(
       map.nodes.map(node => [node.id, node.parentId ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
     );
   if (parentGraph(before) === parentGraph(after)) return;
+  // A cycle needs an AI card. The metadata cache answers this without reading a note; a note it has not indexed yet is unknown.
+  const mayBeAi = after.nodes.some(node => {
+    const file = app.vault.getAbstractFileByPath(node.path);
+    if (!(file instanceof TFile)) return false;
+    const cache = app.metadataCache.getFileCache(file);
+    return !cache || !!cache.frontmatter?.["ai-card"];
+  });
+  if (!mayBeAi) return;
   const { cards } = await prepareMap({ repo, app }, after);
   const oldById = new Map(before.nodes.map(node => [node.id, node]));
   const oldCards = cards

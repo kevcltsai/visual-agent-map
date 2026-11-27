@@ -603,7 +603,7 @@ function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources =
       content: '---\nagent-map-id: map\ntopic-id: map\nnode-id: up\nai-card: true\nliving-node-refs:\n  - "note:missing"\n---\n# Up\n' }]
   ]);
   const port = { repo: { readMap: async () => map, readNoteSnapshot: async path => snapshots.get(path) },
-    app: { vault: { configDir: '.obsidian' }, metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
+    app: { vault: { configDir: '.obsidian', getAbstractFileByPath: path => snapshots.has(path) ? new S.obsidian.TFile(path) : null }, metadataCache: { getFirstLinkpathDest: () => null, getFileCache: file => ({ frontmatter: snapshots.get(file.path)?.note.aiCard ? { 'ai-card': true } : {} }) } }, calls: {}, mapPath: 'Map.md',
     viewSession: 'editor', signal: new AbortController().signal, current: () => true, language: () => 'en',
     mapSources };
   return { prepare: (prompt = 'Research root') => prepareLivingTrial(port, 'root', prompt), snapshots, map, port };
@@ -700,6 +700,26 @@ S.integrationTest('Living Node structure: a new parent edge is rejected before M
     { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
   await assert.rejects(() => validateLivingStructure(port.app, port.repo, before, map), /living-node-cycle/);
   await validateLivingStructure(port.app, port.repo, map, before);
+});
+
+S.integrationTest('Living Node structure: a structural edit on a map without AI cards reads no notes', async () => {
+  const f = S.fixture('en');
+  const mapPath = await f.repo.createMap('Ordinary map');
+  const map = await f.repo.readMap(mapPath);
+  for (const title of ['One', 'Two', 'Three', 'Four']) map.nodes.push(await f.repo.createNote(title, 'model-a', map, mapPath, 'workspace'));
+  await f.repo.saveMap(mapPath, map);
+  const before = await f.repo.readMap(mapPath);
+  const after = JSON.parse(JSON.stringify(before));
+  after.nodes[1].parentId = after.nodes[0].id;
+  let reads = 0;
+  for (const name of ['read', 'cachedRead']) {
+    const original = f.app.vault[name].bind(f.app.vault);
+    f.app.vault[name] = async (...args) => { reads++; return original(...args); };
+  }
+  const { validateLivingStructure } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  await validateLivingStructure(f.app, f.repo, before, after);
+  assert.equal(reads, 0, 'no note is read when no card is an AI card');
 });
 
 S.integrationTest('Living Node removal: surviving explicit consumers are identified without removing persisted references', async () => {

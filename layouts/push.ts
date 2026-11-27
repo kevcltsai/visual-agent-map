@@ -21,6 +21,8 @@ export interface PushOptions {
   boxOf?: (id: string) => PushBox | undefined;
   heightOf?: (id: string) => number | undefined;
   decorations?: PushDecoration[];
+  /** Cards (text blocks, ring members) that are obstacles only: they and what hangs under them are never moved. */
+  fixed?: ReadonlySet<string>;
   layout: { direction: string; gap?: number };
 }
 
@@ -122,7 +124,9 @@ export function pushAffected(nodes: MapNode[], movingIds: Iterable<string>, opts
       out.push(at);
     return out;
   };
+  let blocked = false;
   const subtree = (id: string, into: Set<string>): void => {
+    if (opts.fixed?.has(id)) blocked = true;
     into.add(id);
     for (const kid of kids.get(id) ?? []) subtree(kid.id, into);
   };
@@ -182,10 +186,30 @@ export function pushAffected(nodes: MapNode[], movingIds: Iterable<string>, opts
         const late = aFirst ? b.rect(offsets) : ra;
         const delta = vertical ? early.r - late.l + gap : early.b - late.t + gap;
         const group = new Set<string>();
+        blocked = false;
         for (const sibling of lca ? (kids.get(lca) ?? []) : (kids.get("") ?? [])) {
           if (sibling.id !== lateChild && !before(lateChild, sibling.id)) continue;
           if (balanced && sideOf(sibling.id) !== sideOf(lateChild)) continue;
+          if (sibling.id !== lateChild && original.has(sibling.id)) continue;
           subtree(sibling.id, group);
+        }
+        if (blocked) {
+          // A text block or ring member would have to move: the new cards step past it instead.
+          const aIsNew = hasAny(a, original);
+          const moverRect = aIsNew ? ra : b.rect(offsets);
+          const otherRect = aIsNew ? b.rect(offsets) : ra;
+          const step = vertical ? otherRect.r - moverRect.l + gap : otherRect.b - moverRect.t + gap;
+          const mine = new Set<string>();
+          blocked = false;
+          subtree(aIsNew ? ca : cb, mine);
+          for (const id of mine) {
+            if (!original.has(id)) continue;
+            const off = offsets.get(id) ?? { dx: 0, dy: 0 };
+            offsets.set(id, vertical ? { dx: off.dx + step, dy: off.dy } : { dx: off.dx, dy: off.dy + step });
+            pushed.add(id);
+          }
+          resolved = true;
+          break search;
         }
         for (const id of group) {
           const off = offsets.get(id) ?? { dx: 0, dy: 0 };

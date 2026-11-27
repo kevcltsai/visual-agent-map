@@ -300,8 +300,10 @@ import {
   orderSiblings,
   shiftSibling,
   type LayoutKind,
-  type LayoutSpacing
+  type LayoutSpacing,
+  type PushHints
 } from "../../map-layout";
+import type { PushBox, PushDecoration } from "../../layouts/push";
 import {
   arrangeMapWithRings,
   arrangeNewBranchWithRings,
@@ -1876,6 +1878,81 @@ export class VisualAgentMapView extends ItemView {
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
+  /**
+   * What the push needs from the screen (A9): each drawn card's box including its cover and other children, and each summary
+   * bracket's reach beyond its cards, all in canvas units (screen size divided by zoom). A card or bracket that is not drawn
+   * is left out, so the layout falls back to the stored size.
+   */
+  private pushHints(map: MapDocument): PushHints {
+    const zoom = map.viewport?.zoom || 1;
+    // The push asks for the same card many times; each card is measured once (one layout read per card).
+    const seen = new Map<string, PushBox | undefined>();
+    const boxOf = (id: string): PushBox | undefined => {
+      if (!seen.has(id)) seen.set(id, measure(id));
+      return seen.get(id);
+    };
+    const measure = (id: string): PushBox | undefined => {
+      const card = this.cardEls.get(id);
+      const node = map.nodes.find(item => item.id === id);
+      if (!card?.isConnected || !node) return undefined;
+      const own = card.getBoundingClientRect();
+      if (!own.width || !own.height) return undefined;
+      let left = own.left,
+        top = own.top,
+        right = own.right,
+        bottom = own.bottom;
+      for (const part of Array.from(card.querySelectorAll<HTMLElement>(".vam-card-cover"))) {
+        const rect = part.getBoundingClientRect();
+        if (!rect.width || !rect.height) continue;
+        left = Math.min(left, rect.left);
+        top = Math.min(top, rect.top);
+        right = Math.max(right, rect.right);
+        bottom = Math.max(bottom, rect.bottom);
+      }
+      return {
+        x: node.x + (left - own.left) / zoom,
+        y: node.y + (top - own.top) / zoom,
+        w: (right - left) / zoom,
+        h: (bottom - top) / zoom
+      };
+    };
+    const decorations: PushDecoration[] = [];
+    const summaries = (map.canvasItems ?? []).filter((item): item is SummaryItem => item.kind === "summary");
+    for (const item of summaries) {
+      const bracket = this.summaryEls.get(item.id);
+      if (!bracket?.isConnected) continue;
+      const members = new Set<string>();
+      for (const id of item.members) {
+        members.add(id);
+        for (const below of descendants(map.nodes, id)) members.add(below);
+      }
+      const rects = [...members]
+        .map(id => this.cardEls.get(id)?.getBoundingClientRect())
+        .filter((rect): rect is DOMRect => !!rect && rect.width > 0);
+      const parts = Array.from(bracket.children)
+        .map(child => child.getBoundingClientRect())
+        .filter(rect => rect.width > 0);
+      if (!rects.length || !parts.length) continue;
+      const union = (list: DOMRect[]) => ({
+        l: Math.min(...list.map(rect => rect.left)),
+        t: Math.min(...list.map(rect => rect.top)),
+        r: Math.max(...list.map(rect => rect.right)),
+        b: Math.max(...list.map(rect => rect.bottom))
+      });
+      const cards = union(rects),
+        drawn = union(parts);
+      decorations.push({
+        members: [...members],
+        pad: {
+          l: Math.max(0, cards.l - drawn.l) / zoom,
+          t: Math.max(0, cards.t - drawn.t) / zoom,
+          r: Math.max(0, drawn.r - cards.r) / zoom,
+          b: Math.max(0, drawn.b - cards.b) / zoom
+        }
+      });
+    }
+    return { boxOf, decorations };
+  }
   /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. `sizes` gives the text sizes the layout is to assume. */
   private arrangeBranch(
     map: MapDocument,
@@ -1884,6 +1961,10 @@ export class VisualAgentMapView extends ItemView {
     minTop?: number,
     sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }
   ): void {
+    // The selected card may be pushed by the arrangement: the view pans (only) so it stays where the eye was.
+    const selectedId = this.selection?.state.selected;
+    const before = selectedId ? map.nodes.find(node => node.id === selectedId) : undefined;
+    const from = before ? { x: before.x, y: before.y } : null;
     const out = arrangeNewBranchWithRings(
       map.nodes,
       map.canvasItems ?? [],
@@ -1892,10 +1973,21 @@ export class VisualAgentMapView extends ItemView {
       sizes.heightOf,
       minTop,
       layoutOf(map),
-      sizes.widthOf
+      sizes.widthOf,
+      this.pushHints(map)
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
+    const after = from && selectedId ? map.nodes.find(node => node.id === selectedId) : undefined;
+    if (from && after && map.viewport) {
+      const dx = after.x - from.x,
+        dy = after.y - from.y;
+      const limit = this.cardHeightOf(after.id) ?? DEFAULT_CARD_HEIGHT;
+      if (Math.abs(dx) > limit || Math.abs(dy) > limit) {
+        map.viewport.x -= dx * map.viewport.zoom;
+        map.viewport.y -= dy * map.viewport.zoom;
+      }
+    }
   }
   /** A branch became a top-level tree: it is laid out below the rest; a text block with followers inside it goes with it, as it would in Auto layout. */
   private arrangeTree(map: MapDocument, rootId: string, ids: Set<string>): void {
@@ -1914,8 +2006,17 @@ export class VisualAgentMapView extends ItemView {
   /** Nodes of `nodes` with the new cards under `parentId` placed, rings left alone (for callers that only have a node list). */
   private arrangeBranchNodes(parentId: string, nodes: MapNode[], newIds: Set<string>, minTop?: number): MapNode[] {
     const rings = (this.map?.canvasItems ?? []).filter(isAnnotatedImage);
-    return arrangeNewBranchWithRings(nodes, rings, parentId, newIds, this.cardHeightOf, minTop, layoutOf(this.map))
-      .nodes;
+    return arrangeNewBranchWithRings(
+      nodes,
+      rings,
+      parentId,
+      newIds,
+      this.cardHeightOf,
+      minTop,
+      layoutOf(this.map),
+      undefined,
+      this.map ? this.pushHints(this.map) : undefined
+    ).nodes;
   }
   /** How ring members grow here (away from their picture); empty without rings. Never stored. */
   private ringDirections(map: MapDocument | null | undefined): Map<string, string> {

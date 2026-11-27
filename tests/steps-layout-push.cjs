@@ -135,3 +135,41 @@ test('j: radial, timeline and fishbone keep the whole-map rearrange', () => {
     assert.deepEqual([whole[0].x, whole[0].y], [0, 0]);
   }
 });
+
+// Wired into arrangeNewBranch (A9 phase 2): a new card goes after its previous sibling and only the affected branch is pushed.
+const place = (nodes, ids, direction = 'right', extra = {}) => layout.arrangeNewBranch(nodes.map(item => ({ ...item })), 'root', new Set(ids), heights(extra.heights), undefined, direction, extra.push);
+const xy = (list, id) => { const n = list.find(item => item.id === id); return [n.x, n.y]; };
+const sameExcept = (before, list, changed) => { for (const item of before) if (!changed.includes(item.id)) assert.deepEqual(xy(list, item.id), [item.x, item.y], `${item.id} must not move`); };
+
+test('k: arrangeNewBranch mid-column insert pushes the later siblings and their subtrees, nothing else', () => {
+  const nodes = [node('root', null, 0, 0), node('p1', 'root', 360, 0), node('p2', 'root', 360, 124), node('p2k', 'p2', 720, 124), node('n', 'root', 0, 0), node('p3', 'root', 360, 248), node('p3k', 'p3', 720, 248), node('far', null, 0, 2000)];
+  const out = place(nodes, ['n']);
+  assert.ok(xy(out, 'n')[1] >= 224 && xy(out, 'n')[1] < xy(out, 'p3')[1]);
+  assert.ok(xy(out, 'p3')[1] > 248);
+  assert.equal(xy(out, 'p3k')[1] - xy(out, 'p3')[1], 0);
+  sameExcept(nodes, out, ['n', 'p3', 'p3k']);
+  noOverlap({ nodes: out }, heights(), (a, b) => a.id === 'root' || b.id === 'root' || a.id === 'far' || b.id === 'far');
+});
+
+test('l: arrangeNewBranch ten new cards in the middle keep earlier cards and push the later branch down', () => {
+  const fresh = Array.from({ length: 10 }, (_, i) => node(`n${i}`, 'root', 0, 0));
+  const nodes = [node('root', null, 0, 0), node('p1', 'root', 360, 0), node('p2', 'root', 360, 124), ...fresh, node('p3', 'root', 360, 248), node('p3k', 'p3', 720, 248), node('far', null, 0, 2000)];
+  const out = place(nodes, fresh.map(item => item.id));
+  assert.ok(xy(out, 'p3')[1] >= xy(out, 'n9')[1] + H);
+  assert.ok(xy(out, 'n0')[1] >= 224);
+  sameExcept(nodes, out, [...fresh.map(item => item.id), 'p3', 'p3k']);
+  noOverlap({ nodes: out }, heights(), (a, b) => a.id === 'root' || b.id === 'root' || a.id === 'far' || b.id === 'far');
+});
+
+test('m: arrangeNewBranch down map keeps the slide-along-x rule: nothing else moves', () => {
+  const nodes = [node('root', null, 0, 0), node('a', 'root', 0, 200), node('n', 'root', 0, 0), node('b', 'root', 330, 200), node('far', null, 0, 2000)];
+  const out = place(nodes, ['n'], 'down');
+  sameExcept(nodes, out, ['n']);
+});
+
+test('n: arrangeNewBranch passes boxOf to the push (a wider measured previous card makes more room)', () => {
+  const nodes = [node('root', null, 0, 0), node('p1', 'root', 360, 0), node('n', 'root', 0, 0), node('p3', 'root', 360, 124)];
+  const boxOf = id => (id === 'p1' ? { x: 360, y: 0, w: 280, h: 400 } : undefined);
+  const out = place(nodes, ['n'], 'right', { push: { boxOf } });
+  assert.ok(xy(out, 'n')[1] >= 400);
+});

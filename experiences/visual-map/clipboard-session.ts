@@ -19,8 +19,28 @@ export interface ClipRecord {
   notePaths: readonly string[];
 }
 
+/** What "copy as reference" remembers (P4.3): the identity of one card of one map. Never read from clipboard text. */
+export interface ReferenceRecord {
+  mapId: string;
+  nodeId: string;
+  /** Where the card was when it was copied; only a lookup hint for the reference that is pasted. */
+  mapPath: string;
+}
+
 export class ClipboardSession {
   private current: ClipRecord | null = null;
+  private reference: ReferenceRecord | null = null;
+
+  /** Remembers the card to be referenced; replaces an earlier one. */
+  recordReference(input: ReferenceRecord): ReferenceRecord {
+    this.reference = Object.freeze({ mapId: input.mapId, nodeId: input.nodeId, mapPath: input.mapPath });
+    return this.reference;
+  }
+
+  /** The card remembered by "copy as reference", or null. */
+  getReference(): ReferenceRecord | null {
+    return this.reference;
+  }
 
   /** Replaces any earlier record. The arrays are copied, so later changes by the caller cannot alter it. */
   record(input: ClipRecord): ClipRecord {
@@ -60,6 +80,7 @@ export class ClipboardSession {
 
   clear(): void {
     this.current = null;
+    this.reference = null;
   }
 }
 

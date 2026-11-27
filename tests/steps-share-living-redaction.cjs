@@ -9,10 +9,10 @@ const embeds = load('experiences/sharing/share-embeds.ts');
 
 const SIGNED = 'https://bucket.s3.amazonaws.com/a/file.pdf?X-Amz-Algorithm=AWS4&X-Amz-Signature=abc123&X-Amz-Credential=AKIA%2Fx&page=2';
 
-test('redactLivingShareText: signed-URL secret params are dropped, harmless params and the address stay', () => {
+test('redactLivingShareText: signed-URL secret params are dropped, the address stays', () => {
   const out = red.redactLivingShareText(`> see ${SIGNED}\n> and https://a.example/p?token=SECRET&id=7#top and https://b.example/?sig=1&Signature=2&key=3&expires=4`);
-  assert.ok(out.includes('https://bucket.s3.amazonaws.com/a/file.pdf?page=2'));
-  assert.ok(out.includes('https://a.example/p?id=7#top'));
+  assert.ok(out.includes('https://bucket.s3.amazonaws.com/a/file.pdf') && !out.includes('page=2'));
+  assert.ok(out.includes('https://a.example/p') && !out.includes('id=7'));
   assert.ok(out.includes('https://b.example/'));
   for (const secret of ['abc123', 'AKIA', 'SECRET', 'X-Amz', 'sig=', 'Signature', 'key=', 'expires']) assert.ok(!out.includes(secret), secret);
 });
@@ -42,7 +42,7 @@ test('redactLivingShareText: suppression, draft and ownership fields and Living 
 
 test('redactLivingShareText: ordinary text without any of these is unchanged', () => {
   const text = '> A claim about https://a.example/p?id=7 with `/Users/x` in code is fine\n> 第二行';
-  assert.equal(red.redactLivingShareText('> plain 句子 [[Link]]\n> https://a.example/p?id=7'), '> plain 句子 [[Link]]\n> https://a.example/p?id=7');
+  assert.equal(red.redactLivingShareText('> plain 句子 [[Link]]\n> https://a.example/p'), '> plain 句子 [[Link]]\n> https://a.example/p');
   assert.ok(red.redactLivingShareText(text).includes('第二行'));
 });
 
@@ -56,6 +56,28 @@ test('shareNoteMarkdown: the Living Node projection is redacted, the ordinary de
   const detail = 'Ordinary /Users/kevin/x.md ?token=keep stays as written';
   const out = embeds.shareNoteMarkdown({ detail, livingNode: { shareMarkdown: `> out ${SIGNED}\n> /Users/kevin/Vault/a.md\n> ![[Private/Diary#H]] and ![[pic.png]]` } });
   assert.ok(out.startsWith(detail));
-  assert.ok(!out.includes('abc123') && !out.includes('/Users/kevin/Vault') && !out.includes('![[Private') && out.includes('[[Private/Diary#H]]') && out.includes('![[pic.png]]'));
+  assert.ok(!out.includes('abc123') && !out.includes('/Users/kevin/Vault') && !out.includes('![[Private') && out.includes('[[Private/Diary#H]]') && !out.includes('![[pic.png]]'));
   assert.equal(embeds.shareNoteMarkdown({ detail: 'only' }), 'only');
+});
+
+test('redactLivingShareText: the whole query and fragment of every web address go, whatever the parameter names or encoding', () => {
+  const out = red.redactLivingShareText([
+    '> https://storage.googleapis.com/b/o?X-Goog-Signature=GSIG&X-Goog-Credential=GCRED',
+    '> https://x.blob.core.windows.net/c/f?sv=2022&sig=SASSIG&se=2030',
+    '> https://api.example/p?access_token=ATOK&id=7#frag',
+    '> https://a.example/p?x=1&amp;Signature=AMPSIG&amp;y=2',
+    '> https://a.example/p?x=1&#38;sig=NUMSIG',
+    '> https://en.wikipedia.org/wiki/Foo_(bar)?token=PARSECRET#sec',
+    '> (see https://a.example/q?auth=PAREN) end',
+    '> http://a.example:8080/z?;key=SEMI'
+  ].join('\n'));
+  for (const secret of ['GSIG', 'GCRED', 'SASSIG', 'sv=', 'ATOK', 'frag', 'AMPSIG', 'NUMSIG', 'PARSECRET', '#sec', 'PAREN', 'SEMI', '?']) assert.ok(!out.includes(secret), secret);
+  assert.ok(out.includes('https://en.wikipedia.org/wiki/Foo_(bar)') && out.includes('(see https://a.example/q) end') && out.includes('http://a.example:8080/z'));
+});
+
+test('shareNoteMarkdown: an unclosed code fence in the detail cannot hide a Living Node embed (every embed there is a plain link, also in code)', () => {
+  const out = embeds.shareNoteMarkdown({ detail: 'Intro\n```js\nunclosed', livingNode: { shareMarkdown: '> ![[Private/Diary]]\n> ```\n> ![[Other]]' } });
+  assert.ok(!out.includes('![[') && out.includes('[[Private/Diary]]') && out.includes('[[Other]]'));
+  const mixed = embeds.shareNoteMarkdown({ detail: '```\nopen', livingNode: { shareMarkdown: '> ![[Private]]' } });
+  assert.ok(!mixed.includes('![[Private]]'));
 });

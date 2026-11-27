@@ -4,28 +4,26 @@
  * sentences can still carry things only this device may know: a signed URL's secret parameters, a vault or home path,
  * ownership / suppression / draft bookkeeping or a marker comment. (Note embeds are flattened by the caller, share-embeds.)
  */
-const SECRET_PARAM = /^(?:x-amz-[\w-]*|sig|signature|token|key|expires)$/i;
-const URL_WITH_QUERY = /\b(https?:\/\/[^\s<>)\]]*?)\?([^\s<>)\]#]*)(#[^\s<>)\]]*)?/gi;
+const WEB_ADDRESS = /\bhttps?:\/\/[^\s<>"'`]+/gi;
 const LOCAL_PATH =
   /file:\/\/[^\s<>"'`)\]]*|(?:[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\s<>"'`)\]]*|(?<![\w.:/-])\/(?:Users|home|Volumes|private|var|tmp|mnt|root)\/[^\s<>"'`)\]]*)/g;
 const REGION = /<!--\s*vam-living-node:begin[\s\S]*?<!--\s*vam-living-node:end[^>]*-->/gi;
 const MARKER = /<!--\s*vam-living-node:[\s\S]*?-->/gi;
 const BOOKKEEPING_LINE = /^[ \t>*+-]*["']?(?:living-node-[\w-]+|ownership|suppress\w*|draft\w*)["']?[ \t]*[:=].*$/gim;
 
-/** Drops secret query parameters (signed-URL fields, tokens, keys, expiry); other parameters and the address stay. */
-function stripSecretParams(text: string): string {
-  return text.replace(URL_WITH_QUERY, (_all, base: string, query: string, hash?: string) => {
-    const kept = query.split("&").filter(pair => pair && !SECRET_PARAM.test(decodeName(pair.split("=")[0])));
-    return base + (kept.length ? `?${kept.join("&")}` : "") + (hash ?? "");
+/**
+ * Drops the whole query string and fragment of every web address, whatever the parameter names or how `&` is written (a
+ * signed address keeps its secrets in either, under names no list can cover). A closing bracket that belongs to the
+ * surrounding sentence rather than to the address stays.
+ */
+function stripQueries(text: string): string {
+  return text.replace(WEB_ADDRESS, token => {
+    const cut = token.search(/[?#]/);
+    if (cut < 0) return token;
+    const opens = (token.match(/[([]/g) ?? []).length;
+    const closes = (token.match(/[)\]]/g) ?? []).length;
+    return token.slice(0, cut) + ")".repeat(Math.max(0, closes - opens));
   });
-}
-
-function decodeName(name: string): string {
-  try {
-    return decodeURIComponent(name);
-  } catch {
-    return name;
-  }
 }
 
 /** The Living Node share projection with private paths, secrets, bookkeeping and markers taken out. */
@@ -36,7 +34,7 @@ export function redactLivingShareText(text: string): string {
     .replace(MARKER, "")
     .replace(/<!--\s*vam-living-node:[^\n]*$/gim, "");
   out = out.replace(BOOKKEEPING_LINE, "");
-  out = stripSecretParams(out);
+  out = stripQueries(out);
   out = out.replace(LOCAL_PATH, "");
   return out.replace(/\n{3,}/g, "\n\n");
 }

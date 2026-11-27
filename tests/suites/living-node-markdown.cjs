@@ -1137,3 +1137,189 @@ S.integrationTest('A13: a trend update replaces the current result without appen
   assert.equal(after.output.text, 'Different topic result');
   assert.deepEqual(S.plain(after.records.map(r => r.id)), ['r1', 'r2']);
 });
+
+S.integrationTest('Living Node A27: explicitly undoing a manual edit or deletion makes the AI-owned knowledge readable and updatable again', async () => {
+  const f = await setup();
+  const first = request(f, { proposal: { baseRevision: 'empty', operations: [
+    { kind: 'output', text: 'Current findings', evidence: ['e1'] },
+    { kind: 'append', id: 'r1', subject: 'price', scope: 'daily', granularity: 'day', eventTime: '2026-11-26', claim: 'Observed 100', evidence: ['e1'] }
+  ] } });
+  assert.equal(await commitLivingMarkdown(f.repo, first), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.replace('> Current findings', '> Owner revised it').replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const owned = readLivingMarkdown(edited);
+  assert.equal(owned.output.owner, 'user');
+  assert.equal(owned.records.length, 0);
+  assert.ok(owned.suppressed.includes('r1'));
+  // The explicit undo restores the exact earlier bytes; ownership is derived from bytes, never from a shadow copy.
+  await f.app.vault.process(f.files.get(path), () => saved);
+  const base = readLivingMarkdown(f.contents.get(path));
+  assert.equal(base.output.owner, 'ai');
+  assert.equal(base.output.text, 'Current findings');
+  assert.equal(base.records.length, 1);
+  assert.equal(base.records[0].owner, 'ai');
+  assert.equal(base.records[0].claim, 'Observed 100');
+  assert.deepEqual(S.plain(base.suppressed), []);
+  const next = request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'Updated findings', evidence: ['e1'] }] } });
+  assert.equal(await commitLivingMarkdown(f.repo, next), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Updated findings');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).records[0].claim, 'Observed 100');
+});
+
+S.integrationTest('Living Node A28: a failed storage write leaves the note byte-identical, a retry or a restarted replay commits exactly once', async () => {
+  const f = await setup();
+  const process = f.app.vault.process;
+  let failures = 1;
+  f.app.vault.process = async (file, change) => {
+    if (failures-- > 0) { change(f.contents.get(file.path)); throw new Error('disk write failed'); }
+    return process(file, change);
+  };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f)), /disk write failed/);
+  assert.equal(f.contents.get(path), initial);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, 'empty');
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const committed = f.contents.get(path);
+  // Restart: a new Repository over the same vault sees the same bytes and refuses the same executionId again.
+  const restarted = new S.Repository(f.app, { ...S.DEFAULT_SETTINGS, language: 'zh-TW' });
+  assert.equal(await commitLivingMarkdown(restarted, request(f, { expectedContent: committed, candidate: { baseRevision: livingSnapshotRevision(committed) }, base: readLivingMarkdown(committed) })), 'discarded');
+  assert.equal(f.contents.get(path), committed);
+  assert.equal((committed.match(/vam-living-node:begin/g) ?? []).length, 1);
+  assert.equal((committed.match(/Current findings/g) ?? []).length, 1);
+  // Derived data is rebuilt from the note bytes alone.
+  const note = await restarted.readNote(path);
+  assert.equal(note.livingNode.knowledgeRevision, readLivingMarkdown(committed).revision);
+  assert.equal(note.livingNode.outcome, 'ok');
+  assert.equal(note.livingNode.damaged, false);
+});
+
+S.integrationTest('Living Node A30: legacy ordinary Prompt, V2 AI card, identity-less and corrupt-metadata notes stay readable and are never rewritten by reading', async () => {
+  const ordinary = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\n---\n# Ordinary\n\n## Prompt\n\nOld ordinary prompt\n\n## Detail\n\nKeep me.\n';
+  const v2 = initial.replace('ai-card: true\n', 'ai-card: true\nai-update-mode: append\nai-run-result: ok\nai-run-at: "2026-11-01T00:00:00Z"\n').replace('## Detail', '## Prompt\n\nV2 prompt\n\n## Detail');
+  const noIdentity = '# Old note\n\nNo front matter at all, [[Link]] stays.\n';
+  const cases = [
+    ['ordinary prompt', ordinary, false],
+    ['V2 AI card', v2, false],
+    ['no identity', noIdentity, false],
+    ['corrupt region hash', initial.replace('custom-key: keep', 'custom-key: keep\nliving-node-region-hash: 42'), true],
+    ['corrupt ownership', initial.replace('custom-key: keep', 'custom-key: keep\nliving-node-ownership: not-a-list\nliving-node-region-hash: "abc"'), true]
+  ];
+  for (const [name, content, damaged] of cases) {
+    const f = S.fixture();
+    await f.app.vault.create(path, content);
+    const before = f.contents.get(path);
+    let knowledge;
+    try { knowledge = readLivingMarkdown(content); } catch (error) { knowledge = undefined; assert.ok(damaged, name + ': ' + error.message); }
+    if (!damaged) assert.equal(knowledge.revision, 'empty', name);
+    const note = await f.repo.readNote(path);
+    assert.ok(note.title, name);
+    if (name === 'ordinary prompt') { assert.equal(note.livingNode, undefined, name); assert.equal(note.prompt, 'Old ordinary prompt'); }
+    if (name === 'V2 AI card') { assert.equal(note.livingNode.outcome, 'never'); assert.equal(note.prompt, 'V2 prompt'); }
+    if (damaged) assert.equal(note.livingNode.damaged, true, name);
+    assert.equal(f.contents.get(path), before, name + ' unchanged by reading');
+  }
+});
+
+S.integrationTest('Living Node A32: every committed living-node metadata key is covered by the share leak scan', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const scan = S.load('experiences/sharing/share-leak-scan.ts', { obsidian: S.obsidian });
+  const forbidden = scan.forbiddenStringsFor({ mapFolder: 'Agent Workspace/Topics/map' }, { nodes: [] });
+  const keys = [...f.contents.get(path).matchAll(/^(living-node-[a-z-]+):/gm)].map(match => match[1]);
+  assert.ok(keys.length >= 6);
+  for (const key of keys) assert.ok(scan.scanForLeaks(key + ': x', forbidden).some(hit => hit.category === 'internal-field'), key);
+  const { shareNoteMarkdown } = S.load('experiences/sharing/share-embeds.ts');
+  const shared = shareNoteMarkdown({ detail: 'Detail', prompt: 'Private prompt', livingNode: { shareMarkdown: '> Current findings' } });
+  for (const key of keys) assert.ok(!shared.includes(key), key);
+});
+
+S.integrationTest('Living Node A33: a round gives each card one provider call and bounds the optional map context', async () => {
+  const f = await roundFixture();
+  const contexts = [];
+  const run = f.port.calls.run;
+  f.port.calls.run = async (prepared, options, finish) => { contexts.push(JSON.parse(prepared.input.context)); return run(prepared, options, finish); };
+  const docs = Array.from({ length: 130 }, (_, index) => ({ path: 'Reference/doc-' + index + '.md', content: 'x'.repeat(100), external: true, key: 'k' + index }));
+  f.port.mapSources = async () => [{ documents: docs }];
+  const results = await runLivingRound(f.port);
+  assert.equal(results.get('child'), 'changed');
+  assert.equal(results.get('parent'), 'changed');
+  assert.equal(f.calls.length, 2);
+  for (const context of contexts) {
+    assert.ok(context.documents.length <= 100);
+    assert.ok(context.documents.reduce((sum, item) => sum + item.text.length, 0) <= 60000);
+    assert.ok(context.warnings.some(item => item.startsWith('map-source-budget-omitted')));
+  }
+  const before = f.contents.get('child.md');
+  assert.equal((await runLivingRound(f.port)).get('child'), 'no-change');
+  const after = f.contents.get('child.md');
+  assert.equal(after.slice(after.indexOf('# child')), before.slice(before.indexOf('# child')));
+});
+
+S.integrationTest('Living Node A33: a required source beyond the context budget fails before any provider call', async () => {
+  const f = await roundFixture();
+  await f.app.vault.create('Big.md', '# Big\n' + 'x'.repeat(61000));
+  await saveLivingConfig(f.app, f.repo, f.map, 'child', 'Read big\n\nSources: [[Big]]');
+  const before = f.contents.get('child.md');
+  const results = await runLivingRound(f.port, ['child']);
+  assert.equal(results.get('child'), 'failed');
+  assert.deepEqual(f.calls, []);
+  assert.equal(readLivingMarkdown(f.contents.get('child.md')).revision, 'empty');
+  assert.equal(f.contents.get('child.md').includes('Big'), before.includes('Big'));
+});
+
+S.integrationTest('Living Node A37: a failed attempt keeps old knowledge readable and diagnostics orthogonal; a persisted running outcome is not success', async () => {
+  const f = await roundFixture();
+  assert.equal((await runLivingRound(f.port, ['child'])).get('child'), 'changed');
+  const good = await f.repo.readNote('child.md');
+  assert.equal(good.livingNode.outcome, 'ok');
+  assert.ok(good.livingNode.lastSuccessfulCheck && good.livingNode.lastContentChange);
+  const knowledge = readLivingMarkdown(f.contents.get('child.md'));
+  f.port.calls.run = async () => { throw new Error('provider down'); };
+  assert.equal((await runLivingRound(f.port, ['child'])).get('child'), 'failed');
+  const failed = await f.repo.readNote('child.md');
+  assert.equal(failed.livingNode.outcome, 'failed');
+  assert.equal(failed.livingNode.lastSuccessfulCheck, good.livingNode.lastSuccessfulCheck);
+  assert.equal(failed.livingNode.lastContentChange, good.livingNode.lastContentChange);
+  assert.equal(failed.livingNode.successfulKnowledgeRevision, good.livingNode.successfulKnowledgeRevision);
+  assert.equal(readLivingMarkdown(f.contents.get('child.md')).revision, knowledge.revision);
+  assert.equal(failed.livingNode.summary, good.livingNode.summary);
+  // A restart never turns an interrupted run into a success; it is "never" for a card that never succeeded.
+  const g = await setup();
+  const running = initial.replace('custom-key: keep', 'custom-key: keep\nliving-node-outcome: running\nliving-node-last-attempt: "old"');
+  await g.app.vault.process(g.files.get(path), () => running);
+  const note = await g.repo.readNote(path);
+  assert.equal(note.livingNode.outcome, 'never');
+  assert.equal(note.livingNode.successfulKnowledgeRevision, undefined);
+  assert.equal(note.livingNode.lastSuccessfulCheck, undefined);
+  assert.equal(g.contents.get(path), running);
+});
+
+S.integrationTest('Living Node A38: delivered context scope follows the Prompt and every delivered source is a read the revision covers', async () => {
+  for (const [prompt, scope] of [['Research parent', 'summary'], ['Research parent with full history', 'full']]) {
+    const f = await roundFixture();
+    await runLivingRound(f.port, ['child']);
+    await saveLivingConfig(f.app, f.repo, f.map, 'parent', prompt);
+    const contexts = [];
+    const run = f.port.calls.run;
+    f.port.calls.run = async (prepared, options, finish) => { contexts.push(JSON.parse(prepared.input.context)); return run(prepared, options, finish); };
+    await runLivingRound(f.port, ['parent']);
+    const own = contexts.at(-1).documents.find(item => item.title === 'child');
+    assert.equal(own.scope, scope, prompt);
+    assert.ok(own.revision.length === 64);
+  }
+});
+
+S.integrationTest('Living Node A38: a cross-map AI note is delivered read-only, never executed or written, and its read is recorded', async () => {
+  const f = await roundFixture();
+  const foreign = '---\nagent-map-node: true\nagent-map-id: other\ntopic-id: other\nnode-id: foreign\nai-card: true\n---\n# Foreign\n\n## Detail\n\nForeign manual text.\n';
+  await f.app.vault.create('Foreign.md', foreign);
+  await saveLivingConfig(f.app, f.repo, f.map, 'child', 'Read foreign\n\nSources: [[Foreign]]');
+  const contexts = [];
+  const run = f.port.calls.run;
+  f.port.calls.run = async (prepared, options, finish) => { contexts.push(JSON.parse(prepared.input.context)); return run(prepared, options, finish); };
+  const results = await runLivingRound(f.port, ['child']);
+  assert.equal(results.get('child'), 'changed');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.contents.get('Foreign.md'), foreign);
+  assert.ok(contexts[0].documents.some(item => item.title === 'Foreign' && item.revision.length === 64));
+});

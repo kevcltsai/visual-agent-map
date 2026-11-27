@@ -46,12 +46,6 @@ test('redactLivingShareText: ordinary text without any of these is unchanged', (
   assert.ok(red.redactLivingShareText(text).includes('第二行'));
 });
 
-test('stripLivingNodeMarkers: imported marker comments become plain text, region content is not treated as an owned region', () => {
-  const out = red.stripLivingNodeMarkers('a\n<!-- vam-living-node:begin v1 -->\nowned?\n<!--   VAM-LIVING-NODE:end v1 -->\nb');
-  assert.ok(!/vam-living-node/i.test(out) && !out.includes('<!--'));
-  assert.ok(out.includes('owned?') && out.startsWith('a') && out.endsWith('b'));
-});
-
 test('shareNoteMarkdown: the Living Node projection is redacted, the ordinary detail is untouched', () => {
   const detail = 'Ordinary /Users/kevin/x.md ?token=keep stays as written';
   const out = embeds.shareNoteMarkdown({ detail, livingNode: { shareMarkdown: `> out ${SIGNED}\n> /Users/kevin/Vault/a.md\n> ![[Private/Diary#H]] and ![[pic.png]]` } });
@@ -80,4 +74,36 @@ test('shareNoteMarkdown: an unclosed code fence in the detail cannot hide a Livi
   assert.ok(!out.includes('![[') && out.includes('[[Private/Diary]]') && out.includes('[[Other]]'));
   const mixed = embeds.shareNoteMarkdown({ detail: '```\nopen', livingNode: { shareMarkdown: '> ![[Private]]' } });
   assert.ok(!mixed.includes('![[Private]]'));
+});
+
+test('redactLivingShareText: paths with spaces, drive paths, home paths and the vault base path are removed to the line end or closing bracket', () => {
+  const out = red.redactLivingShareText('> a /Users/k/My Vault/Secret.md\n> b D:\\Obsidian\\Vault\\x.md\n> c (~/Notes/My Dir/y.md) kept\n> d /srv/data/My Vault/z.md here\n> e [/Users/k/My Vault/Other.md] f', '/srv/data/My Vault');
+  for (const leak of ['Secret', 'Obsidian', 'D:', '~/', 'Notes', 'y.md', 'z.md', 'Other', '/srv/data', '/Users/k']) assert.ok(!out.includes(leak), leak);
+  assert.ok(out.includes(') kept') && out.includes('] f'));
+});
+
+test('redactLivingShareText: scheme-less www addresses lose their query too, and redacting twice changes nothing', () => {
+  const once = red.redactLivingShareText('> www.example.com/p?token=WWWSECRET#x and ![[Note]]');
+  assert.ok(!once.includes('WWWSECRET') && once.includes('www.example.com/p'));
+  assert.equal(red.redactLivingShareText(once), once);
+});
+
+// The producer redacts once; the OPML/FreeMind export, the share summary and body and the clipboard text all read these two fields.
+const { commitLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian });
+test('Repository.readNote: Living Node shareMarkdown and summary leave no signed URL, local path or note embed', async () => {
+  const f = support.fixture();
+  f.app.vault.adapter.getBasePath = () => '/srv/vaults/Main Vault';
+  const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Title\n\n## Detail\n\nBody.\n';
+  await f.app.vault.create('card.md', initial);
+  const claim = 'See https://s3.example.com/f?X-Goog-Signature=GSECRET and /srv/vaults/Main Vault/Private/a.md and ![[Private/Diary]]';
+  const base = { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
+  const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: load('experiences/visual-map/living-node-markdown.ts', { obsidian: support.obsidian }).livingSnapshotRevision(initial), inputRevision: 'i1', viewSession: 'v1' };
+  await commitLivingMarkdown(f.repo, { path: 'card.md', expectedContent: initial, base, proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: claim, evidence: [] }] },
+    context: { at: '2026-11-27T04:00:00+08:00', evidence: [] }, signal: new AbortController().signal, isCurrent: () => true, candidate,
+    inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
+  const note = await f.repo.readNote('card.md');
+  for (const field of [note.livingNode.shareMarkdown, note.livingNode.summary]) {
+    assert.ok(field.length > 0);
+    for (const leak of ['GSECRET', '?X-Goog', '/srv/vaults', 'Private', '![[']) assert.ok(!field.includes(leak), leak);
+  }
 });

@@ -1,12 +1,23 @@
 /**
- * Redaction of the Living Node text that goes into a shared file, and the plain-text rule for Living Node markers in imported
- * text (pure text work, no Obsidian). The share projection of a Living Node is built for readers, but its model-written
- * sentences can still carry things only this device may know: a signed URL's secret parameters, a vault or home path,
- * ownership / suppression / draft bookkeeping or a marker comment. (Note embeds are flattened by the caller, share-embeds.)
+ * Redaction of the Living Node text that leaves the note (share file, OPML/FreeMind export, clipboard), applied once where the
+ * projection is built (pure text work, no Obsidian). The projection is built for readers, but its model-written sentences can
+ * still carry things only this device may know: a signed URL's secrets, a vault or home path, ownership / suppression / draft
+ * bookkeeping, a marker comment, or an embed that would pull in a note that is not shared. Redacting twice changes nothing.
  */
-const WEB_ADDRESS = /\bhttps?:\/\/[^\s<>"'`]+/gi;
-const LOCAL_PATH =
-  /file:\/\/[^\s<>"'`)\]]*|(?:[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\s<>"'`)\]]*|(?<![\w.:/-])\/(?:Users|home|Volumes|private|var|tmp|mnt|root)\/[^\s<>"'`)\]]*)/g;
+import { escapeRegExp } from "../../core/escape-regexp";
+
+const WEB_ADDRESS = /\b(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
+// A path may contain spaces: it runs to the end of the line or the next closing bracket or quote.
+const PATH_TAIL = "[^\\n)\\]\"'`<>]*";
+const LOCAL_PATH = new RegExp(
+  [
+    `file:\\/\\/${PATH_TAIL}`,
+    `(?<![\\w])[A-Za-z]:[\\\\/]${PATH_TAIL}`,
+    `(?<![\\w.:/-])~\\/${PATH_TAIL}`,
+    `(?<![\\w.:/-])\\/(?:Users|home|Volumes|private|var|tmp|mnt|root)\\/${PATH_TAIL}`
+  ].join("|"),
+  "g"
+);
 const REGION = /<!--\s*vam-living-node:begin[\s\S]*?<!--\s*vam-living-node:end[^>]*-->/gi;
 const MARKER = /<!--\s*vam-living-node:[\s\S]*?-->/gi;
 const BOOKKEEPING_LINE = /^[ \t>*+-]*["']?(?:living-node-[\w-]+|ownership|suppress\w*|draft\w*)["']?[ \t]*[:=].*$/gim;
@@ -26,8 +37,8 @@ function stripQueries(text: string): string {
   });
 }
 
-/** The Living Node share projection with private paths, secrets, bookkeeping and markers taken out. */
-export function redactLivingShareText(text: string): string {
+/** The Living Node text with private paths (`basePath` is the vault's real folder), secrets, bookkeeping, markers and embeds taken out. */
+export function redactLivingShareText(text: string, basePath?: string): string {
   if (!text) return text;
   let out = text
     .replace(REGION, "")
@@ -35,11 +46,9 @@ export function redactLivingShareText(text: string): string {
     .replace(/<!--\s*vam-living-node:[^\n]*$/gim, "");
   out = out.replace(BOOKKEEPING_LINE, "");
   out = stripQueries(out);
+  const base = basePath?.replace(/[\\/]+$/, "");
+  if (base) out = out.replace(new RegExp(`${escapeRegExp(base)}(?:[\\\\/]${PATH_TAIL})?`, "g"), "");
   out = out.replace(LOCAL_PATH, "");
-  return out.replace(/\n{3,}/g, "\n\n");
-}
-
-/** Imported text: Living Node marker comments become nothing, so imported content can never claim ownership or start a card. */
-export function stripLivingNodeMarkers(text: string): string {
-  return text.replace(MARKER, "").replace(/<!--\s*vam-living-node:[^\n]*$/gim, "");
+  // Every embed becomes a plain link, also inside code, so no fence elsewhere in the note can change what is read in.
+  return out.replace(/!\[\[/g, "[[").replace(/\n{3,}/g, "\n\n");
 }

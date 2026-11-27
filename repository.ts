@@ -60,6 +60,7 @@ import {
   resetLivingCopyDiagnostics,
   splitLivingNodeRegion
 } from "./core/living-node-region";
+import { redactLivingShareText } from "./experiences/sharing/living-node-redaction";
 import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -782,16 +783,20 @@ export class Repository {
       let summary = "";
       let damaged = false;
       let shareMarkdown = "";
+      const base = (this.app.vault.adapter as { getBasePath?: () => unknown }).getBasePath?.();
+      const basePath = typeof base === "string" ? base : undefined;
       try {
         const knowledge = readLivingMarkdown(raw);
-        shareMarkdown = renderLivingShareKnowledge(knowledge);
+        shareMarkdown = redactLivingShareText(renderLivingShareKnowledge(knowledge), basePath);
         knowledgeRevision = knowledge.revision;
-        summary =
+        summary = redactLivingShareText(
           knowledge.output.text
             .split(/\r?\n/)
             .find(line => line.trim())
             ?.trim()
-            .slice(0, 180) ?? "";
+            .slice(0, 180) ?? "",
+          basePath
+        );
       } catch {
         damaged = true;
       }

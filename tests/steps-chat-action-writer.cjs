@@ -1,7 +1,7 @@
 // ChatActionWriter (experiences/visual-map/chat-action-writer.ts) on its own: fake ports and a fake map, no view, no real waiting.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load } = require('./support.cjs');
+const { load, obsidian } = require('./support.cjs');
 const { ChatActionWriter } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
 const { t } = load('i18n.ts');
 const { contentHash } = load('core/map-chat-context.ts');
@@ -88,7 +88,7 @@ function world(options = {}) {
     noteChatOwnFile: (path, text, created) => log('noteChatOwnFile', path, text, created),
     fileOf: path => (files.has(path) ? fileObject(path) : null)
   };
-  const writer = new ChatActionWriter(ports);
+  const writer = new (options.Writer ?? ChatActionWriter)(ports);
   const nodeById = id => map.nodes.find(item => item.id === id);
   const baseline = (extra = {}) => ({
     mdHashes: {}, topicHashes: Object.fromEntries(map.nodes.map(item => [item.id, { title: notes.get(item.id)?.title, parentId: item.parentId }])),
@@ -230,6 +230,21 @@ test('chat action writer: undo refuses newer live editor content even when the r
   await assert.rejects(() => w.history[0].undo(), /refused/);
   assert.equal(editorText, 'new unsaved user text');
   assert.equal(w.files.get(path), 'hello there');
+});
+
+test('chat action writer: raw edits and creates hand the Repository YAML parser to the guard, so an escaped Living Node key is refused', async () => {
+  // "ai-card" is the key ai-card to a YAML parser but not to the guard's line pattern; only the real parser sees it.
+  const { ChatActionWriter: Parsing } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: { parseYaml: obsidian.parseYaml } });
+  const card = '---\n"ai\\u002dcard": true\n---\nhello world';
+  const refused = { status: 'skipped', reason: t('ui.living_node_use_run_card') };
+  const w = world({ Writer: Parsing, files: { 'notes/x.md': card } });
+  const baseline = w.baseline({ mdHashes: { 'notes/x.md': contentHash(card) } });
+  assert.deepEqual((await apply(w, { kind: 'edit_md_file', path: 'notes/x.md', find: 'world', replace: 'there' }, baseline)).outcome, refused);
+  assert.equal(w.files.get('notes/x.md'), card);
+  assert.deepEqual((await apply(w, { kind: 'create_md_file', path: 'notes/new.md', content: card }, baseline)).outcome, refused);
+  const plain = world({ Writer: Parsing, files: { 'notes/y.md': '---\ntitle: y\n---\nhello world' } });
+  const base = plain.baseline({ mdHashes: { 'notes/y.md': contentHash('---\ntitle: y\n---\nhello world') } });
+  assert.deepEqual((await apply(plain, { kind: 'edit_md_file', path: 'notes/y.md', find: 'world', replace: 'there' }, base)).outcome, { status: 'done' });
 });
 
 test('chat action writer: a card or file that is a data source of the map is refused for rename_topic and edit_md_file, nothing written', async () => {

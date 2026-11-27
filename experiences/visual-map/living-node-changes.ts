@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /** Pure change-set validator. Storage must independently reconcile ownership against the actual Markdown. */
 export interface LivingEvidence {
   id: string;
@@ -111,6 +113,26 @@ function isPeriod(granularity: string): boolean {
   return /^(?:daily|day|daily close|hourly|hour|weekly|week|monthly|month|quarterly|quarter|yearly|year|每日|每小時|每小时|日|小時|小时|每週|每周|每月|每季|每年)$/.test(normalized(granularity));
 }
 
+/** Privacy-preserving deterministic event fingerprint; never store deleted claims.
+ * Period observations use the bucket identity even if the value changes.
+ * For other events, exact normalized claims are a conservative fallback.
+ */
+export function livingEventFingerprint(record: LivingRecord): string {
+  return createHash("sha256").update(JSON.stringify([
+    normalized(record.subject), normalized(record.scope), normalized(record.granularity),
+    timeKey(record.eventTime), isPeriod(record.granularity) ? null : normalized(record.claim)
+  ])).digest("hex");
+}
+
+export function livingEventTombstone(recordId: string, fingerprint: string): string {
+  return "@event:" + fingerprint + ":" + recordId;
+}
+
+export function parseLivingEventTombstone(value: string): { fingerprint: string; recordId: string } | undefined {
+  const match = /^@event:([a-f0-9]{64}):(.+)$/.exec(value);
+  return match ? { fingerprint: match[1], recordId: match[2] } : undefined;
+}
+
 function isChange(granularity: string): boolean {
   return /^(?:change|change only|on change|price change|變動|变化|變化|每次變動|每次变化)$/.test(normalized(granularity));
 }
@@ -167,6 +189,10 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   const records = new Map(base.records.map(record => [record.id, record]));
   if (records.size !== base.records.length) throw new Error("duplicate-record");
   const suppressed = new Set(base.suppressed);
+  const events = base.suppressed.flatMap(value => { const event = parseLivingEventTombstone(value); return event ? [event] : []; });
+  const knownSuppression = new Set(events.map(event => event.recordId));
+  const suppressedFingerprints = new Set(events.map(event => event.fingerprint));
+  const ambiguousSuppression = base.suppressed.some(value => !parseLivingEventTombstone(value) && !knownSuppression.has(value));
   const allowed = new Map(context.evidence.map(entry => [entry.id, entry]));
   // Retained evidence can be selected explicitly for a new conclusion. It is
   // already formal knowledge, not a new retrieval or an invented source.
@@ -211,7 +237,10 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
         owner: "ai",
         history: []
       };
+      if (suppressedFingerprints.has(livingEventFingerprint(candidate))) throw new Error("suppressed-record");
       const duplicate = duplicateRecord(records, candidate);
+      // A legacy ID-only tombstone cannot prove an unknown new record is safe.
+      if (!duplicate && ambiguousSuppression) throw new Error("ambiguous-suppression");
       if (duplicate) {
         if (duplicate.owner !== "ai") throw new Error("protected-record");
         const merged = mergeEvidence(duplicate.evidence, evidence);

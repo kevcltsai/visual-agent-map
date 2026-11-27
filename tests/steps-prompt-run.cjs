@@ -1001,7 +1001,7 @@ test('reason: a card waiting on a card in trial says so; the trial card itself i
   assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'upstream-trial' }), 'ui.living_node_upstream_trial');
 });
 
-test('Run All: a card under trial shows the skip line on the card while the batch runs and in the result, without being stamped', async () => {
+test('Run All: a card under trial shows the skip line on the card while the batch runs and clears it when the batch ends, without being stamped', async () => {
   const h = await harness(TREE);
   const trial = h.viewCoordinator(h.host).acquire('map-a', 'trial-view', [h.node('mid').path], false);
   const before = h.raw('mid');
@@ -1017,7 +1017,7 @@ test('Run All: a card under trial shows the skip line on the card while the batc
   eq(skipLine(), [skipText()], 'while the batch runs');
   h.view.stopPromptBatch(); await h.done();
   trial.release();
-  eq(skipLine(), [skipText()], 'in the batch result');
+  eq(skipLine(), [], 'the skip line is gone once the batch has ended');
   assert.equal(h.raw('mid'), before, 'a card under trial is not stamped');
 });
 

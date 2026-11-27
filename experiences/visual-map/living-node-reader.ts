@@ -51,6 +51,11 @@ export class LivingReaderView extends ItemView {
     await this.paint();
   }
 
+  /** A language change repaints the open reader: tab labels, banners and localized lines. */
+  refreshLanguage(): void {
+    if (this.file) void this.paint();
+  }
+
   markInvalid(owner: string): void {
     if (!this.owns(owner)) return;
     this.invalid = true;

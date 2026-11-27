@@ -2366,9 +2366,13 @@ export class VisualAgentMapView extends ItemView {
       // A reference shows what its original is now: any rename or delete, or a save of a file it was read from, reads it again.
       this.registerEvent(vault.on("delete", () => this.invalidateKnowledgeRefs()));
       this.registerEvent(vault.on("rename", () => this.invalidateKnowledgeRefs()));
-      this.registerEvent(vault.on("modify", file => this.invalidateKnowledgeRefs(file.path)));
       // A chapter note of the open picture book was saved: a review box in it may have been ticked.
-      this.registerEvent(vault.on("modify", file => this.onBookNoteModified(file.path)));
+      this.registerEvent(
+        vault.on("modify", file => {
+          this.invalidateKnowledgeRefs(file.path);
+          this.onBookNoteModified(file.path);
+        })
+      );
     }
     // A note whose image or `topic-cover` just changed redraws only its own cover.
     const cache = this.app.metadataCache;
@@ -7211,6 +7215,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True when this map's references may be changed here: the branch-edit gate (not AIM, not picking, not loading). */
   private canEditKnowledgeRefs(): boolean {
+    if (!this.plugin?.settings) return false;
     return !this.presentation && !this.map?.aim && !this.clipboardReadOnly();
   }
   /**
@@ -14967,7 +14972,7 @@ export class VisualAgentMapView extends ItemView {
       covers,
       coverLooks,
       ...(ringHeights.size ? { ringHeights } : {}),
-      ...(this.shareRefTitles.size ? { refTitles: new Map(this.shareRefTitles) } : {}),
+      ...(this.shareRefTitles?.size ? { refTitles: new Map(this.shareRefTitles) } : {}),
       mapPath: this.path
     };
   }

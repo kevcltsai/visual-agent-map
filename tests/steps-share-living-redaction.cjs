@@ -109,10 +109,12 @@ const assertClean = (text, where) => { for (const leak of LEAKS) assert.ok(!text
 
 test('Repository.readNote: Living Node shareMarkdown and summary leave no signed URL, local path or note embed', async () => {
   const { note } = await liveNote();
-  for (const field of [note.livingNode.shareMarkdown, note.livingNode.summary]) {
+  for (const field of [note.livingNode.shareMarkdown, note.livingNode.shareSummary]) {
     assert.ok(field.length > 0);
     assertClean(field, 'field');
   }
+  // The user's own screen keeps what they wrote.
+  assert.ok(note.livingNode.summary.includes('GSECRET') && note.livingNode.summary.includes('/srv/vaults'));
 });
 
 test('consumer: OPML and FreeMind export of a Repository-read Living Node carries no signed URL, local path or embed', async () => {

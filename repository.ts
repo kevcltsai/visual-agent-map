@@ -781,6 +781,7 @@ export class Repository {
     ) {
       let knowledgeRevision = "empty";
       let summary = "";
+      let shareSummary = "";
       let damaged = false;
       let shareMarkdown = "";
       const base = (this.app.vault.adapter as { getBasePath?: () => unknown }).getBasePath?.();
@@ -789,14 +790,13 @@ export class Repository {
         const knowledge = readLivingMarkdown(raw);
         shareMarkdown = redactLivingShareText(renderLivingShareKnowledge(knowledge), basePath);
         knowledgeRevision = knowledge.revision;
-        summary = redactLivingShareText(
+        summary =
           knowledge.output.text
             .split(/\r?\n/)
             .find(line => line.trim())
             ?.trim()
-            .slice(0, 180) ?? "",
-          basePath
-        );
+            .slice(0, 180) ?? "";
+        shareSummary = redactLivingShareText(summary, basePath);
       } catch {
         damaged = true;
       }
@@ -805,6 +805,7 @@ export class Repository {
         value === "ok" || value === "failed" || value === "blocked" || value === "cancelled" ? value : "never";
       livingNode = {
         summary,
+        shareSummary,
         shareMarkdown,
         configRevision: livingConfigurationStamp(section(content, "Prompt"), fm),
         knowledgeRevision,

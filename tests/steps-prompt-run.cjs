@@ -781,6 +781,8 @@ for (const [name, change] of [
   ['only its configuration (revision)', h => h.repo.writeAiCard(h.node('A').path, false)]
 ]) test(`P3.3 ${name} changed elsewhere while the editor is open: the save is refused, the draft and the editor stay`, async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error); // as the plugin does
   h.view.openAiCardPopover(h.node('A'));
   type(h, 'My draft');
   await change(h);
@@ -789,6 +791,7 @@ for (const [name, change] of [
   h.saveButton().click();
   await until(() => h.notices.length > 0);
   await dom.tick(); await dom.tick();
+  assert.match(h.notices.join('\n'), /changed elsewhere/i, 'says why: changed elsewhere, draft kept');
   assert.ok(h.view.aiCardOpen, 'the editor stays open');
   assert.equal(h.question().value, 'My draft');
   assert.equal(h.raw('A'), outside, 'nothing was written');

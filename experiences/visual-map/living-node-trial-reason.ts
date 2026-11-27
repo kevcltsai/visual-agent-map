@@ -48,6 +48,8 @@ export function livingSaveReason(error: unknown): TranslationKey | null {
     case "changed-configuration":
     case "changed-target":
     case "changed-target-identity":
+    case "changed-source-identity":
+    case "changed-source-resolution":
     case "missing-target":
       return "ui.living_node_save_reason_changed";
     case "locked-target":

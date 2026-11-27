@@ -1,5 +1,5 @@
 name: Living Node CI repair diagnostics
-# Source candidate f94d3777b40c2f5e588f47fca174d848e99be760
+# Source candidate 3f23a743b19f197bbe96f6ec70ed2070eeb3e109
 
 on:
   push:

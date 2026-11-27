@@ -101,6 +101,7 @@ import {
   type TranslationKey
 } from "./i18n";
 import type { CanvasItem } from "./experiences/visual-map/canvas-items";
+import { duplicatedKnowledgeRefs, type KnowledgeRefIO } from "./experiences/visual-map/knowledge-refs";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
 import type { ReasoningLevel } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
@@ -1359,6 +1360,37 @@ export class Repository {
     return parseMap(await this.app.vault.read(this.file(path)));
   }
 
+  /**
+   * The vault as the knowledge-reference resolver reads it (P4.3): only maps that carry the marker, each read fresh, a
+   * failure reported as null. Nothing here writes.
+   */
+  knowledgeRefIO(): KnowledgeRefIO {
+    return {
+      mapPaths: async () => (await this.mapFiles()).map(file => file.path),
+      readMap: async path => {
+        try {
+          return await this.readMap(path);
+        } catch {
+          return null;
+        }
+      },
+      noteFrontmatter: async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) return null;
+        const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        return cached ?? frontmatter(await this.app.vault.cachedRead(file));
+      },
+      readNote: async path => {
+        try {
+          const note = await this.readNote(path);
+          return { title: note.title, summary: note.summary, detail: note.detail };
+        } catch {
+          return null;
+        }
+      }
+    };
+  }
+
   /** Map.md read once: the map plus its sources (what hydrate and synchronize need). */
   async readMapMeta(path: string): Promise<MapMeta> {
     const content = await this.app.vault.read(this.file(path));
@@ -2513,6 +2545,9 @@ export class Repository {
       map.viewport = { ...source.viewport };
       for (const key of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"] as const)
         if (source[key] !== undefined) (map as unknown as Record<string, unknown>)[key] = cloneJson(source[key]);
+      // Cross-map references point at other maps and stay as they are; the ones hanging on a copied card hang on its copy.
+      const refs = duplicatedKnowledgeRefs(source, new Map([...copies].map(([id, copy]) => [id, copy.id])));
+      if (refs) map.knowledgeRefs = refs;
       if (source.topicRelations)
         map.topicRelations = source.topicRelations.map(relation => ({
           ...relation,

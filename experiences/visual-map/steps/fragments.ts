@@ -1,3 +1,4 @@
+export { default as livingNodeChangeSetTemplate } from "./living-node-change-set.md";
 import type { ContentLanguage } from "../../../i18n";
 import { renderTemplate } from "../../../core/step-runner";
 import { inLanguage, type FragmentPair } from "../../../core/steps/_shared/fragments";

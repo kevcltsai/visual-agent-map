@@ -185,13 +185,13 @@ test('sim: add with refs, move, reorder, delete (branch and not), kind, appearan
   assert.equal(sim.relations.length, 0, 'a relation goes with its card');
 });
 
-test('S5 parity: the simulator runs the product functions, so their quirks hold (partial reorder, exclusive markers, text size, branch delete)', () => {
+test('S5 parity: the simulator runs the product functions, so their quirks hold (partial reorder, marker toggle, text size, branch delete)', () => {
   const sim = new SimMap('t', [['r', 'R', null], ['a', 'A', 'r'], ['b', 'B', 'r'], ['c', 'C', 'r']]);
   sim.apply([item('reorder_topics', { parentId: 'r', nodeIds: ['c', 'a'] })]);
   assert.deepEqual(sim.snapshot()[0].children.map(x => x.title), ['C', 'B', 'A'], 'unlisted B keeps its place (product orderSiblings); a naive sort would give C,A,B');
-  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['progress-25'] })]);
-  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['progress-50'] })]);
-  assert.deepEqual([...sim.nodes.get('a').markers], ['progress-50'], 'a single-choice marker group keeps one value (a union would keep both)');
+  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['star'] })]);
+  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['done'] })]);
+  assert.deepEqual([...sim.nodes.get('a').markers], ['star', 'done'], 'markers accumulate (product changeTopicMarkers appends)');
   sim.apply([item('set_appearance', { nodeIds: ['a'], formats: ['text-small'] })]);
   sim.apply([item('set_appearance', { nodeIds: ['a'], formats: ['text-large'] })]);
   assert.deepEqual([...sim.nodes.get('a').styles], ['text-large'], 'text size is one choice');

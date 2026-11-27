@@ -91,7 +91,7 @@ export class MapSourcesControl {
   }
   // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
   /**
-   * One toolbar button right after the goal button: 「資料來源 · N 份」, with ⚠ in front when a source cannot be read.
+   * One header button: 「資料來源 · N 份」, with ⚠ in front when a source cannot be read.
    * It opens a panel (same open/close, focus and Esc rules as the goal panel) to add and remove this map's sources.
    */
   renderMapSourcesControl(parent: HTMLElement): void {
@@ -265,13 +265,16 @@ export class MapSourcesControl {
     this.mapSourcesPanelCleanup = () => panelCleanups.forEach(clean => clean());
     this.ports.placeTools();
   }
-  /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
+  /**
+   * Left-aligned under the button, shifted left when it would overflow the map pane; the width follows the CSS (max about
+   * 440px). A narrow header hides the button: the panel then starts at the pane's left margin.
+   */
   placeMapSourcesPanel(panel: HTMLElement): void {
     const button = this.mapSourcesButtonEl;
     const tools = this.mapSourcesToolsEl;
-    const overlay = tools?.parentElement;
-    if (!button?.getBoundingClientRect || !tools?.getBoundingClientRect || !overlay?.getBoundingClientRect) return;
-    const bounds = overlay.getBoundingClientRect();
+    const pane = tools?.closest?.<HTMLElement>(".vam-view") ?? tools?.parentElement;
+    if (!button?.getBoundingClientRect || !tools?.getBoundingClientRect || !pane?.getBoundingClientRect) return;
+    const bounds = pane.getBoundingClientRect();
     const width = Math.max(0, Math.min(440, bounds.width - 32));
     const from = button.getBoundingClientRect().left;
     const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);

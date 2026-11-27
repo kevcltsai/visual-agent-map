@@ -596,6 +596,57 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
+test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  const face = () => {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }), title = card.createEl('h3', { cls: 'vam-card-title' }), tools = card.createDiv({ cls: 'vam-node-tools' });
+    return { card, header, title, tools };
+  };
+  const paint = (status, extra = {}) => {
+    const f = face();
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(f.card, f.header, node, { ...h.view.notes.get(node.id), ...extra });
+    return f;
+  };
+  const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+    const f = paint(status);
+    const [chip, ...rest] = chips(f.header);
+    assert.equal(rest.length, 0, `${status}: one label`);
+    assert.ok(chip?.cls.includes(cls), `${status}: ${chip?.cls}`);
+    assert.equal(chip.text, text, `${status}: words, not only a colour`);
+    assert.equal(findAll(f.title, i => i.cls?.includes('vam-ai-glyph')).length, 0, `${status}: the header label replaces the title glyph`);
+    h.view.paintPromptState(f.card, f.header, node, h.view.notes.get(node.id));
+    assert.equal(chips(f.header).length, 1, `${status}: repainting does not stack labels`);
+  }
+  for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
+  assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+});
+
+test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  const paint = status => {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }); card.createEl('h3', { cls: 'vam-card-title' }); const tools = card.createDiv({ cls: 'vam-node-tools' });
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    return { card, header, tools };
+  };
+  let stopped = 0; h.view.stopPromptBatch = () => { stopped++; };
+  h.view.promptBatch = { outcome: null, controller: new AbortController() };
+  h.view.promptEntryOf = () => ({ status: 'running' });
+  const running = paint('running');
+  const stop = find(running.tools, i => i.tag === 'button' && i.text === 'Stop');
+  assert.ok(stop, 'Stop in the toolbar');
+  stop.click();
+  assert.equal(stopped, 1);
+  h.view.paintPromptState(running.card, running.header, node, h.view.notes.get(node.id));
+  assert.equal(findAll(running.tools, i => i.tag === 'button' && i.text === 'Stop').length, 1, 'repainting keeps one Stop');
+  assert.equal(find(paint('stale').tools, i => i.tag === 'button' && i.text === 'Stop'), undefined);
+  h.view.promptBatch = null;
+});
+
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
 test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
   const h = await harness([['Y', null], ['X', null]]);
@@ -642,6 +693,146 @@ test('popover close: Esc, Close or discard returns focus to the card it was open
   h.pop().keydown({ key: 'Escape' });
   assert.equal(h.view.aiCardOpen, null);
   eq(restored, [h.node('A').id]);
+  // P3.3: back on the canvas, the viewport and the selection are what they were before the editor opened, also after "discard".
+  const g = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const back = [];
+  g.view.restoreMapFocusSoon = id => back.push(id);
+  g.view.map.viewport = { x: -120, y: 45, zoom: 1.5 };
+  g.view.selection.replaceMulti([g.node('A').id]);
+  const before = canvasState(g);
+  g.view.openAiCardPopover(g.node('A'));
+  g.pop().keydown({ key: 'Escape' });
+  eq(canvasState(g), before);
+  assert.equal(g.view.aiCardOpen, null);
+  g.view.openAiCardPopover(g.node('A'));
+  g.question().value = 'Changed?'; g.question().input();
+  g.pop().keydown({ key: 'Escape' });
+  assert.ok(g.view.aiCardOpen, 'unsaved changes: the choices come first');
+  find(g.pop(), i => i.tag === 'button' && i.text === 'Discard').click();
+  assert.equal(g.view.aiCardOpen, null);
+  eq(canvasState(g), before);
+  eq(back, [g.node('A').id, g.node('A').id]);
+});
+
+// P3.3: the central editor's close choices, draft guard and refusals.
+const canvasState = h => {
+  const s = h.view.selection.state;
+  return { viewport: h.view.map.viewport, selected: s.selected, multi: [...s.multiSelected].sort(), mode: s.multiSelectMode };
+};
+const choices = h => find(h.pop(), i => i.cls?.includes('vam-living-editor-close-choices'));
+const choice = (h, text) => find(choices(h), i => i.tag === 'button' && i.text === text);
+const type = (h, text) => { h.question().value = text; h.question().input(); };
+
+test('P3.3 save and close: one history step, the viewport stays, the editor closes', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  h.view.map.viewport = { x: -120, y: 45, zoom: 1.5 };
+  const before = canvasState(h);
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'New question');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(choices(h).hidden, false);
+  choice(h, 'Save').click();
+  await until(() => h.view.aiCardOpen === null);
+  assert.equal(h.view.history.past.length, past + 1);
+  assert.match(h.raw('A'), /New question/);
+  eq(canvasState(h), before);
+});
+
+test('P3.3 return: the editor stays open, the draft is kept and the focus is on the Prompt field', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Draft');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(choices(h).hidden, false);
+  choice(h, 'Return').click();
+  assert.equal(choices(h).hidden, true);
+  assert.ok(h.view.aiCardOpen);
+  assert.equal(h.question().value, 'Draft');
+  assert.equal(dom.focusedNow(), h.question());
+  assert.match(h.raw('A'), /Old/);
+});
+
+test('P3.3 another card with unsaved changes: the editor stays on the original card and shows the close choices', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['B', null, { prompt: 'Other' }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Draft');
+  const win = h.view.aiCardOpen.win;
+  h.view.openAiCardPopover(h.node('B'));
+  assert.equal(h.view.aiCardOpen.win, win);
+  assert.equal(h.view.aiCardOpen.nodeId, h.node('A').id);
+  assert.equal(choices(h).hidden, false);
+  assert.equal(h.question().value, 'Draft');
+});
+
+test('P3.3 a [[link]] in the Prompt body (not on the sources line) is not saved as a source', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['N', null, { noAi: true }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Compare with [[N]] in the text');
+  h.saveButton().click();
+  await until(() => /Compare with/.test(h.raw('A')));
+  assert.match(h.raw('A'), /\[\[N\]\]/, 'the text is kept as written');
+  assert.match(h.raw('A'), /^living-node-refs: \[\]$/m, 'no source recorded');
+  assert.equal(h.raw('A').includes('card:' + h.node('N').id), false);
+});
+
+for (const [name, change] of [
+  ['its Prompt', h => h.repo.updateNote(h.node('A').path, { prompt: 'Changed elsewhere' })],
+  ['only its configuration (revision)', h => h.repo.writeAiCard(h.node('A').path, false)]
+]) test(`P3.3 ${name} changed elsewhere while the editor is open: the save is refused, the draft and the editor stay`, async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error); // as the plugin does
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'My draft');
+  await change(h);
+  const outside = h.raw('A');
+  const past = h.view.history.past.length;
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  await dom.tick(); await dom.tick();
+  assert.match(h.notices.join('\n'), /changed elsewhere/i, 'says why: changed elsewhere, draft kept');
+  assert.ok(h.view.aiCardOpen, 'the editor stays open');
+  assert.equal(h.question().value, 'My draft');
+  assert.equal(h.raw('A'), outside, 'nothing was written');
+  assert.equal(h.view.history.past.length, past);
+});
+
+test('P3.3 a refused save says why in plain words, not a raw code', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error); // as the plugin does
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Why?\nSources: [[A]]');
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  assert.equal(/self-reference/.test(h.notices.join('\n')), false, h.notices.join('\n'));
+  assert.match(h.notices.join('\n'), /itself/i);
+  assert.ok(h.view.aiCardOpen);
+});
+
+test('P3.3 refusal reasons are localized in English, Traditional and Simplified Chinese; an unknown code gives none', () => {
+  const ui = require('./support-replay.cjs').loadSource(`
+export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";
+export { setUiLanguage, t } from "./i18n";
+`, { obsidian });
+  const codes = ['empty-prompt', 'self-reference', 'living-node-cycle', 'unauthorized-source', 'missing-source', 'ambiguous-source', 'changed-configuration', 'changed-target'];
+  const seen = new Map();
+  try {
+    for (const language of ['en', 'zh-TW', 'zh-CN']) {
+      ui.setUiLanguage(language);
+      for (const code of codes) {
+        const key = ui.livingSaveReason(new Error(code));
+        assert.ok(key, code);
+        const text = ui.t(key);
+        assert.ok(text && text !== key && !text.includes(code), `${language} ${code}: ${text}`);
+        if (!seen.has(code)) seen.set(code, new Set());
+        seen.get(code).add(text);
+      }
+    }
+  } finally { ui.setUiLanguage('en'); }
+  for (const [code, texts] of seen) assert.equal(texts.size, 3, `${code}: three languages`);
+  assert.equal(ui.livingSaveReason(new Error('some free text')), null);
 });
 
 test('save path: existing AI card is one undoable configuration edit; source IDs and manual content are preserved', async () => {
@@ -1161,4 +1352,23 @@ test('trial cancel: declining the usage confirmation or pressing Stop shows no f
   tryButton(failed).click();
   await until(() => box(failed).hidden === false);
   assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
+});
+
+test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note, and Note still opens the details', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  let opened = 0; h.view.openDetails = () => { opened++; };
+  const buttons = tools => findAll(tools, i => i.tag === 'button');
+  const hasCls = (i, cls) => !!i.cls?.split(' ').includes(cls);
+  h.view.noteLoad = { pending: true };
+  const loading = element('div');
+  h.view.paintCardToolbar(loading, node, true);
+  assert.deepEqual(buttons(loading).map(b => hasCls(b, 'vam-detail-button')), [true], 'read-only: Note only');
+  buttons(loading)[0].click();
+  assert.equal(opened, 1, 'Note only reads, so it works while read-only');
+  h.view.noteLoad = null;
+  const ready = element('div');
+  h.view.paintCardToolbar(ready, node, true);
+  assert.ok(buttons(ready).length > 1, 'editable again: the other tools are back');
+  assert.ok(buttons(ready).some(b => hasCls(b, 'vam-card-tool-more')));
 });

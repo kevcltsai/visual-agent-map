@@ -2744,6 +2744,31 @@ integrationTest('B1 map: open_map with several matches lists them and opens noth
   h.type('open wine'); await h.view.sendMapChat();
   assert.equal(h.view.path, b); assert.match(chat.transcript().at(-1).lines[0].text, /no map has that name/);
 });
+integrationTest('B16 map: open_map in its own turn with no other work switches this tab; the reply and the running turn are kept', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push(path); return null; };
+  let aborted = null;
+  h.control.reply = async (_request, signal) => { aborted = signal; return { reply: 'Switching now.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] }; };
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [], 'the turn itself does not send the map to a new tab'); assert.equal(h.view.path, coffee);
+  assert.equal(aborted.aborted, false, 'the turn was not stopped'); assert.equal(chat.isBusy, false);
+  assert.equal(chat.transcript().at(-1).text, 'Switching now.', 'the reply is kept'); assert.equal(chat.transcript().at(-1).lines[0].status, 'done');
+});
+integrationTest('B16 map: open_map while other AI work runs on this map opens it in a new tab after the write queue; the chat stays here', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const coffee = await h.repo.createMap('Coffee industry');
+  h.view.startingExpand.add(h.ids.a);
+  // Like the real one: the new tab opens its map through mutate, so a call made inside a write would never finish.
+  const newTabs = []; h.plugin.openMapInNewTab = async path => { newTabs.push([path, h.control.depth]); await h.plugin.mutate(async () => {}); return {}; };
+  h.control.reply = async () => ({ reply: 'Opening it.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  h.type('go to coffee'); await h.view.sendMapChat();
+  eq(newTabs, [[coffee, 0]], 'one new tab, outside the write queue'); assert.equal(h.view.path, MAP, 'this tab keeps its map');
+  assert.equal(h.view.startingExpand.has(h.ids.a), true, 'the running work is not dropped');
+  assert.equal(chat.transcript().at(-1).text, 'Opening it.');
+  const line = chat.transcript().at(-1).lines[0];
+  assert.equal(line.status, 'done'); assert.match(line.text, /This map still has AI running; opened “Coffee industry” in a new tab/);
+});
 
 integrationTest('B1 view operations: collapse, expand, auto layout and focus each write one result line; collapse and expand are saved in Map.md', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
@@ -3184,7 +3209,7 @@ integrationTest('UX B10: "Create an empty mind map" clears the draft typed on th
   const box = element('div'); h.view.fillEmptyMap(box);
   assert.match(visibleText(box), /This mind map has no topics yet\./); assert.doesNotMatch(visibleText(box), /＋ Topic|\+ Topic/, 'no pointer to the removed toolbar button');
   const addButtons = findAll(box, i => i.tag === 'button');
-  assert.equal(addButtons.length, 1, 'the empty canvas has exactly one add button'); assert.equal(addButtons[0].text, '+ Add first topic');
+  assert.deepEqual(addButtons.map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the empty canvas has the one "Add first topic" button and, since V3.3 A7, the secondary "✦ AI root" after it');
   const opened = []; h.view.openAddMenu = (event, parent) => opened.push([event, parent]);
   addButtons[0].click(); assert.equal(opened.length, 1); assert.equal(opened[0][1], null, 'the button adds a top-level topic');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -3197,8 +3222,8 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
     const idle = findAll(draw(h, method), i => i.tag === 'button');
-    // The ordinary toolbar keeps the always-visible 「Data sources」 button; the hidden-AIM one has nothing while idle.
-    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), method === 'renderMapTools' ? [true] : [], `${method}: no select icon while idle`);
+    // B17: 「Data sources」 moved to the header, so neither canvas toolbar has anything while idle.
+    assert.deepEqual(idle.map(b => b.cls.includes('vam-sources-button')), [], `${method}: no select icon while idle`);
     assert.equal(findAll(draw(h, method), i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
     h.view.selection.toggleMultiSelect();
     assert.equal(h.view.selection.state.multiSelectMode, true);
@@ -3283,7 +3308,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics" and the 
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
+  assert.deepEqual(all, [], 'select several is in the header ⋯ menu; data sources is a header button (B17)'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
@@ -3472,7 +3497,7 @@ test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only
   assert.doesNotMatch(css, /\.vam-map-chat ~ \.vam-canvas-hint/); assert.doesNotMatch(css, /bottom: 392px/); assert.doesNotMatch(chatRules, /border-left|border-right: [2-9]|linear-gradient|background-clip: text/, 'none of the banned surface habits');
   assert.match(css, /^\.vam-map-tools \{ top: 12px; left: 12px;/m); assert.match(css, /^\.vam-zoom-controls \{ right: 12px; bottom: 12px; \}/m);
   assert.match(css, /^\.vam-workspace \{ display: flex;[^}]*position: relative;/m); assert.match(css, /^\.vam-canvas \{ position: relative; display: flex; flex: 1;/m);
-  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
+  assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/, 'B17: the folded chat edge is 28px');
 });
 
 test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay), and the selection bar lives in the canvas', () => {
@@ -3598,7 +3623,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 1, 'the idle empty canvas has the one "Add first topic" button');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.deepEqual(findAll(box, i => i.tag === 'button').map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the idle empty canvas has "Add first topic" and the V3.3 A7 "✦ AI root"');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');
@@ -3750,8 +3775,8 @@ integrationTest('B1 fix 26: after create_map re-mounts the conversation in the n
 integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px of it; the tool group moves to the window\'s right edge and comes back; the hover preview is under the window', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const tools = h.rootEl.createDiv('vam-map-tools'); h.plugin.settings.mapChatWidth = 340;
   h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isNarrow, true); assert.equal(tools.style.left ?? '', '', 'folded: the group stays at the canvas corner');
-  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 44 + 12}px`, 'beside the window, like a docked one');
-  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 44 + 12}px`);
+  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 28 + 12}px`, 'beside the window, like a docked one');
+  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 28 + 12}px`);
   h.rootEl.clientWidth = 500; h.view.onResize(); assert.equal(chat.el.style.width, '340px');
   chat.collapseOverlay(); assert.equal(tools.style.left, '', 'folded again: the group goes back');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const z = selector => Number(css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*z-index: (\\d+)`))[1]);
@@ -5995,10 +6020,12 @@ const looksOf = async (h, key) => { const note = await h.note(key); return { col
 integrationTest('chat 08: set_appearance sets colour, markers and styles on every card it names, with the panel\'s writes; the note text stays', async () => {
   const h = await harness(); await h.view.hydrate();
   const before = { a: h.contents.get(h.node('a').path), b: h.contents.get(h.node('b').path) };
-  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold', 'text-large'] })]);
+  // P1.10b: a removed marker id the model still sends is dropped without an error; the status marker is set.
+  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'star', 'priority-2'], formats: ['bold', 'text-large'] })]);
   eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Done: Set the appearance of 2 topics');
   for (const key of ['a', 'b']) {
-    eq(await looksOf(h, key), { color: 'red', markers: ['priority-2', 'flag-red'], style: ['bold', 'text-large'] });
+    eq(await looksOf(h, key), { color: 'red', markers: ['star'], style: ['bold', 'text-large'] });
+    assert.doesNotMatch(h.contents.get(h.node(key).path), /flag-red|priority-2/, 'a removed id is not written');
     assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
   }
   eq(await looksOf(h, 'c'), { color: null, markers: [], style: [] }, 'other cards are untouched');
@@ -6013,12 +6040,12 @@ integrationTest('chat 08 / L1: set_appearance counts the cards it could not touc
   const clean = await apply(h, [lookAct([h.ids.b], { color: 'red' })]);
   assert.doesNotMatch(clean[0].text, /skipped/, 'no filtered card, nothing to count');
 });
-integrationTest('chat 08: a single-choice marker group keeps one value and the text size one choice, as in the panel', async () => {
+integrationTest('chat 08: the text size keeps one choice, as in the panel (P1.10b: the single-choice marker groups are gone)', async () => {
   const h = await harness();
   const path = h.node('a').path;
-  await h.repo.writeTopicMarkers(path, 'priority-1'); await h.repo.writeTopicMarkers(path, 'progress-25'); await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
-  await apply(h, [lookAct([h.ids.a], { markers: ['priority-4', 'progress-100'], formats: ['text-large'] })]);
-  eq(await looksOf(h, 'a'), { color: null, markers: ['priority-4', 'progress-100'], style: ['text-large'] });
+  await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
+  await apply(h, [lookAct([h.ids.a], { formats: ['text-large'] })]);
+  eq(await looksOf(h, 'a'), { color: null, markers: [], style: ['text-large'] });
 });
 integrationTest('chat 08: set_appearance clears a colour, every marker and every style; unknown frontmatter values stay', async () => {
   const h = await harness(); const path = h.node('a').path;
@@ -6038,14 +6065,14 @@ integrationTest('chat 08: a card that already looks like that is not written, an
 });
 integrationTest('chat 08: a real send carries each card\'s appearance (default left out); an unknown value is counted as skipped and writes nothing', async () => {
   const h = await harness(); const path = h.node('a').path;
-  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'flag-blue'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
+  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'star'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
   const before = h.contents.get(h.node('b').path);
   h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.b], color: 'pink' }] }), request.context);
   h.open(); h.type('make it pink'); await h.view.sendMapChat();
   await until(() => !h.view.chat.isBusy);
   const outline = JSON.parse(h.control.requests[0].context.json).outline;
   const card = id => outline.find(n => n.id === id);
-  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['flag-blue']); eq(card(h.ids.a).formats, ['bold']);
+  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['star']); eq(card(h.ids.a).formats, ['bold']);
   assert.equal(['color', 'markers', 'formats'].some(key => key in card(h.ids.b)), false);
   assert.equal(h.contents.get(h.node('b').path), before);
   assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
@@ -6723,7 +6750,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 32 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 33 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

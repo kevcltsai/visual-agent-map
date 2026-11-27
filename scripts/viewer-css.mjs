@@ -5,8 +5,6 @@
 export const ALLOW_PREFIXES = [
   "vam-node",
   "vam-edge",
-  "vam-relevance-tag",
-  "vam-relevance-icon",
   "vam-inspector",
   "vam-card-",
   "vam-status",

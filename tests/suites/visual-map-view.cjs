@@ -126,20 +126,24 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   card = view.stageEl.children[0];
   assert.equal(card.dataset.status, 'idea'); assert.equal(all(card, item => item.cls === 'vam-status vam-status-queued').length, 0);
 });
-integrationTest('outline reveal expands collapsed ancestors, centers and selects the topic, and reports unknown paths', async () => {
+// B15 (P1.6c): an outline reveal is read-only navigation, like a search hit (V3.3 decision #7): it never writes collapse.
+integrationTest('outline reveal selects the topic without writing collapse, centers on the top collapsed ancestor, and reports unknown paths', async () => {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const root = node('root'), child = node('child'), leaf = node('leaf');
   child.parentId = root.id; leaf.parentId = child.id; root.collapsed = true; child.collapsed = true;
   const doc = map([root, child, leaf]); doc.viewport = { x: 0, y: 0, zoom: 1 }; leaf.x = 1000; leaf.y = 400;
-  const view = new VisualAgentMapView({ app: {} }, { mutate: work => work(), expansionBatches: new Map() });
+  const active = [];
+  const view = new VisualAgentMapView({ app: {} }, { mutate: work => work(), expansionBatches: new Map(), setOutlineActive: path => active.push(path) });
   view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600 };
-  let renders = 0; view.render = () => { renders++; }; view.transform = () => {}; view.saveViewport = () => {};
-  view.mapChange = async change => { change(view.map); };
+  let saves = 0, changes = 0; view.render = () => {}; view.transform = () => {}; view.saveViewport = () => { saves++; };
+  view.mapChange = async change => { changes++; change(view.map); };
   view.selection.replaceMulti(['root']);
   assert.equal(await view.revealPath('leaf.md'), true);
-  assert.equal(root.collapsed, false); assert.equal(child.collapsed, false);
-  assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0); assert.ok(renders > 0);
-  assert.deepEqual(plain(doc.viewport), { x: 400 - 1140, y: 300 - 480, zoom: 1 });
+  assert.equal(root.collapsed, true, 'collapse is not written'); assert.equal(child.collapsed, true, 'collapse is not written');
+  assert.equal(changes, 0, 'no map change'); assert.equal(saves, 0, 'the camera move is not saved');
+  assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0);
+  assert.equal(active.at(-1), 'leaf.md', 'the outline is told the active topic');
+  assert.deepEqual(plain(doc.viewport), { x: 400 - (root.x + 140), y: 300 - (root.y + 80), zoom: 1 }, 'centered on the top collapsed ancestor');
   view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');
   assert.deepEqual([...view.selection.state.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selection.state.selected, null);
@@ -1116,7 +1120,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   const task = { mapPath: view.path, mapId: 'm', mapTitle: 'M', title: 'T', sources: [{ id: 'a', path: 'a.md' }, { id: 'b', path: 'b.md' }], parentId: 'root', targetId: null, model: 'x', sourceContent: '', controller: new AbortController(), state: 'running', progress: '' };
   const chips = card => { const all = el => [el, ...el.children.flatMap(all)]; return all(card).filter(e => e.classes?.has('vam-status')).map(e => e.text); };
   fixture.build(); let cards = fixture.cards();
-  assert.deepEqual(chips(cards.a), ['Researched']); assert.notEqual(cards.a.dataset.status, 'running');
+  assert.deepEqual(chips(cards.a), [], 'a researched card carries no success chip (DELIVERY_V3_3 7 P1.2)'); assert.notEqual(cards.a.dataset.status, 'running');
   view.mergeDrafts.tasks.set(view.path, task); fixture.build(); cards = fixture.cards();
   for (const id of ['a', 'b']) { assert.deepEqual(chips(cards[id]), ['Merging…'], `${id} is marked`); assert.equal(cards[id].dataset.status, 'running'); }
   for (const id of ['root', 'c']) { assert.equal(chips(cards[id]).includes('Merging…'), false, `${id} is not`); assert.notEqual(cards[id].dataset.status, 'running'); }
@@ -1128,7 +1132,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   assert.ok(texts.includes('Merging:')); assert.equal(texts.includes('Stop merge'), false, 'no Stop once the result is being written');
   const stop = (task.state = 'running', all(bar()).find(e => e.tag === 'button' && e.text === 'Stop merge')); stop.handlers.get('click')();
   assert.equal(view.mergeDrafts.tasks.size, 0); assert.equal(task.controller.signal.aborted, true);
-  fixture.build(); assert.deepEqual(chips(fixture.cards().a), ['Researched']); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
+  fixture.build(); assert.deepEqual(chips(fixture.cards().a), []); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
 });
 integrationTest('AI merge lock: a merging card cannot be dragged; other cards still can', () => {
   for (const [merging, expected] of [[true, 0], [false, 1]]) {
@@ -1247,7 +1251,7 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.card_tool_research', 'ui.card_tool_add', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['研究', '新增', '筆記', '更多卡片動作']);
 });
-integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
+integrationTest('status pill: researched and unresearched topics show none (no success label on the card face, DELIVERY_V3_3 7 P1.2), other states keep theirs and screen readers still hear the status ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
     const fixture = selectionView(load);
     fixture.view.notes.get('a').status = status;
@@ -1259,7 +1263,7 @@ integrationTest('status pill: researched topics show "Researched", unresearched 
     return { found, card, label: fixture.view.stageEl.children.find(item => item.dataset.nodeId === 'a') };
   };
   const done = pills('completed');
-  assert.deepEqual(done.found.map(item => [item.text, [...item.classes].sort().join(' ')]), [['Researched', 'vam-status vam-status-completed']], 'completed cards show the Researched pill');
+  assert.equal(done.found.length, 0, 'completed cards carry no Researched pill (no success label on the card face)');
   assert.equal(pills('idea').found.length, 0, 'unresearched cards have no pill');
   assert.equal(pills('idea').card.dataset.status, 'idea', 'the card still carries its status');
   assert.equal(pills('error').found.length, 1, 'error keeps its pill');
@@ -1269,6 +1273,39 @@ integrationTest('status pill: researched topics show "Researched", unresearched 
   assert.ok(labelled.cards().a.attrs['aria-labelledby'], 'the card is still named');
   const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
   assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
+});
+integrationTest('A4 two states: an unselected card keeps links, model, add-summary and the secondary actions out of its header; they sit in the card toolbar, and no success chip is drawn', () => {
+  const f = heFixture({ notes: heNotes([
+    ['fact', { summary: 'Has a summary', links: ['https://a.example/x'], modelOverride: true, model: 'gpt-x', status: 'completed' }],
+    ['hyp', { summary: 'No conclusion yet', status: 'completed' }],
+    ['other', { summary: 'S', status: 'error', lastError: 'boom' }]
+  ]) });
+  f.view.plugin.modelLabel = model => `M:${model}`;
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map();
+  for (const n of f.view.map.nodes) f.view.renderNode(n);
+  const has = (el, name) => (el.cls ?? '').split(/\s+/).includes(name);
+  const part = (i, name) => dom.find(f.view.stageEl.children[i], c => has(c, name));
+  const within = (root, test) => root ? dom.findAll(root, test) : [];
+  for (let i = 0; i < 3; i++) {
+    const header = part(i, 'vam-node-header'), tools = part(i, 'vam-node-tools');
+    assert.ok(tools, `card ${i} has its toolbar`);
+    assert.deepEqual(within(header, c => has(c, 'vam-card-links') || has(c, 'vam-node-model-tag') || has(c, 'vam-badge-new')).length, 0, `card ${i}: no links, model or suggestion badge in the header`);
+    assert.deepEqual(within(f.view.stageEl.children[i], c => has(c, 'vam-status-completed')).length, 0, `card ${i}: no completed chip`);
+    assert.deepEqual(within(tools, c => c.tag === 'button' && has(c, 'vam-detail-button')).length, 1, `card ${i}: the toolbar keeps Note`);
+  }
+  assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-links')).length === 1, 'links in the toolbar');
+  assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-node-model-tag') && c.text === 'M:gpt-x').length === 1, 'model name in the toolbar');
+  const meta = part(0, 'vam-node-tools').children.at(-1);
+  assert.ok(has(meta, 'vam-node-tools-meta'), 'link count and model close the toolbar');
+  assert.equal(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, 'a card with a summary has no add-summary button');
+  const add = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool-add-summary'));
+  assert.equal(add.length, 1, 'an empty-summary card offers Add summary in the toolbar'); assert.equal(add[0].text, 'Add summary');
+  const buttons = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool')).map(c => c.text);
+  assert.deepEqual(buttons.slice(-2), ['Add summary', '⋯'], 'Add summary sits just before More');
+  assert.equal(within(part(2, 'vam-node-header'), c => has(c, 'vam-status-error')).length, 1, 'the error chip stays in the header');
+  // The card-level add-summary line takes no room and shows nothing (the stylesheet hides it).
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-card-summary-add \{ display: none;/);
 });
 integrationTest('header ⋯ menu: presentation, layout, select several, topic outline and focus mode, then the maintenance entries; map management is not here', () => {
   const menus = [];
@@ -1943,6 +1980,63 @@ integrationTest('hypothesis-evidence: switching the type is one undoable step; u
   await view.changeTopicKind(view.map.nodes[1], 'topic');
   assert.equal(pushed.length, 2, 'choosing the current type does nothing');
 });
+integrationTest('V3.3 P1.2: type, AI card, colour, cover and size changes keep the note body byte for byte and leave unrelated frontmatter lines alone', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const crypto = require('node:crypto');
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-p/Map.md';
+  const doc = { id: 'map-p', title: 'p', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-p');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const created = await repo.createNote('Owned', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(created);
+  await repo.saveMap(MAP, doc);
+  // The owner's own text: a heading, a list and a wiki link after what VAM wrote, plus a frontmatter line VAM does not own.
+  const human = '\n## My notes\n\n- first point\n- second point with [[Some Other Note|alias]]\n\n> quoted line\n';
+  contents.set(created.path, contents.get(created.path).replace(/^---\r?\n/, '---\nowner-field: keep me\n') + human);
+  const split = text => { const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text); return { fm: m ? m[1].split(/\r?\n/) : [], body: m ? text.slice(m[0].length) : text }; };
+  const sha = text => crypto.createHash('sha256').update(text).digest('hex');
+  // The AI step adds only its Prompt callout (and its own frontmatter keys); everything else stays byte for byte.
+  const withoutPrompt = body => body.replace(/^> \[!info\]- Prompt\n(?:>.*\n)*\n?/m, '');
+  const { view } = heFixture({ topics: [created] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.app = repo.app; view.plugin.repo = repo; view.plugin.mutate = work => work(); view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.plugin.recordFailure = (_, error) => { throw error; };
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  view.history = { push() {} }; view.render = () => {};
+  await view.refreshAfterSavedChange();
+  const card = () => view.map.nodes[0];
+  const start = split(contents.get(created.path));
+  const ownerLine = start.fm.find(line => line.startsWith('owner-field'));
+  assert.equal(ownerLine, 'owner-field: keep me');
+  const keepsBody = (label, strip = body => body) => {
+    const now = split(contents.get(created.path));
+    assert.equal(sha(strip(now.body)), sha(strip(start.body)), `${label}: the body is unchanged`);
+    assert.ok(now.body.includes(human.trim()), `${label}: the owner's text is still there`);
+    assert.ok(now.fm.includes(ownerLine), `${label}: the owner's frontmatter line is untouched`);
+  };
+  await view.changeTopicKind(card(), 'evidence');
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-kind:\s*"?evidence/.test(line)));
+  keepsBody('type');
+  const aiSaved = await view.saveAiCard(card(), null, undefined, { question: 'What changed?', sources: [] }, undefined, undefined, () => true);
+  assert.ok(aiSaved, 'the AI card was saved');
+  assert.ok(contents.get(created.path).includes('What changed?'), 'the question was written');
+  keepsBody('AI card', withoutPrompt);
+  await view.changeTopicColor(card(), 'red');
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-color:\s*"?red/.test(line)));
+  keepsBody('colour', withoutPrompt);
+  await view.changeTopicCover(card());
+  assert.ok(split(contents.get(created.path)).fm.some(line => /^topic-cover:\s*"?none/.test(line)));
+  keepsBody('cover', withoutPrompt);
+  const noteBytes = contents.get(created.path), mapBytes = contents.get(MAP);
+  await view.resizeCard(card().id, { width: 360 });
+  assert.equal(contents.get(created.path), noteBytes, 'size: the note is not written at all');
+  assert.notEqual(contents.get(MAP), mapBytes, 'size: only Map.md changes');
+  assert.equal((await repo.readMap(MAP)).nodes[0].width, 360);
+});
 integrationTest('hypothesis-leaning: changeHypothesisLeaning is one history entry; the leaning and the lifted strength undo and redo together, updated and other lines untouched', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
   const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
@@ -2606,15 +2700,15 @@ integrationTest('hypothesis-evidence: every type rule starts with the data-topic
   const viewer = extractViewerRules(css).map(item => item.text).join('\n');
   assert.doesNotMatch(viewer, /data-topic-kind|vam-kind-/, 'the viewer stylesheet carries no type rule');
 });
-integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines, dash only a skippable topic, and mark running, error and selected on the outline', () => {
+integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines (no relevance-tier dash), and mark running, error and selected on the outline', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const frame = css.split('\n').find(line => line.includes('isolation: isolate; padding: 28px 40px'));
   assert.match(frame, /border-color: transparent; background: transparent; box-shadow: none;/);
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(frame.includes(`[data-topic-kind="${kind}"]`), `${kind} is in the hidden-frame rule`); assert.ok(!frame.includes('"action"') && !frame.includes('"topic"'), 'action and topic keep their card frame');
-  assert.match(css, /--vam-kind-dash: none;/); assert.match(css, /\[data-relevance="side"\][^{]*\{ --vam-kind-dash: 6 4; \}/);
-  assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)/);
+  assert.match(css, /--vam-kind-dash: none;/); assert.doesNotMatch(css, /data-relevance/, 'P1.10b: no card or line is styled by the relevance tier');
+  assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)/);
   assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
-  assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px; \}/);
+  assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px; \}/);
   assert.match(css, /\.vam-kind-shape \.vam-kind-outline \{[^}]*stroke-dasharray: var\(--vam-kind-dash\)/);
 });
 
@@ -3053,19 +3147,17 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.ok(line && line.startsWith('[data-topic-kind="atomic"]'), 'starts with the attribute');
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(line.includes(`[data-topic-kind="${kind}"].vam-node.is-relation-end`), kind);
   assert.ok(!line.includes('"action"'), 'action keeps the rectangular outline');
-  assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px/);
+  assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px/);
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });
 // ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
-integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM and a skippable branch keep the plain accent edge (A1)', () => {
+integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM keeps the plain accent edge, and a legacy side-tier branch now gets the ordinary parent line (A1, P1.10b)', () => {
   const topics = [node('root'), node('kid', 'root'), node('skip', 'root')];
   const notes = heNotes([['root', {}], ['kid', {}], ['skip', { relevance: { tier: 'side' } }]]);
   const edges = options => { const fx = heFixture({ topics, notes, ...options }); return heDrawn(fx.view, { root: [0, 0], kid: [400, 0], skip: [400, 200] }); };
   const plain = edges({});
   assert.equal(plain.length, 2);
-  const kid = plain.find(p => !p.classes.includes('vam-edge-side')), skip = plain.find(p => p.classes.includes('vam-edge-side'));
-  assert.ok(kid.classes.includes('vam-edge') && 'data-parent-line' in kid.attrs, 'an ordinary parent line is marked');
-  assert.equal('data-parent-line' in skip.attrs, false, 'a skippable branch keeps its own muted edge');
+  for (const p of plain) { assert.ok(p.classes.includes('vam-edge') && 'data-parent-line' in p.attrs, 'every parent line is marked, the legacy side branch included'); assert.equal(p.classes.includes('vam-edge-side'), false, 'no muted side edge any more'); }
   for (const options of [{ aim: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
@@ -3443,9 +3535,8 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker'), /font-size: 16px/);
+  assert.doesNotMatch(css, /is-segmented/, 'P1.10b: the one-of marker groups (priority, progress) are gone');
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3567,17 +3658,17 @@ const tmRender = (options, id) => {
 integrationTest('topic-markers: a card shows whitelisted markers as aria-hidden symbols in a fixed order and names them in its accessible name; a topic without any shows none', () => {
   const notes = heNotes([['fact', { markers: ['star', 'done', 'priority-2'] }], ['hyp', heHyp('weak')], ['other', {}]]);
   const shown = tmRender({ notes }, 'fact');
-  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★', 'P2'], 'whitelist order, plain Unicode');
+  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★'], 'whitelist order, plain Unicode; a legacy priority value is not shown (P1.10b)');
   const row = dom.find(shown.card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-markers'));
   assert.equal(row.attrs['aria-hidden'], 'true');
-  assert.match(shown.label.text, /Markers: Done, Star, Priority 2/); assert.match(shown.label.text, /^FACT, /);
+  assert.match(shown.label.text, /Markers: Done, Star$/); assert.doesNotMatch(shown.label.text, /Priority/); assert.match(shown.label.text, /^FACT, /);
   assert.equal(shown.card.attrs['aria-labelledby'], shown.label.id);
   const kindToo = tmRender({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) }, 'fact');
   assert.match(kindToo.label.text, /Evidence/); assert.match(kindToo.label.text, /Markers: Done/);
   const none = tmRender({ notes }, 'other');
   assert.deepEqual(none.marks, []); assert.doesNotMatch(none.label.text, /Markers/);
   const aim = tmRender({ aim: true, notes }, 'fact');
-  assert.equal(aim.marks.length, 3, 'a read-only map still shows the markers');
+  assert.equal(aim.marks.length, 2, 'a read-only map still shows the markers');
 });
 integrationTest('topic-markers: a value outside the whitelist is not shown, not drawn and not read out', () => {
   const notes = heNotes([['fact', { markers: ['<img src=x onerror=alert(1)>', 'DONE', 3, 'star', 'star'] }], ['hyp', {}], ['other', {}]]);
@@ -3593,9 +3684,9 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.drawEdges = () => {};
   f.view.notes.get('fact').markers = ['warning', 'priority-3'];
   f.view.refreshCard(node, false);
-  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠', 'P3']);
+  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠']);
   const label = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
-  assert.match(label.text, /Markers: Warning, Priority 3/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
+  assert.match(label.text, /Markers: Warning$/); assert.doesNotMatch(label.text, /Priority/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
   f.view.notes.get('fact').markers = [];
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
@@ -3656,7 +3747,7 @@ integrationTest('topic-markers, topic-color and topic-style: select mode has no 
     assert.deepEqual(writes, [], `${name} ${JSON.stringify(options)}`);
   }
 });
-integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
+integrationTest('topic-markers: the panel has one aria-pressed toggle per status marker in a single many-of box, with no group titles (P1.10b)', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
   const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
@@ -3668,39 +3759,27 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   };
   view.refreshAfterSavedChange = async () => {};
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
-  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
+  const group = () => dom.find(panel, c => (c.cls ?? '').split(/\s+/).includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
-  // Priority and progress buttons are symbol-only; their name is the aria-label.
-  const name = c => c.attrs['aria-label'] ?? c.text;
-  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(name);
-  const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
-  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
-  const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
-  assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
-  sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  const { TOPIC_MARKERS } = load('topic-markers.ts', { obsidian });
+  const boxes = () => dom.findAll(group(), c => (c.cls ?? '').split(/\s+/).includes('vam-topic-marker-group'));
+  assert.equal(boxes().length, 1, 'one box'); assert.match(boxes()[0].cls, /\bis-multi\b/); assert.doesNotMatch(boxes()[0].cls, /is-segmented/);
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length); assert.equal(TOPIC_MARKERS.length, 3);
+  assert.deepEqual(dom.findAll(panel, c => /vam-topic-marker-group-title/.test(c.cls ?? '')), [], 'no group titles');
   assert.deepEqual(pressed(), []);
-  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => (c.attrs['aria-label'] ?? c.text).includes(name)).click();
-  click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
-  assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
-  assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  click('Done'); await dom.tick(); click('Star'); await dom.tick();
+  assert.deepEqual(toggled, ['done', 'star']);
+  assert.equal(pressed().length, 2, 'status markers can coexist');
   click('Done'); await dom.tick();
-  assert.equal(pressed().length, 1);
-  click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
-  assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
-  assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
-  sub.forEach((box, i) => {
-    const single = TOPIC_MARKER_GROUPS[i].single;
-    assert.equal((box.cls ?? '').includes('is-segmented'), !!single, 'only one-of groups are segmented');
-    for (const b of dom.findAll(box, c => c.tag === 'button')) {
-      if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
-      else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
-      assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
-      // The stylesheet's progress size rule is `button[data-marker^="progress-"] > .vam-marker`: the attribute is on the button, the symbol is its child.
-      assert.ok(b.dataset.marker, 'the marker id is on the button');
-      assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
-    }
-  });
-  assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
+  assert.equal(pressed().length, 1); assert.ok(pressed()[0].includes('Star'));
+  for (const b of dom.findAll(group(), c => c.tag === 'button')) {
+    assert.ok(b.text && b.attrs['aria-label'] === undefined, 'buttons keep their text');
+    assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+    assert.ok(TOPIC_MARKERS.includes(b.dataset.marker), 'the marker id is on the button');
+    assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
+  }
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -3729,15 +3808,14 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
   await pushed[0].redo(); assert.ok(text());
   await pushed[0].undo();
   await view.refreshAfterSavedChange();
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-25'); const mid = contents.get(topic.path);
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-50');
-  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2', 'progress-50']);
-  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of a same-group switch restores the previous choice');
+  await view.changeTopicMarker(view.map.nodes[0], 'done');
+  await view.changeTopicMarker(view.map.nodes[0], 'warning'); const mid = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'star');
+  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done', 'warning', 'star']);
+  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of the last toggle restores the previous note text');
   await pushed.at(-1).redo(); await view.refreshAfterSavedChange();
   await pushed.at(-1).undo(); await pushed.at(-2).undo(); await view.refreshAfterSavedChange();
-  assert.equal(pushed.length, 5); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
+  assert.equal(pushed.length, 4); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done']);
 });
 // ---- topic colour (ticket 37, P2b) ----
 const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
@@ -3991,13 +4069,13 @@ integrationTest('topic-links: opening re-validates, refuses an unsafe href with 
     assert.equal(notices.length, 11);
   }
 });
-integrationTest('topic-links: the card header shows a button whose label lists the hosts; one link opens directly, several open a keyboard menu', () => {
+integrationTest('topic-links: the card toolbar (selected card) holds a button whose label lists the hosts; one link opens directly, several open a keyboard menu', () => {
   {
     const f = heFixture({ notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', { links: ['https://a.example/x', 'https://b.example/y'] }], ['other', { links: ['javascript:alert(1)'] }]]) });
     const { view, opened } = f;
     view.stageEl = hePatch(dom.element('stage')); view.cardEls = new Map();
     for (const n of view.map.nodes) view.renderNode(n);
-    const header = i => dom.find(view.stageEl.children[i], c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+    const header = i => dom.find(view.stageEl.children[i], c => (c.cls ?? '').split(/\s+/).includes('vam-node-tools'));
     const button = i => dom.find(header(i), c => c.tag === 'button' && (c.cls ?? '').includes('vam-card-links'));
     assert.equal(button(0).text, '↗'); assert.equal(button(0).attrs['aria-label'], 'Links: a.example');
     assert.equal(button(1).text, '↗2'); assert.equal(button(1).attrs['aria-label'], 'Links: a.example, b.example');
@@ -4840,17 +4918,18 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
   view.path = 'Current/Map.md'; view.map = map(Array.from({ length: nodes }, (_, i) => node(`n${i}`))); if (aim) view.map.aim = { runs: [] };
   view.mapSourcesControl.mapSources = plain(stored); view.announcer = dom.element('status');
   const tools = dom.element('tools');
-  const draw = () => { tools.children = []; view.renderMapTools(tools); return tools; };
+  // B17: the button and its panel live in the header (renderHeaderSources); `tools` stands for the header row.
+  const draw = () => { tools.children = []; view.renderHeaderSources(tools); return tools; };
   return { view, tree, state, tools, draw, plugin };
 }
 const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
 const msLabel = tools => msButton(tools).attrs['aria-label'];
 const msBadge = tools => dom.find(msButton(tools), c => (c.cls ?? '').split(' ').includes('vam-sources-button-badge'));
-integrationTest('map sources toolbar: the button stands alone while idle, reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
+integrationTest('map sources header button: it stands alone in its wrapper, reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
   const none = msViewFixture(); none.draw();
-  const buttons = none.tools.children.filter(c => c.tag === 'button');
+  const buttons = dom.findAll(none.tools, c => c.tag === 'button');
   assert.equal(buttons.at(-1), msButton(none.tools), 'the data sources button is there');
-  assert.equal(buttons.length, 1, 'no select icon while idle: select several is in the header ⋯ menu');
+  assert.equal(buttons.length, 1, 'only the data sources button: select several is in the header ⋯ menu');
   assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
   assert.equal(msLabel(none.tools), 'Data sources'); assert.equal(msBadge(none.tools), undefined, 'no sources: no badge');
   assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-label'), undefined, 'no text label node');
@@ -4859,7 +4938,7 @@ integrationTest('map sources toolbar: the button stands alone while idle, reads 
   assert.equal(msLabel(three.tools), 'Data sources · 3'); assert.equal(dom.find(msButton(three.tools), c => c.iconName === 'alert-triangle'), undefined);
   assert.equal(msBadge(three.tools).text, '3'); assert.equal(msBadge(three.tools).attrs['aria-hidden'], 'true'); assert.equal(msBadge(three.tools).classes.includes('is-bad'), false);
   assert.equal(msButton(three.tools).attrs['aria-haspopup'], 'dialog'); assert.equal(msButton(three.tools).attrs['aria-expanded'], 'false'); assert.ok(msButton(three.tools).attrs['aria-controls']);
-  assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no tools at all on an AIM map');
+  assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no data sources button on an AIM map');
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /vam-sources-button-label|vam-map-sources-warning|vam-tools-select-label/, 'the removed label and warning rules are gone');
   const empty = msViewFixture({ nodes: 0 }).draw();
   assert.equal(msButton(empty), undefined, 'an empty map has no data sources button');
@@ -4937,6 +5016,79 @@ integrationTest('map sources in the view: deleting a source note repaints the bu
   assert.ok(dom.find(fx.tools, c => (c.cls ?? '').includes('vam-map-sources-remove')), 'the unreadable row keeps Remove');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.registerEvent\(vault\.on\("delete"[\s\S]*this\.registerEvent\(vault\.on\("rename"/);
+});
+// ---- B17 (P1.7) workspace layout: the header holds the whole-map tools, the reader toggle folds Obsidian's right sidebar ----
+const b17Header = ({ popout = false, collapsed = true, nodes = 1 } = {}) => {
+  const fx = msViewFixture({ nodes });
+  const calls = [], rootSplit = {}, layoutHandlers = [];
+  const rightSplit = { collapsed, collapse() { this.collapsed = true; calls.push('collapse'); }, expand() { this.collapsed = false; calls.push('expand'); } };
+  fx.tree.app.workspace = { rightSplit, rootSplit };
+  fx.view.leaf = { getRoot: () => (popout ? {} : rootSplit) };
+  const header = dom.element('div');
+  fx.view.contentEl = header;
+  fx.view.renderHeaderActions(header);
+  const kind = b => ((b.cls ?? '').includes('vam-sources-button') ? 'sources' : (b.cls ?? '').includes('vam-book-button') ? 'book' : (b.cls ?? '').includes('vam-share-button') ? 'share' : (b.cls ?? '').includes('vam-run-all') ? 'run-all' : b.dataset.icon);
+  const order = () => dom.findAll(header, c => c.tag === 'button').map(kind);
+  const reader = () => dom.find(header, c => c.tag === 'button' && (c.cls ?? '').includes('vam-reader-toggle'));
+  return { ...fx, calls, rightSplit, header, order, reader, layoutHandlers };
+};
+integrationTest('B17 header: data sources, search, undo, redo, book, share, run all, ⋯, then the reader toggle; the canvas toolbar no longer has the sources button', () => {
+  const fx = b17Header();
+  assert.deepEqual(fx.order(), ['sources', 'search', 'undo-2', 'redo-2', 'book', 'share', 'run-all', 'more-vertical', 'panel-right']);
+  const search = dom.find(fx.header, c => c.tag === 'button' && c.dataset.icon === 'search');
+  assert.equal(search.attrs['aria-label'], 'Search this map');
+  let searched = 0; fx.view.openMapSearch = () => searched++;
+  search.click(); assert.equal(searched, 1, 'the search button opens the map search');
+  const tools = dom.element('tools'); fx.view.renderMapTools(tools);
+  assert.equal(dom.find(tools, c => (c.cls ?? '').includes('vam-sources-button')), undefined, 'the canvas toolbar has no sources button');
+  assert.equal(b17Header({ nodes: 0 }).order().includes('sources'), false, 'an empty map has no data sources button');
+});
+integrationTest('B17 reader toggle: folds and unfolds the Obsidian right sidebar, aria-pressed follows the sidebar at once and on layout change and resize; a popout window has none', () => {
+  const fx = b17Header({ collapsed: true });
+  const reader = fx.reader();
+  assert.equal(reader.attrs['aria-label'], 'Reader'); assert.equal(reader.attrs['aria-pressed'], 'false');
+  reader.click(); assert.deepEqual(fx.calls, ['expand']); assert.equal(reader.attrs['aria-pressed'], 'true', 'pressed right after the click');
+  reader.click(); assert.deepEqual(fx.calls, ['expand', 'collapse']); assert.equal(reader.attrs['aria-pressed'], 'false');
+  fx.rightSplit.collapsed = false; fx.view.syncReaderToggle(); assert.equal(reader.attrs['aria-pressed'], 'true', 'a sidebar opened elsewhere is picked up');
+  fx.rightSplit.collapsed = true; fx.view.onResize(); assert.equal(reader.attrs['aria-pressed'], 'false', 'onResize syncs it too');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /workspace\.on\("layout-change", \(\) => \{[^}]*this\.syncReaderToggle\(\);/, 'layout-change syncs it');
+  assert.equal(b17Header({ popout: true }).reader(), undefined, 'a popout window has no reader toggle');
+  const zh = fs.readFileSync(path.join(root, 'i18n/zh-TW.ts'), 'utf8'); assert.match(zh, /"ui\.reader_toggle": "閱讀器"/);
+});
+integrationTest('B17 narrow header: under 480px the pane gets is-header-narrow and ⋯ lists the hidden header tools first; wide ⋯ is unchanged', () => {
+  const menus = [];
+  const fx = b17Header();
+  fx.view.newMenu = () => { const menu = { items: [], separators: [], addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon(v) { this.icon = v; return this; }, setWarning() { return this; }, setChecked(v) { this.checked = v; return this; }, setDisabled(v) { this.disabled = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); menu.items.push(item); return menu; }, addSeparator() { menu.separators.push(menu.items.length); return menu; }, showAtPosition() { return menu; }, showAtMouseEvent() { return menu; } }; menus.push(menu); return menu; };
+  let width = 900; fx.header.getBoundingClientRect = () => ({ left: 0, top: 0, right: width, bottom: 600, width, height: 600 });
+  fx.view.onResize();
+  assert.equal(fx.header.hasClass('is-header-narrow'), false);
+  const more = dom.find(fx.header, c => c.tag === 'button' && c.dataset.icon === 'more-vertical');
+  more.click(); const wide = menus.at(-1).items.map(i => i.title);
+  assert.equal(wide.includes('Search this map') || wide.includes('Reader'), false, 'wide: none of the header tools is repeated in ⋯');
+  width = 380; fx.view.onResize();
+  assert.equal(fx.header.hasClass('is-header-narrow'), true, '380px is narrow');
+  more.click(); const narrow = menus.at(-1);
+  assert.deepEqual(narrow.items.slice(0, 7).map(i => i.title), ['Data sources', 'Search this map', 'Redo', 'Picture book', 'Export or share map', 'Run all', 'Reader']);
+  assert.equal(narrow.items[5].disabled, true, 'run all is greyed out like its button (no AI card)');
+  assert.equal(narrow.separators[0], 7, 'a separator after the moved tools');
+  assert.equal(narrow.items[2].disabled, true, 'redo is greyed out with nothing to redo');
+  assert.deepEqual(narrow.items.slice(7).map(i => i.title), wide, 'then the usual entries');
+  narrow.items[6].click(); assert.deepEqual(fx.calls, ['expand'], 'the reader entry folds the sidebar like the button');
+  let searched = 0; fx.view.openMapSearch = () => searched++; narrow.items[1].click(); assert.equal(searched, 1);
+  narrow.items[0].click(); assert.equal(fx.view.mapSourcesControl.mapSourcesOpen, true, 'the sources entry opens the panel');
+  width = 0; fx.view.onResize(); assert.equal(fx.header.hasClass('is-header-narrow'), true, 'a hidden pane (width 0) keeps its state');
+  width = 520; fx.view.onResize(); assert.equal(fx.header.hasClass('is-header-narrow'), false);
+});
+test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat edge is 28px; a narrow status bar keeps one line and its Stop', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-header-wide[^{]*\{ display: none; \}/);
+  assert.match(css, /\.vam-map-chat\.is-rail \{ width: 28px;/); assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 28px; \}/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
+  assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });
 test('map sources: the removed task-dialog picker, its styles and its dead keys are gone', () => {
   assert.equal(fs.existsSync(path.join(root, 'ui', ['reference', 'picker'].join('-') + '.ts')), false);

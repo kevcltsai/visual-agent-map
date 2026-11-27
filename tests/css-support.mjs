@@ -85,3 +85,49 @@ test("card title keeps wrapping anywhere and the summary keeps its 3-line clamp"
   assert.match(css, /^\.vam-card-title \{[^}]*overflow-wrap: anywhere/m);
   assert.match(css, /^\.vam-card-summary \{[^}]*-webkit-line-clamp: 3/m);
 });
+
+test('A4: resize handles and the AI lock button show on selection or focus, never on hover (hover only changes the border)', () => {
+  const css = readFileSync(resolve(root, 'styles.css'), 'utf8');
+  const rules = css.split('\n').filter(line => /vam-card-resize|is-hover-only/.test(line) && /opacity: 1|opacity: 0\.6/.test(line));
+  assert.ok(rules.length >= 4, 'the visible-state rules exist');
+  for (const line of rules) assert.ok(!/\.vam-node:hover/.test(line), `not keyed on hover: ${line.slice(0, 80)}`);
+  assert.match(css, /\.vam-node\.is-selected > \.vam-card-resize\b/);
+  assert.match(css, /\.vam-node\.is-selected \.vam-card-ai-lock\.is-hover-only/);
+});
+
+test("hover deepens an unselected card's border (V3.3 P1.2: hover changes only the border colour, visibly)", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  const mix = (selector) => {
+    let value;
+    postcss.parse(css).walkRules((rule) => { if (rule.selector === selector) rule.walkDecls("border-color", (d) => { value = d.value; }); });
+    assert.ok(value, `${selector} has a border-color`);
+    const m = /color-mix\(in srgb, var\(--(?:text-muted|vam-muted)\) (\d+)%, var\(--background-modifier-border-hover\)\)/.exec(value);
+    assert.ok(m, `${selector}: ${value}`);
+    return Number(m[1]);
+  };
+  for (const [base, hover] of [
+    [":where([data-node-id]).vam-node:where(:not([data-aim-kind]))", ":where([data-node-id]).vam-node:where(:not([data-aim-kind], .is-selected)):hover"],
+    [":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind])", ":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]:not(.is-selected)):hover"],
+  ]) assert.ok(mix(hover) > mix(base), `${hover} must mix more muted than ${base}`);
+});
+
+// The :where() rules above keep a low specificity so the typed cards' own frames win, which also lets `.vam-node:hover` and the
+// idea card's dashed frame (`.vam-node:not([data-aim-kind])[data-status="idea"]`, 0,3,0) cover the ordinary card's hover. This
+// rule (0,3,0, placed after the idea frame and before the typed-card frames) is the ordinary, unselected, not-busy card's hover.
+const ORDINARY_HOVER = '.vam-node:not([data-aim-kind], .is-selected, [data-status="queued"], [data-status="running"], [data-status="error"]):hover';
+test("an ordinary unselected card's hover outranks the idea card frame and .vam-node:hover (V3.3 P1.2)", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  let value;
+  postcss.parse(css).walkRules((rule) => { if (rule.selector === ORDINARY_HOVER) rule.walkDecls("border-color", (d) => { value = d.value; }); });
+  assert.ok(value, "the ordinary card hover rule exists");
+  assert.match(value, /color-mix\(in srgb, var\(--vam-muted\) 75%, var\(--background-modifier-border-hover\)\)/);
+  const lines = css.split("\n"), at = (start) => lines.findIndex((line) => line.startsWith(start));
+  const hover = at(ORDINARY_HOVER), idea = at('.vam-node:not([data-aim-kind])[data-status="idea"] {'), typed = at('[data-topic-kind="action"].vam-node:not([data-aim-kind]) {');
+  assert.ok(idea >= 0 && typed >= 0 && idea < hover && hover < typed, "after the idea frame (same specificity, later wins), before the typed frames (they keep theirs)");
+});
+
+test('A5: a locked card is not dimmed; it says "locked" in words instead (V3.3 P1.2)', () => {
+  const css = readFileSync(resolve(root, 'styles.css'), 'utf8');
+  for (const line of css.split('\n').filter(l => /data-ai-locked/.test(l))) assert.ok(!/opacity/.test(line), `no dimming: ${line.slice(0, 80)}`);
+  assert.match(css, /\.vam-card-ai-lock-label\b/);
+});

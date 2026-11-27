@@ -187,6 +187,11 @@ export interface LivingSuppressionV2 {
   fp2: string;
   /** Hash of scope words + period + normalised value (no text); absent when the claim has no number. */
   valueKey?: string;
+  /**
+   * Hash of period + normalised value with its unit (subject and scope excluded, so a re-labelled subject or scope
+   * still matches). Only written for a value with a currency, percent or "per ..." unit; absent on older entries.
+   */
+  valueKey2?: string;
 }
 
 const V2_PREFIX = "@v2:";
@@ -249,10 +254,26 @@ function claimValue(claim: string): string | null {
   return currency + percent + "|" + String(Number(match[2]));
 }
 
+/** First amount with its unit ("usd|12|per user per month"); null unless a currency, percent or per-unit is present. */
+function claimValueUnit(claim: string): string | null {
+  const text = claim.replace(/\d{4}-\d\d-\d\d(?:T[\d:.]+Z?)?/g, " ").replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const match =
+    /(NT\$|US\$|[$€£¥]|\b(?:usd|eur|gbp|jpy|twd)\b)?\s*(\d+(?:\.\d+)?)\s*(%|\b(?:usd|eur|gbp|jpy|twd)\b)?/i.exec(text);
+  if (!match) return null;
+  const currency = CURRENCIES[(match[1] ?? match[3] ?? "").toLowerCase()] ?? CURRENCIES[match[1] ?? ""] ?? "";
+  const percent = match[3] === "%" ? "%" : "";
+  const rest = text.slice(match.index + match[0].length);
+  const unit = /^\s*(?:\/|\bper\b)\s*(\p{L}+)(?:\s*(?:\/|\bper\b)\s*(\p{L}+))?/iu.exec(rest);
+  const perUnit = unit ? [unit[1], unit[2]].filter(Boolean).join(" per ").toLowerCase() : "";
+  if (!currency && !percent && !perUnit) return null;
+  return currency + percent + "|" + String(Number(match[2])) + "|" + perUnit;
+}
+
 export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {
   const scopeKey = fingerprint(["v2", scopeWords(record.subject), scopeWords(record.scope)]);
   const period = periodKey(record);
   const value = claimValue(record.claim);
+  const unitValue = claimValueUnit(record.claim);
   return {
     v: 2,
     type: "event",
@@ -261,40 +282,60 @@ export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {
     fp2: fingerprint([scopeKey, granularityKey(record.granularity), period]),
     ...(period !== null && value !== null
       ? { valueKey: fingerprint(["v2value", scopeWords(record.scope), period, value]) }
-      : {})
+      : {}),
+    ...(period !== null && unitValue !== null ? { valueKey2: fingerprint(["v2value2", period, unitValue]) } : {})
   };
+}
+
+/**
+ * A `correct`/`invalidate` that states the period of its observation (`eventTime`) may only touch a record with that
+ * same period, or one without a period: an observation for another period is a new record, never a correction.
+ */
+export function livingSupersedeMismatch(base: Pick<LivingKnowledge, "records">, raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const op = raw as Record<string, unknown>;
+  if ((op.kind !== "correct" && op.kind !== "invalidate") || typeof op.eventTime !== "string") return false;
+  const old = base.records.find(record => record.id === op.id);
+  if (!old || periodKey(old) === null) return false;
+  return periodKey({ ...old, eventTime: op.eventTime }) !== periodKey(old);
 }
 
 export function livingSuppressionV2Entry(entry: LivingSuppressionV2): string {
   const parts: unknown[] = [entry.v, entry.type, entry.scopeKey, entry.periodKey, entry.fp2];
   if (entry.valueKey) parts.push(entry.valueKey);
+  if (entry.valueKey && entry.valueKey2) parts.push(entry.valueKey2);
   return V2_PREFIX + JSON.stringify(parts);
 }
 
 /** Both stored forms of a record's entry: with the value hash and the legacy one without (older notes). */
 export function livingSuppressionV2Forms(record: LivingRecord): string[] {
   const entry = livingSuppressionV2(record);
-  const { valueKey: _valueKey, ...legacy } = entry;
-  return [...new Set([livingSuppressionV2Entry(entry), livingSuppressionV2Entry(legacy)])];
+  const { valueKey2: _valueKey2, ...withValue } = entry;
+  const { valueKey: _valueKey, ...legacy } = withValue;
+  return [
+    ...new Set([livingSuppressionV2Entry(entry), livingSuppressionV2Entry(withValue), livingSuppressionV2Entry(legacy)])
+  ];
 }
 
 export function parseLivingSuppressionV2(value: string): LivingSuppressionV2 | undefined {
   if (!value.startsWith(V2_PREFIX)) return undefined;
   try {
     const raw: unknown = JSON.parse(value.slice(V2_PREFIX.length));
-    if (!Array.isArray(raw) || (raw.length !== 5 && raw.length !== 6)) return undefined;
-    const [v, type, scopeKey, period, fp2, valueKey] = raw as unknown[];
+    if (!Array.isArray(raw) || raw.length < 5 || raw.length > 7) return undefined;
+    const [v, type, scopeKey, period, fp2, valueKey, valueKey2] = raw as unknown[];
     const hash = (x: unknown): x is string => typeof x === "string" && /^[a-f0-9]{64}$/.test(x);
     if (v !== 2 || type !== "event" || !hash(scopeKey) || !hash(fp2)) return undefined;
     if (period !== null && (typeof period !== "string" || !period || period.length > 100)) return undefined;
-    if (raw.length === 6 && !hash(valueKey)) return undefined;
+    if (raw.length >= 6 && !hash(valueKey)) return undefined;
+    if (raw.length === 7 && !hash(valueKey2)) return undefined;
     const entry: LivingSuppressionV2 = {
       v: 2,
       type: "event",
       scopeKey,
       periodKey: period,
       fp2,
-      ...(raw.length === 6 ? { valueKey: valueKey as string } : {})
+      ...(raw.length >= 6 ? { valueKey: valueKey as string } : {}),
+      ...(raw.length === 7 ? { valueKey2: valueKey2 as string } : {})
     };
     return livingSuppressionV2Entry(entry) === value ? entry : undefined;
   } catch {
@@ -403,7 +444,12 @@ function suppressionVerdict(index: SuppressionIndex, candidate: LivingRecord): s
   const v2 = livingSuppressionV2(candidate);
   if (
     index.v1.some(event => event?.fingerprint === v1) ||
-    index.v2.some(entry => entry.fp2 === v2.fp2 || (!!v2.valueKey && entry.valueKey === v2.valueKey))
+    index.v2.some(
+      entry =>
+        entry.fp2 === v2.fp2 ||
+        (!!v2.valueKey && entry.valueKey === v2.valueKey) ||
+        (!!v2.valueKey2 && entry.valueKey2 === v2.valueKey2)
+    )
   )
     return "suppressed-record";
   const scope = livingEventScopeFingerprint(candidate);
@@ -546,8 +592,12 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     if (kind !== "correct" && kind !== "dispute" && kind !== "invalidate") throw new Error("unknown-operation");
     exactKeys(
       operation,
-      kind === "invalidate" ? ["kind", "id", "reason", "evidence"] : ["kind", "id", "claim", "reason", "evidence"]
+      kind === "invalidate"
+        ? ["kind", "id", "reason", "evidence", "eventTime"]
+        : ["kind", "id", "claim", "reason", "evidence", "eventTime"]
     );
+    if (livingSupersedeMismatch({ records: [...records.values()] }, operation))
+      throw new Error("period-mismatch-correction");
     const evidence = evidenceFor(operation.evidence, allowed);
     if (!evidence.length) throw new Error("missing-evidence");
     // A web excerpt is the model's summary, never verified page text: it cannot alone replace or retract a claim.

@@ -25,6 +25,7 @@ import {
   type TopicRelation
 } from "../../map-model";
 import { ringMemberIds } from "../../map-layout-text";
+import { isTopicMarker } from "../../topic-markers";
 import { ringMembers } from "./image-ring";
 import { type Note, type NotePatch, topicAppearanceValues, type TopicAppearanceChange } from "../../repository";
 import { intakeAiMarkdown, intakeAiMarkdownChecked } from "../../ai/markdown-intake";
@@ -88,8 +89,9 @@ export const chatAppearanceChange = (
   action: Extract<MapChatAction, { kind: "set_appearance" }>
 ): TopicAppearanceChange => ({
   ...(action.color ? { color: action.color === "none" ? null : action.color } : {}),
-  addMarkers: action.markers ?? [],
-  removeMarkers: action.removeMarkers ?? [],
+  // Only whitelisted ids are written (V3.3 P1.10b): a retired id that reaches here is dropped, never stored.
+  addMarkers: (action.markers ?? []).filter(isTopicMarker),
+  removeMarkers: (action.removeMarkers ?? []).filter(id => id === "all" || isTopicMarker(id)),
   addStyles: action.formats ?? [],
   removeStyles: action.removeFormats ?? []
 });
@@ -676,8 +678,8 @@ export class ChatActionWriter {
     }
   }
   /**
-   * set_appearance: the colour, markers and styles of every target in one step, with the topic panel's rules (one colour, one
-   * value per single-choice marker group, one text size; unknown frontmatter values stay). Only the notes whose appearance
+   * set_appearance: the colour, markers and styles of every target in one step, with the topic panel's rules (one colour,
+   * one text size; unknown frontmatter values stay). Only the notes whose appearance
    * really changes are written; Map.md changes only its viewport. A card of an AIM map (or an AIM card) has none and is skipped.
    */
   async chatSetAppearance(

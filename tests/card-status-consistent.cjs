@@ -39,14 +39,8 @@ test("research prompts remove outdated no-source statements and keep strength on
   }
 });
 
-test("a card marked 100% progress never says To research; the map header shows the marked progress", () => {
-  const shape = read("experiences/visual-map/topic-kind-shape.ts");
-  const { showsToResearch } = load(shape);
-  assert.equal(showsToResearch("topic", "idea", true), false);
-  assert.equal(showsToResearch("topic", "idea", false), true);
-  assert.equal(showsToResearch("topic", "completed", true), true);
+test("a legacy progress-100 marker no longer hides To research, and the map header has no marked progress (v3.3 #17)", () => {
   const view = read("experiences/visual-map/view.ts");
-  assert.match(view, /progressDone\(node\.id\)/);
-  assert.match(view, /markedProgressPercent\(/);
-  for (const f of ["en", "zh-TW", "zh-CN"]) assert.match(read(`i18n/${f}.ts`), /"ui\.marked_progress_0"/);
+  assert.doesNotMatch(view, /progressDone|markedProgressPercent|progress-100/);
+  for (const f of ["en", "zh-TW", "zh-CN"]) assert.doesNotMatch(read(`i18n/${f}.ts`), /"ui\.marked_progress_0"/);
 });

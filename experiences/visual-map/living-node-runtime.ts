@@ -277,18 +277,24 @@ async function readInputs(
   const evidence: LivingEvidence[] = [];
   const documents: { id: string; title: string; scope: string; text: string; revision: string }[] = [];
   const seen = new Set<string>();
+  const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
   let characters = 0;
   const at = new Date().toISOString();
   const prompt = splitPrompt(snapshot.note.prompt).question;
   const full = /full (?:text|content|history)|complete (?:text|history)|全文|完整內容|完整内容|歷史紀錄|历史记录/i.test(prompt);
-  const add = (identity: string, title: string, content: string, summary?: string): void => {
+  const add = (identity: string, title: string, content: string, summary?: string, optional = false): void => {
     if (seen.has(identity)) return;
     seen.add(identity);
     const revision = livingSnapshotRevision(content);
     const scoped = !full && summary?.trim() && !isPlaceholder(summary) ? summary : content;
     const scope = scoped === content ? "full" : "summary";
+    if (documents.length >= 100 || characters + scoped.length > 60_000) {
+      if (!optional) throw new Error("living-node-context-too-large");
+      // Do not grant a citation handle to context that the model never receives.
+      warnings.push("map-source-budget-omitted: " + title);
+      return;
+    }
     characters += scoped.length;
-    if (documents.length >= 100 || characters > 60_000) throw new Error("living-node-context-too-large");
     const evidenceId = "note:" + livingSnapshotRevision(identity + ":" + revision);
     reads.push({ id: identity, revision, scope });
     if (scoped.trim()) evidence.push({ id: evidenceId, source: title, retrievedAt: at });
@@ -312,14 +318,13 @@ async function readInputs(
       add(source.identity, file.basename, readableMarkdown(await port.app.vault.read(file)));
     }
   }
-  const warnings = [...resolved.failures.filter(failure => !failure.required).map(failure => failure.reason), ...additionalWarnings];
   const mapContext = await readLivingMapContext(port);
   if (mapContext.unavailable > 0) warnings.push("map-source-unavailable");
   for (const group of mapContext.groups) {
     for (const document of group.documents) {
       if (document.external) {
         // External paths require the existing scrubbed gateway identity, never a new direct file read.
-        add("map:" + (document.key ?? document.path), document.path, readableMarkdown(document.content));
+        add("map:" + (document.key ?? document.path), document.path, readableMarkdown(document.content), undefined, true);
         continue;
       }
       if (document.path === map.nodes.find(node => node.id === id)?.path) continue;
@@ -328,7 +333,7 @@ async function readInputs(
         continue;
       }
       if (resolved.sources.some(source => source.path === document.path)) continue;
-      add("map:" + document.path, document.path, readableMarkdown(document.content));
+      add("map:" + document.path, document.path, readableMarkdown(document.content), undefined, true);
     }
   }
   const inputRevision = livingInputRevision({

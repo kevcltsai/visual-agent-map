@@ -3915,9 +3915,11 @@ const overlaps = (nodes, height = 500) => {
 const spread = () => [addRoot('r', 'Root'), ...Array.from({ length: 9 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
 integrationTest('B2-0 L4: stopping a batch places the new cards that exist so far without overlap, skips what is left, and re-lays nothing else', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
-  let asked = 0; const alive = () => ++asked < 7;
-  const lines = await apply(h, [...spread(), { kind: 'rename_topic', nodeId: 'zzz', title: 'late' }], {}, alive);
-  const created = h.view.map.nodes.length; assert.ok(created >= 3 && created < 10, `part was created: ${created}`);
+  let stopped = false, writes = 0; const original = h.view.applyChatWrite.bind(h.view);
+  h.view.applyChatWrite = async (...args) => { const outcome = await original(...args); if (++writes === 4) stopped = true; return outcome; };
+  const lines = await apply(h, [...spread(), { kind: 'rename_topic', nodeId: 'zzz', title: 'late' }], {}, () => !stopped);
+  assert.equal(writes, 4, 'stop prevents further writes');
+  assert.equal(h.view.map.nodes.length, 4, 'only the committed cards exist');
   assert.ok(lines.some(l => l.status === 'skipped'), 'the rest is skipped'); assert.equal(lines.some(l => /Arranged/.test(l.text)), false, 'no automatic layout line');
   eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
   eq(overlaps(await h.saved()), [], 'and the saved map is the same');

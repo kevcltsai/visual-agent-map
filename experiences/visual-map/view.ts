@@ -69,7 +69,7 @@ import {
   type BracketRect,
   type BracketResult
 } from "./summary-bracket-geometry";
-import { attachmentPath } from "./attachment-store";
+import { attachmentPath, isLinked } from "./attachment-store";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
 import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
@@ -205,7 +205,20 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import type { ReferenceGroup } from "../../ai/reference-materials";
+import {
+  inspectLivingValidity,
+  livingCoordinator,
+  prepareLivingTrial,
+  runLivingRound,
+  saveLivingConfig,
+  validateLivingStructure,
+  livingRemovalConsumers,
+  livingCrossCut,
+  type LivingConfigSave
+} from "./living-node-runtime";
+import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
+import { renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -312,7 +325,6 @@ import {
   researchTopicTask,
   synthesisDirectionsTask,
   synthesisGoalTask,
-  promptIntegrationTask,
   thinkingOriginDocumentBlock
 } from "./steps/fragments";
 import {
@@ -586,25 +598,15 @@ import {
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import {
-  aiCardStatus,
   aiCardTitle,
-  blockingChildren,
   hasAiCard,
   isPromptEdge,
   isAiCard,
   joinPrompt,
   splitPrompt,
-  planPromptRun,
-  promptInputKey,
-  readPromptSources,
-  promptSourceLinks,
-  runPromptItems,
   type AiCardStatus,
-  type AiRunRecord,
   type PromptBatchState,
   type PromptNoteRef,
-  type PromptPlan,
-  type PromptPlanItem,
   type PromptRunEntry
 } from "./prompt-run";
 import {
@@ -1359,6 +1361,23 @@ export class VisualAgentMapView extends ItemView {
     topicState: (id, fresh) => this.chatTopicState(id, fresh),
     addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
       this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+    createLivingNode: (parent, action, rebuild, current, allowSource) =>
+      this.createNode(
+        parent,
+        action.title,
+        rebuild,
+        false,
+        action.topicKind ?? "topic",
+        false,
+        { leaning: action.leaning, strength: action.strength },
+        undefined,
+        {
+          prompt: action.livingPrompt ?? "",
+          current,
+          allowSource,
+          onSaved: () => {}
+        }
+      ),
     noteChange: (node, patch) => this.noteChange(node, patch),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
@@ -1423,10 +1442,11 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       readMap: () => this.plugin.repo.readMap(this.path),
       readCard: path => this.plugin.readBookCardForChat(path),
-      updateNoteGuarded: (path, patch, options) => this.plugin.repo.updateNoteGuarded(path, patch, options),
+      updateNoteGuarded: (path, patch, options) =>
+        this.plugin.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
       language: () => this.plugin.settings.language,
       updateNoteRawGuarded: (path, transform, options) =>
-        this.plugin.repo.updateNoteRawGuarded(path, transform, options),
+        this.plugin.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
       editStructure: (ops, expect, opening) => this.plugin.editBookStructureAtReview(this.path, ops, expect, opening)
     };
   }
@@ -1550,6 +1570,10 @@ export class VisualAgentMapView extends ItemView {
     afterTextId?: string;
     mapId: string;
     win: AiCardPopover;
+    trial: LivingTrial;
+    controller: AbortController;
+    viewSession: string;
+    adoption?: LivingAdoptionCheck;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -3638,6 +3662,25 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceGoal = goal;
     this.relevanceContext = context;
     this.mapSourcesControl?.loadForMap(sources);
+    this.livingValidity.clear();
+    if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
+      try {
+        const validity = await inspectLivingValidity({
+          app: this.app,
+          repo: this.plugin.repo,
+          calls: this.plugin.aiCalls,
+          mapPath: path,
+          viewSession: "validity",
+          signal: new AbortController().signal,
+          current: alive,
+          language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+          mapSources: signal => this.readLivingMapSourceReport(signal)
+        });
+        if (alive()) this.livingValidity = validity;
+      } catch {
+        // Unknown validity never pretends to be a fresh result.
+      }
+    }
     return { failedPaths: Array.from(ctx.failedPaths) };
   }
   /** Logical background session; a reload of the same map does not replace it. */
@@ -3685,6 +3728,8 @@ export class VisualAgentMapView extends ItemView {
     const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
+      this.closeAiCardPopover();
+      this.stopPromptBatch();
       // Another map on this screen ends the old map's picture-book run, as closing the view does.
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
@@ -6813,7 +6858,8 @@ export class VisualAgentMapView extends ItemView {
     change: (map: MapDocument, attachment: AttachmentPath) => void,
     rebuildDerivedData = true,
     created: string[] = [],
-    attachment?: { name: string; data: ArrayBuffer }
+    attachment?: { name: string; data: ArrayBuffer },
+    authorize?: () => boolean
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
@@ -6823,9 +6869,10 @@ export class VisualAgentMapView extends ItemView {
     let before!: MapDocument, after!: MapDocument;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
+    const mapPath = this.path;
     try {
       const entry = await tx
-        .editMap(this.path, (map, _resolve, attachmentPath) => {
+        .editMap(mapPath, (map, _resolve, attachmentPath) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
@@ -6833,7 +6880,8 @@ export class VisualAgentMapView extends ItemView {
           this.pruneSummariesIn(map);
           after = clone(map);
         })
-        .commit({ deferRebuild: true });
+        .commit({ deferRebuild: true, authorize });
+      if (authorize && (this.closed || this.path !== mapPath || this.map?.id !== opened.id)) return { before, after };
       this.history.push(entry);
       // Commit is asynchronous: the user may have panned meanwhile, so only a viewport the change itself set is applied.
       // A conflict window replaces this.map with another object (possibly the older file version): the viewport on screen wins then.
@@ -6880,6 +6928,7 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
+    const consumers = await livingRemovalConsumers(this.app, this.plugin.repo, before, ids);
     const removed = before.nodes.filter(item => ids.has(item.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
     const tx = this.beginMapTransaction();
@@ -6916,6 +6965,7 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
+    this.noticeLivingRemoval(consumers);
     return entry;
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
@@ -6953,7 +7003,8 @@ export class VisualAgentMapView extends ItemView {
       ids,
       nodes: this.map?.nodes ?? [],
       hasNote: id => this.notes.has(id),
-      busy: node => this.mergeBusy(node, except)
+      busy: node => this.mergeBusy(node, except),
+      livingNode: node => this.notes.get(node.id)?.aiCard === true
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -7055,11 +7106,16 @@ export class VisualAgentMapView extends ItemView {
         check.sources.every(node => snapshot.sources.find(source => source.id === node.id)?.path === node.path)
       );
     };
+    const fresh = await this.freshNotes();
+    if (snapshot.sources.some(source => fresh.get(source.id)?.aiCard === true)) {
+      new Notice(t("ui.merge_living_node_convert"));
+      return false;
+    }
     if (
       this.mergeLockReason(
         snapshot.sources.map(source => source.id),
         snapshot.targetId,
-        await this.freshNotes()
+        fresh
       )
     ) {
       new Notice(t("ui.ai_locked_notice"));
@@ -7291,14 +7347,19 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_missing_note"));
       return;
     }
-    // The late-result fence of the AI merge: a topic locked while the AI ran stops the write (a merge by hand is the
-    // user's own edit and is not asked).
+    const fresh = await this.freshNotes();
+    if (check.sources.some(source => fresh.get(source.id)?.aiCard === true)) {
+      if (content) throw new Error(t("ui.merge_living_node_convert"));
+      new Notice(t("ui.merge_living_node_convert"));
+      return;
+    }
+    // The late-result fence of the AI merge: a topic locked while the AI ran stops the write.
     if (
       content &&
       this.mergeLockReason(
         check.sources.map(source => source.id),
         check.targetId,
-        await this.freshNotes()
+        fresh
       )
     )
       throw aiLockedError();
@@ -7320,6 +7381,7 @@ export class VisualAgentMapView extends ItemView {
     let detail = "";
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (sourceNotes.some(note => note.aiCard === true)) throw new Error(t("ui.merge_living_node_convert"));
     if (!content)
       detail = mergedDetail(
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
@@ -7488,6 +7550,7 @@ export class VisualAgentMapView extends ItemView {
       detailTemplate = (await this.mapStyle(language)).template;
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (sourceNotes.some(note => note.aiCard === true)) throw new Error(t("ui.merge_living_node_convert"));
     const name = title.trim(),
       sourcePaths = [...new Set([...sourceNotes[0].sourcePaths, ...children.map(child => child.path)])];
     let patch: NotePatch;
@@ -10396,6 +10459,13 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("settings-2")
           .onClick(() => this.whenEditing(() => this.openNodePanel(node, "structure")))
       );
+    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.living_node_run_card"))
+          .setIcon("play")
+          .onClick(() => this.whenEditing(() => this.startPromptRun([node.id])))
+      );
     if (this.canSetAiCard(node))
       menu.addItem(item =>
         item
@@ -10488,6 +10558,8 @@ export class VisualAgentMapView extends ItemView {
       this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
     });
     if (!bookLock.structure) add(t("ui.card_settings_menu"), "settings-2", () => this.openNodePanel(node, "structure"));
+    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
+      add(t("ui.living_node_run_card"), "play", () => this.startPromptRun([node.id]));
     if (this.canSetAiCard(node))
       add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
         this.openAiCardPopover(node)
@@ -10955,6 +11027,7 @@ export class VisualAgentMapView extends ItemView {
       for (const id of branchIds) ids.add(id);
     }
     if (!this.mergeUnlocked(ids)) return;
+    const consumers = await livingRemovalConsumers(this.app, this.plugin.repo, before, ids);
     const removed = before.nodes.filter(node => ids.has(node.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned"),
       viewport = clone(this.map.viewport);
@@ -10986,6 +11059,16 @@ export class VisualAgentMapView extends ItemView {
     this.selection.afterRemove();
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+    this.noticeLivingRemoval(consumers);
+  }
+  private noticeLivingRemoval(consumers: readonly string[]): void {
+    if (!consumers.length) return;
+    const names = consumers
+      .slice(0, 5)
+      .map(id => this.notes.get(id)?.title ?? id)
+      .join(", ");
+    const remaining = consumers.length > 5 ? ` (+${consumers.length - 5})` : "";
+    new Notice(t("ui.living_node_removed_source_0", names + remaining));
   }
   private chooseSelectedParent(copyNodes: boolean): void {
     if (!this.map) return;
@@ -11265,7 +11348,7 @@ export class VisualAgentMapView extends ItemView {
         const node = map.nodes.find(item => item.id === id);
         return {
           title: note?.title ?? node?.path.replace(/^.*\//, "").replace(/\.md$/, "") ?? "",
-          body: note?.detail ?? "",
+          body: [note?.detail, note?.livingNode?.shareMarkdown].filter(value => value?.trim()).join("\n\n"),
           kind: note?.topicKind ?? "topic",
           ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {}),
           ...(note?.hypothesisLeaning !== undefined ? { leaning: note.hypothesisLeaning } : {})
@@ -11391,17 +11474,31 @@ export class VisualAgentMapView extends ItemView {
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    // A cut made in another map: this map gets copies, the originals park in the source map's Unassigned (D8).
+    // A Living Node cut transfers the original files and IDs. Ordinary unrelated cuts keep the existing D8 behavior.
     if (record?.mode === "cut" && !source && record.sourceMapPath !== this.path) {
       const accepted = await this.acceptCrossCut(payload, record);
       if (!accepted) return;
-      tops = await this.copyFromOtherMap(
-        accepted,
-        target,
-        payload,
-        record.nodeIds,
-        this.crossCutOf(payload, record, accepted.branch)
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const living = await livingCrossCut(
+        this.app,
+        this.plugin.repo,
+        sourceMap,
+        map,
+        new Set(record.nodeIds),
+        target?.id
       );
+      if (living.preserveIdentity) {
+        tops = await this.moveLivingAcrossMaps(accepted, target, payload, record);
+        if (tops.length) this.noticeLivingRemoval(living.affected);
+      } else {
+        tops = await this.copyFromOtherMap(
+          accepted,
+          target,
+          payload,
+          record.nodeIds,
+          this.crossCutOf(payload, record, accepted.branch, undefined, target?.id)
+        );
+      }
       const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
       if (landed) {
         this.selection.setSelected(landed.id);
@@ -11601,11 +11698,97 @@ export class VisualAgentMapView extends ItemView {
     const problem = cutSourceProblem(sourceMap, record, found);
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
+    if (
+      found.branch.some(
+        node => this.plugin.topicRuns.isBusy(node.path) || livingCoordinator(this.plugin).busy(node.path)
+      )
+    )
+      return refuse("ui.merge_locked");
     return found;
   }
-  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
-  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[]): CrossCut {
+  /** Move original notes as one cross-map transaction, so Undo/Redo can restore
+   * the exact stable node IDs and content rather than a duplicated snapshot. */
+  private async moveLivingAcrossMaps(
+    source: { branch: MapNode[]; roots: MapNode[] },
+    target: MapNode | null,
+    payload: ClipboardPayload,
+    record: ClipRecord
+  ): Promise<MapNode[]> {
+    if (!this.map || !this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const destination = clone(this.map);
+    const graph = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    const ids = new Set(source.branch.map(node => node.id));
+    const roots = new Set(source.roots.map(node => node.id));
+    const cross = this.crossCutOf(payload, record, source.branch, destination.id, target?.id);
+    await cross.snapshot();
+    const tx = cross.begin();
+    cross.join(tx);
+    const tops: MapNode[] = [];
+    try {
+      const entry = await tx
+        .editMap(this.path, (map, resolve) => {
+          if (
+            map.id !== destination.id ||
+            graph(map) !== graph(destination) ||
+            map.nodes.some(node => ids.has(node.id))
+          )
+            throw new Error("ambiguous-card-identity");
+          const parent = target ? map.nodes.find(node => node.id === target.id) : null;
+          if (target && !parent) throw new Error(t("ui.outline_import_selected_missing"));
+          const moved = source.branch.map(original => {
+            const node = { ...clone(original), path: resolve(original.path) };
+            if (roots.has(node.id)) node.parentId = parent?.id ?? null;
+            delete node.afterTextId;
+            return node;
+          });
+          tops.splice(0, tops.length, ...moved.filter(node => roots.has(node.id)));
+          map.nodes.push(...moved);
+          for (const relation of payload.relations) {
+            const from = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.from)];
+            const to = record.nodeIds[payload.nodes.findIndex(item => item.id === relation.to)];
+            if (!ids.has(from) || !ids.has(to)) continue;
+            const link: TopicRelation = {
+              kind: relation.kind,
+              from,
+              to,
+              ...(relation.description !== undefined ? { description: relation.description } : {})
+            };
+            if (relationAllowed(map.topicRelations ?? [], link))
+              setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+          }
+          if (parent) {
+            parent.collapsed = false;
+            this.arrangeBranch(map, parent.id, ids, undefined);
+          } else {
+            for (const top of tops)
+              map.nodes = arrangeNewTree(
+                map.nodes,
+                top.id,
+                new Set([top.id, ...descendants(moved, top.id)]),
+                this.cardHeightOf,
+                layoutOf(map)
+              );
+          }
+        })
+        .commit();
+      await cross.finish(entry);
+    } catch (error) {
+      if (!isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {});
+      throw error;
+    }
+    this.selection.afterPaste();
+    await this.refreshAfterSavedChange();
+    return tops;
+  }
+  /** The source side of a cross-map cut: re-check before writing; transfer or park originals. */
+  private crossCutOf(
+    payload: ClipboardPayload,
+    record: ClipRecord,
+    branch: MapNode[],
+    destinationId?: string,
+    destinationParentId?: string
+  ): CrossCut {
     const plugin = this.plugin,
       repo = plugin.repo,
       from = record.sourceMapPath,
@@ -11634,10 +11817,23 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       },
-      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      begin: () =>
+        this.beginCrossTransaction(from, async () => {
+          const sourceMap = await repo.readMap(from);
+          assertSource(sourceMap);
+          if (branch.some(node => plugin.topicRuns.isBusy(node.path) || livingCoordinator(plugin).busy(node.path)))
+            throw new Error(t("ui.merge_locked"));
+          const destination = await repo.readMap(into);
+          if (destinationId && destination.id !== destinationId) throw new Error("changed-target-identity");
+          const checked = await livingCrossCut(this.app, repo, sourceMap, destination, removed, destinationParentId);
+          if (checked.preserveIdentity !== Boolean(destinationId)) throw new Error("changed-source-identity");
+        }),
       join: tx => {
         const parkFolder = repo.topicFolder(from, "Unassigned");
-        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        for (const node of branch) {
+          if (destinationId) tx.unpark(node.path, repo.topicFolder(into, "Notes"), destinationId, destinationId);
+          else tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        }
         tx.editMap(from, map => {
           // The transaction hands over Map.md as it reads it at commit: a change made since the checks stops here.
           assertSource(map);
@@ -11675,6 +11871,7 @@ export class VisualAgentMapView extends ItemView {
       repo: plugin.repo,
       rebuildDerivedData: () => plugin.rebuildDerivedData(),
       refreshNotes: paths => plugin.rebuildDerivedData(paths),
+      validateStructure: (before, after) => validateLivingStructure(plugin.repo.app, plugin.repo, before, after),
       onApplied: () => {},
       checkConflict: async mapPath => {
         // The source map is judged first, so a cut that cannot go ahead never opens a conflict window in its view.
@@ -11752,6 +11949,7 @@ export class VisualAgentMapView extends ItemView {
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
       guardPath: path => this.assertChatWritable(path),
+      validateStructure: (before, after) => validateLivingStructure(this.app, this.plugin.repo, before, after),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },
@@ -11962,7 +12160,7 @@ export class VisualAgentMapView extends ItemView {
   }): void {
     const path = job.path;
     // AI lock: no diagrams are asked for a locked topic, and a result that lands after a lock is not written.
-    if (job.saved.aiLocked) return;
+    if (job.saved.aiLocked || job.saved.aiCard) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = this.map ?? undefined;
     this.plugin.addChartsAfterWrite({
@@ -11973,21 +12171,22 @@ export class VisualAgentMapView extends ItemView {
       model: job.model,
       apply: async charted => {
         if (this.plugin.topicRuns.isBusy(path)) return false;
-        const latest = await this.plugin.repo.readNote(path, map);
-        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
+        const { note: latest, content: expectedContent } = await this.plugin.repo.readNoteSnapshot(path, map);
+        if (latest.aiLocked || latest.aiCard || this.chartSnapshot(latest) !== snapshot) return false;
         // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
         // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
         const top = job.updateMode === "top";
         if (top && !job.preserve?.(charted)) return false;
-        await this.plugin.repo.updateNote(
+        const outcome = await this.plugin.repo.updateNoteGuarded(
           path,
           {
             detail: top
               ? charted
               : canonicalDetail(guardInlineHtmlLinks(charted), noteLanguageOf(job.language), job.template)
           },
-          { detailTemplate: job.template }
+          { detailTemplate: job.template, expectedContent, rejectAiCard: true }
         );
+        if (outcome !== "written") return false;
         const after = await this.plugin.repo.readNote(path, map);
         if (!this.closed) this.recordNoteWrite(path, latest, after, ["detail"], t("ui.add_charts_history"));
         for (const view of this.plugin.views()) if (view !== this) view.history.clear();
@@ -13551,11 +13750,19 @@ export class VisualAgentMapView extends ItemView {
       // A planned card shows its content headings instead of the summary (the note keeps both).
       const list = card.createEl("ul", { cls: "vam-card-summary vam-book-points" });
       for (const point of bookCard.points) list.createEl("li", { text: point });
-    } else if (!note || !isPlaceholder(note.summary)) {
+    } else if (!note || !isPlaceholder(note.livingNode?.summary || note.summary)) {
       const summaryText = card.createEl("p", {
         cls: "vam-card-summary",
-        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text:
+          note?.livingNode?.summary ||
+          note?.summary ||
+          t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: {
+          title:
+            note?.livingNode?.summary ||
+            note?.summary ||
+            t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        }
       });
       if (textEditable) summaryText.addClass("is-inline-editable");
       // Screen-only prefix ("this chapter will cover" / "what it covers"); the note's summary is not changed.
@@ -14846,7 +15053,7 @@ export class VisualAgentMapView extends ItemView {
     if (argumentView) {
       summary?.remove();
       addLine?.remove();
-    } else if (isPlaceholder(note.summary)) {
+    } else if (isPlaceholder(note.livingNode?.summary || note.summary)) {
       summary?.remove();
       // The faint "add a summary" line takes the summary's place (and goes again once a summary exists).
       if (!addLine && !typing && editable && title) {
@@ -14860,8 +15067,8 @@ export class VisualAgentMapView extends ItemView {
         title.after(summary);
         this.arrangeCardCover(card);
       }
-      summary?.setText(note.summary);
-      summary?.setAttr("title", note.summary);
+      summary?.setText(note.livingNode?.summary || note.summary);
+      summary?.setAttr("title", note.livingNode?.summary || note.summary);
       summary?.removeClass("is-preview");
       if (editable) summary?.addClass("is-inline-editable");
     }
@@ -14920,20 +15127,29 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     const mapId = this.map?.id;
     return {
-      mapSources: async signal => {
-        const sources = await this.plugin.repo.readMapSources(mapPath);
-        const external = { sources: loadExternalSources(this.app, mapId), scope: this.externalScope() };
-        if (!sources.length && !external.sources.length) return [];
-        const { groups } = await resolveMapSources(
-          { app: this.app, readMap: path => this.plugin.repo.readMap(path), external },
-          sources,
-          mapPath,
-          signal
-        );
-        // Every group, vault notes included, may quote a registered external root: none leaves this exit with it.
-        const roots = await externalScrubRoots(external.sources);
-        return roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups;
-      }
+      mapSources: async signal => (await this.readLivingMapSourceReport(signal, mapPath, mapId)).groups
+    };
+  }
+  /** Same authorization and scrubbing as the existing task-source exit, with
+   * optional failures retained for Living Node rather than hidden from users. */
+  private async readLivingMapSourceReport(
+    signal: AbortSignal,
+    mapPath = this.path,
+    mapId = this.map?.id
+  ): Promise<{ groups: ReferenceGroup[]; unavailable: number }> {
+    const sources = await this.plugin.repo.readMapSources(mapPath);
+    const external = { sources: loadExternalSources(this.app, mapId), scope: this.externalScope() };
+    if (!sources.length && !external.sources.length) return { groups: [], unavailable: 0 };
+    const { groups, unreadable, externalUnreadable } = await resolveMapSources(
+      { app: this.app, readMap: path => this.plugin.repo.readMap(path), external },
+      sources,
+      mapPath,
+      signal
+    );
+    const roots = await externalScrubRoots(external.sources);
+    return {
+      groups: roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups,
+      unavailable: unreadable.length + externalUnreadable.length
     };
   }
   /**
@@ -15262,7 +15478,7 @@ export class VisualAgentMapView extends ItemView {
     this.topicChatOpen = { entry, win };
     win.mount(overlay);
   }
-  /** Opens the AI card setup window for an existing card (prefilled), or for a new card under `parent` (blank; nothing is made until 「存好」). */
+  /** Keep editing in the center; the right-hand leaf is for reading only. */
   private openAiCardPopover(node: MapNode | null, parent: MapNode | null = null, afterTextId?: string): void {
     if (this.closed || !this.map || this.notesLoading() || this.presentation || this.bookLock().ai) return;
     if (node ? this.aiLockReason("write", [node.id]) : false) {
@@ -15271,38 +15487,198 @@ export class VisualAgentMapView extends ItemView {
     }
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
-    this.closeAiCardPopover();
+    if (this.aiCardOpen) {
+      this.aiCardOpen.win.requestClose();
+      if (this.aiCardOpen) return;
+    }
     const note = node ? this.notes.get(node.id) : undefined;
     if (node && !note) return;
     const split = note?.prompt.trim() ? splitPrompt(note.prompt) : { question: "", sources: [] as string[] };
+    let expectedPrompt = note?.prompt;
+    let expectedConfigRevision = note?.livingNode?.configRevision;
     const mapId = this.map.id;
-    const anchorId = node?.id ?? parent?.id ?? null;
+    const mapPath = this.path;
+    const mapSession = this.captureMapSession();
+    const controller = new AbortController();
+    const trial = new LivingTrial(livingCoordinator(this.plugin));
+    const viewSession = randomUUID();
+    const current = (): boolean => !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
+    let activeTrial: AbortController | undefined;
+    controller.signal.addEventListener("abort", () => activeTrial?.abort(), { once: true });
+    const invalidateTrial = (): void => {
+      activeTrial?.abort();
+      activeTrial = undefined;
+      trial.invalidate();
+      this.plugin.invalidateLivingTrial(viewSession);
+    };
+    const promptOf = (values: AiCardPopoverValues): string =>
+      joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"));
     const win = new AiCardPopover(
       {
         cardTitle: node ? (note?.title ?? node.path) : null,
-        initial: { question: split.question, sources: split.sources, keepOld: note?.aiUpdateMode !== "fresh" },
+        initial: { question: split.question, sources: split.sources, keepOld: true },
         anchor: () => {
-          const area = overlay.getBoundingClientRect?.();
-          if (!area) return null;
-          const card = anchorId ? this.cardEls.get(anchorId)?.getBoundingClientRect?.() : undefined;
-          const controls =
-            this.contentEl?.querySelector?.<HTMLElement>(".vam-zoom-controls")?.getBoundingClientRect?.() ?? null;
-          const at = card ?? new DOMRect(area.left + 16, area.top + 16, 0, 0);
-          return { card: at, area, controls };
+          const area = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay")?.getBoundingClientRect();
+          return area ? { card: area, area, controls: null } : null;
         },
         pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
-        save: values => this.saveAiCard(node, parent, afterTextId, values),
+        save: async values => {
+          const saved = await this.saveAiCard(
+            node,
+            parent,
+            afterTextId,
+            values,
+            expectedPrompt,
+            expectedConfigRevision,
+            current
+          );
+          if (!saved) return false;
+          if (node) {
+            expectedPrompt = promptOf(values);
+            expectedConfigRevision = saved.configRevision;
+            trial.acceptSave(saved.before, saved.after);
+          }
+          return true;
+        },
+        trial: node
+          ? async values => {
+              invalidateTrial();
+              const attempt = new AbortController();
+              activeTrial = attempt;
+              const currentTrial = (): boolean =>
+                current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
+              try {
+                const prepared = await prepareLivingTrial(
+                  {
+                    app: this.app,
+                    repo: this.plugin.repo,
+                    calls: this.plugin.aiCalls,
+                    mapPath,
+                    viewSession,
+                    signal: attempt.signal,
+                    current: currentTrial,
+                    language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
+                    mapSources: signal => this.readLivingMapSourceReport(signal)
+                  },
+                  node.id,
+                  promptOf(values)
+                );
+                let ready = false;
+                await this.plugin.confirmAiUsage(prepared.model, async () => {
+                  if (currentTrial()) ready = await trial.run(prepared.request);
+                });
+                if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
+                  if (currentTrial()) {
+                    invalidateTrial();
+                    new Notice(t("ui.living_node_trial_invalid"));
+                  }
+                  return false;
+                }
+                this.aiCardOpen.adoption = prepared.adoption;
+                const warnings = prepared.warnings.map(warning =>
+                  t(
+                    warning === "upstream-stale"
+                      ? "ui.living_node_trial_stale_sources"
+                      : warning === "frozen-source"
+                        ? "ui.living_node_trial_frozen_sources"
+                        : "ui.living_node_optional_source_unavailable"
+                  )
+                );
+                const shown = await this.plugin.showLivingTrial(
+                  this.plugin.repo.file(node.path),
+                  renderLivingPreview(trial.result),
+                  viewSession,
+                  currentTrial,
+                  warnings
+                );
+                if (!shown && currentTrial()) invalidateTrial();
+                return shown && currentTrial();
+              } catch (error) {
+                if (currentTrial()) {
+                  invalidateTrial();
+                  new Notice(this.plugin.recordFailure(t("ui.living_node_trial"), error));
+                }
+                return false;
+              }
+            }
+          : undefined,
+        stopTrial: node ? invalidateTrial : undefined,
+        adopt: node
+          ? async () => {
+              const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
+              if (!check || !current()) return false;
+              const outcome = await trial.adopt(this.plugin.repo, {
+                ...check,
+                onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
+              });
+              if (outcome !== "written") {
+                new Notice(t("ui.living_node_trial_invalid"));
+                this.plugin.invalidateLivingTrial(viewSession);
+                return false;
+              }
+              if (current()) {
+                await this.plugin.restoreLivingOfficial(this.plugin.repo.file(node.path), viewSession);
+                await this.refreshAfterSavedChange();
+              }
+              return true;
+            }
+          : undefined,
+        convert:
+          node && note?.aiCard
+            ? async () => {
+                try {
+                  await this.plugin.mutate(async () => {
+                    if (!current()) return;
+                    const entry = await this.beginMapTransaction()
+                      .rewriteNote(node.path, path => this.plugin.repo.writeAiCard(path, false))
+                      .commit({ deferRebuild: true, label: t("ui.living_node_convert") });
+                    this.history.push(entry);
+                    await this.refreshAfterSavedChange();
+                  });
+                  this.closeAiCardPopover();
+                  return true;
+                } catch (error) {
+                  new Notice(this.plugin.recordFailure(t("ui.living_node_convert"), error));
+                  return false;
+                }
+              }
+            : undefined,
+        changed: invalidateTrial,
         cancel: () => this.closeAiCardPopover()
       },
       overlay
     );
-    this.aiCardOpen = { nodeId: node?.id ?? null, parentId: parent?.id ?? null, afterTextId, mapId, win };
+    this.aiCardOpen = {
+      nodeId: node?.id ?? null,
+      parentId: parent?.id ?? null,
+      afterTextId,
+      mapId,
+      win,
+      trial,
+      controller,
+      viewSession
+    };
     win.mount(overlay);
+    if (node)
+      void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
+        if (current()) new Notice(error instanceof Error ? error.message : String(error));
+      });
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
     this.aiCardOpen = null;
-    open?.win.destroy();
+    if (!open) return;
+    open.controller.abort();
+    open.trial.close();
+    open.win.destroy();
+    const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
+    const target =
+      node && !this.closed && !this.plugin.repo.isDisposed()
+        ? this.app.vault.getAbstractFileByPath(node.path)
+        : undefined;
+    void this.plugin
+      .restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
+      .catch(() => {});
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
@@ -15315,54 +15691,106 @@ export class VisualAgentMapView extends ItemView {
     );
     modal.open();
   }
-  /** 「存好」: a new card is made (named, no title field), then the question, notes, mode and flag are written in one undoable step. */
-  private saveAiCard(
+  /** Configuration saves do not execute AI. An existing editor remains open for adoption. */
+  private async saveAiCard(
     node: MapNode | null,
     parent: MapNode | null,
     afterTextId: string | undefined,
-    values: AiCardPopoverValues
-  ): void {
-    this.closeAiCardPopover();
-    const map = this.map;
-    if (!map) return;
-    const isCurrent = this.captureMapSession();
-    this.enqueue(async () => {
-      if (!isCurrent()) return;
-      let target = node ? this.mapNodeById(node.id) : undefined;
-      if (!node) {
-        const name = values.title || aiCardTitle(values.question);
-        const found = parent ? this.mapNodeById(parent.id) : null;
-        target = await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId);
-      }
-      if (!target) return;
-      await this.writeAiCard(target, values);
-    });
-  }
-  /** Writes the AI card's Prompt (question and 資料來源 line), flag, web mode and keep-old choice; an emptied question removes the Prompt and the flag. */
-  private async writeAiCard(node: MapNode, values: AiCardPopoverValues): Promise<void> {
-    if (!this.map) return;
-    const repo = this.plugin.repo;
-    const viewport = clone(this.map.viewport);
-    const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, async path => {
-        if (!values.question.trim()) {
-          await repo.clearPrompt(path);
-          await repo.writeAiCard(path, false);
+    values: AiCardPopoverValues,
+    expectedPrompt: string | undefined,
+    expectedConfigRevision: string | undefined,
+    editorCurrent: () => boolean
+  ): Promise<LivingConfigSave | undefined> {
+    if (!this.map || !values.question.trim() || !editorCurrent()) return undefined;
+    const mapCurrent = this.captureMapSession();
+    const current = (): boolean => mapCurrent() && editorCurrent();
+    let saved: LivingConfigSave | undefined;
+    try {
+      await this.plugin.mutate(async () => {
+        if (!current()) return;
+        if (!node) {
+          const name = values.title || aiCardTitle(values.question);
+          const found = parent ? this.mapNodeById(parent.id) : null;
+          if (parent && !found) throw new Error("changed-target-identity");
+          await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
+            prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
+            current,
+            onSaved: result => {
+              saved = result;
+            }
+          });
           return;
         }
-        await repo.updateNote(path, {
-          prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
-          researchMode: "research"
-        });
-        await repo.writeAiCard(path, true);
-        await repo.writeAiUpdateMode(path, values.keepOld ? "top" : "fresh");
+        const target = this.mapNodeById(node.id);
+        if (!target || !current()) return;
+        saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
+      });
+      if (saved && !node && current()) this.closeAiCardPopover();
+      return saved;
+    } catch (error) {
+      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
+      return undefined;
+    }
+  }
+
+  private async writeAiCard(
+    node: MapNode,
+    values: AiCardPopoverValues,
+    expectedPrompt: string | undefined,
+    expectedConfigRevision: string | undefined,
+    current: () => boolean
+  ): Promise<LivingConfigSave | undefined> {
+    if (!this.map || !current()) return undefined;
+    const repo = this.plugin.repo;
+    const viewport = clone(this.map.viewport);
+    const mapPath = this.path;
+    const mapId = this.map.id;
+    const nodeId = node.id;
+    const nodePath = node.path;
+    const parentId = node.parentId;
+    let firstCommit = true;
+    const stillCurrent = (): boolean => {
+      if (!firstCommit) return true; // redo has its own transaction preimage guard
+      const live = this.map?.nodes.find(item => item.id === nodeId);
+      return (
+        current() &&
+        this.path === mapPath &&
+        this.map?.id === mapId &&
+        live?.path === nodePath &&
+        live?.parentId === parentId
+      );
+    };
+    let saved: LivingConfigSave | undefined;
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(nodePath, async path => {
+        if (!stillCurrent()) throw new Error("changed-target");
+        const liveMap = await repo.readMap(mapPath);
+        const live = liveMap.nodes.find(item => item.id === nodeId);
+        if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
+          throw new Error("changed-target-identity");
+        saved = await saveLivingConfig(
+          this.app,
+          repo,
+          liveMap,
+          nodeId,
+          joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
+          expectedPrompt,
+          expectedConfigRevision,
+          stillCurrent,
+          undefined,
+          firstCommit ? undefined : saved?.sourceRevision
+        );
       })
-      .editMap(this.path, map => {
+      .editMap(mapPath, map => {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.ai_card") });
-    this.history.push(entry);
-    await this.refreshAfterSavedChange();
+    firstCommit = false;
+    if (this.path === mapPath && this.map?.id === mapId && !this.closed) {
+      this.history.push(entry);
+      await this.refreshAfterSavedChange();
+    }
+    return saved;
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {
@@ -17637,9 +18065,17 @@ export class VisualAgentMapView extends ItemView {
     keyboardFocus = false,
     hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {},
     /** The text block (on `parentNode`) the new topic follows: it is laid out after the block and drawn with its line from it. */
-    afterTextId?: string
+    afterTextId?: string,
+    livingConfig?: {
+      prompt: string;
+      current: () => boolean;
+      allowSource?: (path: string) => boolean;
+      onSaved: (saved: LivingConfigSave) => void;
+    }
   ): Promise<MapNode | undefined> {
-    if (!this.map) return undefined;
+    if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
+    const creationMapPath = this.path;
+    const creationMapId = this.map.id;
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
@@ -17649,6 +18085,7 @@ export class VisualAgentMapView extends ItemView {
     const model = parent
       ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
       : this.plugin.currentModelChoice().model;
+    if (livingConfig && !livingConfig.current()) return undefined;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return undefined;
@@ -17680,23 +18117,57 @@ export class VisualAgentMapView extends ItemView {
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;
     node.y = parent?.y ?? 80;
-    this.notes.set(
-      node.id,
-      await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
-    );
-    this.selection.setSelected(node.id);
-    // Set before the repaint that shows the card, so the card is drawn with its title field.
-    if (interactive && focus && !this.inlineName)
-      this.inlineName = {
-        target: "card",
-        id: node.id,
-        draft: this.notes.get(node.id)?.title ?? defaultName,
-        fresh: true,
-        created: true
-      };
+    const repo = this.plugin.repo;
+    let provisionalFile: TFile | undefined;
+    let provisionalText: string | undefined;
+    let configured: LivingConfigSave | undefined;
+    let configurationGraph: string | undefined;
+    const previousSelection = this.selection.state.selected;
+    const graph = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(item => [item.id, item.path, item.parentId]));
     try {
+      if (livingConfig) {
+        // Configure the new note before publishing its card. The ordinary creation
+        // transaction then owns one history entry; redo restores the configured note.
+        provisionalFile = repo.file(node.path);
+        provisionalText = await this.app.vault.read(provisionalFile);
+        if (!livingConfig.current()) throw new Error("changed-target");
+        const disk = await repo.readMap(creationMapPath);
+        if (disk.id !== creationMapId || (parent && !disk.nodes.some(item => item.id === parent.id)))
+          throw new Error("changed-target-identity");
+        configurationGraph = graph(disk);
+        configured = await saveLivingConfig(
+          this.app,
+          repo,
+          { ...disk, nodes: [...disk.nodes, node] },
+          node.id,
+          livingConfig.prompt,
+          undefined,
+          undefined,
+          livingConfig.current,
+          livingConfig.allowSource
+        );
+        provisionalText = configured.after;
+        if (!livingConfig.current()) throw new Error("changed-target");
+      }
+      if (!this.map) throw new Error("changed-target");
+      const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
+      if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
+      this.notes.set(node.id, preparedNote);
+      this.selection.setSelected(node.id);
+      // Set before the repaint that shows the card, so the card is drawn with its title field.
+      if (interactive && focus && !this.inlineName)
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: this.notes.get(node.id)?.title ?? defaultName,
+          fresh: true,
+          created: true
+        };
       await this.mapChangeSnapshots(
         map => {
+          if (livingConfig && (map.id !== creationMapId || graph(map) !== configurationGraph))
+            throw new Error("changed-target-identity");
           map.nodes.push(node);
           const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
           // Only a block that hangs on this very topic can be followed; anything else adds an ordinary child.
@@ -17727,13 +18198,58 @@ export class VisualAgentMapView extends ItemView {
               node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
           }
         },
-        rebuildDerivedData,
-        [node.path]
+        livingConfig ? false : rebuildDerivedData,
+        [node.path],
+        undefined,
+        livingConfig?.current
       );
+      if (livingConfig && configured) {
+        livingConfig.onSaved(configured);
+        // Derived data is recoverable and is not part of the authoritative commit.
+        try {
+          if (rebuildDerivedData) await this.plugin.rebuildDerivedData();
+          if (livingConfig.current()) await this.refreshAfterSavedChange();
+        } catch {
+          if (livingConfig.current()) new Notice(t("ui.change_saved_refresh_failed"));
+        }
+        if (!livingConfig.current()) return node;
+      }
       // The step that made the topic (pushed by the change above): Esc in its name field takes it back.
       if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
+      if (
+        livingConfig &&
+        provisionalFile &&
+        provisionalText !== undefined &&
+        !isTransactionError(error, "rollback-failed")
+      ) {
+        try {
+          const disk = await repo.readMap(creationMapPath);
+          // Never remove a published note, a replacement, or a note edited since creation.
+          if (
+            disk.id === creationMapId &&
+            !disk.nodes.some(item => item.id === node.id || item.path === node.path) &&
+            this.app.vault.getAbstractFileByPath(node.path) === provisionalFile &&
+            (await this.app.vault.read(provisionalFile)) === provisionalText &&
+            provisionalFile.path === node.path &&
+            !isLinked(this.app, node.path)
+          ) {
+            await this.app.fileManager.trashFile(provisionalFile);
+          }
+          if (
+            this.path === creationMapPath &&
+            this.map?.id === creationMapId &&
+            !disk.nodes.some(item => item.id === node.id)
+          ) {
+            this.notes.delete(node.id);
+            if (this.selection.state.selected === node.id) this.selection.setSelected(previousSelection);
+            this.render();
+          }
+        } catch (cleanupError) {
+          throw new AggregateError([error, cleanupError], "Living Node creation rollback failed");
+        }
+      }
       throw error;
     }
     if (!focus) return this.map?.nodes.find(n => n.id === node.id) ?? node;
@@ -19806,98 +20322,29 @@ export class VisualAgentMapView extends ItemView {
       !!this.map &&
       !this.notesLoading() &&
       !this.bookLock().ai &&
-      hasAiCard(this.map.nodes, id => this.promptNoteOf(id))
+      this.map.nodes.some(node => isAiCard(this.promptNoteOf(node.id)) && !this.promptNoteOf(node.id)?.aiLocked)
     );
-  }
-  /** Why the AI is busy on any card the plan would run (or a multi-select research runs): then nothing starts. */
-  private promptScopeBusy(plan: PromptPlan): boolean {
-    if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey())) return true;
-    return plan.order.some(item => {
-      const node = this.map?.nodes.find(candidate => candidate.id === item.id);
-      return (
-        !!node &&
-        (this.plugin.topicRuns.isBusy(node.path) ||
-          this.plugin.quickExpandPending.has(node.path) ||
-          this.plugin.topicRuns.hasTask(node.path))
-      );
-    });
   }
   private promptRunning(): boolean {
     return !!this.promptBatch && !this.promptBatch.outcome;
   }
-  /** "Run all": the whole map, straight to the usage notice (no confirmation card); nothing is written before it. */
-  startPromptRun(): void {
+  /** Both explicit commands share the same round, dependency plan and write fence. */
+  startPromptRun(requested?: readonly string[]): void {
     const map = this.map;
-    if (!map || !this.path || this.notesLoading() || this.bookLock().ai) return;
+    if (!map || !this.path || this.notesLoading() || this.bookLock().ai || this.presentation) return;
     if (this.promptRunning()) {
       new Notice(t("ui.prompt_run_already"));
       return;
     }
-    const plan = planPromptRun(map.nodes, id => this.promptNoteOf(id));
-    if (!plan.order.length) {
+    if (requested?.some(id => this.notes.get(id)?.aiLocked)) {
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
+    if (!this.canRunPrompts()) {
       new Notice(t("ui.prompt_run_nothing"));
       return;
     }
-    if (this.promptScopeBusy(plan)) {
-      new Notice(t("ui.prompt_run_busy"));
-      return;
-    }
-    void this.confirmPromptRun(plan);
-  }
-  /** The Markdown notes a card's 資料來源 line resolves to, as the run would read them (at most 10). */
-  private promptSourceFiles(id: string, prompt: string): TFile[] {
-    const node = this.map?.nodes.find(candidate => candidate.id === id);
-    if (!node || !prompt) return [];
-    const files: TFile[] = [];
-    for (const link of promptSourceLinks(prompt)) {
-      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-      if (file instanceof TFile && file.extension.toLowerCase() === "md") files.push(file);
-      if (files.length >= 10) break;
-    }
-    return files;
-  }
-  /** The fingerprint of an AI card's inputs: its Prompt, its direct children's summaries and the modified time of its source notes. */
-  private aiCardInputKey(node: MapNode, prompt: string, summaryOf: (child: MapNode) => string | undefined): string {
-    return promptInputKey({
-      prompt,
-      children: (this.map?.nodes ?? [])
-        .filter(item => item.parentId === node.id)
-        .map(child => ({ id: child.id, summary: summaryOf(child) ?? "" })),
-      sources: this.promptSourceFiles(node.id, prompt).map(file => ({ path: file.path, mtime: file.stat.mtime }))
-    });
-  }
-  /** The usage notice of every model the batch will use (a refusal starts nothing and leaves no state), then the batch. */
-  private async confirmPromptRun(plan: PromptPlan): Promise<void> {
-    const map = this.map;
-    if (!map) return;
-    const models = [
-      ...new Set(
-        await Promise.all(
-          plan.order.map(async item => {
-            const node = map.nodes.find(candidate => candidate.id === item.id);
-            return node ? (await this.plugin.repo.resolveTopicModel(node.path, map)).model : this.currentModelId();
-          })
-        )
-      )
-    ];
-    const confirmEach = async (index: number, run: () => Promise<void>): Promise<boolean> =>
-      index >= models.length
-        ? (await run(), true)
-        : this.plugin.confirmAiUsage(models[index], async () => {
-            await confirmEach(index + 1, run);
-          });
-    await confirmEach(0, async () => {
-      if (this.closed || this.map !== map) return;
-      if (this.promptRunning()) {
-        new Notice(t("ui.prompt_run_already"));
-        return;
-      }
-      if (this.promptScopeBusy(plan)) {
-        new Notice(t("ui.prompt_run_busy"));
-        return;
-      }
-      await this.runPromptBatch(plan);
-    });
+    void this.runLivingBatch(requested);
   }
   private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
     let entries = this.promptRuns.get(mapPath);
@@ -19912,169 +20359,115 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   private promptRenderQueued = false;
-  /**
-   * One AI card of a batch: the research (a leaf, on the web) or the integration (its children's summaries, the Prompt as the
-   * direction). Returns the fingerprint of the inputs it read, for the record.
-   */
-  private async runPromptItem(
-    item: PromptPlanItem,
-    signal: AbortSignal,
-    languageSource: Pick<MapDocument, "title" | "outputLanguage"> | undefined,
-    gate: { shown: boolean }
-  ): Promise<string> {
-    const node = this.map?.nodes.find(candidate => candidate.id === item.id);
-    if (!node || !this.map) throw new Error(t("ui.note_missing"));
+  private async runLivingBatch(
+    requested?: readonly string[],
+    stop?: AbortSignal
+  ): Promise<PromptBatchState["outcome"]> {
     const map = this.map;
-    const note = await this.plugin.repo.readNote(node.path, map);
-    if (!note.prompt.trim()) throw new Error(t("ui.prompt_run_not_written"));
-    if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) throw new Error(t("ui.ai_locked_notice"));
-    // The children as they are now (an earlier card of this batch has just written its summary).
-    const childNotes = new Map<string, Note>();
-    for (const child of map.nodes.filter(candidate => candidate.parentId === node.id))
-      childNotes.set(child.id, await this.plugin.repo.readNote(child.path, map));
-    const inputKey = this.aiCardInputKey(node, note.prompt, child => childNotes.get(child.id)?.summary);
-    // Only the Markdown notes on the "資料來源：" line go in; a link that does not resolve, or a URL, is skipped.
-    const documents = await readPromptSources(note.prompt, async link => {
-      const file = this.app.metadataCache.getFirstLinkpathDest(link, node.path);
-      return file instanceof TFile && file.extension.toLowerCase() === "md"
-        ? await readMarkdownFile(this.app, file)
-        : null;
-    });
-    const referenceGroups: ReferenceGroup[] = documents.length
-      ? [{ id: "prompt-sources", name: t("ui.prompt_run_sources_group"), location: "", documents }]
-      : [];
-    // "Keep old data" (the default) puts the new text on top of the old; unticked rewrites the note.
-    const updateMode: UpdateMode = note.aiUpdateMode === "fresh" ? "fresh" : "top";
-    if (item.kind === "research") {
-      await this.researchChild(
-        node,
-        signal,
-        () => {},
-        { ...aiModeOptions(noteAiMode("research"), "research"), referenceGroups, requirements: "", updateMode },
-        false,
-        undefined,
-        gate,
-        languageSource
-      );
-      return inputKey;
-    }
-    const outputLanguage = cardOutputLanguage(languageSource ?? map, this.plugin.settings.language, note.title);
-    let written = false;
-    let failure: string | undefined;
-    await this.integrateChildren(
-      node,
-      {
-        researchMode: "local",
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        synthesisContent: "summary",
-        skipCharts: true,
-        referenceGroups,
-        signal,
-        outputLanguage,
-        updateMode
-      },
-      promptIntegrationTask(outputLanguage, note.prompt),
-      async (_result, write, summary, detail) => {
-        await write(summary, detail);
-        written = true;
-      },
-      message => {
-        failure = message;
-      }
-    );
-    if (!written) throw new Error(failure ?? t("ui.prompt_run_not_written"));
-    return inputKey;
-  }
-  private async runPromptBatch(plan: PromptPlan): Promise<void> {
-    const map = this.map;
+    if (!map || !this.path || stop?.aborted || this.promptRunning()) return undefined;
     const mapPath = this.path;
-    if (!map || !mapPath) return;
-    const mapId = map.id;
+    const session = this.captureMapSession();
     const controller = new AbortController();
-    const state: PromptBatchState = { mapPath, controller, total: plan.order.length, finished: 0 };
+    const stopRound = (): void => controller.abort();
+    stop?.addEventListener("abort", stopRound, { once: true });
+    const state: PromptBatchState = { mapPath, controller, total: 0, finished: 0 };
     this.promptBatch = state;
-    // The last batch's marks end here: a card this batch has not reached yet shows its own state, not the old done/blocked.
-    this.promptRuns.delete(mapPath);
-    const notes = new Map(this.notes);
-    const noteOf = (id: string): PromptNoteRef | undefined => {
-      const note = notes.get(id);
-      return note
-        ? {
-            prompt: note.prompt,
-            ...(note.aiCard ? { aiCard: true } : {}),
-            ...(note.aiLocked ? { aiLocked: true } : {})
-          }
-        : undefined;
-    };
-    const languageSource = this.batchLanguageSource();
-    const gate = { shown: false };
-    const here = (): boolean => !this.closed && this.path === mapPath && this.map?.id === mapId;
-    // The record goes in the note only while the batch still stands: Stop or a closed view writes nothing.
-    const stamps: Promise<void>[] = [];
-    const stamp = (id: string, result: AiRunRecord["result"], input?: string): void => {
-      const node = map.nodes.find(candidate => candidate.id === id);
-      if (!node || controller.signal.aborted || !here()) return;
-      stamps.push(
-        this.plugin.repo
-          .writeAiRunStamp(node.path, {
-            at: new Date().toISOString(),
-            result,
-            ...(input !== undefined ? { input } : {})
-          })
-          .catch(() => undefined)
-      );
-    };
-    const started = new Set<string>();
+    const failureReasons = new Map<string, string>();
+    let warnedOptionalSources = false;
+    const current = (): boolean => session() && !this.plugin.repo.isDisposed() && !controller.signal.aborted;
     try {
-      const outcome = await runPromptItems(plan.order, {
-        nodes: map.nodes,
-        noteOf,
-        signal: controller.signal,
-        isBad: id => this.promptRuns.get(mapPath)?.get(id)?.status === "blocked",
-        setStatus: (id, status, reason) => {
-          this.setPromptStatus(mapPath, id, status, reason);
-          if (status === "running") started.add(id);
-          // Held back by a child (never started): the record says so; a card that ran and failed is recorded by its own run.
-          else if (status === "blocked" && !started.has(id)) stamp(id, "blocked");
+      const result = await runLivingRound(
+        {
+          app: this.app,
+          repo: this.plugin.repo,
+          calls: this.plugin.aiCalls,
+          coordinator: livingCoordinator(this.plugin),
+          mapPath,
+          viewSession: randomUUID(),
+          signal: controller.signal,
+          current,
+          busy: path =>
+            this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
+            this.plugin.topicRuns.isBusy(path) ||
+            this.plugin.quickExpandPending.has(path) ||
+            this.plugin.topicRuns.hasTask(path),
+          language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onOptionalSourcesUnavailable: () => {
+            if (!current() || warnedOptionalSources) return;
+            warnedOptionalSources = true;
+            new Notice(t("ui.living_node_optional_source_unavailable"));
+          },
+          confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
+          onStart: total => {
+            state.total = total;
+            this.promptRuns.delete(mapPath);
+            if (current()) this.render();
+          },
+          onRunning: id => {
+            state.current = this.notes.get(id)?.title ?? id;
+            this.setPromptStatus(mapPath, id, "running");
+          },
+          onSettled: (id, result) => {
+            state.finished = Math.min(state.total, state.finished + 1);
+            const status =
+              result === "changed" || result === "no-change" || result === "reused"
+                ? "done"
+                : result === "failed" || result === "blocked"
+                  ? "blocked"
+                  : "idle";
+            this.setPromptStatus(mapPath, id, status, failureReasons.get(id));
+          },
+          onFailure: (id, error) => {
+            failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
+          },
+          onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
         },
-        titleOf: id => notes.get(id)?.title ?? id,
-        blockedReason: titles => t("ui.ai_card_blocked_0", titles),
-        onStart: (id, finished) => {
-          state.finished = finished;
-          state.current = notes.get(id)?.title ?? id;
-        },
-        runItem: async item => {
-          // The view closed or the map changed under the batch: stop before any further call.
-          if (!here()) {
-            controller.abort();
-            return;
-          }
-          let input: string;
-          try {
-            input = await this.runPromptItem(item, controller.signal, languageSource, gate);
-          } catch (error) {
-            stamp(item.id, "failed");
-            throw error;
-          }
-          stamp(item.id, "ok", input);
-        }
-      });
+        requested
+      );
+      const values = [...(result?.values() ?? [])];
+      const outcome = {
+        done: values.filter(value => value === "changed" || value === "no-change" || value === "reused").length,
+        failed: values.filter(value => value === "failed").length,
+        blocked: values.filter(value => value === "blocked").length,
+        stopped: controller.signal.aborted
+      };
       state.outcome = outcome;
-      state.finished = outcome.done + outcome.failed + outcome.blocked;
-      // Silent when everything ran; only a failure, a held-back card or a Stop is told.
-      if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
-      else if (outcome.failed || outcome.blocked)
-        new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
+      if (session()) {
+        if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
+        else if (outcome.failed || outcome.blocked)
+          new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
+      }
+    } catch (error) {
+      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
     } finally {
+      stop?.removeEventListener("abort", stopRound);
       state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
-      await Promise.all(stamps);
-      if (!this.closed) {
+      if (session()) {
         await this.hydrate();
         this.render();
       }
     }
+    return state.outcome;
   }
+  private recordLivingCommit(path: string, before: string, after: string): void {
+    if (before === after || this.closed) return;
+    const restore = async (expected: string, replacement: string): Promise<void> => {
+      const repo = this.plugin.repo;
+      const result = await repo.updateNoteRawGuarded(path, () => replacement, {
+        expectedContent: expected,
+        authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
+      });
+      if (result !== "written") throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    };
+    this.history.push({
+      label: t("ui.living_node_run_card"),
+      undo: () => restore(after, before),
+      redo: () => restore(before, after)
+    });
+    this.updateHistoryButtons();
+  }
+
   stopPromptBatch(): void {
     this.promptBatch?.controller.abort();
   }
@@ -20090,54 +20483,40 @@ export class VisualAgentMapView extends ItemView {
       !!this.plugin.researchProgress?.get(node.path)
     );
   }
-  /** The status of an AI card, memoised for one render; undefined for a card that is not an AI card. */
-  private aiStatusOf(id: string, seen: Set<string> = new Set()): AiCardStatus | undefined {
+  private livingValidity = new Map<string, "none" | "valid" | "stale">();
+
+  /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
+  private aiStatusOf(id: string): AiCardStatus | undefined {
     const note = this.notes.get(id);
     const node = this.mapNodeById(id);
     if (!node || !note || !isAiCard(note)) return undefined;
     const known = this.aiStatusMemo.get(id);
     if (known) return known;
-    if (seen.has(id)) return "done";
-    seen.add(id);
     const entry = this.promptRunning() ? this.promptEntryOf(id) : undefined;
     let status: AiCardStatus;
     if (this.aiWorkingOn(node)) status = "running";
     else if (entry?.status === "blocked") status = "failed";
     else if (entry?.status === "done") status = "done";
+    else if (note.livingNode?.outcome === "failed" || note.livingNode?.outcome === "blocked") status = "failed";
     else {
-      const children = (this.map?.nodes ?? []).filter(child => child.parentId === id);
-      status = aiCardStatus({
-        running: false,
-        run: note.aiRun,
-        inputKey: this.aiCardInputKey(node, note.prompt, child => this.notes.get(child.id)?.summary),
-        childStatuses: children
-          .filter(child => isAiCard(this.notes.get(child.id)) && this.notes.get(child.id)?.aiLocked !== true)
-          .map(child => this.aiStatusOf(child.id, seen) ?? "done")
-      });
+      const validity = this.livingValidity.get(id);
+      status = validity === "valid" ? "done" : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
     }
     this.aiStatusMemo.set(id, status);
     return status;
   }
-  /** The words of the glyph's tooltip: the stage while it runs, why it did not finish, or the plain state name. */
+
   private aiStatusTip(node: MapNode, note: Note, status: AiCardStatus): string {
     if (status === "running") {
       const progress = this.plugin.researchProgress?.get(node.path);
       return progress ? this.researchStageText(progress) : t("ui.ai_running");
     }
-    if (status !== "failed") return t(`ui.ai_card_status_${status}`);
-    const entry = this.promptRunning() ? this.promptEntryOf(node.id) : undefined;
-    const blockers = blockingChildren(
-      this.map?.nodes ?? [],
-      id => this.promptNoteOf(id),
-      node.id,
-      id => this.aiStatusOf(id) === "failed"
-    );
-    const blocked = entry ? blockers.length > 0 : note.aiRun?.result === "blocked";
-    if (blocked) {
-      const names = blockers.map(id => this.notes.get(id)?.title ?? id).join("\u3001");
-      return names ? t("ui.ai_card_blocked_0", names) : t("ui.ai_card_blocked_unnamed");
-    }
-    return t("ui.ai_card_failed_0", (entry ? entry.reason : undefined) ?? note.lastError ?? "");
+    const lines = [t(`ui.ai_card_status_${status}`)];
+    if (note.livingNode?.lastSuccessfulCheck)
+      lines.push(t("ui.living_node_last_success") + ": " + note.livingNode.lastSuccessfulCheck);
+    if (note.livingNode?.lastAttempt) lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
+    if (status === "failed" && this.promptEntryOf(node.id)?.reason) lines.push(this.promptEntryOf(node.id)!.reason!);
+    return lines.join("\n");
   }
   /**
    * What an AI card shows: a grey star before its name, its question (first line) under the name, and one state glyph after the
@@ -22019,6 +22398,7 @@ export class VisualAgentMapView extends ItemView {
         markers: this.notes.get(node.id)?.markers,
         styles: this.notes.get(node.id)?.style,
         ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
+        ...(this.notes.get(node.id)?.aiCard ? { aiCard: true } : {}),
         ...failureOf(node.id)
       };
     });
@@ -22053,6 +22433,12 @@ export class VisualAgentMapView extends ItemView {
             title: titleOf(node),
             summary: summaryOf(id),
             detail: freshDetail.get(id) ?? this.notes.get(id)?.detail ?? "",
+            ...(this.notes.get(id)?.aiCard
+              ? {
+                  livingPrompt: this.notes.get(id)?.prompt,
+                  livingConfigRevision: this.notes.get(id)?.livingNode?.configRevision
+                }
+              : {}),
             path: node.path,
             ...failureOf(id)
           }
@@ -22609,11 +22995,17 @@ export class VisualAgentMapView extends ItemView {
       refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
     switch (action.kind) {
-      case "add_child":
-        // No parent (the same test as the apply step): the card becomes a root topic.
-        return action.parentId
+      case "add_child": {
+        // Include the complete executable configuration in the confirmation, not merely the card title.
+        const label = action.parentId
           ? t("ui.map_chat_do_add_child_0", action.title)
           : t("ui.map_chat_do_add_root_0", action.title);
+        return action.livingPrompt
+          ? label + "\n" + t("ui.living_node_chat_configure_0", action.title) + "\n" + action.livingPrompt
+          : label;
+      }
+      case "configure_ai_card":
+        return t("ui.living_node_chat_configure_0", title(action.nodeId)) + "\n" + action.content;
       case "rename_topic":
         return t("ui.map_chat_do_rename_0", action.title);
       case "update_summary":
@@ -22697,6 +23089,10 @@ export class VisualAgentMapView extends ItemView {
           : t("ui.map_chat_do_appearance_many_0", action.nodeIds.length);
       case "run_map_action":
         switch (action.action) {
+          case "run_living_card":
+            return t("ui.living_node_run_card") + ": " + action.nodeIds.map(title).join(", ");
+          case "run_living_all":
+            return t("ui.ai_run_all");
           case "research_standard":
             return (
               t(
@@ -23425,6 +23821,8 @@ export class VisualAgentMapView extends ItemView {
       .filter((id): id is string => !!id);
     // A target list that lost all its entries must not turn into "the current selection".
     if (action.nodeIds.length && !ids.length) return null;
+    if (action.kind === "run_map_action" && action.action === "run_living_card" && ids.length !== action.nodeIds.length)
+      return null;
     return { action: { ...action, nodeIds: ids } };
   }
   /** create_map: makes the map, opens it (the conversation goes along) and moves the anchor to it. */
@@ -23621,6 +24019,7 @@ export class VisualAgentMapView extends ItemView {
       if (node) paths.push(node.path);
     };
     switch (action.kind) {
+      case "configure_ai_card":
       case "rename_topic":
       case "update_summary":
       case "edit_topic_note":
@@ -24004,6 +24403,40 @@ export class VisualAgentMapView extends ItemView {
     if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
       return skipped("ui.ai_locked_notice");
     switch (action.action) {
+      case "run_living_card":
+      case "run_living_all": {
+        if (work?.controller.signal.aborted) return skipped("ui.map_chat_skip_stopped");
+        if (this.promptRunning()) return skipped("ui.prompt_run_already");
+        if (this.notesLoading() || this.bookLock().ai || this.presentation)
+          return skipped("ui.map_chat_skip_unavailable");
+        const fresh = await this.freshNotesOf(
+          action.action === "run_living_all" ? map.nodes.map(node => node.id) : targets
+        );
+        if (this.map?.id !== map.id || work?.controller.signal.aborted) return skipped("ui.map_chat_skip_map_changed");
+        const ids = action.action === "run_living_all" ? [...fresh.keys()] : targets;
+        if (
+          action.action === "run_living_card" &&
+          (ids.length !== action.nodeIds.length || ids.some(id => !isAiCard(fresh.get(id))))
+        )
+          return skipped("ui.map_chat_skip_unavailable");
+        if (action.action === "run_living_card" && ids.some(id => fresh.get(id)?.aiLocked))
+          return skipped("ui.ai_locked_notice");
+        if (!ids.some(id => isAiCard(fresh.get(id)) && !fresh.get(id)?.aiLocked))
+          return skipped("ui.prompt_run_nothing");
+        // Formal Run Card / Run All use the identical planner and per-model usage confirmation.
+        if (this.promptRunning()) return skipped("ui.prompt_run_already");
+        const outcome = await this.runLivingBatch(
+          action.action === "run_living_all" ? undefined : ids,
+          work?.controller.signal
+        );
+        if (!outcome || outcome.stopped) return skipped("ui.map_chat_skip_stopped");
+        if (outcome.failed || outcome.blocked)
+          return {
+            status: "failed",
+            reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
+          };
+        return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
+      }
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
         else if (!this.selection.state.multiSelectMode && this.aiTargets?.length) this.chatSelect(this.chatTargetIds());

@@ -85,6 +85,7 @@ export function chatPlanGroupOf(kind: MapChatAction["kind"]): ChatPlanGroup {
     case "create_md_file":
     case "create_map":
       return "create";
+    case "configure_ai_card":
     case "rename_topic":
     case "update_summary":
     case "edit_topic_note":

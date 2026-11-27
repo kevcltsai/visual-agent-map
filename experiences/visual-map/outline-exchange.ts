@@ -302,7 +302,11 @@ function cleanBody(raw: string, line: number): string {
   const body = raw.replace(/\r\n?/g, "\n");
   if (!body.trim()) return "";
   if (body.length > EXCHANGE_MAX_BODY) throw new ExchangeReject("body-too-long", line);
-  if (body.includes("<!-- visual-agent-map:") || /^\uFEFF?---[ \t]*(?:\n|$)/.test(body))
+  if (
+    body.includes("<!-- visual-agent-map:") ||
+    /<!--\s*vam-living-node:/i.test(body) ||
+    /^\uFEFF?---[ \t]*(?:\n|$)/.test(body)
+  )
     throw new ExchangeReject("bad-body", line);
   return body;
 }

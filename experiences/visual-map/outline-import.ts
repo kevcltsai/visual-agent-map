@@ -160,7 +160,11 @@ export function parseOutline(input: string): OutlineParse {
     if (end > 0) {
       start = end + 1;
       skippedLines += start;
-      vamNote = lines.slice(1, end).some(line => /^(visual-agent-map|agent-map-node)[ \t]*:/.test(line));
+      vamNote = lines
+        .slice(1, end)
+        .some(line =>
+          /(?:^|[\s{,])["']?(?:visual-agent-map|agent-map-node|ai-card|living-node-[\w-]+)["']?[ \t]*:/.test(line)
+        );
     }
   }
   const stack: OutlineNode[] = [];
@@ -170,7 +174,7 @@ export function parseOutline(input: string): OutlineParse {
   for (let index = start; index < lines.length; index++) {
     const line = lines[index];
     const lineNumber = index + 1;
-    if (line.includes("<!-- visual-agent-map:")) vamNote = true;
+    if (line.includes("<!-- visual-agent-map:") || /<!--\s*vam-living-node:/i.test(line)) vamNote = true;
     if (fence) {
       skippedLines++;
       const close = FENCE_CLOSE.exec(line);

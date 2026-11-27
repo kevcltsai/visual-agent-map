@@ -57,7 +57,7 @@ test('switching maps stops the old map\'s run (source-level), and an author call
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const open = source.indexOf('private async openMapInMutation(');
   const head = source.slice(open, open + 1200);
-  assert.match(head, /if \(path !== this\.path\) \{\s*\/\/[^\n]*\n\s*if \(this\.path\) void this\.plugin\.bookPipelineRuns\?\.stop\(this\.path\)/);
+  assert.match(head, /if \(path !== this\.path\) \{\s*this\.closeAiCardPopover\(\);\s*this\.stopPromptBatch\(\);\s*\/\/[^\n]*\n\s*if \(this\.path\) void this\.plugin\.bookPipelineRuns\?\.stop\(this\.path\)/);
   const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
   plugin.views = () => [{ mapPath: 'Other.vam' }];
   const stops = [];

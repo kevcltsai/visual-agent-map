@@ -13,6 +13,7 @@ const suites = [
   'claude-runtime.cjs',
   'ai-tasks.cjs',
   'notes-repository.cjs',
+  'living-node-markdown.cjs',
   'expansion-and-synthesis.cjs',
   'visual-map-view.cjs',
   'map-chat.cjs',

@@ -54,6 +54,8 @@ export interface TransactionDeps {
    * throwing refuses the step with nothing written. The one place a caller can keep a set of notes read-only.
    */
   guardPath?: (path: string) => void;
+  /** Validate the final dependency graph before the first publication of an edit. A refusal uses normal transaction rollback. */
+  validateStructure?: (before: MapDocument, after: MapDocument) => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
   onApplied: (mapPath: string, map: MapDocument) => void | Promise<void>;
   /** Called for each edited map before anything is written; throwing cancels the whole transaction. */
@@ -72,6 +74,8 @@ export interface CommitOptions {
   /** Skip the derived-data rebuild during commit; the caller rebuilds. Undo and redo still rebuild. */
   deferRebuild?: boolean;
   label?: string;
+  /** First publication only: an invalidated editor must not publish its pending change. */
+  authorize?: () => boolean;
 }
 /** The vault path commit chose for the attachment registered under `key`; throws for an unknown key. */
 export type AttachmentPath = (key: string) => string;
@@ -487,6 +491,9 @@ export function begin(deps: TransactionDeps): Transaction {
         }
         for (const step of notes.after) await step.apply();
         for (const item of maps) {
+          // The dependencies may have changed since this history entry was
+          // recorded. A replay must not publish a newly cyclic structure.
+          await deps.validateStructure?.(item.restore, item.write);
           await repo.saveMap(item.mapPath, clone(item.write), {
             authorize: current => requireMapSnapshot(current, item.restore),
             preserveViewport: item.preserveViewport,
@@ -781,6 +788,11 @@ export function begin(deps: TransactionDeps): Transaction {
     async commit(options = {}) {
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
+      const authorize = (): void => {
+        if (options.authorize && !options.authorize())
+          throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+      };
+      authorize();
       for (const note of noteOps)
         if (moves.some(move => move.path === note.path && move.kind !== "rename"))
           throw new Error(`A note cannot be rewritten and moved in one step: ${note.path}`);
@@ -827,6 +839,7 @@ export function begin(deps: TransactionDeps): Transaction {
       const owner = {};
       return journal.notes.run(async () => {
         try {
+          authorize();
           await place(owner);
           for (const note of noteRecords) await note.write(note.path, attachment);
           for (const op of ops) {
@@ -889,11 +902,16 @@ export function begin(deps: TransactionDeps): Transaction {
             for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
             // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
             pruneAfterText(after);
+            await deps.validateStructure?.(before, after);
+            authorize();
             records.push({ mapPath, before, after });
             for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
             if (ownership(before) !== ownership(after)) rebuildNeeded = true;
             await repo.saveMap(mapPath, after, {
-              authorize: current => requireMapSnapshot(current, before),
+              authorize: current => {
+                authorize();
+                requireMapSnapshot(current, before);
+              },
               preserveViewport: true,
               recordWrite: (current, next) => {
                 journal.maps.push({ mapPath, restore: current, after: next });

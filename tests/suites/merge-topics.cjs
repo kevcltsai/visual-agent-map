@@ -633,3 +633,9 @@ integrationTest('hypothesis-leaning: a parent-mode merge and an adopter keep the
   const adopter = await h.repo.readNote(h.notes.hyp2.path, await h.saved());
   assert.equal(adopter.hypothesisLeaning, 'refuted'); assert.equal(adopter.hypothesisStrength, 'strong');
 });
+
+test('merge eligibility: active Living Node configuration must be converted before sibling or parent merge', () => {
+  assert.deepEqual(check(['a', 'b'], { livingNode: n => n.id === 'a' }), { ok: false, reason: 'ui.merge_living_node_convert' });
+  assert.deepEqual(check(['root', 'a'], { livingNode: n => n.id === 'root' }), { ok: false, reason: 'ui.merge_living_node_convert' });
+  assert.equal(check(['a', 'b'], { livingNode: () => false }).ok, true);
+});

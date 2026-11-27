@@ -20,6 +20,24 @@ test('frontmatter patch preserves CRLF, unrelated lines, body and the facade con
   assert.equal(frontmatter.setFrontmatterKeys('# No frontmatter', { remove: null }), '# No frontmatter');
 });
 
+test('frontmatter patch distinguishes an explicit empty list from a removed key', () => {
+  const input = '---\r\nkeep: "value"\r\nlist:\r\n  - "old"\r\n---\r\n# Title\r\n';
+  const updated = frontmatter.setFrontmatterKeys(input, { list: [] });
+  assert.equal(updated, '---\r\nkeep: "value"\r\nlist: []\r\n---\r\n# Title\r\n');
+  assert.deepEqual(JSON.parse(JSON.stringify(frontmatter.frontmatter(updated).list)), []);
+  const removed = frontmatter.setFrontmatterKeys(updated, { list: null });
+  assert.equal(frontmatter.frontmatter(removed).list, undefined);
+  assert.equal(removed, '---\r\nkeep: "value"\r\n---\r\n# Title\r\n');
+});
+
+test('frontmatter patch replaces quoted keys without adding duplicates or dropping unrelated keys', () => {
+  const input = '---\n"ai-card": false\n\'living-node-refs\' :\n  - "old"\n"unrelated": keep\n---\n# Title\n';
+  const updated = frontmatter.setFrontmatterKeys(input, { 'ai-card': true, 'living-node-refs': [] });
+  assert.equal(updated, '---\nai-card: true\nliving-node-refs: []\n"unrelated": keep\n---\n# Title\n');
+  const removed = frontmatter.setFrontmatterKeys(input, { 'living-node-refs': null });
+  assert.equal(removed, '---\n"ai-card": false\n"unrelated": keep\n---\n# Title\n');
+});
+
 test('map content preserves unrelated text and orders coordinates independently of viewport', () => {
   const map = { title: 'New title', nodes: [{ id: 'b', x: 2, y: 3 }, { id: 'a', x: 1, y: 4 }], viewport: { x: 20 } };
   const source = '---\nowner: keep\n---\n# Old title\n\n```agent-map\n{}\n```\n\nUser text\n';

@@ -98,9 +98,10 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 12, 'no new drawEdges call sites');
   // 23 before the subtree chain; it checks the AI lock before each step (one more call site, same guard, no new AI entry).
   // The two goal-suggest guards (show filter, stale check) moved to goal-suggest.ts behind the lockedParent port: 24 - 2 + 1.
-  // Prompt run-all (runPromptItem) checks the AI lock before each topic's write: 23 + 1 = 24, same guard, no new AI entry.
-  // The AI card window (openAiCardPopover) checks the lock before it edits an existing card's Prompt: 24 + 1 = 25.
-  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 25);
+  // Living Node replaces runPromptItem with the guarded formal/trial runtime. Retain the editor guard and assert the new write boundary separately.
+  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 24);
+  const runtime = fs.readFileSync(path.join(root, 'experiences/visual-map/living-node-markdown.ts'), 'utf8');
+  assert.match(runtime, /!readAiCard\(fm\)\s*\|\|\s*readAiLocked\(fm\)/);
   const goalSuggest = fs.readFileSync(path.join(root, 'experiences/visual-map/goal-suggest.ts'), 'utf8');
   assert.equal(goalSuggest.split('\n').filter(line => line.includes('this.ports.lockedParent(')).length, 2);
 });

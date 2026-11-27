@@ -219,6 +219,8 @@ export class MapChatConversation {
         return t("ui.map_chat_plan_reason_auto_apply_confirm");
       case "book_plan_edit":
         return t("ui.map_chat_plan_reason_book_plan_edit");
+      case "living_node_confirm":
+        return t("ui.living_node_chat_plan_confirm");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -293,7 +295,9 @@ export class MapChatConversation {
       ...(noApply ? { noApply: true } : {}),
       ...(diff ? { diff, applyLabel: t("ui.map_chat_book_apply"), cancelLabel: t("ui.map_chat_book_cancel") } : {}),
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
-      ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
+      ...(plan.reasons.some(
+        reason => reason === "image_preview" || reason === "image_other_actions" || reason === "living_node_confirm"
+      )
         ? { openGroups: true }
         : {}),
       reasons: plan.reasons.map(reason =>

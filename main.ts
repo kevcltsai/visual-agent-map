@@ -8,6 +8,7 @@ import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
+import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
@@ -89,7 +90,8 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { TOPIC_KINDS } from "./note-values";
+import { TOPIC_KINDS, readAiCard } from "./note-values";
+import { frontmatter } from "./core/repository-frontmatter";
 import { kindIconId, kindIconSvg } from "./experiences/visual-map/topic-kind-shape";
 import {
   NoteStyleStore,
@@ -318,7 +320,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       return { title: note.title, summary: note.summary };
     },
     updateNote: async (path, patch) => {
-      await this.repo.updateNote(path, patch);
+      await this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true });
     },
     askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
     runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
@@ -355,6 +357,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
   private readonly bookNoteWriter = createNoteWriter({
     openViews: path => this.openMarkdownViews(path),
+    canWrite: content => !readAiCard(frontmatter(content)),
     rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     rerender: path =>
       rerenderReadingViewsWhenLoaded(
@@ -748,8 +751,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     readCard: path => this.readBookCard(path),
     writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
     writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
-    updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
-    updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
+    updateNoteGuarded: (path, patch, options) =>
+      this.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
+    updateNoteRawGuarded: (path, transform, options) =>
+      this.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
     editBookStructure: (mapPath, work) =>
       createBookStructurePort({ repo: this.repo, rebuildDerivedData: () => this.rebuildDerivedData() })(mapPath, work),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
@@ -1359,6 +1364,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.ready = initialize;
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
+    this.registerView(LIVING_READER_VIEW, leaf => new LivingReaderView(leaf));
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>
@@ -2650,8 +2656,23 @@ export default class VisualAgentMapPlugin extends Plugin {
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();
   }
-  openDetails(file: TFile): Promise<void> {
-    return this.nodeDetailsSidebar.openDetails(file);
+  showLivingTrial(
+    file: TFile,
+    markdown: string,
+    owner: string,
+    isCurrent: () => boolean,
+    warnings: readonly string[] = []
+  ): Promise<boolean> {
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings);
+  }
+  invalidateLivingTrial(owner: string): void {
+    this.nodeDetailsSidebar.invalidateLivingTrial(owner);
+  }
+  restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
+    return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release);
+  }
+  openDetails(file: TFile, owner?: string): Promise<void> {
+    return this.nodeDetailsSidebar.openDetails(file, owner);
   } /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
   isNoteTaskBusy(path: string): boolean {
     if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;

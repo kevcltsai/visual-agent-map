@@ -64,7 +64,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "read_md_file",
   "edit_book_plan",
   "edit_book_thread",
-  "place_image"
+  "place_image",
+  "configure_ai_card"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 /** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */
@@ -88,7 +89,9 @@ export const MAP_RUN_ACTIONS = [
   "synthesize",
   "rate_by_goal",
   "merge",
-  "find_images"
+  "find_images",
+  "run_living_card",
+  "run_living_all"
 ] as const;
 export type MapRunAction = (typeof MAP_RUN_ACTIONS)[number];
 /** Research modes a reply may name; "" (not named) is read as the map's remembered mode by the view. */
@@ -122,11 +125,14 @@ export type MapChatAction =
       parentId: string;
       title: string;
       summary: string;
+      /** New AI card, configured before the card becomes visible; empty/absent means ordinary. */
+      livingPrompt?: string;
       ref?: string;
       topicKind?: TopicKind;
       leaning?: HypothesisLeaning;
       strength?: HypothesisStrength;
     }
+  | { kind: "configure_ai_card"; nodeId: string; content: string }
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
@@ -660,6 +666,12 @@ export function parseMapChat(
       };
       switch (kind as MapChatActionKind) {
         case "add_child": {
+          const livingPrompt = text("content", false);
+          if (
+            livingPrompt &&
+            (context.bookPlan || context.aim || livingPrompt.length > 8_000 || text("summary", false))
+          )
+            throw new Dropped("bad_value");
           if (book) {
             // Under a chapter or the book (an existing card); a `new:` parent is not possible here. `note` is the reason.
             const parentId = node("parentId");
@@ -694,6 +706,7 @@ export function parseMapChat(
             parentId,
             title,
             summary: linkSources(text("summary", false), context.sourcePaths),
+            ...(livingPrompt ? { livingPrompt } : {}),
             ...(ref ? { ref } : {}),
             ...(keepType ? { topicKind: typed as TopicKind } : {}),
             ...(keepType && lean ? { leaning: lean } : {}),
@@ -702,6 +715,28 @@ export function parseMapChat(
           if (ref) {
             refs.add(ref);
             parents[`${MAP_CHAT_NEW_PREFIX}${ref}`] = parentId || null;
+          }
+          break;
+        }
+        case "configure_ai_card": {
+          if (context.bookPlan || context.aim) throw new Dropped("bad_value");
+          const content = text("content");
+          if (content.length > 8_000) throw new Dropped("bad_value");
+          const nodeId = node("nodeId", true);
+          if (nodeId.startsWith(MAP_CHAT_NEW_PREFIX)) {
+            // Compatibility with the previous protocol's adjacent two-action creation.
+            // Fold it before confirmation, never publish an ordinary card then configure it.
+            const previous = actions[actions.length - 1];
+            if (
+              previous?.kind !== "add_child" ||
+              previous.ref !== nodeId.slice(MAP_CHAT_NEW_PREFIX.length) ||
+              previous.livingPrompt ||
+              previous.summary
+            )
+              throw new Dropped("bad_ref");
+            previous.livingPrompt = content;
+          } else {
+            actions.push({ kind: "configure_ai_card", nodeId, content });
           }
           break;
         }
@@ -829,6 +864,10 @@ export function parseMapChat(
           const action = text("action");
           if (!(MAP_RUN_ACTIONS as readonly string[]).includes(action)) throw new Dropped("bad_value");
           const nodeIds = list("nodeIds");
+          if (action === "run_living_card" && !nodeIds.length) throw new Dropped("missing_field");
+          if (action === "run_living_all" && nodeIds.length) throw new Dropped("bad_value");
+          if ((action === "run_living_card" || action === "run_living_all") && (context.bookPlan || context.aim))
+            throw new Dropped("bad_value");
           const title = text("title", false),
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");

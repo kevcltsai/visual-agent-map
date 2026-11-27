@@ -52,6 +52,15 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
+import {
+  hasLivingCommitMetadata,
+  livingConfigurationStamp,
+  rebaseLivingNoteReferences,
+  remapLivingCopyCardReferences,
+  resetLivingCopyDiagnostics,
+  splitLivingNodeRegion
+} from "./core/living-node-region";
+import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
@@ -757,7 +766,48 @@ export class Repository {
       links = readTopicLinks(fm),
       color = readTopicColor(fm),
       style = readTopicStyle(fm);
+    let livingNode: Note["livingNode"];
+    if (
+      readAiCard(fm) ||
+      fm["living-node-region-hash"] !== undefined ||
+      fm["living-node-ownership"] !== undefined ||
+      hasLivingCommitMetadata(fm)
+    ) {
+      let knowledgeRevision = "empty";
+      let summary = "";
+      let damaged = false;
+      let shareMarkdown = "";
+      try {
+        const knowledge = readLivingMarkdown(raw);
+        shareMarkdown = renderLivingShareKnowledge(knowledge);
+        knowledgeRevision = knowledge.revision;
+        summary =
+          knowledge.output.text
+            .split(/\r?\n/)
+            .find(line => line.trim())
+            ?.trim()
+            .slice(0, 180) ?? "";
+      } catch {
+        damaged = true;
+      }
+      const value = fm["living-node-outcome"];
+      const outcome =
+        value === "ok" || value === "failed" || value === "blocked" || value === "cancelled" ? value : "never";
+      livingNode = {
+        summary,
+        shareMarkdown,
+        configRevision: livingConfigurationStamp(section(content, "Prompt"), fm),
+        knowledgeRevision,
+        successfulKnowledgeRevision: text(fm["living-node-success-knowledge"]) || undefined,
+        lastAttempt: text(fm["living-node-last-attempt"]) || undefined,
+        lastSuccessfulCheck: text(fm["living-node-last-successful-check"]) || undefined,
+        lastContentChange: text(fm["living-node-last-content-change"]) || undefined,
+        outcome,
+        damaged
+      };
+    }
     return {
+      ...(livingNode ? { livingNode } : {}),
       title: noteTitle(content, fm, file.basename),
       summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
       prompt: section(content, "Prompt"),
@@ -849,18 +899,22 @@ export class Repository {
       detailTemplate?: DetailTemplate;
       newVisualReferences?: boolean;
       expectedContent?: string;
+      /** Unintegrated AI writer: refuse even a flag-only card, using the actual bytes at commit. */
+      rejectAiCard?: boolean;
       /** Gets the file text the callback was given (so a check can look at the text as it is now, not as the caller last read it). */
       authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize, finalize, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))) {
         outcome = "discarded";
         return content;
       }
+      if ((rejectAiCard || writeOptions.newVisualReferences) && readAiCard(frontmatter(content)))
+        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
       const next = this.patchedNote(path, content, patch, writeOptions);
       const final = finalize ? finalize(next) : next;
       if (final === null) {
@@ -880,15 +934,17 @@ export class Repository {
   async updateNoteRawGuarded(
     path: string,
     transform: (content: string) => string,
-    options: { expectedContent?: string; authorize?: () => boolean } = {}
+    options: { expectedContent?: string; authorize?: () => boolean; rejectAiCard?: boolean } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize } = options;
+    const { expectedContent, authorize, rejectAiCard } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
         outcome = "discarded";
         return content;
       }
+      if (rejectAiCard && readAiCard(frontmatter(content)))
+        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
       return transform(content);
     });
     return outcome;
@@ -959,7 +1015,8 @@ export class Repository {
     if (patch.sourcePaths !== undefined)
       patch.sourcePaths.length ? (fm["source-notes"] = patch.sourcePaths) : delete fm["source-notes"];
     fm.updated = new Date().toISOString();
-    let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    const separated = splitLivingNodeRegion(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    let body = decodeCalloutSections(separated.body);
     // AIM notes carry their content language; every other note keeps following the interface language.
     const textLanguage = options.contentLanguage ?? noteContentLanguage(fm) ?? language;
     if (options.contentLanguage !== undefined && noteContentLanguage(fm) === undefined)
@@ -1027,7 +1084,11 @@ export class Repository {
       isBookCardFrontmatter(fm)
     );
     // Headings stay in the language the note was written in: a language switch never relabels an existing note.
-    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
+    const rendered = localizeHeadings(
+      withReferenceLinks(body, fm, language),
+      writtenHeadingSet(content, this.headingsFor(textLanguage))
+    );
+    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}\n` : ""}`;
   }
 
   async createNote(
@@ -1123,6 +1184,13 @@ export class Repository {
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
+    if (
+      readAiCard(metadata) ||
+      metadata["living-node-region-hash"] !== undefined ||
+      metadata["living-node-ownership"] !== undefined ||
+      hasLivingCommitMetadata(metadata)
+    )
+      resetLivingCopyDiagnostics(metadata);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle
       ? sourceTitle
@@ -1140,8 +1208,8 @@ export class Repository {
 
   /**
    * Rewrites the body links of notes just copied for "Copy to…": each link is read from the source note's place and
-   * written for the copy's place, following the copies of this run. Only the copies (`to`) are written, and only when
-   * their body changes; the sources and the frontmatter are never touched.
+   * written for the copy's place, following the copies of this run. Only copies are written.
+   * Living Node record bytes and ownership hashes are preserved; persisted card references are remapped separately.
    */
   async rewriteCopiedNoteLinks(
     pairs: Array<{ from: string; to: string }>
@@ -1151,17 +1219,57 @@ export class Repository {
         linkPath ? this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath)?.path : undefined,
       unverified: string[] = [];
     let rewritten = 0;
+    const copiedIds = new Map<string, string>();
+    const identities = new Map<string, { sourceMap: string; destinationMap: string; content: string }>();
     for (const { from, to } of pairs) {
-      const file = this.file(to),
-        { body } = splitFrontmatter(await this.app.vault.read(file)),
-        result = rewriteCopiedLinks(body, { sourcePath: from, newPath: to, copies, resolve });
-      rewritten += result.rewritten;
-      unverified.push(...result.unverified);
-      if (result.text === body) continue;
-      // The copy was created a moment ago by this run; rewrite it only if its body is still the one read above.
+      const source = frontmatter(await this.app.vault.read(this.file(from)));
+      const content = await this.app.vault.read(this.file(to));
+      const target = frontmatter(content);
+      const sourceMap = text(source["agent-map-id"], text(source["topic-id"]));
+      const destinationMap = text(target["agent-map-id"], text(target["topic-id"]));
+      const sourceId = text(source["node-id"]);
+      const targetId = text(target["node-id"]);
+      if (sourceMap && sourceId && targetId) {
+        const key = JSON.stringify([sourceMap, sourceId]);
+        if (copiedIds.has(key)) throw new Error("ambiguous-copied-card-identity");
+        copiedIds.set(key, targetId);
+      }
+      identities.set(to, { sourceMap, destinationMap, content });
+    }
+    for (const { from, to } of pairs) {
+      const file = this.file(to);
+      const identity = identities.get(to)!;
+      const { body, head } = splitFrontmatter(identity.content);
+      const region = splitLivingNodeRegion(body).region;
+      const rewrite = (part: string) => rewriteCopiedLinks(part, { sourcePath: from, newPath: to, copies, resolve });
+      const at = region ? body.indexOf(region) : body.length;
+      const before = rewrite(body.slice(0, at));
+      const after = rewrite(body.slice(at + region.length));
+      rewritten += before.rewritten + after.rewritten;
+      unverified.push(...before.unverified, ...after.unverified);
+      let next = head + before.text + region + after.text;
+      const refs = frontmatter(identity.content)["living-node-refs"];
+      if (Array.isArray(refs) && refs.every(value => typeof value === "string")) {
+        const remapped = remapLivingCopyCardReferences(refs, identity.sourceMap, identity.destinationMap, copiedIds);
+        // Resolve persisted external note references from the original path, not from the new card.
+        const updated = remapped.map(ref => {
+          if (!ref.startsWith("note:")) return ref;
+          const sourcePath = resolve(ref.slice(5), from);
+          if (!sourcePath) return "card:foreign:" + JSON.stringify([identity.sourceMap, ref]);
+          const targetPath = copies.get(sourcePath) ?? sourcePath;
+          return resolve(targetPath, to) === targetPath
+            ? "note:" + targetPath
+            : "card:foreign:" + JSON.stringify([identity.sourceMap, ref]);
+        });
+        if (JSON.stringify(updated) !== JSON.stringify(refs))
+          next = setFrontmatterKeys(next, { "living-node-refs": updated });
+      }
+      if (next === identity.content) continue;
+      // A change to a freshly created copy is a conflict, not permission to
+      // attach a new card whose stored identities still point to the originals.
       await this.app.vault.process(file, content => {
-        const current = splitFrontmatter(content);
-        return current.body === body ? current.head + result.text : content;
+        if (content !== identity.content) throw new Error("changed-copied-note");
+        return next;
       });
     }
     return { rewritten, unverified };
@@ -1348,9 +1456,7 @@ export class Repository {
    */
   async writeAiCard(path: string, on: boolean): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
-      readAiCard(frontmatter(content)) === on && (on || readAiUpdateMode(frontmatter(content)) === undefined)
-        ? content
-        : setFrontmatterKeys(content, on ? { "ai-card": true } : { "ai-card": null, "ai-update-mode": null })
+      readAiCard(frontmatter(content)) === on ? content : setFrontmatterKeys(content, { "ai-card": on ? true : null })
     );
   }
 
@@ -1976,6 +2082,7 @@ export class Repository {
    */
   async replaceSourcePaths(pairs: readonly RenamePair[]): Promise<void> {
     if (!pairs.some(([from, to]) => from !== to)) return;
+    const rebase = chainRebase(pairs);
     const failures: unknown[] = [];
     for (const file of await this.markedFiles("agent-map-node")) {
       try {
@@ -1983,14 +2090,19 @@ export class Repository {
         const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (
           cached &&
-          ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs))
+          ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)) &&
+          !rebaseLivingNoteReferences(cached["living-node-refs"], rebase)
         )
           continue;
-        const note = await this.readNoteIfManaged(file);
-        if (!note) continue;
+        const raw = await this.app.vault.read(file);
+        const metadata = frontmatter(raw);
+        if (!marker(metadata["agent-map-node"])) continue;
+        const note = await this.parseNote(file.path, raw);
         const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
         const sourcePaths = rebasePathList(note.sourcePaths, pairs);
-        if (!referencePaths && !sourcePaths) continue;
+        // The Living Node reference list is separate from the legacy citation lists.
+        const livingRefs = rebaseLivingNoteReferences(metadata["living-node-refs"], rebase);
+        if (!referencePaths && !sourcePaths && !livingRefs) continue;
         await this.app.vault.process(file, content => {
           const fm = frontmatter(content);
           if (!marker(fm["agent-map-node"])) return content;
@@ -2002,13 +2114,21 @@ export class Repository {
           };
           const references = rebasePathList(paths("reference-materials"), pairs);
           const sources = rebasePathList(paths("source-notes"), pairs);
-          if (!references && !sources) return content;
-          return this.patchedNote(
-            file.path,
-            content,
-            { ...(references ? { referencePaths: references } : {}), ...(sources ? { sourcePaths: sources } : {}) },
-            {}
-          );
+          const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
+          if (!references && !sources && !living) return content;
+          const next =
+            references || sources
+              ? this.patchedNote(
+                  file.path,
+                  content,
+                  {
+                    ...(references ? { referencePaths: references } : {}),
+                    ...(sources ? { sourcePaths: sources } : {})
+                  },
+                  {}
+                )
+              : content;
+          return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
         });
       } catch (error) {
         // One unreadable or unwritable note must not prevent later candidates from following the rename.
@@ -2043,8 +2163,10 @@ export class Repository {
       const patch: NotePatch = {};
       if (references.some(path => rebase(path) !== path)) patch.referencePaths = references.map(rebase);
       if (sources.some(path => rebase(path) !== path)) patch.sourcePaths = sources.map(rebase);
-      if (!Object.keys(patch).length) return content;
-      const text = this.patchedNote(file.path, content, patch, {});
+      const living = rebaseLivingNoteReferences(fm["living-node-refs"], rebase);
+      if (!Object.keys(patch).length && !living) return content;
+      const next = Object.keys(patch).length ? this.patchedNote(file.path, content, patch, {}) : content;
+      const text = living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
       recordPrior(content, text);
       return text;
     });

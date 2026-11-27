@@ -68,6 +68,29 @@ test('writer: a refused file write with no view to retry on stays refused', asyn
   assert.equal(await write('p', upper), 'refused');
 });
 
+test('writer: protected bytes are refused before transform in the open editor, file and editor-retry paths', async () => {
+  const protectedText = 'ai-card: true\nOwner text';
+  const canWrite = text => !text.includes('ai-card: true');
+  let transformed = 0;
+  const transform = text => { transformed++; return text.toUpperCase(); };
+  const log = [];
+  let file = protectedText;
+  const open = b.createNoteWriter({ canWrite, openViews: () => [view(protectedText, log)], rawGuarded: async () => { throw Error('unexpected file write'); } });
+  assert.equal(await open('p', transform), 'refused');
+  const closed = b.createNoteWriter({ canWrite, openViews: () => [], rawGuarded: async (_, fn, o) => { if (!o.authorize()) return 'discarded'; file = fn(file); return 'written'; } });
+  assert.equal(await closed('p', transform), 'refused');
+  assert.equal(file, protectedText);
+  let opened = false;
+  const retry = b.createNoteWriter({ canWrite, openViews: () => opened ? [view(protectedText, log)] : [], rawGuarded: async (_, fn, o) => { opened = true; return o.authorize() ? 'written' : 'discarded'; } });
+  assert.equal(await retry('p', transform), 'refused');
+  assert.equal(transformed, 0);
+  assert.deepEqual(log, []);
+  file = 'ordinary';
+  assert.equal(await closed('p', transform), 'written');
+  assert.equal(file, 'ORDINARY');
+  assert.equal(transformed, 1);
+});
+
 // ---- the aligner ----
 const want = (over = {}) => ({ runId: 'r1', nodeId: 'n1', ...over });
 const box = (fp = 'fp1') => ({ fp, build: () => legacy.reviewCallout({ id: 'n1', index: 1, title: 'T', stage: 'needs-review', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false }, ['x'], undefined, fp, 'r1') });

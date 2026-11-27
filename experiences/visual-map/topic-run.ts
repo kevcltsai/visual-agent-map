@@ -5,6 +5,7 @@
  */
 import { isBudgetExhausted } from "../../core/admission";
 import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
+import { isAiCard } from "./prompt-run";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
@@ -892,6 +893,10 @@ export class TopicRuns {
     };
     const repo = this.ports.repository()!;
     const note = await repo.readNote(path, options.map());
+    if (isAiCard(note)) {
+      fail(t("ui.living_node_use_run_card"));
+      return;
+    }
     // AI lock: a locked topic is refused before anything is written or any AI call is made.
     if (note.aiLocked) {
       fail(t("ui.ai_locked_notice"));
@@ -971,6 +976,7 @@ export class TopicRuns {
             : { note: await repo.readNote(path, options.map()), content: undefined };
           // The late-result fence: a topic locked while the AI ran gets nothing (its status is already back).
           if (latest.aiLocked) throw aiLockedError();
+          if (isAiCard(latest)) throw new Error(t("ui.living_node_use_run_card"));
           if (latest.status !== note.status || noteSnapshot(latest) !== snapshot) throw changed();
           const mode: WritebackMode = prepared.updateMode ?? "merge";
           const noteLanguage = noteLanguageOf(outputLanguage);
@@ -1382,6 +1388,12 @@ export class TopicRuns {
       return null;
     }
     const { note, used, context, styleLabel } = prelude;
+    if (isAiCard(note)) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.living_node_use_run_card"));
+      else options.notify?.(t("ui.living_node_use_run_card"));
+      return null;
+    }
     // AI lock: a locked topic is refused before anything is written or any AI call is made.
     if (note.aiLocked) {
       handle.release();
@@ -1499,7 +1511,7 @@ export class TopicRuns {
             JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
           // The late-result fence: a topic locked while the AI ran gets nothing but its status back.
           const locked = latest.aiLocked === true;
-          if (controller.signal.aborted || stale || locked) {
+          if (controller.signal.aborted || stale || locked || isAiCard(latest)) {
             await this.settleRunning(repo, path, { status: note.status });
             if (exchangeId)
               exchanges()?.failed(
@@ -1507,6 +1519,7 @@ export class TopicRuns {
                 t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
               );
             if (locked) fail(t("ui.ai_locked_notice"));
+            else if (isAiCard(latest)) fail(t("ui.living_node_use_run_card"));
             else if (stale) {
               options.pipeline?.onDiscarded?.();
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));

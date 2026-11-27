@@ -41,6 +41,7 @@ const base = { mapTitle: "測試地圖", selected: [], references: [], snippets:
 const kase = (id, group, title, source, covers, input, checks, review) => ({ id, group, title, source, covers, input: { ...base, language: "zh-TW", ...input }, checks, ...(review ? { review } : {}) });
 
 const CASES = [
+  kase("LN4", "研究", "明確修改已設定的 AI 卡", "Living Node: configure without implicit execution", ["configure_ai_card"], { message: "把這張 AI 卡的研究問題改成每週比較價格", outline: COFFEE, selected: [ref("h", "手沖", { livingPrompt: "每日比較價格" })] }, [C.noRejected(), C.hasAction("configure_ai_card", a => a.nodeId === "h" && /每週/.test(a.content), "explicit config"), C.noKinds(["run_map_action", "update_summary", "edit_topic_note"])]),
   // ---- A. questions: no action ----
   kase("A1", "發問", "問還缺什麼", "prompt: 只是發問時 actions 回傳空清單", [], { message: "這張地圖還缺什麼？", outline: STEAK }, [...Q, C.replyMentionsMap()]),
   kase("A2", "發問", "問選取卡內容", "prompt: 只是發問時 actions 空", [], { message: "這張卡在講什麼？", outline: STEAK, selected: [ref("a", "部位", { detail: "牛排依部位分為肋眼、菲力、紐約客，口感與油花不同。" })] }, [...Q, C.replyMentionsMap()]),
@@ -240,6 +241,22 @@ const CASES = [
         prompts: { c1: { path: "Maps/Notes/c1.md", prompt: "p1", kind: "chapter", title: "認識部位", summary: "s1" }, c2: { path: "Maps/Notes/c2.md", prompt: "p2", kind: "chapter", title: "煎與烤", summary: "s2" } } } },
     [C.noRejected(), C.hasKind("edit_book_structure", 1, 1), C.noKinds(["reorder_topics"])])
 ];
+
+// Living Node uses the same chat parser and confirmation path; these are semantic
+// fixtures, not evidence that a live provider has passed them.
+CASES.push(
+  kase("LN1", "研究", "新建 AI 卡但不執行", "Living Node V1 A02", ["add_child"],
+    { message: "新增一張 AI 卡片追蹤每日新聞，不要執行", outline: [] },
+    [C.noRejected(), C.hasKind("add_child", 1, 1),
+      C.hasAction("add_child", a => /新聞/.test(a.livingPrompt ?? ""), "atomic creation carries the saved prompt"),
+      C.noKinds(["configure_ai_card", "run_map_action"])]),
+  kase("LN2", "研究", "正式執行指定 AI 卡", "Living Node V1 A02", ["run_map_action"],
+    { message: "執行 AI 卡『新聞』，不要改 Prompt", outline: tree([["n", "新聞", null, "", { aiCard: true }]]) },
+    [C.noRejected(), C.runAction("run_living_card"), C.hasAction("run_map_action", a => a.nodeIds.length === 1 && a.nodeIds[0] === "n", "exact target"), C.noKinds(["configure_ai_card", "edit_topic_note", "update_summary"])]),
+  kase("LN3", "研究", "執行全部 AI 卡", "Living Node V1 A02", ["run_map_action"],
+    { message: "執行全部 AI 卡", outline: tree([["n", "新聞", null, "", { aiCard: true }], ["p", "價格", null, "", { aiCard: true }], ["o", "普通卡", null]]) },
+    [C.noRejected(), C.runAction("run_living_all"), C.hasAction("run_map_action", a => a.nodeIds.length === 0, "all eligible cards"), C.noKinds(["configure_ai_card", "edit_topic_note"])])
+);
 
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";
 for (const id of ["A1", "A2", "A3", "A4"]) CASES.find(k => k.id === id).weak = WEAK;

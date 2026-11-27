@@ -195,6 +195,7 @@ async function harness(spec, { confirm = true } = {}) {
     repo, settings: { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', cliReasoning: 'low' }, running: new Set(), logs: { appendLog() {} },
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, relevanceGrades: new Map(), expansionBatches: new Map(),
     recordFailure: (_l, e) => String(e?.message ?? e), views: () => [], mutate: async work => work(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    openDetails: async () => {}, invalidateLivingTrial() {}, restoreLivingOfficial: async () => {}, showLivingTrial: async () => {},
     confirmAiUsage: async (model, run) => { usage.push(model); if (!confirm) return false; await run(); return true; },
     askModel: async (_c, _m, _r, signal, _x, accepted) => {
       accepted?.();
@@ -218,28 +219,28 @@ async function harness(spec, { confirm = true } = {}) {
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   await hydrate();
-  // The two AI paths are stubbed: they count calls and write the summary the way the real ones do.
+  // Exercise the production execution path through the real Repository. Only the provider transport is stubbed.
   const plan = { fail: new Set(), hang: new Set() };
-  const gateFor = async (key, signal) => {
-    if (!plan.hang.has(key)) return;
-    await new Promise(resolve => { signal.addEventListener('abort', resolve); });
-  };
-  const keyOf = node => spec.find(([k]) => byKey.get(k).id === node.id)[0];
-  view.researchChild = async (node, signal, accepted, choices, charts, _r, _g, languageSource) => {
-    const key = keyOf(node);
-    calls.push({ kind: 'research', key, choices, charts });
-    await gateFor(key, signal);
-    if (signal.aborted) return;
-    if (plan.fail.has(key)) throw new Error(`research failed: ${key}`);
-    await repo.updateNote(node.path, { summary: `R:${key}`, detail: `D:${key}` });
-  };
-  view.integrateChildren = async (node, options, direction, drafted, failed) => {
-    const key = keyOf(node);
-    calls.push({ kind: 'integrate', key, options, direction });
-    await gateFor(key, options.signal);
-    if (options.signal.aborted) return;
-    if (plan.fail.has(key)) { failed(`integrate failed: ${key}`); return; }
-    await drafted({}, async (summary, detail) => { await repo.updateNote(node.path, { summary, detail }); }, `I:${key}`, `ID:${key}`);
+  view.readMapSourceGroups = async () => [];
+  host.aiCalls = { run: async (prepared, options, finish) => {
+    const input = prepared.input;
+    const key = JSON.parse(input.context).documents[0].title;
+    calls.push({ key, input, options });
+    if (plan.hang.has(key)) await new Promise(resolve => options.signal.addEventListener('abort', resolve, { once: true }));
+    if (options.signal.aborted) throw new Error('stopped');
+    if (plan.fail.has(key)) throw new Error('provider failed: ' + key);
+    const text = 'Result: ' + key;
+    const operations = input.base.output.text === text ? [] : [{ kind: 'output', text, evidence: [] }];
+    return finish(JSON.stringify({ baseRevision: input.base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} });
+  } };
+  const { inspectLivingValidity } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian });
+  view.hydrate = async () => {
+    await hydrate();
+    view.livingValidity = await inspectLivingValidity({
+      app, repo, calls: host.aiCalls, mapPath: MAP, viewSession: 'test-validity',
+      signal: new AbortController().signal, current: () => true,
+      language: () => 'English', mapSources: async () => []
+    });
   };
   const raw = key => contents.get(byKey.get(key).path);
   const node = key => byKey.get(key);
@@ -251,7 +252,7 @@ async function harness(spec, { confirm = true } = {}) {
 
 // root -> mid -> leaf1, leaf2 ; root -> side
 const TREE = [['root', null], ['mid', 'root'], ['leaf1', 'mid'], ['leaf2', 'mid'], ['side', 'root']];
-const stamp = (h, key) => ({ at: h.raw(key).match(/^ai-run-at: "(.*)"$/m)?.[1], result: h.raw(key).match(/^ai-run-result: "(.*)"$/m)?.[1], input: h.raw(key).match(/^ai-run-input: "(.*)"$/m)?.[1] });
+const stamp = (h, key) => ({ at: h.raw(key).match(/^living-node-last-attempt: "(.*)"$/m)?.[1], result: h.raw(key).match(/^living-node-outcome: "(.*)"$/m)?.[1], input: h.raw(key).match(/^living-node-input-revision: "(.*)"$/m)?.[1] });
 const updatedOf = h => key => h.raw(key).match(/^updated:.*$/m)?.[0]; // the stub's own summary write bumps it; the records must not (see the keys test)
 
 test('keys: `ai-card` / `ai-run-*` / `ai-update-mode` readers accept only valid values; `reuse-last-result` is not read', () => {
@@ -278,8 +279,8 @@ test('keys: writers add and remove their keys, `updated` unchanged, byte round t
   assert.equal(h.raw('A'), on, 'already on: byte for byte');
   await h.repo.writeAiUpdateMode(h.node('A').path, 'fresh');
   await h.repo.writeAiCard(h.node('A').path, false);
-  assert.doesNotMatch(h.raw('A'), /ai-update-mode/, 'a card that stops being an AI card loses ai-update-mode');
-  assert.equal(h.raw('A'), before);
+  assert.match(h.raw('A'), /ai-update-mode: "fresh"/, 'legacy mode survives conversion without controlling new execution');
+  assert.equal(h.raw('A').replace(/^ai-update-mode: "fresh"\n/m, ''), before);
   await h.repo.writeAiUpdateMode(h.node('A').path, 'fresh');
   assert.match(h.raw('A'), /^ai-update-mode: "fresh"$/m);
   assert.equal((await h.repo.readNote(h.node('A').path)).aiUpdateMode, 'fresh');
@@ -301,177 +302,140 @@ test('keys: writers add and remove their keys, `updated` unchanged, byte round t
 });
 
 // ---- run all ----------------------------------------------------------------------------------------------------------
-test('run all: no confirmation card; the usage notice, then leaves to root, one AI call each, no charts; leaves go on the web, "keep old data" is top', async () => {
+test('Run All: one call per unlocked AI card, dependency order, optional web on every card', async () => {
   const h = await harness(TREE);
-  await h.runAll();
-  await h.done();
-  assert.equal(h.modals.length, 0, 'no confirmation card');
-  assert.ok(h.usage.length >= 1, 'the usage notice was asked');
-  eq(h.calls.map(c => `${c.kind}:${c.key}`), ['research:leaf1', 'research:leaf2', 'integrate:mid', 'research:side', 'integrate:root']);
-  assert.equal(h.calls[0].charts, false, 'research charts off');
-  assert.equal(h.calls[0].choices.researchMode, 'research', 'a leaf always searches the web');
-  assert.equal(h.calls[0].choices.updateMode, 'top');
-  assert.equal(h.calls[2].options.skipCharts, true);
-  assert.equal(h.calls[2].options.synthesisContent, 'summary');
-  assert.equal(h.calls[2].options.researchMode, 'local', 'an integration does not search');
-  assert.equal(h.calls[2].options.updateMode, 'top');
-  assert.match(h.calls[2].direction, /^Prompt mid\n\n.*organise/s, 'the note Prompt then the default instruction');
+  await h.runAll(); await h.done();
+  assert.equal(h.modals.length, 0);
+  assert.ok(h.usage.length >= 1);
+  const keys = h.calls.map(c => c.key);
+  assert.equal(keys.length, 5);
+  assert.ok(keys.indexOf('leaf1') < keys.indexOf('mid'));
+  assert.ok(keys.indexOf('leaf2') < keys.indexOf('mid'));
+  assert.ok(keys.indexOf('side') < keys.indexOf('root'));
+  assert.ok(keys.indexOf('mid') < keys.indexOf('root'));
+  for (const call of h.calls) {
+    assert.equal(call.options.task.webSearchOnly, true);
+    assert.equal(call.options.task.optionalWebSearch, true);
+  }
   eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
-  for (const k of ['leaf1', 'leaf2', 'mid', 'root', 'side']) assert.equal(h.status(k), 'done', k);
-  assert.match(h.raw('root'), /I:root/);
+  for (const [key] of TREE) assert.equal(stamp(h, key).result, 'ok');
+  assert.match(h.raw('root'), /> Result: root/);
 });
 
-test('run all: `ai-update-mode: fresh` goes to the research and the integration as "fresh"', async () => {
+test('Run All: legacy fresh mode never deletes existing manual content', async () => {
   const h = await harness([['root', null, { fresh: true }], ['leaf', 'root', { fresh: true }]]);
+  await h.repo.updateNote(h.node('leaf').path, { detail: 'User-owned history' });
   await h.runAll(); await h.done();
-  assert.equal(h.calls[0].choices.updateMode, 'fresh');
-  assert.equal(h.calls[1].options.updateMode, 'fresh');
+  assert.match(h.raw('leaf'), /User-owned history/);
+  assert.equal(require('./support.cjs').obsidian.parseYaml(h.raw('leaf').match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])['ai-update-mode'], 'fresh');
+  assert.match(h.raw('leaf'), /Result: leaf/);
 });
 
-test('records: a success writes ai-run-at / result ok / input; the input follows the children as they were read at the start', async () => {
+test('Run Card: valid dependencies are reused; a forced target runs even if valid', async () => {
   const h = await harness(TREE);
   await h.runAll(); await h.done();
-  for (const [k] of TREE) { const s = stamp(h, k); assert.equal(s.result, 'ok', k); assert.match(s.at, /^\d{4}-\d\d-\d\dT/); assert.match(s.input, /^[0-9a-f]{8}$/); }
-  // The parent's input saw the summary its leaves had just written.
-  const note = await h.repo.readNote(h.node('mid').path);
-  const midKey = pr.promptInputKey({ prompt: 'Prompt mid', children: [{ id: h.node('leaf1').id, summary: 'R:leaf1' }, { id: h.node('leaf2').id, summary: 'R:leaf2' }], sources: [] });
-  assert.equal(note.aiRun.input, midKey);
+  const count = h.calls.length;
+  h.view.startPromptRun([h.node('root').id]);
+  await h.done();
+  assert.equal(h.calls.length, count + 1);
+  assert.equal(h.calls.at(-1).key, 'root');
+  assert.match(stamp(h, 'root').input, /^[0-9a-f]{64}$/);
 });
 
-test('records: a failed card gets failed, the cards it holds back get blocked with no AI call; neither changes the last input', async () => {
+test('failed upstream blocks dependent branches without altering their last success', async () => {
   const h = await harness(TREE);
   await h.runAll(); await h.done();
-  const input = stamp(h, 'mid').input;
-  const g = await harness(TREE);
-  g.plan.fail.add('leaf1');
-  await g.runAll(); await g.done();
-  eq(g.calls.map(c => c.key), ['leaf1', 'leaf2', 'side'], 'no call for mid or root');
-  assert.equal(stamp(g, 'leaf1').result, 'failed'); assert.equal(stamp(g, 'leaf1').input, undefined);
-  assert.equal(stamp(g, 'mid').result, 'blocked'); assert.equal(stamp(g, 'root').result, 'blocked');
-  assert.equal(stamp(g, 'mid').input, undefined, 'a blocked card that never ran has no input');
-  assert.equal(stamp(g, 'leaf2').result, 'ok');
-  assert.equal(g.raw('mid').includes('I:mid'), false, 'nothing written for the blocked parent');
-  // A card that had succeeded keeps its last input through a failed run.
+  const previous = stamp(h, 'mid').input;
+  const oldContent = h.raw('mid').slice(h.raw('mid').indexOf('<!-- vam-living-node:begin'));
   h.plan.fail.add('leaf1');
-  await h.hydrate();
-  h.view.promptBatch = null;
+  h.calls.length = 0;
   await h.runAll(); await h.done();
+  assert.equal(h.calls.some(c => c.key === 'mid' || c.key === 'root'), false);
   assert.equal(stamp(h, 'leaf1').result, 'failed');
   assert.equal(stamp(h, 'mid').result, 'blocked');
-  assert.equal(stamp(h, 'mid').input, input, 'the input of the last success stays');
+  assert.equal(stamp(h, 'root').result, 'blocked');
+  assert.equal(stamp(h, 'mid').input, previous);
+  assert.equal(h.raw('mid').slice(h.raw('mid').indexOf('<!-- vam-living-node:begin')), oldContent);
 });
 
-test('an integration that reports a failure (no throw) is a failed card, not a silent success', async () => {
-  const h = await harness(TREE);
-  h.plan.fail.add('mid');
-  await h.runAll(); await h.done();
-  assert.equal(h.status('mid'), 'blocked'); assert.match(h.view.promptRuns.get(MAP).get(h.node('mid').id).reason, /integrate failed: mid/);
-  assert.equal(h.status('root'), 'blocked');
-  assert.equal(stamp(h, 'mid').result, 'failed'); assert.equal(stamp(h, 'root').result, 'blocked');
-});
-
-test('counter-example: an ordinary card with only a Prompt is not run; an ordinary middle card stops the chain, its AI-card children still run', async () => {
+test('ordinary Prompt card is a read-only boundary; its AI child still runs independently', async () => {
   const h = await harness([['root', null], ['mid', 'root', { noAi: true }], ['leaf', 'mid'], ['side', 'root']]);
   h.plan.fail.add('leaf');
   await h.runAll(); await h.done();
-  eq(h.calls.map(c => `${c.kind}:${c.key}`), ['research:leaf', 'research:side', 'integrate:root']);
-  assert.equal(h.status('mid'), undefined);
-  assert.equal(h.status('root'), 'done', 'the ordinary card stops the chain: the failed leaf does not block root');
-  assert.equal(stamp(h, 'mid').result, undefined, 'no record on an ordinary card');
-  const g = await harness([['solo', null, { noAi: true }]]);
-  g.view.startPromptRun();
-  assert.equal(g.calls.length, 0); assert.equal(g.notices.length, 1, 'nothing to run: a notice');
+  assert.equal(h.calls.some(c => c.key === 'mid'), false);
+  assert.equal(stamp(h, 'root').result, 'ok');
+  assert.equal(stamp(h, 'mid').result, undefined);
 });
 
-test('counter-example: a locked AI card and its subtree are not run and have no record; the parent still runs over the summaries', async () => {
+test('locked empty dependency blocks parent but does not prune its unlocked descendants', async () => {
   const h = await harness([['root', null], ['l', 'root', { locked: true }], ['lc', 'l'], ['x', 'root']]);
   await h.runAll(); await h.done();
-  eq(h.calls.map(c => c.key), ['x', 'root']);
-  for (const k of ['l', 'lc']) { assert.equal(h.status(k), undefined); assert.equal(stamp(h, k).result, undefined); }
-  assert.equal(h.status('root'), 'done');
-  assert.equal(h.view.promptBatch.total, 2, 'N counts only what runs');
+  assert.deepEqual(h.calls.map(c => c.key).sort(), ['lc', 'x']);
+  assert.equal(stamp(h, 'l').result, undefined);
+  assert.equal(stamp(h, 'lc').result, 'ok');
+  assert.equal(stamp(h, 'root').result, 'blocked');
 });
 
-test('counter-example 5: AI already running on a card of the map, or a multi-select research: Notice, 0 calls, 0 writes', async () => {
+test('existing busy task refuses formal dispatch without writing', async () => {
   const h = await harness(TREE);
-  const gate = h.hold();
-  const handle = await startResearch(h.host, h.node('leaf1'), { map: h.view.map, request: { task: 'go', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] } });
-  assert.ok(handle && h.host.topicRuns.isBusy(h.node('leaf1').path));
+  h.host.running.add(h.node('leaf1').path);
   const before = TREE.map(([k]) => h.raw(k));
-  h.view.startPromptRun();
-  assert.equal(h.notices.length, 1);
-  await dom.tick(); await dom.tick();
+  await h.runAll(); await h.done();
   assert.equal(h.calls.length, 0);
-  assert.equal(h.view.promptBatch, null);
   eq(TREE.map(([k]) => h.raw(k)), before);
-  await until(() => gate.length === 1);
-  gate[0]();
-  await handle.finished;
   const g = await harness(TREE);
   g.host.expansionCoordinator.isRunning = () => true;
-  g.view.startPromptRun();
-  assert.equal(g.notices.length, 1);
+  await g.runAll(); await g.done();
+  assert.equal(g.calls.length, 0);
 });
 
-test('counter-example 8: refusing the usage notice runs nothing and leaves no state or record', async () => {
+test('refusing usage leaves all formal data unchanged', async () => {
   const h = await harness(TREE, { confirm: false });
   const before = TREE.map(([k]) => h.raw(k));
-  await h.runAll();
-  await dom.tick(); await dom.tick();
-  assert.ok(h.usage.length >= 1, 'the notice was asked');
+  await h.runAll(); await h.done();
+  assert.ok(h.usage.length >= 1);
   assert.equal(h.calls.length, 0);
-  assert.equal(h.view.promptBatch, null);
-  assert.equal(h.view.promptRuns.size, 0);
   eq(TREE.map(([k]) => h.raw(k)), before);
 });
 
-test('counter-example 1: Stop after the call went out and before the write: the note is byte for byte unchanged, no record, later cards keep their mark, no new call', async () => {
+test('Stop rejects late result and retains already committed work', async () => {
   const h = await harness(TREE);
   h.plan.hang.add('mid');
   const rootBefore = h.raw('root');
   await h.runAll();
   await until(() => h.calls.some(c => c.key === 'mid'));
   const midBefore = h.raw('mid');
-  h.view.stopPromptBatch();
-  await h.done();
-  assert.equal(h.raw('mid'), midBefore, 'the integrating card is not written, no ai-run-*');
+  h.view.stopPromptBatch(); await h.done();
+  assert.equal(h.raw('mid'), midBefore);
   assert.equal(h.raw('root'), rootBefore);
-  assert.equal(h.calls.some(c => c.key === 'root'), false, 'no new call after Stop');
-  assert.equal(h.status('mid'), 'idle'); assert.equal(h.status('root'), undefined);
-  assert.equal(h.status('leaf1'), 'done', 'finished work stays');
-  assert.equal(stamp(h, 'leaf1').result, 'ok', 'and keeps its record');
+  assert.equal(h.calls.some(c => c.key === 'root'), false);
+  assert.equal(stamp(h, 'leaf1').result, 'ok');
   assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
-test('counter-example 6: closing the view mid-batch: no later call or write, no record', async () => {
+test('closing view rejects in-flight writes and prevents subsequent provider calls', async () => {
   const h = await harness(TREE);
   h.plan.hang.add('leaf2');
   await h.runAll();
   await until(() => h.calls.some(c => c.key === 'leaf2'));
-  const snapshot = TREE.map(([k]) => h.raw(k));
-  try { await h.view.onClose(); } catch { /* the rest of the teardown needs a real DOM */ }
-  assert.equal(h.view.closed, true);
-  await dom.tick(); await dom.tick(); await dom.tick();
-  eq(h.calls.map(c => c.key), ['leaf1', 'leaf2'], 'no call after close');
-  eq(TREE.map(([k]) => h.raw(k)), snapshot, 'no write after close');
+  const before = TREE.map(([k]) => h.raw(k));
+  const calls = h.calls.length;
+  try { await h.view.onClose(); } catch { /* the remaining DOM teardown needs real Obsidian */ }
+  await h.done();
+  assert.equal(h.calls.length, calls);
+  eq(TREE.map(([k]) => h.raw(k)), before);
 });
 
-test('counter-example 7: a Sources line with a URL or a [[missing]] link is skipped without throwing; a real Markdown note goes in as a reference group and into the input key', async () => {
-  const h = await harness([['solo', null, { prompt: '資料來源：https://example.com/x [[Missing]] [[Ref]]' }]]);
-  const file = await h.app.vault.create('Notes/Ref.md', 'reference body');
-  file.stat = { mtime: 111 };
-  h.app.metadataCache = { getFirstLinkpathDest: link => h.app.vault.getAbstractFileByPath(`Notes/${link}.md`) ?? null };
+test('required explicit Markdown source missing blocks instead of skipping it', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Missing]]' }]]);
   await h.runAll(); await h.done();
-  const groups = h.calls[0].choices.referenceGroups;
-  assert.equal(groups.length, 1);
-  eq(groups[0].documents.map(d => d.path), ['Notes/Ref.md']);
-  assert.equal(h.status('solo'), 'done');
-  assert.equal(stamp(h, 'solo').input, pr.promptInputKey({ prompt: '資料來源：https://example.com/x [[Missing]] [[Ref]]', children: [], sources: [{ path: 'Notes/Ref.md', mtime: 111 }] }));
-  const g = await harness([['solo', null, { prompt: '資料來源：https://example.com/x [[Missing]]' }]]);
-  g.app.metadataCache = { getFirstLinkpathDest: () => null };
+  assert.equal(h.calls.length, 0);
+  assert.equal(stamp(h, 'solo').result, 'blocked');
+  const g = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await g.app.vault.create('Notes/Ref.md', 'reference body');
   await g.runAll(); await g.done();
-  eq(g.calls[0].choices.referenceGroups, []);
-  assert.equal(g.status('solo'), 'done');
+  assert.equal(g.calls.length, 1);
+  assert.match(g.calls[0].input.context, /reference body/);
 });
 
 test('a second run is refused while a batch runs', async () => {
@@ -642,29 +606,28 @@ test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its q
   assert.equal(h.question().value, '');
 });
 
-test('save path: an existing card is one undo step and undo restores the note byte for byte; keys follow the tick', async () => {
-  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+test('save path: existing AI card is one undoable configuration edit; source IDs and manual content are preserved', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['N', null, { noAi: true }]]);
   const before = h.raw('A');
   const past = h.view.history.past.length;
-  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: ['N', 'M'], keepOld: true });
-  assert.equal(h.view.history.past.length, past + 1, 'one undo step');
+  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: ['N'], keepOld: true }, 'Old', undefined, () => true);
+  assert.equal(h.view.history.past.length, past + 1);
   assert.match(h.raw('A'), /^ai-card: true$/m);
-  assert.match(h.raw('A'), /^research-mode: "?research"?$/m);
-  assert.match(h.raw('A'), /> New Q\n> Sources: \[\[N\]\], \[\[M\]\]/);
-  assert.equal(/^ai-update-mode: /m.test(h.raw('A')), false, 'ticked: no ai-update-mode written');
-  await h.view.writeAiCard(h.node('A'), { title: '', question: 'New Q', sources: [], keepOld: false });
-  assert.match(h.raw('A'), /^ai-update-mode: "?fresh"?$/m);
+  assert.ok(h.raw('A').includes('card:' + h.node('N').id));
+  assert.match(h.raw('A'), /New Q/);
+  assert.equal(h.calls.length, 0);
   await h.view.history.undo().undo();
-  await h.view.history.undo().undo();
-  assert.equal(h.raw('A'), before, 'byte for byte');
+  assert.equal(h.raw('A'), before);
 });
 
-test('save path: an emptied question removes the Prompt and `ai-card`', async () => {
+test('save path: blank prompt is refused; explicit conversion retains configuration and knowledge', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Old question' }]]);
-  await h.view.writeAiCard(h.node('A'), { title: '', question: '', sources: [], keepOld: true });
-  assert.equal(h.raw('A').includes('Old question'), false);
-  assert.equal(/^ai-card:/m.test(h.raw('A')), false);
-  assert.equal(/^prompt:/m.test(h.raw('A')), false);
+  const before = h.raw('A');
+  await assert.rejects(() => h.view.writeAiCard(h.node('A'), { title: '', question: '', sources: [], keepOld: true }, 'Old question', undefined, () => true), /empty-prompt/);
+  assert.equal(h.raw('A'), before);
+  await h.repo.writeAiCard(h.node('A').path, false);
+  assert.match(h.raw('A'), /Old question/);
+  assert.doesNotMatch(h.raw('A'), /^ai-card:/m);
 });
 
 test('save path: a new card is made only on save; the popover blocks an empty question, Cmd/Ctrl+Enter saves, Esc writes nothing', async () => {
@@ -706,17 +669,12 @@ test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fenc
   assert.equal(out.includes('Real question'), false);
 });
 
-test('blocked tooltip: names the failed child, or says so without a name when no child is failing now', async () => {
-  const h = await harness([['P', null, { prompt: 'Parent?' }], ['C', 'P', { prompt: 'Child?' }]]);
-  const note = id => h.view.notes.get(h.node(id).id);
-  note('P').aiRun = { at: '2026-11-27T00:00:00.000Z', result: 'blocked' };
-  note('C').aiRun = { at: '2026-11-27T00:00:00.000Z', result: 'failed' };
-  h.view.aiStatusMemo?.clear?.();
-  const named = h.view.aiStatusTip(h.node('P'), note('P'), 'failed');
-  assert.match(named, /C/);
-  note('C').aiRun = { at: '2026-11-27T00:01:00.000Z', result: 'ok', input: 'x' };
-  h.view.aiStatusMemo?.clear?.();
-  const unnamed = h.view.aiStatusTip(h.node('P'), note('P'), 'failed');
-  assert.equal(/""|「」|“”/.test(unnamed), false, `no empty name: ${unnamed}`);
-  assert.match(unnamed, /did not finish last time/);
+test('failed status tooltip retains latest successful check and last attempt independently', async () => {
+  const h = await harness([['P', null]]);
+  const note = h.view.notes.get(h.node('P').id);
+  note.livingNode = { summary: 'Old result', knowledgeRevision: 'r1', outcome: 'failed', damaged: false,
+    lastSuccessfulCheck: '2026-11-27T00:00:00.000Z', lastAttempt: '2026-11-27T01:00:00.000Z' };
+  const tip = h.view.aiStatusTip(h.node('P'), note, 'failed');
+  assert.match(tip, /2026-11-27T00:00:00.000Z/);
+  assert.match(tip, /2026-11-27T01:00:00.000Z/);
 });

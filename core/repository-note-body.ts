@@ -15,6 +15,7 @@ import { contentHash } from "./content-hash";
 import { managedSectionValue } from "../note-values";
 import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./image-keys";
 import { readCoverBlock, stripCoverBlock } from "./book-pipeline/cover-block";
+import { LIVING_NODE_BEGIN } from "./living-node-region";
 
 export const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 export const REFERENCE_END = "<!-- visual-agent-map:references:end -->";
@@ -244,11 +245,13 @@ function sectionBounds(content: string, heading: NoteSection): { start: number; 
   const start = match.index + match[0].length;
   const next = /^## .+$/m.exec(content.slice(start));
   const reference = content.indexOf(REFERENCE_START, start);
+  const living = content.indexOf(LIVING_NODE_BEGIN, start);
   // A hidden work-record callout (`> [!vam-book]- ...`, the proofread result) after a section is no part of it: Preview and Prompt callouts were turned into `## ` sections before.
   const hidden = HIDDEN_AFTER.has(heading) ? /^> \[!vam-book\]/m.exec(content.slice(start)) : null;
   const candidates = [
     next ? start + next.index : content.length,
     reference >= 0 ? reference : content.length,
+    living >= 0 ? living : content.length,
     hidden ? start + hidden.index : content.length
   ];
   return { start, end: Math.min(...candidates) };

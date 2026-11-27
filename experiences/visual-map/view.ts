@@ -20383,6 +20383,9 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map || !this.path || stop?.aborted || this.promptRunning()) return undefined;
     const mapPath = this.path;
+    // This view may open another map while the round goes on for the others; the round keeps its own map.
+    const mapId = map.id;
+    const busyKey = `multi-research:${mapPath}`;
     const coordinator = livingCoordinator(this.plugin);
     // A card being tried out is an execution boundary: it cannot be run on its own.
     if (requested?.some(id => coordinator.trialBusy(this.mapNodeById(id)?.path ?? ""))) {
@@ -20461,6 +20464,9 @@ export class VisualAgentMapView extends ItemView {
     };
     if (existing) {
       stop?.removeEventListener("abort", stopRound);
+      // A caller that only follows the round stops following; the round itself goes on for the other views.
+      if (stop?.aborted) state.leave();
+      else stop?.addEventListener("abort", state.leave, { once: true });
     } else {
       let error = false;
       try {
@@ -20475,12 +20481,12 @@ export class VisualAgentMapView extends ItemView {
             signal: run.signal,
             current: () => !run.signal.aborted && !this.plugin.repo.isDisposed(),
             busy: path =>
-              this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
+              this.plugin.expansionCoordinator.isRunning(busyKey) ||
               this.plugin.topicRuns.isBusy(path) ||
               this.plugin.quickExpandPending.has(path) ||
               this.plugin.topicRuns.hasTask(path),
             language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-            mapSources: signal => this.readLivingMapSourceReport(signal),
+            mapSources: signal => this.readLivingMapSourceReport(signal, mapPath, mapId),
             onOptionalSourcesUnavailable: () => {
               if (!current() || warnedOptionalSources) return;
               warnedOptionalSources = true;
@@ -20500,7 +20506,9 @@ export class VisualAgentMapView extends ItemView {
             onSettled: (id, result) => run.emit({ kind: "settled", id, result }),
             onFailure: (id, cause) =>
               run.emit({ kind: "failure", id, reason: this.plugin.recordFailure(t("ui.ai_card"), cause) }),
-            onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
+            onCommit: (path, before, after) => {
+              if (this.path === mapPath) this.recordLivingCommit(path, before, after);
+            }
           },
           requested
         );
@@ -20514,6 +20522,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     const outcome = await ended;
+    stop?.removeEventListener("abort", state.leave);
     if (session()) {
       await this.hydrate();
       this.render();

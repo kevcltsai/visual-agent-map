@@ -861,3 +861,49 @@ test('Run Card on a card in trial is refused; nothing runs or is written', async
   eq(TREE.map(([k]) => h.raw(k)), before);
   trial.release();
 });
+
+test('a view that switches maps leaves the run; the round it started keeps reading and busy-checking the original map', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  const reads = [], keys = [];
+  const readSources = h.repo.readMapSources.bind(h.repo);
+  h.repo.readMapSources = async path => { reads.push(path); return readSources(path); };
+  const isRunning = h.host.expansionCoordinator.isRunning.bind(h.host.expansionCoordinator);
+  h.host.expansionCoordinator.isRunning = key => { keys.push(key); return isRunning(key); };
+  h.plan.pause.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  second.startPromptRun();
+  // View A opens another map: it only leaves the run, which the other view keeps following.
+  h.view.promptBatch.leave();
+  h.view.path = 'Other.vam';
+  h.view.map = { id: 'other-map', title: 'other', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  reads.length = 0; keys.length = 0;
+  const before = h.raw('side');
+  h.plan.go();
+  await until(() => second.promptBatch.outcome);
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
+  eq([...new Set(reads)], [MAP], 'sources come from the original map');
+  eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');
+  assert.notEqual(h.raw('side'), before, 'writes still land on the original map');
+});
+
+test('a trial lease taken while validity is inspected makes the round fail busy with zero writes', async () => {
+  const h = await ranOnce();
+  await h.repo.updateNote(h.node('leaf1').path, { prompt: 'Prompt leaf1 changed' });
+  const first = midTrial(h); // a trial on another card makes the round inspect validity
+  const round = h.roundPort();
+  let late;
+  const mapSources = round.port.mapSources;
+  round.port.mapSources = async signal => {
+    late ??= round.port.coordinator.acquire('map-a', 'late-trial', [h.node('leaf1').path], false);
+    return mapSources(signal);
+  };
+  const before = TREE.map(([k]) => h.raw(k));
+  await assert.rejects(round.run(), /living-node-busy/);
+  assert.ok(late, 'the lease was taken during the inspection');
+  assert.equal(h.calls.length, 0);
+  eq(TREE.map(([k]) => h.raw(k)), before);
+  late.release(); first.release();
+});

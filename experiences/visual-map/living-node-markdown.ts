@@ -16,6 +16,7 @@ import {
   type LivingKnowledge,
   type LivingRecord
 } from "./living-node-changes";
+import { livingModelView } from "./living-node-retrieval";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
 import {
@@ -25,7 +26,8 @@ import {
   livingFenceAfterCommit,
   readLivingFence,
   LIVING_NODE_BEGIN as BEGIN,
-  LIVING_NODE_END as END
+  LIVING_NODE_END as END,
+  livingNoteWithoutManaged
 } from "../../core/living-node-region";
 const HASH_KEY = "living-node-region-hash";
 const OWNERSHIP_KEY = "living-node-ownership";
@@ -556,6 +558,28 @@ function readLivingData(content: string) {
 /** Reading never migrates or rewrites the legacy body. Recognizable manual edits become user-owned. */
 export function readLivingMarkdown(content: string): LivingKnowledge {
   return readLivingData(content).knowledge;
+}
+
+/**
+ * The only form of a note that may reach a provider when it might be a Living Node note read as ordinary text: the
+ * managed region becomes the card's model view (revision, records, output, AI latest) and every `living-node-*`
+ * frontmatter key (ownership index, hashes) is dropped, so suppression holds and deletion hashes never leave the vault.
+ * A torn or unreadable region is cut out entirely. A note with neither region nor metadata is returned unchanged.
+ */
+export function livingNoteForModel(content: string): string {
+  const stripped = livingNoteWithoutManaged(content);
+  if (stripped === content) return content;
+  let view = "";
+  try {
+    view = JSON.stringify(livingModelView(readLivingMarkdown(content)));
+  } catch {
+    return stripped;
+  }
+  const start = content.indexOf(BEGIN);
+  const end = content.indexOf(END, Math.max(start, 0));
+  if (start < 0 || end < 0) return stripped;
+  // The view sits where the region was; the shared helper then drops the metadata and any leftover marker.
+  return livingNoteWithoutManaged(content.slice(0, start) + view + content.slice(end + END.length));
 }
 
 /**

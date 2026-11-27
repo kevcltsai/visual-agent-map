@@ -7,6 +7,7 @@ import {
   type ReferenceGroup
 } from "../../ai/reference-materials";
 import type { MapDocument } from "../../map-model";
+import { livingNoteForModel } from "./living-node-markdown";
 import { externalScrubRoots, readExternalSource, type ExternalScope, type ExternalSource } from "./external-sources";
 
 /**
@@ -112,7 +113,8 @@ function markdownFiles(folder: TFolder): TFile[] {
 
 const asDocument = (document: ReferenceDocument): ReferenceDocument => ({
   path: document.path,
-  content: document.content,
+  // A Living Node note read as an ordinary source reaches the provider as its model view only.
+  content: livingNoteForModel(document.content),
   external: false,
   key: document.path
 });

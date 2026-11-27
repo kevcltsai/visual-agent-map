@@ -402,3 +402,72 @@ S.integrationTest('Draft confirmation: a failed save does not reconfirm; a succe
   assert.notEqual(f.store.at('Note.md').refId, before.refId);
   f.restore();
 });
+
+// A cross-map reference reads a Living Node note as an ordinary note: the provider sees its model view, never holds or ownership.
+async function foreignLivingNote() {
+  const f = await runtimeFixture({ count: 3, prompt: 'seed' });
+  const saved = f.contents.get('parent.md');
+  const edited = saved.replace(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get('parent.md'), () => edited);
+  const base = readLivingMarkdown(edited);
+  const candidate = { executionId: 'del', cardId: 'parent', mapId: 'map', baseRevision: livingSnapshotRevision(edited), inputRevision: 'i', viewSession: 'v' };
+  assert.equal(await commitLivingMarkdown(f.repo, { path: 'parent.md', expectedContent: edited, candidate, base, baseGeneration: livingGeneration(edited),
+    proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'FOREIGN-FINDINGS', evidence: ['e1'] }] }, context: SEED_AT, signal: new AbortController().signal, isCurrent: () => true,
+    inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) }), 'written');
+  const note = f.contents.get('parent.md');
+  assert.match(note, /Suppression v2: /);
+  return note;
+}
+const leaks = (prompt, note) => {
+  const owned = String(note.match(/living-node-ownership:[^\n]*(?:\n[ \t]+[^\n]*)*/)?.[0] ?? '');
+  const hashes = (owned.match(/[0-9a-f]{64}/g) ?? []).filter(hash => !prompt.includes('"revision":"' + hash + '"'));
+  return [/@v2:/.test(prompt) && '@v2', /@event|evt:/.test(prompt) && 'tombstone', /Suppression/.test(prompt) && 'Suppression', /living-node-/.test(prompt) && 'frontmatter',
+    hashes.some(hash => prompt.includes(hash)) && 'ownership hash'].filter(Boolean);
+};
+
+S.integrationTest('privacy: a Living Node note read as an ordinary cross-map note sends its model view, never suppression or ownership', async () => {
+  const foreign = await foreignLivingNote();
+  const f = await runtimeFixture({ count: 0, prompt: 'track things\n\nSources: [[Foreign]]', notes: { Foreign: foreign } });
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(f.prompts.length, 1, f.failures.join('|'));
+  assert.ok(f.prompts[0].includes('FOREIGN-FINDINGS'), 'the output still reaches the model');
+  assert.deepEqual(leaks(f.prompts[0], foreign), []);
+});
+
+S.integrationTest('privacy: a Living Node note delivered as a map-level source is sanitised the same way', async () => {
+  const foreign = await foreignLivingNote();
+  const mapSources = async () => ({ unavailable: 0, groups: [{ documents: [{ path: 'Other.md', content: foreign }, { path: 'ext/x.md', content: foreign, external: true, key: 'k' }] }] });
+  const f = await runtimeFixture({ count: 0, prompt: 'track things', mapSources });
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(f.prompts.length, 1, f.failures.join('|'));
+  assert.ok(f.prompts[0].includes('FOREIGN-FINDINGS'));
+  assert.deepEqual(leaks(f.prompts[0], foreign), []);
+});
+
+// Every other AI reader of raw vault text: chat attachments, chat-started research and map-level file sources.
+const { buildMapChatContext } = S.load('core/map-chat-context.ts', { obsidian: S.obsidian });
+const chatBase = { mapTitle: 'M', outline: [], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] };
+
+S.integrationTest('privacy: chat context (attached file, active note, own file) never carries a Living Node note\'s holds or ownership', async () => {
+  const foreign = await foreignLivingNote();
+  for (const input of [{ files: [{ path: 'F.md', content: foreign }] }, { activeFile: { path: 'A.md', content: foreign } }, { ownFiles: [{ path: 'O.md', content: foreign }] }]) {
+    const sent = JSON.stringify(buildMapChatContext({ ...chatBase, ...input }));
+    assert.ok(sent.includes('Current') || sent.includes('"path":'), 'the note is still delivered');
+    assert.deepEqual(leaks(sent, foreign), [], Object.keys(input)[0]);
+  }
+});
+
+const { chatResearchReferenceGroups } = S.load('experiences/visual-map/chat-research-sources.ts', { obsidian: S.obsidian });
+const { resolveMapSources } = S.load('experiences/visual-map/map-sources.ts', { obsidian: S.obsidian });
+S.integrationTest('privacy: research started from the chat and map-level file sources get the model view of a Living Node note', async () => {
+  const foreign = await foreignLivingNote();
+  const groups = chatResearchReferenceGroups({ files: [{ path: 'F.md', content: foreign }], activeFile: null, snippets: [] });
+  assert.deepEqual(leaks(JSON.stringify(groups), foreign), []);
+  assert.ok(JSON.stringify(groups).includes('FOREIGN-FINDINGS'));
+  const f = S.fixture();
+  await f.app.vault.create('Src/live.md', foreign);
+  const out = await resolveMapSources({ app: f.app, readMap: p => f.repo.readMap(p) }, [{ kind: 'file', path: 'Src/live.md' }, { kind: 'folder', path: 'Src' }], 'Cur/Map.md', new AbortController().signal);
+  assert.equal(out.groups.length > 0, true);
+  assert.deepEqual(leaks(JSON.stringify(out.groups), foreign), []);
+  assert.ok(JSON.stringify(out.groups).includes('FOREIGN-FINDINGS'));
+});

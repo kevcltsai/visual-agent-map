@@ -27,6 +27,7 @@ import { executeLivingPlan, type LivingSettlement } from "./living-node-executio
 import {
   commitLivingMarkdown,
   livingGeneration,
+  livingNoteForModel,
   livingSnapshotRevision,
   readLivingMarkdown
 } from "./living-node-markdown";
@@ -118,7 +119,7 @@ interface Snapshot {
 const rawText = (raw: string): string => raw.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
 
 function readableMarkdown(raw: string): string {
-  let body = decodeCalloutSections(rawText(raw));
+  let body = decodeCalloutSections(rawText(livingNoteForModel(raw)));
   for (const heading of ["Prompt", "Rules"] as const) body = removeSection(body, heading);
   return body;
 }

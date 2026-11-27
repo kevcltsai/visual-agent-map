@@ -10,8 +10,8 @@ const day = n => new Date(Date.UTC(2020, 0, 1 + n)).toISOString().slice(0, 10);
 const append = n => ({ kind: 'append', id: 'r' + n, subject: 'subject ' + n, scope: 'scope', granularity: 'day', eventTime: day(n), claim: 'claim ' + n + ' ' + 'x'.repeat(300), evidence: ['e1'] });
 const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
 
-async function commit(f, base, operations) {
-  const expectedContent = f.contents.get(path);
+async function commit(f, base, operations, expected) {
+  const expectedContent = expected ?? f.contents.get(path);
   const candidate = { executionId: 'x' + Math.random(), cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
   return commitLivingMarkdown(f.repo, { path, expectedContent, candidate, base, proposal: { baseRevision: base.revision, operations }, context, signal: new AbortController().signal, isCurrent: () => true,
     inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
@@ -27,12 +27,12 @@ async function bigCard(count) {
   return f;
 }
 // One formal round: the fake transport answers with `operations`; the production validator runs against the full base.
-async function round(f, operations) {
+async function round(f, operations, echoed) {
   const base = readLivingMarkdown(f.contents.get(path));
   const sent = [];
   const calls = { run: async (prepared, options, finish) => {
     sent.push(prepared.prompt);
-    return finish(JSON.stringify({ baseRevision: base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} });
+    return finish(JSON.stringify({ baseRevision: echoed ?? base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} });
   } };
   const generated = await generateLivingProposal(calls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: context.evidence, mapPath: 'map.md' }, new AbortController().signal);
   return { sent, base, generated };
@@ -120,4 +120,17 @@ S.integrationTest('Living Node A33: untimed records rank newest, then time desce
   assert.ok(timedShown.length > 0 && timedShown.length < 220);
   const cutoff = Math.min(...timedShown);
   assert.ok(Array.from({ length: 330 - cutoff }, (_, i) => cutoff + i).filter(n => n % 3 !== 0).every(n => shown.includes(n)), 'timed shown form a newest suffix');
+});
+
+S.integrationTest('Living Node A33: a wrong echoed baseRevision (a document hash) no longer fails the round, while a real concurrent edit is still refused', async () => {
+  const f = await bigCard(3);
+  const base = readLivingMarkdown(f.contents.get(path));
+  const hash = 'a'.repeat(64);
+  const { generated } = await round(f, [append(1000)], hash);
+  assert.equal(generated.proposal.baseRevision, base.revision);
+  const stale = f.contents.get(path);
+  f.contents.set(path, stale + '\nOwner edit\n');
+  const outcome = await commit(f, base, generated.proposal.operations, stale).catch(error => error.message);
+  assert.notEqual(outcome, 'written');
+  assert.ok(!f.contents.get(path).includes('r1000'));
 });

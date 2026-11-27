@@ -250,6 +250,9 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         omitted.has(String(operation.id));
       const droppedOperations = normalized.proposal.operations.filter(blind).length;
       normalized.proposal.operations = normalized.proposal.operations.filter(operation => !blind(operation));
+      // The model's echoed revision is not trusted: context documents carry their own revision fields and models
+      // confuse them. Real staleness is fenced at commit by the expected file content and snapshot revision.
+      normalized.proposal.baseRevision = input.base.revision;
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();
       return { ...normalized, droppedOperations };

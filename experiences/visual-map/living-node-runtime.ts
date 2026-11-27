@@ -5,6 +5,7 @@ import { decodeCalloutSections, removeSection } from "../../core/repository-note
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import { livingConfigurationStamp } from "../../core/living-node-region";
 import { normalizeVaultPath } from "../../core/map-chat-guard";
+import { createNoteReadContext, readOnce, type NoteReadContext } from "../../core/note-read-context";
 import type { AiCalls } from "../../core/ai-calls";
 import type { Repository, Note } from "../../repository";
 import type { MapDocument } from "../../map-model";
@@ -82,7 +83,10 @@ export interface LivingRoundPort {
 type LivingTrialPort = Pick<
   LivingRoundPort,
   "app" | "repo" | "calls" | "mapPath" | "viewSession" | "signal" | "current" | "language" | "mapSources"
->;
+> & {
+  /** Notes the caller already read (the view's hydrate); one pass never reads a note the context holds. */
+  noteReads?: NoteReadContext;
+};
 
 interface Snapshot {
   note: Note;
@@ -177,14 +181,14 @@ function configKey(snapshot: Snapshot, map: MapDocument, id: string, port: Pick<
   );
 }
 
-async function prepareMap(port: Pick<LivingRoundPort, "repo" | "app">, map: MapDocument) {
+async function prepareMap(port: Pick<LivingRoundPort, "repo" | "app">, map: MapDocument, reads?: NoteReadContext) {
   const snapshots = new Map<string, Snapshot>();
   const cards: LivingMapCard[] = [];
   for (const node of map.nodes) {
     let snapshot: Snapshot | undefined;
     try {
       if (!allowedLivingNotePath(port.app, node.path)) throw new Error("unauthorized-source");
-      snapshot = await port.repo.readNoteSnapshot(node.path, map);
+      snapshot = await port.repo.readNoteSnapshot(node.path, map, reads);
       snapshots.set(node.id, snapshot);
     } catch {
       // Missing notes cannot execute. A consumer that needs one will fail closed when reading its source.
@@ -279,6 +283,13 @@ export async function livingCrossCut(
   return { preserveIdentity, affected };
 }
 
+/** The metadata cache describes the file only once it has indexed the file's latest write; until then the note is read. */
+function cacheSettled(app: App, file: TFile): boolean {
+  const indexed = (app.metadataCache as unknown as { fileCache?: Record<string, { mtime?: number } | undefined> })
+    .fileCache?.[file.path];
+  return !indexed || indexed.mtime === undefined || indexed.mtime >= file.stat.mtime;
+}
+
 /** Check the final structural snapshot before Map.md is published. Reordering,
  * layout, viewport and collapse do not change dependencies. Existing cards use
  * their current note bytes (including after a file move); only graph edges that
@@ -299,7 +310,7 @@ export async function validateLivingStructure(
     const file = app.vault.getAbstractFileByPath(node.path);
     if (!(file instanceof TFile)) return false;
     const cache = app.metadataCache.getFileCache(file);
-    return !cache || !!cache.frontmatter?.["ai-card"];
+    return !cache || !cacheSettled(app, file) || !!cache.frontmatter?.["ai-card"];
   });
   if (!mayBeAi) return;
   const { cards } = await prepareMap({ repo, app }, after);
@@ -361,7 +372,7 @@ async function readInputs(
     if (port.signal.aborted || !port.current()) throw new Error("cancelled");
     if (!allowedLivingNotePath(port.app, source.path)) throw new Error("unauthorized-source");
     if (source.cardId) {
-      const data = await port.repo.readNoteSnapshot(source.path, map);
+      const data = await port.repo.readNoteSnapshot(source.path, map, port.noteReads);
       if (isAiCard(data.note) && !usableKnowledge(data)) throw new Error("missing-ai-knowledge");
       const knowledge = readLivingMarkdown(data.content);
       const current = knowledge.output.text || data.note.summary;
@@ -370,7 +381,10 @@ async function readInputs(
     } else {
       const file = port.app.vault.getAbstractFileByPath(source.path);
       if (!(file instanceof TFile) || !allowedLivingNotePath(port.app, file.path)) throw new Error("missing-source");
-      add(source.identity, file.basename, readableMarkdown(await port.app.vault.read(file)));
+      const text = port.noteReads
+        ? await readOnce(port.noteReads, file.path, () => port.app.vault.read(file))
+        : await port.app.vault.read(file);
+      add(source.identity, file.basename, readableMarkdown(text));
     }
   }
   const mapContext = await readLivingMapContext(port);
@@ -877,7 +891,9 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */
 export async function inspectLivingValidity(port: LivingTrialPort) {
   const map = await port.repo.readMap(port.mapPath);
-  const { snapshots, cards } = await prepareMap(port, map);
+  // One pass reads each note once: the view's reads are reused, and every other read is shared across cards.
+  const noteReads = port.noteReads ?? createNoteReadContext(map);
+  const { snapshots, cards } = await prepareMap(port, map, noteReads);
   const planned = planLivingMap(cards, [], sourceResolver(port.app));
   const validity = new Map<string, "none" | "valid" | "stale">();
   for (const card of cards) {
@@ -887,7 +903,7 @@ export async function inspectLivingValidity(port: LivingTrialPort) {
   }
   // Read the optional map context once, not once per card.
   let groups: Promise<LivingMapSources> | undefined;
-  const readPort: LivingTrialPort = { ...port, mapSources: signal => (groups ??= port.mapSources(signal)) };
+  const readPort: LivingTrialPort = { ...port, noteReads, mapSources: signal => (groups ??= port.mapSources(signal)) };
   for (const item of planned.plan.order) {
     if (!port.current() || port.signal.aborted) break;
     const snapshot = snapshots.get(item.id);

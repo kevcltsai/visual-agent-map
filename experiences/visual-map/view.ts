@@ -3674,6 +3674,7 @@ export class VisualAgentMapView extends ItemView {
           viewSession: "validity",
           signal: new AbortController().signal,
           current: alive,
+          noteReads: ctx,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
           mapSources: signal => this.readLivingMapSourceReport(signal)
         });

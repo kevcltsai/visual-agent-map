@@ -1729,3 +1729,59 @@ S.integrationTest('Living Node A33: dropped omitted-record edits are disclosed i
   assert.equal((await stubbedRound(f.port)).get('solo'), 'changed');
   assert.deepEqual(skipped, [['solo', 3]]);
 });
+
+// ---- Living Node V1.1 T01: validity pass cost, structure cache window ----
+const { createNoteReadContext } = S.load('core/note-read-context.ts', { obsidian: S.obsidian });
+async function sharedSourceFixture(cards) {
+  const f = await roundFixture([['root'], ...Array.from({ length: cards }, (_, i) => ['c' + i, 'root'])]);
+  for (let k = 0; k < 3; k++) await f.app.vault.create('Shared ' + k + '.md', '# Shared ' + k + '\n\ntext ' + k + '\n');
+  for (let i = 0; i < cards; i++)
+    await saveLivingConfig(f.app, f.repo, f.map, 'c' + i, 'Read\n\nSources: [[Shared ' + (i % 3) + ']] [[Shared ' + ((i + 1) % 3) + ']]');
+  const reads = new Map();
+  for (const name of ['read', 'cachedRead']) {
+    const original = f.app.vault[name].bind(f.app.vault);
+    f.app.vault[name] = async (file, ...rest) => { reads.set(file.path, (reads.get(file.path) ?? 0) + 1); return original(file, ...rest); };
+  }
+  return { ...f, reads };
+}
+
+S.integrationTest('Living Node T01: one validity pass reads each note at most once however many cards share it', async () => {
+  const f = await sharedSourceFixture(12);
+  await inspectLivingValidity(f.port);
+  const worst = [...f.reads.entries()].filter(([, n]) => n > 1);
+  assert.deepEqual(worst, [], 'every note is read at most once per pass');
+  for (let k = 0; k < 3; k++) assert.equal(f.reads.get('Shared ' + k + '.md'), 1);
+});
+
+S.integrationTest('Living Node T01: notes the view already read are reused, not read again', async () => {
+  const f = await sharedSourceFixture(6);
+  const ctx = createNoteReadContext(f.map);
+  for (const node of f.map.nodes) await f.repo.readNote(node.path, f.map, ctx);
+  f.reads.clear();
+  await inspectLivingValidity({ ...f.port, noteReads: ctx });
+  for (const node of f.map.nodes) assert.equal(f.reads.get(node.path) ?? 0, 0, node.path + ' was already read by the view');
+  assert.ok(![...f.reads.values()].some(n => n > 1));
+});
+
+S.integrationTest('Living Node T01: a structural edit reads a note whose metadata cache has not caught up with the file', async () => {
+  const { map, port, snapshots } = livingTrialRuntimeFixture();
+  snapshots.get('root.md').note.prompt = 'Root';
+  snapshots.get('up.md').note.prompt = 'Up';
+  snapshots.get('up.md').content = snapshots.get('up.md').content.replace('note:missing', 'card:root');
+  const before = { ...map, nodes: map.nodes.map(n => ({ ...n, parentId: null })) };
+  // The cache still describes an older, non-AI version of every note; the files themselves are newer.
+  const stale = { frontmatter: {} };
+  port.app.metadataCache.getFileCache = () => stale;
+  port.app.metadataCache.fileCache = {};
+  const files = new Map();
+  for (const node of map.nodes) {
+    const file = new S.obsidian.TFile(node.path);
+    file.stat = { mtime: 2000 };
+    files.set(node.path, file);
+    port.app.metadataCache.fileCache[node.path] = { mtime: 1000 };
+  }
+  port.app.vault.getAbstractFileByPath = path => files.get(path) ?? null;
+  const { validateLivingStructure } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  await assert.rejects(() => validateLivingStructure(port.app, port.repo, before, map), /living-node-cycle/);
+});

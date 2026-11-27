@@ -587,9 +587,9 @@ S.integrationTest('Living Node reader: stopping during reader creation restores 
   assert.deepEqual(calls.at(-1), ['detach']);
 });
 
-function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources = async () => [] } = {}) {
+function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources = async () => [], generate = () => { throw new Error('unexpected AI call'); } } = {}) {
   const { prepareLivingTrial } = S.load('experiences/visual-map/living-node-runtime.ts',
-    { obsidian: S.obsidian, './living-node-provider': { generateLivingProposal() { throw new Error('unexpected AI call'); } } },
+    { obsidian: S.obsidian, './living-node-provider': { generateLivingProposal: (...args) => generate(...args) } },
     {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
   const map = { id: 'map', nodes: [
     { id: 'root', path: 'root.md', parentId: null },
@@ -606,7 +606,7 @@ function livingTrialRuntimeFixture({ locked = false, usable = true, mapSources =
     app: { vault: { configDir: '.obsidian' }, metadataCache: { getFirstLinkpathDest: () => null } }, calls: {}, mapPath: 'Map.md',
     viewSession: 'editor', signal: new AbortController().signal, current: () => true, language: () => 'en',
     mapSources };
-  return { prepare: () => prepareLivingTrial(port, 'root', 'Research root'), snapshots, map, port };
+  return { prepare: (prompt = 'Research root') => prepareLivingTrial(port, 'root', prompt), snapshots, map, port };
 }
 
 S.integrationTest('Living Node trial: stale readable upstream may preview but cannot adopt until formal dependencies are ready', async () => {
@@ -889,4 +889,251 @@ S.integrationTest('Living Node share: Repository.readNote derives shareMarkdown 
   const note = await f.repo.readNote(path);
   assert.equal(note.livingNode.shareMarkdown, '> Current findings');
   assert.ok(!note.livingNode.shareMarkdown.includes('e1'));
+});
+
+// ---- Acceptance ledger A01-A13 (integration clauses) ----
+const evidenceOf = id => ({ id, source: 'https://news.example/' + id, retrievedAt: '2026-11-27T05:00:00+08:00' });
+async function commitOps(f, operations, ids, executionId) {
+  const base = readLivingMarkdown(f.contents.get(path));
+  return commitLivingMarkdown(f.repo, request(f, { base, candidate: { executionId },
+    proposal: { baseRevision: base.revision, operations }, context: { at: '2026-11-27T05:00:00+08:00', evidence: ids.map(evidenceOf) } }));
+}
+const record = (id, extra = {}) => ({ kind: 'append', id, subject: 'Acme', scope: 'news', granularity: 'event', eventTime: '2026-11-26', claim: 'Acme acquires Beta', evidence: ['e1'], ...extra });
+
+S.integrationTest('A01: a Prompt-only ordinary card is not run; explicit save converts without executing; converting back keeps knowledge and re-enabling needs an explicit save', async () => {
+  const f = await roundFixture();
+  const before = f.contents.get('ordinary.md');
+  await runLivingRound(f.port);
+  assert.equal(f.contents.get('ordinary.md'), before);
+  assert.ok(!f.calls.includes('Research ordinary'));
+  const converted = await saveLivingConfig(f.app, f.repo, f.map, 'ordinary', 'Research ordinary');
+  assert.equal(converted.outcome, 'written');
+  assert.ok(f.contents.get('ordinary.md').includes('ai-card: true'));
+  assert.ok(f.contents.get('ordinary.md').includes('Manual ordinary'));
+  assert.ok(!f.calls.includes('Research ordinary'), 'saving the conversion must not execute');
+  assert.equal(readLivingMarkdown(f.contents.get('ordinary.md')).revision, 'empty');
+  assert.equal((await runLivingRound(f.port, ['ordinary'])).get('ordinary'), 'changed');
+  const knowledge = readLivingMarkdown(f.contents.get('ordinary.md'));
+  await f.repo.writeAiCard('ordinary.md', false);
+  assert.ok(!f.contents.get('ordinary.md').includes('ai-card: true'));
+  assert.equal(readLivingMarkdown(f.contents.get('ordinary.md')).revision, knowledge.revision);
+  const calls = f.calls.length;
+  await runLivingRound(f.port);
+  assert.equal(f.calls.filter(prompt => prompt === 'Research ordinary').length, 1, 'a converted-back card is not run again');
+  assert.ok(f.calls.length > calls - 1);
+  await saveLivingConfig(f.app, f.repo, f.map, 'ordinary', 'Research ordinary');
+  assert.ok(f.contents.get('ordinary.md').includes('ai-card: true'));
+  assert.equal(f.calls.filter(prompt => prompt === 'Research ordinary').length, 1, 're-enabling by explicit save does not execute');
+  assert.equal(readLivingMarkdown(f.contents.get('ordinary.md')).revision, knowledge.revision);
+  const saved = f.contents.get('ordinary.md');
+  await assert.rejects(() => saveLivingConfig(f.app, f.repo, f.map, 'ordinary', '   '), /empty-prompt/);
+  assert.equal(f.contents.get('ordinary.md'), saved, 'a blank Prompt cannot be saved as an executable AI card');
+});
+
+S.integrationTest('A02: the chat-style and mouse-style save of the same configuration write identical bytes and never execute', async () => {
+  const prompt = 'Read child and ordinary\n\nSources: [[child]], [[ordinary]]';
+  const mouse = await roundFixture();
+  const chat = await roundFixture();
+  const a = await saveLivingConfig(mouse.app, mouse.repo, mouse.map, 'parent', prompt);
+  const b = await saveLivingConfig(chat.app, chat.repo, chat.map, 'parent', prompt, 'Research parent', undefined, () => true, () => true);
+  const stable = text => text.replace(/^updated: .*$/m, '');
+  assert.equal(stable(chat.contents.get('parent.md')), stable(mouse.contents.get('parent.md')));
+  assert.equal(a.configRevision, b.configRevision);
+  assert.equal(a.sourceRevision, b.sourceRevision);
+  assert.deepEqual([...mouse.calls, ...chat.calls], []);
+  const refused = await roundFixture();
+  const original = refused.contents.get('parent.md');
+  await assert.rejects(() => saveLivingConfig(refused.app, refused.repo, refused.map, 'parent', prompt, 'Research parent', undefined, () => true, () => false), /unauthorized-source/);
+  assert.equal(refused.contents.get('parent.md'), original, 'an unauthorized or unsaved draft does not pollute formal configuration');
+});
+
+S.integrationTest('A03: only direct children, extra same-map cards, notes and own knowledge are read; grandchildren are not; overlap is one source', async () => {
+  const f = await roundFixture();
+  f.map.nodes.push(S.node('grand', 'child'));
+  await f.app.vault.create('grand.md', '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: map\nnode-id: grand\n---\n# grand\n\n## Detail\n\nGRANDCHILD-ONLY\n');
+  await f.app.vault.create('Note.md', '# Note\nVAULT-NOTE-TEXT');
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read all\n\nSources: [[child]], [[ordinary]], [[Note]]');
+  const contexts = [];
+  const run = f.port.calls.run;
+  f.port.calls.run = (prepared, options, finish) => { contexts.push(JSON.parse(prepared.input.context)); return run(prepared, options, finish); };
+  await runLivingRound(f.port, ['parent']);
+  const documents = contexts.at(-1).documents;
+  assert.deepEqual(documents.map(d => d.title).sort(), ['Note', 'child', 'ordinary', 'parent']);
+  const text = name => documents.find(d => d.title === name).text;
+  assert.ok(text('parent').includes('Manual parent'), 'own knowledge');
+  assert.ok(text('ordinary').includes('Manual ordinary'), 'extra same-map card');
+  assert.ok(text('Note').includes('VAULT-NOTE-TEXT'), 'authorized vault note');
+  assert.ok(!JSON.stringify(documents).includes('GRANDCHILD-ONLY'), 'grandchild does not penetrate the parent');
+  assert.ok(JSON.stringify(contexts[0]).includes('GRANDCHILD-ONLY'), 'the grandchild is the direct source of its own parent card');
+});
+
+S.integrationTest('A05: a deleted source blocks its consumer without editing the reference; a same-name card never substitutes; restoring the ID recovers', async () => {
+  const f = await roundFixture();
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read ordinary\n\nSources: [[ordinary]]');
+  const saved = f.contents.get('parent.md');
+  const original = f.map.nodes.find(n => n.id === 'ordinary');
+  f.map.nodes = f.map.nodes.filter(n => n.id !== 'ordinary');
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'blocked');
+  f.map.nodes.push({ ...original, id: 'lookalike' });
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'blocked');
+  assert.ok(f.contents.get('parent.md').includes('  - "card:ordinary"'), 'blocked run keeps the persisted reference');
+  assert.equal(f.contents.get('parent.md').match(/living-node-refs:[\s\S]*?(?=\n[a-z-]+:|\n---)/)[0], saved.match(/living-node-refs:[\s\S]*?(?=\n[a-z-]+:|\n---)/)[0]);
+  assert.deepEqual(f.calls.filter(prompt => prompt === 'Research parent'), []);
+  f.map.nodes = f.map.nodes.filter(n => n.id !== 'lookalike');
+  f.map.nodes.push(original);
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'changed');
+});
+
+S.integrationTest('A06: web search is dispatched by policy, and a required-live task with no opened source fails instead of citing old knowledge', async () => {
+  const tasks = [];
+  const calls = reply => ({ run: async (prepared, options, finish) => {
+    tasks.push(options.task);
+    return finish(JSON.stringify(reply(prepared)), { signal: options.signal, parsed() {} });
+  } });
+  const stale = prepared => ({ baseRevision: prepared.input.base.revision, requiresWeb: true, checkedWeb: [], operations: [{ kind: 'output', text: 'Price is 100 (from earlier knowledge)', evidence: [] }] });
+  const input = prompt => ({ prompt, language: 'en', model: undefined, base: empty(), context: '{"documents":[],"warnings":[]}', evidence: [], mapPath: 'Map.md' });
+  await assert.rejects(() => generateLivingProposal(calls(stale), input('Search the web for the latest price'), new AbortController().signal), /required-web-unavailable/);
+  assert.equal(tasks[0].webSearch, true);
+  assert.equal(tasks[0].textOnly, false);
+  assert.equal(tasks[0].optionalWebSearch, false);
+  const local = prepared => ({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: [{ kind: 'output', text: 'Local summary', evidence: [] }] });
+  const ok = await generateLivingProposal(calls(local), input('Summarize the notes'), new AbortController().signal);
+  assert.equal(ok.proposal.operations[0].text, 'Local summary');
+  assert.equal(tasks[1].webSearch, true);
+  assert.equal(tasks[1].optionalWebSearch, true);
+});
+
+S.integrationTest('A07: a source card is delivered as its summary first with its full revision tracked; a full-history Prompt reads the complete record; over-limit required data fails closed', async () => {
+  const seen = [];
+  const generate = async (_calls, input) => { seen.push(JSON.parse(input.context)); return { proposal: { baseRevision: 'empty', operations: [] }, context: { at: 't', evidence: [] } }; };
+  const read = async (prompt, change = () => {}) => {
+    const f = livingTrialRuntimeFixture({ generate });
+    change(f);
+    const prepared = await f.prepare(prompt);
+    await prepared.request.generate(new AbortController().signal);
+    return seen.at(-1).documents.find(d => d.title === 'Up');
+  };
+  const summary = await read('Research root');
+  assert.equal(summary.scope, 'summary');
+  assert.equal(summary.text, 'Existing findings');
+  const full = await read('Research root using the full history');
+  assert.equal(full.scope, 'full');
+  assert.ok(full.text.length > summary.text.length);
+  assert.equal(full.revision, summary.revision, 'summary delivery still tracks the full-content revision');
+  const big = f => { f.snapshots.get('up.md').note.detail = 'x'.repeat(70_000); };
+  const huge = await read('Research root', big);
+  assert.equal(huge.scope, 'summary', 'a large history is not read unless the task needs it');
+  assert.notEqual(huge.revision, summary.revision, 'an unread full change still alters the revision');
+  await assert.rejects(() => read('Research root using the full history', big), /living-node-context-too-large/);
+});
+
+S.integrationTest('A07: over-budget optional map context is omitted with disclosure and no citation handle; unauthorized paths are never delivered', async () => {
+  const seen = [];
+  const generate = async (_calls, input) => { seen.push(JSON.parse(input.context)); return { proposal: { baseRevision: 'empty', operations: [] }, context: { at: 't', evidence: [] } }; };
+  const mapSources = async () => ({ unavailable: 0, groups: [{ documents: [
+    { path: 'small.md', content: 'SMALL-OPTIONAL' }, { path: 'big.md', content: 'x'.repeat(70_000) }, { path: '.obsidian/secret.md', content: 'PRIVATE-CONFIG' }] }] });
+  const { prepare } = livingTrialRuntimeFixture({ generate, mapSources });
+  const prepared = await prepare();
+  await prepared.request.generate(new AbortController().signal);
+  const context = seen[0];
+  assert.deepEqual(context.documents.map(d => d.title).sort(), ['Root', 'Up', 'small.md']);
+  assert.ok(prepared.warnings.includes('map-source-budget-omitted: big.md'));
+  assert.ok(prepared.warnings.includes('map-source-unavailable'));
+  const handles = prepared.request.context.evidence.map(e => e.source);
+  assert.ok(handles.includes('small.md'));
+  assert.ok(!handles.includes('big.md') && !handles.includes('.obsidian/secret.md'));
+  assert.ok(!JSON.stringify(context).includes('PRIVATE-CONFIG'));
+});
+
+S.integrationTest('A10: one news event reported by two URLs is deduplicated with added evidence; different events stay separate; a same-day newspaper update is a correction, not an appended copy', async () => {
+  const f = await setup();
+  const ids = ['e1', 'e2', 'e3'];
+  assert.equal(await commitOps(f, [record('n1')], ids, 'x1'), 'written');
+  assert.equal(await commitOps(f, [record('n1-url2', { claim: 'Acme  acquires beta', evidence: ['e2'] })], ids, 'x2'), 'written');
+  let knowledge = readLivingMarkdown(f.contents.get(path));
+  assert.equal(knowledge.records.length, 1);
+  assert.deepEqual(S.plain(knowledge.records[0].evidence.map(e => e.id)), ['e1', 'e2']);
+  assert.equal(await commitOps(f, [record('n2', { claim: 'Acme sues Gamma', evidence: ['e3'] })], ids, 'x3'), 'written');
+  knowledge = readLivingMarkdown(f.contents.get(path));
+  assert.deepEqual(S.plain(knowledge.records.map(r => r.claim)), ['Acme acquires Beta', 'Acme sues Gamma']);
+  const paper = (id, claim, time = '2026-11-26') => record(id, { subject: 'Daily', scope: 'newspaper', granularity: 'daily', eventTime: time, claim });
+  assert.equal(await commitOps(f, [paper('p1', 'Edition 1')], ids, 'x4'), 'written');
+  const before = f.contents.get(path);
+  await assert.rejects(() => commitOps(f, [paper('p2', 'Edition 2 (updated)')], ids, 'x5'), /period-conflict-requires-correction/);
+  assert.equal(f.contents.get(path), before);
+  assert.equal(await commitOps(f, [{ kind: 'correct', id: 'p1', claim: 'Edition 2 (updated)', reason: 'same-day update', evidence: ['e3'] }], ids, 'x6'), 'written');
+  assert.equal(await commitOps(f, [paper('p3', 'Next day edition', '2026-11-27')], ids, 'x7'), 'written');
+  knowledge = readLivingMarkdown(f.contents.get(path));
+  const papers = knowledge.records.filter(r => r.scope === 'newspaper');
+  assert.deepEqual(S.plain(papers.map(r => r.claim)), ['Edition 2 (updated)', 'Next day edition']);
+  assert.equal(papers[0].history[0].claim, 'Edition 1');
+});
+
+S.integrationTest('A11: contradiction, supplement, expiry, correction and unknown time each persist correctly and none deletes old knowledge', async () => {
+  const f = await setup();
+  const ids = ['e1', 'e2', 'e3', 'e4'];
+  await commitOps(f, [record('r1', { claim: '100', evidence: ['e1'] })], ids, 'y1');
+  const state = () => readLivingMarkdown(f.contents.get(path)).records.find(r => r.id === 'r1');
+  await commitOps(f, [{ kind: 'dispute', id: 'r1', claim: '120', reason: 'conflicting report', evidence: ['e2'] }], ids, 'y2');
+  assert.equal(state().validity, 'disputed');
+  assert.equal(state().claim, '100');
+  assert.equal(state().history[0].claim, '120');
+  await commitOps(f, [{ kind: 'supplement', id: 'r1', evidence: ['e3'] }], ids, 'y3');
+  assert.deepEqual(S.plain(state().evidence.map(e => e.id)), ['e1', 'e3']);
+  await commitOps(f, [{ kind: 'invalidate', id: 'r1', reason: 'withdrawn', evidence: ['e4'] }], ids, 'y4');
+  assert.equal(state().validity, 'invalidated');
+  assert.equal(state().claim, '100');
+  await commitOps(f, [record('r2', { claim: 'unrelated unknown-time fact', eventTime: null, evidence: ['e2'] })], ids, 'y5');
+  const all = readLivingMarkdown(f.contents.get(path)).records;
+  assert.deepEqual(S.plain(all.map(r => [r.id, r.validity])), [['r1', 'invalidated'], ['r2', 'active']]);
+  await commitOps(f, [record('r4', { claim: '90', eventTime: '2026-11-25', evidence: ['e1'] })], ids, 'y7');
+  await commitOps(f, [{ kind: 'correct', id: 'r4', claim: '95', reason: 'corrected close', evidence: ['e2'] }], ids, 'y8');
+  const corrected = readLivingMarkdown(f.contents.get(path)).records.find(r => r.id === 'r4');
+  assert.equal(corrected.claim, '95');
+  assert.equal(corrected.history[0].claim, '90');
+  assert.deepEqual(S.plain(corrected.history[0].previousEvidence.map(e => e.id)), ['e1']);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).records.length, 3);
+});
+
+S.integrationTest('A12: a no-change success leaves downstream valid; a full-knowledge change with an unchanged summary makes the direct consumer stale', async () => {
+  const { inspectLivingValidity } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+  const f = await roundFixture();
+  await runLivingRound(f.port);
+  const validity = async () => Object.fromEntries(await inspectLivingValidity(f.port));
+  assert.deepEqual(await validity(), { parent: 'valid', child: 'valid' });
+  const original = f.port.calls.run;
+  let append = false;
+  f.port.calls.run = async (prepared, options, finish) => {
+    if (!append || prepared.input.prompt !== 'Research child') return original(prepared, options, finish);
+    const operations = [{ kind: 'append', id: 'obs1', subject: 'child', scope: 'detail', granularity: 'day', eventTime: '2026-11-27', claim: 'New observation', evidence: [prepared.input.evidence[0].id] }];
+    return finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations }), { signal: options.signal, parsed() {} });
+  };
+  assert.equal((await runLivingRound(f.port, ['child'])).get('child'), 'no-change');
+  assert.deepEqual(await validity(), { parent: 'valid', child: 'valid' });
+  const summary = readLivingMarkdown(f.contents.get('child.md')).output.text;
+  append = true;
+  assert.equal((await runLivingRound(f.port, ['child'])).get('child'), 'changed');
+  assert.equal(readLivingMarkdown(f.contents.get('child.md')).output.text, summary);
+  assert.deepEqual(await validity(), { parent: 'stale', child: 'valid' });
+});
+
+S.integrationTest('A13: a trend update replaces the current result without appending the old full text, keeps valuable records and evidence, and a new Prompt topic keeps the old scope', async () => {
+  const f = await setup();
+  const ids = ['e1', 'e2'];
+  const day = (id, time, claim, evidence) => record(id, { subject: 'index', scope: 'close', granularity: 'day', eventTime: time, claim, evidence: [evidence] });
+  await commitOps(f, [{ kind: 'output', text: 'Trend: rising across the week', evidence: ['e1'] }, day('r1', '2026-11-26', '100', 'e1')], ids, 'z1');
+  await commitOps(f, [{ kind: 'output', text: 'Trend: flat since Thursday', evidence: ['e1'] }, day('r2', '2026-11-27', '101', 'e2')], ids, 'z2');
+  const markdown = f.contents.get(path);
+  const knowledge = readLivingMarkdown(markdown);
+  assert.equal(knowledge.output.text, 'Trend: flat since Thursday');
+  assert.ok(!markdown.includes('rising across the week'), 'the old full analysis is not appended');
+  assert.equal((markdown.match(/vam-living-node:begin/g) ?? []).length, 1);
+  assert.deepEqual(S.plain(knowledge.output.evidence.map(e => e.id)), ['e1']);
+  assert.deepEqual(S.plain(knowledge.records.map(r => [r.id, r.claim, r.evidence.map(e => e.id)])), [['r1', '100', ['e1']], ['r2', '101', ['e2']]]);
+  await f.repo.updateNote(path, { prompt: 'Track a different topic' });
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, knowledge.revision);
+  await commitOps(f, [{ kind: 'output', text: 'Different topic result', evidence: ['e2'] }], ids, 'z3');
+  const after = readLivingMarkdown(f.contents.get(path));
+  assert.equal(after.output.text, 'Different topic result');
+  assert.deepEqual(S.plain(after.records.map(r => r.id)), ['r1', 'r2']);
 });

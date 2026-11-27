@@ -70,7 +70,10 @@ function open(overrides = {}) {
     ...overrides
   };
   const parent = element('div');
+  const doc = { activeElement: null };
+  parent.root = doc;
   const win = new AiCardPopover(host, parent);
+  win.el.ownerDocument = doc;
   return { win, calls, el: win.el };
 }
 const alertBox = el => find(el, i => i.attrs?.role === 'alert');
@@ -142,5 +145,26 @@ test('setup window: relabel sets the fixed words again and keeps the draft', () 
     win.relabel();
     assert.notEqual(save(), 'Save');
     assert.equal(question.value, 'My draft');
+  } finally { ui.setUiLanguage('en'); }
+});
+
+test('setup window: a relabel puts the focus back on the equivalent rebuilt control (retry, Confirm again), not the question field', () => {
+  ui.setUiLanguage('en');
+  const { win, el } = open({ initial: { question: 'Why?', sources: ['Ref', 'Other'], keepOld: true } });
+  win.markReplaced(['Other']);
+  try {
+    const confirm = find(el, i => i.hasClass?.('vam-ai-card-pop-chip-confirm'));
+    confirm.focus();
+    win.relabel();
+    const again = find(el, i => i.hasClass?.('vam-ai-card-pop-chip-confirm'));
+    assert.notEqual(again, confirm, 'the chip was rebuilt');
+    assert.equal(dom.focusedNow(), again, 'the keyboard is on the rebuilt Confirm again');
+    win.showTrialFailure('Provider said no');
+    const retry = find(alertBox(el), i => i.tag === 'button');
+    assert.equal(dom.focusedNow(), retry);
+    win.relabel();
+    const retryAgain = find(alertBox(el), i => i.tag === 'button');
+    assert.notEqual(retryAgain, retry);
+    assert.equal(dom.focusedNow(), retryAgain, 'the keyboard stays on the retry');
   } finally { ui.setUiLanguage('en'); }
 });

@@ -28,6 +28,14 @@ export interface AiCardPopoverHost {
 let seq = 0;
 
 /** The central editor owns an unsaved draft; the separate right reader owns the preview. */
+/** Controls a repaint rebuilds, as selectors: the focus finds its equivalent again. */
+const REPAINTED_CONTROLS = [
+  ".vam-living-editor-retry",
+  ".vam-ai-card-pop-chip-confirm",
+  ".vam-ai-card-pop-chip-x",
+  ".vam-ai-card-pop-add"
+];
+
 export class AiCardPopover {
   readonly el: HTMLElement;
   private readonly titleEl: HTMLInputElement | null = null;
@@ -192,11 +200,21 @@ export class AiCardPopover {
     }
     const active = this.el.ownerDocument?.activeElement ?? null;
     const inside = !!active && this.el.contains(active);
+    // The repaint replaces the chips and the failure box: note which of their controls the keyboard was on.
+    let was: { selector: string; at: number } | undefined;
+    if (inside)
+      for (const selector of REPAINTED_CONTROLS) {
+        const at = Array.from(this.el.querySelectorAll(selector)).indexOf(active);
+        if (at >= 0) was = { selector, at };
+      }
     this.paintSources();
     this.paintFailure();
     this.refresh();
-    // The repaint replaced the chips and the failure box: a control the keyboard was on is found again by the field.
-    if (inside && !this.el.contains(active)) this.questionEl.focus();
+    // The equivalent rebuilt control gets the focus back; the field only when that control is gone.
+    if (inside && !this.el.contains(active)) {
+      const same = was ? this.el.querySelectorAll<HTMLElement>(was.selector)[was.at] : undefined;
+      (same ?? this.questionEl).focus();
+    }
   }
 
   /** The trial did not finish: say so inside the editor, with the reason and a way to try again. */
@@ -226,6 +244,7 @@ export class AiCardPopover {
     this.failureEl.createDiv({ cls: "vam-living-editor-failure-reason", text: this.failure, attr: { dir: "auto" } });
     this.failureEl.createDiv({ cls: "vam-living-editor-failure-note", text: t("ui.living_node_trial_failed_note") });
     const retry = this.failureEl.createEl("button", {
+      cls: "vam-living-editor-retry",
       text: t("ui.living_node_trial_retry"),
       attr: { type: "button" }
     });

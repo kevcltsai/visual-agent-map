@@ -93,7 +93,7 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { TOPIC_KINDS, readAiCard } from "./note-values";
+import { TOPIC_KINDS } from "./note-values";
 import { frontmatter } from "./core/repository-frontmatter";
 import { kindIconId, kindIconSvg } from "./experiences/visual-map/topic-kind-shape";
 import {

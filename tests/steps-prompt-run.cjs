@@ -327,7 +327,7 @@ test('Run All: legacy fresh mode never deletes existing manual content', async (
   await h.repo.updateNote(h.node('leaf').path, { detail: 'User-owned history' });
   await h.runAll(); await h.done();
   assert.match(h.raw('leaf'), /User-owned history/);
-  assert.match(h.raw('leaf'), /ai-update-mode: "fresh"/);
+  assert.equal(require('./support.cjs').obsidian.parseYaml(h.raw('leaf').match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])['ai-update-mode'], 'fresh');
   assert.match(h.raw('leaf'), /Result: leaf/);
 });
 

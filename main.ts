@@ -360,7 +360,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
   private readonly bookNoteWriter = createNoteWriter({
     openViews: path => this.openMarkdownViews(path),
-    canWrite: content => !isLivingNodeNote(content, readAiCard(frontmatter(content))),
+    canWrite: content => !isLivingNodeNote(content, frontmatter(content)),
     rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     rerender: path =>
       rerenderReadingViewsWhenLoaded(

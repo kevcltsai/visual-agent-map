@@ -24,10 +24,10 @@ S.integrationTest('writer admission: the marker state is none, paired or corrupt
 });
 
 S.integrationTest('writer admission: book callout writes use the marker-keyed Living Node test, not only the flag', () => {
-  assert.equal(isLivingNodeNote(head(false) + paired, false), true);
-  assert.equal(isLivingNodeNote(head(false) + corrupt['unpaired end'], false), true);
-  assert.equal(isLivingNodeNote('---\ncustom: 1\n---\n# Plain\n', false), false);
-  assert.equal(isLivingNodeNote('---\nai-card: true\n---\n# Flag only\n', true), true);
+  assert.equal(isLivingNodeNote(head(false) + paired, {}), true);
+  assert.equal(isLivingNodeNote(head(false) + corrupt['unpaired end'], {}), true);
+  assert.equal(isLivingNodeNote('---\ncustom: 1\n---\n# Plain\n', {}), false);
+  assert.equal(isLivingNodeNote('---\nai-card: true\n---\n# Flag only\n', { 'ai-card': true }), true);
   assert.ok(require('node:fs').readFileSync(require('node:path').join(S.root, 'main.ts'), 'utf8').includes('canWrite: content => !isLivingNodeNote('));
 });
 

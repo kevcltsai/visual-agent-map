@@ -162,7 +162,7 @@ export async function collectExportScene(
       y: box.y,
       w: box.width,
       h: box.height,
-      title: wrapText(title, box.width - 24),
+      title: wrapText(title, box.width - 28),
       fill: colorOf(style.backgroundColor),
       stroke: colorOf(style.borderTopColor),
       textColor: colorOf(titleEl ? computed(titleEl).color : undefined),

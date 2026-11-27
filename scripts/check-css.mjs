@@ -74,7 +74,7 @@ export const TOKENS = [
   "--vam-surface", "--vam-text", "--vam-muted", "--vam-border", "--vam-accent", "--vam-focus", "--vam-selected", "--vam-error", "--vam-warning",
   "--vam-card-title-size", "--vam-card-summary-size",
 ];
-const TOKEN_ROOTS = new Set([".vam-view", ".vam-stage", ".vam-card-frame-stage"]);
+const TOKEN_ROOTS = new Set([".vam-view", ".vam-stage", ".vam-tokens"]);
 
 export function findUnscopedTokens(css, file = "input.css") {
   const found = [];
@@ -83,7 +83,7 @@ export function findUnscopedTokens(css, file = "input.css") {
     const rule = decl.parent;
     const selectors = rule.type === "rule" ? rule.selectors.map((s) => s.trim().replace(/^\.theme-dark\s+/, "")) : [];
     if (!selectors.length || !selectors.every((s) => TOKEN_ROOTS.has(s)))
-      found.push({ line: decl.source.start.line, message: `${decl.prop} may only be declared on .vam-view, .vam-stage or .vam-card-frame-stage (got "${selectors.join(", ") || rule.type}").` });
+      found.push({ line: decl.source.start.line, message: `${decl.prop} may only be declared on .vam-view, .vam-stage or .vam-tokens (got "${selectors.join(", ") || rule.type}").` });
   });
   return found;
 }

@@ -50,7 +50,7 @@ test('sharing viewer: stylesheet rules are copied from styles.css unchanged and 
   const known = tools.allRuleTexts(styles);
   assert.ok(rules.length > 40, 'the extraction keeps the card, canvas and panel rules');
   for (const item of rules) for (const rule of item.rules) assert.ok(known.has(rule), `not a rule of styles.css: ${rule.slice(0, 80)}`);
-  const wanted = ['.vam-view, .vam-stage, .vam-card-frame-stage {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
+  const wanted = ['.vam-view, .vam-stage, .vam-tokens {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
   const flat = rules.flatMap(item => item.rules);
   for (const start of wanted) assert.ok(flat.some(rule => rule.startsWith(start)), `${start} must be taken from styles.css`);
   // The rules appear in the shipped stylesheet byte for byte.

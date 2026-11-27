@@ -38,7 +38,7 @@ test("design tokens may only be declared on the VAM roots", () => {
   assert.equal(findUnscopedTokens(".vam-node { --vam-space-1: 4px; }").length, 1);
   assert.equal(findUnscopedTokens(":root { --vam-surface: red; }").length, 1);
   assert.equal(findUnscopedTokens(".vam-view, .vam-node { --vam-text: red; }").length, 1);
-  assert.deepEqual(findUnscopedTokens(".vam-view, .vam-stage, .vam-card-frame-stage { --vam-space-1: 4px; --vam-card-bg: red; }\n.theme-dark .vam-view { --vam-surface: #000; }"), []);
+  assert.deepEqual(findUnscopedTokens(".vam-view, .vam-stage, .vam-tokens { --vam-space-1: 4px; --vam-card-bg: red; }\n.theme-dark .vam-view { --vam-surface: #000; }"), []);
   assert.deepEqual(findUnscopedTokens(".vam-node { --vam-card-bg: red; --vam-kind-x: blue; }"), []);
 });
 
@@ -46,7 +46,7 @@ test("design tokens keep the V3.3 stage A values (02-stage-a-mockup)", () => {
   const css = readFileSync(resolve(root, "styles.css"), "utf8");
   const values = {};
   postcss.parse(css).walkRules((rule) => {
-    if (rule.selector !== ".vam-view, .vam-stage, .vam-card-frame-stage") return;
+    if (rule.selector !== ".vam-view, .vam-stage, .vam-tokens") return;
     rule.walkDecls((decl) => { values[decl.prop] = decl.value; });
   });
   assert.deepEqual(values, {

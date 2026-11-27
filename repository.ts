@@ -884,18 +884,22 @@ export class Repository {
       detailTemplate?: DetailTemplate;
       newVisualReferences?: boolean;
       expectedContent?: string;
+      /** Unintegrated AI writer: refuse even a flag-only card, using the actual bytes at commit. */
+      rejectAiCard?: boolean;
       /** Gets the file text the callback was given (so a check can look at the text as it is now, not as the caller last read it). */
       authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize, finalize, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))) {
         outcome = "discarded";
         return content;
       }
+      if ((rejectAiCard || writeOptions.newVisualReferences) && readAiCard(frontmatter(content)))
+        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
       const next = this.patchedNote(path, content, patch, writeOptions);
       const final = finalize ? finalize(next) : next;
       if (final === null) {
@@ -915,15 +919,17 @@ export class Repository {
   async updateNoteRawGuarded(
     path: string,
     transform: (content: string) => string,
-    options: { expectedContent?: string; authorize?: () => boolean } = {}
+    options: { expectedContent?: string; authorize?: () => boolean; rejectAiCard?: boolean } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize } = options;
+    const { expectedContent, authorize, rejectAiCard } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
         outcome = "discarded";
         return content;
       }
+      if (rejectAiCard && readAiCard(frontmatter(content)))
+        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
       return transform(content);
     });
     return outcome;

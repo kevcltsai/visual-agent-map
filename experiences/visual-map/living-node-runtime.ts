@@ -22,7 +22,7 @@ import {
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
-import { applyLivingChanges, type LivingEvidence } from "./living-node-changes";
+import { applyLivingChanges, hasLivingResult, type LivingEvidence } from "./living-node-changes";
 
 const coordinators = new WeakMap<object, LivingCoordinator>();
 export function livingCoordinator(owner: object): LivingCoordinator {
@@ -99,8 +99,8 @@ function ownKnowledge(note: Note): string {
 
 function usableKnowledge(snapshot: Snapshot): boolean {
   const base = readLivingMarkdown(snapshot.content);
-  return !!base.output.text || base.records.length > 0 ||
-    (base.revision === "empty" &&
+  return hasLivingResult(base) ||
+    (base.revision === "empty" && base.output.owner === "ai" &&
       (snapshot.note.aiRun?.result === "ok" || frontmatter(snapshot.content)["living-node-copy-snapshot"] === true) &&
       !!ownKnowledge(snapshot.note));
 }
@@ -437,8 +437,10 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           const value = await read(id);
           cache.set(id, value);
           const fm = frontmatter(value.snapshot.content);
-          const validity = value.input.base.revision === "empty"
-            ? usableKnowledge(value.snapshot) ? "stale" : "none"
+          const validity = !usableKnowledge(value.snapshot)
+            ? "none"
+            : value.input.base.revision === "empty"
+              ? "stale"
             : fm["living-node-input-revision"] === value.input.inputRevision &&
                 fm["living-node-success-knowledge"] === value.input.base.revision
               ? "valid"
@@ -793,7 +795,7 @@ export async function inspectLivingValidity(port: LivingTrialPort) {
     try {
       const data = await readInputs(readPort, map, item.id, snapshot, resolved);
       const fm = frontmatter(snapshot.content);
-      if (data.base.revision === "empty") {
+      if (!usableKnowledge(snapshot) || data.base.revision === "empty") {
         validity.set(item.id, usableKnowledge(snapshot) ? "stale" : "none");
         continue;
       }

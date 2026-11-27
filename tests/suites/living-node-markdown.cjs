@@ -357,6 +357,18 @@ S.integrationTest('Living Node formal round: actual Repository writes in depende
   assert.equal(readLivingMarkdown(f.contents.get('child.md')).revision, revision);
 });
 
+S.integrationTest('Living Node recovery: blocked round cannot erase the only surviving successful diagnostic', async () => {
+  const f = await roundFixture();
+  const child = f.contents.get('child.md').replace('ai-card: true\n', 'ai-card: true\nliving-node-outcome: ok\n');
+  await f.app.vault.process(f.files.get('child.md'), () => child);
+  const results = await runLivingRound(f.port);
+  assert.equal(results.get('child'), 'blocked');
+  assert.equal(results.get('parent'), 'blocked');
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.contents.get('child.md'), child);
+  assert.throws(() => readLivingMarkdown(child), /unknown-ownership/);
+});
+
 S.integrationTest('Living Node formal round: a target changed while its provider is running is not written; dependent branch is blocked', async () => {
   const f = await roundFixture();
   f.beforeReply(async prompt => {

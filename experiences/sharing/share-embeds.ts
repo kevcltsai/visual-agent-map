@@ -21,9 +21,9 @@ export function isManagedShareEmbed(text: string): boolean {
 }
 
 export function shareNoteMarkdown(note?: { detail?: string; livingNode?: { shareMarkdown?: string } }): string {
-  // Only the Living Node projection is redacted; its note embeds become plain links so a non-shared note is never read into the file.
+  // Only the Living Node projection is redacted; every `![[` there becomes a plain link, also inside code (no fence in the joined text can change what is read), so a non-shared note is never read into the file.
   const living = note?.livingNode?.shareMarkdown;
-  return [note?.detail, living && flattenNoteEmbeds(redactLivingShareText(living))]
+  return [note?.detail, living && redactLivingShareText(living).replace(/!\[\[/g, "[[")]
     .filter(value => value?.trim())
     .join("\n\n");
 }

@@ -9,6 +9,7 @@ import {
   livingSuppressionV2Entry,
   parseLivingEventTombstone,
   parseLivingSuppressionV2,
+  type LivingAiLatest,
   type LivingChangeContext,
   type LivingEvidence,
   type LivingKnowledge,
@@ -24,6 +25,8 @@ import {
 const HASH_KEY = "living-node-region-hash";
 const OWNERSHIP_KEY = "living-node-ownership";
 const COMMIT_KEY = "living-node-last-execution";
+/** Note-file heading of the AI result slot: English and stable, like every other heading. The UI label is localized. */
+const AI_LATEST = "### AI latest";
 
 export const livingSnapshotRevision = (content: string): string => createHash("sha256").update(content).digest("hex");
 
@@ -88,6 +91,21 @@ function renderRegion(knowledge: LivingKnowledge): string {
     "#### Evidence",
     ...sourceLines(knowledge.output.evidence)
   ];
+  // Only written once the AI has a separate result, so a V1 region stays byte-identical. Older builds cannot read this
+  // section and fail closed on the whole region, leaving the bytes untouched.
+  if (knowledge.aiLatest) {
+    lines.push(
+      "",
+      AI_LATEST,
+      field("Ownership", knowledge.aiLatest.owner),
+      field("Generated", knowledge.aiLatest.at),
+      "",
+      quote(knowledge.aiLatest.text),
+      "",
+      "#### Evidence",
+      ...sourceLines(knowledge.aiLatest.evidence)
+    );
+  }
   for (const record of knowledge.records) {
     lines.push(
       "",
@@ -179,6 +197,18 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
   expect("");
   expect("#### Evidence");
   const output = { text: outputText, owner: outputOwner, evidence: evidence() };
+  let aiLatest: LivingAiLatest | undefined;
+  if (lines[at] === "" && lines[at + 1] === AI_LATEST) {
+    expect("");
+    expect(AI_LATEST);
+    const latestOwner = owner();
+    const generated = text(readField("Generated"));
+    expect("");
+    const latestText = prose();
+    expect("");
+    expect("#### Evidence");
+    aiLatest = { text: latestText, owner: latestOwner, at: generated, evidence: evidence() };
+  }
   const records: LivingRecord[] = [];
   const ids = new Set<string>();
   while (lines[at] === "" && lines[at + 1] === "### Observation") {
@@ -239,13 +269,19 @@ function decodeRegion(region: Region, revision: string): LivingKnowledge {
   }
   expect("");
   expect(END);
-  const result = { revision, records, output, suppressed };
+  const result = { revision, records, output, suppressed, ...(aiLatest ? { aiLatest } : {}) };
   if (at !== lines.length || renderRegion(result) !== region.text) fail();
   return result;
 }
 
-export function renderLivingPreview(knowledge: LivingKnowledge): string {
-  return renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
+/** The note keeps the English heading; a view shows the localized label. User text is quoted, so it never matches. */
+export function localizeAiLatestHeading(markdown: string, label: string): string {
+  return markdown.replace(/^### AI latest$/m, () => "### " + label);
+}
+
+export function renderLivingPreview(knowledge: LivingKnowledge, aiLatestLabel?: string): string {
+  const text = renderRegion(knowledge).slice(BEGIN.length, -END.length).trim();
+  return aiLatestLabel ? localizeAiLatestHeading(text, aiLatestLabel) : text;
 }
 
 /** Share committed knowledge and verified public evidence only. No internal IDs,
@@ -265,6 +301,7 @@ export function renderLivingShareKnowledge(knowledge: LivingKnowledge): string {
     if (text.trim()) sections.push(quote([text, ...publicEvidence(evidence)].join("\n")));
   };
   append(knowledge.output.text, knowledge.output.evidence);
+  if (knowledge.aiLatest) append(knowledge.aiLatest.text, knowledge.aiLatest.evidence);
   for (const record of knowledge.records) {
     append(
       [record.eventTime, record.claim, record.validity !== "active" ? record.validity : ""].filter(Boolean).join("\n"),
@@ -291,8 +328,13 @@ function outputHash(output: LivingKnowledge["output"]): string {
   return livingSnapshotRevision(renderRegion({ ...emptyKnowledge(), output }));
 }
 
+function aiLatestHash(aiLatest: LivingAiLatest): string {
+  return livingSnapshotRevision(renderRegion({ ...emptyKnowledge(), aiLatest }));
+}
+
 interface OwnershipIndex {
   output: string;
+  aiLatest?: string;
   records: Map<string, string>;
   events: Map<string, { fingerprint: string; scope?: string; unknownTime?: boolean }>;
   /** Suppression v2 entry (as stored string) for records written by this version. */
@@ -304,6 +346,7 @@ interface OwnershipIndex {
 function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
+    ...(knowledge.aiLatest ? [JSON.stringify(["aiLatest", aiLatestHash(knowledge.aiLatest)])] : []),
     ...knowledge.records.map(record =>
       JSON.stringify(["record", record.id, recordHash(record), livingSuppressionV2Entry(livingSuppressionV2(record))])
     ),
@@ -328,6 +371,8 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
     if (!Array.isArray(value)) throw new Error("invalid-ownership-index");
     if (value[0] === "output" && value.length === 2 && validHash(value[1]) && !index.output) {
       index.output = value[1];
+    } else if (value[0] === "aiLatest" && value.length === 2 && validHash(value[1]) && !index.aiLatest) {
+      index.aiLatest = value[1];
     } else if (
       value[0] === "record" &&
       (value.length === 3 ||
@@ -389,7 +434,12 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
   });
   const output =
     index.output === outputHash(current.output) ? current.output : { ...current.output, owner: "user" as const };
-  const next = { ...current, records, output, suppressed: [...suppressed] };
+  // An AI result the index does not vouch for (typed in, or edited) is user text and is never overwritten.
+  const aiLatest =
+    current.aiLatest && index.aiLatest !== aiLatestHash(current.aiLatest)
+      ? { ...current.aiLatest, owner: "user" as const }
+      : current.aiLatest;
+  const next = { ...current, records, output, suppressed: [...suppressed], ...(aiLatest ? { aiLatest } : {}) };
   return { ...next, revision: livingSnapshotRevision(renderRegion(next)) };
 }
 
@@ -469,7 +519,12 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   const next = applyLivingChanges(stored, request.proposal, context);
   if (stored.revision === "empty" && !next.records.length && !next.output.text)
     throw new Error("missing-formal-result");
-  const nextKnowledge = { ...stored, records: next.records, output: next.output };
+  const nextKnowledge = {
+    ...stored,
+    records: next.records,
+    output: next.output,
+    ...(next.aiLatest ? { aiLatest: next.aiLatest } : {})
+  };
   const managed = renderRegion(nextKnowledge);
   const changed = !region || region.text !== managed;
   const checked = await request.inspect();

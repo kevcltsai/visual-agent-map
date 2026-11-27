@@ -109,7 +109,12 @@ export class LivingTrial {
         if (current()) this.status = "invalid";
         return false;
       }
-      this.preview = { ...base, records: next.records, output: next.output };
+      this.preview = {
+        ...base,
+        records: next.records,
+        output: next.output,
+        ...(next.aiLatest ? { aiLatest: next.aiLatest } : {})
+      };
       this.candidate = { snapshot, proposal, savedContent };
       this.status = "ready";
       return true;

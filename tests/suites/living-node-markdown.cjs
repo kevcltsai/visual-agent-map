@@ -1977,3 +1977,178 @@ S.integrationTest('A39 resurrection: a user edit of an AI sibling keeps the hold
   assert.equal(back.suppressed.some(v => v.startsWith('@v2:')), false);
   assert.equal(back.suppressed.includes('r1'), false);
 });
+
+// ---- T06: independent AI result slot ----
+const latestOp = text => ({ kind: 'output', text, evidence: ['e1'] });
+/** A card whose output the owner hand-edited after the AI wrote it. Returns the bytes of that user-owned state. */
+async function userOwnedOutput(f) {
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const edited = f.contents.get(path).replace('> Current findings', '> Owner wrote this');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  return edited;
+}
+const latestRequest = (f, base, text, executionId, at = '2026-11-27T06:00:00+08:00') => request(f, { base, candidate: { executionId },
+  proposal: { baseRevision: base.revision, operations: [latestOp(text)] }, context: { ...context, at } });
+
+S.integrationTest('T06: a hand-edited output stays byte-for-byte while the AI result goes to its own section with its generated time', async () => {
+  const f = await setup();
+  const edited = await userOwnedOutput(f);
+  const base = readLivingMarkdown(edited);
+  assert.equal(base.output.owner, 'user');
+  assert.equal(base.aiLatest, undefined);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, base, 'AI newest result', 'e2')), 'written');
+  const after = f.contents.get(path);
+  assert.ok(after.includes('### Current output\n- Ownership: "user"\n\n> Owner wrote this\n'));
+  assert.ok(after.includes('### AI latest\n- Ownership: "ai"\n- Generated: "2026-11-27T06:00:00+08:00"\n\n> AI newest result\n'));
+  const read = readLivingMarkdown(after);
+  assert.equal(read.output.text, 'Owner wrote this');
+  assert.equal(read.output.owner, 'user');
+  assert.equal(read.aiLatest.text, 'AI newest result');
+  assert.equal(read.aiLatest.owner, 'ai');
+  assert.equal(read.aiLatest.at, '2026-11-27T06:00:00+08:00');
+  // A later run replaces only the AI slot; an identical result is a no-op that keeps the generated time.
+  const again = readLivingMarkdown(after);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, again, 'AI newest result', 'e3', '2026-11-27T07:00:00+08:00')), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).aiLatest.at, '2026-11-27T06:00:00+08:00');
+  const third = readLivingMarkdown(f.contents.get(path));
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, third, 'AI second result', 'e4', '2026-11-27T08:00:00+08:00')), 'written');
+  const last = readLivingMarkdown(f.contents.get(path));
+  assert.equal(last.aiLatest.text, 'AI second result');
+  assert.equal(last.output.text, 'Owner wrote this');
+});
+
+S.integrationTest('T06: an owner:ai output behaves as before and creates no AI latest section; legacy V1 bytes are unchanged by reading', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const v1 = f.contents.get(path);
+  assert.equal(v1.includes('AI latest'), false);
+  const base = readLivingMarkdown(v1);
+  assert.equal(base.aiLatest, undefined);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, base, 'Replaced in place', 'e2')), 'written');
+  const after = readLivingMarkdown(f.contents.get(path));
+  assert.equal(after.output.text, 'Replaced in place');
+  assert.equal(after.output.owner, 'ai');
+  assert.equal(after.aiLatest, undefined);
+  assert.equal(f.contents.get(path).includes('AI latest'), false);
+});
+
+S.integrationTest('T06: deleting the user output stays protected; an edited or deleted AI latest never blocks the next run', async () => {
+  const f = await setup();
+  const edited = await userOwnedOutput(f);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, readLivingMarkdown(edited), 'AI newest result', 'e2')), 'written');
+  const withLatest = f.contents.get(path);
+  // Deleting the output text region part: the user output remains user-owned and is not overwritten by any AI op.
+  const gone = withLatest.replace('> Owner wrote this', '> Owner rewrote again');
+  await f.app.vault.process(f.files.get(path), () => gone);
+  const base = readLivingMarkdown(gone);
+  assert.equal(base.output.owner, 'user');
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, base, 'AI third result', 'e3')), 'written');
+  assert.ok(f.contents.get(path).includes('> Owner rewrote again'));
+  assert.equal(readLivingMarkdown(f.contents.get(path)).aiLatest.text, 'AI third result');
+  // Hand-editing the AI section turns it into protected user text: the AI op is refused with bytes untouched.
+  const typed = f.contents.get(path).replace('> AI third result', '> Owner polished the AI text');
+  await f.app.vault.process(f.files.get(path), () => typed);
+  const protectedBase = readLivingMarkdown(typed);
+  assert.equal(protectedBase.aiLatest.owner, 'user');
+  await assert.rejects(() => commitLivingMarkdown(f.repo, latestRequest(f, protectedBase, 'AI fourth result', 'e4')), /protected-output/);
+  assert.equal(f.contents.get(path), typed);
+  // Removing the AI section entirely just empties the slot; the AI may write it again.
+  const removed = typed.replace(/\n### AI latest\n[\s\S]*?(?=\n### Suppression)/, '');
+  await f.app.vault.process(f.files.get(path), () => removed);
+  const emptied = readLivingMarkdown(removed);
+  assert.equal(emptied.aiLatest, undefined);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, emptied, 'AI fifth result', 'e5')), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).aiLatest.text, 'AI fifth result');
+});
+
+S.integrationTest('T06: formal commit, trial preview and adoption write identical bytes; the preview shows both sections', async () => {
+  const formal = await setup();
+  const edited = await userOwnedOutput(formal);
+  const baseFormal = readLivingMarkdown(edited);
+  const run = latestRequest(formal, baseFormal, 'AI newest result', 'e2');
+  assert.equal(await commitLivingMarkdown(formal.repo, run), 'written');
+  const viaTrial = await setup();
+  await userOwnedOutput(viaTrial);
+  const trial = new LivingTrial(new LivingCoordinator());
+  const trialBase = readLivingMarkdown(viaTrial.contents.get(path));
+  const r = { ...request(viaTrial, { base: trialBase, candidate: { executionId: 'e2' }, proposal: run.proposal, context: run.context }),
+    generate: async () => run.proposal, stillCurrent: async () => true };
+  const before = viaTrial.contents.get(path);
+  assert.equal(await trial.run(r), true);
+  assert.equal(trial.result.aiLatest.text, 'AI newest result');
+  assert.equal(trial.result.output.text, 'Owner wrote this');
+  assert.equal(viaTrial.contents.get(path), before);
+  const { renderLivingPreview } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+  const preview = renderLivingPreview(trial.result, 'AI 最新成果');
+  assert.ok(preview.includes('### AI 最新成果') && preview.includes('> AI newest result') && preview.includes('> Owner wrote this'));
+  assert.equal(preview.includes('### AI latest'), false);
+  assert.equal(renderLivingPreview(trial.result).includes('### AI latest'), true);
+  assert.equal(await trial.adopt(viaTrial.repo, r), 'written');
+  assert.equal(viaTrial.contents.get(path), formal.contents.get(path));
+});
+
+S.integrationTest('T06: undo restores the exact bytes before the AI result; the section reappears with the same bytes on redo', async () => {
+  const f = await setup();
+  const edited = await userOwnedOutput(f);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, readLivingMarkdown(edited), 'AI newest result', 'e2')), 'written');
+  const written = f.contents.get(path);
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const undone = readLivingMarkdown(f.contents.get(path));
+  assert.equal(undone.aiLatest, undefined);
+  assert.equal(undone.output.text, 'Owner wrote this');
+  await f.app.vault.process(f.files.get(path), () => written);
+  const redone = readLivingMarkdown(f.contents.get(path));
+  assert.equal(redone.aiLatest.text, 'AI newest result');
+  assert.equal(redone.aiLatest.owner, 'ai');
+});
+
+S.integrationTest('T06: share projection includes the AI latest section through the existing redaction; reader label is localized', async () => {
+  const f = await setup();
+  const edited = await userOwnedOutput(f);
+  const withSecret = { ...context, at: '2026-11-27T06:00:00+08:00' };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base: readLivingMarkdown(edited), candidate: { executionId: 'e2' },
+    proposal: { baseRevision: readLivingMarkdown(edited).revision, operations: [latestOp('AI newest result read /Users/kevin/Vault/private.md ok')] }, context: withSecret })), 'written');
+  const note = await f.repo.readNote(path);
+  assert.ok(note.livingNode.shareMarkdown.includes('> Owner wrote this'));
+  assert.ok(note.livingNode.shareMarkdown.includes('AI newest result'));
+  assert.equal(note.livingNode.shareMarkdown.includes('/Users/kevin'), false);
+  assert.equal(note.livingNode.shareMarkdown.includes('2026-11-27T06:00'), false);
+  assert.equal(note.livingNode.shareMarkdown.includes('Ownership'), false);
+  const { localizeAiLatestHeading } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+  assert.ok(localizeAiLatestHeading(f.contents.get(path), 'AI 最新成果').includes('\n### AI 最新成果\n'));
+  const user = localizeAiLatestHeading('> ### AI latest\n', 'X');
+  assert.equal(user, '> ### AI latest\n');
+});
+
+S.integrationTest('T06 A5: a V1.1 note with an AI latest section is rejected by the V1 grammar and a V1 build leaves the bytes unchanged', async () => {
+  const f = await setup();
+  const edited = await userOwnedOutput(f);
+  assert.equal(await commitLivingMarkdown(f.repo, latestRequest(f, readLivingMarkdown(edited), 'AI newest result', 'e2')), 'written');
+  const v11 = f.contents.get(path);
+  // V1 build: after the output evidence its strict grammar allows only an Observation or the Suppression section.
+  const v1Decode = content => {
+    const lines = content.slice(content.indexOf('<!-- vam-living-node:begin')).split('\n');
+    let at = lines.indexOf('#### Evidence');
+    while (lines[++at]?.startsWith('- Source: ')) { /* sources */ }
+    if (!(lines[at] === '' && (lines[at + 1] === '### Observation' || lines[at + 1] === '### Suppression'))) throw new Error('invalid-managed-region');
+    return true;
+  };
+  assert.equal(v1Decode(f.contents.get(path).replace(/\n### AI latest\n[\s\S]*?(?=\n### Suppression)/, '')), true);
+  const before = v11;
+  assert.throws(() => v1Decode(v11), /invalid-managed-region/);
+  assert.equal(f.contents.get(path), before);
+  // V1 ownership index: an unknown entry kind is an invalid index, so that build fails closed too.
+  const index = v11.match(/living-node-ownership:[\s\S]*?\n(?=\S)/)[0];
+  assert.ok(index.includes('aiLatest'));
+});
+
+S.integrationTest('T06: a V1.1 region with no AI latest is byte-identical to the V1 rendering (old schema read)', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const v1 = f.contents.get(path);
+  const base = readLivingMarkdown(v1);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base, candidate: { executionId: 'e2' }, proposal: { baseRevision: base.revision, operations: [latestOp('Current findings')] } })), 'written');
+  assert.equal(f.contents.get(path).includes('living-node-ownership'), true);
+  assert.equal(JSON.stringify(readLivingMarkdown(f.contents.get(path)).output), JSON.stringify(base.output));
+  assert.equal(f.contents.get(path).includes('aiLatest'), false);
+});

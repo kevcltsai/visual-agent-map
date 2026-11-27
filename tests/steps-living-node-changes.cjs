@@ -51,7 +51,8 @@ test('change set: new time bucket remains distinct even when the value is unchan
 test('change set: rejects protected records, protected summaries, unknown fields and forged evidence', () => {
   const correct = { kind: 'correct', id: 'r1', claim: '105', reason: 'correction', evidence: ['e2'] };
   assert.throws(() => apply(base({ records: [record({ owner: 'user' })] }), correct), /protected-record/);
-  assert.throws(() => apply(base({ output: { text: 'manual', owner: 'user', evidence: [] } }), { kind: 'output', text: 'replacement', evidence: [] }), /protected-output/);
+  // T06: a user-owned output is no longer a reason to reject; the AI result goes to aiLatest and the user text is kept.
+  assert.equal(apply(base({ output: { text: 'manual', owner: 'user', evidence: [] } }), { kind: 'output', text: 'replacement', evidence: [] }).output.text, 'manual');
   assert.throws(() => apply(base(), { ...correct, evidence: ['forged'] }), /unauthorized-evidence/);
   assert.throws(() => apply(base(), { ...correct, targetCard: 'other' }), /unknown-field/);
   assert.throws(() => apply(base(), { ...correct, id: 'missing' }), /unknown-record/);
@@ -243,4 +244,33 @@ test('A39 suppression v2: period truncates on the wall-clock time in its own off
   const q = base({ records: [], suppressed: [v2(record({ granularity: 'quarter', eventTime: '2026-10-01' }))] });
   assert.throws(() => apply(q, appendOp({ granularity: 'quarterly', eventTime: '2026-12-31' })), /suppressed-record/);
   assert.equal(apply(q, appendOp({ granularity: 'quarterly', eventTime: '2027-01-01' })).records.length, 1);
+});
+
+test('T06: with a user-owned output an output op updates aiLatest, never the user text and never rejects the proposal', () => {
+  const user = base({ output: { text: 'manual', owner: 'user', evidence: [] } });
+  const result = apply(user, { kind: 'output', text: 'ai answer', evidence: ['e1'] }, { kind: 'supplement', id: 'r1', evidence: ['e2'] });
+  assert.equal(result.changed, true);
+  assert.equal(result.output.text, 'manual');
+  assert.equal(result.output.owner, 'user');
+  assert.deepEqual(plain(result.aiLatest), { text: 'ai answer', owner: 'ai', at: 't2', evidence: [e('e1', 't2')] });
+  assert.equal(result.records[0].evidence.length, 2);
+  assert.equal(user.aiLatest, undefined);
+});
+
+test('T06: aiLatest is replaced as a unit, an identical result is a no-op that keeps its time, an edited one is protected', () => {
+  const user = base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'old', owner: 'ai', at: 't0', evidence: [e('e1', 't0')] } });
+  const same = apply(user, { kind: 'output', text: 'old', evidence: ['e1'] });
+  assert.equal(same.changed, false);
+  assert.equal(same.aiLatest.at, 't0');
+  const next = apply(user, { kind: 'output', text: 'new', evidence: ['e2'] });
+  assert.deepEqual(plain(next.aiLatest), { text: 'new', owner: 'ai', at: 't2', evidence: [e('e2')] });
+  assert.throws(() => apply(base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatest: { text: 'edited', owner: 'user', at: 't0', evidence: [] } }), { kind: 'output', text: 'x', evidence: [] }), /protected-output/);
+});
+
+test('T06: an owner:ai output is replaced in place and no aiLatest appears; aiLatest alone counts as a result', () => {
+  const result = apply(base(), { kind: 'output', text: 'replaced', evidence: ['e1'] });
+  assert.equal(result.output.text, 'replaced');
+  assert.equal(result.aiLatest, undefined);
+  assert.equal(hasLivingResult({ records: [], output: { text: '', owner: 'user', evidence: [] }, aiLatest: { text: 'x', owner: 'ai', at: 't', evidence: [] } }), true);
+  assert.equal(hasLivingResult({ records: [], output: { text: '', owner: 'user', evidence: [] } }), false);
 });

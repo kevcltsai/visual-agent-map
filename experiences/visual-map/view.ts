@@ -15604,7 +15604,7 @@ export class VisualAgentMapView extends ItemView {
                 );
                 const shown = await this.plugin.showLivingTrial(
                   this.plugin.repo.file(node.path),
-                  renderLivingPreview(trial.result),
+                  renderLivingPreview(trial.result, t("ui.living_node_ai_latest")),
                   viewSession,
                   currentTrial,
                   warnings

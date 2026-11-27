@@ -219,13 +219,14 @@ function knowledgeOverhead(base: LivingKnowledge): number {
     revision: base.revision,
     records: [],
     omitted: { count: base.records.length, oldest: longest, newest: longest },
-    output: base.output
+    output: base.output,
+    aiLatest: base.aiLatest
   }).length;
 }
 
 /** The model's view of the store: all records when they fit, else the projection with a disclosed omitted boundary. */
 export function livingKnowledgeText(base: LivingKnowledge, projection: LivingProjection): string {
-  const view = { revision: base.revision, records: base.records, output: base.output };
+  const view = { revision: base.revision, records: base.records, output: base.output, aiLatest: base.aiLatest };
   if (!projection.omitted.length) return JSON.stringify(view);
   const times = projection.omitted.flatMap(record =>
     eventMillis(record) === undefined ? [] : [record.eventTime as string]
@@ -238,7 +239,8 @@ export function livingKnowledgeText(base: LivingKnowledge, projection: LivingPro
       count: projection.omitted.length,
       ...(times.length ? { oldest: times[0], newest: times[times.length - 1] } : {})
     },
-    output: base.output
+    output: base.output,
+    aiLatest: base.aiLatest
   });
 }
 
@@ -249,7 +251,12 @@ export function buildLivingPrompt(input: LivingPromptInput & { base: LivingKnowl
 } {
   const whole = renderLivingPrompt(
     input,
-    JSON.stringify({ revision: input.base.revision, records: input.base.records, output: input.base.output })
+    JSON.stringify({
+      revision: input.base.revision,
+      records: input.base.records,
+      output: input.base.output,
+      aiLatest: input.base.aiLatest
+    })
   );
   if (whole.length <= LIVING_PROMPT_BUDGET) return { prompt: whole, omitted: new Set() };
   const shell = renderLivingPrompt(input, "").length + knowledgeOverhead(input.base);

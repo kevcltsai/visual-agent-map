@@ -26,16 +26,31 @@ export interface LivingRecord {
   }[];
 }
 
+/** The AI's own latest result, kept apart from `output` so a hand-edited output is never overwritten or rejected. */
+export interface LivingAiLatest {
+  text: string;
+  owner: "ai" | "user";
+  /** When the AI produced this result. */
+  at: string;
+  evidence: readonly LivingEvidence[];
+}
+
 export interface LivingKnowledge {
   revision: string;
   records: readonly LivingRecord[];
   suppressed: readonly string[];
   output: { text: string; owner: "ai" | "user"; evidence: readonly LivingEvidence[] };
+  /** Absent until the AI writes a result while `output` is user-owned. */
+  aiLatest?: LivingAiLatest;
 }
 
 /** Readable formal knowledge is required for a successful check; metadata alone is not a result. */
-export function hasLivingResult(knowledge: Pick<LivingKnowledge, "records" | "output">): boolean {
-  return !!knowledge.output.text.trim() || knowledge.records.some(record => !!record.claim.trim());
+export function hasLivingResult(knowledge: Pick<LivingKnowledge, "records" | "output" | "aiLatest">): boolean {
+  return (
+    !!knowledge.output.text.trim() ||
+    !!knowledge.aiLatest?.text.trim() ||
+    knowledge.records.some(record => !!record.claim.trim())
+  );
 }
 
 export interface LivingChangeContext {
@@ -375,27 +390,32 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     [
       ...base.records.filter(record => record.validity === "active").flatMap(record => record.evidence),
       ...base.output.evidence,
+      ...(base.aiLatest?.evidence ?? []),
       ...context.evidence
     ].map(entry => [entry.id, entry])
   );
   let output = base.output;
+  let aiLatest = base.aiLatest;
   let changed = false;
   for (const rawOperation of proposal.operations as unknown[]) {
     const operation = object(rawOperation);
     const kind = operation.kind;
     if (kind === "output") {
       exactKeys(operation, ["kind", "text", "evidence"]);
-      if (output.owner !== "ai") throw new Error("protected-output");
+      // A user-owned output is never touched: the AI result goes to its own slot. That slot is protected once edited.
+      const slot = output.owner === "ai" ? output : (aiLatest ?? { text: "", owner: "ai" as const, evidence: [] });
+      if (slot.owner !== "ai") throw new Error("protected-output");
       const text = string(operation.text);
       // Evidence for a replaced conclusion must be explicitly selected, not
       // inherited from a different claim. Preserve retrieval stamps for retained IDs.
       const selected = evidenceFor(operation.evidence, outputEvidence);
       const evidence =
-        text === output.text
-          ? mergeEvidence(output.evidence, selected)
-          : selected.map(entry => output.evidence.find(previous => previous.id === entry.id) ?? entry);
-      if (text !== output.text || evidence.length !== output.evidence.length) {
-        output = { text, evidence, owner: "ai" };
+        text === slot.text
+          ? mergeEvidence(slot.evidence, selected)
+          : selected.map(entry => slot.evidence.find(previous => previous.id === entry.id) ?? entry);
+      if (text !== slot.text || evidence.length !== slot.evidence.length) {
+        if (output.owner === "ai") output = { text, evidence, owner: "ai" };
+        else aiLatest = { text, evidence, owner: "ai", at: context.at };
         changed = true;
       }
       continue;
@@ -488,7 +508,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     });
     changed = true;
   }
-  if (!hasLivingResult({ records: [...records.values()], output })) throw new Error("missing-formal-result");
+  if (!hasLivingResult({ records: [...records.values()], output, aiLatest })) throw new Error("missing-formal-result");
   // Revision is assigned by the actual Markdown commit, not by model output.
-  return { changed, records: [...records.values()], output };
+  return { changed, records: [...records.values()], output, aiLatest };
 }

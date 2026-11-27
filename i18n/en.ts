@@ -1248,6 +1248,7 @@ export const en = {
   "ui.living_node_last_attempt": "Last attempt",
   "ui.living_node_trial": "Trial",
   "ui.living_node_official": "Official",
+  "ui.living_node_ai_latest": "AI latest",
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_removed_source_0":
     "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",

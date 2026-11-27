@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const S = require('../support.cjs');
-const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown, livingDamageKind, livingGeneration, livingRestoreSnapshot } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+const { readLivingFence } = S.load('core/living-node-region.ts', { obsidian: S.obsidian });
 const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
 const empty = () => ({ revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } });
 const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
@@ -14,7 +15,7 @@ async function setup() {
 function request(f, extra = {}) {
   const expectedContent = extra.expectedContent ?? f.contents.get(path);
   const candidate = { executionId: 'e1', cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i1', viewSession: 'v1', ...extra.candidate };
-  return { path, expectedContent, base: empty(), proposal, context, signal: new AbortController().signal, isCurrent: () => true,
+  return { path, expectedContent, base: empty(), baseGeneration: livingGeneration(expectedContent), proposal, context, signal: new AbortController().signal, isCurrent: () => true,
     ...extra, candidate, inspect: extra.inspect ?? (async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false })) };
 }
 
@@ -2195,4 +2196,161 @@ S.integrationTest('T06: a V1.1 region with no AI latest is byte-identical to the
   assert.equal(f.contents.get(path).includes('living-node-ownership'), true);
   assert.equal(JSON.stringify(readLivingMarkdown(f.contents.get(path)).output), JSON.stringify(base.output));
   assert.equal(f.contents.get(path).includes('aiLatest'), false);
+});
+
+
+// Replay fence (generation + receipts).
+const gen = content => Number(content.match(/living-node-generation: (\d+)/)?.[1]);
+const receiptIds = content => [...content.matchAll(/^  - "(.+)"$/gm)].map(m => m[1]).filter(id => /^e\d+$/.test(id));
+async function commitText(f, id, text, extra = {}) {
+  const expectedContent = f.contents.get(path);
+  const base = readLivingMarkdown(expectedContent);
+  const proposal = { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] };
+  return commitLivingMarkdown(f.repo, request(f, { expectedContent, base, proposal, candidate: { executionId: id }, context: { ...context, at: 't-' + id }, ...extra }));
+}
+const restore = (f, expected, replacement) => f.repo.updateNoteRawGuarded(path, current => livingRestoreSnapshot(current, replacement), { expectedContent: expected, authorize: () => true });
+
+S.integrationTest('A46 replay fence: every commit raises the generation and records its execution id', async () => {
+  const f = await setup();
+  assert.equal(await commitText(f, 'e1', 'one'), 'written');
+  assert.equal(gen(f.contents.get(path)), 1);
+  assert.equal(await commitText(f, 'e2', 'two'), 'written');
+  assert.equal(gen(f.contents.get(path)), 2);
+  assert.deepEqual(receiptIds(f.contents.get(path)), ['e1', 'e2']);
+  assert.equal(livingGeneration(f.contents.get(path)), 2);
+});
+
+S.integrationTest('A46 replay fence: e1 -> e2 -> undo e2 -> replay of e2 is refused, undo restores knowledge under a new generation', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  const afterE1 = f.contents.get(path);
+  const staleBase = readLivingMarkdown(afterE1);
+  await commitText(f, 'e2', 'two');
+  const afterE2 = f.contents.get(path);
+  assert.equal(await restore(f, afterE2, afterE1), 'written');
+  const undone = f.contents.get(path);
+  assert.equal(readLivingMarkdown(undone).output.text, 'one');
+  assert.equal(readLivingMarkdown(undone).revision, staleBase.revision, 'same knowledge as before e2');
+  assert.equal(gen(undone), 3, 'undo moves forward, never back to generation 1');
+  assert.deepEqual(receiptIds(undone), ['e1', 'e2'], 'undo keeps the receipts of what already ran');
+  const proposal = { baseRevision: staleBase.revision, operations: [{ kind: 'output', text: 'two', evidence: ['e1'] }] };
+  // The late e2 callback: same knowledge, same bytes it now sees, but already executed.
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { expectedContent: undone, base: staleBase, baseGeneration: 1, proposal, candidate: { executionId: 'e2' } })), 'discarded');
+  assert.equal(f.contents.get(path), undone);
+  // A brand new execution built on the pre-undo snapshot (generation 1) is refused too; a fresh read is accepted.
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { expectedContent: undone, base: staleBase, baseGeneration: 1, proposal, candidate: { executionId: 'e3' } })), /stale-generation/);
+  assert.equal(f.contents.get(path), undone);
+  assert.equal(await commitText(f, 'e3', 'three'), 'written');
+  assert.equal(gen(f.contents.get(path)), 4);
+});
+
+S.integrationTest('A46 replay fence: redo restores under yet another generation and e2 stays refused', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  const afterE1 = f.contents.get(path);
+  await commitText(f, 'e2', 'two');
+  const afterE2 = f.contents.get(path);
+  await restore(f, afterE2, afterE1);
+  const undone = f.contents.get(path);
+  assert.equal(await restore(f, undone, afterE2), 'written');
+  const redone = f.contents.get(path);
+  assert.equal(readLivingMarkdown(redone).output.text, 'two');
+  assert.equal(gen(redone), 4);
+  assert.deepEqual(receiptIds(redone), ['e1', 'e2']);
+  const staleBase = readLivingMarkdown(afterE1);
+  const proposal = { baseRevision: staleBase.revision, operations: [{ kind: 'output', text: 'x', evidence: ['e1'] }] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { expectedContent: redone, base: staleBase, baseGeneration: 1, proposal, candidate: { executionId: 'e2' } })), 'discarded');
+  assert.equal(f.contents.get(path), redone);
+});
+
+S.integrationTest('A46 replay fence: the fence lives in the note, so a restart does not reopen a late callback', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  const afterE1 = f.contents.get(path);
+  const staleBase = readLivingMarkdown(afterE1);
+  await commitText(f, 'e2', 'two');
+  await restore(f, f.contents.get(path), afterE1);
+  const g = S.fixture();
+  await g.app.vault.create(path, f.contents.get(path));
+  const proposal = { baseRevision: staleBase.revision, operations: [{ kind: 'output', text: 'late', evidence: ['e1'] }] };
+  assert.equal(await commitLivingMarkdown(g.repo, request(g, { base: staleBase, baseGeneration: 1, proposal, candidate: { executionId: 'e2' } })), 'discarded');
+  await assert.rejects(() => commitLivingMarkdown(g.repo, request(g, { base: staleBase, baseGeneration: 1, proposal, candidate: { executionId: 'e9' } })), /stale-generation/);
+  assert.equal(readLivingMarkdown(g.contents.get(path)).output.text, 'one');
+});
+
+S.integrationTest('A46 replay fence: receipts stay bounded to the last 20 executions', async () => {
+  const f = await setup();
+  for (let i = 1; i <= 25; i++) assert.equal(await commitText(f, 'e' + i, 'text ' + i), 'written');
+  const content = f.contents.get(path);
+  assert.equal(gen(content), 25);
+  const ids = receiptIds(content);
+  assert.equal(ids.length, 20);
+  assert.equal(ids[0], 'e6');
+  assert.equal(ids[19], 'e25');
+  assert.equal(await commitText(f, 'e25', 'again'), 'discarded');
+});
+
+S.integrationTest('A46 old schema: a V1 note without generation migrates forward and its last execution still counts as a receipt', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  const legacy = f.contents.get(path).replace(/living-node-generation: \d+\n/, '').replace(/living-node-receipts:\n(  - ".*"\n)+/, '');
+  assert.ok(!legacy.includes('living-node-generation') && !legacy.includes('living-node-receipts'));
+  await f.app.vault.process(f.files.get(path), () => legacy);
+  assert.deepEqual(S.plain(readLivingFence({ 'living-node-last-execution': 'e1' })), { generation: 0, receipts: ['e1'] });
+  assert.equal(livingGeneration(legacy), 0);
+  assert.equal(await commitText(f, 'e1', 'replayed'), 'discarded');
+  assert.equal(f.contents.get(path), legacy);
+  assert.equal(await commitText(f, 'e2', 'two'), 'written');
+  assert.equal(gen(f.contents.get(path)), 1);
+});
+
+S.integrationTest('A46 corrupt fence metadata fails closed with bytes preserved and is reported as rebuildable', async () => {
+  for (const bad of ['living-node-generation: -1', 'living-node-generation: "x"', 'living-node-generation: 1.5', 'living-node-receipts: 7']) {
+    const f = await setup();
+    await commitText(f, 'e1', 'one');
+    const content = f.contents.get(path);
+    const key = bad.split(':')[0];
+    const damaged = content.replace(new RegExp('^' + key + ':.*(\\n  - ".*)*$', 'm'), bad);
+    assert.notEqual(damaged, content, bad);
+    await f.app.vault.process(f.files.get(path), () => damaged);
+    assert.throws(() => readLivingMarkdown(damaged), /invalid-(generation|receipts)/, bad);
+    await assert.rejects(() => commitText(f, 'e2', 'two'), /invalid-(generation|receipts)/, bad);
+    assert.equal(f.contents.get(path), damaged);
+    const note = await f.repo.readNote(path);
+    assert.equal(note.livingNode.damaged, true);
+    assert.equal(note.livingNode.damageKind, 'rebuildable');
+  }
+});
+
+S.integrationTest('A46 damage kinds: a decodable region with lost metadata is rebuildable, a torn or missing region is not', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  const content = f.contents.get(path);
+  assert.equal(livingDamageKind(content), null);
+  const noHash = content.replace(/living-node-region-hash: .*\n/, '');
+  assert.equal(livingDamageKind(noHash), 'rebuildable');
+  const noIndex = noHash.replace(/living-node-ownership:\n(  - .*\n)+/, '');
+  assert.equal(livingDamageKind(noIndex), 'rebuildable');
+  assert.equal(livingDamageKind(content.replace('<!-- vam-living-node:end v1 -->', '')), 'unrecoverable');
+  const noRegion = content.slice(0, content.indexOf('<!-- vam-living-node:begin'));
+  assert.equal(livingDamageKind(noRegion), null, 'a deleted region with its ownership index reads as user-removed knowledge');
+  const lost = noRegion.replace(/living-node-region-hash: .*\n/, '').replace(/living-node-ownership:\n(  - .*\n)+/, '');
+  assert.equal(livingDamageKind(lost), 'unrecoverable', 'orphan success metadata cannot be rebuilt');
+  await f.app.vault.process(f.files.get(path), () => lost);
+  const note = await f.repo.readNote(path);
+  assert.equal(note.livingNode.damageKind, 'unrecoverable');
+  assert.equal(f.contents.get(path), lost, 'reading never writes');
+});
+
+S.integrationTest('A46 copy keeps the generation and leaves the original execution ids with the original', async () => {
+  const f = await setup();
+  await commitText(f, 'e1', 'one');
+  await commitText(f, 'e2', 'two');
+  const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const copy = await f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md', { keepTitle: true });
+  const copied = f.contents.get(copy.path);
+  assert.equal(gen(copied), 2);
+  assert.ok(!copied.includes('living-node-receipts'));
+  assert.equal(readLivingMarkdown(copied).output.text, 'two');
+  assert.deepEqual(receiptIds(f.contents.get(path)), ['e1', 'e2']);
 });

@@ -64,7 +64,11 @@ import {
   splitLivingNodeRegion
 } from "./core/living-node-region";
 import { redactLivingShareText } from "./experiences/sharing/living-node-redaction";
-import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
+import {
+  livingDamageKind,
+  readLivingMarkdown,
+  renderLivingShareKnowledge
+} from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
 import { foldEntryName, linkAlias, safeName } from "./core/repository-names";
@@ -820,6 +824,7 @@ export class Repository {
       let summary = "";
       let shareSummary = "";
       let damaged = false;
+      let damageKind: "rebuildable" | "unrecoverable" | undefined;
       let shareMarkdown = "";
       const base = (this.app.vault.adapter as { getBasePath?: () => unknown }).getBasePath?.();
       const basePath = typeof base === "string" ? base : undefined;
@@ -836,6 +841,7 @@ export class Repository {
         shareSummary = redactLivingShareText(firstLine, basePath).slice(0, 180);
       } catch {
         damaged = true;
+        damageKind = livingDamageKind(raw) ?? "unrecoverable";
       }
       const value = fm["living-node-outcome"];
       const outcome =
@@ -851,7 +857,8 @@ export class Repository {
         lastSuccessfulCheck: text(fm["living-node-last-successful-check"]) || undefined,
         lastContentChange: text(fm["living-node-last-content-change"]) || undefined,
         outcome,
-        damaged
+        damaged,
+        ...(damageKind ? { damageKind } : {})
       };
     }
     return {

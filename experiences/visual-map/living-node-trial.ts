@@ -2,6 +2,7 @@ import type { LivingCoordinator, LivingLease } from "./living-node-coordinator";
 import { applyLivingChanges, type LivingChangeContext, type LivingKnowledge } from "./living-node-changes";
 import {
   commitLivingMarkdown,
+  livingGeneration,
   readLivingMarkdown,
   livingSnapshotRevision,
   type LivingMarkdownCommit,
@@ -12,8 +13,9 @@ import type { LivingCommitCheck } from "./living-node-state";
 export type LivingPreviewStatus = "none" | "running" | "ready" | "invalid" | "error";
 
 type TrialSnapshot = Omit<LivingMarkdownCommit, "proposal" | "signal" | "isCurrent" | "inspect" | "onCommit">;
+type TrialRequestSnapshot = Omit<TrialSnapshot, "baseGeneration">;
 
-export interface LivingTrialRequest extends TrialSnapshot {
+export interface LivingTrialRequest extends TrialRequestSnapshot {
   /** Reads only the authorized draft inputs. It may not write, dispatch dependencies or modify formal diagnostics. */
   generate(signal: AbortSignal): Promise<unknown>;
   /** Must check the draft read set, effective configuration and formal base after the provider settles. */
@@ -93,6 +95,7 @@ export class LivingTrial {
         expectedContent: request.expectedContent,
         candidate: identity,
         base,
+        baseGeneration: livingGeneration(request.expectedContent),
         context: request.context
       });
       let proposal = clone(await request.generate(lease.signal));
@@ -166,7 +169,8 @@ export class LivingTrial {
       if (
         !current() ||
         (expectedContent !== snapshot.expectedContent && expectedContent !== savedContent) ||
-        readLivingMarkdown(expectedContent).revision !== snapshot.base.revision
+        readLivingMarkdown(expectedContent).revision !== snapshot.base.revision ||
+        livingGeneration(expectedContent) !== snapshot.baseGeneration
       ) {
         if (!this.closed && this.generation === generation) this.status = "invalid";
         return "discarded";

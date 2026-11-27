@@ -68,6 +68,8 @@ export interface Note extends PipelineFields {
     lastContentChange?: string;
     outcome: "never" | "ok" | "failed" | "blocked" | "cancelled";
     damaged: boolean;
+    /** Set with `damaged`: whether the managed region itself still decodes (index/metadata can be rebuilt) or not. */
+    damageKind?: "rebuildable" | "unrecoverable";
   };
   /** From `ai-run-at` / `ai-run-result` / `ai-run-input` (see readAiRun): what the last "run all" did to this card. Absent = never run. */
   aiRun?: { at: string; result: "ok" | "failed" | "blocked"; input?: string };

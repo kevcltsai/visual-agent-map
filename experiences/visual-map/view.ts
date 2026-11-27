@@ -220,7 +220,7 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import { renderLivingPreview } from "./living-node-markdown";
+import { livingRestoreSnapshot, livingWithoutFence, renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -20547,13 +20547,21 @@ export class VisualAgentMapView extends ItemView {
   }
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;
+    // Each restore moves the replay fence, so the guard compares the note with the fence keys removed: any other edit refuses.
     const restore = async (expected: string, replacement: string): Promise<void> => {
       const repo = this.plugin.repo;
-      const result = await repo.updateNoteRawGuarded(path, () => replacement, {
-        expectedContent: expected,
-        authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
-      });
-      if (result !== "written") throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+      let written = false;
+      const result = await repo.updateNoteRawGuarded(
+        path,
+        current => {
+          if (livingWithoutFence(current) !== livingWithoutFence(expected)) return current;
+          written = true;
+          return livingRestoreSnapshot(current, replacement);
+        },
+        { authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path) }
+      );
+      if (result !== "written" || !written)
+        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     };
     this.history.push({
       label: t("ui.living_node_run_card"),

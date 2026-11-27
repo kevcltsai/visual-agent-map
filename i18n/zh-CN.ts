@@ -998,6 +998,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.parent_topic": "所属父议题",
   "ui.no_parent_root_topic": "无父议题（根议题）",
   "ui.circular_links_are_not_allowed": "不能创建循环链接。",
+  "ui.outline_move_readonly": "目前这张图是只读，所以没有移动。",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "父议题会影响下次 AI 读到的背景。",
   "ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can":
     "笔记会移至当前主题的 Unassigned，可重新认领或复原。",

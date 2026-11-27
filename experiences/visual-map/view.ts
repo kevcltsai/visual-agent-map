@@ -3268,8 +3268,8 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   async onClose(): Promise<void> {
-    this.closed = true;
     this.clearTidy(false);
+    this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.dropBookReviewSession();

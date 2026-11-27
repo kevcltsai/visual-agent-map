@@ -1731,6 +1731,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.app.vault.on("modify", file => {
         if (file instanceof TFile) this.collectUnsynced(file.path);
         if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file);
+        // Obsidian's stale-position link update of a note VAM just rewrote on rename is put right (RenameRepairWatch).
+        if (file instanceof TFile && this.repo.renameWatch.watching(file.path))
+          this.runMutation(() => this.repo.renameWatch.check(file.path, line => this.logs.appendLog("info", line)));
       })
     );
     this.registerEvent(

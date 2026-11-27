@@ -11,12 +11,12 @@ const BLOCK_ID = /(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*$/;
 const sameHeading = (a: string, b: string): boolean =>
   a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
 
-/** External managed notes have no authorized card snapshot in this export; render their link title only. */
+/** Living Node notes outside the map have no authorized share projection in this export; render their link title only. */
 export function isManagedShareEmbed(text: string): boolean {
   const normalized = normalizeNewlines(text).replace(/^\uFEFF/, "");
   if (/<!--\s*vam-living-node:/i.test(normalized)) return true;
   const header = normalized.match(/^---[^\S\n]*\n([\s\S]*?)(?:\n(?:---|\.\.\.)[^\S\n]*(?:\n|$)|$)/)?.[1];
-  return header !== undefined && /\b(?:agent-map-node|visual-agent-map|ai-card|living-node-[\w-]+)\b/i.test(header);
+  return header !== undefined && /\b(?:ai-card|living-node-[\w-]+)\b/i.test(header);
 }
 
 export function shareNoteMarkdown(note?: { detail?: string; livingNode?: { shareMarkdown?: string } }): string {

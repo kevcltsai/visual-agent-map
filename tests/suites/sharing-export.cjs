@@ -1174,6 +1174,24 @@ test('sharing export R2: embeds inside %% and <!-- --> comments are never read',
   assert.equal(shown.get('Draft'), 'Public  tail');
 });
 
+test('share exporter embeds: an ordinary card note of another map is embedded with its content; only a Living Node note is withheld', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const files = {
+    'Folder/Ordinary.md': { path: 'Folder/Ordinary.md', extension: 'md', text: '---\nagent-map-node: true\nvisual-agent-map: other\n---\nORDINARY-CARD-BODY' },
+    'Folder/Living.md': { path: 'Folder/Living.md', extension: 'md', text: '---\nagent-map-node: true\nai-card: true\nliving-node-state: ok\n---\nLIVING-INTERNALS' },
+    'Folder/Region.md': { path: 'Folder/Region.md', extension: 'md', text: '---\nagent-map-node: true\n---\n<!-- vam-living-node:begin -->\nREGION-INTERNALS' }
+  };
+  const app = { vault: { adapter: new FileSystemAdapter(), getName: () => 'V', cachedRead: async file => file.text }, metadataCache: { getFirstLinkpathDest: ref => files[`Folder/${ref}.md`] ?? null } };
+  const node = { id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false };
+  const map = { id: 'm', title: 'M', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node] };
+  const exporter = new module.ShareExporter(app, { map, notes: new Map(), mapPath: 'Maps/M/Map.md' }, { vamVersion: '1', language: 'en' });
+  const embeds = await exporter.readEmbeds('![[Ordinary]]\n\n![[Living]]\n\n![[Region]]', 'Folder/A.md', 'a', 0);
+  assert.equal(embeds.get('Ordinary'), 'ORDINARY-CARD-BODY');
+  assert.equal(embeds.has('Living'), false);
+  assert.equal(embeds.has('Region'), false);
+});
+
 test('share exporter acceptance fix: the shared map\'s own folder is content even inside a VAM folder; other VAM folders stay out', async () => {
   class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
   const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });

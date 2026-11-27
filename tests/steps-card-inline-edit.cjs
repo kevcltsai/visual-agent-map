@@ -469,7 +469,7 @@ test('right-click on one card: the eight-item menu; Collapse only with subtopics
     h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
-  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
+  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Copy as reference', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
   for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Add summary bracket', 'Note style…', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;

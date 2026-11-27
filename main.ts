@@ -1362,20 +1362,25 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>
-        new OutlineView(leaf, async path => {
-          try {
-            // The outline moves the map to the topic and opens its note beside it.
-            const view = this.views().find(item => item.hasPath(path));
-            if (view) {
-              // Bring the map tab forward first: a background tab has no size to center in.
-              await this.app.workspace.revealLeaf(view.leaf);
-              await view.revealPath(path);
+        new OutlineView(
+          leaf,
+          async path => {
+            try {
+              // The outline moves the map to the topic and opens its note beside it.
+              const view = this.views().find(item => item.hasPath(path));
+              if (view) {
+                // Bring the map tab forward first: a background tab has no size to center in.
+                await this.app.workspace.revealLeaf(view.leaf);
+                await view.revealPath(path);
+              }
+              await this.openDetails(this.repo.file(path));
+            } catch (error) {
+              new Notice(error instanceof Error ? error.message : String(error));
             }
-            await this.openDetails(this.repo.file(path));
-          } catch (error) {
-            new Notice(error instanceof Error ? error.message : String(error));
-          }
-        })
+          },
+          // Drag and Alt+arrow in the outline move topics of the map it shows, through that view.
+          async (id, to) => (await this.outlineSourceView?.outlineMove(id, to)) ?? null
+        )
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
       void this.activateView().catch(error => new Notice(String(error)));

@@ -7,6 +7,10 @@ import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 export const foldOutlineSearch = foldSearchText;
+/** Where the outline asks the map view to put a topic: next to a row (before / after it) or under it, or one step along its siblings. */
+export type OutlineMove = { target: string; place: "before" | "after" | "into" } | { shift: -1 | 1 };
+/** Asks the map view to move a topic; resolves to the reason in words when the move is refused (nothing is written then), null otherwise. */
+export type OutlineMover = (id: string, to: OutlineMove) => Promise<string | null>;
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
@@ -24,9 +28,15 @@ export class OutlineView extends ItemView {
   private tempOpen = new Set<string>();
   private query = "";
   private activePath = "";
+  private dragId: string | null = null;
+  private dropRow: HTMLElement | null = null;
+  /** A row that took focus before a move rebuilds the tree: focus returns to the same topic. */
+  private refocusId: string | null = null;
+  private reasonEl: HTMLElement | null = null;
   constructor(
     leaf: WorkspaceLeaf,
-    private openNote: (path: string) => Promise<void>
+    private openNote: (path: string) => Promise<void>,
+    private moveTopic?: OutlineMover
   ) {
     super(leaf);
   }
@@ -186,6 +196,72 @@ export class OutlineView extends ItemView {
     }
     return null;
   }
+  /** The move goes through the map view, which validates it; a refusal is shown as red text and nothing was written. */
+  private async requestMove(id: string, to: OutlineMove): Promise<void> {
+    let reason: string | null = null;
+    try {
+      reason = (await this.moveTopic?.(id, to)) ?? null;
+    } catch (error) {
+      reason = error instanceof Error ? error.message : String(error);
+    }
+    this.reasonEl?.remove();
+    this.reasonEl = null;
+    if (reason) {
+      this.refocusId = null;
+      this.reasonEl = this.contentEl.createDiv({ cls: "vam-outline-reason", text: reason });
+      this.reasonEl.setAttr("role", "alert");
+    }
+  }
+  /** Drag handle on the row's left; the row takes the drop: its top / bottom quarter puts the topic next to it, the middle puts it under it. */
+  private attachDrag(row: HTMLElement, node: MapNode): void {
+    const handle = row.createSpan({ cls: "vam-outline-handle", text: "⋮⋮", attr: { "aria-hidden": "true" } });
+    handle.setAttr("draggable", "true");
+    handle.addEventListener("dragstart", event => {
+      this.dragId = node.id;
+      event.dataTransfer?.setData("text/plain", node.id);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+      row.addClass("is-dragging");
+    });
+    handle.addEventListener("dragend", () => {
+      this.dragId = null;
+      row.removeClass("is-dragging");
+      this.markDrop(null);
+    });
+    const placeOf = (event: DragEvent): "before" | "after" | "into" => {
+      if (!node.parentId) return "into";
+      const box = row.getBoundingClientRect();
+      const at = box.height ? (event.clientY - box.top) / box.height : 0.5;
+      return at < 0.25 ? "before" : at > 0.75 ? "after" : "into";
+    };
+    row.addEventListener("dragover", event => {
+      if (!this.dragId) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      this.markDrop(row, placeOf(event));
+    });
+    row.addEventListener("dragleave", () => {
+      if (this.dropRow === row) this.markDrop(null);
+    });
+    row.addEventListener("drop", event => {
+      const id = this.dragId;
+      if (!id) return;
+      event.preventDefault();
+      const place = placeOf(event);
+      this.dragId = null;
+      this.markDrop(null);
+      void this.requestMove(id, { target: node.id, place });
+    });
+  }
+  /** The insertion line (before / after) or the "under this row" highlight; at most one row at a time. */
+  private markDrop(row: HTMLElement | null, place?: "before" | "after" | "into"): void {
+    if (this.dropRow && this.dropRow !== row) {
+      for (const name of ["is-drop-before", "is-drop-after", "is-drop-into"]) this.dropRow.removeClass(name);
+    }
+    this.dropRow = row;
+    if (!row) return;
+    for (const name of ["is-drop-before", "is-drop-after", "is-drop-into"]) row.removeClass(name);
+    row.addClass(`is-drop-${place}`);
+  }
   private renderTree(): void {
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
@@ -193,7 +269,11 @@ export class OutlineView extends ItemView {
     this.noteEls.clear();
     this.activeEl = null;
     this.parentOf.clear();
+    this.reasonEl?.remove();
+    this.reasonEl = null;
     if (!this.map) return;
+    // Dragging works on the whole tree only: a search shows part of it, and "between two rows" would be a guess.
+    const movable = !!this.moveTopic && !this.map.aim && !this.query.trim();
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = new Map<string | null, MapNode[]>();
     for (const node of this.map.nodes) {
@@ -212,6 +292,7 @@ export class OutlineView extends ItemView {
       const descendants = children.get(node.id) ?? [];
       const row = into.createDiv("vam-outline-row");
       row.style.paddingLeft = `${8 + depth * 16}px`;
+      if (movable) this.attachDrag(row, node);
       if (descendants.length) {
         const toggle = row.createEl("button", {
           text: query || !closed(node.id) ? "▾" : "▸",
@@ -268,6 +349,14 @@ export class OutlineView extends ItemView {
         button.addClass("is-active");
         button.setAttr("aria-current", "true");
       }
+      if (movable)
+        button.addEventListener("keydown", event => {
+          if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return;
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+          event.preventDefault();
+          this.refocusId = node.id;
+          void this.requestMove(node.id, { shift: event.key === "ArrowUp" ? -1 : 1 });
+        });
       button.addEventListener("click", () => {
         // Mark the row in place: a re-render would drop keyboard focus from the outline.
         this.setActive(node.path);
@@ -290,6 +379,11 @@ export class OutlineView extends ItemView {
       } else for (const child of descendants) append(child, depth + 1, into);
     };
     for (const root of children.get(null) ?? []) append(root, 0, tree);
+    if (this.refocusId) {
+      const path = this.map.nodes.find(node => node.id === this.refocusId)?.path;
+      this.refocusId = null;
+      if (path) this.noteEls.get(path)?.focus();
+    }
     if (!tree.childElementCount) {
       tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
       if (query)

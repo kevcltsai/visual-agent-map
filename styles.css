@@ -2134,3 +2134,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-ai-card-pop-chip.is-replaced { flex-wrap: wrap; border-color: var(--text-error); }
 .vam-ai-card-pop-chip-warn { color: var(--text-error); font-size: var(--font-ui-smaller); }
 .vam-ai-card-pop-chip-confirm { font-size: var(--font-ui-smaller); }
+.vam-outline-handle { flex: 0 0 14px; cursor: grab; color: var(--text-faint); font-size: var(--font-ui-smaller); line-height: 1; text-align: center; user-select: none; }
+.vam-outline-row:hover .vam-outline-handle { color: var(--text-muted); }
+.vam-outline-row.is-dragging { opacity: 0.5; }
+.vam-outline-row.is-drop-before { box-shadow: 0 -2px 0 0 var(--interactive-accent); }
+.vam-outline-row.is-drop-after { box-shadow: 0 2px 0 0 var(--interactive-accent); }
+.vam-outline-row.is-drop-into { background: var(--background-modifier-hover); outline: 1px solid var(--interactive-accent); outline-offset: -1px; }
+.vam-outline-reason { padding: 6px 12px; color: var(--text-error); font-size: var(--font-ui-small); }

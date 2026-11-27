@@ -873,7 +873,7 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
 });
 test('card tools: four labelled buttons (Research, Add, Note, More) in the selected card toolbar; the icon-only hover tools and the + circle are gone', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode\)/);
+  assert.match(view, /private paintCardToolbar\(tools: HTMLElement, node: MapNode, addSummary = false\)/);
   assert.match(view, /private openCardMoreMenu\(button: HTMLElement, node: MapNode\)/, 'the toolbar More menu');
   for (const cls of ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']) assert.match(view, new RegExp(`"${cls}"`), `${cls} button`);
   assert.doesNotMatch(view, /"vam-node-tool"|"vam-fold-tool"|"vam-structure-tool"|"vam-select-subtopics-tool"|"vam-add-child"/, 'no icon-only hover tools, no + circle');

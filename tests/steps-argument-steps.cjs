@@ -886,14 +886,14 @@ test('#59 verdict reason naming an evidence id (or its first 8 characters) is re
   assert.ok(ok(mod.facetVerdictStep, req, { ...good, reason: 'n2 matches the 9.2 percent' }), 'a short id is ordinary text');
 });
 test('#59 conclusion: an id in the summary or a point is refused; one verified hypothesis is a valid request and partial adds the partial rule to the prompt', () => {
-  const hid = '4924cc48-8487-4f23-88d9-154103363460';
-  const eid = 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3';
+  const hid = 'abababab-abab-4bab-8bab-abababababab';
+  const eid = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
   const input = { hypotheses: [{ id: hid, round: 1, evidence: [{ id: eid, claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] }] };
   const req = { ...base, proposition: PROP, input, statements: { [hid]: 'Hiring slowed' } };
   const good = { summary: 'Hiring slowed', points: [{ text: 'Rate was 9.2 percent', hypothesisIds: [hid] }] };
   assert.ok(ok(mod.conclusionStep, req, good));
   bad(mod.conclusionStep, req, { ...good, summary: `see ${hid}` }, /names an id/);
-  bad(mod.conclusionStep, req, { ...good, points: [{ text: 'in 4924cc48 it rose', hypothesisIds: [hid] }] }, /names an id/);
+  bad(mod.conclusionStep, req, { ...good, points: [{ text: `in ${hid.slice(0, 8)} it rose`, hypothesisIds: [hid] }] }, /names an id/);
   bad(mod.conclusionStep, req, { ...good, points: [{ text: `evidence ${eid}`, hypothesisIds: [hid] }] }, /names an id/);
   assert.ok(sr.prepareStep(mod.conclusionStep, req));
   const full = mod.conclusionStep.render(req);

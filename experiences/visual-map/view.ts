@@ -795,6 +795,20 @@ const CARD_EDITOR_DROP = [
 ].join(", ");
 /** Picture shapes (width over height) already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
 const coverShapes = new Map<string, number>();
+/** The toolbar's closing cell (link count, model name), made on first use; its place is kept by the caller. */
+const toolsMetaCells = new WeakMap<HTMLElement, HTMLElement>();
+function toolsMeta(tools: HTMLElement): HTMLElement {
+  let meta = toolsMetaCells.get(tools);
+  if (!meta) {
+    meta = tools.createDiv("vam-node-tools-meta");
+    toolsMetaCells.set(tools, meta);
+  }
+  return meta;
+}
+/** The toolbar's "add summary" button, kept by reference so a refresh adds or drops it without a selector query. */
+const addSummaryTools = new WeakMap<HTMLElement, HTMLElement>();
+/** Each card's toolbar, so a refresh finds it without a selector query. */
+const cardToolbars = new WeakMap<HTMLElement, HTMLElement>();
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -9603,7 +9617,7 @@ export class VisualAgentMapView extends ItemView {
    * The selected card's toolbar: Research (the topic chat), Add (a topic under it, its type can change later), Note (the
    * details sidebar; Cmd/Ctrl-click opens a new tab) and More (the rarer card actions). Every button has a text label.
    */
-  private paintCardToolbar(tools: HTMLElement, node: MapNode): void {
+  private paintCardToolbar(tools: HTMLElement, node: MapNode, addSummary = false): void {
     const bookLock = this.bookLock();
     const tool = (label: string, cls: string, action: (event: MouseEvent, button: HTMLButtonElement) => void) => {
       const button = this.button(tools, label, () => {});
@@ -9618,6 +9632,12 @@ export class VisualAgentMapView extends ItemView {
     tool(t("ui.card_tool_note"), "vam-detail-button", event =>
       event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
     ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    // An empty summary offers its field here (the card face draws nothing for it).
+    if (addSummary)
+      addSummaryTools.set(
+        tools,
+        tool(t("ui.card_tool_add_summary"), "vam-card-tool-add-summary", () => this.startCardSummaryEdit(node, 0))
+      );
     const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
@@ -12625,6 +12645,22 @@ export class VisualAgentMapView extends ItemView {
     }
     const batch = this.plugin.expansionBatches.get(node.path);
     const research = this.plugin.researchProgress?.get(node.path);
+    // The selected card's toolbar floats beside the card, so showing it never moves the card's content. Only what must always
+    // show (status, stop and review actions, a folded branch's count) stays in the header; every other action, the link count
+    // and the model name live here and appear with the selection.
+    const tools = card.createDiv("vam-node-tools");
+    cardToolbars.set(card, tools);
+    if (!this.selection.state.multiSelectMode)
+      this.paintCardToolbar(
+        tools,
+        node,
+        !!note &&
+          !argumentView &&
+          this.cardTextEditable() &&
+          !research?.preview?.summary &&
+          this.inlineSummary?.id !== node.id &&
+          isPlaceholder(note.summary)
+      );
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
     const active =
@@ -12701,7 +12737,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== "idea" || active || queued) {
+      } else if (!note || (note.status !== "idea" && note.status !== "completed") || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -12792,9 +12828,9 @@ export class VisualAgentMapView extends ItemView {
     }
     // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
     this.paintCardMarkers(card, header, node.id);
-    this.paintCardLinks(card, header, node.id);
-    // The model tag follows the marker row (see paintModelTag).
-    this.paintModelTag(card, header, note);
+    this.paintCardLinks(card, tools, node.id);
+    // The model tag follows the link count in the toolbar's meta cell (see paintModelTag).
+    this.paintModelTag(card, tools, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
     this.paintCardColor(card, note);
     this.paintCardStyle(card, note);
@@ -12820,10 +12856,12 @@ export class VisualAgentMapView extends ItemView {
         batch,
         currentTitle ? t("ui.shallow_research_current", currentTitle) : undefined
       );
-      header.createSpan({
-        cls: `vam-status vam-status-${batch.status === "running" ? "running" : batch.failures.length ? "error" : "completed"}`,
-        text: label
-      });
+      // A batch that finished without a failure says nothing: the card face carries no success label.
+      if (batch.status === "running" || batch.failures.length)
+        header.createSpan({
+          cls: `vam-status vam-status-${batch.status === "running" ? "running" : "error"}`,
+          text: label
+        });
       if (batch.status === "running")
         this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path));
       if (batch.failures.length) {
@@ -12838,7 +12876,7 @@ export class VisualAgentMapView extends ItemView {
           if (failure.technical) technicalDetails.push(failure.technical);
         }
       }
-      this.renderRetryFailedButton(header, node.path, batch);
+      this.renderRetryFailedButton(tools, node.path, batch);
     }
     // One Stop for every AI run on this card: a dialog's run still starting, guided expand, and research. A batch and
     // a synthesis show their own Stop; a child researched by a running batch is stopped through its batch.
@@ -12872,7 +12910,7 @@ export class VisualAgentMapView extends ItemView {
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
-      this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
+      this.button(tools, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
     // A Quick answer that says the model's knowledge was not enough offers the Standard run (never while AI works on it).
@@ -12886,7 +12924,7 @@ export class VisualAgentMapView extends ItemView {
       !merging &&
       hasKnowledgeGapMarker(note.detail)
     )
-      this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
+      this.button(tools, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
@@ -12899,7 +12937,7 @@ export class VisualAgentMapView extends ItemView {
       !research &&
       !merging
     )
-      this.renderOtherProviderButton(header, [node]);
+      this.renderOtherProviderButton(tools, [node]);
     const synthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
@@ -12911,14 +12949,13 @@ export class VisualAgentMapView extends ItemView {
           text: synthesis.state === "cancelled" ? t("ui.ai_task_cancelled") : t("ui.failed"),
           attr: { title: synthesis.progress }
         });
-        this.button(header, t("ui.try_again"), () => this.retrySynthesis(node));
-        this.button(header, t("ui.discard_synthesis"), () => this.discardSynthesis(node));
+        this.button(tools, t("ui.try_again"), () => this.retrySynthesis(node));
+        this.button(tools, t("ui.discard_synthesis"), () => this.discardSynthesis(node));
       }
     }
-    // The selected card's toolbar floats beside the card (above its top edge unless that covers a neighbour), so showing it
-    // never moves the card's content. What must always show (status, stop and review actions, a folded branch's count) stays
-    // in the header. The toolbar has four labelled buttons: Research, Add, Note and More (the rarer card actions).
-    const tools = card.createDiv("vam-node-tools");
+    // The link count and model name close the toolbar (after every action button above).
+    const meta = toolsMetaCells.get(tools);
+    if (meta) tools.appendChild(meta);
     const count = this.paintBranchSize?.(node.id) ?? descendants(this.map!.nodes, node.id).size;
     if (count) {
       if (node.collapsed) {
@@ -12930,7 +12967,6 @@ export class VisualAgentMapView extends ItemView {
         collapse.setAttr("aria-expanded", "false");
       }
     }
-    if (!this.selection.state.multiSelectMode) this.paintCardToolbar(tools, node);
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
     const shownTitle = loading
@@ -13838,9 +13874,9 @@ export class VisualAgentMapView extends ItemView {
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
    * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
    */
-  private paintModelTag(card: HTMLElement, header: HTMLElement, note: Note | undefined): void {
-    const old = cardModelTags.get(header);
-    cardModelTags.delete(header);
+  private paintModelTag(card: HTMLElement, tools: HTMLElement, note: Note | undefined): void {
+    const old = cardModelTags.get(tools);
+    cardModelTags.delete(tools);
     const previous = card.dataset.modelText ?? "";
     // The accessible name is the card label (aria-labelledby), so the model part is merged into it and replaced on a redraw.
     let named = cardLabels.get(card)?.textContent;
@@ -13851,15 +13887,13 @@ export class VisualAgentMapView extends ItemView {
     if (note?.modelOverride) {
       const label = this.plugin.modelLabel(note.model),
         text = t("ui.card_model_override_0", label),
-        tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+        tag = toolsMeta(tools).createSpan({ cls: "vam-node-model-tag", text: label });
       // The card name already carries the text, so the tag itself is hidden from screen readers (no second reading).
       tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text);
-      // In place on a redraw; otherwise right after the marker row (painted first), so renderNode and refreshCard agree.
-      const row = cardMarkerRows.get(card);
+      // In place on a redraw; otherwise last in the meta cell, after the link count.
       if (old) old.replaceWith(tag);
-      else if (row && row.parentElement === header) row.after(tag);
-      cardModelTags.set(header, tag);
+      cardModelTags.set(tools, tag);
       card.dataset.modelText = text;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
     } else {
@@ -14129,36 +14163,24 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map?.nodes.some(item => item.path === path);
   }
   /**
-   * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
+   * Brings an outline topic into view: selects its card and centers it. Never writes collapse or the map file.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
+   * A card inside a collapsed branch is not drawn: the camera goes to its nearest visible ancestor instead.
+   * P1.6b's view-only temporary expand replaces this fallback.
    */
   async revealPath(path: string): Promise<boolean> {
     const node = this.map?.nodes.find(item => item.path === path);
     if (!this.map || !node) return false;
-    const collapsed: string[] = [];
+    let visible: MapNode = node;
     for (let parent = node.parentId; parent;) {
       const ancestor = this.map.nodes.find(item => item.id === parent);
       if (!ancestor) break;
-      if (ancestor.collapsed) collapsed.push(ancestor.id);
+      if (ancestor.collapsed) visible = ancestor;
       parent = ancestor.parentId;
     }
-    if (collapsed.length) {
-      await this.plugin.mutate(() =>
-        this.mapChange(map => {
-          for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
-        })
-      );
-    }
-    const current = this.map?.nodes.find(item => item.id === node.id);
-    if (!current) return false;
-    if (!this.selection.state.multiSelectMode) {
-      // Opening collapsed ancestors already rendered; a plain reveal only moves the selection.
-      if (collapsed.length) {
-        this.selection.click(current.id);
-        this.render();
-      } else this.applySelectionChange(this.selection.click(current.id));
-    } else this.render();
-    this.focusNode(current);
+    if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
+    // Centering is the camera only: it is not saved, so an outline click never writes the map file.
+    this.focusNode(visible, false);
     return true;
   }
   private selectMapNode(node: MapNode): void {
@@ -14285,6 +14307,23 @@ export class VisualAgentMapView extends ItemView {
       summary?.removeClass("is-preview");
       if (editable) summary?.addClass("is-inline-editable");
     }
+    // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
+    const toolbar = cardToolbars.get(card);
+    const addTool = toolbar ? addSummaryTools.get(toolbar) : undefined;
+    const wantsAddTool =
+      !argumentView && !typing && editable && isPlaceholder(note.livingNode?.summary || note.summary);
+    if (addTool && !wantsAddTool) {
+      addTool.remove();
+      addSummaryTools.delete(toolbar!);
+    } else if (toolbar && !addTool && wantsAddTool && !this.selection.state.multiSelectMode) {
+      const fresh = this.button(toolbar, t("ui.card_tool_add_summary"), () => {});
+      fresh.addEventListener("click", () => this.whenEditing(() => this.startCardSummaryEdit(node, 0)));
+      fresh.addClass("vam-card-tool", "vam-card-tool-add-summary");
+      addSummaryTools.set(toolbar, fresh);
+      // Before the More button (the toolbar's last action); More is the first button after Note.
+      const more = Array.from(toolbar.children).find(child => child.classList.contains("vam-card-tool-more"));
+      if (more) toolbar.insertBefore(fresh, more);
+    }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
     const status = card.querySelector<HTMLElement>(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
     if (
@@ -14300,7 +14339,7 @@ export class VisualAgentMapView extends ItemView {
       if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
         this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
       else this.labelCard(card, note.title);
-      if (note.status === "idea" || isAiCard(note)) status?.remove();
+      if (note.status === "idea" || note.status === "completed" || isAiCard(note)) status?.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
         status.setText(label);
@@ -14321,10 +14360,13 @@ export class VisualAgentMapView extends ItemView {
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    const tools = cardToolbars.get(card);
+    if (header) this.paintCardMarkers(card, header, node.id);
+    if (tools) {
+      this.paintCardLinks(card, tools, node.id);
+      this.paintModelTag(card, tools, note);
+    }
     if (header) {
-      this.paintCardMarkers(card, header, node.id);
-      this.paintCardLinks(card, header, node.id);
-      this.paintModelTag(card, header, note);
       if (clearStatus) this.aiStatusMemo.clear();
       this.paintPromptState(card, header, node, note);
     }
@@ -16574,8 +16616,8 @@ export class VisualAgentMapView extends ItemView {
       return href;
     }
   }
-  /** Draws the link button in the card header: `↗` (with the count when several); its aria-label lists the hosts. */
-  private paintCardLinks(card: HTMLElement, header: HTMLElement, id: string): void {
+  /** Draws the link button in the card's toolbar: `↗` (with the count when several); its aria-label lists the hosts. */
+  private paintCardLinks(card: HTMLElement, tools: HTMLElement, id: string): void {
     const old = cardLinkButtons.get(card);
     cardLinkButtons.delete(card);
     const links = this.linksOf(id);
@@ -16584,7 +16626,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const hosts = links.map(href => this.linkHost(href)).join(t("ui.list_separator"));
-    const button = header.createEl("button", {
+    const button = toolsMeta(tools).createEl("button", {
       cls: "vam-card-links",
       text: links.length > 1 ? `↗${links.length}` : "↗"
     });
@@ -16604,10 +16646,7 @@ export class VisualAgentMapView extends ItemView {
       else if (current.length) this.showTopicLinkMenu(button, current);
     });
     if (old) old.replaceWith(button);
-    else {
-      const row = cardMarkerRows.get(card);
-      if (row && row.parentElement === header) row.after(button);
-    }
+    else toolsMeta(tools).insertBefore(button, toolsMeta(tools).firstChild);
     cardLinkButtons.set(card, button);
   }
   /** A small menu of the topic's links (one item per host); arrow keys move, Enter opens, Escape closes and returns focus. */

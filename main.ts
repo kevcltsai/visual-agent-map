@@ -17,6 +17,7 @@ import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-r
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
 import { selectionOutputLanguage } from "./core/content-language";
+import { isLivingNodeNote } from "./core/living-node-region";
 import {
   BookPipelineRunError,
   BookPipelineRuns,
@@ -92,7 +93,7 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { TOPIC_KINDS, readAiCard } from "./note-values";
+import { TOPIC_KINDS } from "./note-values";
 import { frontmatter } from "./core/repository-frontmatter";
 import { kindIconId, kindIconSvg } from "./experiences/visual-map/topic-kind-shape";
 import {
@@ -359,7 +360,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
   private readonly bookNoteWriter = createNoteWriter({
     openViews: path => this.openMarkdownViews(path),
-    canWrite: content => !readAiCard(frontmatter(content)),
+    canWrite: content => !isLivingNodeNote(content, frontmatter(content)),
     rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     rerender: path =>
       rerenderReadingViewsWhenLoaded(
@@ -1262,7 +1263,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       isManagedNote: notePath => this.repo.isArgumentManagedNote(notePath),
-      saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
+      saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name),
+      processNote: (file, edit) => this.repo.app.vault.process(file, edit)
     }));
     this.addChild(markdownSelectionAi);
     // Tag reading-view blocks with their source lines so an action on a rendered image finds its embed.

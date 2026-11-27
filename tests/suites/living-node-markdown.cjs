@@ -44,8 +44,9 @@ S.integrationTest('Living Node write boundary: unsupported AI writers cannot ove
   assert.equal(await f.repo.updateNoteGuarded(path, { detail: 'Owner edited legacy detail' }), 'written');
   assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
   assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
+  // A converted managed region (flag cleared, markers kept) still refuses AI writers: admission keys on the markers.
   await f.repo.writeAiCard(path, false);
-  assert.equal(await f.repo.updateNoteGuarded(path, { detail: 'Ordinary research' }, { rejectAiCard: true }), 'written');
+  await assert.rejects(() => f.repo.updateNoteGuarded(path, { detail: 'Ordinary research' }, { rejectAiCard: true }));
   assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
 });
 

@@ -3,6 +3,8 @@ import type { TranslationKey } from "./en";
 /** Simplified Chinese (Mainland usage) dictionary. Display strings only; notes keep zh-TW fixed text. Terms: agents-spec docs/product/I18N_GLOSSARY.md. */
 export const zhCN: Record<TranslationKey, string> = {
   "error.recovery_write_conflict": "保存前文件已更改。请重新打开后再试一次。",
+  "error.living_node_markers_damaged":
+    "这张卡片的 Living Node 标记已损坏（未成对或重复），所以 VAM 没有改动这张卡片。没有修复任何内容；请手动修正或移除标记。",
   "error.recovery_backup_failed": "无法确认恢复副本完整，原文件未更改。",
   "log.recovery_snapshot_retained_0": "已保留恢复副本：{0}",
   "log.recovery_scan_failed": "无法检查尚待处理的恢复副本。",

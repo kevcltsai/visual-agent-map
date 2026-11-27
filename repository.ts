@@ -54,7 +54,10 @@ import {
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
 import {
   hasLivingCommitMetadata,
+  isLivingNodeNote,
+  keepsLivingBodyAndMetadata,
   livingConfigurationStamp,
+  livingMarkerState,
   rebaseLivingNoteReferences,
   remapLivingCopyCardReferences,
   resetLivingCopyDiagnostics,
@@ -299,7 +302,8 @@ function guardWrites<T extends object>(
   message: () => string,
   recovery?: VaultWriteRecovery,
   recoveryErrors?: { conflict: () => Error; backup: () => Error; saveOpenEditors: (file: TFile) => Promise<void> },
-  noteGuard?: () => NoteWriteGuard | undefined
+  noteGuard?: () => NoteWriteGuard | undefined,
+  damagedMarkers?: () => Error
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -309,6 +313,29 @@ function guardWrites<T extends object>(
       return writes.has(property)
         ? (...args: unknown[]) => {
             if (disposed()) return Promise.reject(new Error(message()));
+            if (
+              property === "process" &&
+              damagedMarkers &&
+              args[0] instanceof TFile &&
+              args[0].extension === "md" &&
+              typeof args[1] === "function"
+            ) {
+              // Damaged Living Node markers: only a write proven to keep the body and Living Node metadata may pass.
+              const change = args[1] as (content: string) => string;
+              args[1] = (current: string): string => {
+                if (livingMarkerState(current) !== "corrupt") return change(current);
+                let next: string;
+                try {
+                  next = change(current);
+                } catch (error) {
+                  throw error instanceof Error && error.message === "ambiguous-living-node-region"
+                    ? damagedMarkers()
+                    : error;
+                }
+                if (next === current || keepsLivingBodyAndMetadata(current, next, frontmatter)) return next;
+                throw damagedMarkers();
+              };
+            }
             if (property === "process" && args[0] instanceof TFile && typeof args[1] === "function") {
               const guard = noteGuard?.();
               if (guard) {
@@ -392,11 +419,21 @@ export class Repository {
       }
     };
     const noteGuard = (): NoteWriteGuard | undefined => this.noteWriteScope.getStore();
+    const damagedMarkers = (): Error => new Error(this.message("error.living_node_markers_damaged"));
     this.app = new Proxy(app, {
       get(object, property) {
         const value = Reflect.get(object, property, object) as unknown;
         if (property === "vault")
-          return guardWrites(value as object, VAULT_WRITES, stopped, message, recovery, recoveryErrors, noteGuard);
+          return guardWrites(
+            value as object,
+            VAULT_WRITES,
+            stopped,
+            message,
+            recovery,
+            recoveryErrors,
+            noteGuard,
+            damagedMarkers
+          );
         if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
         return value;
       }
@@ -924,8 +961,7 @@ export class Repository {
         outcome = "discarded";
         return content;
       }
-      if ((rejectAiCard || writeOptions.newVisualReferences) && readAiCard(frontmatter(content)))
-        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
+      if (rejectAiCard || writeOptions.newVisualReferences) this.admitAiWriter(content);
       const next = this.patchedNote(path, content, patch, writeOptions);
       const final = finalize ? finalize(next) : next;
       if (final === null) {
@@ -954,11 +990,21 @@ export class Repository {
         outcome = "discarded";
         return content;
       }
-      if (rejectAiCard && readAiCard(frontmatter(content)))
-        throw new Error(translate(this.settings.language, "ui.living_node_use_run_card"));
+      if (rejectAiCard) this.admitAiWriter(content);
       return transform(content);
     });
     return outcome;
+  }
+
+  /**
+   * The one admission check of every AI writer (formal-outside, trial adopt, chat, book, raw and late callbacks). It reads the
+   * bytes being replaced and keys on the Living Node markers and metadata, not only the ai-card flag, so a converted managed
+   * region or a flag-only card is covered. Damaged markers get their own message.
+   */
+  private admitAiWriter(content: string): void {
+    const state = livingMarkerState(content);
+    if (state === "corrupt") throw new Error(this.message("error.living_node_markers_damaged"));
+    if (isLivingNodeNote(content, frontmatter(content))) throw new Error(this.message("ui.living_node_use_run_card"));
   }
 
   /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */
@@ -987,12 +1033,25 @@ export class Repository {
     return wrote;
   }
 
+  /** Damaged markers: only a status/error change, written to the frontmatter alone, is possible; the body is never rewritten. */
+  private damagedMarkerPatch(content: string, patch: NotePatch): string {
+    const keys = Object.keys(patch).filter(key => patch[key as keyof NotePatch] !== undefined);
+    if (!keys.length || keys.some(key => key !== "status" && key !== "lastError"))
+      throw new Error(this.message("error.living_node_markers_damaged"));
+    const values: Record<string, string | null> = {};
+    if (patch.status !== undefined) values.status = patch.status;
+    if (patch.lastError !== undefined) values["last-error"] = patch.lastError || null;
+    else if (patch.status === "completed") values["last-error"] = null;
+    return setFrontmatterKeys(content, values);
+  }
+
   private patchedNote(
     path: string,
     content: string,
     patch: NotePatch,
     options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate; newVisualReferences?: boolean }
   ): string {
+    if (livingMarkerState(content) === "corrupt") return this.damagedMarkerPatch(content, patch);
     const fm = frontmatter(content);
     // One decision for every label this write emits: the note's own scaffolding language (see scaffoldLanguage).
     const language = this.scaffoldLanguage(content, fm);

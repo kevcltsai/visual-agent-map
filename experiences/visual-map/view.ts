@@ -1,4 +1,5 @@
 import { errorMessage } from "../../core/error-message";
+import { livingEditorRefusal } from "../../core/living-node-region";
 import {
   cardOutputLanguage,
   defaultOutputLanguage,
@@ -197,6 +198,7 @@ import {
   Modal,
   MarkdownView,
   Notice,
+  parseYaml,
   Scope,
   TFile,
   type App,
@@ -24942,8 +24944,11 @@ export class VisualAgentMapView extends ItemView {
               }),
               { seen: imageKeysIn(note.detail) }
             );
-            await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition }, entry =>
-              collected.push(entry)
+            await this.noteChange(
+              again.node,
+              { detail: before ? `${before}\n\n${addition}` : addition },
+              entry => collected.push(entry),
+              true
             );
             outcome.result = { ok: true };
           } catch (error) {
@@ -25014,6 +25019,9 @@ export class VisualAgentMapView extends ItemView {
     if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return null;
     // AI lock: a locked card gets no new file either.
     if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return null;
+    // A Living Node (or damaged markers) gets no embed: checked on the bytes first, and again inside the write below.
+    const target = this.app.vault.getAbstractFileByPath(node.path);
+    if (!(target instanceof TFile) || livingEditorRefusal(await this.app.vault.read(target), parseYaml)) return null;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path })
@@ -25021,7 +25029,10 @@ export class VisualAgentMapView extends ItemView {
         const note = this.app.vault.getAbstractFileByPath(path);
         if (!(note instanceof TFile)) throw new Error(path);
         const link = attachment("image");
-        await this.plugin.repo.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
+        await this.plugin.repo.app.vault.process(note, content => {
+          if (livingEditorRefusal(content, parseYaml)) throw new Error(t("ui.living_node_use_run_card"));
+          return withCover(appendImageEmbed(content, link), link);
+        });
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);

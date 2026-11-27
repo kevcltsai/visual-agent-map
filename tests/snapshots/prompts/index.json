@@ -571,36 +571,6 @@
       "language": "zh-CN",
       "schema": true
     },
-    "claude.goal-recommend-current.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (scope current)",
-      "language": "en",
-      "schema": true
-    },
-    "claude.goal-recommend-current.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (scope current)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "claude.goal-recommend-current.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (scope current)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "claude.goal-recommend.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (StructuredOutput wording)",
-      "language": "en",
-      "schema": true
-    },
-    "claude.goal-recommend.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (StructuredOutput wording)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "claude.goal-recommend.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (StructuredOutput wording)",
-      "language": "zh-CN",
-      "schema": true
-    },
     "claude.task-decompose.en": {
       "builder": "AiTaskService instructions for Claude: mode decompose",
       "language": "en",
@@ -673,66 +643,6 @@
     },
     "claude.task-synthesize.zh-CN": {
       "builder": "AiTaskService instructions for Claude: mode synthesize, local",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "goal-recommend-context.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (goal and context, output language ja)",
-      "language": "en",
-      "schema": true
-    },
-    "goal-recommend-context.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (goal and context, output language ja)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "goal-recommend-context.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (goal and context, output language ja)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "goal-recommend-current.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope current, current tiers sent)",
-      "language": "en",
-      "schema": true
-    },
-    "goal-recommend-current.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope current, current tiers sent)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "goal-recommend-current.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope current, current tiers sent)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "goal-recommend-pinned.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, one pinned and one locked card)",
-      "language": "en",
-      "schema": true
-    },
-    "goal-recommend-pinned.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, one pinned and one locked card)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "goal-recommend-pinned.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, one pinned and one locked card)",
-      "language": "zh-CN",
-      "schema": true
-    },
-    "goal-recommend.en": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, goal only)",
-      "language": "en",
-      "schema": true
-    },
-    "goal-recommend.zh": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, goal only)",
-      "language": "zh-TW",
-      "schema": true
-    },
-    "goal-recommend.zh-CN": {
-      "builder": "core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, goal only)",
       "language": "zh-CN",
       "schema": true
     },

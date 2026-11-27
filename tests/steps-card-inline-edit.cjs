@@ -59,7 +59,7 @@ async function harness({ language = 'en' } = {}) {
     await lp.changeLanguage(language);
   }
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -436,10 +436,10 @@ const menuTitles = (h, fill) => {
   const menu = () => { const list = []; const m = { list, addItem(cb) { const e = entry(); cb(e.chain); list.push(e.it); return m; }, addSeparator() { list.push({ title: '—' }); return m; }, showAtPosition() {}, showAtMouseEvent() {} }; return m; };
   const root = menu(); fill(root); items.push(...root.list); return items;
 };
-test('a selected card shows four labelled buttons: Research, Add, Note, More; Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
+test('a selected card shows labelled buttons: Research, Add, Note, More (and Add summary on an empty-summary card); Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
   const h = await harness();
   const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-card-tool'));
-  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', '⋯']);
+  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', 'Add summary', '⋯']);
   assert.ok(tools.every(i => (i.text && i.text !== '⋯') || i.attrs['aria-label']), 'every button has a name');
   assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-add-child') || i.classes.has('vam-node-tool')).length, 0, 'no hover icons and no + circle');
   h.view.whenEditing = run => run();

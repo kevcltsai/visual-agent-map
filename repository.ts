@@ -128,10 +128,6 @@ import {
   type HypothesisStrength,
   type HypothesisLeaning,
   type TopicKind,
-  readRelevanceGoal,
-  normalizeRelevanceGoal,
-  normalizeRelevanceContext,
-  readRelevanceContext,
   type NoteRelevance
 } from "./note-values";
 import {
@@ -253,22 +249,8 @@ export function topicAppearanceValues(
   return values;
 }
 
-const localDate = (date = new Date()): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-/** What the map file's frontmatter said about the goal before a write; handed back to restore it exactly. */
-export interface RelevanceGoalState {
-  goal: string | undefined;
-  history: string[] | undefined;
-  context?: string | undefined;
-}
-/** The two setup values of a map's relevance grading, as read from the map file. */
-export interface RelevanceSetup {
-  goal: string | undefined;
-  context: string | undefined;
-}
-
 /** Everything one read of Map.md gives: the document and its frontmatter values. */
-export interface MapMeta extends RelevanceSetup {
+export interface MapMeta {
   map: MapDocument;
   sources: MapSource[];
 }
@@ -1377,21 +1359,14 @@ export class Repository {
     return parseMap(await this.app.vault.read(this.file(path)));
   }
 
-  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  /** Map.md read once: the map plus its sources (what hydrate and synchronize need). */
   async readMapMeta(path: string): Promise<MapMeta> {
     const content = await this.app.vault.read(this.file(path));
     const fm = frontmatter(content);
     return {
       map: parseMap(content),
-      goal: readRelevanceGoal(fm),
-      context: readRelevanceContext(fm),
       sources: readMapSources(fm)
     };
-  }
-
-  /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
-  async readRelevanceGoal(path: string): Promise<string | undefined> {
-    return readRelevanceGoal(frontmatter(await this.app.vault.read(this.file(path))));
   }
 
   /** The map file's `map-sources` list, tolerantly read (a missing key or a malformed value gives the valid subset). */
@@ -1415,12 +1390,6 @@ export class Repository {
         return content;
       return setFrontmatterKeys(content, { [MAP_SOURCES_KEY]: next.length ? next : null });
     });
-  }
-
-  /** The goal and context keys of the map file in one read (an old `relevance-level` key is ignored). */
-  async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
-    const fm = frontmatter(await this.app.vault.read(this.file(path)));
-    return { goal: readRelevanceGoal(fm), context: readRelevanceContext(fm) };
   }
 
   /**
@@ -1700,60 +1669,6 @@ export class Repository {
         "relevance-tier": value ? value.tier : null,
         "relevance-reason": null,
         "relevance-manual": value?.manual ? true : null
-      })
-    );
-  }
-
-  /**
-   * Sets the map's `relevance-goal` and `relevance-context` (a missing context removes its key) in one write and, when the goal differs from the current goal (or there was none), appends
-   * `"YYYY-MM-DD: <goal>"` (local date) to `relevance-goal-history`. Only those keys change; the history records the
-   * goal alone. `changed` is about the goal (the history); `setupChanged` is true when the goal or context
-   * differs. An old `relevance-level` key is never read, written or removed. Resolves with what was there before, for {@link restoreRelevanceGoal}.
-   */
-  async writeRelevanceGoal(
-    mapPath: string,
-    goal: string,
-    context?: string
-  ): Promise<{ previous: RelevanceGoalState; next: RelevanceGoalState; changed: boolean; setupChanged: boolean }> {
-    const next = normalizeRelevanceGoal(goal);
-    if (!next) throw new Error("A relevance goal is required.");
-    const nextContext = context === undefined ? undefined : normalizeRelevanceContext(context);
-    let previous: RelevanceGoalState = { goal: undefined, history: undefined };
-    let nextState: RelevanceGoalState = { goal: next, history: undefined, context: nextContext };
-    let changed = false;
-    let setupChanged = false;
-    await this.app.vault.process(this.file(mapPath), content => {
-      const fm = frontmatter(content);
-      previous = {
-        goal: typeof fm["relevance-goal"] === "string" ? fm["relevance-goal"] : undefined,
-        history: Array.isArray(fm["relevance-goal-history"])
-          ? fm["relevance-goal-history"].filter((item): item is string => typeof item === "string")
-          : undefined,
-        context: typeof fm["relevance-context"] === "string" ? fm["relevance-context"] : undefined
-      };
-      changed = previous.goal?.trim() !== next;
-      setupChanged = changed || readRelevanceContext(fm) !== nextContext;
-      nextState = {
-        goal: next,
-        history: changed ? [...(previous.history ?? []), `${localDate()}: ${next}`] : previous.history,
-        context: nextContext
-      };
-      return setFrontmatterKeys(content, {
-        "relevance-goal": next,
-        "relevance-context": nextContext ?? null,
-        ...(changed ? { "relevance-goal-history": nextState.history ?? null } : {})
-      });
-    });
-    return { previous, next: nextState, changed, setupChanged };
-  }
-
-  /** Puts the goal, context and history keys back exactly as {@link writeRelevanceGoal} found them (a missing value removes the key). */
-  async restoreRelevanceGoal(mapPath: string, state: RelevanceGoalState): Promise<void> {
-    await this.app.vault.process(this.file(mapPath), content =>
-      setFrontmatterKeys(content, {
-        "relevance-goal": state.goal ?? null,
-        "relevance-context": state.context ?? null,
-        "relevance-goal-history": state.history ?? null
       })
     );
   }

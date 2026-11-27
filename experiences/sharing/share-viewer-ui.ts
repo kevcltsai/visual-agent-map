@@ -13,8 +13,6 @@ export interface ShareViewerUi {
   readOnly: string;
   madeWithVam: string;
   install: string;
-  /** `{0}` is the map goal. */
-  goal: string;
   hint: string;
   layout: string;
   collapseAll: string;
@@ -120,7 +118,6 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   readOnly: "Shared map · read-only",
   madeWithVam: "Made with VAM",
   install: "Install VAM",
-  goal: "Goal: {0}",
   hint: "Drag empty space to pan · Scroll to zoom · Click a topic to read it",
   layout: "Layout",
   collapseAll: "Collapse all",

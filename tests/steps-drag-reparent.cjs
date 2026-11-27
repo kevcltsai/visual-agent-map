@@ -108,14 +108,6 @@ test('a target that is merging is refused with the existing Notice', () => {
   assert.equal(h.changes.length, 0); assert.deepEqual(h.notes, ['Merging; try again when it finishes']);
 });
 
-test('relevance sort keeps every card where it is', () => {
-  const h = harness();
-  h.view.relevanceSortOn = () => true; h.view.commitSelection = () => {}; // the drop falls through to a plain click
-  h.drag('d', 450, 250); assert.deepEqual(h.lit(), []);
-  h.drop('d', 450, 250);
-  assert.equal(h.changes.length, 0);
-});
-
 test('the highlight is removed on pointercancel and lostpointercapture, and nothing is written', () => {
   for (const ending of ['pointercancel', 'lostpointercapture']) {
     const h = harness();

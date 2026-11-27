@@ -97,7 +97,6 @@ export interface ShareTranslateSource {
   /** Keys the session cache. */
   mapId: string;
   title: string;
-  goal?: string;
   sourceLanguage: ShareOriginalLanguage;
   nodes: ShareTranslateNodeInput[];
 }
@@ -200,7 +199,7 @@ function prepareSource(
   source: ShareTranslateSource,
   options: Pick<ShareTranslateOptions, "dom" | "renderMermaid">
 ): Prepared {
-  const fieldTexts: string[] = [source.title, ...(source.goal ? [source.goal] : [])];
+  const fieldTexts: string[] = [source.title];
   const body: string[] = [];
   const labels: string[] = [];
   const nodes: PreparedNode[] = source.nodes.map(input => {
@@ -494,8 +493,6 @@ export class ShareTranslateService {
       nodes[input.id] = entry;
     }
     const top: ShareMapTranslation = { title: field(source.title, true) ?? source.title };
-    const goal = field(source.goal, false);
-    if (goal !== undefined) top.goal = goal;
 
     const totalSegments = body.texts.length + fields.texts.length;
     const failedSegments = body.failed.size + fields.failed.size;

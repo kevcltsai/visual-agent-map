@@ -18,7 +18,7 @@ function element(tag, options = {}) {
     createSpan(value) { return this.child('span', value); },
     setCssProps(props) { for (const [name, value] of Object.entries(props)) this.style.setProperty(name, value); },
     setText(value) { this.text = String(value); }, setAttr(name, value) { this.attrs[name] = String(value); this[name] = String(value); },
-    getAttr(name) { return this.attrs[name]; },
+    getAttr(name) { return this.attrs[name]; }, getAttribute(name) { return this.attrs[name] ?? null; },
     removeAttribute(name) { delete this.attrs[name]; delete this[name]; },
     addClass(...names) { for (const n of names) if (!this.classes.includes(n)) this.cls = `${this.cls} ${n}`.trim(); },
     removeClass(...names) { this.cls = this.classes.filter(n => !names.includes(n)).join(' '); },

@@ -399,14 +399,10 @@ export function startViewer(doc: Document): void {
         : {})
     };
   };
-  const mapTextNow = (): { title: string; goal: string } => {
+  const mapTextNow = (): { title: string } => {
     const translation = isTranslated() ? data.translations?.[language] : undefined;
     const rawTitle = isText(translation?.title) ? translation.title : data.title;
-    const rawGoal = isText(translation?.goal) ? translation.goal : data.goal;
-    return {
-      title: (typeof rawTitle === "string" && rawTitle.trim()) || ui.untitledMap,
-      goal: typeof rawGoal === "string" ? rawGoal.trim() : ""
-    };
+    return { title: (typeof rawTitle === "string" && rawTitle.trim()) || ui.untitledMap };
   };
   /** A language's name for the menu; the platform's name in the interface language when the file gave none. */
   const nameOf = (code: string, inLanguage?: string): string => {
@@ -570,10 +566,6 @@ export function startViewer(doc: Document): void {
   if (summaries.length) stage.append(summaryLayer);
   viewport.append(stage);
   const overlay = make("div", "vam-canvas-overlay");
-  const tools = make("div", "vam-map-tools");
-  const goal = make("span", "vam-goal");
-  const goalLabel = make("span", "vam-goal-text");
-  goal.append(icon("target"), goalLabel);
   const hint = make("span", "vam-canvas-hint");
   const zoomBar = make("div", "vam-zoom-controls");
   const zoomOutButton = iconButton(zoomBar, "minus", "", () => zoomBy(1 / 1.2));
@@ -595,7 +587,7 @@ export function startViewer(doc: Document): void {
   menu.setAttribute("role", "menu");
   menu.hidden = true;
   zoomBar.append(menu);
-  overlay.append(tools, hint, zoomBar);
+  overlay.append(hint, zoomBar);
   const inspector = make("aside", "vam-inspector");
   inspector.hidden = true;
   const outline = make("nav", "vam-outline");
@@ -636,8 +628,7 @@ export function startViewer(doc: Document): void {
       if (++depth > nodes.length) break;
     return depth;
   };
-  const insetNow = (): number =>
-    insetFromRects(viewport.getBoundingClientRect().top, tools.hidden ? undefined : tools.getBoundingClientRect());
+  const insetNow = (): number => insetFromRects(viewport.getBoundingClientRect().top, undefined);
 
   // ---- canvas
   function transform(): void {
@@ -1810,15 +1801,6 @@ export function startViewer(doc: Document): void {
     if (originalUnknown)
       for (const option of Array.from(languageSelect.options))
         if (option.dataset.original) option.textContent = ui.originalText;
-    if (mapText.goal) {
-      goalLabel.textContent = fill(ui.goal, mapText.goal);
-      goal.title = mapText.goal;
-      if (!goal.parentElement) tools.append(goal);
-      tools.hidden = false;
-    } else {
-      goal.remove();
-      tools.hidden = true;
-    }
     hint.textContent = ui.hint;
     const setLabel = (item: HTMLElement, label: string): void => {
       item.setAttribute("aria-label", label);
@@ -1842,7 +1824,7 @@ export function startViewer(doc: Document): void {
     } else translateNote.hidden = true;
     transform();
   }
-  /** Switches the whole page to `code`: cards, side panel, goal, title, interface text and `<html lang>`. */
+  /** Switches the whole page to `code`: cards, side panel, title, interface text and `<html lang>`. */
   function switchLanguage(code: string): void {
     if (code === language || !languages.includes(code)) return;
     language = code;

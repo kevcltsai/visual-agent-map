@@ -273,7 +273,7 @@ function fakeRunner({ transform = tagged, delay = 0, fail = () => false, onCall 
   return { run, state };
 }
 const manyNodes = (count, size = 500) => Array.from({ length: count }, (_, i) => ({ id: `n${i}`, title: `Topic ${i}`, summary: `Summary of topic ${i}`, detailHtml: `<p>${`Paragraph ${i} `.repeat(Math.ceil(size / 12)).slice(0, size)}</p>` }));
-const baseSource = (nodes, extra = {}) => ({ mapId: 'map-1', title: 'My map', goal: 'Learn it', sourceLanguage: 'en', nodes, ...extra });
+const baseSource = (nodes, extra = {}) => ({ mapId: 'map-1', title: 'My map', sourceLanguage: 'en', nodes, ...extra });
 const baseOptions = (extra = {}) => ({ dom: html.makeDom(), signal: new AbortController().signal, cache: new planModule.ShareTranslationCache(), model: 'claude:sonnet', reasoning: 'low', forbidden: [], ...extra });
 
 test('share translate service: translates every field and paragraph, at most 3 calls at once', async () => {
@@ -292,7 +292,7 @@ test('share translate service: translates every field and paragraph, at most 3 c
   assert.ok(n7.startsWith('<p>T:Paragraph 7'), n7.slice(0, 40));
   assert.equal(ja.nodes.n7.detailHtml, undefined, 'a new file carries no whole-note detailHtml');
   assert.equal(ja.top.title, 'T:My map');
-  assert.equal(ja.top.goal, 'T:Learn it');
+  assert.equal('goal' in ja.top, false, 'P1.10a: no goal is translated');
   assert.ok(state.maxInFlight <= 3 && state.maxInFlight >= 2, `parallelism ${state.maxInFlight}`);
   assert.equal(result.calls, state.calls.length);
   assert.equal(ja.calls, state.calls.length);

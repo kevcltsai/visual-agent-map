@@ -222,7 +222,6 @@ test('collect snapshots: Markdown context and shared services', async () => {
   }
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
   const { buildStructureReviewPrompt, STRUCTURE_REVIEW_SCHEMA } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
-  const { buildGoalRecommendPrompt, GOAL_RECOMMEND_SCHEMA } = support.load('core/goal-recommend-service.ts', { obsidian: support.obsidian });
   const reviewNodes = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', status: 'completed', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', status: 'idea', parentId: 'n1', depth: 1 }];
   const { buildMapChatPrompt, MAP_CHAT_SCHEMA } = support.load('core/map-chat-service.ts', { obsidian: support.obsidian });
   const { buildMapChatContext } = support.load('core/map-chat-context.ts', { obsidian: support.obsidian });
@@ -250,19 +249,6 @@ test('collect snapshots: Markdown context and shared services', async () => {
     // A selected annotated image: its `selectedImage` block and fixed note join the context; the picture itself travels outside the prompt.
     const imageChatContext = buildMapChatContext({ mapTitle: 'Map title', outline: chatOutline, selected: [], references: [], snippets: [], files: [], history: [], selectedImage: { id: 'img1', kind: 'annotated', note: 'Beef cuts', anchors: [{ id: 'anc-1', x: 0.25, y: 0.5, note: 'Ribeye' }], relations: [{ kind: 'related', from: 'anc-1', to: 'n2' }], imageAttached: true } });
     record(`map-chat-image.${tag}`, 'core/map-chat-service.ts buildMapChatPrompt (annotated image selected)', language, buildMapChatPrompt({ language, message: 'Mark the brisket on the picture', context: imageChatContext, model: 'm', reasoning: 'low' }), MAP_CHAT_SCHEMA);
-    // Pinned cards: n3 under n2 is pinned core, n4 under n2 is graded, n5 is a second child of the top-level card.
-    const pinNodes = [...reviewNodes, { id: 'n3', title: 'Pinned grandchild', summary: 'Pinned summary', status: 'idea', parentId: 'n2', depth: 2 }, { id: 'n4', title: 'Open grandchild', summary: '', status: 'idea', parentId: 'n2', depth: 2 }, { id: 'n5', title: 'Second child', summary: 'Second summary', status: 'idea', parentId: 'n1', depth: 1 }];
-    const pinned = { language, goal: 'Learner goal text', nodes: pinNodes, model: 'm', reasoning: 'low', pins: [{ id: 'n3', tier: 'core' }] };
-    // Claude gets the StructuredOutput wording (no "Reply with ONLY", no "use tools").
-    const claudeModel = 'claude:sonnet';
-    // goal-recommend: one call rates the cards and suggests new ones. `all` sends no earlier tier; `current` sends the current tiers.
-    const recommend = { language, goal: 'Learner goal text', nodes: reviewNodes, model: 'm', reasoning: 'low', scope: 'all' };
-    record(`goal-recommend.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, goal only)', language, buildGoalRecommendPrompt(recommend), GOAL_RECOMMEND_SCHEMA);
-    record(`goal-recommend-current.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope current, current tiers sent)', language, buildGoalRecommendPrompt({ ...recommend, scope: 'current', current: [{ id: 'n2', tier: 'support' }] }), GOAL_RECOMMEND_SCHEMA);
-    record(`goal-recommend-pinned.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, one pinned and one locked card)', language, buildGoalRecommendPrompt({ ...pinned, scope: 'all', lockedIds: ['n5'] }), GOAL_RECOMMEND_SCHEMA);
-    record(`goal-recommend-context.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (goal and context, output language ja)', language, buildGoalRecommendPrompt({ ...recommend, contentLanguage: 'ja', context: 'Learner context text' }), GOAL_RECOMMEND_SCHEMA);
-    record(`claude.goal-recommend.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (StructuredOutput wording)', language, buildGoalRecommendPrompt({ ...recommend, model: claudeModel }), GOAL_RECOMMEND_SCHEMA);
-    record(`claude.goal-recommend-current.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (scope current)', language, buildGoalRecommendPrompt({ ...recommend, scope: 'current', current: [{ id: 'n2', tier: 'support' }], model: claudeModel }), GOAL_RECOMMEND_SCHEMA);
   }
   const { planStep } = support.load('experiences/markdown-context/steps/plan/step.ts', { obsidian: support.obsidian });
   const planPrompt = (instruction, selected, context, hasImage) => planStep.render({ instruction, selected, context, hasImage });

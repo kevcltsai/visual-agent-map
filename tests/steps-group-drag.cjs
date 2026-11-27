@@ -147,13 +147,6 @@ test('a merging member blocks the whole group with one Notice', () => {
   assert.equal(h.changes.length, 0); assert.equal(h.cards.a.style.left, '400px'); assert.equal(h.cards.b.style.left, '400px');
 });
 
-test('relevance sort keeps the group where it is', () => {
-  const h = harness();
-  h.view.relevanceSortOn = () => true;
-  h.down('a'); h.fire('a', 'pointermove', 40, 0); h.flush(); h.fire('a', 'pointerup', 40, 0);
-  assert.equal(h.changes.length, 0); assert.equal(h.cards.a.style.left, '400px'); assert.equal(h.notes?.length ?? 0, 0);
-});
-
 test('timeline: a group with a first-level topic does not move and says why once; without one it moves', () => {
   const notes = [];
   const h = harness({ layout: 'timeline', notes });

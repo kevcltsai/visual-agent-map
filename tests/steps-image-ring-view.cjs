@@ -191,14 +191,14 @@ test('dropped card: a ring card is never "among siblings" (the drop only moves i
   for (const id of ringIds) assert.equal(view.droppedAmongSiblings(map, map.nodes.find(n => n.id === id)), false, id);
 });
 
-test('relevance order: ring cards and their branches keep their coordinates in the sorted display', () => {
+test('P1.10a: canvasNodes shows the map in its own order, with every ring card and branch at its stored coordinates', () => {
   const map = withRing('right');
   bare(map).arrangeAll(map);
   map.nodes.push(node('t1-k', 't1', 123, 456));
   const view = bare(map);
-  view.relevanceSortOn = () => true;
   view.notes = new Map();
   const shown = view.canvasNodes();
+  assert.deepEqual(shown.map(n => n.id), map.nodes.map(n => n.id), 'map order, no re-sorting');
   for (const id of [...ringIds, 't1-k']) {
     const real = map.nodes.find(n => n.id === id);
     const got = shown.find(n => n.id === id);
@@ -244,7 +244,6 @@ test('tidy after resize: without rings it is the old rule (overlap only), with a
 // ---- P3: arrow keys around a picture ---------------------------------------------------------------------------------------
 const keyView = map => {
   const view = bare(map);
-  view.relevanceSortOn = () => false;
   return view;
 };
 const MANY = Array.from({ length: 12 }, (_, i) => [`a${i}`, `m${i}`, [0.1 + 0.07 * i, 0.15 + 0.06 * ((i * 5) % 12)]]);

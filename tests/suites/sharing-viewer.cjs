@@ -228,7 +228,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
     for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
-    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
+    for (const key of ['expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
   for (const lang of ['zh-TW', 'zh-CN']) for (const key of ['install', 'madeWithVam', 'readOnly', 'tierCore', 'topicDetails']) assert.notEqual(text.shareViewerUiFor(lang)[key], english[key], `${lang}.${key} is translated`);
@@ -356,7 +356,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
     for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' || k === 'kindNames' || k === 'relationNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
-    for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
+    for (const key of ['expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
   assert.match(read('experiences/sharing/share-viewer-dictionaries.ts'), /NOT[\s*]+native-reviewed/);
@@ -524,6 +524,28 @@ test('sharing viewer fit: the first view and Show all include a free text block 
     });
     assert.equal(report.first, true, 'the first view shows the free block');
     assert.equal(report.again, true, 'Show all brings the free block back into view');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('P1.10a: a file exported by an older version, with a top-level goal and node tier and manual, opens with every card and no goal chip (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-old-goal-'));
+  try {
+    const data = payload();
+    data.goal = 'Pass the cook certification exam';
+    Object.assign(data.nodes.find(node => node.id === 'water'), { tier: 'side', manual: true });
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'old.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: `(() => ({ cards: document.querySelectorAll('.vam-node').length, water: document.querySelector('.vam-node[data-node-id="water"]')?.getAttribute('data-relevance') ?? null, goal: document.querySelectorAll('.vam-goal, .vam-goal-text, .vam-map-tools').length, goalText: document.getElementById('vam-app').textContent.includes('Pass the cook certification exam') }))()`, returnByValue: true })).result.value);
+    assert.equal(report.cards, data.nodes.length, 'every topic is drawn');
+    assert.equal(report.water, 'side', 'the node tier still drives the card');
+    assert.equal(report.goal, 0, 'no goal chip or tools container');
+    assert.equal(report.goalText, false, 'the old goal text is not shown anywhere');
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
@@ -760,7 +782,7 @@ test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps 
       const result = {};
       result.items = await evaluate(`Array.from(document.querySelectorAll('.vam-outline [role="treeitem"]')).map(r => [r.dataset.outlineId, Number(r.getAttribute('aria-level')), r.getAttribute('aria-expanded'), r.querySelector('.vam-outline-title')?.textContent, r.querySelector('.vam-outline-title')?.title])`);
       result.structure = await evaluate(`(() => { const n = document.querySelector('nav.vam-outline'); const b = document.querySelector('${TOGGLE}'); return { role: n.querySelector('[role="tree"]') ? 'tree' : null, label: n.getAttribute('aria-label'), hidden: n.hidden, width: n.getBoundingClientRect().width, toggleFirst: document.querySelector('.vam-toolbar').firstElementChild === b, toggleLabel: b.getAttribute('aria-label'), toggleTitle: b.title, expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls') === n.id && !!n.id, tabbable: n.querySelectorAll('[role="treeitem"][tabindex="0"]').length }; })()`);
-      result.layout = await evaluate(`(() => { const o = document.querySelector('.vam-outline').getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const ov = document.querySelector('.vam-canvas-overlay').getBoundingClientRect(); const g = document.querySelector('.vam-map-tools').getBoundingClientRect(); const h = document.querySelector('.vam-canvas-hint').getBoundingClientRect(); return { viewportLeft: v.left, outlineRight: o.right, overlayLeft: ov.left, goalLeft: g.left, hintLeft: h.left }; })()`);
+      result.layout = await evaluate(`(() => { const o = document.querySelector('.vam-outline').getBoundingClientRect(); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const ov = document.querySelector('.vam-canvas-overlay').getBoundingClientRect(); const h = document.querySelector('.vam-canvas-hint').getBoundingClientRect(); return { viewportLeft: v.left, outlineRight: o.right, overlayLeft: ov.left, hintLeft: h.left }; })()`);
       result.visibleAtStart = (await visibleRows()).length;
       result.cardsAtStart = await cardCount();
       // The arrow folds only the outline.
@@ -840,8 +862,8 @@ test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps 
     }
     assert.deepEqual(report.structure, { role: 'tree', label: 'Outline', hidden: false, width: 260, toggleFirst: true, toggleLabel: 'Outline', toggleTitle: 'Outline', expanded: 'true', controls: true, tabbable: 1 });
     assert.equal(report.layout.viewportLeft, report.layout.outlineRight, 'the map sits beside the outline, not under it');
-    assert.equal(report.layout.overlayLeft, report.layout.outlineRight, 'the goal, hint and zoom bar make way for the outline');
-    assert.ok(report.layout.goalLeft > report.layout.outlineRight && report.layout.hintLeft > report.layout.outlineRight);
+    assert.equal(report.layout.overlayLeft, report.layout.outlineRight, 'the hint and zoom bar make way for the outline');
+    assert.ok(report.layout.hintLeft > report.layout.outlineRight);
     assert.equal(report.visibleAtStart, 12);
     assert.equal(report.cardsAtStart, 4);
     assert.deepEqual(report.folded.rows, ['root', 'heat', 'water', 'a1', 'a2', 'salt', 's1']);
@@ -1006,8 +1028,7 @@ const CONTRAST_PROBE = `(() => {
     sideTag: '.vam-node[data-relevance="side"] .vam-relevance-tag',
     idea: '.vam-status-idea',
     hint: '.vam-canvas-hint',
-    zoom: '.vam-zoom',
-    goal: '.vam-goal-text'
+    zoom: '.vam-zoom'
   };
   for (const [name, selector] of Object.entries(text)) out[name] = worst(selector);
   out.twist = worst('.vam-outline-twist');

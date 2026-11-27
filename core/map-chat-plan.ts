@@ -165,7 +165,7 @@ export interface MapChatPlan {
    * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
    * more, which is a retry and is not counted). Each synthesize is one integration call plus the
    * same diagram call: B2 starts it without a dialog and without the directions step. An expand is {@link MAP_CHAT_EXPAND_CALLS_PER_CARD} outline calls per
-   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets and one for a place_image (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for a merge, one for each card a find_images targets and one for a place_image (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -243,7 +243,6 @@ export function estimateChatCalls(
         case "expand":
           calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
           break;
-        case "rate_by_goal":
         case "merge":
           calls += 1;
           break;
@@ -277,13 +276,7 @@ const AUTO_ALLOWED_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAc
   "auto_layout",
   "ask_topic_kind"
 ]);
-const AUTO_ALLOWED_RUN: ReadonlySet<string> = new Set([
-  "research_standard",
-  "expand",
-  "find_images",
-  "synthesize",
-  "rate_by_goal"
-]);
+const AUTO_ALLOWED_RUN: ReadonlySet<string> = new Set(["research_standard", "expand", "find_images", "synthesize"]);
 
 /** A vault path as a list of segments, or null when it is absolute, empty or climbs out with `..`. */
 function pathSegments(path: string): string[] | null {

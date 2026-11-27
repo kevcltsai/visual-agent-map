@@ -21,7 +21,6 @@ export const nodeTestFiles = [
   "tests/replay.cjs",
   "tests/markdown-selection-auto-open.cjs",
   "tests/step-runner.cjs",
-  "tests/relevance-offline.cjs",
   "tests/steps-*.cjs",
   "tests/codex-parallel-runtime.cjs",
   "tests/prompt-monitor-timing.cjs",

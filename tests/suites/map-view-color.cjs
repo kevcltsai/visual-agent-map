@@ -39,7 +39,6 @@ ${styles}
 body { margin: 0; width: 1200px; height: 800px; background: var(--background-primary); color: var(--text-normal); }
 </style></head><body>
 <div class="vam-toolbar"><button class="vam-map-switcher"><span class="vam-map-title">Map</span><span class="vam-map-switcher-icon">${svg}</span></button></div>
-<div class="view-header vam-goal-host" style="background:var(--background-primary)"><div class="vam-goal-bar"><span class="vam-goal-target"></span><div class="vam-goal-text">Learn the basics</div></div><div class="vam-goal-bar is-empty"><div class="vam-goal-text">What do you want to achieve?</div></div></div>
 <div class="vam-workspace" style="height:620px">
 <div class="vam-map-chat" style="width:300px;height:600px">
 </div>
@@ -104,8 +103,6 @@ const CASES = [
   ['argument-bar-resume-hover', '.vam-argument-bar button.mod-cta', 'color', 4.5, { hover: true }],
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
-  ['goal-bar-text', '.vam-goal-bar:not(.is-empty) .vam-goal-text', 'color', 4.5],
-  ['goal-bar-placeholder', '.vam-goal-bar.is-empty .vam-goal-text', 'color', 4.5],
   ['map-search-count', '.vam-map-search-count', 'color', 4.5],
   ['map-search-close', '.vam-map-search-close', 'color', 4.5],
   ['map-search-match-outline', '.vam-view .vam-node.is-search-match', 'outline', 3],

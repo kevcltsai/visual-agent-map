@@ -1,0 +1,8 @@
+{
+  "needs": {
+    "response": "{\"needs\":[{\"text\":\"A synthetic note containing the unsupported number 111\"}]}"
+  },
+  "facetVerdict": {
+    "response": "{\"verdict\":\"refuted\",\"citedNeeds\":[\"abcdef12-3456-4789-8abc-def012345678\",\"fedcba98-7654-4321-8765-43210fedcba9\"],\"reason\":\"The evidence abcdef12-3456-4789-8abc-def012345678 indicates a mismatch.\",\"insights\":[{\"kind\":\"consistent\",\"text\":\"The source abcdef12 conflicts with this claim.\"}]}"
+  }
+}

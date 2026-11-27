@@ -856,21 +856,21 @@ test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 an
 });
 
 // ---- #59: replies that name an id; partial conclusion ----
-const realReplies = require('./fixtures/argument-real-replies-with-ids.json');
-const P59_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
-test('#59 real failed reply (needs, exchange 92d08dc8): the made-up number 111 is still refused', () => {
-  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '警力配置與執法強度改變', statement: '治安感受的變化可能來自警力部署的調整', round: 3 }, data: [], existing: [], max: 1 };
-  bad(mod.needsStep, req, realReplies.needs.response, /number 111/);
+const syntheticIdReplies = require('./fixtures/argument-synthetic-id-replies.json');
+const P59_PROP = '近期系統更新是否降低了線上服務的穩定性？';
+test('#59 synthetic reply: an unsupported number is still refused', () => {
+  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '更新影響服務穩定性', statement: '近期變更可能增加錯誤率', round: 3 }, data: [], existing: [], max: 1 };
+  bad(mod.needsStep, req, syntheticIdReplies.needs.response, /number 111/);
 });
-test('#59 real failed reply (facet verdict, exchange 6333bbea): an id in the reason or insight text is refused as an id, not as a number', () => {
-  const ids = ['4924cc48-8487-4f23-88d9-154103363460', 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3', 'c8cc89c1-0000-4000-8000-000000000001'];
-  const evidence = ids.map(id => ({ id, claim: '證據', quote: 'quote text here', url: 'https://example.org/a', stance: 'contradicts' }));
-  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '監視器普及使治安改善' });
-  bad(mod.facetVerdictStep, req, realReplies.facetVerdict.response, /names an id/);
-  // the same reply with the ids removed from the text passes the id check (it then fails only on the numbers, which this fixture does not have)
-  const clean = JSON.parse(realReplies.facetVerdict.response);
-  clean.reason = '假說主張治安改善，但證據顯示不安全感上升。';
-  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/c8cc89c1/g, '某項證據') }));
+test('#59 synthetic reply: full and short ids in text are refused, and removal restores positive parsing', () => {
+  const ids = ['abcdef12-3456-4789-8abc-def012345678', 'fedcba98-7654-4321-8765-43210fedcba9', 'c001cafe-0000-4000-8000-000000000001'];
+  const evidence = ids.map(id => ({ id, claim: `synthetic evidence marker ${id}`, quote: `synthetic quote marker ${id}`, url: 'https://example.org/a', stance: 'contradicts' }));
+  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '近期更新可能提升服務穩定性' });
+  bad(mod.facetVerdictStep, req, syntheticIdReplies.facetVerdict.response, /names an id/);
+  bad(mod.facetVerdictStep, req, { ...JSON.parse(syntheticIdReplies.facetVerdict.response), reason: 'abcdef12 matches' }, /names an id/);
+  const clean = JSON.parse(syntheticIdReplies.facetVerdict.response);
+  clean.reason = '近期更新後服務的錯誤率有所變化。';
+  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/abcdef12/g, '某項證據') }));
   assert.equal(mod.facetVerdictStep.parse(reply(clean), req).citedNeeds.length, 2);
 });
 test('#59 verdict reason naming an evidence id (or its first 8 characters) is refused; short ids are not checked', () => {

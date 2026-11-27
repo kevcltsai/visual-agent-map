@@ -1378,7 +1378,8 @@ export class VisualAgentMapView extends ItemView {
           onSaved: () => {}
         }
       ),
-    noteChange: (node, patch) => this.noteChange(node, patch),
+    noteChange: (node, patch) =>
+      this.noteChange(node, patch, undefined, patch.summary !== undefined || patch.detail !== undefined),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
     chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
@@ -12063,7 +12064,9 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     patch: NotePatch,
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
-    sink: (entry: Action) => void = entry => this.history.push(entry)
+    sink: (entry: Action) => void = entry => this.history.push(entry),
+    /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
+    rejectAiCard = false
   ): Promise<void> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
@@ -12079,7 +12082,7 @@ export class VisualAgentMapView extends ItemView {
       before.previewAutoHash = current.previewAutoHash;
     }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
-    await this.plugin.repo.updateNote(node.path, patch);
+    await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard });
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
       this.plugin.topicRuns.dropPending(node.path);

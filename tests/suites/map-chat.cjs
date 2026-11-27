@@ -613,6 +613,24 @@ integrationTest('map chat: F2 - the Detail changed after the message was sent, s
   assert.equal((await h.note('a')).detail.trim(), 'User typed this meanwhile');
 });
 
+integrationTest('map chat: a card that became an AI card after the chat snapshot is refused at the note write, bytes unchanged', async () => {
+  for (const act of [{ kind: 'edit_topic_note', nodeId: null, detail: 'AI text' }, { kind: 'update_summary', nodeId: null, summary: 'AI summary' }]) {
+    const h = await harness(); await h.view.hydrate();
+    await h.repo.updateNote(h.node('a').path, { detail: 'Original body', summary: 'Original summary' }); await h.view.hydrate();
+    const baseline = topicBaseline(h);
+    const path = h.node('a').path;
+    // Another view flips the card on disk right after the chat's own freshness read (the view's cache and the baseline still say "ordinary").
+    const flip = () => h.contents.set(path, h.contents.get(path).replace(/^---\n/, '---\nai-card: true\n'));
+    const untouched = h.contents.get(path).replace(/^---\n/, '---\nai-card: true\n');
+    const read = h.repo.readNote.bind(h.repo); let armed = true;
+    h.repo.readNote = async (...args) => { const note = await read(...args); if (armed && new Error().stack.includes('chatTopicNow')) { armed = false; flip(); } return note; };
+    const lines = await apply(h, [{ ...act, nodeId: h.ids.a }], {}, undefined, baseline);
+    const flipped = h.contents.get(path); assert.match(flipped, /ai-card: true/); assert.equal(armed, false);
+    assert.notEqual(lines[0]?.status, 'done');
+    assert.equal(flipped, untouched, act.kind + ' leaves the AI card bytes untouched');
+  }
+});
+
 integrationTest('map chat: F3 - the summary changed while the AI was replying: that action is skipped, the others still apply', async () => {
   const h = await harness(); await h.view.hydrate();
   const baseline = topicBaseline(h);

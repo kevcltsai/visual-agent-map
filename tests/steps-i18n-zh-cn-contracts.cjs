@@ -104,6 +104,7 @@ test('B1: the selection-AI command and the map ribbon refresh with the language'
   const plugin = new Plugin(), attributes = {};
   const selection = { name: '' };
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
+  plugin.app = { workspace: { getLeavesOfType: () => [] } };
   plugin.manifest = { name: 'Visual Agent Map' };
   plugin.localizedCommands = [{ command: selection, key: 'ui.command_selection_ai' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'zh-CN' };

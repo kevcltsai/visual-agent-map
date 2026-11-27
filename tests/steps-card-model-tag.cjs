@@ -74,9 +74,9 @@ test('painting again replaces the tag (no duplicates) and removes it when the ov
   assert.equal(tags(header).length, 0);
 });
 
-test('renderNode and refreshCard both paint the tag, next to (not inside) the marker row', () => {
+test('renderNode and refreshCard both paint the tag, in the toolbar meta cell, not inside the marker row', () => {
   const source = read('experiences/visual-map/view.ts');
-  assert.equal((source.match(/this\.paintModelTag\(card, header, note\)/g) ?? []).length, 2);
+  assert.equal((source.match(/this\.paintModelTag\(card, tools, note\)/g) ?? []).length, 2);
   const method = source.match(/private paintCardMarkers[\s\S]*?\n  }\n/)[0];
   assert.ok(!method.includes('model-tag'), 'the marker row code is untouched');
 });

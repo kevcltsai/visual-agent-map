@@ -190,12 +190,12 @@ test('without IntersectionObserver the image loads at once', () => {
   globalThis.IntersectionObserver = saved;
 });
 
-test('renderNode paints the cover before the title; the header, model tag and colour calls are untouched', () => {
+test('renderNode paints the cover before the title; the toolbar model tag and colour calls are untouched', () => {
   const source = read('experiences/visual-map/view.ts');
   const body = source.match(/private renderNode\([\s\S]*?\n  }\n/)[0];
   assert.match(body, /this\.paintCover\(card, node\.path\)/);
   assert.ok(body.indexOf('this.paintCover(') < body.indexOf('cls: "vam-card-title"'));
-  assert.ok(body.includes('this.paintModelTag(card, header, note)') && body.includes('this.paintCardColor('));
+  assert.ok(body.includes('this.paintModelTag(card, tools, note)') && body.includes('this.paintCardColor('));
   assert.match(source, /\.on\("changed"/);
 });
 

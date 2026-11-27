@@ -1111,7 +1111,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   const task = { mapPath: view.path, mapId: 'm', mapTitle: 'M', title: 'T', sources: [{ id: 'a', path: 'a.md' }, { id: 'b', path: 'b.md' }], parentId: 'root', targetId: null, model: 'x', sourceContent: '', controller: new AbortController(), state: 'running', progress: '' };
   const chips = card => { const all = el => [el, ...el.children.flatMap(all)]; return all(card).filter(e => e.classes?.has('vam-status')).map(e => e.text); };
   fixture.build(); let cards = fixture.cards();
-  assert.deepEqual(chips(cards.a), ['Researched']); assert.notEqual(cards.a.dataset.status, 'running');
+  assert.deepEqual(chips(cards.a), [], 'a researched card carries no success chip (DELIVERY_V3_3 7 P1.2)'); assert.notEqual(cards.a.dataset.status, 'running');
   view.mergeDrafts.tasks.set(view.path, task); fixture.build(); cards = fixture.cards();
   for (const id of ['a', 'b']) { assert.deepEqual(chips(cards[id]), ['Merging…'], `${id} is marked`); assert.equal(cards[id].dataset.status, 'running'); }
   for (const id of ['root', 'c']) { assert.equal(chips(cards[id]).includes('Merging…'), false, `${id} is not`); assert.notEqual(cards[id].dataset.status, 'running'); }
@@ -1123,7 +1123,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   assert.ok(texts.includes('Merging:')); assert.equal(texts.includes('Stop merge'), false, 'no Stop once the result is being written');
   const stop = (task.state = 'running', all(bar()).find(e => e.tag === 'button' && e.text === 'Stop merge')); stop.handlers.get('click')();
   assert.equal(view.mergeDrafts.tasks.size, 0); assert.equal(task.controller.signal.aborted, true);
-  fixture.build(); assert.deepEqual(chips(fixture.cards().a), ['Researched']); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
+  fixture.build(); assert.deepEqual(chips(fixture.cards().a), []); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
 });
 integrationTest('AI merge lock: a merging card cannot be dragged; other cards still can', () => {
   for (const [merging, expected] of [[true, 0], [false, 1]]) {
@@ -1242,7 +1242,7 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.card_tool_research', 'ui.card_tool_add', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['研究', '新增', '筆記', '更多卡片動作']);
 });
-integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
+integrationTest('status pill: researched and unresearched topics show none (no success label on the card face, DELIVERY_V3_3 7 P1.2), other states keep theirs and screen readers still hear the status ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
     const fixture = selectionView(load);
     fixture.view.notes.get('a').status = status;
@@ -1254,7 +1254,7 @@ integrationTest('status pill: researched topics show "Researched", unresearched 
     return { found, card, label: fixture.view.stageEl.children.find(item => item.dataset.nodeId === 'a') };
   };
   const done = pills('completed');
-  assert.deepEqual(done.found.map(item => [item.text, [...item.classes].sort().join(' ')]), [['Researched', 'vam-status vam-status-completed']], 'completed cards show the Researched pill');
+  assert.equal(done.found.length, 0, 'completed cards carry no Researched pill (no success label on the card face)');
   assert.equal(pills('idea').found.length, 0, 'unresearched cards have no pill');
   assert.equal(pills('idea').card.dataset.status, 'idea', 'the card still carries its status');
   assert.equal(pills('error').found.length, 1, 'error keeps its pill');
@@ -1264,6 +1264,39 @@ integrationTest('status pill: researched topics show "Researched", unresearched 
   assert.ok(labelled.cards().a.attrs['aria-labelledby'], 'the card is still named');
   const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
   assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
+});
+integrationTest('A4 two states: an unselected card keeps links, model, add-summary and the secondary actions out of its header; they sit in the card toolbar, and no success chip is drawn', () => {
+  const f = heFixture({ notes: heNotes([
+    ['fact', { summary: 'Has a summary', links: ['https://a.example/x'], modelOverride: true, model: 'gpt-x', status: 'completed' }],
+    ['hyp', { summary: 'No conclusion yet', status: 'completed' }],
+    ['other', { summary: 'S', status: 'error', lastError: 'boom' }]
+  ]) });
+  f.view.plugin.modelLabel = model => `M:${model}`;
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map();
+  for (const n of f.view.map.nodes) f.view.renderNode(n);
+  const has = (el, name) => (el.cls ?? '').split(/\s+/).includes(name);
+  const part = (i, name) => dom.find(f.view.stageEl.children[i], c => has(c, name));
+  const within = (root, test) => root ? dom.findAll(root, test) : [];
+  for (let i = 0; i < 3; i++) {
+    const header = part(i, 'vam-node-header'), tools = part(i, 'vam-node-tools');
+    assert.ok(tools, `card ${i} has its toolbar`);
+    assert.deepEqual(within(header, c => has(c, 'vam-card-links') || has(c, 'vam-node-model-tag') || has(c, 'vam-badge-new')).length, 0, `card ${i}: no links, model or suggestion badge in the header`);
+    assert.deepEqual(within(f.view.stageEl.children[i], c => has(c, 'vam-status-completed')).length, 0, `card ${i}: no completed chip`);
+    assert.deepEqual(within(tools, c => c.tag === 'button' && has(c, 'vam-detail-button')).length, 1, `card ${i}: the toolbar keeps Note`);
+  }
+  assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-links')).length === 1, 'links in the toolbar');
+  assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-node-model-tag') && c.text === 'M:gpt-x').length === 1, 'model name in the toolbar');
+  const meta = part(0, 'vam-node-tools').children.at(-1);
+  assert.ok(has(meta, 'vam-node-tools-meta'), 'link count and model close the toolbar');
+  assert.equal(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, 'a card with a summary has no add-summary button');
+  const add = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool-add-summary'));
+  assert.equal(add.length, 1, 'an empty-summary card offers Add summary in the toolbar'); assert.equal(add[0].text, 'Add summary');
+  const buttons = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool')).map(c => c.text);
+  assert.deepEqual(buttons.slice(-2), ['Add summary', '⋯'], 'Add summary sits just before More');
+  assert.equal(within(part(2, 'vam-node-header'), c => has(c, 'vam-status-error')).length, 1, 'the error chip stays in the header');
+  // The card-level add-summary line takes no room and shows nothing (the stylesheet hides it).
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-card-summary-add \{ display: none;/);
 });
 integrationTest('header ⋯ menu: presentation, layout, select several, topic outline and focus mode, then the maintenance entries; map management is not here', () => {
   const menus = [];
@@ -2607,9 +2640,9 @@ integrationTest('hypothesis-evidence: the SVG types hide the card frame and shad
   assert.match(frame, /border-color: transparent; background: transparent; box-shadow: none;/);
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(frame.includes(`[data-topic-kind="${kind}"]`), `${kind} is in the hidden-frame rule`); assert.ok(!frame.includes('"action"') && !frame.includes('"topic"'), 'action and topic keep their card frame');
   assert.match(css, /--vam-kind-dash: none;/); assert.match(css, /\[data-relevance="side"\][^{]*\{ --vam-kind-dash: 6 4; \}/);
-  assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)/);
+  assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)/);
   assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
-  assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px; \}/);
+  assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px; \}/);
   assert.match(css, /\.vam-kind-shape \.vam-kind-outline \{[^}]*stroke-dasharray: var\(--vam-kind-dash\)/);
 });
 
@@ -3048,7 +3081,7 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.ok(line && line.startsWith('[data-topic-kind="atomic"]'), 'starts with the attribute');
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(line.includes(`[data-topic-kind="${kind}"].vam-node.is-relation-end`), kind);
   assert.ok(!line.includes('"action"'), 'action keeps the rectangular outline');
-  assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px/);
+  assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px/);
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });
 // ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
@@ -3986,13 +4019,13 @@ integrationTest('topic-links: opening re-validates, refuses an unsafe href with 
     assert.equal(notices.length, 11);
   }
 });
-integrationTest('topic-links: the card header shows a button whose label lists the hosts; one link opens directly, several open a keyboard menu', () => {
+integrationTest('topic-links: the card toolbar (selected card) holds a button whose label lists the hosts; one link opens directly, several open a keyboard menu', () => {
   {
     const f = heFixture({ notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', { links: ['https://a.example/x', 'https://b.example/y'] }], ['other', { links: ['javascript:alert(1)'] }]]) });
     const { view, opened } = f;
     view.stageEl = hePatch(dom.element('stage')); view.cardEls = new Map();
     for (const n of view.map.nodes) view.renderNode(n);
-    const header = i => dom.find(view.stageEl.children[i], c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+    const header = i => dom.find(view.stageEl.children[i], c => (c.cls ?? '').split(/\s+/).includes('vam-node-tools'));
     const button = i => dom.find(header(i), c => c.tag === 'button' && (c.cls ?? '').includes('vam-card-links'));
     assert.equal(button(0).text, '↗'); assert.equal(button(0).attrs['aria-label'], 'Links: a.example');
     assert.equal(button(1).text, '↗2'); assert.equal(button(1).attrs['aria-label'], 'Links: a.example, b.example');

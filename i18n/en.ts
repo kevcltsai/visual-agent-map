@@ -1046,6 +1046,7 @@ export const en = {
   "ui.card_tool_research": "Research",
   "ui.card_tool_add": "Add",
   "ui.card_tool_note": "Note",
+  "ui.card_tool_add_summary": "Add summary",
   "ui.card_tool_note_label": "Note: open in the right sidebar (Cmd/Ctrl-click: new tab)",
   "ui.card_tool_more": "More card actions",
   "ui.card_tool_add_other": "Add another type",

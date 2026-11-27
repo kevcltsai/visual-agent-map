@@ -85,3 +85,12 @@ test("card title keeps wrapping anywhere and the summary keeps its 3-line clamp"
   assert.match(css, /^\.vam-card-title \{[^}]*overflow-wrap: anywhere/m);
   assert.match(css, /^\.vam-card-summary \{[^}]*-webkit-line-clamp: 3/m);
 });
+
+test('A4: resize handles and the AI lock button show on selection or focus, never on hover (hover only changes the border)', () => {
+  const css = readFileSync(resolve(root, 'styles.css'), 'utf8');
+  const rules = css.split('\n').filter(line => /vam-card-resize|is-hover-only/.test(line) && /opacity: 1|opacity: 0\.6/.test(line));
+  assert.ok(rules.length >= 4, 'the visible-state rules exist');
+  for (const line of rules) assert.ok(!/\.vam-node:hover/.test(line), `not keyed on hover: ${line.slice(0, 80)}`);
+  assert.match(css, /\.vam-node\.is-selected > \.vam-card-resize\b/);
+  assert.match(css, /\.vam-node\.is-selected \.vam-card-ai-lock\.is-hover-only/);
+});

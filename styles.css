@@ -158,14 +158,14 @@
 [data-topic-kind="atomic"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="evidence"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="conclusion"].vam-node.is-clipped > .vam-card-fade { display: none; }
 /* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused. The share viewer's stylesheet carries these rules too (the vam-card- prefix is collected) but the viewer never builds the handles. */
 .vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
-.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+.vam-node.is-selected > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
 /* The height handle on the bottom edge and the corner handle (card-height). Both sit inside the border. The corner is mouse-only. */
 .vam-card-resize-y { position: absolute; left: 14px; right: 22px; bottom: 2px; z-index: 1; height: 10px; border-radius: 5px; cursor: ns-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
-.vam-node:hover > .vam-card-resize-y, .vam-node:focus-within > .vam-card-resize-y { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+.vam-node.is-selected > .vam-card-resize-y, .vam-node:focus-within > .vam-card-resize-y { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-card-resize-y:hover, .vam-card-resize-y:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
 .vam-card-resize-corner { position: absolute; right: 2px; bottom: 2px; z-index: 1; width: 14px; height: 14px; border-radius: 3px; cursor: nwse-resize; opacity: 0; transition: opacity 120ms ease-out; touch-action: none; background: linear-gradient(135deg, transparent 55%, var(--interactive-accent) 55%); }
-.vam-node:hover > .vam-card-resize-corner, .vam-node:focus-within > .vam-card-resize-corner { opacity: 0.6; }
+.vam-node.is-selected > .vam-card-resize-corner, .vam-node:focus-within > .vam-card-resize-corner { opacity: 0.6; }
 .vam-card-resize-corner:hover { opacity: 1; }
 /* Mind-map-only polish (decision 35). None of these starts with a class the share viewer collects (scripts/viewer-css.mjs), so the viewer's stylesheet is unchanged. The parent line is a thin low-saturation line, lighter than the semantic lines; AIM, the sample and skippable edges do not carry the attribute. */
 path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35%, var(--text-muted)); stroke-width: 1.5px; }
@@ -178,10 +178,10 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
 .vam-node[data-aim-kind="topic"] { border-radius: 48% / 28%; padding: 22px 24px; }
 .vam-node[data-aim-kind="question"] { isolation: isolate; border-color: transparent; background: transparent; box-shadow: none; }
-.vam-node[data-aim-kind="question"]::before { content: ""; position: absolute; z-index: -1; width: 174px; height: 174px; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); }
-.vam-node[data-aim-kind="answer"] { border: 1px solid var(--interactive-accent); border-radius: 18px; }
+.vam-node[data-aim-kind="question"]::before { content: ""; position: absolute; z-index: -1; width: 174px; height: 174px; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); border: 1px solid var(--vam-border); border-radius: 10px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); }
+.vam-node[data-aim-kind="answer"] { border: 1px solid var(--vam-accent); border-radius: 18px; }
 .vam-node[data-aim-kind="research"] { border-radius: 4px; }
-.vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
+.vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--vam-accent); }
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
 /* Semantic lines (V1.6): six patterns in the text colour, told apart by pattern and end, not by hue. Every rule starts with .vam-relation, so the share viewer, which draws none, does not pick them up. */
 .vam-relation { fill: none; stroke: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke-width: var(--vam-relation-width, 1.75px); pointer-events: none; }
@@ -332,6 +332,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-header .vam-aim-question-status { padding: 3px 9px; border: 1px solid var(--background-modifier-border); border-radius: 20px; font-weight: 650; }
 .vam-badge-new { padding: 2px 8px; border-radius: 20px; font-size: var(--font-ui-smaller); background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
+.vam-node-tools button.vam-badge-new { border: 0; cursor: pointer; height: auto; }
+.vam-node-tools > .vam-node-tools-meta { display: inline-flex; align-items: center; gap: var(--vam-space-1); margin-inline-start: var(--vam-space-1); padding-inline-start: var(--vam-space-2); border-inline-start: 1px solid var(--vam-border); color: var(--vam-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
+.vam-view .vam-node-tools > .vam-node-tools-meta .vam-card-links { margin-inline-start: 0; }
 /* The cover shows the whole picture (never cropped): as wide as the card's content, as tall as the picture's shape asks (the view sets aspect-ratio = width / height, held at 2 / 3 so it is at most 1.5 times as tall as wide); a taller picture is scaled down inside and the sides keep the frame colour. Until the shape is known the frame is a 96 px placeholder. */
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
@@ -415,12 +418,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 [data-topic-kind="evidence"].vam-node { --vam-kind-hue: var(--color-green); }
 [data-topic-kind="conclusion"].vam-node { --vam-kind-hue: var(--color-blue); }
 [data-topic-kind="action"].vam-node { --vam-kind-hue: var(--color-orange); }
-[data-topic-kind="atomic"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node:not([data-aim-kind]), [data-topic-kind="action"].vam-node:not([data-aim-kind]) { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--text-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
+[data-topic-kind="atomic"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node:not([data-aim-kind]), [data-topic-kind="action"].vam-node:not([data-aim-kind]) { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--vam-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
 /* Research state and selection change the line: a skippable topic is dashed, running is the accent, failed is red, selected is the accent and heavier. */
 [data-topic-kind="atomic"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-relevance="side"].vam-node:not([data-aim-kind]) { --vam-kind-dash: 6 4; }
-[data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="action"][data-status="running"].vam-node:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); }
+[data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="action"][data-status="running"].vam-node:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--vam-accent) 80%, var(--text-normal)); }
 [data-topic-kind="atomic"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="action"][data-status="error"].vam-node:not([data-aim-kind]) { --vam-kind-line: var(--color-red); }
-[data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="action"].vam-node.is-selected:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
+[data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="action"].vam-node.is-selected:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--vam-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
 /* Action: the ordinary card with a 3px corner, the type's tint and line; the existing status rules (dashed idea / queued) stay. */
 [data-topic-kind="action"].vam-node:not([data-aim-kind]) { border-radius: 3px; border-color: var(--vam-kind-line); background: var(--vam-kind-fill); }
 /* Atomic, hypothesis, evidence, conclusion: an SVG shape behind the text replaces the card frame, shadow and fill. The padding here is the fallback; view.ts sets the real one from shapeInsets() and the measured text. */
@@ -428,7 +431,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 [data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind])::after { display: none; }
 [data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]) { outline: 0; border-color: transparent; }
 /* The end cards of a selected line: the shapes mark it on their own outline (a rectangular outline would show a box around a diamond). */
-[data-topic-kind="atomic"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-relation-end:not([data-aim-kind]) { outline: 0; --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
+[data-topic-kind="atomic"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-relation-end:not([data-aim-kind]) { outline: 0; --vam-kind-line: color-mix(in srgb, var(--vam-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
 .vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
 .vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill); stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-dasharray: var(--vam-kind-dash); stroke-linejoin: round; }
 .vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-linejoin: round; }
@@ -1850,7 +1853,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node .vam-card-title-input { box-sizing: border-box; width: 100%; font: inherit; font-weight: 650; user-select: text; pointer-events: auto; }
 .vam-view .vam-node .vam-card-summary.is-inline-editable { cursor: text; }
 .vam-view .vam-node .vam-card-summary-input { box-sizing: border-box; display: block; width: 100%; min-height: 0; padding: 2px 6px; margin: 0; font-family: inherit; font-size: var(--vam-card-summary-size); line-height: 1.55; color: var(--text-normal); height: var(--vam-summary-height, auto); resize: none; overflow: hidden; user-select: text; pointer-events: auto; }
-.vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
+.vam-view .vam-node .vam-card-summary-add { display: none; opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
 .vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }
 .vam-view .vam-anchor { position: absolute; z-index: 1; box-sizing: border-box; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 2px solid var(--interactive-accent); border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px var(--background-primary); cursor: pointer; transition: transform 0.1s ease; }
@@ -2166,7 +2169,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-ai-question.is-clickable { cursor: pointer; }
 .vam-view .vam-node[data-ai-card][data-ai-locked] { opacity: .62; }
 .vam-view .vam-card-ai-lock.is-hover-only { opacity: 0; }
-.vam-view .vam-node:hover .vam-card-ai-lock.is-hover-only, .vam-view .vam-node:focus-within .vam-card-ai-lock.is-hover-only, .vam-view .vam-card-ai-lock.is-hover-only:focus-visible { opacity: 1; }
+.vam-view .vam-node.is-selected .vam-card-ai-lock.is-hover-only, .vam-view .vam-node:focus-within .vam-card-ai-lock.is-hover-only, .vam-view .vam-card-ai-lock.is-hover-only:focus-visible { opacity: 1; }
 .vam-ai-card-pop { gap: 10px; }
 .vam-ai-card-pop-title { font-weight: var(--font-semibold); overflow-wrap: anywhere; }
 .vam-ai-card-pop-name { width: 100%; }

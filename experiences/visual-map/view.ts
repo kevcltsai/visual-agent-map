@@ -71,10 +71,13 @@ import {
   readKnowledgeRefs,
   refreshPathHints,
   removeKnowledgeRef,
+  referenceOutline,
+  referenceTitle,
   resolveKnowledgeRefs,
   visibleKnowledgeRefs,
   type KnowledgeRef,
-  type RefResolution
+  type RefResolution,
+  type ReferenceOutline
 } from "./knowledge-refs";
 import {
   avoidBracketObstacles,
@@ -1783,7 +1786,8 @@ export class VisualAgentMapView extends ItemView {
   private refResolved = new Map<string, RefResolution>();
   private refLayerEl: HTMLElement | null = null;
   private refResolveSeq = 0;
-  private refResolveTimer: ReturnType<typeof setTimeout> | null = null;
+  private shareRefTitles = new Map<string, string | null>();
+  private refResolveTimer: number | null = null;
   /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
   private focusTextResizeId: string | null = null;
   /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
@@ -5407,7 +5411,27 @@ export class VisualAgentMapView extends ItemView {
   private exportExchange(format: "opml" | "freemind"): void {
     const map = this.map;
     if (!map || !this.path) return;
-    void exportMapWithNotice(this.app.vault, { mapPath: this.path, map, notes: this.notes, format });
+    const mapPath = this.path;
+    void this.referenceOutlineOf(map).then(references =>
+      exportMapWithNotice(this.app.vault, { mapPath, map, notes: this.notes, format, references })
+    );
+  }
+  /** The reference lines an outline export adds, titles read now; nothing is written back to the map. */
+  private async referenceOutlineOf(map: MapDocument): Promise<ReferenceOutline> {
+    const refs = visibleKnowledgeRefs(map);
+    const titles = new Map<string, string | null>();
+    if (refs.length) {
+      try {
+        const found = await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO());
+        for (const ref of refs) titles.set(ref.id, referenceTitle(found.get(ref.id)));
+      } catch {
+        // Unreadable: every reference is written as unavailable.
+      }
+    }
+    return referenceOutline(map, titles, {
+      prefix: t("ui.knowledge_ref_export_prefix"),
+      unavailable: t("ui.knowledge_ref_export_unavailable")
+    });
   }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
@@ -7211,7 +7235,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True when this map's references may be changed here: the branch-edit gate (not AIM, not picking, not loading). */
   private canEditKnowledgeRefs(): boolean {
-    return !this.presentation && !this.clipboardReadOnly();
+    return !this.presentation && !this.map?.aim && !this.clipboardReadOnly();
   }
   /**
    * A change in the vault: what the references resolved to is dropped (only the ones read from `path`, when it is given) and read
@@ -7230,7 +7254,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private scheduleKnowledgeRefResolve(): void {
     if (this.refResolveTimer !== null) return;
-    this.refResolveTimer = setTimeout(() => {
+    this.refResolveTimer = window.setTimeout(() => {
       this.refResolveTimer = null;
       void this.resolveKnowledgeRefsNow();
     }, 0);
@@ -10361,8 +10385,9 @@ export class VisualAgentMapView extends ItemView {
         node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
         () => this.toggleCollapsed(node)
       );
-    add(t("ui.knowledge_ref_copy"), "link", () => this.copyAsKnowledgeRef(node));
-    if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs())
+    if (this.canEditKnowledgeRefs() && !this.isMerging(node.id))
+      add(t("ui.knowledge_ref_copy"), "link", () => this.copyAsKnowledgeRef(node));
+    if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs() && !this.isMerging(node.id))
       add(t("ui.knowledge_ref_paste"), "clipboard-paste", () => this.pasteKnowledgeRef(node.id));
     menu.addSeparator();
     menu.addItem(item => {
@@ -12373,6 +12398,7 @@ export class VisualAgentMapView extends ItemView {
       path: () => this.path,
       fence: () => this.captureMapSession(),
       outlineNodes: map => this.onScreenSiblingOrder(map),
+      referenceOutline: map => this.referenceOutlineOf(map),
       outlineSummary: id => {
         const summary = this.notes.get(id)?.summary ?? "";
         return isPlaceholder(summary) ? "" : summary;
@@ -14870,6 +14896,17 @@ export class VisualAgentMapView extends ItemView {
    */
   async prepareShare(timeoutMs = 3000): Promise<void> {
     if (!this.map || this.notesLoading()) return;
+    // The titles of the references are read now (share time) and only the titles; nothing is written back to the map.
+    this.shareRefTitles = new Map();
+    const shareRefs = visibleKnowledgeRefs(this.map);
+    if (shareRefs.length) {
+      try {
+        const found = await resolveKnowledgeRefs(shareRefs, this.plugin.repo.knowledgeRefIO());
+        for (const ref of shareRefs) this.shareRefTitles.set(ref.id, referenceTitle(found.get(ref.id)));
+      } catch {
+        for (const ref of shareRefs) this.shareRefTitles.set(ref.id, null);
+      }
+    }
     const waits: Promise<void>[] = [];
     const finish: Array<() => void> = [];
     for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
@@ -14923,6 +14960,7 @@ export class VisualAgentMapView extends ItemView {
         covers: Map<string, string>;
         coverLooks: Map<string, { frame: CoverFrame | null; size: number; position: CoverPosition }>;
         ringHeights?: Map<string, number>;
+        refTitles?: Map<string, string | null>;
         mapPath: string;
       }
     | "none"
@@ -14962,6 +15000,7 @@ export class VisualAgentMapView extends ItemView {
       covers,
       coverLooks,
       ...(ringHeights.size ? { ringHeights } : {}),
+      ...(this.shareRefTitles.size ? { refTitles: new Map(this.shareRefTitles) } : {}),
       mapPath: this.path
     };
   }

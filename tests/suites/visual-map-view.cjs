@@ -5087,6 +5087,13 @@ test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat 
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const pinned = css.match(/\.vam-view\.is-header-narrow \.vam-multi-research-statusbar \{([^}]*)\}/);
+  assert.ok(pinned, 'narrow research bar rule');
+  assert.match(pinned[1], /position: sticky;/); assert.match(pinned[1], /top: 0;/);
+  const zOf = re => Number(css.match(re)[1]);
+  const barZ = Number(pinned[1].match(/z-index: (\d+);/)[1]);
+  assert.ok(barZ > zOf(/\.vam-selection-bar \{[^}]*z-index: (\d+)/), 'above the selection bar');
+  assert.ok(!/\.vam-zoom-controls \{[^}]*z-index: (\d+)/.test(css) || barZ > zOf(/\.vam-zoom-controls \{[^}]*z-index: (\d+)/), 'above the zoom bar');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });

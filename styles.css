@@ -270,6 +270,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-view.is-header-narrow .vam-aim-statusbar, .vam-view.is-header-narrow .vam-integration-progress { flex-wrap: nowrap; gap: var(--vam-space-2); min-width: 0; padding: var(--vam-space-2) var(--vam-space-3); }
 .vam-view.is-header-narrow .vam-aim-statusbar > span, .vam-view.is-header-narrow .vam-integration-progress > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-view.is-header-narrow .vam-aim-statusbar > button, .vam-view.is-header-narrow .vam-integration-progress > button { flex: none; }
+.vam-view.is-header-narrow .vam-multi-research-statusbar { position: sticky; top: 0; z-index: 7; }
 .vam-aim-attribution { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 14px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
 .vam-aim-attribution a { white-space: nowrap; }
 .vam-aim-attribution a:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }

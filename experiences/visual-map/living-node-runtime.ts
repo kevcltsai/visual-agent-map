@@ -91,9 +91,9 @@ function readableMarkdown(raw: string): string {
   return body;
 }
 
-function ownKnowledge(note: Note): string {
-  return [note.title, note.thinkingOrigin, note.summary, note.preview, note.detail, note.newFindings]
-    .filter(value => value && !isPlaceholder(value))
+function ownKnowledge(note: Note, includeTitle = true): string {
+  return [includeTitle ? note.title : "", note.thinkingOrigin, note.summary, note.preview, note.detail, note.newFindings]
+    .filter(value => value && value.trim() && !isPlaceholder(value))
     .join("\n\n");
 }
 
@@ -102,7 +102,7 @@ function usableKnowledge(snapshot: Snapshot): boolean {
   return hasLivingResult(base) ||
     (base.revision === "empty" && base.output.owner === "ai" &&
       (snapshot.note.aiRun?.result === "ok" || frontmatter(snapshot.content)["living-node-copy-snapshot"] === true) &&
-      !!ownKnowledge(snapshot.note));
+      !!ownKnowledge(snapshot.note, false));
 }
 
 function refs(snapshot: Snapshot): LivingSourceRef[] {
@@ -441,10 +441,10 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
             ? "none"
             : value.input.base.revision === "empty"
               ? "stale"
-            : fm["living-node-input-revision"] === value.input.inputRevision &&
-                fm["living-node-success-knowledge"] === value.input.base.revision
-              ? "valid"
-              : "stale";
+              : fm["living-node-input-revision"] === value.input.inputRevision &&
+                  fm["living-node-success-knowledge"] === value.input.base.revision
+                ? "valid"
+                : "stale";
           return { current: true, locked: false, validity };
         },
         execute: async (id, signal) => {
@@ -795,8 +795,9 @@ export async function inspectLivingValidity(port: LivingTrialPort) {
     try {
       const data = await readInputs(readPort, map, item.id, snapshot, resolved);
       const fm = frontmatter(snapshot.content);
-      if (!usableKnowledge(snapshot) || data.base.revision === "empty") {
-        validity.set(item.id, usableKnowledge(snapshot) ? "stale" : "none");
+      const hasKnowledge = usableKnowledge(snapshot);
+      if (!hasKnowledge || data.base.revision === "empty") {
+        validity.set(item.id, hasKnowledge ? "stale" : "none");
         continue;
       }
       const pending = (planned.plan.dependencies.get(item.id) ?? []).some(id => validity.get(id) !== "valid");

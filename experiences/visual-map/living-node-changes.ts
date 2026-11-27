@@ -168,6 +168,9 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
   if (records.size !== base.records.length) throw new Error("duplicate-record");
   const suppressed = new Set(base.suppressed);
   const allowed = new Map(context.evidence.map(entry => [entry.id, entry]));
+  // Retained evidence can be selected explicitly for a new conclusion. It is
+  // already formal knowledge, not a new retrieval or an invented source.
+  const outputEvidence = new Map([...base.records.flatMap(record => record.evidence), ...base.output.evidence, ...context.evidence].map(entry => [entry.id, entry]));
   let output = base.output;
   let changed = false;
   for (const rawOperation of proposal.operations as unknown[]) {
@@ -177,7 +180,12 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
       exactKeys(operation, ["kind", "text", "evidence"]);
       if (output.owner !== "ai") throw new Error("protected-output");
       const text = string(operation.text);
-      const evidence = mergeEvidence(output.evidence, evidenceFor(operation.evidence, allowed));
+      // Evidence for a replaced conclusion must be explicitly selected, not
+      // inherited from a different claim. Preserve retrieval stamps for retained IDs.
+      const selected = evidenceFor(operation.evidence, outputEvidence);
+      const evidence = text === output.text
+        ? mergeEvidence(output.evidence, selected)
+        : selected.map(entry => output.evidence.find(previous => previous.id === entry.id) ?? entry);
       if (text !== output.text || evidence.length !== output.evidence.length) {
         output = { text, evidence, owner: "ai" };
         changed = true;

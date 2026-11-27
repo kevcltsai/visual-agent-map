@@ -695,7 +695,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan', 'edit_book_thread', 'place_image']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan', 'edit_book_thread', 'place_image', 'configure_ai_card']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);

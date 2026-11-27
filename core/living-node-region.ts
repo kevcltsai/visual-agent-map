@@ -1,4 +1,5 @@
 import { contentHash } from "./content-hash";
+import { frontmatter } from "./repository-frontmatter";
 
 /** Saved configuration baseline shared by editor and chat; no knowledge or diagnostics. */
 export function livingConfigurationStamp(prompt: string, fm: Record<string, unknown>): string {
@@ -25,6 +26,50 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
     body: content.slice(0, start) + content.slice(after),
     region: content.slice(start, after)
   };
+}
+
+export type LivingMarkerState = "none" | "paired" | "corrupt";
+
+/** Marker presence, not the ai-card flag: exactly one begin then one end is paired; any other use of either marker is corrupt. */
+export function livingMarkerState(content: string): LivingMarkerState {
+  const start = content.indexOf(LIVING_NODE_BEGIN);
+  const end = content.indexOf(LIVING_NODE_END);
+  if (start < 0 && end < 0) return "none";
+  const damaged =
+    start < 0 ||
+    end < start ||
+    content.indexOf(LIVING_NODE_BEGIN, start + LIVING_NODE_BEGIN.length) >= 0 ||
+    content.indexOf(LIVING_NODE_END, end + LIVING_NODE_END.length) >= 0;
+  return damaged ? "corrupt" : "paired";
+}
+
+/** True when the note is a Living Node: the markers, the ownership/commit metadata or the AI-card flag, whichever is present. */
+export function isLivingNodeNote(content: string, aiCard: boolean): boolean {
+  const fm = frontmatter(content);
+  return (
+    aiCard ||
+    livingMarkerState(content) !== "none" ||
+    fm["living-node-region-hash"] !== undefined ||
+    fm["living-node-ownership"] !== undefined ||
+    hasLivingCommitMetadata(fm)
+  );
+}
+
+const withoutFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+
+function livingMetadata(content: string): string {
+  const fm = frontmatter(content);
+  return JSON.stringify(
+    Object.keys(fm)
+      .filter(key => key.startsWith("living-node-"))
+      .sort()
+      .map(key => [key, fm[key]])
+  );
+}
+
+/** Proof that a write left the body bytes and every `living-node-*` metadata value as they were (frontmatter-only). */
+export function keepsLivingBodyAndMetadata(before: string, after: string): boolean {
+  return withoutFrontmatter(before) === withoutFrontmatter(after) && livingMetadata(before) === livingMetadata(after);
 }
 
 /** A successful formal commit leaves evidence distinct from a failed first attempt or V2 stamps. */

@@ -4901,14 +4901,15 @@ export class VisualAgentMapView extends ItemView {
    * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
    * that order. One undo step. Nothing is written when the card is already first or last.
    */
-  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1): Promise<void> {
+  /** `focusCard` false: the caller (the outline) keeps the keyboard focus, so the repaint does not move it to the canvas card. */
+  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1, focusCard = true): Promise<void> {
     const map = this.map;
     if (!map || !node.parentId || map.aim) return;
     const aligned = this.onScreenSiblingOrder(map);
     if (shiftSibling(aligned, node.id, offset) === aligned) return;
     if (!this.mergeUnlocked([node.id, node.parentId])) return;
     const parentId = node.parentId;
-    this.focusNodeId = node.id;
+    if (focusCard) this.focusNodeId = node.id;
     try {
       await this.mapChange(change => {
         const next = shiftSibling(this.onScreenSiblingOrder(change), node.id, offset);
@@ -10556,7 +10557,7 @@ export class VisualAgentMapView extends ItemView {
       if (!node.parentId) return null;
       const reason = merging([node.id, node.parentId]);
       if (reason) return reason;
-      this.enqueue(() => this.shiftSiblingByKey(node, to.shift));
+      this.enqueue(() => this.shiftSiblingByKey(node, to.shift, false));
       return null;
     }
     const target = map.nodes.find(item => item.id === to.target);

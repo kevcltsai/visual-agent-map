@@ -110,6 +110,8 @@ import { readOnce, type NoteReadContext } from "./core/note-read-context";
 import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
+import { keepFrontmatterFormatting } from "./core/rename-link-guard";
+import { linkSpans, RenameRepairWatch } from "./core/rename-repair";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
@@ -1184,7 +1186,7 @@ export class Repository {
       withReferenceLinks(body, fm, language),
       writtenHeadingSet(content, this.headingsFor(textLanguage))
     );
-    return `---\n${stringifyYaml(fm)}---\n${rendered}${separated.region ? `\n${separated.region}${trailing ? `${trailing}\n` : "\n"}` : ""}`;
+    return `---\n${keepFrontmatterFormatting(content, stringifyYaml(fm))}---\n${rendered}${separated.region ? `\n${separated.region}${trailing ? `${trailing}\n` : "\n"}` : ""}`;
   }
 
   async createNote(
@@ -2168,6 +2170,20 @@ export class Repository {
     );
   }
 
+  /**
+   * Obsidian's "Just once" link update can still write a note it collected link positions of before VAM's rename rewrite;
+   * the watch recognises exactly that write and puts VAM's version back.
+   */
+  readonly renameWatch = new RenameRepairWatch({
+    read: path => this.app.vault.read(this.file(path)),
+    process: (path, change) => this.app.vault.process(this.file(path), change)
+  });
+
+  private obsidianMayUpdateLinks(): boolean {
+    const vault = this.app.vault as unknown as { getConfig?: (key: string) => unknown };
+    return typeof vault.getConfig === "function" && vault.getConfig("alwaysUpdateLinks") !== true;
+  }
+
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
     await this.replaceSourcePaths([[oldPath, newPath]]);
   }
@@ -2224,7 +2240,10 @@ export class Repository {
                   {}
                 )
               : content;
-          return living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
+          const written = living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
+          if (written !== content && this.obsidianMayUpdateLinks())
+            this.renameWatch.remember(file.path, written, pairs, linkSpans(content, pairs));
+          return written;
         });
       } catch (error) {
         // One unreadable or unwritable note must not prevent later candidates from following the rename.

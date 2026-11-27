@@ -888,6 +888,25 @@ S.integrationTest('Living Node web: actual checked source is required even for n
   assert.throws(() => normalize({ ...envelope, operations: [{ kind: 'supplement', id: 'r1', evidence: [url] }, { ...op, evidence: [] }] }), /required-web-output-evidence-missing/);
 });
 
+S.integrationTest('A41 live: a scoped no-match that only searched is allowed; no-change and answers still need an opened page', () => {
+  const url = 'https://example.com/current';
+  const noMatch = { baseRevision: 'base', requiresWeb: true, checkedWeb: [], webExcerpts: [], operations: [{ kind: 'output', text: 'No match found for this company.', evidence: [] }] };
+  const norm = (raw, opened, searched) => normalizeLivingProposal(raw, opened, [], 't1', true, false, searched);
+  assert.equal(norm(noMatch, [], true).proposal.operations.length, 1);
+  assert.throws(() => norm(noMatch, [], false), /required-web-unavailable/);
+  assert.throws(() => norm({ ...noMatch, operations: [] }, [], true), /required-web-unavailable/);
+  assert.throws(() => norm({ ...noMatch, operations: [{ kind: 'append', id: 'a', subject: 's', scope: 'c', granularity: 'day', eventTime: null, claim: 'x', evidence: [] }] }, [], true), /required-web-unavailable/);
+  // With a page opened the old rules stay: an uncited output or an empty checked list is still rejected.
+  assert.throws(() => norm(noMatch, [url], true), /required-web-check-missing/);
+  assert.throws(() => norm({ ...noMatch, checkedWeb: [url], webExcerpts: [{ url, excerpt: 'page' }] }, [url], true), /required-web-evidence-missing/);
+});
+
+S.integrationTest('A48 live: validation failures map to the validation line, not the web-required line', () => {
+  const { livingFailureCode } = S.load('experiences/visual-map/living-node-state.ts', { obsidian: S.obsidian });
+  for (const code of ['invalid-web-excerpt', 'web-excerpt-missing', 'unauthorized-web-excerpt']) assert.equal(livingFailureCode(new Error(code)), 'validation-rejected', code);
+  for (const code of ['required-web-unavailable', 'required-web-evidence-missing', 'unauthorized-web-check']) assert.equal(livingFailureCode(new Error(code)), 'web-required', code);
+});
+
 S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; the id is version-bound and cannot verify a correction (spike branch b)', () => {
   const { applyLivingChanges } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
   const url = 'https://example.com/price';
@@ -896,7 +915,9 @@ S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; t
   // Missing, blank, over-long excerpt, or an excerpt for a URL that was never opened: rejected.
   assert.throws(() => norm({ operations: [{ kind: 'output', text: 'Price', evidence: [url] }] }), /web-excerpt-missing/);
   assert.throws(() => norm(out('   ')), /invalid-web-excerpt/);
-  assert.throws(() => norm(out('x'.repeat(301))), /invalid-web-excerpt/);
+  // An over-long excerpt is cut to 300 characters (validation-only, never persisted) instead of failing the round.
+  assert.equal(norm(out('x'.repeat(362))).context.evidence.length, 1);
+  assert.throws(() => norm(out('\u00a0 ')), /invalid-web-excerpt/);
   assert.throws(() => norm({ webExcerpts: [{ url: 'https://example.com/never', excerpt: 'q' }], operations: [] }), /unauthorized-web-excerpt/);
   // The id is the pre-V1.1 web id (URL only): the excerpt is validated model text, never part of the id.
   const id = envelope => norm(envelope).context.evidence.find(e => e.source === url).id;

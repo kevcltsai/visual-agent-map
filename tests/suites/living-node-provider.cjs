@@ -54,18 +54,41 @@ S.integrationTest('Living Node A33: a card over 100k chars of records makes one 
   assert.deepEqual(S.plain(after.records.slice(0, 320).map(r => r.id)), S.plain(base.records.map(r => r.id)));
 });
 
-S.integrationTest('Living Node A33: editing an omitted or unknown record is refused, a shown one is allowed, and a re-reported old event is a no-op', async () => {
+S.integrationTest('Living Node A33: an unknown record is refused, a shown one is allowed, and a re-reported old event is a no-op', async () => {
   const f = await bigCard(320);
   const base = readLivingMarkdown(f.contents.get(path));
   const { sent } = await round(f, []);
   assert.ok(!sent[0].includes('"id":"r0"'));
   const ghost = { baseRevision: base.revision, operations: [{ kind: 'invalidate', id: 'nope', reason: 'why', evidence: ['e1'] }] };
   assert.throws(() => applyLivingChanges(base, ghost, context));
-  await assert.rejects(() => round(f, [{ kind: 'correct', id: 'r0', claim: 'rewritten', reason: 'why', evidence: ['e1'] }]), /omitted-record-reference/);
   await assert.rejects(() => round(f, [{ kind: 'invalidate', id: 'nope', reason: 'why', evidence: ['e1'] }]), /unknown|invalid|missing/i);
   const shown = await round(f, [{ kind: 'supplement', id: 'r319', evidence: ['e1'] }]);
   assert.equal(shown.generated.proposal.operations.length, 1);
   const again = applyLivingChanges(base, { baseRevision: base.revision, operations: [append(0)] }, context);
   assert.deepEqual(S.plain(again.records.map(r => r.id)), S.plain(base.records.map(r => r.id)));
   assert.equal(again.records.length, 320);
+});
+
+S.integrationTest('Living Node A33: ops on omitted records do not fail the round: supplement passes, correct is dropped with a count, other ops still commit', async () => {
+  const f = await bigCard(320);
+  const base = readLivingMarkdown(f.contents.get(path));
+  const supp = await round(f, [{ kind: 'supplement', id: 'r0', evidence: ['e1'] }]);
+  assert.equal(supp.generated.droppedOperations, 0);
+  assert.equal(supp.generated.proposal.operations.length, 1);
+  const mixed = await round(f, [{ kind: 'correct', id: 'r0', claim: 'rewritten', reason: 'why', evidence: ['e1'] }, { kind: 'dispute', id: 'r1', claim: 'c', reason: 'why', evidence: ['e1'] }, append(1000)]);
+  assert.equal(mixed.generated.droppedOperations, 2);
+  assert.deepEqual(S.plain(mixed.generated.proposal.operations.map(o => o.kind)), ['append']);
+  assert.equal(await commit(f, base, mixed.generated.proposal.operations), 'written');
+  assert.equal(readLivingMarkdown(f.contents.get(path)).records.length, 321);
+});
+
+S.integrationTest('Living Node A33: a recent record with no parseable time stays shown; the time boundary appears only when omitting', async () => {
+  const f = await bigCard(320);
+  const base = readLivingMarkdown(f.contents.get(path));
+  await commit(f, base, [{ ...append(5000), id: 'undated', eventTime: null }]);
+  const { sent } = await round(f, []);
+  assert.ok(sent[0].includes('"id":"undated"'));
+  assert.match(sent[0], /"oldestShownEventTime":"20\d\d-\d\d-\d\d"/);
+  const small = await bigCard(3);
+  assert.ok(!(await round(small, [])).sent[0].includes('oldestShownEventTime":'));
 });

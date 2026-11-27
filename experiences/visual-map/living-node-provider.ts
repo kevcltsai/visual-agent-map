@@ -18,9 +18,10 @@ export interface LivingProviderInput extends ModelChoice {
 
 const MAX_PROMPT_CHARS = 100_000;
 
-function eventMillis(record: LivingKnowledge["records"][number]): number {
+/** Records without a parseable event time have no ordering evidence: they rank by insertion alone. */
+function eventMillis(record: LivingKnowledge["records"][number]): number | undefined {
   const time = record.eventTime ? Date.parse(record.eventTime) : NaN;
-  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+  return Number.isNaN(time) ? undefined : time;
 }
 
 /** Deterministic bounded view of the card's own store: revision, output and suppressed IDs always, then the
@@ -29,7 +30,9 @@ function eventMillis(record: LivingKnowledge["records"][number]): number {
 function projectKnowledge(base: LivingKnowledge, budget: number): { text: string; omitted: Set<string> } {
   const recent = base.records
     .map((record, index) => ({ record, index, time: eventMillis(record) }))
-    .sort((a, b) => (a.time === b.time ? b.index - a.index : b.time > a.time ? 1 : -1));
+    .sort((a, b) =>
+      a.time === undefined || b.time === undefined || a.time === b.time ? b.index - a.index : b.time - a.time
+    );
   const keep = new Set<number>();
   let used = 0;
   for (const { record, index } of recent) {
@@ -40,10 +43,14 @@ function projectKnowledge(base: LivingKnowledge, budget: number): { text: string
   }
   const omitted = new Set(base.records.filter((_, index) => !keep.has(index)).map(record => record.id));
   if (!omitted.size) return { text: JSON.stringify(base), omitted };
+  const shown = base.records.filter((_, index) => keep.has(index));
+  const times = shown.flatMap(record => (eventMillis(record) === undefined ? [] : [record.eventTime as string]));
+  const oldest = times.sort((a, b) => Date.parse(a) - Date.parse(b))[0];
   const text = JSON.stringify({
     revision: base.revision,
-    records: base.records.filter((_, index) => keep.has(index)),
+    records: shown,
     omittedOlderRecords: omitted.size,
+    ...(oldest ? { oldestShownEventTime: oldest } : {}),
     suppressed: base.suppressed,
     output: base.output
   });
@@ -215,14 +222,18 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         policy === "required",
         policy === "forbidden"
       );
-      // The model never saw omitted records, so it cannot be editing them knowingly. A re-reported old
-      // observation (append) is still de-duplicated by applyLivingChanges against the full store.
-      for (const operation of normalized.proposal.operations)
-        if (operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id)))
-          throw new Error("omitted-record-reference");
+      // The model never saw omitted records: drop its edits to them (the rest of the round still runs) instead
+      // of failing every run. supplement and a re-reported append are still decided by applyLivingChanges.
+      const blind = (operation: Record<string, unknown>) =>
+        operation.kind !== "append" &&
+        operation.kind !== "output" &&
+        operation.kind !== "supplement" &&
+        omitted.has(String(operation.id));
+      const droppedOperations = normalized.proposal.operations.filter(blind).length;
+      normalized.proposal.operations = normalized.proposal.operations.filter(operation => !blind(operation));
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();
-      return normalized;
+      return { ...normalized, droppedOperations };
     }
   );
 }

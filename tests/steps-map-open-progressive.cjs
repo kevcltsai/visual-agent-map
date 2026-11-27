@@ -88,7 +88,7 @@ async function harness({ count = 3, running = [], gate = true, heights = 100 } =
   repo.markInterruptedRun = async (...args) => { marks.push(args[0]); log.push(`mark:${args[0]}`); return baseMark(...args); };
   let chain = Promise.resolve(), mutateCalls = 0;
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), pendingSuggestions: new Map(),
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), pendingSuggestions: new Map(),
     releaseOutline() {}, setOutlineActive() {}, detailsShown: () => true, closeStaleDetails() {}, releaseWarmClaude() {}, syncOutline() {},
     mutate: work => { mutateCalls++; return (chain = chain.then(work)); }
   });
@@ -473,14 +473,12 @@ test('k: a failing read ends the loading state, draws what is known and passes t
   assert.equal(h.view.renders.length, 1, 'the map is drawn once, not left half read');
 });
 
-test('l: the previous map\'s goal and sources are gone before the first frame', async () => {
+test('l: the previous map\'s sources are gone before the first frame', async () => {
   const h = await harness();
-  Object.assign(h.view, { relevanceGoal: 'old goal', relevanceContext: 'old context', path: 'Agent Workspace/Topics/other/Map.md' });
+  Object.assign(h.view, { path: 'Agent Workspace/Topics/other/Map.md' });
   h.view.mapSourcesControl.mapSources = [{ id: 'x' }];
   const done = h.open();
   await tick(); fireFrame();
-  assert.equal(h.view.relevanceGoal, undefined);
-  assert.equal(h.view.relevanceContext, undefined);
   assert.equal(h.view.mapSourcesControl.mapSources.length, 0);
   h.release(0, 1, 2);
   await done;
@@ -593,33 +591,14 @@ test('q (B1): a card rebuilt in place is locked again, and no card action starts
   await finish();
 });
 
-test('q2 (B1): lockWhileLoading disables card buttons and marks the goal title off', async () => {
+test('q2 (B1): lockWhileLoading disables card buttons', async () => {
   const { h, finish } = await loadingHarness();
   const { view } = h;
   const card = view.contentEl.createDiv('vam-node');
   const button = card.createEl('button', { text: 'Rerun' });
   button.closest = () => null;
-  const bar = dom.element('div');
-  const goal = bar.createDiv({ cls: 'vam-goal-text' });
-  view.relevanceBarEl = bar;
   view.lockWhileLoading();
   assert.equal(button.disabled, true);
-  assert.equal(goal.attrs['aria-disabled'], 'true');
-  await finish();
-});
-
-test('r (B2): the goal cannot be edited, saved or graded while reading', async () => {
-  const { h, finish } = await loadingHarness();
-  const { view } = h;
-  view.relevanceBarEl = dom.element('div');
-  view.goalBarHost = dom.element('div');
-  view.startGoalEdit({});
-  assert.equal(view.goalEdit, null);
-  view.goalEdit = { path: view.path, draft: 'x' };
-  view.commitGoalEdit('enter');
-  assert.equal(view.goalEdit, null, 'the draft is dropped');
-  assert.equal(h.mutateCalls(), 0);
-  assert.deepEqual(h.writes, []);
   await finish();
 });
 

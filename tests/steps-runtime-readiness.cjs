@@ -232,7 +232,7 @@ function prewarmFixture() {
   return { plugin, out, seen };
 }
 
-test('A3 Claude: prewarmClaude and prewarmClaudeStep start the very command with the plugin folder, model id, effort, schema and web flag', () => {
+test('A3 Claude: prewarmClaude starts the very command with the plugin folder, model id, effort, schema and web flag', () => {
   const { plugin, out } = prewarmFixture();
   plugin.settings.cliReasoning = 'auto';
   plugin.prewarmClaude('claude:sonnet', undefined);
@@ -241,29 +241,21 @@ test('A3 Claude: prewarmClaude and prewarmClaudeStep start the very command with
   const schemas = out.prewarm.map(call => call[3]);
   assert.ok(schemas.every(schema => schema && schema.type === 'object'));
   assert.deepEqual(out.prewarm.map(call => [call[0], call[1], call[2], call[4]]), [['/plugin', 'sonnet', 'low', true], ['/plugin', 'opus', 'high', false], ['/plugin', 'sonnet', 'medium', true]]);
-  const stepSchema = { type: 'object', properties: { step: {} } };
-  out.prewarm.length = 0;
-  plugin.prewarmClaudeStep('claude:sonnet', 'auto', stepSchema);
-  plugin.prewarmClaudeStep('claude:opus', 'high', stepSchema);
-  assert.deepEqual(out.prewarm.map(call => [call[0], call[1], call[2], call[3] === stepSchema, call[4]]), [['/plugin', 'sonnet', 'low', true, false], ['/plugin', 'opus', 'high', true, false]]);
   assert.deepEqual([out.released, out.reset, out.dispose], [0, 0, 0]);
 });
 
-test('A3 Codex: prewarmClaude and prewarmClaudeStep only release the waiting process; no Claude runtime, no plugin folder', () => {
+test('A3 Codex: prewarmClaude only releases the waiting process; no Claude runtime, no plugin folder', () => {
   const { plugin, out } = prewarmFixture();
   plugin.prewarmClaude(CODEX);
   assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [1, 0, 0, 0]);
-  plugin.prewarmClaudeStep(CODEX, 'low', { type: 'object' });
-  assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [2, 0, 0, 0]);
   plugin.releaseWarmClaude();
-  assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [3, 0, 0, 0], 'releaseWarmClaude called directly drops the waiting process');
+  assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [2, 0, 0, 0], 'releaseWarmClaude called directly drops the waiting process');
 });
 
 test('A3 a plugin folder that throws never fails the caller, starts nothing and releases nothing', () => {
   const { plugin, out } = prewarmFixture();
   plugin.pluginDirectory = () => { throw new Error('no folder'); };
   assert.doesNotThrow(() => plugin.prewarmClaude(CLAUDE));
-  assert.doesNotThrow(() => plugin.prewarmClaudeStep(CLAUDE, 'low', { type: 'object' }));
   assert.deepEqual([out.released, out.prewarm.length], [0, 0]);
 });
 
@@ -274,7 +266,6 @@ test('A3 after unload neither a Claude nor a Codex model starts or releases anyt
   assert.deepEqual([out.reset, out.dispose], [1, 1]);
   out.released = 0; out.claude = 0;
   plugin.prewarmClaude(CLAUDE); plugin.prewarmClaude(CODEX);
-  plugin.prewarmClaudeStep(CLAUDE, 'low', { type: 'object' }); plugin.prewarmClaudeStep(CODEX, 'low', { type: 'object' });
   assert.deepEqual([out.released, out.claude, out.prewarm.length], [0, 0, 0]);
 });
 

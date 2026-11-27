@@ -52,16 +52,14 @@ const ALLOWED = {
   'experiences/visual-map/book-plan-chat.ts': { reason: 'forwards the same wrapped ports', calls: {'updateNoteGuarded': 2, 'updateNoteRawGuarded': 2} },
   'experiences/visual-map/book-structure-port.ts': { reason: 'title rewrite inside a map transaction, not AI content', calls: {'updateNote': 1} },
   'experiences/visual-map/chat-action-writer.ts': { reason: 'chat actions; map-chat-guard refuses Living Node notes first (living_node_protected) and the view port passes rejectAiCard on content', calls: {'noteChange': 3, 'vault.process': 2, 'writeTopicAppearance': 1, 'writeTopicKind': 1, 'writeHypothesisLeaning': 1, 'writeHypothesisStrength': 1} },
-  'experiences/visual-map/goal-suggest.ts': { reason: 'relevance metadata stamp, not body', calls: {'writeRelevance': 2} },
   'experiences/visual-map/living-node-markdown.ts': { reason: 'formal-commit port type and its own commit write', calls: {'updateNoteRawGuarded': 2} },
   'experiences/visual-map/living-node-runtime.ts': { reason: 'runtime config save and diagnostic stamp', calls: {'updateNoteRawGuarded': 1, 'updateNoteGuarded': 1} },
   'experiences/visual-map/map-sources-control.ts': { reason: 'owner map-source edit, not AI', calls: {'writeMapSources': 1} },
   'experiences/visual-map/map-transaction.ts': { reason: 'map structure transaction, not AI content', calls: {'vault.process': 2} },
   'experiences/visual-map/math-repair.ts': { reason: 'owner-triggered math repair, not AI', calls: {'vault.process': 1} },
   'experiences/visual-map/outline-import.ts': { reason: 'summary of a card created by the import, not an existing Living Node', calls: {'updateNote': 1} },
-  'experiences/visual-map/relevance-grade-run.ts': { reason: 'relevance metadata stamp, not body', calls: {'writeRelevanceGoal': 1, 'writeRelevance': 2} },
   'experiences/visual-map/topic-run.ts': { reason: 'status stamps; content writes carry writeOptions with newVisualReferences (asserted below)', calls: {'updateNote': 3} },
-  'experiences/visual-map/view.ts': { reason: 'owner UI actions (metadata, cover, merge stamp, undo restore) and chat picture cover (checked on its own bytes); chat content goes through noteChange with the flag', calls: {'noteChange': 7, 'writeRelevance': 4, 'vault.process': 9, 'updateNote': 5, 'writeTopicAppearance': 3, 'writeAiLocked': 3, 'writeBookRoleChoice': 1, 'writeAiCard': 2, 'writeHypothesisStrength': 1, 'writeHypothesisLeaning': 1, 'writeTopicKind': 1, 'writeTopicLinks': 1, 'writeTopicMarkers': 1, 'writeTopicColor': 1, 'writeTopicStyle': 1, 'writeBookSettings': 1, 'updateNoteRawGuarded': 1, 'writeNoteStyle': 1} },
+  'experiences/visual-map/view.ts': { reason: 'owner UI actions (metadata, cover, merge stamp, undo restore) and chat picture cover (checked on its own bytes); chat content goes through noteChange with the flag', calls: {'noteChange': 7, 'writeRelevance': 1, 'vault.process': 9, 'updateNote': 5, 'writeTopicAppearance': 3, 'writeAiLocked': 3, 'writeBookRoleChoice': 1, 'writeAiCard': 2, 'writeHypothesisStrength': 1, 'writeHypothesisLeaning': 1, 'writeTopicKind': 1, 'writeTopicLinks': 1, 'writeTopicMarkers': 1, 'writeTopicColor': 1, 'writeTopicStyle': 1, 'writeBookSettings': 1, 'updateNoteRawGuarded': 1, 'writeNoteStyle': 1} },
   'main.ts': { reason: 'formal-commit port rawGuarded; pipeline field ports; processNote port for image translate (gated above)', calls: {'updateNoteRawGuarded': 1, 'writePipelineFields': 2, 'writePipelineRole': 1, 'vault.process': 1} }
 };
 

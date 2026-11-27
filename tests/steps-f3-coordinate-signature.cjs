@@ -88,7 +88,7 @@ async function harness() {
   // Like the real plugin: writes run one after another, and every view re-reads when the queue step ends.
   let queue = Promise.resolve();
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     closeStaleDetails() {}, syncOutline() {}, views: () => h.views,
     mutate(work) {
       const result = queue.then(async () => { await work(); for (const view of h.views) await view.synchronize(); });

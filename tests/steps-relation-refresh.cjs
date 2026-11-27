@@ -36,7 +36,7 @@ async function harness() {
   const plugin = withExpansionCoordinator({
     repo, settings: repo.settings, running: new Set(), logs: { appendLog() {} },
     rebuildDerivedData: scope => { rebuilds.push(scope); return repo.rebuildDerivedData(scope ? { roots: [], paths: scope } : undefined); },
-    relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
+    expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
   });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
   const view = new VisualAgentMapView({ app }, plugin);

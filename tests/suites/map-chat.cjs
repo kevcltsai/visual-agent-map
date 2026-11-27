@@ -392,7 +392,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false, activeTasks: new Map(), quickExpandPending: new Set(), recordFailure: error => String(error?.message ?? error),
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {
@@ -1039,33 +1039,30 @@ integrationTest('map chat: control - the same nested mutate really does hang whe
   assert.equal(h.control.nested, 1, 'the harness counts the nested call, so a nested write would also fail the other tests');
 });
 
-integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; rate_by_goal and merge start their own task', async () => {
+integrationTest('map chat: synthesize of several cards starts the selection integration without a dialog; merge starts its own task', async () => {
   const h = await harness(); await h.view.hydrate();
   const opened = []; h.view.openSelectionSynthesis = pending => opened.push(pending);
   const starts = []; h.view.startSelectionSynthesis = async (nodes, options, direction, failed, accepted) => { starts.push({ ids: nodes.map(n => n.id).sort(), options, direction, failed: typeof failed, depth: h.control.depth }); accepted(); };
-  const goals = []; h.view.relevanceGradeable = () => true; h.view.submitRelevanceGoal = async goal => { goals.push(goal); };
   const merges = []; h.view.mergeSelected = async (title, snapshot) => { merges.push([title, snapshot.sources.map(s => s.id).sort(), h.control.depth]); };
   const lines = await withTimeout(h.view.applyMapChatActions({ message: 'Compare them', rejected: [], actions: [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' },
-    { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: ' Sleep better ', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Body and mind', goal: '', direction: '' }
   ] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
-  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(opened, [], 'B2: no dialog opens'); eq(goals, ['Sleep better']);
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done'], JSON.stringify(lines)); await tick();
+  eq(opened, [], 'B2: no dialog opens');
   assert.equal(starts.length, 1); eq(starts[0].ids, [h.ids.a, h.ids.b].sort()); assert.equal(starts[0].direction, 'Compare them', 'the user\'s message is the direction'); assert.equal(starts[0].depth, 0, 'not inside a mutate');
   eq(merges, [['Body and mind', [h.ids.a, h.ids.b].sort(), 1]], 'merge runs in its own mutate, after every write');
 });
 
 integrationTest('map chat: run actions are skipped, not guessed, when the map cannot take them', async () => {
   const plain = await harness(); await plain.view.hydrate();
-  plain.view.relevanceGradeable = () => false; plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
+  plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
   const result = await apply(plain, [
     { kind: 'run_map_action', action: 'synthesize', nodeIds: [plain.ids.b], title: '', goal: '', direction: '' },
-    { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'x', direction: '' },
     { kind: 'run_map_action', action: 'merge', nodeIds: [], title: '', goal: '', direction: '' },
     { kind: 'run_map_action', action: 'research_standard', nodeIds: ['nope'], title: '', goal: '', direction: '' }
   ]);
-  eq(result.map(l => l.status), ['skipped', 'skipped', 'skipped', 'skipped']);
+  eq(result.map(l => l.status), ['skipped', 'skipped', 'skipped']);
 });
 
 integrationTest('map chat: invalid items the parser dropped are counted in the chat', async () => {
@@ -1339,15 +1336,6 @@ integrationTest('map chat: a click on a card (no drag) is still a click and adds
   const d = await dragHarness();
   d.down(); d.up();
   assert.equal(d.chat.attachments().length, 0); assert.equal(d.changes.length, 0); assert.equal(d.view.selection.state.selected, d.ids.a, 'the card was selected as usual');
-});
-
-integrationTest('map chat: while the map is sorted by relevance a card dropped on the panel is still a reference', async () => {
-  const d = await dragHarness();
-  d.view.relevanceSortOn = () => true;
-  d.down(); d.move(100, 400); assert.ok(hasClass(d.chat.el, 'is-drop')); d.up();
-  eq(d.chat.attachments(), [{ kind: 'topic', id: d.ids.a }]); assert.equal(d.changes.length, 0);
-  const out = await dragHarness(); out.view.relevanceSortOn = () => true;
-  out.down(); out.move(520, 150); out.up(); assert.equal(out.chat.attachments().length, 0, 'sorted cards still stay put outside the panel'); assert.equal(out.changes.length, 0);
 });
 
 integrationTest('map chat: a merging card dropped on the panel is a reference too, and cancelling the drag leaves nothing highlighted', async () => {
@@ -3231,10 +3219,7 @@ integrationTest('goal banner P3 (header simplify): no "+ Topic" or chevron; star
   assert.doesNotMatch(css, /vam-tools-select-label/, 'the select label rules are gone');
   assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
   assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar keeps its own z-index');
-  const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));
-  assert.doesNotMatch(goal, /z-index|position: absolute|--vam-goal-inset/, 'the goal bar is a row item now: no z-index of its own, not floating, no chat-window inset');
-  assert.match(goal, /max-width: 460px/, 'at most 460px, centred in its row by auto margins'); assert.doesNotMatch(goal, /108px/, 'the old side reservation is gone');
-  assert.match(css, /^\.vam-goal-host \{[^}]*z-index: 20;/m, 'the one z rule is on the host');
+  assert.doesNotMatch(css, /\.vam-goal-bar|\.vam-goal-host/, 'P1.10a: the goal bar and its host rules are gone');
 });
 integrationTest('goal banner P3: the empty canvas button opens the add menu and the keyboard goes to it after "Create an empty mind map"', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();
@@ -3293,16 +3278,14 @@ test('map chat composer: the styles put the keys inside the box with theme varia
   for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
 });
 
-integrationTest('UX B9: an empty map leaves out "Select several topics", the goal bar and the gesture hint; a map with topics has them', async () => {
-  // The goal bar has its own suite (relevance-grade) and is drawn in the overlay, not the toolbar; its guard is pinned from the source below.
+integrationTest('UX B9: an empty map leaves out "Select several topics" and the gesture hint; a map with topics has them', async () => {
   const tools = h => { const box = element('div'); h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  assert.deepEqual(all, ['Data sources'], 'select several is in the header ⋯ menu'); assert.equal(all.some(l => /goal/i.test(l)), false, 'no goal control in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.mountGoalBar\(\);/, 'no goal bar on an empty or AIM map');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
 });
 
@@ -5328,7 +5311,6 @@ integrationTest('MS-03: result rows end with the model label(s) of the task; sev
   assert.equal(label('expand', { ids: [h.ids.a, h.ids.b] }), 'Expand subtopics for 2 topics (label(gpt-x), label(claude:sonnet))');
   assert.equal(label('expand', { ids: [h.ids.root, h.ids.b] }), 'Expand subtopics for 2 topics (label(claude:sonnet))', 'the same model is named once');
   assert.match(label('research_standard', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/);
-  assert.equal(label('rate_by_goal', { fields: { goal: 'Sleep' } }), 'Recommend new cards and update the tiers by the goal “Sleep” (label(claude:sonnet))', 'recommending uses the current model');
   assert.match(label('find_images', { ids: [h.ids.a], fields: { direction: 'x' } }), /^Start looking for pictures for “Body” \(label\(gpt-x\)\)$/);
   assert.match(label('synthesize', { ids: [h.ids.a, h.ids.b] }), / \(label\(claude:sonnet\)\)$/, 'several cards, only one override: the current model');
   assert.match(label('synthesize', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/, 'a single card: its own model');
@@ -6741,7 +6723,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 31 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 32 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

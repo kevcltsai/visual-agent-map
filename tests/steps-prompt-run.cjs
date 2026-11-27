@@ -194,7 +194,7 @@ async function harness(spec, { confirm = true } = {}) {
   let gate = null;
   const host = withExpansionCoordinator({
     repo, settings: { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', cliReasoning: 'low' }, running: new Set(), logs: { appendLog() {} },
-    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, relevanceGrades: new Map(), expansionBatches: new Map(),
+    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, expansionBatches: new Map(),
     recordFailure: (_l, e) => String(e?.message ?? e), views: () => [], mutate: async work => work(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     openDetails: async () => {}, invalidateLivingTrial() {}, restoreLivingOfficial: async () => {}, showLivingTrial: async () => {},
     confirmAiUsage: async (model, run) => { usage.push(model); if (!confirm) return false; await run(); return true; },

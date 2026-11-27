@@ -228,21 +228,6 @@ test('L8c: the arm is continuous at run 40, 60 at run 0, and unchanged for a chi
   assert.equal(armOf(0, -300), 150);
 });
 
-const relevance = load('experiences/visual-map/relevance-order.ts');
-
-test('L9: the relevance display layout follows the left direction', () => {
-  const nodes = [node('r'), node('a', 'r', { y: 100 }), node('b', 'r', { y: 0 }), node('b1', 'b')];
-  const tiers = { a: 'core', b: 'side' };
-  const right = relevance.relevanceDisplayNodes(nodes, id => tiers[id]);
-  const left = relevance.relevanceDisplayNodes(nodes, id => tiers[id], undefined, L);
-  assert.deepEqual(snap(relevance.relevanceDisplayNodes(nodes, id => tiers[id], undefined, 'right')), snap(right));
-  for (const item of left) {
-    assert.equal(item.y, at(right, item.id).y);
-    assert.equal(item.x, at(left, 'r').x - depthOf(nodes, item.id) * 360);
-  }
-  assert.ok(at(left, 'a').y < at(left, 'b').y, 'still sorted by relevance');
-});
-
 // ---- P2: the view. A real view over a fake vault, as in tests/steps-layout-history.cjs. ----
 const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
@@ -279,7 +264,7 @@ async function harness(spec, extra = {}) {
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
   let pending = Promise.resolve();
   const plugin = support.withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
   });
   const view = new VisualAgentMapView({ app }, plugin);

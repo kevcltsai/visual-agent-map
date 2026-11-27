@@ -210,31 +210,6 @@ test('chat batch: a file changed while the release reads back is read by one mor
   assert.equal(h.reads.get(b.mapPath), 1, 'B is read once, by the follow-up');
 });
 
-test('unpin all: the first note written before the second throws is read back by the next unrelated write', async () => {
-  const h = harness();
-  const a = await h.map('Alpha', ['Root', 'One', 'Two']), b = await h.map('Beta');
-  const [, first, second] = a.nodes;
-  for (const node of [first, second]) await h.repo.writeRelevance(node.path, { tier: 'core', manual: true });
-  const va = await h.open(a.mapPath);
-  await h.open(b.mapPath);
-  assert.equal(noteOf(va, first).relevance?.manual, true);
-  const process = h.app.vault.process;
-  h.app.vault.process = async (file, change) => {
-    if (file.path === second.path) throw new Error('disk full');
-    return process(file, change);
-  };
-  va.unpinAllRelevance();
-  await h.plugin.queue;
-  h.app.vault.process = process;
-  assert.equal(noteOf(va, first).relevance?.manual, true, 'a failed write does not read back');
-  assert.ok(va.unsynced.snapshot().paths.has(first.path), 'the written note stays collected');
-  h.reads.clear();
-  await h.plugin.mutate(async () => {});
-  assert.equal(noteOf(va, first).relevance, undefined);
-  assert.equal(noteOf(va, second).relevance?.manual, true);
-  assert.equal(h.readsUnder(b.folder), 0);
-});
-
 test('a read that fails stays collected and the next write reads it again', async () => {
   const h = harness();
   const a = await h.map('Alpha');
@@ -438,19 +413,23 @@ test('hydrate discards metadata from a superseded map session', async () => {
   let release;
   const pending = new Promise(resolve => { release = resolve; });
   const paths = [];
-  repo.readRelevanceSetup = async () => pending;
-  repo.readMapSources = async path => { paths.push(path); return []; };
+  // P1.10a: the goal read that used to block here is gone; the sources read of the old session is the await that is overtaken.
+  repo.readMapSources = async path => { paths.push(path); return pending; };
+  const loaded = [];
+  va.mapSourcesControl.loadForMap = sources => loaded.push(sources);
+  const readNote = repo.readNote.bind(repo), notesRead = [];
+  repo.readNote = async (...args) => { notesRead.push(args[0]); return readNote(...args); };
   const loading = va.hydrate();
   va.path = b.mapPath;
   va.map = vb.map;
   va.mapOpenEpoch++;
   va.notes = vb.notes;
-  va.relevanceGoal = 'current';
-  release({ goal: 'old', context: undefined });
+  release([{ kind: 'note', path: 'Old/source.md' }]);
   await loading;
-  assert.equal(va.relevanceGoal, 'current');
+  assert.deepEqual(paths, [a.mapPath], 'the old session started its sources read');
+  assert.deepEqual(loaded, [], 'the stale sources are not loaded into the new session');
+  assert.deepEqual(notesRead, [], 'no note of the old map is read after the session moved on');
   assert.equal(va.notes, vb.notes);
-  assert.deepEqual(paths, []);
 });
 
 test('synchronize cannot install disk metadata into a superseding map session', async () => {

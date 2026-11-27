@@ -268,7 +268,7 @@ export class ChatActionWriter {
       return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
     };
     // Authorize the actual resolved path, not just a preliminary display alias.
-    const allowedLivingSource = (path: string, map = this.map): boolean => {
+    const allowedLivingSource = (path: string, map: MapDocument | null = this.map): boolean => {
       const key = normalizeVaultPath(path);
       if (!key || key !== path || key.toLowerCase() === configDir.toLowerCase() ||
           key.toLowerCase().startsWith(configDir.toLowerCase() + "/")) return false;

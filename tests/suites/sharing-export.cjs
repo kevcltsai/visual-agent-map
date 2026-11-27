@@ -612,7 +612,7 @@ test('share exporter assemble: a note\'s markers reach the payload node, a note 
   const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
   const result = exporter.assemble({ includeDetail: false, includeImages: false });
   assert.deepEqual(plain(result.leakCategories), []);
-  assert.deepEqual(plain(result.payload.nodes[0].markers), ['done', 'priority-2']);
+  assert.deepEqual(plain(result.payload.nodes[0].markers), ['done'], 'P1.10b: a removed marker id is not exported');
   assert.equal('markers' in result.payload.nodes[1], false);
   assert.equal(result.payload.version, 1);
 });

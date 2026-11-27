@@ -18,7 +18,7 @@ import {
   type TopicRelationKind
 } from "../../../map-model";
 import { TOPIC_COLORS, TOPIC_STYLES, type TopicColor, type TopicStyle } from "../../../topic-colors";
-import { TOPIC_MARKERS, TOPIC_MARKER_GROUPS, type TopicMarker } from "../../../topic-markers";
+import { TOPIC_MARKERS, type TopicMarker } from "../../../topic-markers";
 import {
   HYPOTHESIS_LEANINGS,
   HYPOTHESIS_STRENGTHS,
@@ -221,7 +221,7 @@ export type MapChatAction =
   /**
    * Sets or clears the appearance of one or more cards, with the same rules as the topic panel. `color` absent keeps the
    * colour, "none" clears it. `markers` / `formats` (card styles) are turned on, `removeMarkers` / `removeFormats` off ("all" = every one).
-   * A single-choice marker group (priority, progress) and the text size keep one value. Absent lists change nothing.
+   * The text size keeps one value. Absent lists change nothing.
    */
   | {
       kind: "set_appearance";
@@ -483,6 +483,10 @@ export const MAP_CHAT_SCHEMA = {
 };
 
 const invalid = (detail: string): MapChatError => new MapChatError("invalid", `Map chat reply is not valid: ${detail}`);
+
+/** Marker ids older versions offered (priority, progress, flag, face): a model that still names one has it left out, nothing else. */
+const RETIRED_MARKER =
+  /^(?:priority-[1-5]|progress-(?:0|25|50|75|100)|flag-(?:red|yellow|green|blue)|smile|neutral|sad|question)$/;
 
 class Dropped extends Error {
   constructor(readonly code: MapChatRejectCode) {
@@ -954,27 +958,25 @@ export function parseMapChat(
         case "set_appearance": {
           const nodeIds = list("nodeIds");
           if (!nodeIds.length) throw new Dropped("missing_field");
-          /** A list of known values; an unknown one drops the item. */
-          const values = <T extends string>(key: string, known: readonly string[]): T[] => {
+          /** A list of known values; an unknown one drops the item. Values matching `retired` are left out silently. */
+          const values = <T extends string>(key: string, known: readonly string[], retired?: RegExp): T[] => {
             const field = item[key];
             if (field === undefined || field === null) return [];
             if (!Array.isArray(field) || field.some(value => typeof value !== "string")) throw new Dropped("bad_value");
-            const given = [...new Set((field as string[]).map(value => value.trim()).filter(Boolean))];
+            const given = [
+              ...new Set((field as string[]).map(value => value.trim()).filter(value => value && !retired?.test(value)))
+            ];
             if (given.some(value => !known.includes(value))) throw new Dropped("bad_value");
             return given as T[];
           };
           const color = text("color", false);
           if (color && color !== "none" && !(TOPIC_COLORS as readonly string[]).includes(color))
             throw new Dropped("bad_value");
-          const markers = values<TopicMarker>("markers", TOPIC_MARKERS);
-          const removeMarkers = values<TopicMarker | "all">("removeMarkers", [...TOPIC_MARKERS, "all"]);
+          const markers = values<TopicMarker>("markers", TOPIC_MARKERS, RETIRED_MARKER);
+          const removeMarkers = values<TopicMarker | "all">("removeMarkers", [...TOPIC_MARKERS, "all"], RETIRED_MARKER);
           const formats = values<TopicStyle>("formats", TOPIC_STYLES);
           const removeFormats = values<TopicStyle | "all">("removeFormats", [...TOPIC_STYLES, "all"]);
-          // One value per single-choice group and one text size, as the panel allows; a value both on and off is unclear.
-          if (
-            TOPIC_MARKER_GROUPS.some(group => group.single && markers.filter(id => group.ids.includes(id)).length > 1)
-          )
-            throw new Dropped("bad_value");
+          // One text size, as the panel allows; a value both on and off is unclear.
           if (formats.includes("text-small") && formats.includes("text-large")) throw new Dropped("bad_value");
           if (markers.some(id => removeMarkers.includes(id)) || formats.some(id => removeFormats.includes(id)))
             throw new Dropped("bad_value");
@@ -1100,7 +1102,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 32,
+  version: 33,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

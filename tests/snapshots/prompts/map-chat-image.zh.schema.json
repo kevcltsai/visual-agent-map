@@ -203,25 +203,7 @@
               "enum": [
                 "done",
                 "warning",
-                "star",
-                "priority-1",
-                "priority-2",
-                "priority-3",
-                "priority-4",
-                "priority-5",
-                "progress-0",
-                "progress-25",
-                "progress-50",
-                "progress-75",
-                "progress-100",
-                "flag-red",
-                "flag-yellow",
-                "flag-green",
-                "flag-blue",
-                "smile",
-                "neutral",
-                "sad",
-                "question"
+                "star"
               ]
             }
           },
@@ -233,24 +215,6 @@
                 "done",
                 "warning",
                 "star",
-                "priority-1",
-                "priority-2",
-                "priority-3",
-                "priority-4",
-                "priority-5",
-                "progress-0",
-                "progress-25",
-                "progress-50",
-                "progress-75",
-                "progress-100",
-                "flag-red",
-                "flag-yellow",
-                "flag-green",
-                "flag-blue",
-                "smile",
-                "neutral",
-                "sad",
-                "question",
                 "all"
               ]
             }

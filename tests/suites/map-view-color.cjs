@@ -21,7 +21,6 @@ const BUTTON_SURFACE = {
 };
 
 const svg = '<svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14"><path d="M4 12h16" stroke="currentColor"/></svg>';
-const tag = (tier, label) => `<button class="vam-relevance-tag vam-relevance-tag-button" data-tier="${tier}"><span class="vam-relevance-icon">${svg}</span><span>${label}</span></button>`;
 const card = (attrs, left, top, inner) => `<div class="vam-node" ${attrs} style="left:${left}px;top:${top}px">${inner}</div>`;
 // hypothesis-evidence (V1.6 P13): every line kind x normal / related / dimmed / selected, plus the plain and the expanded label, the arrowheads and the gap line.
 const RELATION_KINDS = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
@@ -44,9 +43,8 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
-    <svg class="vam-edges"><path class="vam-edge" data-parent-line d="M0 0 L200 0"/><path class="vam-edge vam-edge-aim" d="M0 -20 L200 -20"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/>${RELATION_FIXTURE}</svg>
-    ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-card-tool vam-ai-explore">Research</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
+    <svg class="vam-edges"><path class="vam-edge" data-parent-line d="M0 0 L200 0"/><path class="vam-edge vam-edge-aim" d="M0 -20 L200 -20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/>${RELATION_FIXTURE}</svg>
+    ${card('data-probe="core"', 20, 60, `<div class="vam-node-header"></div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-card-tool vam-ai-explore">Research</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
@@ -71,18 +69,12 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 const CASES = [
   ['edge', '.vam-edge[data-parent-line]', 'stroke', 3],
   ['edge-aim', '.vam-edge-aim', 'stroke', 3],
-  ['edge-skippable', '.vam-edge.vam-edge-side', 'stroke', 3],
   ['edge-convergence', '.vam-edge-convergence', 'stroke', 3],
   ...RELATION_KINDS.flatMap(kind => RELATION_STATES.map(([state, cls]) => [`line-${kind}-${state}`, `.vam-relation-${kind}${cls.replace(/ /g, '.')}:not(${['.is-related', '.is-dimmed', '.is-selected'].filter(c => !cls.includes(c.slice(1))).join('):not(')})`, 'stroke', ['normal', 'related'].includes(state) ? 4.5 : 3])),
   ['relation-label', '.vam-relation-label:not(.is-expanded)', 'fill', 4.5],
   ['relation-label-expanded', '.vam-relation-label.is-expanded', 'fill', 4.5],
   ['relation-arrow', '.vam-relation-arrow', 'fill', 3],
   ['relation-arrow-bar', '.vam-relation-arrow-bar', 'stroke', 3],
-  ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
-  ['skippable-summary', '.vam-node[data-relevance="side"] .vam-card-summary', 'color', 4.5],
-  ['skippable-tag-text', '.vam-node[data-relevance="side"] .vam-relevance-tag span:last-child', 'color', 4.5],
-  ['skippable-tag-icon', '.vam-node[data-relevance="side"] .vam-relevance-icon svg', 'color', 3],
-  ['core-tag', '.vam-node[data-relevance="core"] .vam-relevance-tag span:last-child', 'color', 4.5],
   ['idea-label', '.vam-status-idea', 'color', 4.5],
   ['idea-ring', '.vam-status-idea', 'ring', 3],
   ['status-dot', '.vam-status:not([class*="vam-status-"])', 'dot', 3],
@@ -279,30 +271,19 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
           if (options.hover) await hoverOn(selector, false);
         }
         const details = await evaluate(`(() => {
-          const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
-          const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
+          const core = document.querySelector('.vam-node[data-probe="core"]');
+          const edge = document.querySelector('.vam-edge:not(.vam-edge-convergence)');
           const rel = (kind, state = ':not(.is-related):not(.is-dimmed):not(.is-selected)') => getComputedStyle(document.querySelector('.vam-relation-' + kind + state)), convergence = document.querySelector('.vam-edge-convergence');
           const gap = getComputedStyle(document.querySelector('.vam-relation-gap')), dash = kind => rel(kind).strokeDasharray.replace(/px|,/g, '');
           return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, labelDisplay: getComputedStyle(document.querySelector('.vam-relation-label')).display, labelVisibility: getComputedStyle(document.querySelector('.vam-relation-label')).visibility,
             dashes: { supports: dash('supports'), contradicts: dash('contradicts'), verifies: dash('verifies'), derives_from: dash('derives_from'), related: dash('related'), prerequisite: dash('prerequisite') }, widths: Object.fromEntries(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => [kind, rel(kind).strokeWidth])), selectedWidths: { supports: rel('supports', '.is-selected').strokeWidth, derives_from: rel('derives_from', '.is-selected').strokeWidth }, verifiesCap: rel('verifies').strokeLinecap, pointers: ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => rel(kind).pointerEvents), gapStroke: gap.stroke, gapWidth: gap.strokeWidth, gapPointer: gap.pointerEvents, canvas: getComputedStyle(document.body).backgroundColor,
             convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
-            coreWidth: getComputedStyle(core).borderTopWidth,
-            sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
-            edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
+            coreWidth: getComputedStyle(core).borderTopWidth, coreBorder: getComputedStyle(core).borderTopStyle };
         })()`);
         details.parentWidth = await evaluate(`getComputedStyle(document.querySelector('.vam-edge[data-parent-line]')).strokeWidth`);
         details.aimEdgeWidth = await evaluate(`getComputedStyle(document.querySelector('.vam-edge-aim')).strokeWidth`);
         details.aimEdgeStroke = await evaluate(`getComputedStyle(document.querySelector('.vam-edge-aim')).stroke`);
         details.accent = await evaluate(`(() => { const p = document.createElement('i'); p.style.color = 'var(--interactive-accent)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })()`);
-        // Hover / selection of a skippable topic must not change its look beyond the border colour (no opacity jump).
-        await hoverOn('.vam-node[data-relevance="side"]', true);
-        details.sideHoverOpacity = await evaluate(`getComputedStyle(document.querySelector('.vam-node[data-relevance="side"]')).opacity`);
-        details.sideHoverBorder = await evaluate(`getComputedStyle(document.querySelector('.vam-node[data-relevance="side"]')).borderTopStyle`);
-        await hoverOn('.vam-node[data-relevance="side"]', false);
-        await evaluate(`document.querySelector('.vam-node[data-relevance="side"]').classList.add('is-selected')`);
-        details.sideSelectedOpacity = await evaluate(`getComputedStyle(document.querySelector('.vam-node[data-relevance="side"]')).opacity`);
-        details.sideSelectedBorder = await evaluate(`getComputedStyle(document.querySelector('.vam-node[data-relevance="side"]')).borderTopStyle`);
-        await evaluate(`document.querySelector('.vam-node[data-relevance="side"]').classList.remove('is-selected')`);
         out[scheme] = { rows, details };
       }
       return out;
@@ -341,28 +322,18 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
       assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
       assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
-      assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);
-      assert.notEqual(details.coreBorder, 'dashed', `${scheme}: only skippable topics get the dashed frame`);
-      assert.equal(details.sideTag, true, `${scheme}: a skippable topic keeps its tag`);
-      assert.equal(details.sideOpacity, '1', `${scheme}: a skippable topic is not faded`);
-      assert.equal(details.edgeSideOpacity, '1', `${scheme}: a skippable edge is not faded`);
-      assert.notEqual(details.sideStroke, details.edgeStroke, `${scheme}: a skippable edge keeps a colour different from a normal edge`);
-      assert.equal(details.sideHoverOpacity, '1', `${scheme}: hover does not change a skippable topic's opacity`);
-      assert.equal(details.sideSelectedOpacity, '1', `${scheme}: selection does not change a skippable topic's opacity`);
-      assert.equal(details.sideHoverBorder, 'dashed', `${scheme}: hover keeps the dashed frame (no jump)`);
-      assert.equal(details.sideSelectedBorder, 'dashed', `${scheme}: selection keeps the dashed frame (no jump)`);
+      assert.equal(details.coreBorder, 'solid', `${scheme}: an ordinary topic keeps a solid frame`);
     }
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
 
-// ---- hypothesis-evidence (V1.6 P11): six topic types x seven research states x both themes ----
+// ---- hypothesis-evidence (V1.6 P11): six topic types x six research states x both themes ----
 // The shape cards are built from the real topic-kind-shape.ts (so the outline, fold and classes are the ones view.ts draws), then measured in headless Chrome.
 const KIND_STATES = [
   ['completed', 'data-status="completed"', ''],
   ['idea', 'data-status="idea"', ''],
-  ['idea+side', 'data-status="idea" data-relevance="side"', ''],
   ['running', 'data-status="running"', ''],
   ['queued', 'data-status="queued"', ''],
   ['error', 'data-status="error"', ''],
@@ -413,7 +384,7 @@ const KIND_PROBE = `(() => {
   return rows;
 })()`;
 
-test('hypothesis-evidence: six topic types x seven research states keep text >= 4.5:1 and the shape outline >= 3:1 in the light and dark themes', async t => {
+test('hypothesis-evidence: six topic types x six research states keep text >= 4.5:1 and the shape outline >= 3:1 in the light and dark themes', async t => {
   const chrome = findChrome();
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-kind-colour-'));
@@ -449,17 +420,17 @@ test('hypothesis-evidence: six topic types x seven research states keep text >= 
         const [kind, state] = name.split('|');
         assert.equal(row.tag !== undefined, kind !== 'topic', `${scheme} ${name}: every typed card has a kind tag, an ordinary topic has none`);
         if (row.cardFrame) {
-          // The four SVG types hide the card's own frame and shadow; selected is heavier, a skippable one is dashed, the others are solid.
+          // The four SVG types hide the card's own frame and shadow; selected is heavier, every outline is solid (P1.10b removed the dashed skippable tier).
           assert.equal(row.cardFrame.shadow, 'none', `${scheme} ${name}: no card shadow behind a shape`);
           assert.match(row.cardFrame.bg, /rgba\(0, 0, 0, 0\)|transparent/, `${scheme} ${name}: no card fill behind a shape`);
           assert.equal(row.cardFrame.width, state === 'selected' ? '3px' : '2px', `${scheme} ${name}: outline weight`);
-          assert.equal(row.cardFrame.dash !== 'none', state === 'idea+side', `${scheme} ${name}: only a skippable topic is dashed`);
+          assert.equal(row.cardFrame.dash, 'none', `${scheme} ${name}: the outline is solid`);
           if (state === 'selected') assert.equal(row.cardFrame.outline, 'none', `${scheme} ${name}: no rectangular selection outline around a shape`);
         }
         assert.ok(KIND_IDS.includes(kind));
       }
     }
-    console.log(`kind matrix (6 types x 7 states x 2 themes): lowest text ${lowestText.toFixed(2)} (${lowestAt.text}), lowest hypothesis tag ${lowestTag.toFixed(2)} (${lowestAt.tag}), lowest outline ${lowestOutline.toFixed(2)} (${lowestAt.outline})`);
+    console.log(`kind matrix (6 types x 6 states x 2 themes): lowest text ${lowestText.toFixed(2)} (${lowestAt.text}), lowest hypothesis tag ${lowestTag.toFixed(2)} (${lowestAt.tag}), lowest outline ${lowestOutline.toFixed(2)} (${lowestAt.outline})`);
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }

@@ -322,6 +322,19 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-tools > .vam-ai-explore { background: color-mix(in srgb, var(--interactive-accent) 80%, black); color: var(--text-on-accent); font-weight: 600; }
 .vam-node-tools > .vam-ai-explore:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 80%, black); }
 .vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: var(--vam-space-2); padding-right: var(--vam-space-2); }
+/* V3.3 B08: a running AI card's first tool is "Stop", in the error colour. */
+.vam-node-tools > .vam-card-tool-stop { color: var(--vam-error); font-weight: 600; }
+/* V3.3 B08: the toolbar "Style" popover (style-popover.ts); the caller positions it beside the Style button. */
+.vam-style-popover { position: absolute; z-index: 20; display: flex; flex-direction: column; gap: var(--vam-space-2); width: max-content; padding: var(--vam-space-3); border: 1px solid var(--vam-border); border-radius: var(--vam-radius-card); background: var(--vam-surface); color: var(--vam-text); }
+.vam-style-popover-row { display: flex; align-items: center; gap: var(--vam-space-2); }
+.vam-style-popover-label { min-width: 3em; color: var(--vam-muted); font-size: var(--vam-card-summary-size); }
+.vam-style-popover-choices { display: flex; flex-wrap: wrap; gap: var(--vam-space-1); }
+.vam-style-popover-choice { padding: var(--vam-space-1) var(--vam-space-2); border-radius: var(--vam-radius-control); font-size: var(--vam-card-summary-size); }
+.vam-style-popover-choice.vam-style-popover-color { padding: var(--vam-space-1); }
+.vam-style-popover-choice.is-pressed { box-shadow: inset 0 0 0 1px var(--vam-accent); color: var(--vam-text); }
+.vam-style-popover-choice:focus-visible, .vam-style-popover-branch input:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 1px; }
+.vam-style-popover .vam-color-swatch.is-none { background: transparent; border-style: dashed; border-color: var(--vam-muted); }
+.vam-style-popover-branch { gap: var(--vam-space-1); font-size: var(--vam-card-summary-size); cursor: pointer; }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
@@ -1534,13 +1547,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node.vam-aim-hidden[data-topic-color]::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }
 [data-topic-kind="atomic"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="hypothesis"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="evidence"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="conclusion"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="action"].vam-node[data-topic-color].vam-aim-hidden::before { left: 8px; top: 28%; bottom: 28%; }
 .vam-view .vam-node.vam-aim-hidden[data-aim-kind="question"][data-topic-color]::before { z-index: -1; left: 50%; top: 50%; bottom: auto; width: 174px; height: 174px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--vam-card-bg); pointer-events: auto; }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="red"] { background: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="orange"] { background: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="yellow"] { background: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="green"] { background: color-mix(in srgb, var(--color-green) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="blue"] { background: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="purple"] { background: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
-.vam-topic-modal .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="red"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="red"] { background: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="orange"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="orange"] { background: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="yellow"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="yellow"] { background: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="green"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="green"] { background: color-mix(in srgb, var(--color-green) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="blue"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="blue"] { background: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="purple"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="purple"] { background: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch, .vam-style-popover .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
 .vam-topic-modal .vam-color-section > button { margin-top: 8px; }
 .vam-topic-modal .vam-topic-colors button[aria-checked="true"], .vam-topic-modal .vam-topic-colors button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
 .vam-topic-modal .vam-style-section > button { margin-top: 8px; }

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyLivingChanges, hasLivingResult } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
+const { applyLivingChanges, hasLivingResult, livingEventFingerprint, livingEventScopeFingerprint, livingEventTombstone } = require('./support.cjs').load('experiences/visual-map/living-node-changes.ts');
 const e = (id, retrievedAt = 't1') => ({ id, source: 'source:' + id, retrievedAt });
 const context = { at: 't2', evidence: [e('e1', 't2'), e('e2')] };
 const record = (extra = {}) => ({ id: 'r1', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: [e('e1')], validity: 'active', owner: 'ai', history: [], ...extra });
@@ -24,7 +24,7 @@ test('change set: new evidence supplements a record; correction preserves previo
   assert.equal(result.records[0].claim, '105');
   assert.equal(result.records[0].history[0].claim, '100');
   assert.deepEqual(plain(result.records[0].history[0].previousEvidence), [e('e1')]);
-  assert.deepEqual(plain(result.records[0].evidence), [e('e1'), e('e2')]);
+  assert.deepEqual(plain(result.records[0].evidence), [e('e2')]);
   assert.equal(original.records[0].claim, '100');
   assert.equal(apply(original, { kind: 'supplement', id: 'r1', evidence: ['e2'] }).records[0].evidence.length, 2);
 });
@@ -132,4 +132,31 @@ test('change set: explicit no-match and observation-only results remain usable; 
   const observations = base({ output: { text: '', owner: 'ai', evidence: [] } });
   assert.equal(hasLivingResult(observations), true);
   assert.equal(apply(observations).changed, false);
+});
+
+test('change set: current evidence is explicitly selected, not inherited from replaced claim', () => {
+  const result = apply(base(), { kind: 'output', text: 'Revised answer', evidence: ['e2'] });
+  assert.deepEqual(plain(result.output.evidence), [e('e2')]);
+  const retained = apply(base(), { kind: 'output', text: 'Related answer', evidence: ['e1'] });
+  assert.deepEqual(plain(retained.output.evidence), [e('e1')]);
+  const disputed = apply(base(), { kind: 'dispute', id: 'r1', claim: '101', reason: 'conflict', evidence: ['e2'] });
+  assert.deepEqual(plain(disputed.records[0].evidence), [e('e1')]);
+  assert.deepEqual(plain(disputed.records[0].history[0].evidence), [e('e2')]);
+  const withdrawn = apply(base(), { kind: 'invalidate', id: 'r1', reason: 'withdrawn', evidence: ['e2'] });
+  assert.deepEqual(plain(withdrawn.records[0].evidence), [e('e1')]);
+  assert.throws(() => apply({ ...base(), records: withdrawn.records }, { kind: 'append', id: 'different', subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-26', claim: '100', evidence: ['e2'] }), /inactive-record/);
+});
+test('change set: suppression survives new record ID, value and day alias; unrelated dates remain possible', () => {
+  const old = record();
+  const tombstone = livingEventTombstone(old.id, livingEventFingerprint(old), livingEventScopeFingerprint(old), false);
+  const b = base({ records: [], suppressed: ['r1', tombstone] });
+  const op = { kind: 'append', id: 'r2', subject: 'Stock', scope: 'price', granularity: 'day', eventTime: '2026-11-26', claim: '105', evidence: ['e2'] };
+  assert.throws(() => apply(b, op), /suppressed-record/);
+  assert.throws(() => apply(b, { ...op, eventTime: null }), /ambiguous-suppression/);
+  assert.equal(apply(b, { ...op, eventTime: '2026-11-27' }).records.length, 1);
+  assert.equal(apply(b, { ...op, scope: 'dividend' }).records.length, 1);
+  assert.throws(() => apply(base({ records: [], suppressed: ['legacy-id'] }), op), /ambiguous-suppression/);
+  const unknown = record({ eventTime: null, granularity: 'event' });
+  const ub = base({ records: [], suppressed: ['r1', livingEventTombstone(unknown.id, livingEventFingerprint(unknown), livingEventScopeFingerprint(unknown), true)] });
+  assert.throws(() => apply(ub, { ...op, eventTime: '2026-11-27' }), /ambiguous-suppression/);
 });

@@ -205,7 +205,8 @@ export class CoverFrameModal extends Modal {
     this.modalEl.addClass("vam-card-frame-modal");
     this.titleEl.setText(t("ui.topic_cover_frame_title"));
     this.buildTools(this.contentEl.createDiv({ cls: "vam-card-frame-tools" }));
-    const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
+    // vam-tokens: the modal sits outside the map view, so it carries the VAM token root itself (V3.3 P1.1).
+    const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage vam-tokens" });
     const given = this.options.card?.();
     // Without the map card, the stylesheet's default card (its width and padding), empty but for the cover.
     const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });

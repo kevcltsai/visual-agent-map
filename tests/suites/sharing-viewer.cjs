@@ -50,7 +50,7 @@ test('sharing viewer: stylesheet rules are copied from styles.css unchanged and 
   const known = tools.allRuleTexts(styles);
   assert.ok(rules.length > 40, 'the extraction keeps the card, canvas and panel rules');
   for (const item of rules) for (const rule of item.rules) assert.ok(known.has(rule), `not a rule of styles.css: ${rule.slice(0, 80)}`);
-  const wanted = ['.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
+  const wanted = ['.vam-view, .vam-stage, .vam-tokens {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
   const flat = rules.flatMap(item => item.rules);
   for (const start of wanted) assert.ok(flat.some(rule => rule.startsWith(start)), `${start} must be taken from styles.css`);
   // The rules appear in the shipped stylesheet byte for byte.
@@ -1497,16 +1497,30 @@ test('sharing viewer images: image-data keeps only what a viewer may draw (asset
   assert.equal(read([{ ...base, asset: 'web' }])[0].free, false, 'an old picture with no anchors, links or note stays annotated');
 });
 
+// A .vam-view rule that declares nothing but --vam-* custom properties (the V3.3 design-token rule) is allowed through; decided by the rule's content, not by its selector text.
+const onlyVamCustomProperties = rule => {
+  const decls = rule.slice(rule.indexOf('{') + 1, rule.lastIndexOf('}')).split(';').map(item => item.trim()).filter(Boolean);
+  return decls.length > 0 && decls.every(item => /^--vam-[a-z0-9-]+\s*:/.test(item));
+};
+
+test('sharing viewer images: the --vam-* only exception does not let an ordinary .vam-view declaration through', () => {
+  assert.equal(onlyVamCustomProperties('.vam-view, .vam-stage { --vam-space-1: 4px; --vam-surface: var(--background-primary); }'), true);
+  assert.equal(onlyVamCustomProperties('.vam-view, .vam-stage { --vam-space-1: 4px; color: red; }'), false);
+  assert.equal(onlyVamCustomProperties('.vam-view { color: red; }'), false);
+  assert.equal(onlyVamCustomProperties('.vam-view { --other-token: 1px; }'), false);
+});
+
 test('sharing viewer images: only the picture, bar and anchor rules of the map are taken from .vam-view; the viewer stylesheet lets a press pan', async () => {
   const tools = await cssTools;
   const styles = read('styles.css');
   const rules = tools.extractViewerRules(styles).flatMap(item => item.rules);
   const viewRules = rules.filter(rule => /^(?:\.theme-dark\s+)?\.vam-view\b/.test(rule));
   assert.ok(viewRules.length >= 10, 'the annotated image, bar and anchor rules are in');
-  for (const rule of viewRules) assert.match(rule, /^(?:\.theme-dark\s+)?\.vam-view\s+\.(?:vam-canvas-image|vam-annotated|vam-anchor)/, `an unrelated .vam-view rule was taken: ${rule.slice(0, 80)}`);
+  for (const rule of viewRules.filter(rule => !onlyVamCustomProperties(rule))) assert.match(rule, /^(?:\.theme-dark\s+)?\.vam-view\s+\.(?:vam-canvas-image|vam-annotated|vam-anchor)/, `an unrelated .vam-view rule was taken: ${rule.slice(0, 80)}`);
   for (const start of ['.vam-view .vam-canvas-image.is-annotated {', '.vam-view .vam-annotated-bar {', '.vam-view .vam-anchor {', '.vam-view .vam-anchor.is-linked {']) assert.ok(viewRules.some(rule => rule.startsWith(start)), `${start} must be taken`);
   // No rule that begins with another .vam-view descendant (placing mode, crosshair of the editor) is taken, and every card rule is still the same text.
   assert.ok(!rules.some(rule => /\.vam-view\s+\.is-placing/.test(rule)));
+  // The one other .vam-view rule is the design-token rule (V3.3 P1.1): its .vam-stage selector is how the viewer gets the tokens.
   const css = read('experiences/sharing/viewer/viewer.css');
   assert.match(css, /\.vam-view \.vam-canvas-image \{[^}]*cursor: inherit/);
   assert.match(css, /\.vam-view \.vam-canvas-image img \{ pointer-events: none/);

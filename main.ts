@@ -9,6 +9,7 @@ import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/merma
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
+import { livingCoordinator } from "./experiences/visual-map/living-node-runtime";
 import { LivingIdentityStore, setLivingIdentityStore } from "./experiences/visual-map/living-node-sources";
 import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
@@ -2313,6 +2314,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   onunload(): void {
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
+    // Shared Living Node runs and trials stop with the plugin.
+    livingCoordinator(this).unload();
     this.topicRuns.dispose();
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();

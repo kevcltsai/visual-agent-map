@@ -53,11 +53,11 @@ test('blocked: true while a conversation chain runs or a multi-research batch is
   assert.equal(blocked(make({ plugin: { expansionBatches: new Map(), argumentRuns: { isRunning: path => path === 'M.vam' } } })), true, 'an argument-map run blocks');
 });
 
-test('switching maps stops the old map\'s run (source-level), and an author call with no view of the map is cancelled and stops that map, never a failure', async () => {
+test('switching maps leaves (unsubscribes from) the old map\'s run (source-level), and an author call with no view of the map is cancelled and stops that map, never a failure', async () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const open = source.indexOf('private async openMapInMutation(');
   const head = source.slice(open, open + 1200);
-  assert.match(head, /if \(path !== this\.path\) \{\s*this\.closeAiCardPopover\(\);\s*this\.stopPromptBatch\(\);\s*\/\/[^\n]*\n\s*if \(this\.path\) void this\.plugin\.bookPipelineRuns\?\.stop\(this\.path\)/);
+  assert.match(head, /if \(path !== this\.path\) \{\s*this\.closeAiCardPopover\(\);\s*this\.promptBatch\?\.leave\?\.\(\);\s*\/\/[^\n]*\n\s*if \(this\.path\) void this\.plugin\.bookPipelineRuns\?\.stop\(this\.path\)/);
   const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
   plugin.views = () => [{ mapPath: 'Other.vam' }];
   const stops = [];

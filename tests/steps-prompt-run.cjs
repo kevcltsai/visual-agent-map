@@ -11,6 +11,7 @@ const { element, find, findAll } = dom;
 
 const pr = S.load('experiences/visual-map/prompt-run.ts');
 const values = S.load('note-values.ts');
+const contentLanguage = S.load('core/content-language.ts');
 // Values from the vm-loaded modules carry another realm's prototypes: compare them as JSON.
 const eq = (actual, expected, message) => assert.deepEqual(JSON.parse(JSON.stringify(actual === undefined ? null : actual)), expected, message);
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
@@ -220,7 +221,7 @@ async function harness(spec, { confirm = true } = {}) {
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   await hydrate();
   // Exercise the production execution path through the real Repository. Only the provider transport is stubbed.
-  const plan = { fail: new Set(), hang: new Set() };
+  const plan = { fail: new Set(), hang: new Set(), pause: new Set(), waiters: [], go() { this.waiters.splice(0).forEach(resolve => resolve()); } };
   view.readMapSourceGroups = async () => [];
   host.aiCalls = { run: async (prepared, options, finish) => {
     const input = prepared.input;
@@ -228,6 +229,7 @@ async function harness(spec, { confirm = true } = {}) {
     calls.push({ key, input, options });
     if (plan.hang.has(key)) await new Promise(resolve => options.signal.addEventListener('abort', resolve, { once: true }));
     if (options.signal.aborted) throw new Error('stopped');
+    if (plan.pause.has(key)) await new Promise(resolve => plan.waiters.push(resolve));
     if (plan.fail.has(key)) throw new Error('provider failed: ' + key);
     const text = 'Result: ' + key;
     const operations = input.base.output.text === text ? [] : [{ kind: 'output', text, evidence: [] }];
@@ -242,12 +244,36 @@ async function harness(spec, { confirm = true } = {}) {
       language: () => 'English', mapSources: async () => []
     });
   };
+  // A second view of the same map on the same plugin (another pane or window).
+  const otherView = async () => {
+    const v = new VisualAgentMapView({ app }, attachTopicRuns(host));
+    v.armHighlightFade = () => {};
+    Object.assign(v, { path: MAP, map: mapDoc, contentEl: element('div'), stageEl: element('div'), render() {}, ancestorContext: async () => '', queueCharts() {}, focusNode() {}, openDetails() {} });
+    v.viewportEl = view.viewportEl;
+    v.readMapSourceGroups = async () => [];
+    v.hydrate = async () => { v.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
+    await v.hydrate();
+    return v;
+  };
+  // The round on its own, against a coordinator this test owns: used to hold a trial lease on a card.
+  const runtime = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian });
+  const roundPort = () => {
+    const seen = { settled: new Map(), boundary: undefined, failures: [] };
+    const port = {
+      app, repo, calls: host.aiCalls, coordinator: runtime.livingCoordinator(host), mapPath: MAP, viewSession: 'round-test',
+      signal: new AbortController().signal, current: () => true, busy: () => false, language: (live, note) => contentLanguage.cardOutputLanguage(live, 'en', note.title), mapSources: async () => [],
+      confirm: async (_model, work) => { await work(); return true; },
+      onStart() {}, onRunning() {}, onSettled: (id, result) => seen.settled.set(id, result), onFailure: id => seen.failures.push(id),
+      onTrialBoundary: boundary => { seen.boundary = boundary; }
+    };
+    return { port, seen, run: requested => runtime.runLivingRound(port, requested) };
+  };
   const raw = key => contents.get(byKey.get(key).path);
   const node = key => byKey.get(key);
   const status = key => view.promptRuns.get(MAP)?.get(node(key).id)?.status;
   const done = () => until(() => view.promptBatch?.outcome);
   const runAll = async () => { view.startPromptRun(); };
-  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey };
+  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort };
 }
 
 // root -> mid -> leaf1, leaf2 ; root -> side
@@ -687,4 +713,197 @@ test('failed status tooltip retains latest successful check and last attempt ind
   const tip = h.view.aiStatusTip(h.node('P'), note, 'failed');
   assert.match(tip, /2026-11-27T00:00:00.000Z/);
   assert.match(tip, /2026-11-27T01:00:00.000Z/);
+});
+
+// ---- one formal run per map (T02) -------------------------------------------------------------------------------------
+const closeView = async v => { try { await v.onClose(); } catch { /* the remaining DOM teardown needs real Obsidian */ } };
+
+test('two views: a second view joins the running progress instead of starting or failing', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  h.plan.pause.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  second.startPromptRun();
+  assert.ok(second.promptBatch && !second.promptBatch.outcome, 'the second view shows the progress');
+  assert.equal(second.promptBatch.total, h.view.promptBatch.total);
+  assert.ok(second.promptBatch.total > 0);
+  assert.equal(h.calls.length, 1, 'no second round');
+  assert.ok(h.notices.length >= 1);
+  assert.ok(second.promptRunning());
+  h.plan.go();
+  await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  assert.equal(h.calls.length, 5);
+  assert.equal(second.promptBatch.finished, second.promptBatch.total);
+  assert.equal(h.status('root'), 'done');
+});
+
+test('Run Card while Run All runs: another view joins, the same view is told it is running', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  h.plan.pause.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  const before = h.notices.length;
+  h.view.startPromptRun([h.node('side').id]);
+  assert.equal(h.notices.length, before + 1, 'the same view keeps the "already running" notice');
+  second.startPromptRun([h.node('side').id]);
+  assert.ok(second.promptBatch && !second.promptBatch.outcome);
+  assert.equal(h.calls.length, 1);
+  h.plan.go();
+  await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
+  assert.equal(h.calls.length, 5, 'the run was the one Run All');
+});
+
+test('second-view cancel stops the shared run for every view', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  second.startPromptRun();
+  second.stopPromptBatch();
+  await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
+  assert.equal(second.promptBatch.outcome.stopped, true);
+  assert.equal(h.calls.some(c => c.key === 'root'), false);
+});
+
+test('closing a view only unsubscribes; the last view closing cancels the run', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  h.plan.pause.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  second.startPromptRun();
+  await closeView(h.view);
+  assert.equal(h.view.promptBatch.outcome.stopped, true, 'the closed view stops following');
+  assert.equal(second.promptBatch.outcome, undefined, 'the run goes on for the remaining view');
+  h.plan.go();
+  await until(() => second.promptBatch.outcome);
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+
+  const g = await harness(TREE);
+  const other = await g.otherView();
+  g.plan.hang.add('leaf1');
+  await g.runAll();
+  await until(() => g.calls.length === 1);
+  other.startPromptRun();
+  await closeView(g.view);
+  assert.equal(other.promptBatch.outcome, undefined);
+  await closeView(other);
+  await until(() => other.promptBatch.outcome);
+  assert.equal(other.promptBatch.outcome.stopped, true);
+  assert.equal(g.calls.some(c => c.key === 'root'), false);
+});
+
+// ---- trial card in Run All (execution boundary) -----------------------------------------------------------------------
+async function ranOnce() {
+  const h = await harness(TREE);
+  await h.runAll(); await h.done();
+  h.calls.length = 0;
+  return h;
+}
+const midTrial = h => h.roundPort().port.coordinator.acquire('map-a', 'trial-view', [h.node('mid').path], false);
+
+test('trial + Run All, valid upstream: the trial card is skipped and its knowledge is used as is', async () => {
+  const h = await ranOnce();
+  await h.repo.updateNote(h.node('root').path, { prompt: 'Prompt root changed' });
+  const trial = midTrial(h);
+  const round = h.roundPort();
+  const results = await round.run();
+  trial.release();
+  assert.equal(results.get(h.node('mid').id), 'not-run');
+  assert.equal(h.calls.some(c => c.key === 'mid'), false, 'the trial card is not run');
+  assert.ok(h.calls.some(c => c.key === 'root'), 'its consumer runs on the frozen knowledge');
+  assert.ok(['changed', 'no-change'].includes(results.get(h.node('root').id)));
+  eq(round.seen.boundary, { skipped: [h.node('mid').id], frozen: [h.node('mid').id], blocked: [] });
+});
+
+test('trial + Run All, stale upstream: dependents blocked, independent branches run', async () => {
+  const h = await ranOnce();
+  await h.repo.updateNote(h.node('leaf1').path, { prompt: 'Prompt leaf1 changed' });
+  await h.repo.updateNote(h.node('side').path, { prompt: 'Prompt side changed' });
+  const trial = midTrial(h);
+  const round = h.roundPort();
+  const results = await round.run();
+  trial.release();
+  assert.equal(results.get(h.node('mid').id), 'not-run');
+  assert.equal(results.get(h.node('root').id), 'blocked');
+  assert.ok(['changed', 'no-change'].includes(results.get(h.node('side').id)), 'an independent branch runs');
+  assert.ok(['changed', 'no-change'].includes(results.get(h.node('leaf1').id)));
+  assert.equal(h.calls.some(c => c.key === 'mid' || c.key === 'root'), false);
+  eq(round.seen.boundary, { skipped: [h.node('mid').id], frozen: [], blocked: [h.node('root').id] });
+});
+
+test('trial + Run All, empty upstream: dependents blocked, other cards run', async () => {
+  const h = await harness(TREE);
+  const trial = midTrial(h);
+  const round = h.roundPort();
+  const results = await round.run();
+  trial.release();
+  assert.equal(results.get(h.node('mid').id), 'not-run');
+  assert.equal(results.get(h.node('root').id), 'blocked');
+  assert.equal(h.calls.some(c => c.key === 'mid' || c.key === 'root'), false);
+  for (const key of ['leaf1', 'leaf2', 'side']) assert.equal(results.get(h.node(key).id), 'changed', key);
+  eq(round.seen.boundary.blocked, [h.node('root').id]);
+  eq(round.seen.boundary.frozen, []);
+});
+
+test('Run Card on a card in trial is refused; nothing runs or is written', async () => {
+  const h = await ranOnce();
+  const trial = midTrial(h);
+  const before = TREE.map(([k]) => h.raw(k));
+  await assert.rejects(h.roundPort().run([h.node('mid').id]), /living-node-trial-busy/);
+  assert.equal(h.calls.length, 0);
+  eq(TREE.map(([k]) => h.raw(k)), before);
+  trial.release();
+});
+
+test('a view that switches maps leaves the run; the round it started keeps reading and busy-checking the original map', async () => {
+  const h = await harness(TREE);
+  const second = await h.otherView();
+  const reads = [], keys = [];
+  const readSources = h.repo.readMapSources.bind(h.repo);
+  h.repo.readMapSources = async path => { reads.push(path); return readSources(path); };
+  const isRunning = h.host.expansionCoordinator.isRunning.bind(h.host.expansionCoordinator);
+  h.host.expansionCoordinator.isRunning = key => { keys.push(key); return isRunning(key); };
+  h.plan.pause.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.length === 1);
+  second.startPromptRun();
+  // View A opens another map: it only leaves the run, which the other view keeps following.
+  h.view.promptBatch.leave();
+  h.view.path = 'Other.vam';
+  h.view.map = { id: 'other-map', title: 'other', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  reads.length = 0; keys.length = 0;
+  const before = h.raw('side');
+  h.plan.go();
+  await until(() => second.promptBatch.outcome);
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
+  eq([...new Set(reads)], [MAP], 'sources come from the original map');
+  eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');
+  assert.notEqual(h.raw('side'), before, 'writes still land on the original map');
+});
+
+test('a trial lease taken while validity is inspected makes the round fail busy with zero writes', async () => {
+  const h = await ranOnce();
+  await h.repo.updateNote(h.node('leaf1').path, { prompt: 'Prompt leaf1 changed' });
+  const first = midTrial(h); // a trial on another card makes the round inspect validity
+  const round = h.roundPort();
+  let late;
+  const mapSources = round.port.mapSources;
+  round.port.mapSources = async signal => {
+    late ??= round.port.coordinator.acquire('map-a', 'late-trial', [h.node('leaf1').path], false);
+    return mapSources(signal);
+  };
+  const before = TREE.map(([k]) => h.raw(k));
+  await assert.rejects(round.run(), /living-node-busy/);
+  assert.ok(late, 'the lease was taken during the inspection');
+  assert.equal(h.calls.length, 0);
+  eq(TREE.map(([k]) => h.raw(k)), before);
+  late.release(); first.release();
 });

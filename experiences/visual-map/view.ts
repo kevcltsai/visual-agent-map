@@ -3245,7 +3245,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeMapSearch(false);
     this.exitPresentation(false);
     // A run-all batch stops with its view: nothing it has in flight is written afterwards.
-    this.promptBatch?.controller.abort();
+    this.promptBatch?.leave?.();
     this.dropCanvasInteractionModes();
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
@@ -3731,7 +3731,7 @@ export class VisualAgentMapView extends ItemView {
     if (!isCurrent()) return;
     if (path !== this.path) {
       this.closeAiCardPopover();
-      this.stopPromptBatch();
+      this.promptBatch?.leave?.();
       // Another map on this screen ends the old map's picture-book run, as closing the view does.
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
@@ -15547,6 +15547,14 @@ export class VisualAgentMapView extends ItemView {
         trial: node
           ? async values => {
               invalidateTrial();
+              // A card in a formal run cannot be tried out; the run reads and writes it.
+              if (
+                livingCoordinator(this.plugin).runOf(mapPath) ||
+                livingCoordinator(this.plugin).formalBusy(node.path)
+              ) {
+                new Notice(t("ui.living_node_trial_formal_busy"));
+                return false;
+              }
               const attempt = new AbortController();
               activeTrial = attempt;
               const currentTrial = (): boolean =>
@@ -20375,96 +20383,151 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map || !this.path || stop?.aborted || this.promptRunning()) return undefined;
     const mapPath = this.path;
+    // This view may open another map while the round goes on for the others; the round keeps its own map.
+    const mapId = map.id;
+    const busyKey = `multi-research:${mapPath}`;
+    const coordinator = livingCoordinator(this.plugin);
+    // A card being tried out is an execution boundary: it cannot be run on its own.
+    if (requested?.some(id => coordinator.trialBusy(this.mapNodeById(id)?.path ?? ""))) {
+      new Notice(t("ui.living_node_trial_run_refused"));
+      return undefined;
+    }
     const session = this.captureMapSession();
-    const controller = new AbortController();
-    const stopRound = (): void => controller.abort();
+    // One formal run per map: a second view or a second Run follows the run that is already going.
+    const existing = coordinator.runOf(mapPath);
+    const run = existing ?? coordinator.beginRun(mapPath);
+    if (!run) return undefined;
+    if (existing) new Notice(t("ui.living_node_run_joined"));
+    const stopRound = (): void => run.cancel();
     stop?.addEventListener("abort", stopRound, { once: true });
-    const state: PromptBatchState = { mapPath, controller, total: 0, finished: 0 };
+    const state: PromptBatchState = { mapPath, controller: run.controller, total: 0, finished: 0 };
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
+    const tally = { done: 0, failed: 0, blocked: 0 };
     let warnedOptionalSources = false;
-    const current = (): boolean => session() && !this.plugin.repo.isDisposed() && !controller.signal.aborted;
-    try {
-      const result = await runLivingRound(
-        {
-          app: this.app,
-          repo: this.plugin.repo,
-          calls: this.plugin.aiCalls,
-          coordinator: livingCoordinator(this.plugin),
-          mapPath,
-          viewSession: randomUUID(),
-          signal: controller.signal,
-          current,
-          busy: path =>
-            this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()) ||
-            this.plugin.topicRuns.isBusy(path) ||
-            this.plugin.quickExpandPending.has(path) ||
-            this.plugin.topicRuns.hasTask(path),
-          language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readLivingMapSourceReport(signal),
-          onOptionalSourcesUnavailable: () => {
-            if (!current() || warnedOptionalSources) return;
-            warnedOptionalSources = true;
-            new Notice(t("ui.living_node_optional_source_unavailable"));
-          },
-          onOmittedEditsSkipped: () => {
-            if (current()) new Notice(t("ui.living_node_omitted_edits_skipped"));
-          },
-          log: (level, message) => this.plugin.logs.appendLog(level, message),
-          onSuppressedDropped: (_id, count) => {
-            if (current()) new Notice(t("ui.living_node_suppressed_dropped_0", count));
-          },
-          confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
-          onStart: total => {
-            state.total = total;
-            this.promptRuns.delete(mapPath);
-            if (current()) this.render();
-          },
-          onRunning: id => {
-            state.current = this.notes.get(id)?.title ?? id;
-            this.setPromptStatus(mapPath, id, "running");
-          },
-          onSettled: (id, result) => {
-            state.finished = Math.min(state.total, state.finished + 1);
-            const status =
-              result === "changed" || result === "no-change" || result === "reused"
-                ? "done"
-                : result === "failed" || result === "blocked"
-                  ? "blocked"
-                  : "idle";
-            this.setPromptStatus(mapPath, id, status, failureReasons.get(id));
-          },
-          onFailure: (id, error) => {
-            failureReasons.set(id, this.plugin.recordFailure(t("ui.ai_card"), error));
-          },
-          onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)
-        },
-        requested
-      );
-      const values = [...(result?.values() ?? [])];
-      const outcome = {
-        done: values.filter(value => value === "changed" || value === "no-change" || value === "reused").length,
-        failed: values.filter(value => value === "failed").length,
-        blocked: values.filter(value => value === "blocked").length,
-        stopped: controller.signal.aborted
-      };
-      state.outcome = outcome;
-      if (session()) {
-        if (outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", outcome.done, state.total));
-        else if (outcome.failed || outcome.blocked)
-          new Notice(t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked));
+    const viewCurrent = (): boolean => session() && !this.plugin.repo.isDisposed();
+    const current = (): boolean => viewCurrent() && !run.signal.aborted;
+    let finish!: (outcome: PromptBatchState["outcome"]) => void;
+    const ended = new Promise<PromptBatchState["outcome"]>(resolve => (finish = resolve));
+    const unsubscribe = run.subscribe(event => {
+      switch (event.kind) {
+        case "start":
+          state.total = event.total;
+          this.promptRuns.delete(mapPath);
+          if (current()) this.render();
+          break;
+        case "running":
+          state.current = this.notes.get(event.id)?.title ?? event.id;
+          this.setPromptStatus(mapPath, event.id, "running");
+          break;
+        case "failure":
+          failureReasons.set(event.id, event.reason);
+          break;
+        case "trial":
+          for (const id of event.skipped) failureReasons.set(id, t("ui.living_node_trial_skipped"));
+          for (const id of event.blocked) failureReasons.set(id, t("ui.living_node_upstream_trial"));
+          if (event.skipped.length && viewCurrent()) new Notice(t("ui.living_node_trial_boundary"));
+          break;
+        case "settled": {
+          const result = event.result;
+          state.finished = Math.min(state.total, state.finished + 1);
+          const usable = result === "changed" || result === "no-change" || result === "reused";
+          if (usable) tally.done++;
+          else if (result === "failed") tally.failed++;
+          else if (result === "blocked") tally.blocked++;
+          this.setPromptStatus(
+            mapPath,
+            event.id,
+            usable ? "done" : result === "failed" || result === "blocked" ? "blocked" : "idle",
+            failureReasons.get(event.id)
+          );
+          break;
+        }
+        case "done":
+          state.outcome = { ...tally, stopped: run.signal.aborted || event.error === true };
+          if (session()) {
+            if (state.outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", state.outcome.done, state.total));
+            else if (state.outcome.failed || state.outcome.blocked)
+              new Notice(
+                t("ui.ai_run_finished_0_1_2", state.outcome.done, state.outcome.failed, state.outcome.blocked)
+              );
+          }
+          finish(state.outcome);
+          break;
       }
-    } catch (error) {
-      if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), error));
-    } finally {
+    });
+    // Leaving only unsubscribes (the last view to leave cancels the run); this view's own batch then ends.
+    state.leave = () => {
+      unsubscribe();
+      state.outcome ??= { ...tally, stopped: true };
+      finish(state.outcome);
+    };
+    if (existing) {
       stop?.removeEventListener("abort", stopRound);
-      state.outcome ??= { done: 0, failed: 0, blocked: 0, stopped: true };
-      if (session()) {
-        await this.hydrate();
-        this.render();
+      // A caller that only follows the round stops following; the round itself goes on for the other views.
+      if (stop?.aborted) state.leave();
+      else stop?.addEventListener("abort", state.leave, { once: true });
+    } else {
+      let error = false;
+      try {
+        await runLivingRound(
+          {
+            app: this.app,
+            repo: this.plugin.repo,
+            calls: this.plugin.aiCalls,
+            coordinator,
+            mapPath,
+            viewSession: randomUUID(),
+            signal: run.signal,
+            current: () => !run.signal.aborted && !this.plugin.repo.isDisposed(),
+            busy: path =>
+              this.plugin.expansionCoordinator.isRunning(busyKey) ||
+              this.plugin.topicRuns.isBusy(path) ||
+              this.plugin.quickExpandPending.has(path) ||
+              this.plugin.topicRuns.hasTask(path),
+            language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
+            mapSources: signal => this.readLivingMapSourceReport(signal, mapPath, mapId),
+            onOptionalSourcesUnavailable: () => {
+              if (!current() || warnedOptionalSources) return;
+              warnedOptionalSources = true;
+              new Notice(t("ui.living_node_optional_source_unavailable"));
+            },
+            onOmittedEditsSkipped: () => {
+              if (current()) new Notice(t("ui.living_node_omitted_edits_skipped"));
+            },
+            log: (level, message) => this.plugin.logs.appendLog(level, message),
+            onSuppressedDropped: (_id, count) => {
+              if (current()) new Notice(t("ui.living_node_suppressed_dropped_0", count));
+            },
+            confirm: (model, work) => this.plugin.confirmAiUsage(model, work),
+            onStart: total => run.emit({ kind: "start", total }),
+            onTrialBoundary: boundary => run.emit({ kind: "trial", ...boundary }),
+            onRunning: id => run.emit({ kind: "running", id }),
+            onSettled: (id, result) => run.emit({ kind: "settled", id, result }),
+            onFailure: (id, cause) =>
+              run.emit({ kind: "failure", id, reason: this.plugin.recordFailure(t("ui.ai_card"), cause) }),
+            onCommit: (path, before, after) => {
+              if (this.path === mapPath) this.recordLivingCommit(path, before, after);
+            }
+          },
+          requested
+        );
+      } catch (cause) {
+        error = true;
+        if (current()) new Notice(this.plugin.recordFailure(t("ui.ai_card"), cause));
+      } finally {
+        stop?.removeEventListener("abort", stopRound);
+        run.emit({ kind: "done", error });
+        state.leave();
       }
     }
-    return state.outcome;
+    const outcome = await ended;
+    stop?.removeEventListener("abort", state.leave);
+    if (session()) {
+      await this.hydrate();
+      this.render();
+    }
+    return outcome;
   }
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;

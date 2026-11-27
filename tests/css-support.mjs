@@ -94,3 +94,9 @@ test('A4: resize handles and the AI lock button show on selection or focus, neve
   assert.match(css, /\.vam-node\.is-selected > \.vam-card-resize\b/);
   assert.match(css, /\.vam-node\.is-selected \.vam-card-ai-lock\.is-hover-only/);
 });
+
+test('A5: a locked card is not dimmed; it says "locked" in words instead (V3.3 P1.2)', () => {
+  const css = readFileSync(resolve(root, 'styles.css'), 'utf8');
+  for (const line of css.split('\n').filter(l => /data-ai-locked/.test(l))) assert.ok(!/opacity/.test(line), `no dimming: ${line.slice(0, 80)}`);
+  assert.match(css, /\.vam-card-ai-lock-label\b/);
+});

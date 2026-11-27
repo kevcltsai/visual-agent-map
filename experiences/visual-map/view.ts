@@ -5872,6 +5872,7 @@ export class VisualAgentMapView extends ItemView {
           summary.removeAttribute("title");
         }
       }
+      card.querySelector(".vam-status-preview")?.remove();
       for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
       return card;
     }
@@ -6731,11 +6732,14 @@ export class VisualAgentMapView extends ItemView {
       else this.renderPreservingFocus();
     }, 150);
   }
-  /** Marks a card summary as the unsaved preview: a label plus plain text (never Markdown). Not a live region. */
-  private fillCardPreview(summary: HTMLElement, text: string): void {
+  /**
+   * Marks a summary as the unsaved preview: plain text (never Markdown), not a live region. `label` adds the inline
+   * "not saved yet" label; a card leaves it out because its header says so (paintPreviewLabel).
+   */
+  private fillCardPreview(summary: HTMLElement, text: string, label = true): void {
     summary.addClass("is-preview");
     summary.empty();
-    summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
+    if (label) summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
     summary.title = text;
   }
@@ -6757,7 +6761,8 @@ export class VisualAgentMapView extends ItemView {
         this.arrangeCardCover(card);
       }
       if (!summary) return;
-      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
+      this.paintPreviewLabel(card, true);
+      if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text, false);
       else {
         summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
         summary.title = text;
@@ -6765,6 +6770,7 @@ export class VisualAgentMapView extends ItemView {
       this.fitKindShape(card, this.shapeKindOf(node.id));
       return;
     }
+    this.paintPreviewLabel(card, false);
     if (!summary?.hasClass("is-preview")) return;
     const note = this.notes.get(node.id);
     if (!note || isPlaceholder(note.summary)) summary.remove();
@@ -6774,6 +6780,20 @@ export class VisualAgentMapView extends ItemView {
       summary.title = note.summary;
     }
     this.fitKindShape(card, this.shapeKindOf(node.id));
+  }
+  /** The header's grey "Preview · not saved yet" label while a card streams an unsaved summary (V3.3 P1.2). */
+  private paintPreviewLabel(card: HTMLElement, on: boolean): void {
+    const header = card.querySelector<HTMLElement>(".vam-node-header");
+    const old = header?.querySelector<HTMLElement>(".vam-status-preview");
+    if (!header || on === !!old) return;
+    if (old) {
+      old.remove();
+      return;
+    }
+    const label = header.createSpan({ cls: "vam-status vam-status-preview", text: t("ui.card_state_preview") });
+    const check = header.querySelector<HTMLElement>(":scope > input");
+    if (check) check.after(label);
+    else header.prepend(label);
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -10477,13 +10497,20 @@ export class VisualAgentMapView extends ItemView {
       button.addClass("vam-card-tool", cls);
       return button;
     };
-    if (!bookLock.ai)
+    // Read-only while the notes load: Note is the only entry (V3.3 P1.2).
+    const readOnly = this.notesLoading();
+    if (!bookLock.ai && !readOnly)
       tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
-    if (!bookLock.structure)
+    if (!bookLock.structure && !readOnly)
       tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
-    tool(t("ui.card_tool_note"), "vam-detail-button", event =>
+    // Note only reads, so it works even when the map is read-only (notes still loading, a presentation).
+    const note = this.button(tools, t("ui.card_tool_note"), () => {});
+    note.addEventListener("click", event =>
       event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
-    ).setAttr("aria-label", t("ui.card_tool_note_label"));
+    );
+    note.addClass("vam-card-tool", "vam-detail-button");
+    note.setAttr("aria-label", t("ui.card_tool_note_label"));
+    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
     if (addSummary)
       addSummaryTools.set(
@@ -13810,9 +13837,10 @@ export class VisualAgentMapView extends ItemView {
         }
       );
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
-    else if (research?.preview?.summary)
-      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (loading) {
+    else if (research?.preview?.summary) {
+      this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary, false);
+      this.paintPreviewLabel(card, true);
+    } else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
       bars.setAttr("aria-hidden", "true");
       bars.createSpan({ cls: "vam-loading-bar" });
@@ -15150,6 +15178,7 @@ export class VisualAgentMapView extends ItemView {
       summary?.setText(note.livingNode?.summary || note.summary);
       summary?.setAttr("title", note.livingNode?.summary || note.summary);
       summary?.removeClass("is-preview");
+      this.paintPreviewLabel(card, false);
       if (editable) summary?.addClass("is-inline-editable");
     }
     // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
@@ -17804,6 +17833,8 @@ export class VisualAgentMapView extends ItemView {
     cardAiLockButtons.set(card, button);
     button.type = "button";
     setIcon(button, "lock");
+    // Locked says so in words next to the icon, never by a dimmed card alone (V3.3 P1.2).
+    if (locked) button.createSpan({ cls: "vam-card-ai-lock-label", text: t("ui.card_state_locked") });
     button.tabIndex = -1;
     if (managed) {
       // The argument flow owns this card: always locked, and the button offers nothing to unlock.

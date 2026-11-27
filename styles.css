@@ -334,6 +334,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-status-stale::before { background: var(--vam-warning); }
 .vam-status-failed { color: color-mix(in srgb, var(--vam-error) 80%, var(--vam-text)); }
 .vam-status-failed::before { content: "\00d7"; width: auto; height: auto; border-radius: 0; background: none; color: var(--vam-error); font-weight: 700; vertical-align: 0; }
+/* An unsaved streaming summary: grey italic words in the header, the summary below shows the text as it comes. */
+.vam-status-preview { color: var(--vam-muted); font-style: italic; }
+.vam-status-preview::before { display: none; }
 .vam-node-header .vam-aim-question-status { padding: 3px 9px; border: 1px solid var(--background-modifier-border); border-radius: 20px; font-weight: 650; }
 .vam-badge-new { padding: 2px 8px; border-radius: 20px; font-size: var(--font-ui-smaller); background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
@@ -2174,7 +2177,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-ai-glyph-running { animation: none; } }
 .vam-view .vam-ai-question { margin: 3px 0 0; color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vam-view .vam-ai-question.is-clickable { cursor: pointer; }
-.vam-view .vam-node[data-ai-card][data-ai-locked] { opacity: .62; }
+.vam-view .vam-card-ai-lock-label { margin-left: var(--vam-space-1); font-size: var(--font-ui-smaller); color: var(--vam-muted); }
 .vam-view .vam-card-ai-lock.is-hover-only { opacity: 0; }
 .vam-view .vam-node.is-selected .vam-card-ai-lock.is-hover-only, .vam-view .vam-node:focus-within .vam-card-ai-lock.is-hover-only, .vam-view .vam-card-ai-lock.is-hover-only:focus-visible { opacity: 1; }
 .vam-ai-card-pop { gap: 10px; }

@@ -1010,3 +1010,19 @@ test('busy: a chat expand while the same parent is still reading its sources for
   h.host.activeTasks.get(p.path)?.abort();
   await batch.catch(() => {});
 });
+
+test('A5: a locked card says "Locked" in words next to the lock icon; an unlocked AI card does not (V3.3 P1.2)', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  const header = dom.element('div'), card = dom.element('div');
+  h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: true });
+  h.view.paintAiLock(card, header, a);
+  const label = () => dom.findAll(header, i => dom.hasCls(i, 'vam-card-ai-lock-label'));
+  assert.equal(label().length, 1);
+  assert.equal(label()[0].text, t('ui.card_state_locked'));
+  h.view.paintAiLock(card, header, a);
+  assert.equal(label().length, 1, 'a redraw keeps one label');
+  h.view.notes.set(a.id, { ...h.view.notes.get(a.id), aiLocked: false, aiCard: true, aiStatus: 'done' });
+  h.view.paintAiLock(card, header, a);
+  assert.equal(label().length, 0, 'unlocked: no label');
+});

@@ -864,7 +864,8 @@ const { normalizeLivingProposal, explicitlyRequiresLivingWeb, livingWebPolicy, g
 S.integrationTest('Living Node web: actual checked source is required even for no-change, and current answer must cite it', async () => {
   const url = 'https://example.com/current';
   const other = 'https://example.com/other';
-  const envelope = { baseRevision: 'base', requiresWeb: true, checkedWeb: [url], operations: [] };
+  const webExcerpts = [{ url, excerpt: 'Price 100 on 2026-11-27' }, { url: other, excerpt: 'Unrelated page' }];
+  const envelope = { baseRevision: 'base', requiresWeb: true, checkedWeb: [url], webExcerpts, operations: [] };
   const normalize = (raw, opened = [url, other], required = false) => normalizeLivingProposal(raw, opened, [], 't1', required);
   assert.equal(explicitlyRequiresLivingWeb('搜尋最新股價'), true);
   assert.equal(explicitlyRequiresLivingWeb('Search the web for news'), true);
@@ -872,7 +873,7 @@ S.integrationTest('Living Node web: actual checked source is required even for n
   assert.equal(explicitlyRequiresLivingWeb('不要上網，只用本地筆記分析最新股價'), false);
   assert.deepEqual(S.plain(normalize(envelope).proposal.operations), []);
   assert.throws(() => normalize(envelope, []), /required-web-unavailable/);
-  assert.throws(() => normalize({ ...envelope, requiresWeb: false, checkedWeb: [] }, [url], true), /required-web-decision-conflict/);
+  assert.throws(() => normalize({ ...envelope, requiresWeb: false, checkedWeb: [], webExcerpts: [webExcerpts[0]] }, [url], true), /required-web-decision-conflict/);
   assert.throws(() => normalize({ ...envelope, checkedWeb: [] }), /required-web-check-missing/);
   assert.throws(() => normalize({ ...envelope, checkedWeb: ['https://example.com/not-opened'] }), /unauthorized-web-check/);
   const op = { kind: 'output', text: 'Current result', evidence: [url] };
@@ -881,6 +882,70 @@ S.integrationTest('Living Node web: actual checked source is required even for n
   assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [] }] }), /required-web-evidence-missing/);
   assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [other] }] }), /required-web-evidence-missing/);
   assert.throws(() => normalize({ ...envelope, operations: [{ kind: 'supplement', id: 'r1', evidence: [url] }, { ...op, evidence: [] }] }), /required-web-output-evidence-missing/);
+});
+
+S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; the id is version-bound and cannot verify a correction (spike branch b)', () => {
+  const { applyLivingChanges } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
+  const url = 'https://example.com/price';
+  const norm = (envelope, opened = [url]) => normalizeLivingProposal({ baseRevision: 'base', requiresWeb: true, checkedWeb: [url], ...envelope }, opened, [], '2026-11-28T00:00:00Z');
+  const out = (excerpt, extra = {}) => ({ webExcerpts: [{ url, excerpt }], operations: [{ kind: 'output', text: 'Price', evidence: [url] }], ...extra });
+  // Missing, blank, over-long excerpt, or an excerpt for a URL that was never opened: rejected.
+  assert.throws(() => norm({ operations: [{ kind: 'output', text: 'Price', evidence: [url] }] }), /web-excerpt-missing/);
+  assert.throws(() => norm(out('   ')), /invalid-web-excerpt/);
+  assert.throws(() => norm(out('x'.repeat(301))), /invalid-web-excerpt/);
+  assert.throws(() => norm({ webExcerpts: [{ url: 'https://example.com/never', excerpt: 'q' }], operations: [] }), /unauthorized-web-excerpt/);
+  // The id is the pre-V1.1 web id (URL only): the excerpt is validated model text, never part of the id.
+  const id = envelope => norm(envelope).context.evidence.find(e => e.source === url).id;
+  const a = id(out('Price  100\n today'));
+  assert.equal(a, 'web:' + livingSnapshotRevision(url));
+  assert.equal(a, id(out('Price 120, reworded')));
+  // Branch b: an excerpt is a model summary, so web evidence alone cannot correct or invalidate a claim.
+  const rec = { id: 'r1', subject: 's', scope: 'c', granularity: 'change', eventTime: null, claim: 'old', evidence: [{ id: 'note:1', source: 'n', retrievedAt: 't' }], validity: 'active', owner: 'ai', history: [] };
+  const base = { revision: 'base', records: [rec], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
+  const first = norm(out('Price 100'));
+  const webCtx = first.context;
+  const apply = (op, ctx) => applyLivingChanges(base, { baseRevision: 'base', operations: [op] }, ctx);
+  const webId = webCtx.evidence[0].id;
+  assert.throws(() => apply({ kind: 'correct', id: 'r1', claim: 'new', reason: 'r', evidence: [webId] }, webCtx), /unverified-web-correction/);
+  assert.throws(() => apply({ kind: 'invalidate', id: 'r1', reason: 'r', evidence: [webId] }, webCtx), /unverified-web-correction/);
+  // A retraction or contradiction may only be recorded as a dispute; it never replaces the claim.
+  const disputed = apply({ kind: 'dispute', id: 'r1', claim: 'conflict', reason: 'r', evidence: [webId] }, webCtx);
+  assert.equal(disputed.records[0].claim, 'old');
+  assert.equal(disputed.records[0].validity, 'disputed');
+  // Web plus the record's own unchanged old note evidence is still web-only for this purpose: refused.
+  const mixed = { at: 't', evidence: [...webCtx.evidence, { id: 'note:1', source: 'n', retrievedAt: 't2' }, { id: 'note:2', source: 'n2', retrievedAt: 't' }] };
+  assert.throws(() => apply({ kind: 'correct', id: 'r1', claim: 'new', reason: 'r', evidence: [webId, 'note:1'] }, mixed), /unverified-web-correction/);
+  assert.throws(() => apply({ kind: 'invalidate', id: 'r1', reason: 'r', evidence: [webId, 'note:1'] }, mixed), /unverified-web-correction/);
+  // Web plus a new note revision (an id not in the record's old evidence) still corrects.
+  assert.equal(apply({ kind: 'correct', id: 'r1', claim: 'new', reason: 'r', evidence: [webId, 'note:2'] }, mixed).records[0].claim, 'new');
+  // Re-check of the same URL, even with different excerpt wording, is a no-op on an existing record.
+  const withWeb = { ...base, records: [{ ...rec, evidence: [...rec.evidence, webCtx.evidence[0]] }] };
+  const again = applyLivingChanges(withWeb, { baseRevision: 'base', operations: [{ kind: 'supplement', id: 'r1', evidence: [webId] }] }, norm(out('Price 100, reworded this run')).context);
+  assert.equal(again.changed, false);
+  assert.equal(again.records[0].evidence.length, 2);
+});
+
+S.integrationTest('A41: required web records a checked artifact; no tool call, unrelated URL or missing citation is not success', async () => {
+  const url = 'https://example.com/current';
+  const other = 'https://example.com/other';
+  const webExcerpts = [{ url, excerpt: 'No change' }, { url: other, excerpt: 'Unrelated' }];
+  const norm = (extra, opened = [url, other]) => normalizeLivingProposal({ baseRevision: 'b', requiresWeb: true, checkedWeb: [url], webExcerpts, operations: [], ...extra }, opened, [], '2026-11-28T01:00:00Z', true);
+  // Real no-change: no operations, but the checked artifact says what was opened and when.
+  assert.deepEqual(S.plain(norm({}).checked), [{ url, at: '2026-11-28T01:00:00Z' }]);
+  assert.throws(() => norm({}, []), /required-web-unavailable/);
+  assert.throws(() => norm({ checkedWeb: [] }), /required-web-check-missing/);
+  assert.throws(() => norm({ operations: [{ kind: 'output', text: 'x', evidence: [other] }] }), /required-web-evidence-missing/);
+  assert.throws(() => norm({ operations: [{ kind: 'output', text: 'x', evidence: [] }] }), /required-web-evidence-missing/);
+  const calls = (events, excerpts = webExcerpts) => ({ run: async (prepared, options, finish) => {
+    for (const event of events) options.task.onWebSearchEvent(event);
+    return finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: true, checkedWeb: [url], webExcerpts: excerpts, operations: [] }), { signal: options.signal, parsed() {} });
+  } });
+  const input = { prompt: 'Search the web for the latest price', language: 'en', model: undefined, base: empty(), context: '{"documents":[],"warnings":[]}', evidence: [], mapPath: 'Map.md' };
+  const opened = u => ({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url: u } } } });
+  const searchOnly = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search', query: 'price' } } } };
+  await assert.rejects(() => generateLivingProposal(calls([]), input, new AbortController().signal), /required-web-unavailable/);
+  await assert.rejects(() => generateLivingProposal(calls([searchOnly]), input, new AbortController().signal), /required-web-unavailable/);
+  await assert.rejects(() => generateLivingProposal(calls([opened(other)], [webExcerpts[1]]), input, new AbortController().signal), /unauthorized-web-check/);
 });
 
 S.integrationTest('Living Node web: forbidden policy disables the tool at dispatch and refuses unexpected web proof', async () => {

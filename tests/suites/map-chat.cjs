@@ -10292,3 +10292,40 @@ integrationTest('book plan chat: a reply with two edit_book_plan actions shows b
   const text = visibleText(planCard(h)[0]);
   assert.match(text, /entry A2/); assert.match(text, /entry B2/);
 });
+
+// Living Node A02: configure_ai_card on an EXISTING AI card (saved prompt, living region, diagnostics), baseline stamped like the view does.
+const livingBaseline = h => {
+  const base = topicBaseline(h);
+  for (const n of h.view.map.nodes) { const note = h.view.notes.get(n.id); if (note?.aiCard && note.livingNode?.configRevision) base[n.id] = { ...base[n.id], livingConfigRevision: note.livingNode.configRevision }; }
+  return base;
+};
+const makeLivingCard = async h => {
+  const path = h.node('a').path;
+  await h.repo.updateNote(path, { prompt: 'Old prompt' });
+  h.contents.set(path, h.contents.get(path).replace(/^---\n/, '---\nai-card: true\nliving-node-outcome: ok\nliving-node-last-attempt: "2026-01-01T00:00:00.000Z"\n') + '\n<!-- vam-living-node:begin v1 -->\n## Living Node\n\nKnown output\n<!-- vam-living-node:end v1 -->\n');
+  await h.view.hydrate();
+  return path;
+};
+integrationTest('map chat: configure_ai_card on an existing AI card applies when stamped; a genuine edit is "changed"; an outline-only card is "not shown"', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const path = await makeLivingCard(h);
+  const baseline = livingBaseline(h);
+  assert.ok(baseline[h.ids.a].livingConfigRevision, 'stamp sent');
+  const lines = await apply(h, [{ kind: 'configure_ai_card', nodeId: h.ids.a, content: 'New prompt' }], {}, undefined, baseline);
+  eq(lines.map(l => l.status), ['done']);
+  assert.equal((await h.note('a')).prompt.trim(), 'New prompt');
+  assert.match(h.contents.get(path), /Known output/);
+  const h2 = await harness(); await h2.view.hydrate();
+  const path2 = await makeLivingCard(h2);
+  const base2 = livingBaseline(h2);
+  h2.contents.set(path2, h2.contents.get(path2).replace('Old prompt', 'User prompt')); await h2.view.hydrate();
+  const changed = await apply(h2, [{ kind: 'configure_ai_card', nodeId: h2.ids.a, content: 'New prompt' }], {}, undefined, base2);
+  eq(changed.map(l => l.status), ['skipped']); assert.match(changed[0].text, /changed after you sent/);
+  assert.match(h2.contents.get(path2), /User prompt/);
+  const h3 = await harness(); await h3.view.hydrate();
+  const path3 = await makeLivingCard(h3);
+  const before3 = h3.contents.get(path3);
+  const unseen = await apply(h3, [{ kind: 'configure_ai_card', nodeId: h3.ids.a, content: 'New prompt' }], {}, undefined, topicBaseline(h3, { full: false }));
+  eq(unseen.map(l => l.status), ['skipped']); assert.match(unseen[0].text, /was not shown/);
+  assert.equal(h3.contents.get(path3), before3);
+});

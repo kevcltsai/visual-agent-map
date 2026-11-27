@@ -273,7 +273,7 @@ async function harness(spec, { confirm = true } = {}) {
   const status = key => view.promptRuns.get(MAP)?.get(node(key).id)?.status;
   const done = () => until(() => view.promptBatch?.outcome);
   const runAll = async () => { view.startPromptRun(); };
-  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort };
+  return { hold: () => (gate = []), repo, app, contents, view, host, calls, notices, menus, modals, usage, plan, raw, node, status, done, runAll, hydrate, mapDoc, byKey, otherView, roundPort, runtime };
 }
 
 // root -> mid -> leaf1, leaf2 ; root -> side
@@ -906,4 +906,144 @@ test('a trial lease taken while validity is inspected makes the round fail busy 
   assert.equal(h.calls.length, 0);
   eq(TREE.map(([k]) => h.raw(k)), before);
   late.release(); first.release();
+});
+
+// ---- UI gaps (T11): why a card did not finish, the header count, and re-confirming a replaced source ---------------------
+const reasonOf = (h, key) => h.raw(key).match(/^living-node-reason: "(.*)"$/m)?.[1];
+const livingOf = (h, key) => h.repo.readNote(h.node(key).path, h.mapDoc).then(note => note.livingNode);
+const livingState = S.load('experiences/visual-map/living-node-state.ts');
+const sourcesMod = S.load('experiences/visual-map/living-node-sources.ts');
+// A source note with a fixed identity (ctime, size), watched by an identity store like the plugin does.
+function watchedSource(h, path, ctime) {
+  const store = new sourcesMod.LivingIdentityStore(undefined, () => {}, (() => { let n = 0; return () => 'id' + ++n; })());
+  h.runtime.setLivingIdentityStore(h.app, store);
+  const stamp = c => { h.app.vault.getAbstractFileByPath(path).stat = { ctime: c, mtime: 1, size: 5 }; };
+  stamp(ctime);
+  return { store, stamp };
+}
+
+test('reason: a failed card and the cards blocked by it keep a short reason in the note; the next success clears it', async () => {
+  const h = await harness(TREE);
+  h.plan.fail.add('leaf1');
+  await h.runAll(); await h.done();
+  assert.equal(reasonOf(h, 'leaf1'), 'failed');
+  assert.equal(reasonOf(h, 'mid'), 'dependency-blocked');
+  assert.equal(reasonOf(h, 'root'), 'dependency-blocked');
+  await h.view.hydrate();
+  const note = h.view.notes.get(h.node('mid').id);
+  assert.equal(note.livingNode.reason, 'dependency-blocked', 'it is read back from the note, so it survives a reopen');
+  assert.equal(livingState.livingReasonKey(note.livingNode), 'ui.living_node_reason_dependency');
+  assert.equal(livingState.livingReasonKey((await livingOf(h, 'leaf1'))), 'ui.living_node_reason_failed');
+  h.plan.fail.clear();
+  await h.runAll(); await h.done();
+  for (const key of ['leaf1', 'mid', 'root']) {
+    assert.equal(stamp(h, key).result, 'ok', key);
+    assert.equal(reasonOf(h, key), undefined, key + ' reason cleared');
+    assert.equal((await livingOf(h, key)).reason, undefined);
+  }
+});
+
+test('reason: a missing required source is reported as missing-source', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Missing]]' }]]);
+  await h.runAll(); await h.done();
+  assert.equal(stamp(h, 'solo').result, 'blocked');
+  assert.equal(reasonOf(h, 'solo'), 'missing-source');
+});
+
+test('reason: a card waiting on a card in trial says so; the trial card itself is not stamped', async () => {
+  const h = await harness(TREE);
+  const trial = midTrial(h);
+  const before = h.raw('mid');
+  await h.roundPort().run();
+  trial.release();
+  assert.equal(reasonOf(h, 'root'), 'upstream-trial');
+  assert.equal(h.raw('mid'), before, 'a card under trial is left byte for byte as it was');
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'upstream-trial' }), 'ui.living_node_upstream_trial');
+});
+
+test('reason: a source note that was replaced blocks with source-replaced', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+  const { store, stamp: stampRef } = watchedSource(h, 'Notes/Ref.md', 10);
+  await h.roundPort().run();
+  assert.equal(stamp(h, 'solo').result, 'ok');
+  store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stampRef(99);
+  await h.repo.updateNote(h.node('solo').path, { prompt: 'Find facts again\nSources: [[Ref]]' });
+  await h.roundPort().run();
+  assert.equal(stamp(h, 'solo').result, 'blocked');
+  assert.equal(reasonOf(h, 'solo'), 'source-replaced');
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'source-replaced' }), 'ui.living_node_source_replaced');
+});
+
+test('reason: a damaged region shows the markers message whatever the outcome; an unknown or missing code shows nothing', () => {
+  assert.equal(livingState.livingReasonKey({ damaged: true, outcome: 'ok' }), 'ui.living_node_reason_markers_damaged');
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'failed', reason: 'zzz' }), undefined);
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'failed' }), undefined);
+  assert.equal(livingState.livingReasonKey({ damaged: false, outcome: 'ok', reason: 'failed' }), undefined, 'a finished card never shows an old reason');
+  assert.equal(livingState.livingReasonKey(undefined), undefined);
+});
+
+test('header count: a card needing a rerun does not count as researched; a valid one does', async () => {
+  const h = await harness(TREE);
+  const id = key => h.node(key).id;
+  const validity = entries => { h.view.livingValidity = new Map(entries.map(([key, v]) => [id(key), v])); };
+  validity(TREE.map(([key]) => [key, 'valid']));
+  assert.equal(h.view.researchedCount(), 5);
+  validity([['leaf1', 'stale'], ['mid', 'stale'], ['root', 'stale'], ['leaf2', 'valid'], ['side', 'none']]);
+  assert.equal(h.view.researchedCount(), 1, 'stale and empty cards are not researched');
+  const parent = element('div');
+  h.view.renderResearchProgress(parent);
+  const bar = find(parent, i => i.attrs?.role === 'progressbar');
+  assert.equal(String(bar.attrs['aria-valuenow']), '1');
+  // A damaged card does not count even when its validity says valid; a completed topic card always does.
+  h.view.notes.get(id('leaf2')).livingNode = { summary: '', knowledgeRevision: '', outcome: 'ok', damaged: true };
+  assert.equal(h.view.researchedCount(), 0);
+  h.view.notes.get(id('side')).status = 'completed';
+  assert.equal(h.view.researchedCount(), 1);
+});
+
+test('replaced sources: the card lists the links whose note was replaced; none for an intact source', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+  const { store, stamp: stampRef } = watchedSource(h, 'Notes/Ref.md', 10);
+  await h.roundPort().run();
+  eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), []);
+  store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stampRef(99);
+  eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), ['Ref']);
+});
+
+test('reconfirm: the identity is confirmed only after the formal save succeeded, and only for the chosen link', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]], [[Other]]' }]]);
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+  await h.app.vault.create('Notes/Other.md', 'other body');
+  const { store, stamp: stampRef } = watchedSource(h, 'Notes/Ref.md', 10);
+  h.app.vault.getAbstractFileByPath('Notes/Other.md').stat = { ctime: 20, mtime: 1, size: 5 };
+  await h.roundPort().run();
+  const prompt = 'Find facts\nSources: [[Ref]], [[Other]]';
+  const save = (isCurrent, allow, reconfirm) => h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, prompt, undefined, undefined, isCurrent, allow, undefined, reconfirm);
+  await save(() => true); // the saved links now carry their identities
+  store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stampRef(99);
+  const otherId = store.at('Notes/Other.md').refId, refId = store.at('Notes/Ref.md').refId;
+  // A save that is refused leaves the identity as it was.
+  await assert.rejects(save(() => true, () => false, ['Ref']), /unauthorized-source/);
+  assert.equal(store.at('Notes/Ref.md').state, 'dangling', 'nothing was confirmed before the write');
+  await assert.rejects(save(() => false, undefined, ['Ref']), /changed-configuration/);
+  assert.equal(store.at('Notes/Ref.md').state, 'dangling');
+  // The saved save confirms the link the user chose again, not the other replaced note.
+  await save(() => true, undefined, ['Ref']);
+  assert.equal(store.at('Notes/Ref.md').state, 'resolved');
+  assert.notEqual(store.at('Notes/Ref.md').refId, refId, 'a new identity for the confirmed note');
+  assert.equal(store.at('Notes/Other.md').refId, otherId, 'the other source keeps its identity');
+});
+
+test('reconfirm: choosing the link again re-resolves it even when the list is unchanged', () => {
+  const resolved = [];
+  const refs = [{ kind: 'note', link: 'a.md', exact: true }, { kind: 'note', link: 'b.md', exact: true }];
+  const resolveNew = link => { resolved.push(link); return { kind: 'note', link: link + '#new', exact: true }; };
+  const same = ['A', 'B'];
+  eq(sourcesMod.reconcileLivingDraftReferences(same, refs, same, resolveNew), refs, 'unchanged without a request');
+  eq(resolved, []);
+  const out = sourcesMod.reconcileLivingDraftReferences(same, refs, same, resolveNew, new Set(['B']));
+  eq(resolved, ['B']);
+  eq(out, [refs[0], { kind: 'note', link: 'B#new', exact: true }]);
 });

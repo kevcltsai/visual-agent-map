@@ -2205,3 +2205,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-living-editor-status { font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-living-editor-close-choices { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .vam-living-editor-close-choices[hidden] { display: none; }
+.vam-view .vam-ai-reason { margin: 2px 0 0; color: var(--text-error); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vam-living-editor-failure { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--text-error); border-radius: var(--radius-s); background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary)); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.vam-living-editor-failure[hidden] { display: none; }
+.vam-living-editor-failure-title { color: var(--text-error); font-weight: var(--font-semibold); }
+.vam-living-editor-failure-reason { overflow-wrap: anywhere; }
+.vam-living-editor-failure-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-ai-card-pop-chip.is-replaced { flex-wrap: wrap; border-color: var(--text-error); }
+.vam-ai-card-pop-chip-warn { color: var(--text-error); font-size: var(--font-ui-smaller); }
+.vam-ai-card-pop-chip-confirm { font-size: var(--font-ui-smaller); }

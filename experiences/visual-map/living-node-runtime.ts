@@ -547,6 +547,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   );
   const { plan, sources } = planLivingMap(planCards, [], resolver, requested);
   if (!port.current() || port.signal.aborted) return undefined;
+  let upstreamBlocked: string[] = [];
   if (trialIds.length) {
     for (const card of trialIds) if (!plan.lockedTargets.includes(card.id)) plan.lockedTargets.push(card.id);
     // Everything downstream of a trial card that cannot be used frozen is blocked, whatever the planner called it.
@@ -562,12 +563,25 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           grew = true;
         }
     }
+    upstreamBlocked = [...plan.blocked.keys()].filter(id => upstream.has(id));
     port.onTrialBoundary?.({
       skipped: trialIds.map(card => card.id),
       frozen: [...boundary].filter(([, valid]) => valid).map(([id]) => id),
-      blocked: [...plan.blocked.keys()].filter(id => upstream.has(id))
+      blocked: upstreamBlocked
     });
   }
+  // Why a card did not finish, as a short code kept with its outcome so the card can say so after a reopen.
+  const reasons = new Map<string, string>();
+  for (const [id, reason] of plan.blocked) {
+    const replaced = sources
+      .get(id)
+      ?.failures.some(failure => failure.required && failure.reason === "source-replaced");
+    reasons.set(
+      id,
+      replaced ? "source-replaced" : reason === "missing-source" || reason === "cycle" ? reason : "dependency-blocked"
+    );
+  }
+  for (const id of upstreamBlocked) reasons.set(id, "upstream-trial");
   const paths = plan.order.map(item => cards.find(card => card.id === item.id)!.path);
   if (!paths.length && !plan.blocked.size && !plan.lockedTargets.length) return new Map<string, LivingSettlement>();
   const lease = port.coordinator.acquire(initialMap.id, port.viewSession, paths.length ? paths : [port.mapPath], true);
@@ -632,7 +646,19 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     const models = [...new Set(plan.order.map(item => snapshots.get(item.id)?.note.model ?? "").filter(Boolean))];
     let results: Map<string, LivingSettlement> | undefined;
     const diagnostics: Promise<unknown>[] = [];
+    const failed = (id: string, error: unknown): void => {
+      reasons.set(
+        id,
+        /^(?:living-range-too-large|living-section-ambiguous|living-node-context-too-large)/.test(
+          String((error as Error)?.message)
+        )
+          ? "range-too-large"
+          : "failed"
+      );
+      port.onFailure(id, error);
+    };
     const stamp = async (id: string, outcome: "failed" | "blocked"): Promise<void> => {
+      const reason = reasons.get(id) ?? (outcome === "blocked" ? "dependency-blocked" : "failed");
       if (!current()) return;
       try {
         const checked = await checkCard(id);
@@ -647,7 +673,8 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           content =>
             setFrontmatterKeys(content, {
               "living-node-last-attempt": new Date().toISOString(),
-              "living-node-outcome": outcome
+              "living-node-outcome": outcome,
+              "living-node-reason": reason
             }),
           { expectedContent: checked.snapshot.content, authorize: current }
         );
@@ -679,7 +706,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
                 String((error as Error)?.message)
               )
             )
-              port.onFailure(id, error);
+              failed(id, error);
             throw error;
           });
           cache.set(id, value);
@@ -756,7 +783,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
             // A successful storage result is final; a later read or refresh cannot turn it into a failed run.
             return changes.changed ? "changed" : "no-change";
           } catch (error) {
-            port.onFailure(id, error);
+            failed(id, error);
             throw error;
           }
         },
@@ -787,7 +814,8 @@ function resolveDraft(
   target: LivingMapCard,
   prompt: string,
   saved: Snapshot,
-  allowNewSource?: (path: string) => boolean
+  allowNewSource?: (path: string) => boolean,
+  reconfirm?: ReadonlySet<string>
 ) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
   const base = sourceResolver(app);
@@ -810,20 +838,28 @@ function resolveDraft(
     raw === undefined || !nextLinks.some(link => previousLinks.includes(link))
       ? undefined
       : readLivingReferences(raw, previousLinks);
-  const explicit = reconcileLivingDraftReferences(previousLinks, persisted, nextLinks, link => {
-    const note = resolver.resolveAuthorized(link, target.path);
-    if (!note) throw new Error("missing-source");
-    // Choosing the link again is the user's explicit confirmation of an unresolved source.
-    if (note.unresolved) {
-      const file = app.vault.getAbstractFileByPath(note.path);
-      if (file instanceof TFile) pending.set(file.path, file);
-    }
-    if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
-    if (note.path === target.path) throw new Error("self-reference");
-    const matches = cards.filter(card => card.path === note.path);
-    if (matches.length > 1) throw new Error("ambiguous-source");
-    return matches.length === 1 ? { kind: "card", id: matches[0].id } : { kind: "note", link: note.path, exact: true };
-  });
+  const explicit = reconcileLivingDraftReferences(
+    previousLinks,
+    persisted,
+    nextLinks,
+    link => {
+      const note = resolver.resolveAuthorized(link, target.path);
+      if (!note) throw new Error("missing-source");
+      // Choosing the link again is the user's explicit confirmation of an unresolved source.
+      if (note.unresolved) {
+        const file = app.vault.getAbstractFileByPath(note.path);
+        if (file instanceof TFile) pending.set(file.path, file);
+      }
+      if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
+      if (note.path === target.path) throw new Error("self-reference");
+      const matches = cards.filter(card => card.path === note.path);
+      if (matches.length > 1) throw new Error("ambiguous-source");
+      return matches.length === 1
+        ? { kind: "card", id: matches[0].id }
+        : { kind: "note", link: note.path, exact: true };
+    },
+    reconfirm
+  );
   // Keep one saved identity for each distinct display link. The resolver
   // deduplicates actual sources, while positional aliases remain editable.
   const encoded = explicit.map(ref =>
@@ -877,7 +913,8 @@ export async function saveLivingConfig(
   expectedConfigRevision?: string,
   isCurrent: () => boolean = () => true,
   allowNewSource?: (path: string) => boolean,
-  expectedSourceRevision?: string
+  expectedSourceRevision?: string,
+  reconfirm?: readonly string[]
 ): Promise<LivingConfigSave> {
   const authorized = (): boolean => !repo.isDisposed() && isCurrent();
   if (!authorized()) throw new Error("changed-configuration");
@@ -893,7 +930,15 @@ export async function saveLivingConfig(
     livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision
   )
     throw new Error("changed-configuration");
-  const draft = resolveDraft(app, cards, target, prompt, snapshot, allowNewSource);
+  const draft = resolveDraft(
+    app,
+    cards,
+    target,
+    prompt,
+    snapshot,
+    allowNewSource,
+    reconfirm?.length ? new Set(reconfirm) : undefined
+  );
   const { encoded, sourceRevision } = draft;
   if (expectedSourceRevision !== undefined && sourceRevision !== expectedSourceRevision)
     throw new Error("changed-source-identity");
@@ -939,6 +984,32 @@ export async function saveLivingConfig(
     configRevision: savedRevision,
     sourceRevision: draft.confirm()
   };
+}
+
+/** The saved source links of a card whose note was replaced (needs the user's explicit confirmation); empty when none. */
+export async function livingReplacedSources(
+  app: App,
+  repo: Repository,
+  map: MapDocument,
+  id: string
+): Promise<string[]> {
+  const { snapshots } = await prepareMap({ repo, app }, map);
+  const snapshot = snapshots.get(id);
+  if (!snapshot) return [];
+  let explicit: LivingSourceRef[];
+  try {
+    explicit = refs(snapshot);
+  } catch {
+    return [];
+  }
+  const links = promptSourceLinks(snapshot.note.prompt);
+  const resolver = sourceResolver(app);
+  const path = map.nodes.find(node => node.id === id)?.path ?? "";
+  return explicit.flatMap((ref, index) =>
+    ref.kind === "note" && links[index] && resolver.resolveAuthorized(ref.link, path, "explicit", ref.exact)?.unresolved
+      ? [links[index]]
+      : []
+  );
 }
 
 /** Build a draft request without executing dependencies, and an adoption guard over the same effective inputs. */

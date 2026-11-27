@@ -1,6 +1,6 @@
 import { Component, ItemView, MarkdownRenderer, type TFile, type WorkspaceLeaf } from "obsidian";
 import { t } from "../../i18n";
-import { localizeAiLatestHeading } from "./living-node-markdown";
+import { localizeLivingReader } from "./living-node-markdown";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 
 export const LIVING_READER_VIEW = "vam-living-node-reader";
@@ -110,8 +110,16 @@ export class LivingReaderView extends ItemView {
         );
         markdown = removeSection(markdown, "Prompt");
         markdown = removeSection(markdown, "Rules");
-        markdown = localizeAiLatestHeading(markdown, t("ui.living_node_ai_latest"));
       }
+      markdown = localizeLivingReader(
+        markdown,
+        {
+          aiLatest: t("ui.living_node_ai_latest"),
+          source: (title, date) => t("ui.living_node_source_line_0_1", title, date),
+          generated: at => t("ui.living_node_generated_0", at)
+        },
+        this.tab === "trial"
+      );
       if (generation !== this.generation) return;
       await MarkdownRenderer.render(this.app, markdown, content, file.path, component);
       if (generation !== this.generation) return;

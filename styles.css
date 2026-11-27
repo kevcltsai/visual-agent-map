@@ -2215,3 +2215,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-ai-card-pop-chip.is-replaced { flex-wrap: wrap; border-color: var(--text-error); }
 .vam-ai-card-pop-chip-warn { color: var(--text-error); font-size: var(--font-ui-smaller); }
 .vam-ai-card-pop-chip-confirm { font-size: var(--font-ui-smaller); }
+.vam-node.is-layout-preview { border-style: solid; box-shadow: 0 0 0 2px var(--interactive-accent), var(--shadow-s); }
+.vam-layout-ghost { position: absolute; box-sizing: border-box; pointer-events: none; border: 1.5px dashed var(--text-faint); border-radius: var(--vam-radius-card, 12px); }
+.vam-layout-preview-bar { inset: 8px auto auto 50%; transform: translateX(-50%); z-index: 6; width: max-content; max-width: min(92%, 640px); display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); }
+.vam-layout-preview-main { display: flex; align-items: center; gap: 8px; }
+.vam-layout-preview-main > span { flex: 1 1 auto; min-width: 0; }
+.vam-layout-preview-note { color: var(--text-warning); }

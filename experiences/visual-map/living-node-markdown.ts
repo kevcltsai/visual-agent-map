@@ -11,7 +11,7 @@ import {
 } from "./living-node-changes";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
-import { LIVING_NODE_BEGIN as BEGIN, LIVING_NODE_END as END } from "../../core/living-node-region";
+import { hasLivingCommitMetadata, LIVING_NODE_BEGIN as BEGIN, LIVING_NODE_END as END } from "../../core/living-node-region";
 const HASH_KEY = "living-node-region-hash";
 const OWNERSHIP_KEY = "living-node-ownership";
 const COMMIT_KEY = "living-node-last-execution";
@@ -343,9 +343,7 @@ function readLivingData(content: string) {
   // A previous formal commit with neither its region nor its ownership index
   // is not a fresh/legacy card. Lost ownership cannot be reconstructed from
   // diagnostics, so refuse automatic integration rather than resurrecting data.
-  if (!region && !index && [COMMIT_KEY, "living-node-success-knowledge",
-    "living-node-last-successful-check", "living-node-last-content-change"].some(key => fm[key] !== undefined))
-    throw new Error("unknown-ownership");
+  if (!region && !index && hasLivingCommitMetadata(fm)) throw new Error("unknown-ownership");
   const current = region ? decodeRegion(region, livingSnapshotRevision(region.text)) : emptyKnowledge();
   if (!index) return { region, knowledge: current };
   if (!region) {

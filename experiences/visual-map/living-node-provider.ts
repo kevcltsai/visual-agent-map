@@ -67,6 +67,12 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
     });
     return { ...operation, evidence };
   });
+  // A changed answer requiring current web information must cite at least
+  // one actually opened source. A genuine no-change check can have no operations.
+  const webIds = new Set([...byUrl.values()].map(entry => entry.id));
+  if (envelope.requiresWeb && operations.length && !operations.some(operation =>
+    operation.evidence.some(id => webIds.has(id))))
+    throw new Error("required-web-evidence-missing");
   return {
     proposal: { baseRevision: envelope.baseRevision, operations },
     context: { at, evidence: [...local, ...byUrl.values()] }

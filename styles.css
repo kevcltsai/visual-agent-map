@@ -2180,3 +2180,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-card-edge .vam-card-edge-button { height: 22px /* A2 mockup */; padding: 0 var(--vam-space-2); border-radius: 999px /* pill, A2 */; border: 1px solid var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
 .vam-card-edge .vam-card-edge-button:hover { background: var(--vam-accent); color: var(--vam-surface); }
 .vam-card-edge .vam-card-edge-button:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }
+.vam-card-edge .vam-card-edge-ai { border-style: dashed; }
+.vam-empty-add-ai { padding: 0 var(--vam-space-3); border-radius: var(--vam-radius-control); border: 1px dashed var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); cursor: pointer; }
+.vam-empty-add-ai:hover { background: var(--vam-accent); color: var(--vam-surface); }
+.vam-empty-add-ai:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }

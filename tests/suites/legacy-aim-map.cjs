@@ -468,7 +468,8 @@ test('legacy-aim-map: M2 a question card shows no AIM status chip, whatever its 
   }
 });
 
-test('legacy-aim-map: P1 the topic status pill rule (idea shows none, researched shows one) applies to an AIM card too', () => {
+// V3.3 P1.2 (DELIVERY_V3_3 §7): the card face carries no success label, so researched shows no pill either; the AIM card still follows the plain-topic rule.
+test('legacy-aim-map: P1 the topic status pill rule (idea and researched show none) applies to an AIM card too', () => {
   const pills = status => {
     const { doc } = aimDoc();
     const research = node('research', 'topic'); research.aimKind = 'research'; doc.nodes.push(research);
@@ -479,7 +480,7 @@ test('legacy-aim-map: P1 the topic status pill rule (idea shows none, researched
     return spans(view.stageEl).filter(item => /vam-status\b/.test(item.cls ?? '')).length;
   };
   assert.equal(pills('idea'), 0, 'idea: no pill, like any plain topic');
-  assert.equal(pills('completed'), 1, 'researched: a pill, like any plain topic');
+  assert.equal(pills('completed'), 0, 'researched: no pill, like any plain topic');
 });
 
 test('legacy-aim-map: R3 an AIM card carries the vam-aim-hidden marker class', () => {

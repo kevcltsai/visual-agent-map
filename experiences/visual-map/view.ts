@@ -221,7 +221,12 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import { livingRestoreSnapshot, livingWithoutFence, renderLivingPreview } from "./living-node-markdown";
+import {
+  livingNoteForModel,
+  livingRestoreSnapshot,
+  livingWithoutFence,
+  renderLivingPreview
+} from "./living-node-markdown";
 import { livingReasonKey } from "./living-node-state";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
@@ -15626,7 +15631,7 @@ export class VisualAgentMapView extends ItemView {
                 );
                 const shown = await this.plugin.showLivingTrial(
                   this.plugin.repo.file(node.path),
-                  renderLivingPreview(trial.result, t("ui.living_node_ai_latest")),
+                  renderLivingPreview(trial.result),
                   viewSession,
                   currentTrial,
                   warnings
@@ -20487,6 +20492,8 @@ export class VisualAgentMapView extends ItemView {
           break;
         }
         case "done":
+          // The skip line belongs to the batch only; the trial card is not stamped, so nothing else clears it.
+          for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
           state.outcome = { ...tally, stopped: run.signal.aborted || event.error === true };
           if (session()) {
             if (state.outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", state.outcome.done, state.total));
@@ -20502,6 +20509,7 @@ export class VisualAgentMapView extends ItemView {
     // Leaving only unsubscribes (the last view to leave cancels the run); this view's own batch then ends.
     state.leave = () => {
       unsubscribe();
+      for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
       state.outcome ??= { ...tally, stopped: true };
       finish(state.outcome);
     };
@@ -22663,6 +22671,7 @@ export class VisualAgentMapView extends ItemView {
     // The chief editor's turn: only while the plan waits for the author (gate1, plan review, running); everything else is as always.
     const bookPlan = await bookPlanChatInput(this.bookPlanChatDeps()).catch(() => undefined);
     const context = buildMapChatContext({
+      noteForModel: livingNoteForModel,
       mapTitle: map.title,
       mapFolder: this.plugin.repo.topicRoot(this.path),
       mapTitles,

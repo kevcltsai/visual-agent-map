@@ -136,6 +136,7 @@ test('localized command and ribbon labels follow the selected VAM language', () 
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(), attributes = {}, command = { name: '' };
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
+  plugin.app = { workspace: { getLeavesOfType: () => [] } };
   plugin.manifest = { name: 'Visual Agent Map' };
   plugin.localizedCommands = [{ command, key: 'ui.command_open_map' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' }; plugin.refreshLocalizedEntrypoints();

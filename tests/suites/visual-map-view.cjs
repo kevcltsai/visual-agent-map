@@ -1465,7 +1465,9 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   // Auto layout from the Layout menu re-arranges every topic in one write.
   for (const nodes of [doc.nodes, view.map.nodes]) { nodes.find(item => item.id === 'b').x = 9999; nodes.find(item => item.id === 'c').y = -9999; }
   const writes = saved;
-  view.autoLayout(); await view.pending;
+  // A10：P1.4 整理全圖取代 Auto layout（先預覽）: the menu action only previews; Apply writes.
+  view.contentEl = { addEventListener() {}, removeEventListener() {} };
+  view.autoLayout(); view.applyTidy(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /n\.collapsed = !n\.collapsed;\s*(?:map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\)|this\.arrangeAll\(map\));/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
@@ -1476,7 +1478,7 @@ integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a s
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
   const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayout = patch => calls.push(patch.direction ?? patch.spacing);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Tidy map']); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, false, false, false, false, false, false, false, true, false, undefined], 'the current direction and spacing are checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
   assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
@@ -2696,12 +2698,12 @@ integrationTest('hypothesis-evidence: every type rule starts with the data-topic
   const viewer = extractViewerRules(css).map(item => item.text).join('\n');
   assert.doesNotMatch(viewer, /data-topic-kind|vam-kind-/, 'the viewer stylesheet carries no type rule');
 });
-integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines, dash only a skippable topic, and mark running, error and selected on the outline', () => {
+integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines (no relevance-tier dash), and mark running, error and selected on the outline', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const frame = css.split('\n').find(line => line.includes('isolation: isolate; padding: 28px 40px'));
   assert.match(frame, /border-color: transparent; background: transparent; box-shadow: none;/);
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(frame.includes(`[data-topic-kind="${kind}"]`), `${kind} is in the hidden-frame rule`); assert.ok(!frame.includes('"action"') && !frame.includes('"topic"'), 'action and topic keep their card frame');
-  assert.match(css, /--vam-kind-dash: none;/); assert.match(css, /\[data-relevance="side"\][^{]*\{ --vam-kind-dash: 6 4; \}/);
+  assert.match(css, /--vam-kind-dash: none;/); assert.doesNotMatch(css, /data-relevance/, 'P1.10b: no card or line is styled by the relevance tier');
   assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)/);
   assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
   assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px; \}/);
@@ -3147,15 +3149,13 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });
 // ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
-integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM and a skippable branch keep the plain accent edge (A1)', () => {
+integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM keeps the plain accent edge, and a legacy side-tier branch now gets the ordinary parent line (A1, P1.10b)', () => {
   const topics = [node('root'), node('kid', 'root'), node('skip', 'root')];
   const notes = heNotes([['root', {}], ['kid', {}], ['skip', { relevance: { tier: 'side' } }]]);
   const edges = options => { const fx = heFixture({ topics, notes, ...options }); return heDrawn(fx.view, { root: [0, 0], kid: [400, 0], skip: [400, 200] }); };
   const plain = edges({});
   assert.equal(plain.length, 2);
-  const kid = plain.find(p => !p.classes.includes('vam-edge-side')), skip = plain.find(p => p.classes.includes('vam-edge-side'));
-  assert.ok(kid.classes.includes('vam-edge') && 'data-parent-line' in kid.attrs, 'an ordinary parent line is marked');
-  assert.equal('data-parent-line' in skip.attrs, false, 'a skippable branch keeps its own muted edge');
+  for (const p of plain) { assert.ok(p.classes.includes('vam-edge') && 'data-parent-line' in p.attrs, 'every parent line is marked, the legacy side branch included'); assert.equal(p.classes.includes('vam-edge-side'), false, 'no muted side edge any more'); }
   for (const options of [{ aim: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
@@ -3530,9 +3530,8 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker'), /font-size: 16px/);
+  assert.doesNotMatch(css, /is-segmented/, 'P1.10b: the one-of marker groups (priority, progress) are gone');
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3654,17 +3653,17 @@ const tmRender = (options, id) => {
 integrationTest('topic-markers: a card shows whitelisted markers as aria-hidden symbols in a fixed order and names them in its accessible name; a topic without any shows none', () => {
   const notes = heNotes([['fact', { markers: ['star', 'done', 'priority-2'] }], ['hyp', heHyp('weak')], ['other', {}]]);
   const shown = tmRender({ notes }, 'fact');
-  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★', 'P2'], 'whitelist order, plain Unicode');
+  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★'], 'whitelist order, plain Unicode; a legacy priority value is not shown (P1.10b)');
   const row = dom.find(shown.card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-markers'));
   assert.equal(row.attrs['aria-hidden'], 'true');
-  assert.match(shown.label.text, /Markers: Done, Star, Priority 2/); assert.match(shown.label.text, /^FACT, /);
+  assert.match(shown.label.text, /Markers: Done, Star$/); assert.doesNotMatch(shown.label.text, /Priority/); assert.match(shown.label.text, /^FACT, /);
   assert.equal(shown.card.attrs['aria-labelledby'], shown.label.id);
   const kindToo = tmRender({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) }, 'fact');
   assert.match(kindToo.label.text, /Evidence/); assert.match(kindToo.label.text, /Markers: Done/);
   const none = tmRender({ notes }, 'other');
   assert.deepEqual(none.marks, []); assert.doesNotMatch(none.label.text, /Markers/);
   const aim = tmRender({ aim: true, notes }, 'fact');
-  assert.equal(aim.marks.length, 3, 'a read-only map still shows the markers');
+  assert.equal(aim.marks.length, 2, 'a read-only map still shows the markers');
 });
 integrationTest('topic-markers: a value outside the whitelist is not shown, not drawn and not read out', () => {
   const notes = heNotes([['fact', { markers: ['<img src=x onerror=alert(1)>', 'DONE', 3, 'star', 'star'] }], ['hyp', {}], ['other', {}]]);
@@ -3680,9 +3679,9 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.drawEdges = () => {};
   f.view.notes.get('fact').markers = ['warning', 'priority-3'];
   f.view.refreshCard(node, false);
-  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠', 'P3']);
+  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠']);
   const label = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
-  assert.match(label.text, /Markers: Warning, Priority 3/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
+  assert.match(label.text, /Markers: Warning$/); assert.doesNotMatch(label.text, /Priority/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
   f.view.notes.get('fact').markers = [];
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
@@ -3743,7 +3742,7 @@ integrationTest('topic-markers, topic-color and topic-style: select mode has no 
     assert.deepEqual(writes, [], `${name} ${JSON.stringify(options)}`);
   }
 });
-integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
+integrationTest('topic-markers: the panel has one aria-pressed toggle per status marker in a single many-of box, with no group titles (P1.10b)', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
   const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
@@ -3755,39 +3754,27 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   };
   view.refreshAfterSavedChange = async () => {};
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
-  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
+  const group = () => dom.find(panel, c => (c.cls ?? '').split(/\s+/).includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
-  // Priority and progress buttons are symbol-only; their name is the aria-label.
-  const name = c => c.attrs['aria-label'] ?? c.text;
-  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(name);
-  const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
-  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
-  const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
-  assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
-  sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  const { TOPIC_MARKERS } = load('topic-markers.ts', { obsidian });
+  const boxes = () => dom.findAll(group(), c => (c.cls ?? '').split(/\s+/).includes('vam-topic-marker-group'));
+  assert.equal(boxes().length, 1, 'one box'); assert.match(boxes()[0].cls, /\bis-multi\b/); assert.doesNotMatch(boxes()[0].cls, /is-segmented/);
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length); assert.equal(TOPIC_MARKERS.length, 3);
+  assert.deepEqual(dom.findAll(panel, c => /vam-topic-marker-group-title/.test(c.cls ?? '')), [], 'no group titles');
   assert.deepEqual(pressed(), []);
-  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => (c.attrs['aria-label'] ?? c.text).includes(name)).click();
-  click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
-  assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
-  assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  click('Done'); await dom.tick(); click('Star'); await dom.tick();
+  assert.deepEqual(toggled, ['done', 'star']);
+  assert.equal(pressed().length, 2, 'status markers can coexist');
   click('Done'); await dom.tick();
-  assert.equal(pressed().length, 1);
-  click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
-  assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
-  assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
-  sub.forEach((box, i) => {
-    const single = TOPIC_MARKER_GROUPS[i].single;
-    assert.equal((box.cls ?? '').includes('is-segmented'), !!single, 'only one-of groups are segmented');
-    for (const b of dom.findAll(box, c => c.tag === 'button')) {
-      if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
-      else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
-      assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
-      // The stylesheet's progress size rule is `button[data-marker^="progress-"] > .vam-marker`: the attribute is on the button, the symbol is its child.
-      assert.ok(b.dataset.marker, 'the marker id is on the button');
-      assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
-    }
-  });
-  assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
+  assert.equal(pressed().length, 1); assert.ok(pressed()[0].includes('Star'));
+  for (const b of dom.findAll(group(), c => c.tag === 'button')) {
+    assert.ok(b.text && b.attrs['aria-label'] === undefined, 'buttons keep their text');
+    assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+    assert.ok(TOPIC_MARKERS.includes(b.dataset.marker), 'the marker id is on the button');
+    assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
+  }
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -3816,15 +3803,14 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
   await pushed[0].redo(); assert.ok(text());
   await pushed[0].undo();
   await view.refreshAfterSavedChange();
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-25'); const mid = contents.get(topic.path);
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-50');
-  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2', 'progress-50']);
-  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of a same-group switch restores the previous choice');
+  await view.changeTopicMarker(view.map.nodes[0], 'done');
+  await view.changeTopicMarker(view.map.nodes[0], 'warning'); const mid = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'star');
+  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done', 'warning', 'star']);
+  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of the last toggle restores the previous note text');
   await pushed.at(-1).redo(); await view.refreshAfterSavedChange();
   await pushed.at(-1).undo(); await pushed.at(-2).undo(); await view.refreshAfterSavedChange();
-  assert.equal(pushed.length, 5); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
+  assert.equal(pushed.length, 4); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done']);
 });
 // ---- topic colour (ticket 37, P2b) ----
 const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
@@ -5096,6 +5082,13 @@ test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat 
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const pinned = css.match(/\.vam-view\.is-header-narrow \.vam-multi-research-statusbar \{([^}]*)\}/);
+  assert.ok(pinned, 'narrow research bar rule');
+  assert.match(pinned[1], /position: sticky;/); assert.match(pinned[1], /top: 0;/);
+  const zOf = re => Number(css.match(re)[1]);
+  const barZ = Number(pinned[1].match(/z-index: (\d+);/)[1]);
+  assert.ok(barZ > zOf(/\.vam-selection-bar \{[^}]*z-index: (\d+)/), 'above the selection bar');
+  assert.ok(!/\.vam-zoom-controls \{[^}]*z-index: (\d+)/.test(css) || barZ > zOf(/\.vam-zoom-controls \{[^}]*z-index: (\d+)/), 'above the zoom bar');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });

@@ -1932,68 +1932,6 @@ integrationTest('model resolution survives a parent cycle and a missing parent',
   orphan.mapDoc.nodes[1].parentId = 'missing';
   assert.equal((await orphan.repo.readNote(orphan.nodes[1].path, orphan.mapDoc)).model, 'claude:sonnet');
 });
-integrationTest('relevance frontmatter reads when valid, is absent when missing or invalid, and survives note updates', async () => {
-  const { repo, contents } = fixture(); const n = await topicNote(repo, 'Graded');
-  const original = contents.get(n.path);
-  assert.equal((await repo.readNote(n.path)).relevance, undefined, 'missing: no relevance');
-  const withKeys = (tier, reason) => original.replace('---\n', `---\nrelevance-tier: ${tier}\nrelevance-reason: ${reason}\n`);
-  // A valid tier is a grade; a reason written by an older version is ignored (it is neither shown nor required).
-  for (const tier of ['core', 'support', 'side']) {
-    contents.set(n.path, withKeys(tier, '"Because: it matters"'));
-    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier });
-    contents.set(n.path, original.replace('---\n', `---\nrelevance-tier: ${tier}\n`));
-    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier }, 'a tier alone is a grade');
-    contents.set(n.path, withKeys(tier, '""'));
-    assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier }, 'an empty old reason is ignored too');
-  }
-  for (const bad of [withKeys('huge', 'ok'), withKeys('[core]', 'ok'), original.replace('---\n', '---\nrelevance-reason: only a reason\n')]) {
-    contents.set(n.path, bad);
-    assert.equal((await repo.readNote(n.path)).relevance, undefined, 'invalid or incomplete: no relevance');
-  }
-  contents.set(n.path, withKeys('side', 'Skip it'));
-  await repo.updateNote(n.path, { status: 'completed' });
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side' });
-});
-// ---- Phase 3: relevance writers (frontmatter only; other keys, the body and `updated` stay as they were) ----
-integrationTest('relevance writer sets, replaces and removes only its two keys; body and other frontmatter are untouched', async () => {
-  const { repo, contents } = fixture(); const n = await topicNote(repo, 'Graded');
-  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\nlist:\n  - one\n  - two\n'));
-  const before = await repo.readNote(n.path);
-  const bodyOf = text => text.replace(/^---\r?\n[\s\S]*?\r?\n---/, '');
-  const keysOf = text => text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1].split('\n').filter(line => !/^relevance-/.test(line)).join('\n');
-  const original = contents.get(n.path);
-  await repo.writeRelevance(n.path, { tier: 'core' });
-  const written = contents.get(n.path);
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'core' });
-  assert.doesNotMatch(written, /relevance-reason/, 'no reason key is written');
-  assert.equal(bodyOf(written), bodyOf(original), 'body unchanged'); assert.equal(keysOf(written), keysOf(original), 'other keys unchanged');
-  assert.equal((await repo.readNote(n.path)).updated, before.updated, '`updated` is not bumped');
-  await repo.writeRelevance(n.path, { tier: 'side' });
-  assert.equal(written.match(/relevance-tier/g).length, 1); assert.equal(contents.get(n.path).match(/relevance-tier/g).length, 1, 'replaced in place, not duplicated');
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'side' });
-  await repo.writeRelevance(n.path, null);
-  assert.equal(contents.get(n.path), original, 'removing restores the file byte for byte');
-  assert.equal((await repo.readNote(n.path)).relevance, undefined);
-  // Every write removes the reason an older version left behind, for an AI grade and for a hand-set tier alike.
-  contents.set(n.path, original.replace('---\n', '---\nrelevance-tier: core\nrelevance-reason: "Old reason"\n'));
-  await repo.writeRelevance(n.path, { tier: 'support' });
-  assert.doesNotMatch(contents.get(n.path), /relevance-reason|Old reason/);
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support' });
-  contents.set(n.path, original.replace('---\n', '---\nrelevance-tier: core\nrelevance-reason: "Old reason"\n'));
-  await repo.writeRelevance(n.path, { tier: 'core', manual: true });
-  assert.doesNotMatch(contents.get(n.path), /relevance-reason|Old reason/);
-  await repo.writeRelevance(n.path, null);
-  assert.equal(contents.get(n.path), original);
-});
-integrationTest('relevance writer keeps CRLF files CRLF and drops a stale multi-line value of its own key', async () => {
-  const { repo, contents } = fixture(); const n = await topicNote(repo, 'Windows');
-  contents.set(n.path, contents.get(n.path).replace(/\n/g, '\r\n').replace('---\r\n', '---\r\nrelevance-tier: core\r\nrelevance-reason: >-\r\n  folded old\r\n  value\r\n'));
-  await repo.writeRelevance(n.path, { tier: 'support' });
-  const text = contents.get(n.path);
-  assert.equal(/[^\r]\n/.test(text.replace(/^[\s\S]*?$/, m => m)), false, 'no bare LF introduced');
-  assert.doesNotMatch(text, /folded old/);
-  assert.deepEqual(plain((await repo.readNote(n.path)).relevance), { tier: 'support' });
-});
 // P1.10a removed the goal and AI grading, but maps written by older versions keep their keys: every save leaves them as they were.
 integrationTest('legacy goal, relevance and marker keys survive a topic rename, a summary edit and a map save', async () => {
   const { repo, contents } = fixture('en');
@@ -2015,6 +1953,13 @@ integrationTest('legacy goal, relevance and marker keys survive a topic rename, 
   const mapFm = fm(contents.get(mapPath)), noteFm = fm(contents.get(renamed));
   for (const [key, value] of Object.entries(mapKeys)) assert.deepEqual(mapFm[key], value, `Map.md ${key}`);
   for (const [key, value] of Object.entries(noteKeys)) assert.deepEqual(noteFm[key], value, `Topic Note ${key}`);
+  // P1.10b: toggling a status marker keeps the removed priority, progress, flag and face values and the relevance keys.
+  assert.deepEqual([...reread.markers], ['done']);
+  await repo.writeTopicMarkers(renamed, 'star');
+  const toggledFm = fm(contents.get(renamed));
+  assert.deepEqual(toggledFm['topic-markers'], ['done', 'priority-2', 'progress-50', 'flag-red', 'smile', 'question', 'star']);
+  for (const key of ['relevance-tier', 'relevance-manual', 'relevance-reason', 'x-custom']) assert.deepEqual(toggledFm[key], noteKeys[key], `after a toggle: ${key}`);
+  assert.deepEqual([...(await repo.readNote(renamed)).markers], ['done', 'star']);
 });
 integrationTest('math repair rewrites note bodies only, skips changed notes, and is idempotent', async () => {
   const { repo, contents, files, app } = fixture();
@@ -2348,7 +2293,7 @@ integrationTest('topic-markers: readNote reads only whitelisted ids and a note w
   withValue('["<img onerror=x>", done]');
   assert.deepEqual([...(await repo.readNote(n.path)).markers], ['done']);
 });
-integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values, keeps priority single, removes the key when empty, and leaves updated alone', async () => {
+integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values, removes the key when empty, and leaves updated alone', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   const updatedLine = () => contents.get(n.path).match(/^updated:.*$/m)?.[0];
   const before = updatedLine();
@@ -2357,11 +2302,6 @@ integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values,
   assert.deepEqual([...(await repo.readNote(n.path)).markers], ['done', 'star']);
   assert.match(contents.get(n.path), /"future-x"/, 'an unknown value is kept');
   assert.match(contents.get(n.path), /custom: retain me/);
-  await repo.writeTopicMarkers(n.path, 'priority-1');
-  await repo.writeTopicMarkers(n.path, 'priority-3');
-  const markers = (await repo.readNote(n.path)).markers;
-  assert.ok(markers.includes('priority-3') && !markers.includes('priority-1'), 'priority is one of three');
-  await repo.writeTopicMarkers(n.path, 'priority-3');
   await repo.writeTopicMarkers(n.path, 'done');
   await repo.writeTopicMarkers(n.path, 'star');
   assert.match(contents.get(n.path), /"future-x"/);
@@ -2450,19 +2390,13 @@ integrationTest('topic-links: writeTopicLinks adds, removes, reports invalid/dup
   assert.equal(updatedLine(), before, 'updated is not changed');
 });
 
-integrationTest('topic-markers: new ids read in whitelist order, one per single-choice group, and toggling keeps other groups and unknown values', async () => {
+integrationTest('topic-markers: only status ids are read, in whitelist order; the removed priority, progress, flag and face ids are unknown values a toggle keeps (P1.10b)', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
-  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ntopic-markers: [smile, future-x, flag-blue, progress-75, progress-25, priority-4, priority-1]\n'));
-  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['priority-1', 'progress-25', 'flag-blue', 'smile']);
-  await repo.writeTopicMarkers(n.path, 'progress-100');
-  const after = (await repo.readNote(n.path)).markers;
-  assert.deepEqual([...after], ['priority-1', 'progress-100', 'flag-blue', 'smile']);
-  assert.match(contents.get(n.path), /"future-x"/, 'unknown value kept');
-  assert.equal(/progress-75|progress-25/.test(contents.get(n.path)), false, 'the group is cleared on toggle');
-  await repo.writeTopicMarkers(n.path, 'priority-5');
-  assert.equal(/"priority-1"|"priority-4"/.test(contents.get(n.path)), false, 'old multi-value priority is cleared');
-  await repo.writeTopicMarkers(n.path, 'flag-red');
-  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['priority-5', 'progress-100', 'flag-red', 'flag-blue', 'smile']);
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ntopic-markers: [smile, star, future-x, flag-blue, progress-75, progress-25, priority-4, priority-1, warning]\n'));
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['warning', 'star']);
+  await repo.writeTopicMarkers(n.path, 'done');
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['done', 'warning', 'star']);
+  for (const kept of ['smile', 'future-x', 'flag-blue', 'progress-75', 'progress-25', 'priority-4', 'priority-1']) assert.match(contents.get(n.path), new RegExp(`"${kept}"`), `${kept} kept`);
 });
 integrationTest('topic-color: readNote reads only an exact whitelisted string and a note without a colour has no color field', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);

@@ -4,6 +4,7 @@ import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
+import { pushAffected, type PushDecoration, type PushOptions } from "./layouts/push";
 import { CARD_WIDTH, childIndex, parentIdsForNode, visibleNodes, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
@@ -363,6 +364,49 @@ function rearrangeWhole(nodes: MapNode[], heightOf: HeightOf | undefined, layout
   });
 }
 
+/** What the caller measured on screen; `arrangeNewBranch` hands it to `pushAffected` so the push sees drawn boxes, brackets and frames. */
+export interface PushHints {
+  boxOf?: PushOptions["boxOf"];
+  decorations?: PushDecoration[];
+  /** Cards the push must not move: ring members (text blocks are found by their empty path). */
+  fixed?: ReadonlySet<string>;
+}
+
+/** The sibling just before the first new card among the parent's older children, in array order; undefined if none. */
+function previousSibling(nodes: MapNode[], parentId: string, newIds: Set<string>): MapNode | undefined {
+  let previous: MapNode | undefined;
+  for (const node of nodes) {
+    if (node.parentId !== parentId) continue;
+    if (newIds.has(node.id)) return previous;
+    previous = node;
+  }
+  return previous;
+}
+
+/** Pushes apart what the freshly placed cards overlap; a whole-map-only arrangement never reaches here. */
+function pushNew(
+  nodes: MapNode[],
+  newIds: Set<string>,
+  heightOf: HeightOf | undefined,
+  direction: string,
+  gap: number,
+  hints: PushHints | undefined
+): MapNode[] {
+  const fixed = new Set([...(hints?.fixed ?? [])].filter(id => !newIds.has(id)));
+  for (const node of nodes) if (node.path === "" && !newIds.has(node.id)) fixed.add(node.id);
+  return pushAffected(nodes, newIds, {
+    fixed,
+    boxOf: hints?.boxOf,
+    heightOf: id => cardHeight(heightOf, id),
+    // Several new cards count as one block, so a later sibling is pushed past all of them, not into a gap between two.
+    decorations: [
+      ...(hints?.decorations ?? []),
+      ...(newIds.size > 1 ? [{ members: [...newIds], pad: { l: 0, t: 0, r: 0, b: 0 } }] : [])
+    ],
+    layout: { direction, gap }
+  }).nodes;
+}
+
 /** A new branch in a down or up map: one row below (above) the parent, centred under it, sliding along x past older cards. */
 function arrangeVerticalBranch(
   nodes: MapNode[],
@@ -371,7 +415,8 @@ function arrangeVerticalBranch(
   roots: MapNode[],
   newIds: Set<string>,
   heightOf: HeightOf | undefined,
-  layout: LayoutKind | MapLayout
+  layout: LayoutKind | MapLayout,
+  hints?: PushHints
 ): MapNode[] {
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
@@ -393,15 +438,20 @@ function arrangeVerticalBranch(
       const own = cardHeight(heightOf, id);
       const topY = point.y + shiftY;
       for (const node of fixed) {
-        const other = cardHeight(heightOf, node.id);
+        // The drawn box, when the caller measured one, replaces the stored size.
+        const drawn = hints?.boxOf?.(node.id);
+        const other = drawn?.h ?? cardHeight(heightOf, node.id);
+        const left = node.x + (drawn?.dx ?? 0);
+        const top = node.y + (drawn?.dy ?? 0);
+        const right = left + (drawn?.w ?? obstacleWidth(node));
         const x = point.x + shiftX;
         if (
-          x < node.x + obstacleWidth(node) + LAYOUT_GAP &&
-          node.x < x + WIDTH + LAYOUT_GAP &&
-          topY < node.y + other + LAYOUT_GAP &&
-          node.y < topY + own + LAYOUT_GAP
+          x < right + LAYOUT_GAP &&
+          left < x + WIDTH + LAYOUT_GAP &&
+          topY < top + other + LAYOUT_GAP &&
+          top < topY + own + LAYOUT_GAP
         )
-          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP - point.x);
+          next = Math.max(next, right + LAYOUT_GAP - point.x);
       }
     }
     if (next === shiftX) break;
@@ -434,14 +484,15 @@ function arrangeBalancedBranch(
   newIds: Set<string>,
   heightOf: HeightOf | undefined,
   minTop: number | undefined,
-  layout: LayoutKind | MapLayout
+  layout: LayoutKind | MapLayout,
+  hints?: PushHints
 ): MapNode[] {
   const { gap } = resolveLayout(layout);
   const spacing = typeof layout === "string" ? undefined : layout.spacing;
   const as = (direction: "right" | "left"): MapLayout => (spacing ? { direction, spacing } : { direction });
   const byId = new Map(nodes.map(node => [node.id, node]));
   if (parent.parentId)
-    return arrangeNewBranch(nodes, parent.id, newIds, heightOf, minTop, as(branchSide(byId, parent) ?? "right"));
+    return arrangeNewBranch(nodes, parent.id, newIds, heightOf, minTop, as(branchSide(byId, parent) ?? "right"), hints);
   const older = nodes.filter(node => !newIds.has(node.id));
   const { kidsOf } = structureOf(older, true);
   const { sizes } = horizontalPositions({
@@ -487,7 +538,8 @@ function arrangeBalancedBranch(
       mine,
       heightOf,
       minTop,
-      as(side)
+      as(side),
+      hints
     );
     const moved = new Map(placed.map(node => [node.id, node]));
     current = current.map(node => moved.get(node.id) ?? node);
@@ -502,7 +554,8 @@ export function arrangeNewBranch(
   heightOf?: HeightOf,
   /** The new branch's top edge starts at or below this y (before collision avoidance); undefined keeps the centred start. */
   minTop?: number,
-  layout: LayoutKind | MapLayout = "right"
+  layout: LayoutKind | MapLayout = "right",
+  hints?: PushHints
 ): MapNode[] {
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const parent = nodes.find(node => node.id === parentId);
@@ -512,15 +565,15 @@ export function arrangeNewBranch(
   if (actual !== direction) {
     const spacing = typeof layout === "string" ? undefined : layout.spacing;
     const own = { direction: actual as LayoutKind, ...(spacing ? { spacing } : {}) };
-    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own);
+    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own, hints);
   }
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
   if (direction === "radial" || direction === "timeline" || direction === "fishbone")
     return rearrangeWhole(nodes, heightOf, layout);
-  if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
+  if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout, hints);
   if (direction === "balanced")
-    return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
+    return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout, hints);
   // Wide cards need room: a wide parent pushes its children right; wide new children step further left.
   const startX =
     signOf(direction) > 0
@@ -530,32 +583,18 @@ export function arrangeNewBranch(
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
+  // The new cards go after their previous sibling; whatever they then overlap is pushed away.
+  const before = previousSibling(nodes, parentId, newIds);
+  if (before)
+    offset =
+      before.y + cardHeight(heightOf, before.id) + LAYOUT_GAP - Math.min(...[...placed.values()].map(point => point.y));
   if (minTop !== undefined && placed.size)
     offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map(point => point.y)));
-  const fixed = nodes.filter(node => !newIds.has(node.id));
-  for (;;) {
-    let next = offset;
-    for (const [id, point] of placed) {
-      const own = cardHeight(heightOf, id);
-      for (const node of fixed) {
-        const other = cardHeight(heightOf, node.id);
-        const top = point.y + offset;
-        if (
-          point.x - node.x < obstacleWidth(node) &&
-          node.x - point.x < WIDTH &&
-          top < node.y + other + LAYOUT_GAP &&
-          node.y < top + own + LAYOUT_GAP
-        )
-          next = Math.max(next, node.y + other + LAYOUT_GAP - point.y);
-      }
-    }
-    if (next === offset) break;
-    offset = next;
-  }
-  return nodes.map(node => {
+  const out = nodes.map(node => {
     const point = placed.get(node.id);
     return point ? { ...node, x: point.x, y: Math.round(point.y + offset) } : node;
   });
+  return pushNew(out, newIds, heightOf, direction, LAYOUT_GAP, hints);
 }
 
 /** Lays out a new top-level tree below every existing node, in the leftmost root column; existing nodes never move. */

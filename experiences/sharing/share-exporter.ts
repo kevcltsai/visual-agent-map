@@ -1033,7 +1033,6 @@ export class ShareExporter {
         id: node.id,
         title: node.title,
         summary: node.summary,
-        ...(node.reason ? { reason: node.reason } : {}),
         ...(node.detailHtml ? { detailHtml: node.detailHtml } : {}),
         ...(node.detailHtml && this.rendered.get(node.id)?.diagrams.length
           ? { diagrams: this.rendered.get(node.id)?.diagrams }
@@ -1073,7 +1072,6 @@ export class ShareExporter {
         status: note.status,
         ...(note.topicKind && !argumentIds.has(node.id) ? { kind: note.topicKind } : {}),
         shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,
-        ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),
         ...(note.color ? { color: note.color } : {}),
         ...(note.style?.length ? { style: note.style } : {}),

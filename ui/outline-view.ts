@@ -28,6 +28,8 @@ export class OutlineView extends ItemView {
   private tempOpen = new Set<string>();
   private query = "";
   private activePath = "";
+  /** What the outline last drew from (see setMap), so an unchanged repaint does not rebuild it. */
+  private content = "";
   private dragId: string | null = null;
   private dropRow: HTMLElement | null = null;
   /** A row that took focus before a move rebuilds the tree: focus returns to the same topic. */
@@ -61,10 +63,24 @@ export class OutlineView extends ItemView {
     const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
     const restoreFocus = !!search && search === document.activeElement;
     const selection = restoreFocus ? ([search.selectionStart, search.selectionEnd] as const) : null;
+    // Every full map repaint hands the outline its content again; when nothing the outline shows changed, keep the tree
+    // (rows, active row, temporary opens) instead of rebuilding it. The label text is included so a language change redraws.
+    const content = JSON.stringify([
+      t("ui.topic_outline"),
+      map?.title,
+      !!map?.aim,
+      map?.nodes.map(node => [node.id, node.parentId, node.path]),
+      [...titles],
+      [...markers],
+      [...links]
+    ]);
+    const same = content === this.content && !!this.contentEl.querySelector(".vam-outline-tree");
+    this.content = content;
     this.map = map;
     this.titles = titles;
     this.markers = markers;
     this.links = links;
+    if (same) return;
     if (map) {
       this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
       this.tempOpen = new Set([...this.tempOpen].filter(id => this.collapsed.has(id)));
@@ -96,10 +112,13 @@ export class OutlineView extends ItemView {
       .filter(id => !open.has(id))
       .concat([...open].filter(id => !this.tempOpen.has(id)));
     this.tempOpen = open;
+    // A lazy fill draws the new active row already marked and points activeEl at it; keep the previous row so it is cleared.
+    const previous = this.activeEl;
     for (const id of [...open].filter(id => changed.includes(id))) {
       const branch = this.branches.get(id);
       if (branch && !branch.filled) branch.fill();
     }
+    this.activeEl = previous;
     for (const id of changed) {
       const closed = this.collapsed.has(id) && !open.has(id);
       const branch = this.branches.get(id);

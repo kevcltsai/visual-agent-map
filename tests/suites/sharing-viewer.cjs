@@ -50,7 +50,7 @@ test('sharing viewer: stylesheet rules are copied from styles.css unchanged and 
   const known = tools.allRuleTexts(styles);
   assert.ok(rules.length > 40, 'the extraction keeps the card, canvas and panel rules');
   for (const item of rules) for (const rule of item.rules) assert.ok(known.has(rule), `not a rule of styles.css: ${rule.slice(0, 80)}`);
-  const wanted = ['.vam-view, .vam-stage, .vam-tokens {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-edge.vam-edge-side {', '.vam-relevance-tag[data-tier="core"] {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
+  const wanted = ['.vam-view, .vam-stage, .vam-tokens {', '.vam-node {', '.vam-node:hover {', '.vam-node.is-selected {', '.vam-edge {', '.vam-status {', '.vam-card-title {', '.vam-card-summary {', '.vam-inspector {', '.vam-toolbar {', '.vam-zoom {', '.vam-viewport {', '.vam-stage {', '.vam-map-tools, .vam-zoom-controls {'];
   const flat = rules.flatMap(item => item.rules);
   for (const start of wanted) assert.ok(flat.some(rule => rule.startsWith(start)), `${start} must be taken from styles.css`);
   // The rules appear in the shipped stylesheet byte for byte.
@@ -58,6 +58,8 @@ test('sharing viewer: stylesheet rules are copied from styles.css unchanged and 
   assert.equal(bundle.SHARE_VIEWER_CSS, tools.composeViewerCss(read('experiences/sharing/viewer/viewer.css'), styles), 'run npm run build: viewer-bundle.generated.ts is stale');
   // Rules about fields the viewer must not carry are not extracted.
   assert.doesNotMatch(bundle.SHARE_VIEWER_CSS, /data-aim-kind="|vam-aim|marquee|relevance-goal/);
+  // P1.10b: the relevance tag, the side tier and the removed markers have no rule left.
+  assert.doesNotMatch(bundle.SHARE_VIEWER_CSS, /vam-relevance-tag|data-relevance|vam-edge-side|flag-red|is-segmented/);
 });
 
 test('sharing viewer: every CSS variable the stylesheet uses is defined', () => {
@@ -82,7 +84,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['core/social-video.ts', 'experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['core/social-video.ts', 'experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/sharing/viewer/math.ts', 'experiences/sharing/viewer/relation-data.ts', 'experiences/sharing/viewer/topic-shapes.ts', 'experiences/sharing/viewer/video.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/push.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
   assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
@@ -231,7 +233,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     for (const key of ['expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
-  for (const lang of ['zh-TW', 'zh-CN']) for (const key of ['install', 'madeWithVam', 'readOnly', 'tierCore', 'topicDetails']) assert.notEqual(text.shareViewerUiFor(lang)[key], english[key], `${lang}.${key} is translated`);
+  for (const lang of ['zh-TW', 'zh-CN']) for (const key of ['install', 'madeWithVam', 'readOnly', 'topicDetails']) assert.notEqual(text.shareViewerUiFor(lang)[key], english[key], `${lang}.${key} is translated`);
   assert.equal(text.shareViewerUiFor('zh-TW').install, '安裝 VAM');
   assert.equal(text.shareViewerUiFor('zh-CN').madeWithVam, '由 VAM 制作');
 });
@@ -529,21 +531,23 @@ test('sharing viewer fit: the first view and Show all include a free text block 
   }
 });
 
-test('P1.10a: a file exported by an older version, with a top-level goal and node tier and manual, opens with every card and no goal chip (headless Chrome)', async t => {
+test('P1.10a/P1.10b: a file exported by an older version, with a top-level goal, node tier and manual and removed markers, opens with every card, no goal chip, no tier and only status markers (headless Chrome)', async t => {
   const chrome = findChrome();
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-old-goal-'));
   try {
     const data = payload();
     data.goal = 'Pass the cook certification exam';
-    Object.assign(data.nodes.find(node => node.id === 'water'), { tier: 'side', manual: true });
+    Object.assign(data.nodes.find(node => node.id === 'water'), { tier: 'side', manual: true, markers: ['done', 'priority-2', 'progress-50', 'flag-red', 'smile', 'question'] });
     const source = path.join(directory, 'payload.json');
     fs.writeFileSync(source, JSON.stringify(data));
     const out = path.join(directory, 'old.html');
     execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
-    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: `(() => ({ cards: document.querySelectorAll('.vam-node').length, water: document.querySelector('.vam-node[data-node-id="water"]')?.getAttribute('data-relevance') ?? null, goal: document.querySelectorAll('.vam-goal, .vam-goal-text, .vam-map-tools').length, goalText: document.getElementById('vam-app').textContent.includes('Pass the cook certification exam') }))()`, returnByValue: true })).result.value);
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: `(() => ({ cards: document.querySelectorAll('.vam-node').length, relevance: document.querySelectorAll('[data-relevance], [data-tier], .vam-relevance-tag').length, waterMarks: [...document.querySelectorAll('.vam-node[data-node-id="water"] .vam-marker')].map(m => m.textContent), waterLabel: document.querySelector('.vam-node[data-node-id="water"]')?.getAttribute('aria-label') ?? '', goal: document.querySelectorAll('.vam-goal, .vam-goal-text, .vam-map-tools').length, goalText: document.getElementById('vam-app').textContent.includes('Pass the cook certification exam') }))()`, returnByValue: true })).result.value);
     assert.equal(report.cards, data.nodes.length, 'every topic is drawn');
-    assert.equal(report.water, 'side', 'the node tier still drives the card');
+    assert.equal(report.relevance, 0, 'P1.10b: the old node tier is not shown and styles nothing');
+    assert.deepEqual(plain(report.waterMarks), ['✓'], 'P1.10b: only the status marker is drawn');
+    assert.match(report.waterLabel, /Markers: Done$/); assert.doesNotMatch(report.waterLabel, /Priority|Progress|flag|Smile|Question/i);
     assert.equal(report.goal, 0, 'no goal chip or tools container');
     assert.equal(report.goalText, false, 'the old goal text is not shown anywhere');
   } finally {
@@ -1019,13 +1023,9 @@ const CONTRAST_PROBE = `(() => {
     outlineCurrent: '.vam-outline-item[aria-current="true"] .vam-outline-title',
     shared: '.vam-shared',
     madeWith: '.vam-made-with',
-    cardTitle: '.vam-node:not([data-relevance="side"]) .vam-card-title',
-    cardSummary: '.vam-node:not([data-relevance="side"]) .vam-card-summary',
-    collapse: '.vam-node:not([data-relevance="side"]) .vam-collapse-button',
-    sideTitle: '.vam-node[data-relevance="side"] .vam-card-title',
-    sideSummary: '.vam-node[data-relevance="side"] .vam-card-summary',
-    sideCollapse: '.vam-node[data-relevance="side"] .vam-collapse-button',
-    sideTag: '.vam-node[data-relevance="side"] .vam-relevance-tag',
+    cardTitle: '.vam-node .vam-card-title',
+    cardSummary: '.vam-node .vam-card-summary',
+    collapse: '.vam-node .vam-collapse-button',
     idea: '.vam-status-idea',
     hint: '.vam-canvas-hint',
     zoom: '.vam-zoom'
@@ -1052,12 +1052,11 @@ test('sharing viewer colour: every text and icon in the outline, toolbar, cards 
         await new Promise(resolve => setTimeout(resolve, 300));
         const ratios = await evaluate(CONTRAST_PROBE);
         const details = await evaluate(`(() => {
-          const side = document.querySelector('.vam-node[data-relevance="side"]');
           const current = document.querySelector('.vam-outline-item[aria-current="true"]');
           const plain = document.querySelector('.vam-outline-item:not([aria-current="true"])');
           return {
             scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-            sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'),
+            tiers: document.querySelectorAll('[data-relevance], .vam-relevance-tag').length,
             currentShadow: getComputedStyle(current).boxShadow, currentBg: getComputedStyle(current).backgroundColor, plainBg: getComputedStyle(plain).backgroundColor, currentWeight: getComputedStyle(current).fontWeight
           };
         })()`);
@@ -1074,10 +1073,7 @@ test('sharing viewer colour: every text and icon in the outline, toolbar, cards 
         const need = name === 'twist' || name === 'ideaCircle' ? 3 : 4.5;
         assert.ok(value >= need, `${scheme}: ${name} contrast ${value} must be >= ${need}`);
       }
-      // Counterexamples: the cues that replace the fade stay visible.
-      assert.equal(details.sideBorder, 'dashed', `${scheme}: a side topic keeps its dashed frame`);
-      assert.equal(details.sideTag, true, `${scheme}: a side topic keeps its tag`);
-      assert.equal(details.sideOpacity, '1', `${scheme}: a side topic is not faded in the viewer`);
+      assert.equal(details.tiers, 0, `${scheme}: P1.10b: no card carries a relevance tier or tag`);
       assert.notEqual(details.currentShadow, 'none', `${scheme}: the current outline row keeps its inset bar`);
       assert.notEqual(details.currentBg, details.plainBg, `${scheme}: the current outline row keeps its own fill`);
       assert.equal(details.currentWeight, '600', `${scheme}: the current outline row is bold`);
@@ -1088,7 +1084,7 @@ test('sharing viewer colour: every text and icon in the outline, toolbar, cards 
 });
 
 test('sharing viewer: marker text exists in every language, names and the "markers: {0}" label', () => {
-  const markers = ['done', 'warning', 'star', 'priority-1', 'priority-2', 'priority-3', 'priority-4', 'priority-5', 'progress-0', 'progress-25', 'progress-50', 'progress-75', 'progress-100', 'flag-red', 'flag-yellow', 'flag-green', 'flag-blue', 'smile', 'neutral', 'sad', 'question'];
+  const markers = ['done', 'warning', 'star'];
   const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
   assert.equal(everyUi.length, 6);
   for (const ui of everyUi) {
@@ -1124,12 +1120,13 @@ test('sharing viewer markers: cards and outline show aria-hidden symbols and a n
         return { card: marks(card), label: card.getAttribute('aria-label'), otherMarks: other ? other.querySelectorAll('.vam-marker').length : -1, otherLabel: other && other.getAttribute('aria-label'), row: marks(row), rowLabel: row.getAttribute('aria-label'), images: document.querySelectorAll('img[src="x"]').length, title: document.title };
       })()`);
     });
-    assert.deepEqual(plain(report.card.map(m => m.text)), ['✓', '★', 'P2', '◑', '⚑R']);
+    // P1.10b: priority, flag and progress ids are unknown values now and draw nothing, like future-x.
+    assert.deepEqual(plain(report.card.map(m => m.text)), ['✓', '★']);
     assert.ok(report.card.every(m => m.hidden === 'true'), 'symbols are aria-hidden');
-    assert.match(report.label, /標記：完成、星號、優先 2、進度 50%、紅旗$/);
-    assert.deepEqual(plain(report.row.map(m => m.text)), ['✓', '★', 'P2', '◑', '⚑R']);
+    assert.match(report.label, /標記：完成、星號$/);
+    assert.deepEqual(plain(report.row.map(m => m.text)), ['✓', '★']);
     assert.ok(report.row.every(m => m.hidden === 'true'));
-    assert.match(report.rowLabel, /標記：完成、星號、優先 2、進度 50%、紅旗$/);
+    assert.match(report.rowLabel, /標記：完成、星號$/);
     assert.equal(report.otherMarks, 0, 'a non-list value draws nothing');
     assert.ok(!/標記/.test(report.otherLabel ?? ''), 'no marker text without markers');
     assert.equal(report.images, 0, 'a hostile id is never turned into markup');

@@ -26,11 +26,6 @@ export interface ShareViewerUi {
   zoomReset: string;
   showAll: string;
   toResearch: string;
-  tierCore: string;
-  tierSupport: string;
-  tierSide: string;
-  /** Reason shown for a tier the author set by hand (no `reason`). */
-  manualReason: string;
   topicDetails: string;
   detailsButton: string;
   close: string;
@@ -129,10 +124,6 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   zoomReset: "Zoom {0}, reset to 100%",
   showAll: "Show all",
   toResearch: "To research",
-  tierCore: "Must learn",
-  tierSupport: "Learn when needed",
-  tierSide: "Skippable",
-  manualReason: "You set this",
   topicDetails: "Topic details",
   detailsButton: "Details",
   close: "Close",
@@ -162,25 +153,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   markerNames: {
     done: "Done",
     warning: "Warning",
-    star: "Star",
-    "priority-1": "Priority 1",
-    "priority-2": "Priority 2",
-    "priority-3": "Priority 3",
-    "priority-4": "Priority 4",
-    "priority-5": "Priority 5",
-    "progress-0": "Progress 0%",
-    "progress-25": "Progress 25%",
-    "progress-50": "Progress 50%",
-    "progress-75": "Progress 75%",
-    "progress-100": "Progress 100%",
-    "flag-red": "Red flag",
-    "flag-yellow": "Yellow flag",
-    "flag-green": "Green flag",
-    "flag-blue": "Blue flag",
-    smile: "Smile",
-    neutral: "Neutral",
-    sad: "Sad",
-    question: "Question"
+    star: "Star"
   },
   colorLabel: "Color: {0}",
   colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" },

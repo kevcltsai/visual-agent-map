@@ -30,6 +30,8 @@ export interface Settings {
     mapsNotified?: true;
     legacy?: { templates: Record<string, string>; tones: Record<string, string> };
   };
+  /** Persisted identity state of the notes AI cards reference (see experiences/visual-map/living-node-sources.ts). */
+  livingSourceIdentity?: unknown[];
   /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */

@@ -64,11 +64,13 @@ export type LivingResolvedSource = {
 export interface LivingAuthorizedNote {
   identity: string;
   path: string;
+  /** The file at this path is not provably the note that was bound: replaced, deleted-and-recreated or unverifiable. */
+  unresolved?: true;
 }
 
 export interface LivingSourceFailure {
   ref: LivingSourceRef;
-  reason: "missing-or-unauthorized" | "self-reference" | "ambiguous";
+  reason: "missing-or-unauthorized" | "self-reference" | "ambiguous" | "source-replaced";
   required: boolean;
 }
 
@@ -149,6 +151,10 @@ export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], p
         fail(ref, "self-reference", role);
         return;
       }
+      if (note.unresolved) {
+        fail(ref, "source-replaced", role);
+        return;
+      }
       const sameMap = byPath.get(note.path) ?? [];
       if (sameMap.length > 1) {
         fail(ref, "ambiguous", role);
@@ -182,4 +188,216 @@ export function resolveLivingSources(
   port: LivingSourcePort
 ) {
   return createLivingSourceResolver(nodes, port)(targetId, explicit, mapLinks);
+}
+
+export type LivingIdentityState = "resolved" | "dangling" | "unknown";
+/** Persisted association of one referenced note path with the file that was bound there. */
+export interface LivingIdentityEntry {
+  refId: string;
+  path: string;
+  ctime: number;
+  size: number;
+  state: LivingIdentityState;
+  continuityGen: number;
+}
+export interface LivingFileStat {
+  ctime: number;
+  size: number;
+}
+
+const STATES: readonly string[] = ["resolved", "dangling", "unknown"];
+function newRefId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+/** Corrupt entries are dropped (their reference then binds again as a first sight), never repaired by guessing. */
+export function readLivingIdentityEntries(saved: unknown): LivingIdentityEntry[] {
+  if (!Array.isArray(saved)) return [];
+  const seen = new Set<string>();
+  const result: LivingIdentityEntry[] = [];
+  for (const item of saved) {
+    const e = item as Partial<LivingIdentityEntry> | null;
+    if (
+      !e ||
+      typeof e.refId !== "string" ||
+      !e.refId ||
+      typeof e.path !== "string" ||
+      !e.path ||
+      typeof e.ctime !== "number" ||
+      typeof e.size !== "number" ||
+      typeof e.state !== "string" ||
+      !STATES.includes(e.state) ||
+      typeof e.continuityGen !== "number" ||
+      seen.has(e.path)
+    )
+      continue;
+    seen.add(e.path);
+    result.push({
+      refId: e.refId,
+      path: e.path,
+      ctime: e.ctime,
+      size: e.size,
+      state: e.state,
+      continuityGen: e.continuityGen
+    });
+  }
+  return result;
+}
+
+/**
+ * Identity state of the notes that cards reference, reduced from vault events as they happen. The state is persisted
+ * as it is: it is never recomputed from the absence of events, so a lost or rolled-over log cannot turn an unresolved
+ * source back into a resolved one. Only referenced paths are tracked and nothing is written into the source notes.
+ */
+export class LivingIdentityStore {
+  private readonly byPath = new Map<string, LivingIdentityEntry>();
+
+  constructor(
+    saved?: unknown,
+    private readonly changed: () => void = () => {},
+    private readonly makeId: () => string = newRefId
+  ) {
+    for (const entry of readLivingIdentityEntries(saved)) this.byPath.set(entry.path, entry);
+  }
+
+  entries(): LivingIdentityEntry[] {
+    return [...this.byPath.values()].map(entry => ({ ...entry }));
+  }
+
+  at(path: string): LivingIdentityEntry | undefined {
+    const entry = this.byPath.get(path);
+    return entry && { ...entry };
+  }
+
+  /** A reference is resolved for the first time (bind), or looked at again: a changed ctime means another file. */
+  observe(path: string, stat: LivingFileStat): LivingIdentityEntry {
+    const entry = this.byPath.get(path);
+    if (!entry) {
+      const fresh: LivingIdentityEntry = {
+        refId: this.makeId(),
+        path,
+        ctime: stat.ctime,
+        size: stat.size,
+        state: "resolved",
+        continuityGen: 0
+      };
+      this.byPath.set(path, fresh);
+      this.changed();
+      return { ...fresh };
+    }
+    if (entry.state === "resolved" && entry.ctime !== stat.ctime) {
+      entry.state = "unknown";
+      this.changed();
+    }
+    return { ...entry };
+  }
+
+  /** The same file moved: it keeps its identity at the new path. Whatever was recorded at the new path is another file. */
+  renamed(oldPath: string, newPath: string): void {
+    if (oldPath === newPath) return;
+    const moving = this.byPath.get(oldPath);
+    const occupant = this.byPath.get(newPath);
+    if (!moving && !occupant) return;
+    if (moving) this.byPath.delete(oldPath);
+    if (occupant) {
+      // Two bound files now claim one path: neither can be proven, so the reference needs explicit confirmation.
+      this.byPath.set(newPath, {
+        ...occupant,
+        refId: this.makeId(),
+        state: "unknown",
+        continuityGen: occupant.continuityGen + 1
+      });
+    } else if (moving) {
+      this.byPath.set(newPath, { ...moving, path: newPath, continuityGen: moving.continuityGen + 1 });
+    }
+    this.changed();
+  }
+
+  deleted(path: string): void {
+    const entry = this.byPath.get(path);
+    if (!entry || entry.state === "dangling") return;
+    entry.state = "dangling";
+    this.changed();
+  }
+
+  /** A file appeared at a referenced path. Only a deleted file that comes back with the same ctime and size is restored. */
+  created(path: string, stat: LivingFileStat): void {
+    const entry = this.byPath.get(path);
+    if (!entry) return;
+    if (entry.state === "dangling" && entry.ctime > 0 && entry.ctime === stat.ctime && entry.size === stat.size) {
+      entry.state = "resolved";
+      entry.continuityGen += 1;
+    } else if (entry.state === "resolved") entry.state = "dangling";
+    else return;
+    this.changed();
+  }
+
+  /** A content edit keeps the identity; the recorded size follows it so a restart can still prove continuity. */
+  modified(path: string, stat: LivingFileStat): void {
+    const entry = this.byPath.get(path);
+    if (!entry || entry.state !== "resolved" || entry.size === stat.size) return;
+    if (entry.ctime !== stat.ctime) {
+      entry.state = "unknown";
+    } else entry.size = stat.size;
+    this.changed();
+  }
+
+  /** After a restart a resolved reference stays resolved only if path, ctime and size all still match. */
+  revalidate(statOf: (path: string) => LivingFileStat | undefined): void {
+    let dirty = false;
+    for (const entry of this.byPath.values()) {
+      if (entry.state !== "resolved") continue;
+      const stat = statOf(entry.path);
+      if (stat && stat.ctime === entry.ctime && stat.size === entry.size) continue;
+      entry.state = "unknown";
+      dirty = true;
+    }
+    if (dirty) this.changed();
+  }
+
+  /** Only referenced paths keep a record. */
+  prune(keep: ReadonlySet<string>): void {
+    let dirty = false;
+    for (const path of [...this.byPath.keys()])
+      if (!keep.has(path)) {
+        this.byPath.delete(path);
+        dirty = true;
+      }
+    if (dirty) this.changed();
+  }
+
+  /** The user chose this file explicitly: a new identity, so consumers of the old one are recalculated. */
+  reconfirm(path: string, stat: LivingFileStat): LivingIdentityEntry {
+    const previous = this.byPath.get(path);
+    if (previous?.state === "resolved" && previous.ctime === stat.ctime) return { ...previous };
+    const entry: LivingIdentityEntry = {
+      refId: this.makeId(),
+      path,
+      ctime: stat.ctime,
+      size: stat.size,
+      state: "resolved",
+      continuityGen: (previous?.continuityGen ?? 0) + 1
+    };
+    this.byPath.set(path, entry);
+    this.changed();
+    return { ...entry };
+  }
+}
+
+const stores = new WeakMap<object, LivingIdentityStore>();
+export function setLivingIdentityStore(app: object, store: LivingIdentityStore | undefined): void {
+  if (store) stores.set(app, store);
+  else stores.delete(app);
+}
+export function livingIdentityStore(app: object): LivingIdentityStore | undefined {
+  return stores.get(app);
+}
+
+/** The configuration identity of a reference: a bound note is its persisted id, so renaming the file does not change it. */
+export function livingConfigRef(ref: LivingSourceRef, idOf: (path: string) => string | undefined): string {
+  if (ref.kind === "note" && ref.exact) {
+    const id = idOf(ref.link);
+    if (id) return JSON.stringify({ kind: "note", id });
+  }
+  return JSON.stringify(ref);
 }

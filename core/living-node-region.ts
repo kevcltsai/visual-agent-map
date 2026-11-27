@@ -124,6 +124,43 @@ export function hasLivingCommitMetadata(metadata: Record<string, unknown>): bool
   );
 }
 
+export const LIVING_GENERATION_KEY = "living-node-generation";
+export const LIVING_RECEIPTS_KEY = "living-node-receipts";
+export const LIVING_RECEIPT_LIMIT = 20;
+
+export interface LivingFence {
+  generation: number;
+  /** The last execution ids that committed, oldest first, at most LIVING_RECEIPT_LIMIT. */
+  receipts: string[];
+}
+
+/**
+ * Replay fence stored with the region metadata. A note written before V1.1 has neither key and migrates forward as
+ * generation 0 (its last execution id counts as a receipt). Malformed values fail closed and are never rewritten.
+ */
+export function readLivingFence(fm: Record<string, unknown>): LivingFence {
+  const raw = fm[LIVING_GENERATION_KEY];
+  if (raw !== undefined && (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw < 0))
+    throw new Error("invalid-generation");
+  const stored = fm[LIVING_RECEIPTS_KEY];
+  if (stored !== undefined && (!Array.isArray(stored) || stored.some(id => typeof id !== "string")))
+    throw new Error("invalid-receipts");
+  const receipts = [...((stored as string[] | undefined) ?? [])];
+  const last = fm["living-node-last-execution"];
+  if (typeof last === "string" && last && !receipts.includes(last)) receipts.push(last);
+  return { generation: raw ?? 0, receipts: receipts.slice(-LIVING_RECEIPT_LIMIT) };
+}
+
+/** The fence metadata a commit writes: one generation up, this execution recorded, receipts bounded. */
+export function livingFenceAfterCommit(fence: LivingFence, executionId: string): Record<string, unknown> {
+  return {
+    [LIVING_GENERATION_KEY]: fence.generation + 1,
+    [LIVING_RECEIPTS_KEY]: [...fence.receipts.filter(id => id !== executionId), executionId].slice(
+      -LIVING_RECEIPT_LIMIT
+    )
+  };
+}
+
 /** Copy only formal knowledge and configuration. Run diagnostics belong to the original node. */
 export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): void {
   // Resetting diagnostics must not erase the only evidence of damaged ownership.
@@ -150,6 +187,8 @@ export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): v
     "last-error"
   ])
     delete metadata[key];
+  // A copy keeps the generation (a number nobody replays against); the original's execution ids stay with the original.
+  delete metadata[LIVING_RECEIPTS_KEY];
   if (metadata.status === "running") metadata.status = "idea";
 }
 

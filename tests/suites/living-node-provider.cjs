@@ -1,7 +1,7 @@
 // Living Node V1 A33: a card whose history grew keeps updating; the provider sees a bounded recent-first projection.
 const assert = require('node:assert/strict');
 const S = require('../support.cjs');
-const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+const { commitLivingMarkdown, livingGeneration, livingSnapshotRevision, readLivingMarkdown } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
 const { generateLivingProposal } = S.load('experiences/visual-map/living-node-provider.ts', { obsidian: S.obsidian });
 const { applyLivingChanges } = S.load('experiences/visual-map/living-node-changes.ts', { obsidian: S.obsidian });
 const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Card\n';
@@ -13,7 +13,7 @@ const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source
 async function commit(f, base, operations, expected) {
   const expectedContent = expected ?? f.contents.get(path);
   const candidate = { executionId: 'x' + Math.random(), cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i', viewSession: 'v' };
-  return commitLivingMarkdown(f.repo, { path, expectedContent, candidate, base, proposal: { baseRevision: base.revision, operations }, context, signal: new AbortController().signal, isCurrent: () => true,
+  return commitLivingMarkdown(f.repo, { path, expectedContent, candidate, base, baseGeneration: livingGeneration(expectedContent), proposal: { baseRevision: base.revision, operations }, context, signal: new AbortController().signal, isCurrent: () => true,
     inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
 }
 async function bigCard(count) {

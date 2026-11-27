@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const S = require('../support.cjs');
-const { commitLivingMarkdown, livingSnapshotRevision } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+const { commitLivingMarkdown, livingGeneration, livingSnapshotRevision } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
 const { livingMarkerState, isLivingNodeNote } = S.load('core/living-node-region.ts', { obsidian: S.obsidian });
 const BEGIN = '<!-- vam-living-node:begin v1 -->', END = '<!-- vam-living-node:end v1 -->';
 const head = (flag = true) => `---\nagent-map-node: true\nagent-map-id: map\ntopic-id: map\nnode-id: card\n${flag ? 'ai-card: true\n' : ''}living-node-region-hash: "abc"\nliving-node-outcome: "ok"\ncustom-key: keep\n---\n# Title\n\n## Prompt\n\nQuestion\n\n## Detail\n\nManual detail.\n\n`;
@@ -73,7 +73,7 @@ for (const [name, tail] of Object.entries(corrupt)) for (const flag of [true, fa
     await check(() => f.repo.clearPrompt(path));
     const candidate = { executionId: 'e9', cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(before), inputRevision: 'i', viewSession: 'v' };
     await assert.rejects(() => commitLivingMarkdown({ updateNoteRawGuarded: (p, t, o) => f.repo.updateNoteRawGuarded(p, t, o) }, {
-      path, expectedContent: before, candidate, base: { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } },
+      path, expectedContent: before, candidate, baseGeneration: livingGeneration(before), base: { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } },
       proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Findings', evidence: ['e1'] }] },
       context: { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] },
       signal: new AbortController().signal, isCurrent: () => true,

@@ -220,7 +220,7 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import { renderLivingPreview } from "./living-node-markdown";
+import { livingRestoreSnapshot, renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -20533,18 +20533,27 @@ export class VisualAgentMapView extends ItemView {
   }
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;
-    const restore = async (expected: string, replacement: string): Promise<void> => {
+    // Each restore moves the note to a new generation, so the bytes the next undo/redo must find are the ones just written.
+    let at = after;
+    const restore = async (replacement: string): Promise<void> => {
       const repo = this.plugin.repo;
-      const result = await repo.updateNoteRawGuarded(path, () => replacement, {
-        expectedContent: expected,
-        authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
-      });
-      if (result !== "written") throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+      let written: string | undefined;
+      const result = await repo.updateNoteRawGuarded(
+        path,
+        current => (written = livingRestoreSnapshot(current, replacement)),
+        {
+          expectedContent: at,
+          authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
+        }
+      );
+      if (result !== "written" || written === undefined)
+        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+      at = written;
     };
     this.history.push({
       label: t("ui.living_node_run_card"),
-      undo: () => restore(after, before),
-      redo: () => restore(before, after)
+      undo: () => restore(before),
+      redo: () => restore(after)
     });
     this.updateHistoryButtons();
   }

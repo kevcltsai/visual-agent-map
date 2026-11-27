@@ -24,7 +24,12 @@ import {
 } from "./living-node-sources";
 import { LivingCoordinator } from "./living-node-coordinator";
 import { executeLivingPlan, type LivingSettlement } from "./living-node-execution";
-import { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } from "./living-node-markdown";
+import {
+  commitLivingMarkdown,
+  livingGeneration,
+  livingSnapshotRevision,
+  readLivingMarkdown
+} from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
 import { fitLivingContext, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
@@ -724,6 +729,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
               expectedContent: snapshot.content,
               candidate,
               base: input.base,
+              baseGeneration: livingGeneration(snapshot.content),
               proposal: generated.proposal,
               context: generated.context,
               signal,

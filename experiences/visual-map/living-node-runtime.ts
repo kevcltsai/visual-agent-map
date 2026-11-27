@@ -32,7 +32,7 @@ import {
 } from "./living-node-markdown";
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
-import { fitLivingContext, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
+import { fitLivingContext, livingModelView, parseLivingSelectors, resolveLivingSection } from "./living-node-retrieval";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
 import {
   applyLivingChanges,
@@ -452,7 +452,7 @@ async function readInputs(
       if (isAiCard(data.note) && !usableKnowledge(data)) throw new Error("missing-ai-knowledge");
       const knowledge = readLivingMarkdown(data.content);
       const current = knowledge.output.text || data.note.summary;
-      const text = [ownKnowledge(data.note), JSON.stringify(knowledge)].filter(Boolean).join("\n\n");
+      const text = [ownKnowledge(data.note), JSON.stringify(livingModelView(knowledge))].filter(Boolean).join("\n\n");
       add(source.identity, data.note.title, text, current);
     } else {
       const file = port.app.vault.getAbstractFileByPath(source.path);
@@ -817,7 +817,17 @@ function resolveDraft(
   reconfirm?: ReadonlySet<string>
 ) {
   if (!splitPrompt(prompt).question.trim()) throw new Error("empty-prompt");
-  const resolver = sourceResolver(app);
+  const base = sourceResolver(app);
+  // Choosing an unresolved link again is the explicit confirmation, but only a saved configuration may record it. Until
+  // then (and for a trial) the link counts as resolved without touching the identity store.
+  const pending = new Map<string, TFile>();
+  const resolver = {
+    resolveAuthorized(...args: Parameters<typeof base.resolveAuthorized>) {
+      const note = base.resolveAuthorized(...args);
+      if (note?.unresolved && pending.has(note.path)) return { identity: note.identity, path: note.path };
+      return note;
+    }
+  };
   const previousLinks = promptSourceLinks(saved.note.prompt);
   const nextLinks = promptSourceLinks(prompt);
   const raw = frontmatter(saved.content)["living-node-refs"];
@@ -827,7 +837,6 @@ function resolveDraft(
     raw === undefined || !nextLinks.some(link => previousLinks.includes(link))
       ? undefined
       : readLivingReferences(raw, previousLinks);
-  const confirmed: string[] = [];
   const explicit = reconcileLivingDraftReferences(
     previousLinks,
     persisted,
@@ -835,9 +844,11 @@ function resolveDraft(
     link => {
       const note = resolver.resolveAuthorized(link, target.path);
       if (!note) throw new Error("missing-source");
-      // Choosing the link again is the user's explicit confirmation of an unresolved source;
-      // it is recorded only after the formal save succeeds, never in a trial or before the write.
-      if (note.unresolved) confirmed.push(note.path);
+      // Choosing the link again is the user's explicit confirmation of an unresolved source.
+      if (note.unresolved) {
+        const file = app.vault.getAbstractFileByPath(note.path);
+        if (file instanceof TFile) pending.set(file.path, file);
+      }
       if (allowNewSource && !allowNewSource(note.path)) throw new Error("unauthorized-source");
       if (note.path === target.path) throw new Error("self-reference");
       const matches = cards.filter(card => card.path === note.path);
@@ -856,32 +867,28 @@ function resolveDraft(
   const proposed = cards.map(card =>
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
-  // A source the user chose again counts as confirmed for this check, but is recorded only once the save has succeeded.
-  const checked = {
-    resolveAuthorized: (...args: Parameters<typeof resolver.resolveAuthorized>) => {
-      const found = resolver.resolveAuthorized(...args);
-      return found && confirmed.includes(found.path) ? { identity: found.identity, path: found.path } : found;
-    }
-  };
-  const revisionOf = (next: ReturnType<typeof planLivingMap>): string =>
+  const next = planLivingMap(proposed, [], resolver);
+  if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
+  if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
+    throw new Error("living-node-cycle");
+  const revisionOf = (planned: typeof next) =>
     livingSnapshotRevision(
       JSON.stringify(
-        (next.sources.get(target.id)?.sources ?? [])
+        (planned.sources.get(target.id)?.sources ?? [])
           .filter(source => source.roles.includes("explicit"))
           .map(source => (source.cardId ? ["card", source.cardId] : ["note", source.identity, source.path]))
       )
     );
-  const next = planLivingMap(proposed, [], checked);
-  if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
-  if (introducesLivingCycle(cards, proposed, checked) || next.plan.blocked.get(target.id) === "cycle")
-    throw new Error("living-node-cycle");
   return {
     encoded,
     proposed,
+    resolver,
     sourceRevision: revisionOf(next),
-    confirmed,
-    /** The same revision once the confirmed sources hold their new identity. */
-    confirmedRevision: () => revisionOf(planLivingMap(proposed, [], resolver))
+    /** Records the explicit confirmations after the formal save succeeded; returns the revision under the new identities. */
+    confirm() {
+      for (const file of pending.values()) livingIdentityStore(app)?.reconfirm(file.path, file.stat);
+      return revisionOf(planLivingMap(proposed, [], resolver));
+    }
   };
 }
 
@@ -922,7 +929,7 @@ export async function saveLivingConfig(
     livingConfigurationStamp(snapshot.note.prompt, frontmatter(snapshot.content)) !== expectedConfigRevision
   )
     throw new Error("changed-configuration");
-  const { encoded, sourceRevision, confirmed, confirmedRevision } = resolveDraft(
+  const draft = resolveDraft(
     app,
     cards,
     target,
@@ -931,16 +938,10 @@ export async function saveLivingConfig(
     allowNewSource,
     reconfirm?.length ? new Set(reconfirm) : undefined
   );
+  const { encoded, sourceRevision } = draft;
   if (expectedSourceRevision !== undefined && sourceRevision !== expectedSourceRevision)
     throw new Error("changed-source-identity");
   const fm = frontmatter(snapshot.content);
-  const confirmAfterSave = (): string => {
-    for (const path of confirmed) {
-      const file = app.vault.getAbstractFileByPath(path);
-      if (file instanceof TFile) livingIdentityStore(app)?.reconfirm(file.path, file.stat);
-    }
-    return confirmed.length ? confirmedRevision() : sourceRevision;
-  };
   if (
     snapshot.note.aiCard &&
     snapshot.note.prompt === prompt &&
@@ -951,7 +952,7 @@ export async function saveLivingConfig(
       before: snapshot.content,
       after: snapshot.content,
       configRevision: livingConfigurationStamp(prompt, fm),
-      sourceRevision: confirmAfterSave()
+      sourceRevision: draft.confirm()
     };
   let saved = "";
   let savedRevision = "";
@@ -980,7 +981,7 @@ export async function saveLivingConfig(
     before: snapshot.content,
     after: saved,
     configRevision: savedRevision,
-    sourceRevision: confirmAfterSave()
+    sourceRevision: draft.confirm()
   };
 }
 
@@ -1024,8 +1025,10 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
     const saved = snapshots.get(id);
     const card = cards.find(item => item.id === id);
     if (!saved || !card || !sameLivingTarget(target, card) || saved.note.aiLocked) throw new Error("changed-target");
-    const { encoded, proposed } = resolveDraft(port.app, cards, card, prompt, saved);
-    const resolver = sourceResolver(port.app);
+    const draft = resolveDraft(port.app, cards, card, prompt, saved);
+    const { encoded, proposed } = draft;
+    // A trial treats a link the draft confirms as resolved; the formal graph keeps the stored identity state.
+    const resolver = formal ? sourceResolver(port.app) : draft.resolver;
     const planned = planLivingMap(formal ? cards : proposed, [], resolver, [id]);
     const blocked = planned.plan.blocked.get(id);
     // A trial reads direct existing knowledge, never dispatches upstream. An

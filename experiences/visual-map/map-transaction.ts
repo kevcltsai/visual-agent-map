@@ -1,4 +1,5 @@
 import { t } from "../../i18n";
+import { livingRestoreSnapshot, livingWithoutFence } from "./living-node-markdown";
 import { clone, type MapDocument } from "../../map-model";
 import { pruneAfterText } from "./canvas-items";
 import { sameApartFromStamps } from "./cross-map-history";
@@ -248,10 +249,16 @@ interface NoteStep {
 }
 const readText = (repo: Pick<Repository, "app" | "file">, path: string): Promise<string> =>
   repo.app.vault.read(repo.file(path));
-const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, text: string): Promise<void> => {
-  await repo.app.vault.process(repo.file(path), current =>
-    current.startsWith("\uFEFF") && !text.startsWith("\uFEFF") ? "\uFEFF" + text : text
-  );
+const writeText = async (
+  repo: Pick<Repository, "app" | "file">,
+  path: string,
+  text: string,
+  carryFence?: (current: string, target: string) => string
+): Promise<void> => {
+  await repo.app.vault.process(repo.file(path), current => {
+    const next = carryFence && livingWithoutFence(current) !== current ? carryFence(current, text) : text;
+    return current.startsWith("\uFEFF") && !next.startsWith("\uFEFF") ? "\uFEFF" + next : next;
+  });
 };
 
 /**
@@ -626,7 +633,12 @@ export function begin(deps: TransactionDeps): Transaction {
         if (!exists(at)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
         const expected = direction === "undo" ? note.afterExpected : note.beforeExpected;
         const current = await readText(repo, at);
-        if (!sameHistoryText(current, expected) && !repo.acceptsNoteHistory(repo.file(at), current))
+        // A Living run or its undo moves the note's replay-fence keys; any other difference still refuses.
+        if (
+          !sameHistoryText(current, expected) &&
+          !sameHistoryText(livingWithoutFence(current), livingWithoutFence(expected)) &&
+          !repo.acceptsNoteHistory(repo.file(at), current)
+        )
           throw noteConflict();
         snapshots.set(at, current);
       }
@@ -687,7 +699,13 @@ export function begin(deps: TransactionDeps): Transaction {
           restore = noteSnapshots.get(at)!;
         // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
         // A rename-back puts the note at `note.path` first, but a failed step finds it at `at` again.
-        if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
+        // The replay fence only moves forward: undo keeps the current fence, never the older one in the saved text.
+        if (undoing)
+          notes.after.push({
+            path: at,
+            restore,
+            apply: () => writeText(repo, note.path, note.beforeText, livingRestoreSnapshot)
+          });
         else {
           notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
           // The same text as the commit left: settle again once the moves rewrote their links (else undo would refuse it).

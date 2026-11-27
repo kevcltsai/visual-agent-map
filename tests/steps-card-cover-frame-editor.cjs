@@ -603,7 +603,7 @@ test('card: when the dialog cannot open (cover off, not editable) a double-click
 test('card: the right-click menu no longer has "Edit card" in any state (the picture double-click and the panel button open it)', async () => {
   const items = h => {
     const titles = [];
-    const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
+    const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, setDisabled() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
     h.view.notes = new Map([['m', { title: 'M', summary: 's' }]]);
     h.view.map = { nodes: [{ id: 'm', path: NOTE }], viewport: { x: 0, y: 0, zoom: 1 } };
     h.view.canEditText = () => false;

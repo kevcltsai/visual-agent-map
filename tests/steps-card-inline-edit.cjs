@@ -261,6 +261,16 @@ test('F2, the title double-click and the rename command all open the inline titl
   assert.deepEqual(modalNames(h), [], 'no rename dialog at all');
 });
 
+test('F2 on a card while the notes load opens no title field (as Enter), and claims the key so Obsidian does not rename the file (decision #35)', async () => {
+  const h = await harness(); place(h, 'leaf'); const f2 = h.view.scope.keys.find(k => k.key === 'F2' && k.modifiers.length === 0);
+  h.view.contentEl.ownerDocument = { activeElement: h.card('leaf') };
+  h.view.noteLoad = {};
+  assert.equal(f2.func({ key: 'F2', isComposing: false, defaultPrevented: false }, {}), false, 'the key is claimed');
+  assert.equal(titleField(h, 'leaf'), undefined, 'no title field while the notes load');
+  h.view.noteLoad = null;
+  assert.equal(f2.func({ key: 'F2', isComposing: false, defaultPrevented: false }, {}), false); assert.ok(titleField(h, 'leaf'), 'F2 works once the notes are read');
+});
+
 test('the card right-click menu, the selected card toolbar and its More list never list Rename', async () => {
   const h = await harness(); const items = [];
   const menu = { addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick() { return this; }, setDisabled() { return this; }, setSection() { return this; } }; cb(it); items.push(it.title); return menu; }, addSeparator() { return menu; } };
@@ -456,11 +466,12 @@ test('More lists card settings, the summary bracket, note style and the other to
   const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
   const more = key => menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, node(key)); });
   const leaf = more('leaf');
-  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Make it an AI card', 'Add summary bracket', 'Note style…', '—', 'Add another type']);
-  assert.ok(leaf.at(-1).sub.list.length >= 6, 'the topic types are in the submenu');
-  assert.deepEqual(more('branch').map(i => i.title).slice(0, 3), ['Card settings…', 'Make it an AI card', 'Select subtopics']);
+  // B06 (mockup §4): settings, summary bracket, note style, AI card | the new topics not on the toolbar | remove.
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', '—', 'Remove from map']);
+  assert.ok(leaf.find(i => i.title === 'Add another type').sub.list.length >= 6, 'the topic types are in the submenu');
+  assert.deepEqual(more('branch').map(i => i.title).slice(0, 3), ['Card settings…', 'Select subtopics', 'Add summary bracket']);
 });
-test('right-click on one card: the eight-item menu; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
+test('right-click on one card: the toolbar actions, then the ⋯ list in its order, Remove last; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
   const h = await harness();
   const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
   const contextMenu = key => menuTitles(h, m => {
@@ -469,8 +480,9 @@ test('right-click on one card: the eight-item menu; Collapse only with subtopics
     h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
-  assert.deepEqual(leaf.filter(t => t !== '—'), ['Add subtopic', 'Add sibling topic', 'Research this card', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
-  for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Add summary bracket', 'Note style…', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
+  // B07: the toolbar's actions (AI explore, Add subtopic, Open note, Add summary), a separator, then the ⋯ list as it is.
+  assert.deepEqual(leaf, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', '—', 'Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', '—', 'Remove from map']);
+  for (const gone of ['Research this card', 'This card', 'Select subtopics', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;
   assert.ok(contextMenu('branch').includes('Expand subtopics'), 'a folded card offers Expand');

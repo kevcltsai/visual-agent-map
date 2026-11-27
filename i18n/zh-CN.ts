@@ -945,7 +945,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_tool_add_other": "添加其他类型",
   "ui.card_settings_menu": "卡片设置…",
   "ui.card_menu_add_child": "添加子议题",
-  "ui.card_menu_research": "研究这张卡",
   "ui.card_menu_collapse": "折叠子议题",
   "ui.card_menu_expand": "展开子议题",
   "ui.card_menu_open_note": "打开笔记",

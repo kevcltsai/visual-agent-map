@@ -1003,7 +1003,6 @@ export const en = {
   "ui.card_tool_add_other": "Add another type",
   "ui.card_settings_menu": "Card settings…",
   "ui.card_menu_add_child": "Add subtopic",
-  "ui.card_menu_research": "Research this card",
   "ui.card_menu_collapse": "Collapse subtopics",
   "ui.card_menu_expand": "Expand subtopics",
   "ui.card_menu_open_note": "Open note",

@@ -314,6 +314,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-tools > .vam-ai-explore:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 80%, black); }
 .vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: var(--vam-space-2); padding-right: var(--vam-space-2); }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+/* A greyed card action says why on the line under its name (V3.3 P1.8), lined up with the title past the icon. */
+.menu-item.vam-menu-has-reason { flex-wrap: wrap; }
+.menu-item .vam-menu-reason { flex-basis: 100%; padding-inline-start: 24px; color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: normal; }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }

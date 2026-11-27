@@ -946,7 +946,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_tool_add_other": "新增其他類型",
   "ui.card_settings_menu": "卡片設定…",
   "ui.card_menu_add_child": "新增子議題",
-  "ui.card_menu_research": "研究這張卡",
   "ui.card_menu_collapse": "收合子議題",
   "ui.card_menu_expand": "展開子議題",
   "ui.card_menu_open_note": "開啟筆記",

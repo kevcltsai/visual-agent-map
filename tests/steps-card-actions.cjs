@@ -1,5 +1,6 @@
-// V3.3 P1.8a (ticket B04): the card action registry, experiences/visual-map/card-actions.ts. No entry uses it yet; every
-// expectation below is read from the entry that draws or runs the action today (experiences/visual-map/view.ts) and says where.
+// V3.3 P1.8a (ticket B04): the card action registry, experiences/visual-map/card-actions.ts. The palette, the card ⋯ and the
+// right-click read it since B05–B07; every other expectation is read from the entry that draws or runs the action today
+// (experiences/visual-map/view.ts) and says where.
 // The contexts are: normal, read-only (notes still loading: whenEditing / canEditSummary refuse), merging, AI-locked card,
 // presentation, topic selection mode, and the two picture-book locks (bookLock().ai / .structure).
 const { test } = require('node:test');
@@ -18,7 +19,7 @@ const { MAP_KEYBOARD_SHORTCUTS } = S.load('ui/modals/keyboard-shortcuts-modal.ts
 const { en } = S.load('i18n/en.ts');
 const { zhTW } = S.load('i18n/zh-TW.ts');
 const { zhCN } = S.load('i18n/zh-CN.ts');
-const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet } = actions;
+const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, commandTitleKey, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet } = actions;
 
 // a (root, child b), b (leaf under a), ai (an AI card), d (a second root).
 const nodes = [
@@ -74,20 +75,21 @@ const availability = (id, surface, ctx) => {
 
 // [action, surface, target, expected under CONTEXTS in order] — the current condition and where it is read.
 const TABLE = [
-  // Command palette (mapCommand): editable = !presentation && !multiSelectMode; the topic ones need a selected card. It reads neither notesLoading nor bookLock.
-  ['add-topic', 'command', null, 'ok ok ok ok pr ms ok ok'],
-  ['add-child', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['add-sibling', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['research', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['rename', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
+  // Command palette (mapCommand → actionsFor('command')): the card gates, the loading notes and the picture-book locks included
+  // (decision #35); the topic ones need a selected card.
+  ['add-topic', 'command', null, 'ok ro ok ok pr ms ok bk'],
+  ['add-child', 'command', 'a', 'ok ro ok ok pr ms ok bk'],
+  ['add-sibling', 'command', 'a', 'ok ro ok ok pr ms ok bk'],
+  ['research', 'command', 'a', 'ok ro ok al pr ms bk ok'],
+  ['rename', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
   ['open-note', 'command', 'a', 'ok ok ok ok ok ok ok ok'], // open-details: run(!!selected)
-  ['toggle-collapse', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
+  ['toggle-collapse', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
   ['zoom-fit', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(!!this.viewportEl)
   ['zoom-reset', 'command', null, 'ok ok ok ok ok ok ok ok'],
   ['search', 'command', null, 'ok ok ok ok pr ok ok ok'], // run(!this.presentation)
   ['shortcuts', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(true)
   // Card toolbar (paintCardToolbar): drawn only outside topic selection; every button runs through whenEditing (presentation, notesLoading).
-  ['research', 'toolbar', 'a', 'ok ro ok ok pr ms bk ok'], // if (!bookLock.ai)
+  ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
   ['add-child', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'], // if (!bookLock.structure)
   // Note: a plain button since V3.3 A5 (no whenEditing): it works while loading and presenting.
   ['open-note', 'toolbar', 'a', 'ok ok ok ok ok ms ok ok'],
@@ -114,7 +116,7 @@ const TABLE = [
   // Right-click (onCanvasContextMenu → addCardMenuActions): canEditSummary on a card; the single-card list only outside selection mode.
   ['add-child', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
   ['add-sibling', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
-  ['research', 'context', 'a', 'ok ro ok ok pr ms bk ok'],
+  ['research', 'context', 'a', 'ok ro ok al pr ms bk ok'],
   ['toggle-collapse', 'context', 'a', 'ok ro ok ok pr ms ok ok'],
   ['open-note', 'context', 'a', 'ok ro ok ok pr ms ok ok'],
   ['card-settings', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
@@ -230,12 +232,14 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
   eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
   eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
-  // openCardMoreMenu: settings, run, AI card, select subtopics, summary bracket, note style | add another type.
-  eq(ids('more', ctxFor('ai', 'normal')), ['card-settings', 'run-card', 'ai-card', 'summary-add', 'note-style', 'add-other']);
-  eq(ids('more', ctxFor('a', 'normal')), ['card-settings', 'ai-card', 'select-subtopics', 'summary-add', 'note-style', 'add-other']);
-  // addCardMenuActions then Remove: add child, sibling | research, fold | open note, settings, run, AI card, book | remove.
-  const context = actionsFor('context', ctxFor('a', 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(context, ['1:add-child', '1:add-sibling', '2:research', '2:toggle-collapse', '3:open-note', '3:card-settings', '3:ai-card', '3:book', '5:remove']);
+  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, select subtopics, summary bracket, note style, run, AI card, book |
+  // add sibling, add another type (add subtopic is on the toolbar) | fold, remove.
+  const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
+  eq(grouped('more', ctxFor('ai', 'normal')), ['3:card-settings', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:select-subtopics', '3:summary-add', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
+  eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
+  eq(ids('context', ctxFor('ai', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
   // renderSelectionBar: Merge, Research, Move to (⋯) ?, Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove.
   eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['merge', 'multi-research', 'move-to', 'selection-help', 'finish-selection']);
@@ -250,10 +254,21 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
 });
 
 test('card actions: the eleven palette commands map to actions that keep their names', () => {
-  const source = read('main.ts');
-  const list = source.slice(source.indexOf('const mapCommands'), source.indexOf('for (const [id, key, action] of mapCommands)'));
-  const commands = [...list.matchAll(/\["([^"]+)", "([^"]+)", "([^"]+)"\]/g)].map(([, id, key, mapAction]) => ({ id, key, mapAction }));
-  assert.equal(commands.length, 11);
+  // The ids, names and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids).
+  const commands = [
+    ['map-add-topic', 'ui.command_map_add_topic', 'add-topic'],
+    ['map-add-subtopic', 'ui.command_map_add_subtopic', 'add-subtopic'],
+    ['map-add-sibling', 'ui.command_map_add_sibling', 'add-sibling'],
+    ['map-ai-explore-selected', 'ui.command_map_ai_explore', 'ai-explore'],
+    ['map-rename-selected', 'ui.command_map_rename', 'rename'],
+    ['map-open-selected-details', 'ui.command_map_open_details', 'open-details'],
+    ['map-toggle-collapse-selected', 'ui.command_map_toggle_collapse', 'toggle-collapse'],
+    ['map-zoom-to-fit', 'ui.command_map_zoom_fit', 'zoom-fit'],
+    ['map-zoom-reset', 'ui.command_map_zoom_reset', 'zoom-reset'],
+    ['map-search', 'ui.command_map_search', 'search'],
+    ['map-keyboard-shortcuts', 'ui.command_map_shortcuts', 'shortcuts']
+  ].map(([id, key, mapAction]) => ({ id, key, mapAction }));
+  assert.equal(CARD_COMMANDS.length, 11);
   eq(CARD_COMMANDS.map(entry => entry.commandId), commands.map(entry => entry.id));
   for (const { id, key, mapAction } of commands) {
     const entry = CARD_COMMANDS.find(item => item.commandId === id);
@@ -261,7 +276,13 @@ test('card actions: the eleven palette commands map to actions that keep their n
     const target = action(entry.action);
     assert.ok(target.surfaces.includes('command'), id);
     assert.equal(titleKeyFor(target, 'command', ctxFor('a', 'normal')), key, id);
+    assert.equal(commandTitleKey(entry.action), key, id);
   }
+  // main.ts registers exactly these, named by commandTitleKey, each checking through mapCommand.
+  const source = read('main.ts');
+  const loop = source.slice(source.indexOf('for (const { commandId, mapAction, action } of CARD_COMMANDS)'));
+  assert.ok(loop.length < source.length, 'main.ts registers the palette commands from CARD_COMMANDS');
+  assert.match(loop.slice(0, 600), /const key = commandTitleKey\(action\);[\s\S]*id: commandId,\s*name: t\(key\),[\s\S]*mapCommand\(mapAction, checking\)/);
 });
 
 test('card actions: shortcut hints come from MAP_KEYBOARD_SHORTCUTS, and the right-click hints match it', () => {
@@ -271,7 +292,8 @@ test('card actions: shortcut hints come from MAP_KEYBOARD_SHORTCUTS, and the rig
     eq(shortcutKeysFor(item), row.keys);
   }
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /t\("ui\.card_menu_add_child"\),\s*"plus",[\s\S]{0,80}shortcutLabel\("Mod\+Enter"\)/);
+  // The ⋯ and right-click rows (addCardActions) show the first key of the action's own row.
+  assert.match(view, /const keys = shortcutKeysFor\(action\);[\s\S]{0,200}else if \(keys\?\.length\) this\.menuHint\(item, shortcutLabel\(keys\[0\]\)\)/);
   eq(shortcutKeysFor(action('add-child')), ['Mod+Enter']);
   eq(shortcutKeysFor(action('add-sibling')), ['Shift+Enter']);
 });
@@ -326,12 +348,23 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('finish-selection', ['a', 'd'], 'toolbar'), [['finishSelection']]);
 });
 
-test('card actions: the view builds the context next to mapCommand, and no entry uses the registry yet', () => {
+test('card actions: the view builds the context next to mapCommand; the palette, the card ⋯ and the right-click read the registry', () => {
   const view = read('experiences/visual-map/view.ts');
   const at = view.indexOf('  cardActionContext(');
   assert.ok(at > view.indexOf('  mapCommand(action: MapCommandAction'), 'cardActionContext follows mapCommand');
   assert.ok(at < view.indexOf('  openKeyboardShortcuts(): void'));
-  assert.equal((view.match(/actionsFor\(|CARD_ACTIONS/g) ?? []).length, 0, 'entries migrate in B05–B10');
+  // B05 mapCommand, B06/B07 addCardActions (openCardMoreMenu and addCardMenuActions call it); the other entries move in B08–B10.
+  const body = name => {
+    const start = view.indexOf(`  ${name}(`);
+    assert.ok(start >= 0, name);
+    return view.slice(start, view.indexOf('\n  }\n', start));
+  };
+  assert.equal((body('mapCommand').match(/actionsFor\(/g) ?? []).length, 1, 'mapCommand');
+  assert.equal((body('private addCardActions').match(/actionsFor\(/g) ?? []).length, 1, 'addCardActions');
+  assert.equal((view.match(/actionsFor\(/g) ?? []).length, 2, 'no other entry reads the registry yet');
+  assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
+  assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
+  assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);
 });
 
 test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {

@@ -6,7 +6,8 @@ import { markPictureParagraphs } from "./experiences/markdown-context/picture-pa
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
-import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
+import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
+import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
 import { livingCoordinator } from "./experiences/visual-map/living-node-runtime";
@@ -1446,29 +1447,19 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     // Map actions with no default hotkey (the user binds one in Obsidian's hotkey settings); each applies only while a
     // map view is active, and the topic ones only with a selected card.
-    const mapCommands: [string, TranslationKey, MapCommandAction][] = [
-      ["map-add-topic", "ui.command_map_add_topic", "add-topic"],
-      ["map-add-subtopic", "ui.command_map_add_subtopic", "add-subtopic"],
-      ["map-add-sibling", "ui.command_map_add_sibling", "add-sibling"],
-      ["map-ai-explore-selected", "ui.command_map_ai_explore", "ai-explore"],
-      ["map-rename-selected", "ui.command_map_rename", "rename"],
-      ["map-open-selected-details", "ui.command_map_open_details", "open-details"],
-      ["map-toggle-collapse-selected", "ui.command_map_toggle_collapse", "toggle-collapse"],
-      ["map-zoom-to-fit", "ui.command_map_zoom_fit", "zoom-fit"],
-      ["map-zoom-reset", "ui.command_map_zoom_reset", "zoom-reset"],
-      ["map-search", "ui.command_map_search", "search"],
-      ["map-keyboard-shortcuts", "ui.command_map_shortcuts", "shortcuts"]
-    ];
-    for (const [id, key, action] of mapCommands)
+    // The palette commands come from the card action list (their ids stay, so the user's hotkeys keep working).
+    for (const { commandId, mapAction, action } of CARD_COMMANDS) {
+      const key = commandTitleKey(action);
       this.localizedCommands.push({
         command: this.addCommand({
-          id,
+          id: commandId,
           name: t(key),
           checkCallback: checking =>
-            this.app.workspace.getActiveViewOfType(VisualAgentMapView)?.mapCommand(action, checking) ?? false
+            this.app.workspace.getActiveViewOfType(VisualAgentMapView)?.mapCommand(mapAction, checking) ?? false
         }),
         key
       });
+    }
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => void this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));

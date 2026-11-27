@@ -606,7 +606,17 @@ import {
   type PromptNoteRef,
   type PromptRunEntry
 } from "./prompt-run";
-import type { CardActionContext, CardActionHost } from "./card-actions";
+import {
+  actionsFor,
+  CARD_COMMANDS,
+  CARD_TOOLBAR,
+  cardActionKind,
+  shortcutKeysFor,
+  titleKeyFor,
+  type CardActionContext,
+  type CardActionHost,
+  type CardActionId
+} from "./card-actions";
 import {
   BOOK_SUGGEST_TIMEOUT_MS,
   BookSettingsViewModal,
@@ -9815,131 +9825,78 @@ export class VisualAgentMapView extends ItemView {
       });
     });
   }
-  /** Whether a card can become or edit an AI card (an ordinary note card; not under an AI lock or an argument card). */
-  private canSetAiCard(node: MapNode): boolean {
-    return !this.bookLock().ai && !this.isArgumentCard(node.id) && this.notes.has(node.id);
-  }
-  /** The toolbar's More list: card settings, select subtopics, summary bracket, note style, and the other topic types to add. */
+  /** The toolbar's ⋯: the card's actions that are not on its toolbar (card-actions.ts ruleMoreSet), in the list's order. */
   private openCardMoreMenu(button: HTMLElement, node: MapNode): void {
-    const map = this.map;
-    if (!map || this.presentation) return;
-    const bookLock = this.bookLock();
+    if (!this.map || this.presentation) return;
     const menu = this.newMenu(node.id);
     this.drawInDom(menu);
-    if (!bookLock.structure)
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.card_settings_menu"))
-          .setIcon("settings-2")
-          .onClick(() => this.whenEditing(() => this.openNodePanel(node, "structure")))
-      );
-    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.living_node_run_card"))
-          .setIcon("play")
-          .onClick(() => this.whenEditing(() => this.startPromptRun([node.id])))
-      );
-    if (this.canSetAiCard(node))
-      menu.addItem(item =>
-        item
-          .setTitle(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"))
-          .setIcon("star")
-          .onClick(() => this.whenEditing(() => this.openAiCardPopover(node)))
-      );
-    if (!bookLock.structure && !node.collapsed && map.nodes.some(item => item.parentId === node.id))
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.select_subtopics"))
-          .setIcon("list-checks")
-          .onClick(() => this.whenEditing(() => this.selectSubtopics(node)))
-      );
-    if (this.canEditSummary()) {
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.summary_add"))
-          .setIcon("brackets")
-          .onClick(() => this.addSummaryOver([node.id]))
-      );
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.note_style_menu"))
-          .setIcon("palette")
-          .onClick(() => void this.chooseTopicStyle(node))
-      );
-    }
-    if (!bookLock.structure) {
-      let sub: Menu | undefined;
-      menu.addSeparator();
-      menu.addItem(item => {
-        item.setTitle(t("ui.card_tool_add_other")).setIcon("plus");
-        sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
-      });
-      this.fillAddMenu(sub ?? menu, node);
-    }
+    this.addCardActions(menu, "more", node);
     const box = button.getBoundingClientRect();
     menu.showAtPosition({ x: box.left, y: box.bottom });
   }
-  /** A menu row's key or click hint, drawn after its title (an Obsidian-drawn menu only). */
-  private menuHint(item: MenuItem, text: string): void {
-    (item as unknown as { dom?: HTMLElement }).dom?.createSpan({ cls: "vam-menu-hint", text });
+  /** A menu row's key or click hint, drawn after its title (an Obsidian-drawn menu only); a reason goes on its own line. */
+  private menuHint(item: MenuItem, text: string, cls = "vam-menu-hint"): void {
+    (item as unknown as { dom?: HTMLElement }).dom?.createSpan({ cls, text });
   }
   /**
-   * A card's right-click actions in groups: new topics; research and fold; opening and settings; the picture book. Remove
-   * follows in the caller. The rarer actions (summary bracket, note style, select subtopics) are in the toolbar's More.
+   * A card's right-click actions (card-actions.ts ruleContextSet): its toolbar's, a separator, then its ⋯ list. Remove (the
+   * list's last) only when the caller asks for it.
    */
-  private addCardMenuActions(menu: Menu, node: MapNode): void {
-    const map = this.map;
-    if (!map) return;
-    const add = (title: string, icon: string, action: () => void, hint?: string): void => {
+  private addCardMenuActions(menu: Menu, node: MapNode, withRemove = false): void {
+    if (!this.map) return;
+    this.addCardActions(menu, "context", node, withRemove ? [] : ["remove"]);
+  }
+  /**
+   * The card actions `surface` offers for `node`, in order: a separator after the toolbar's part and between groups. One that
+   * cannot run now stays, greyed, with its reason on the next line; a click checks again before it runs.
+   */
+  private addCardActions(
+    menu: Menu,
+    surface: "more" | "context",
+    node: MapNode,
+    skip: readonly CardActionId[] = []
+  ): void {
+    const ctx = { ...this.cardActionContext(node), surface };
+    const kind = cardActionKind(ctx);
+    const toolbar: readonly CardActionId[] = kind === "card" || kind === "ai-card" ? CARD_TOOLBAR[kind] : [];
+    let section: number | "toolbar" | null = null;
+    for (const { action, availability } of actionsFor(surface, ctx)) {
+      if (skip.includes(action.id)) continue;
+      const next = toolbar.includes(action.id) ? "toolbar" : action.group;
+      if (section !== null && next !== section) menu.addSeparator();
+      section = next;
+      // The picture book draws its own row and submenu (addBookMenu).
+      if (action.id === "book") {
+        action.run(ctx, { menu });
+        continue;
+      }
+      const run = (newTab: boolean, target?: Menu): void =>
+        this.whenEditing(() => {
+          const now = { ...this.cardActionContext(node), surface };
+          if (action.available(now).ok) action.run(now, { newTab, menu: target });
+        });
+      let sub: Menu | undefined;
       menu.addItem(item => {
-        item
-          .setTitle(title)
-          .setIcon(icon)
-          .onClick(() => this.whenEditing(action));
-        if (hint) this.menuHint(item, hint);
+        item.setTitle(t(titleKeyFor(action, surface, ctx))).setIcon(action.iconFor?.(ctx) ?? action.icon);
+        if (action.warning) item.setWarning(true);
+        if (!availability.ok) {
+          item.setDisabled(true);
+          (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
+          this.menuHint(item, t(availability.reasonKey), "vam-menu-reason");
+          return;
+        }
+        if (action.id === "add-other") {
+          sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+          return;
+        }
+        item.onClick(event => run(!!event && (event.metaKey || event.ctrlKey)));
+        const keys = shortcutKeysFor(action);
+        if (action.id === "open-note") this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
+        else if (keys?.length) this.menuHint(item, shortcutLabel(keys[0]));
       });
-    };
-    const bookLock = this.bookLock();
-    if (!bookLock.structure) {
-      add(
-        t("ui.card_menu_add_child"),
-        "plus",
-        () => this.enqueue(() => this.addNode(node)),
-        shortcutLabel("Mod+Enter")
-      );
-      add(
-        t("ui.card_menu_add_sibling"),
-        "list-plus",
-        () => this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null)),
-        shortcutLabel("Shift+Enter")
-      );
+      // The other topic types fill its submenu (or this menu, where submenus are not drawn); choosing one adds the topic.
+      if (action.id === "add-other" && availability.ok) action.run(ctx, { menu: sub ?? menu });
     }
-    menu.addSeparator();
-    if (!bookLock.ai) add(t("ui.card_menu_research"), "sparkles", () => this.openTopicChat(node));
-    if (map.nodes.some(item => item.parentId === node.id))
-      add(
-        node.collapsed ? t("ui.card_menu_expand") : t("ui.card_menu_collapse"),
-        node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
-        () => this.toggleCollapsed(node)
-      );
-    menu.addSeparator();
-    menu.addItem(item => {
-      item
-        .setTitle(t("ui.card_menu_open_note"))
-        .setIcon("file-text")
-        .onClick(event => (event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)));
-      this.menuHint(item, t("ui.card_menu_open_note_hint", shortcutLabel("Mod")));
-    });
-    if (!bookLock.structure) add(t("ui.card_settings_menu"), "settings-2", () => this.openNodePanel(node, "structure"));
-    if (isAiCard(this.notes.get(node.id)) && !this.notes.get(node.id)?.aiLocked && !bookLock.ai)
-      add(t("ui.living_node_run_card"), "play", () => this.startPromptRun([node.id]));
-    if (this.canSetAiCard(node))
-      add(t(isAiCard(this.notes.get(node.id)) ? "ui.ai_card_edit" : "ui.ai_card_set"), "star", () =>
-        this.openAiCardPopover(node)
-      );
-    this.addBookMenu(menu, node);
-    menu.addSeparator();
   }
   /** "Picture book ▸": rewrite this chapter and the chapter role, only for a card that is a chapter of this map's book. */
   private addBookMenu(menu: Menu, node: MapNode): void {
@@ -10209,11 +10166,15 @@ export class VisualAgentMapView extends ItemView {
         event.preventDefault();
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu = this.newMenu(cardId);
-        // One topic outside topic selection: the card's own actions come first, in groups (the toolbar's actions).
+        // One topic outside topic selection: the card's whole list (its toolbar's, then its ⋯ list, Remove last), drawn by
+        // Obsidian so a greyed row can show its reason.
         const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
         const single = topic && !this.selection.state.multiSelectMode ? topic : undefined;
-        if (single) this.addCardMenuActions(menu, single);
-        // A single card has these in its toolbar's More list; a selection of cards keeps them here.
+        if (single) {
+          this.drawInDom(menu);
+          this.addCardMenuActions(menu, single, true);
+        }
+        // A selection of cards keeps these here.
         if (!single)
           menu.addItem(item =>
             item
@@ -10229,15 +10190,6 @@ export class VisualAgentMapView extends ItemView {
               .setIcon("palette")
               .onClick(() => void this.chooseTopicStyle(topic))
           );
-        if (single && !this.bookLock().structure) {
-          menu.addItem(item =>
-            item
-              .setTitle(t("ui.remove_from_map"))
-              .setIcon("trash-2")
-              .setWarning(true)
-              .onClick(() => this.whenEditing(() => this.removeByKey(single)))
-          );
-        }
         // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the card, where a keyboard user is.
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
@@ -11892,54 +11844,26 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /**
-   * The map commands of the command palette (they can take a hotkey): `checking` answers whether the command applies to
-   * this view now. Editing commands need an editable map (no AIM map, no presentation); the topic ones a selected card.
+   * The map commands of the command palette (they can take a hotkey; main.ts registers CARD_COMMANDS): `checking` answers
+   * whether the command applies to this view now. Each runs its card action (card-actions.ts), under the same gates as the
+   * card's menus; one that cannot run now is not offered (the palette lists no disabled commands).
    */
   mapCommand(action: MapCommandAction, checking: boolean): boolean {
     const map = this.map;
     if (!map || this.closed) return false;
-    const editable = !this.presentation && !this.selection.state.multiSelectMode;
-    const selected = map.nodes.find(node => node.id === this.selection.state.selected);
-    const note = selected ? this.notes.get(selected.id) : undefined;
-    const run = (applies: boolean, work: () => void): boolean => {
-      if (!applies) return false;
-      if (!checking) work();
-      return true;
-    };
-    switch (action) {
-      case "add-topic":
-        return run(editable, () => this.enqueue(() => this.addNode(null)));
-      case "add-subtopic":
-        return run(editable && !!selected, () => this.enqueue(() => this.addNode(selected!)));
-      case "add-sibling":
-        return run(editable && !!selected, () =>
-          this.enqueue(() => this.addNode(map.nodes.find(node => node.id === selected!.parentId) ?? null))
-        );
-      case "ai-explore":
-        return run(editable && !!selected, () => this.openTopicChat(selected!));
-      case "rename":
-        return run(editable && !!note, () => this.startCardTitleEdit(selected!, { select: true }));
-      case "open-details":
-        return run(!!selected, () => this.openDetails(selected!));
-      case "toggle-collapse":
-        return run(editable && !!selected && map.nodes.some(item => item.parentId === selected.id), () =>
-          this.collapseByKey(selected!)
-        );
-      case "zoom-fit":
-        return run(!!this.viewportEl, () => this.fit());
-      case "zoom-reset":
-        return run(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
-      case "search":
-        return run(!this.presentation, () => this.openMapSearch());
-      case "shortcuts":
-        return run(true, () => this.openKeyboardShortcuts());
-    }
+    const id = CARD_COMMANDS.find(entry => entry.mapAction === action)?.action;
+    const selected = map.nodes.find(node => node.id === this.selection.state.selected) ?? null;
+    const ctx = { ...this.cardActionContext(selected), surface: "command" as const };
+    const entry = actionsFor("command", ctx).find(row => row.action.id === id);
+    if (!entry?.availability.ok) return false;
+    if (!checking) entry.action.run(ctx);
+    return true;
   }
   /** The card action registry's view methods (card-actions.ts), made once. */
   private cardActionHost?: CardActionHost;
   /**
    * What a card action reads now (card-actions.ts): one card, a selection or the right-clicked cards (`ids`), or the map
-   * (null). No entry uses it yet; the entries move to the registry in B05–B10.
+   * (null). The palette, the card ⋯ and the right-click menu read it (B05–B07); the other entries move to it in B08–B10.
    */
   cardActionContext(target: MapNode | readonly string[] | null): CardActionContext {
     const node = target && "id" in target ? target : null;

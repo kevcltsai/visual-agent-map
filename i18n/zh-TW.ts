@@ -3,6 +3,8 @@ import type { TranslationKey } from "./en";
 /** Traditional Chinese (Taiwan) dictionary. */
 export const zhTW: Record<TranslationKey, string> = {
   "error.recovery_write_conflict": "存檔前檔案已變更。請重新開啟後再試一次。",
+  "error.living_node_markers_damaged":
+    "這張卡片的 Living Node 標記已損毀（未成對或重複），所以 VAM 沒有更動這張卡片。沒有修復任何內容；請手動修正或移除標記。",
   "error.recovery_backup_failed": "無法確認復原副本完整，原檔未改動。",
   "log.recovery_snapshot_retained_0": "已保留復原副本：{0}",
   "log.recovery_scan_failed": "無法檢查尚待處理的復原副本。",

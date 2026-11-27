@@ -1580,7 +1580,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         try {
           await this.saveSettings();
         } catch (error) {
-          this.logs.appendLog("warn", `Living Node source identity was not saved: ${String(error)}`);
+          this.logs.appendLog("warn", `living_identity_save_failed ${String(error)}`);
         }
       });
     });

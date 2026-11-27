@@ -25,3 +25,36 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
   })();
   return { key, reason: t(key), code };
 }
+
+/**
+ * The localized reason a configuration save was refused, or null for a code this does not know (the caller then falls
+ * back to its generic failure line). Only a bare code is read, as for the trial.
+ */
+export function livingSaveReason(error: unknown): TranslationKey | null {
+  const message = String((error as { message?: unknown } | null)?.message ?? error);
+  switch (message) {
+    case "empty-prompt":
+      return "ui.living_node_save_reason_empty";
+    case "self-reference":
+      return "ui.living_node_save_reason_self";
+    case "living-node-cycle":
+      return "ui.living_node_reason_cycle";
+    case "unauthorized-source":
+    case "missing-source":
+    case "invalid-source":
+      return "ui.living_node_reason_missing_source";
+    case "ambiguous-source":
+      return "ui.living_node_save_reason_ambiguous";
+    case "changed-configuration":
+    case "changed-target":
+    case "changed-target-identity":
+    case "changed-source-identity":
+    case "changed-source-resolution":
+    case "missing-target":
+      return "ui.living_node_save_reason_changed";
+    case "locked-target":
+      return "ui.ai_locked_notice";
+    default:
+      return null;
+  }
+}

@@ -388,15 +388,26 @@ test('21: typing in the field and Enter renames the card (one more undo step); t
   assert.equal(nameField(h, fresh.id), undefined);
 });
 
-// A blank name is not a cancel: it keeps the default name and the card (unchanged).
-test('21: a blank name keeps the default name and adds no empty card', async () => {
-  const h = await harness(); realAdd(h);
-  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
-  const fresh = freshCard(h), past = h.view.history.past.length, notes = noteCount(h);
-  const field = nameField(h, fresh.id); field.value = '   '; press(field, 'Enter'); await tick(); await tick();
-  assert.equal(h.view.notes.get(fresh.id).title, 'New topic', 'the default name stays');
-  assert.equal(h.map().nodes.length, 5); assert.equal(noteCount(h), notes); assert.equal(h.view.history.past.length, past, 'no history entry for the ended edit');
-  assert.equal(h.view.inlineName, null); assert.equal(nameField(h, fresh.id), undefined);
+// V3.3 P1.3 / A6 spec change (was: "a blank name keeps the default name"): a blank name on a new card cancels it, like Esc,
+// for every way of adding (Mod+Enter, Shift+Enter, toolbar, edge entry). Enter and leaving (blur) both count.
+test('21 (V3.3 P1.3): a blank name on a new card, by Enter or by blur, takes the add back: no card, no Map.md node, no note, no redo', async () => {
+  for (const how of ['Enter', 'blur']) {
+    const h = await harness(); realAdd(h);
+    await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+    const fresh = freshCard(h), notes = noteCount(h);
+    const trashFile = h.app.fileManager.trashFile;
+    h.app.fileManager.trashFile = async file => { await trashFile(file); h.contents.delete(file.path); };
+    const field = nameField(h, fresh.id); field.value = '   ';
+    if (how === 'Enter') press(field, 'Enter'); else field.handlers.get('blur')();
+    await until(() => h.map().nodes.length === 4); await tick(); await tick();
+    assert.equal(h.view.notes.get(fresh.id), undefined, `${how}: the card is gone`);
+    assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, `${how}: no node in the map`);
+    assert.equal((await h.saved()).nodes.some(n => n.id === fresh.id), false, `${how}: no node in Map.md`);
+    assert.equal(noteCount(h), notes - 1, `${how}: the note is gone`);
+    assert.equal(h.view.history.canRedo, false, `${how}: no redo`);
+    assert.equal(h.view.inlineName, null);
+    assert.equal(h.view.focusNodeId, h.ids.leaf, `${how}: focus is handed back to the parent card, as Esc does`);
+  }
 });
 
 // UI audit bugfix-2 (add-topic-esc-keeps-card): Esc cancels the add, so the new topic leaves the map and its note is gone.

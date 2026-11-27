@@ -947,6 +947,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_menu_add_sibling": "添加同层议题",
   "ui.card_tool_research": "研究",
   "ui.card_tool_add": "添加",
+  "ui.card_edge_add": "＋ 议题卡片",
+  "ui.card_edge_add_label": "在此卡片下添加议题卡片",
   "ui.card_tool_note": "笔记",
   "ui.card_tool_add_summary": "加摘要",
   "ui.card_tool_note_label": "笔记：在右侧栏打开（⌘／Ctrl 点＝新标签页）",

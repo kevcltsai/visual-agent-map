@@ -168,6 +168,7 @@ import {
   type CoverLook,
   type CoverPosition
 } from "./card-cover";
+import { paintCardEdge, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
@@ -2967,6 +2968,11 @@ export class VisualAgentMapView extends ItemView {
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
       // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
       if (value === null && edit?.created && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep, node.parentId ?? null);
+        return;
+      }
+      // A new topic left with a blank name (Enter or leaving, V3.3 P1.3) is cancelled the same way: no card, no note.
+      if (value !== null && !value.trim() && edit?.created && edit.createdStep) {
         this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
@@ -9682,6 +9688,49 @@ export class VisualAgentMapView extends ItemView {
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
   }
+  /** The edge "+ Topic card" on a single editable card (V3.3 A6); it sits on the card's edge and never changes its size. */
+  private paintCardEdgeEntries(card: HTMLElement, node: MapNode): void {
+    if (
+      !this.cardTextEditable() ||
+      this.bookLock().structure ||
+      !this.plugin.settings ||
+      !isManagedMapPath(this.plugin.settings, this.path)
+    )
+      return;
+    paintCardEdge(
+      card,
+      [
+        {
+          kind: "add",
+          label: t("ui.card_edge_add"),
+          ariaLabel: t("ui.card_edge_add_label"),
+          onClick: () => this.addTopicFromEdge(node)
+        }
+      ],
+      this.edgeSideOf(node),
+      !this.renderingCard
+    );
+  }
+  /** The side child cards grow toward (read from the layout, never changed); other layouts fall back to the right. */
+  private edgeSideOf(node: MapNode): CardEdgeSide {
+    const direction = this.map ? this.directionOf(this.map, node.id) : "right";
+    return direction === "left" || direction === "down" || direction === "up" ? direction : "right";
+  }
+  /** True from the click on an edge entry until its topic is made: a second click (or an old button) adds nothing. */
+  private edgeAddPending = false;
+  private addTopicFromEdge(node: MapNode): void {
+    if (this.edgeAddPending || this.inlineName?.created) return;
+    this.whenEditing(() => {
+      this.edgeAddPending = true;
+      this.enqueue(async () => {
+        try {
+          await this.addNode(node);
+        } finally {
+          this.edgeAddPending = false;
+        }
+      });
+    });
+  }
   /** Whether a card can become or edit an AI card (an ordinary note card; not under an AI lock or an argument card). */
   private canSetAiCard(node: MapNode): boolean {
     return !this.bookLock().ai && !this.isArgumentCard(node.id) && this.notes.has(node.id);
@@ -12749,6 +12798,7 @@ export class VisualAgentMapView extends ItemView {
           this.inlineSummary?.id !== node.id &&
           isPlaceholder(note.summary)
       );
+    if (note) this.paintCardEdgeEntries(card, node);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
     const active =

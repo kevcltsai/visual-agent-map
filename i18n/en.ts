@@ -1005,6 +1005,8 @@ export const en = {
   "ui.card_menu_add_sibling": "Add sibling topic",
   "ui.card_tool_research": "Research",
   "ui.card_tool_add": "Add",
+  "ui.card_edge_add": "+ Topic card",
+  "ui.card_edge_add_label": "Add a topic card under this card",
   "ui.card_tool_note": "Note",
   "ui.card_tool_add_summary": "Add summary",
   "ui.card_tool_note_label": "Note: open in the right sidebar (Cmd/Ctrl-click: new tab)",

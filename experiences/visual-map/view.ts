@@ -1433,10 +1433,11 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       readMap: () => this.plugin.repo.readMap(this.path),
       readCard: path => this.plugin.readBookCardForChat(path),
-      updateNoteGuarded: (path, patch, options) => this.plugin.repo.updateNoteGuarded(path, patch, options),
+      updateNoteGuarded: (path, patch, options) =>
+        this.plugin.repo.updateNoteGuarded(path, patch, { ...options, rejectAiCard: true }),
       language: () => this.plugin.settings.language,
       updateNoteRawGuarded: (path, transform, options) =>
-        this.plugin.repo.updateNoteRawGuarded(path, transform, options),
+        this.plugin.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
       editStructure: (ops, expect, opening) => this.plugin.editBookStructureAtReview(this.path, ops, expect, opening)
     };
   }
@@ -12114,7 +12115,7 @@ export class VisualAgentMapView extends ItemView {
   }): void {
     const path = job.path;
     // AI lock: no diagrams are asked for a locked topic, and a result that lands after a lock is not written.
-    if (job.saved.aiLocked) return;
+    if (job.saved.aiLocked || job.saved.aiCard) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = this.map ?? undefined;
     this.plugin.addChartsAfterWrite({
@@ -12125,21 +12126,22 @@ export class VisualAgentMapView extends ItemView {
       model: job.model,
       apply: async charted => {
         if (this.plugin.topicRuns.isBusy(path)) return false;
-        const latest = await this.plugin.repo.readNote(path, map);
-        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
+        const { note: latest, content: expectedContent } = await this.plugin.repo.readNoteSnapshot(path, map);
+        if (latest.aiLocked || latest.aiCard || this.chartSnapshot(latest) !== snapshot) return false;
         // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
         // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
         const top = job.updateMode === "top";
         if (top && !job.preserve?.(charted)) return false;
-        await this.plugin.repo.updateNote(
+        const outcome = await this.plugin.repo.updateNoteGuarded(
           path,
           {
             detail: top
               ? charted
               : canonicalDetail(guardInlineHtmlLinks(charted), noteLanguageOf(job.language), job.template)
           },
-          { detailTemplate: job.template }
+          { detailTemplate: job.template, expectedContent, rejectAiCard: true }
         );
+        if (outcome !== "written") return false;
         const after = await this.plugin.repo.readNote(path, map);
         if (!this.closed) this.recordNoteWrite(path, latest, after, ["detail"], t("ui.add_charts_history"));
         for (const view of this.plugin.views()) if (view !== this) view.history.clear();

@@ -137,6 +137,17 @@ test('paste gate: pasting a reference needs a remembered card; refused on a read
   assert.ok(ro.notices.length > 0);
 });
 
+test('addKnowledgeRef re-checks the edit gate when it runs: an AIM map and presentation mode write nothing', async () => {
+  const target = { mapId: 'map-x', nodeId: 'n', mapPath: 'x.md' };
+  const aim = await harness({ aim: true });
+  await aim.view.addKnowledgeRef(target, aim.ids.root); await aim.settle();
+  assert.equal((await aim.saved()).knowledgeRefs.length, 1, 'AIM: nothing added');
+  const pres = await harness();
+  pres.view.presentation = true;
+  await pres.view.addKnowledgeRef(target, pres.ids.root); await pres.settle();
+  assert.equal((await pres.saved()).knowledgeRefs.length, 1, 'presentation: nothing added');
+});
+
 test('remove reference (Delete key and the menu) removes only this map\'s reference, never the original', async () => {
   const h = await harness();
   await h.settle();

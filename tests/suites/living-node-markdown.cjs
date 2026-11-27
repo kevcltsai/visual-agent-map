@@ -818,7 +818,7 @@ S.integrationTest('Living Node share: only verified public web evidence is expor
   assert.doesNotMatch(shared, /secret|localhost|private|unverified|web:/);
 });
 
-const { normalizeLivingProposal, explicitlyRequiresLivingWeb } = S.load('experiences/visual-map/living-node-provider.ts', { obsidian: S.obsidian });
+const { normalizeLivingProposal, explicitlyRequiresLivingWeb, livingWebPolicy, generateLivingProposal } = S.load('experiences/visual-map/living-node-provider.ts', { obsidian: S.obsidian });
 S.integrationTest('Living Node web: actual checked source is required even for no-change, and current answer must cite it', async () => {
   const url = 'https://example.com/current';
   const other = 'https://example.com/other';
@@ -839,4 +839,23 @@ S.integrationTest('Living Node web: actual checked source is required even for n
   assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [] }] }), /required-web-evidence-missing/);
   assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [other] }] }), /required-web-evidence-missing/);
   assert.throws(() => normalize({ ...envelope, operations: [{ kind: 'supplement', id: 'r1', evidence: [url] }, { ...op, evidence: [] }] }), /required-web-output-evidence-missing/);
+});
+
+S.integrationTest('Living Node web: forbidden policy disables the tool at dispatch and refuses unexpected web proof', async () => {
+  assert.equal(livingWebPolicy('只用本地筆記分析今日資訊'), 'forbidden');
+  assert.equal(livingWebPolicy('Search the web for news'), 'required');
+  assert.equal(livingWebPolicy('Summarize local notes'), 'optional');
+  const url = 'https://example.com/news';
+  assert.throws(() => normalizeLivingProposal({ baseRevision: 'empty', requiresWeb: false, operations: [] }, [url], [], 't', false, true), /forbidden-web-search/);
+  assert.throws(() => normalizeLivingProposal({ baseRevision: 'empty', requiresWeb: true, operations: [] }, [], [], 't', false, true), /forbidden-web-search/);
+  const calls = { run: async (prepared, options, finish) => {
+    assert.equal(options.task.webSearch, false);
+    assert.equal(options.task.webSearchOnly, false);
+    assert.equal(options.task.textOnly, true);
+    assert.equal(options.task.optionalWebSearch, false);
+    assert.equal(options.task.searchBudget, 0);
+    return finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, checkedWeb: [], operations: [{ kind: 'output', text: 'Local result', evidence: [] }] }), { signal: options.signal, parsed() {} });
+  } };
+  const result = await generateLivingProposal(calls, { prompt: '不要上網，只用本地筆記', language: 'zh-TW', model: undefined, base: empty(), context: '{"documents":[],"warnings":[]}', evidence: [], mapPath: 'Map.md' }, new AbortController().signal);
+  assert.equal(result.proposal.operations[0].text, 'Local result');
 });

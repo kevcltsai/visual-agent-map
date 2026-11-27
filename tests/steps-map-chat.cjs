@@ -2206,6 +2206,18 @@ test('Living Node chat: the older structural guard codes keep precedence over li
   assert.equal(code(edit('x.md', '---\nhypothesis-leaning: supported\n---\n', `---\nhypothesis-leaning: refuted\n${card}---\n`)), 'hypothesis_frontmatter_changed');
 });
 
+test('Living Node chat: the guard reads YAML metadata through the injected parser, and an unparseable block is refused', () => {
+  // "ai-card" is the key ai-card to a YAML parser but not to a line pattern.
+  const escaped = '---\n"ai\\u002dcard": true\n---\n# Card';
+  const parse = text => (text.includes('\\u002d') ? { 'ai-card': true } : {});
+  assert.equal(code(create('x.md', escaped)), 'ok', 'without a parser only the lexical check runs');
+  assert.equal(code(create('x.md', escaped, { parseFrontmatter: parse })), 'living_node_protected');
+  assert.equal(code(edit('x.md', escaped, '# gone', undefined, { parseFrontmatter: parse })), 'living_node_protected');
+  assert.equal(code(create('x.md', '---\ntitle: x\n---\n# ok', { parseFrontmatter: parse })), 'ok');
+  const broken = () => { throw new Error('bad yaml'); };
+  assert.equal(code(create('x.md', '---\ntitle: x\n---\n# t', { parseFrontmatter: broken })), 'living_node_protected');
+});
+
 test('Living Node chat: the saved prompt baseline is only granted to a fully shown card', () => {
   const selected = topic('a', { livingPrompt: 'Research X', livingConfigRevision: 'v1' });
   const shown = context({ selected: [selected] });

@@ -169,3 +169,17 @@ test('B13-6: an edit written while focused (persist) keeps the pre-focus viewpor
   assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.viewport)), { x: 12, y: 34, zoom: 0.9 });
 });
 
+
+test('B13-7: undoing a map rename while focused writes the pre-focus viewport', async () => {
+  const h = await harness();
+  h.view.map.viewport = { x: 12, y: 34, zoom: 0.9 };
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.enterBranchFocus(h.ids.branch);
+  h.view.map.viewport = { x: 700, y: 700, zoom: 2.5 };
+  h.view.app.workspace = { requestSaveLayout() {} };
+  await h.view.renameMapTo('Renamed');
+  await h.view.travel(false);
+  const onDisk = await h.repo.readMap(h.view.path);
+  assert.deepEqual(JSON.parse(JSON.stringify(onDisk.viewport)), { x: 12, y: 34, zoom: 0.9 });
+  assert.equal(onDisk.title, 'Focus', 'the undo did restore the title');
+});

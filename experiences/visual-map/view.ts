@@ -11838,7 +11838,9 @@ export class VisualAgentMapView extends ItemView {
       }
       this.followedFrom = null;
       this.map = clone(map);
-      await this.plugin.repo.saveMap(this.path, this.map);
+      // One branch shown alone is view-only: Map.md keeps the camera from before the focus.
+      const written = this.branchFocus ? { ...this.map, viewport: { ...this.branchFocus.viewport } } : this.map;
+      await this.plugin.repo.saveMap(this.path, written);
       await this.plugin.rebuildDerivedData();
       this.render();
     };

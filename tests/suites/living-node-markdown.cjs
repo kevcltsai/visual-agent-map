@@ -196,7 +196,7 @@ S.integrationTest('Living Node: explicit no-match is persisted, but clearing it 
   const retry = { base, proposal: emptyProposal, candidate: { executionId: 'e2' } };
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, retry)), /missing-formal-result/);
   const trial = new LivingTrial(new LivingCoordinator());
-  assert.equal(await trial.run(trialRequest(f, async () => emptyProposal, retry)), false);
+  assert.equal(await trial.run(trialRequest(f, async () => emptyProposal, request(f, retry))), false);
   assert.equal(trial.state, 'error');
   assert.equal(f.contents.get(path), edited);
 });

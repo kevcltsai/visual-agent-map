@@ -441,8 +441,8 @@ function arrangeVerticalBranch(
         // The drawn box, when the caller measured one, replaces the stored size.
         const drawn = hints?.boxOf?.(node.id);
         const other = drawn?.h ?? cardHeight(heightOf, node.id);
-        const left = drawn?.x ?? node.x;
-        const top = drawn?.y ?? node.y;
+        const left = node.x + (drawn?.dx ?? 0);
+        const top = node.y + (drawn?.dy ?? 0);
         const right = left + (drawn?.w ?? obstacleWidth(node));
         const x = point.x + shiftX;
         if (

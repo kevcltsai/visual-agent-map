@@ -38,7 +38,7 @@ test('a: right, new card mid-column with a tall cover pushes later siblings and 
 test('b: manual card sizes from boxOf decide the overlap', () => {
   const nodes = [...column(), node('n', 'root', 360, 100)];
   const boxes = { p2: { w: 400, h: 300 } };
-  const boxOf = id => { const n = nodes.find(item => item.id === id); return n ? { x: n.x, y: n.y, w: boxes[id]?.w ?? 280, h: boxes[id]?.h ?? 100 } : undefined; };
+  const boxOf = id => { const n = nodes.find(item => item.id === id); return n ? { dx: 0, dy: 0, w: boxes[id]?.w ?? 280, h: boxes[id]?.h ?? 100 } : undefined; };
   const result = push.pushAffected(nodes, new Set(['n']), { boxOf, heightOf: heights(), decorations: [], layout: { direction: 'right' } });
   assert.deepEqual(pos(result, 'p2'), [360, 224]);
   assert.deepEqual(pos(result, 'p3'), [360, 348]);
@@ -169,7 +169,48 @@ test('m: arrangeNewBranch down map keeps the slide-along-x rule: nothing else mo
 
 test('n: arrangeNewBranch passes boxOf to the push (a wider measured previous card makes more room)', () => {
   const nodes = [node('root', null, 0, 0), node('p1', 'root', 360, 0), node('n', 'root', 0, 0), node('p3', 'root', 360, 124)];
-  const boxOf = id => (id === 'p1' ? { x: 360, y: 0, w: 280, h: 400 } : undefined);
+  const boxOf = id => (id === 'p1' ? { dx: 0, dy: 0, w: 280, h: 400 } : undefined);
   const out = place(nodes, ['n'], 'right', { push: { boxOf } });
   assert.ok(xy(out, 'n')[1] >= 400);
+});
+
+test('o: a card already drawn and moved is measured where it is now (boxOf is an offset, not a stored position)', () => {
+  // m was drawn far below; this arrangement put it at y 124 on top of p2 (which has a 300-high drawn box).
+  const nodes = [...column(), node('m', 'root', 360, 124)];
+  const boxOf = id => ({ dx: 0, dy: 0, w: 280, h: id === 'p2' ? 300 : 100 });
+  const result = push.pushAffected(nodes, new Set(['m']), { boxOf, heightOf: heights(), decorations: [], layout: { direction: 'right' } });
+  const [, my] = pos(result, 'm');
+  const [, p2y] = pos(result, 'p2');
+  const m = { l: 360, r: 640, t: my, b: my + 100 }, p2 = { l: 360, r: 640, t: p2y, b: p2y + 300 };
+  assert.equal(cross(m, p2), false, 'm and p2 must not overlap');
+});
+
+test('p: an old card pushed into a fixed text block moves on past it instead of spinning', () => {
+  const nodes = [...column(), node('n', 'root', 360, 124), node('T', null, 360, 400, { path: '' })];
+  const result = push.pushAffected(nodes, new Set(['n']), { heightOf: heights(), decorations: [], fixed: new Set(['T']), layout: { direction: 'right' } });
+  assert.deepEqual(pos(result, 'T'), [360, 400], 'the text block stays');
+  noOverlap(result);
+});
+
+test('q: a card inserted on top of many siblings is pushed in about linear time (against a baseline from the same run)', () => {
+  const build = count => {
+    const many = [node('root', null, 0, 0), node('n', 'root', 360, 0)];
+    for (let i = 0; i < count; i++) many.push(node(`c${i}`, 'root', 360, i * 124));
+    return many;
+  };
+  const timed = count => {
+    const many = build(count);
+    let best = Infinity, result;
+    for (let k = 0; k < 3; k++) {
+      const started = process.hrtime.bigint();
+      result = push.pushAffected(many, new Set(['n']), { heightOf: heights(), decorations: [], layout: { direction: 'right' } });
+      best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
+    }
+    return { best, result };
+  };
+  const small = timed(30);
+  const large = timed(300);
+  assert.deepEqual(pos(large.result, 'c299'), [360, 299 * 124 + 124]);
+  // 10x the cards: linear is ~10x, quadratic ~100x, cubic ~1000x.
+  assert.ok(large.best < 40 * Math.max(small.best, 0.2), `30 siblings ${small.best}ms, 300 siblings ${large.best}ms`);
 });

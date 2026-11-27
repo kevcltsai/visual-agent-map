@@ -1885,6 +1885,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private pushHints(map: MapDocument): PushHints {
     const zoom = map.viewport?.zoom || 1;
+    // A view built without its drawn cards (tests, a view not painted yet) measures nothing: the layout's own sizes apply.
+    const cards: Map<string, HTMLElement> = this.cardEls ?? new Map<string, HTMLElement>();
+    const brackets: Map<string, HTMLElement> = this.summaryEls ?? new Map<string, HTMLElement>();
     // The push asks for the same card many times; each card is measured once (one layout read per card).
     const seen = new Map<string, PushBox | undefined>();
     const boxOf = (id: string): PushBox | undefined => {
@@ -1892,9 +1895,8 @@ export class VisualAgentMapView extends ItemView {
       return seen.get(id);
     };
     const measure = (id: string): PushBox | undefined => {
-      const card = this.cardEls.get(id);
-      const node = map.nodes.find(item => item.id === id);
-      if (!card?.isConnected || !node) return undefined;
+      const card = cards.get(id);
+      if (!card?.isConnected) return undefined;
       const own = card.getBoundingClientRect();
       if (!own.width || !own.height) return undefined;
       let left = own.left,
@@ -1910,8 +1912,8 @@ export class VisualAgentMapView extends ItemView {
         bottom = Math.max(bottom, rect.bottom);
       }
       return {
-        x: node.x + (left - own.left) / zoom,
-        y: node.y + (top - own.top) / zoom,
+        dx: (left - own.left) / zoom,
+        dy: (top - own.top) / zoom,
         w: (right - left) / zoom,
         h: (bottom - top) / zoom
       };
@@ -1919,7 +1921,7 @@ export class VisualAgentMapView extends ItemView {
     const decorations: PushDecoration[] = [];
     const summaries = (map.canvasItems ?? []).filter((item): item is SummaryItem => item.kind === "summary");
     for (const item of summaries) {
-      const bracket = this.summaryEls.get(item.id);
+      const bracket = brackets.get(item.id);
       if (!bracket?.isConnected) continue;
       const members = new Set<string>();
       for (const id of item.members) {
@@ -1927,7 +1929,7 @@ export class VisualAgentMapView extends ItemView {
         for (const below of descendants(map.nodes, id)) members.add(below);
       }
       const rects = [...members]
-        .map(id => this.cardEls.get(id)?.getBoundingClientRect())
+        .map(id => cards.get(id)?.getBoundingClientRect())
         .filter((rect): rect is DOMRect => !!rect && rect.width > 0);
       const parts = Array.from(bracket.children)
         .map(child => child.getBoundingClientRect())
@@ -1939,15 +1941,15 @@ export class VisualAgentMapView extends ItemView {
         r: Math.max(...list.map(rect => rect.right)),
         b: Math.max(...list.map(rect => rect.bottom))
       });
-      const cards = union(rects),
+      const cardsBox = union(rects),
         drawn = union(parts);
       decorations.push({
         members: [...members],
         pad: {
-          l: Math.max(0, cards.l - drawn.l) / zoom,
-          t: Math.max(0, cards.t - drawn.t) / zoom,
-          r: Math.max(0, drawn.r - cards.r) / zoom,
-          b: Math.max(0, drawn.b - cards.b) / zoom
+          l: Math.max(0, cardsBox.l - drawn.l) / zoom,
+          t: Math.max(0, cardsBox.t - drawn.t) / zoom,
+          r: Math.max(0, drawn.r - cardsBox.r) / zoom,
+          b: Math.max(0, drawn.b - cardsBox.b) / zoom
         }
       });
     }
@@ -1979,7 +1981,9 @@ export class VisualAgentMapView extends ItemView {
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
     const after = from && selectedId ? map.nodes.find(node => node.id === selectedId) : undefined;
-    if (from && after && map.viewport) {
+    // Only for added cards: a moved, sorted or re-parented card (already drawn) is no reason to pan.
+    const addedOnly = [...newIds].every(id => !(this.cardEls as Map<string, HTMLElement> | undefined)?.has(id));
+    if (addedOnly && from && after && map.viewport) {
       const dx = after.x - from.x,
         dy = after.y - from.y;
       const limit = this.cardHeightOf(after.id) ?? DEFAULT_CARD_HEIGHT;

@@ -94,3 +94,19 @@ test('A4: resize handles and the AI lock button show on selection or focus, neve
   assert.match(css, /\.vam-node\.is-selected > \.vam-card-resize\b/);
   assert.match(css, /\.vam-node\.is-selected \.vam-card-ai-lock\.is-hover-only/);
 });
+
+test("hover deepens an unselected card's border (V3.3 P1.2: hover changes only the border colour, visibly)", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  const mix = (selector) => {
+    let value;
+    postcss.parse(css).walkRules((rule) => { if (rule.selector === selector) rule.walkDecls("border-color", (d) => { value = d.value; }); });
+    assert.ok(value, `${selector} has a border-color`);
+    const m = /color-mix\(in srgb, var\(--(?:text-muted|vam-muted)\) (\d+)%, var\(--background-modifier-border-hover\)\)/.exec(value);
+    assert.ok(m, `${selector}: ${value}`);
+    return Number(m[1]);
+  };
+  for (const [base, hover] of [
+    [":where([data-node-id]).vam-node:where(:not([data-aim-kind]))", ":where([data-node-id]).vam-node:where(:not([data-aim-kind], .is-selected)):hover"],
+    [":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind])", ":where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]:not(.is-selected)):hover"],
+  ]) assert.ok(mix(hover) > mix(base), `${hover} must mix more muted than ${base}`);
+});

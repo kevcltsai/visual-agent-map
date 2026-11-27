@@ -1,7 +1,7 @@
 import type { NoteLanguage } from "../i18n";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "../ai/types";
 import type { BookSettings, PipelineFields } from "./book-pipeline/model";
-import type { HypothesisStrength, HypothesisLeaning, TopicKind, NoteRelevance } from "../note-values";
+import type { HypothesisStrength, HypothesisLeaning, TopicKind } from "../note-values";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
 
@@ -46,8 +46,6 @@ export interface Note extends PipelineFields {
   topicState: TopicState;
   sourcePaths: string[];
   referencePaths?: string[];
-  /** Read-only grading from frontmatter (see readRelevance); absent when missing or invalid. */
-  relevance?: NoteRelevance;
   /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
   aiLocked?: true;
   /** From `ai-card: true` (see readAiCard): with a non-empty Prompt the topic is an AI card. Absent = an ordinary card. */

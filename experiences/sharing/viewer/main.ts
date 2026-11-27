@@ -69,12 +69,8 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 2;
 const DRAG_THRESHOLD = 4;
 
-type Tier = "core" | "support" | "side";
 /** Icon parts as "tag|attribute=value|…": a flat string list, so the minified bundle never contains a doubled bracket. */
 const ICONS: Record<string, string[]> = {
-  target: ["circle|cx=12|cy=12|r=10", "circle|cx=12|cy=12|r=6", "circle|cx=12|cy=12|r=2"],
-  library: ["path|d=m16 6 4 14", "path|d=M12 6v14", "path|d=M8 8v12", "path|d=M4 4v16"],
-  skip: ["polygon|points=5 4 15 12 5 20 5 4", "line|x1=19|x2=19|y1=5|y2=19"],
   minus: ["path|d=M5 12h14"],
   list: [
     "path|d=M8 6h13",
@@ -94,9 +90,6 @@ const ICONS: Record<string, string[]> = {
     "path|d=M16 21h3a2 2 0 0 0 2-2v-3"
   ]
 };
-const TIER_ICON: Record<Tier, string> = { core: "target", support: "library", side: "skip" };
-
-const isTier = (value: unknown): value is Tier => value === "core" || value === "support" || value === "side";
 const fill = (template: string, value: string | number): string => template.replace("{0}", String(value));
 
 function readJson(doc: Document, id: string): unknown {
@@ -381,7 +374,7 @@ export function startViewer(doc: Document): void {
     ui = uiOf(language);
     doc.documentElement.lang = language;
   }
-  type Shown = Pick<ShareNodePayload, "title" | "summary" | "reason" | "detailHtml"> & {
+  type Shown = Pick<ShareNodePayload, "title" | "summary" | "detailHtml"> & {
     /** A compact translation (D-2026-10-122): the note is rebuilt from `detailHtml`, the original, with it. */
     compact?: ShareNodeTranslation;
   };
@@ -392,7 +385,6 @@ export function startViewer(doc: Document): void {
     return {
       title: isText(translation.title) ? translation.title : item.title,
       summary: isText(translation.summary) ? translation.summary : item.summary,
-      reason: isText(translation.reason) ? translation.reason : item.reason,
       detailHtml: isText(translation.detailHtml) ? translation.detailHtml : item.detailHtml,
       ...(isCompactEntry(translation) && isText(item.detailHtml)
         ? { compact: translation, detailHtml: item.detailHtml }
@@ -479,8 +471,6 @@ export function startViewer(doc: Document): void {
     parent.append(item);
     return item;
   };
-  const tierLabel = (tier: Tier): string =>
-    tier === "core" ? ui.tierCore : tier === "support" ? ui.tierSupport : ui.tierSide;
   /** Untrusted input: only whitelisted ids, in the fixed order, so cards and the outline show the same row. */
   const markersOf = (item: ShareNodePayload): TopicMarker[] => readTopicMarkers({ "topic-markers": item.markers });
   const cjk = (): boolean => /^(zh|ja)/.test(ui.lang);
@@ -505,15 +495,6 @@ export function startViewer(doc: Document): void {
       row.append(mark);
     }
     return row;
-  };
-  const tierTag = (tier: Tier, title?: string): HTMLElement => {
-    const tag = make("span", "vam-relevance-tag");
-    tag.dataset.tier = tier;
-    if (title) tag.title = title;
-    const holder = make("span", "vam-relevance-icon");
-    holder.append(icon(TIER_ICON[tier]));
-    tag.append(holder, make("span", undefined, tierLabel(tier)));
-    return tag;
   };
 
   // ---- page skeleton
@@ -835,7 +816,7 @@ export function startViewer(doc: Document): void {
       const direction = lineKind(nodes, afterText ?? node.parentId, node.id, directionOf(node.parentId));
       const path = doc.createElementNS(SVG_NS, "path");
       path.setAttribute("d", treeLine(parent, child, direction, edgeDepth(node.id)));
-      path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
+      path.setAttribute("class", "vam-edge");
       const childInfo = info.get(node.id);
       if (childInfo && styleOf(childInfo).includes("line-thick")) path.setAttribute("data-line-thick", "");
       lines.push(path);
@@ -1075,11 +1056,9 @@ export function startViewer(doc: Document): void {
       const item = info.get(node.id)!;
       const shown = textOf(item);
       const count = branchCount(node.id);
-      const tier = isTier(item.tier) ? item.tier : undefined;
       const card = make("div", `vam-node${node.id === selected ? " is-selected" : ""}`);
       card.dataset.nodeId = node.id;
       card.dataset.status = item.status === "completed" ? "completed" : "idea";
-      if (tier) card.dataset.relevance = tier;
       card.tabIndex = 0;
       card.setAttribute("role", "treeitem");
       card.setAttribute("aria-level", String(depthOf(node) + 1));
@@ -1110,7 +1089,6 @@ export function startViewer(doc: Document): void {
       const header = make("div", "vam-node-header");
       card.append(header);
       if (item.status !== "completed") header.append(make("span", "vam-status vam-status-idea", ui.toResearch));
-      if (tier) header.append(tierTag(tier, typeof shown.reason === "string" ? shown.reason : undefined));
       if (markers.length) header.append(markerRow(markers));
       const cardTools = make("div", "vam-node-tools");
       card.append(cardTools);
@@ -1631,15 +1609,6 @@ export function startViewer(doc: Document): void {
     heading.append(make("strong", undefined, ui.topicDetails));
     button(heading, ui.close, undefined, closeInspector);
     inspector.append(heading, make("h3", undefined, String(item.title ?? "")));
-    const tier = isTier(item.tier) ? item.tier : undefined;
-    if (tier) {
-      const why = make("div", "vam-inspector-why");
-      why.append(tierTag(tier));
-      const reason =
-        typeof item.reason === "string" && item.reason.trim() ? item.reason : item.manual ? ui.manualReason : "";
-      if (reason) why.append(make("span", undefined, reason));
-      inspector.append(why);
-    }
     if (typeof item.summary === "string" && item.summary.trim())
       inspector.append(make("p", "vam-sample-summary", item.summary));
     const linksRow = linkRow(doc, item.links, ui);

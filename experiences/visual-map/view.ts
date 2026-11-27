@@ -135,14 +135,7 @@ import {
   treeEdgePathData,
   type RelationBox
 } from "./relation-geometry";
-import {
-  TOPIC_MARKER_GROUPS,
-  markerLabelKey,
-  readTopicMarkers,
-  markerSymbol,
-  markedProgressPercent,
-  type TopicMarker
-} from "../../topic-markers";
+import { TOPIC_MARKERS, markerLabelKey, readTopicMarkers, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { normalizeTopicLink, readTopicLinks, TOPIC_LINKS_MAX, type AddTopicLinkResult } from "../../topic-links";
 import {
   TOPIC_COLORS,
@@ -208,8 +201,7 @@ import {
   type App,
   WorkspaceLeaf,
   requestUrl,
-  setIcon,
-  setTooltip
+  setIcon
 } from "obsidian";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import {
@@ -442,10 +434,8 @@ import {
   TOPIC_KINDS,
   type HypothesisLeaning,
   type HypothesisStrength,
-  type RelevanceTier,
   type TopicKind
 } from "../../note-values";
-import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { hypothesisTagText, LEANING_LABEL, renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import {
   bottomInsetFromRects,
@@ -4538,36 +4528,6 @@ export class VisualAgentMapView extends ItemView {
       this.cardEls.get(id)?.toggleClass("vam-structure-suggested", next.has(id));
     this.structureHighlight = next;
   }
-  // ---- Relevance tag: the card's tier menu ---------------------------------------------------------------------
-  /** The tag's menu: the three tiers (a check on the current one) and Clear grade. */
-  private openRelevanceMenu(node: MapNode, current: RelevanceTier, anchor: HTMLElement): void {
-    const menu = this.newMenu();
-    for (const tier of ["core", "support", "side"] as const)
-      menu.addItem(item =>
-        item
-          .setTitle(t(RELEVANCE_LABEL[tier]))
-          .setChecked(tier === current)
-          .onClick(() => this.setManualRelevance(node, tier))
-      );
-    menu.addSeparator();
-    menu.addItem(item => {
-      item
-        .setTitle(t("ui.relevance_clear"))
-        .setIcon("x")
-        .onClick(() => this.setManualRelevance(node, null));
-      // The menu has no second line; the hint rides on the item as a tooltip where the host exposes its element.
-      (item as unknown as { dom?: HTMLElement }).dom?.setAttribute?.("title", t("ui.relevance_clear_hint"));
-    });
-    const rect = anchor.getBoundingClientRect();
-    menu.showAtPosition({ x: rect.left, y: rect.bottom });
-  }
-  /**
-   * Sets a card's tier by hand (or clears it) in the note's frontmatter and repaints in place. No AI call, no parent-
-   * child check, no viewport or Map.md write: only the three relevance keys of that one note change.
-   */
-  private setManualRelevance(node: MapNode, tier: RelevanceTier | null): void {
-    this.plugin.runMutation(() => this.plugin.repo.writeRelevance(node.path, tier ? { tier, manual: true } : null));
-  }
   /**
    * Applies one structure suggestion as one undo step, after checking again that it still fits the map. Remove and
    * merge go through the delete confirmation; resolves false when it is cancelled.
@@ -6124,10 +6084,6 @@ export class VisualAgentMapView extends ItemView {
       node => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending?.has(node.path)
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
-    // Marked progress is shown beside the research count (the bar itself stays research-only): the average of the marked topics.
-    const marked = markedProgressPercent(nodes.map(node => this.markersOf(node.id)));
-    if (marked !== null)
-      progress.createSpan({ cls: "vam-research-progress-marked", text: t("ui.marked_progress_0", marked) });
   }
   /** The toolbar's ghost 「▶ 全部執行」: disabled without an AI card; while it runs a progress ring and "n / N", a press stops it. */
   private renderRunAllButton(parent: HTMLElement): void {
@@ -13144,33 +13100,10 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       if (note) {
-        if (showsToResearch(kind, note.status, this.progressDone(node.id)))
+        if (showsToResearch(kind, note.status))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
         else this.labelCard(card, note.title);
       }
-    }
-    // Offline relevance grading: mind maps only, and only a valid tier shows anything. Side topics get a dashed border (see styles.css)
-    // but are never hidden, moved or collapsed.
-    const relevance = !node.aimKind && !this.map?.aim ? note?.relevance : undefined;
-    if (relevance) {
-      const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
-      card.dataset.relevance = relevance.tier;
-      const tagButton = renderRelevanceTagButton(
-        header,
-        relevance.tier,
-        tierLabel,
-        t("ui.relevance_tag_label_0", tierLabel),
-        button => this.openRelevanceMenu(node, relevance.tier, button),
-        false
-      );
-      // An AI grade carries no explanation; only a hand-set tier says where it came from.
-      if (relevance.manual) {
-        const manualText = t("ui.relevance_manual_reason");
-        setTooltip(tagButton, manualText);
-        card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
-      }
-      const named = cardLabels.get(card)?.textContent;
-      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
     if (argumentView) {
@@ -14061,10 +13994,6 @@ export class VisualAgentMapView extends ItemView {
     const raw = this.notes.get(id)?.markers;
     return raw ? readTopicMarkers({ "topic-markers": raw }) : [];
   }
-  /** True when the user marked this topic 100% progress. */
-  private progressDone(id: string): boolean {
-    return this.markersOf(id).includes("progress-100");
-  }
   /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
   private markersText(markers: readonly TopicMarker[]): string {
     return markers.length
@@ -14713,7 +14642,7 @@ export class VisualAgentMapView extends ItemView {
       const label =
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
-      if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
+      if (showsToResearch(this.topicKindOf(node.id), note.status))
         this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
       else this.labelCard(card, note.title);
       if (note.status === "idea" || note.status === "completed" || isAiCard(note)) status?.remove();
@@ -16881,7 +16810,7 @@ export class VisualAgentMapView extends ItemView {
   private markersEditable(node: MapNode): boolean {
     return this.relationsEnabled() && !this.selection.state.multiSelectMode;
   }
-  /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
+  /** The marker toggles of the topic panel: one `aria-pressed` button per marker (done, warning, star), any number on. */
   private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
     if (!this.markersEditable(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-marker-section");
@@ -16892,34 +16821,21 @@ export class VisualAgentMapView extends ItemView {
     const paint = (focusId?: TopicMarker): void => {
       group.empty();
       const active = this.markersOf(node.id);
-      for (const def of TOPIC_MARKER_GROUPS) {
-        const title = t(`ui.topic_marker_group_${def.group}` as TranslationKey);
-        group.createSpan({ text: title, cls: "vam-topic-marker-group-title" });
-        const box = group.createDiv(`vam-choice-group vam-topic-marker-group is-${def.single ? "single" : "multi"}`);
-        box.setAttr("role", "group");
-        box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
-        // One-of groups (priority, progress) are a row of symbol-only segments; the full name stays in aria-label and title.
-        if (def.single) box.addClass("is-segmented");
-        for (const id of def.ids) {
-          const label = t(markerLabelKey(id));
-          const choice = this.button(box, def.single ? "" : label, () => {
-            this.enqueue(async () => {
-              await this.changeTopicMarker(node, id);
-              paint(id);
-            });
+      const box = group.createDiv("vam-choice-group vam-topic-marker-group is-multi");
+      for (const id of TOPIC_MARKERS) {
+        const choice = this.button(box, t(markerLabelKey(id)), () => {
+          this.enqueue(async () => {
+            await this.changeTopicMarker(node, id);
+            paint(id);
           });
-          choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
-          choice.dataset.marker = id;
-          if (def.single) {
-            choice.setAttr("aria-label", label);
-            choice.setAttr("title", label);
-          }
-          const on = active.includes(id);
-          choice.setAttr("aria-pressed", String(on));
-          if (on) choice.addClass("is-pressed");
-          // Repainting replaced the button; keep the keyboard focus on the one just toggled.
-          if (id === focusId) choice.focus();
-        }
+        });
+        choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+        choice.dataset.marker = id;
+        const on = active.includes(id);
+        choice.setAttr("aria-pressed", String(on));
+        if (on) choice.addClass("is-pressed");
+        // Repainting replaced the button; keep the keyboard focus on the one just toggled.
+        if (id === focusId) choice.focus();
       }
     };
     paint();
@@ -25964,9 +25880,8 @@ export class VisualAgentMapView extends ItemView {
         path.addClass("vam-edge");
         if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
-        if (!this.map.aim && this.notes.get(node.id)?.relevance?.tier === "side") path.addClass("vam-edge-side");
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
-        else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
+        if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
         // A line from an AI card to a child carries data upward: a thin grey line with an arrow at the parent's end.
         if (
           !this.map.aim &&

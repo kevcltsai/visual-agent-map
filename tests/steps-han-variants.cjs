@@ -65,13 +65,13 @@ const outlineRows = (markers, titles = new Map([['a', 'Alpha'], ['b', 'Beta']]))
 };
 
 test('outline: a marked topic shows aria-hidden symbols and a name with the marker names', () => {
-  const { dom, rows } = outlineRows(new Map([['a', ['done', 'priority-2']]]));
+  const { dom, rows } = outlineRows(new Map([['a', ['done', 'priority-2', 'star']]]));
   const [alpha, beta] = rows;
   const symbols = dom.findAll(alpha, i => dom.hasCls(i, 'vam-marker'));
-  assert.deepEqual(symbols.map(s => s.text), ['✓', 'P2']);
+  assert.deepEqual(symbols.map(s => s.text), ['✓', '★']);
   assert.ok(symbols.every(s => s.attrs['aria-hidden'] === 'true'));
   assert.equal(alpha.text, 'Alpha', 'the visible title text is unchanged');
-  assert.equal(alpha.attrs['aria-label'], 'Alpha, Markers: Done, Priority 2');
+  assert.equal(alpha.attrs['aria-label'], 'Alpha, Markers: Done, Star');
   assert.equal(dom.findAll(beta, i => dom.hasCls(i, 'vam-marker')).length, 0);
   assert.equal(beta.attrs['aria-label'], undefined, 'an unmarked topic keeps its plain name');
 });

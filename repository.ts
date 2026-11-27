@@ -52,7 +52,7 @@ import {
   localizeReference
 } from "./core/repository-note-references";
 import { frontmatter, marker, setFrontmatterKeys } from "./core/repository-frontmatter";
-import { livingConfigurationStamp, rebaseLivingNoteReferences, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
+import { hasLivingCommitMetadata, livingConfigurationStamp, rebaseLivingNoteReferences, remapLivingCopyCardReferences, resetLivingCopyDiagnostics, splitLivingNodeRegion } from "./core/living-node-region";
 import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -760,7 +760,8 @@ export class Repository {
       color = readTopicColor(fm),
       style = readTopicStyle(fm);
     let livingNode: Note["livingNode"];
-    if (readAiCard(fm) || fm["living-node-region-hash"] !== undefined) {
+    if (readAiCard(fm) || fm["living-node-region-hash"] !== undefined ||
+        fm["living-node-ownership"] !== undefined || hasLivingCommitMetadata(fm)) {
       let knowledgeRevision = "empty";
       let summary = "";
       let damaged = false;
@@ -1159,7 +1160,8 @@ export class Repository {
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
-    if (readAiCard(metadata) || metadata["living-node-region-hash"] !== undefined)
+    if (readAiCard(metadata) || metadata["living-node-region-hash"] !== undefined ||
+        metadata["living-node-ownership"] !== undefined || hasLivingCommitMetadata(metadata))
       resetLivingCopyDiagnostics(metadata);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle

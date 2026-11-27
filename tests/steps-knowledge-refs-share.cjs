@@ -7,15 +7,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { load, obsidian, root } = require('./support.cjs');
 
-const format = load('experiences/sharing/share-format.ts');
-const text = load('experiences/sharing/share-viewer-text.ts');
-const ui = load('experiences/sharing/share-viewer-ui.ts');
-const dictionaries = load('experiences/sharing/share-viewer-dictionaries.ts');
+const format = load('experiences/sharing/share-format.ts', { obsidian });
+const text = load('experiences/sharing/share-viewer-text.ts', { obsidian });
+const ui = load('experiences/sharing/share-viewer-ui.ts', { obsidian });
+const dictionaries = load('experiences/sharing/share-viewer-dictionaries.ts', { obsidian });
 const kr = load('experiences/visual-map/knowledge-refs.ts', { obsidian });
 const exchange = load('experiences/visual-map/outline-exchange.ts', { obsidian });
 const notices = [];
 const io = load('experiences/visual-map/outline-exchange-io.ts', { obsidian: { ...obsidian, Notice: class { constructor(m) { notices.push(String(m)); } } } });
-const exportRun = load('experiences/visual-map/map-export-run.ts', {}, { document: {}, window: {} });
+const exportRun = load('experiences/visual-map/map-export-run.ts', { obsidian }, { document: {}, window: {} });
 const outline = load('experiences/visual-map/map-export.ts');
 const importer = load('experiences/visual-map/outline-import.ts', { obsidian });
 const mm = load('map-model.ts', { obsidian });
@@ -36,7 +36,9 @@ test('13: the payload carries a reference as absolute x, y and the title read at
   const payload = format.buildSharePayload(map, notes, { ...OPTIONS, refTitles: { 'ref-1': 'Original  card' } });
   assert.deepEqual(plain(payload.refs), [{ id: 'ref-1', parentId: 'c', x: 700, y: 220, title: 'Original card' }]);
   const json = JSON.stringify(payload);
-  for (const leak of ['other', 'n1', 'Mind Maps', 'pathHint', 'mapId', 'nodeId', 'knowledgeRefs', SECRET_BODY]) assert.equal(json.includes(leak), false, leak);
+  for (const leak of ['other', 'n1', 'Mind Maps', 'pathHint', 'nodeId', 'knowledgeRefs', SECRET_BODY]) assert.equal(json.includes(leak), false, leak);
+  // source.mapId is the host map's own id; the reference's mapId must not appear in the refs entry
+  assert.equal(JSON.stringify(payload.refs).includes('mapId'), false, 'mapId');
 });
 
 test('13: a reference that could not be read, or has no title entry, is shared without a title; orphans and bad entries are skipped', () => {
@@ -124,12 +126,13 @@ test('14: Markdown export writes "[引用] 標題" under the parent card and say
   const { src, state } = mdSource(map, refs);
   await exportRun.exportMap(src, 'md', 'vault');
   assert.match(state.created[0], /^# Root\n## Kid\n### \[Reference\] Original card\n?$/);
-  assert.equal(state.notices.length, 1, 'the notice before the file');
-  assert.match(state.notices[0], /title only/);
+  const refNotices = list => list.filter(item => /title only/.test(item));
+  assert.equal(refNotices(state.notices).length, 1, 'the notice before the file');
+  assert.match(state.notices[0], /title only/, 'it comes first, before the saved notice');
   // no references: the old output and no notice (steps-map-export-run.cjs:77 style)
   const plainRun = mdSource(baseMap(), kr.referenceOutline(baseMap(), new Map(), prefixes));
   await exportRun.exportMap(plainRun.src, 'md', 'vault');
-  assert.equal(plainRun.state.notices.length, 0);
+  assert.equal(refNotices(plainRun.state.notices).length, 0);
   assert.equal(plainRun.state.created[0].includes('Reference'), false);
 });
 

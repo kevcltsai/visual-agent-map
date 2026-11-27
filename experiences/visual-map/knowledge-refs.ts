@@ -7,7 +7,7 @@
  * in the file exactly as it was; `readKnowledgeRefs` decides which entries are usable. Pure: the vault is reached only
  * through the `KnowledgeRefIO` the caller passes. Imports nothing from obsidian or a view.
  */
-import { isArchivedVamNote } from "./map-sources";
+import { isArchivedVamNote } from "./archived-note";
 
 export interface KnowledgeRef {
   id: string;

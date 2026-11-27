@@ -343,7 +343,11 @@ const optionalText = (value: string | undefined): string | undefined => {
 const SHARE_TEXT_LIMIT = 2000;
 
 /** The map's text nodes for the payload: a parent that is missing or the node itself makes it an orphan (parentId null), never dropped. */
-function shareRefs(map: MapDocument, titles: Readonly<Record<string, string | null>>, plain: (text: string) => string): ShareRefPayload[] {
+function shareRefs(
+  map: MapDocument,
+  titles: Readonly<Record<string, string | null>>,
+  plain: (text: string) => string
+): ShareRefPayload[] {
   const parents = new Map(map.nodes.map(node => [node.id, node]));
   const out: ShareRefPayload[] = [];
   for (const ref of visibleKnowledgeRefs(map)) {
@@ -351,7 +355,13 @@ function shareRefs(map: MapDocument, titles: Readonly<Record<string, string | nu
     if (!parent) continue;
     const raw = titles[ref.id];
     const title = typeof raw === "string" ? plain(raw).replace(/\s+/g, " ").trim().slice(0, SHARE_TEXT_LIMIT) : "";
-    out.push({ id: ref.id, parentId: parent.id, x: parent.x + ref.x, y: parent.y + ref.y, ...(title ? { title } : {}) });
+    out.push({
+      id: ref.id,
+      parentId: parent.id,
+      x: parent.x + ref.x,
+      y: parent.y + ref.y,
+      ...(title ? { title } : {})
+    });
   }
   return out;
 }

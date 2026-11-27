@@ -7249,7 +7249,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       found = await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO());
     } catch {
-      found = new Map(refs.map(ref => [ref.id, { ok: false, reason: "missing" } as RefResolution]));
+      found = new Map(refs.map(ref => [ref.id, { ok: false, reason: "missing" }]));
     }
     if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
     this.refResolved = found;
@@ -7375,7 +7375,7 @@ export class VisualAgentMapView extends ItemView {
         if (Math.hypot(dx, dy) < 1) return;
         event.stopPropagation();
         el.addClass("is-dragged"); // the click that follows a drag must not open it
-        setTimeout(() => el.removeClass("is-dragged"), 0);
+        window.setTimeout(() => el.removeClass("is-dragged"), 0);
         this.enqueue(() => this.moveKnowledgeRefBy(ref.id, Math.round(dx), Math.round(dy)));
       };
       const cancel = (): void => {
@@ -7409,7 +7409,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The paths each resolved reference was read from, in memory only: written to a map file only inside a reference transaction. */
   private knownRefPaths(): Map<string, string> {
-    return new Map([...this.refResolved].flatMap(([id, item]) => (item.ok ? [[id, item.mapPath] as [string, string]] : [])));
+    return new Map(
+      [...this.refResolved].flatMap(([id, item]) => (item.ok ? [[id, item.mapPath] as [string, string]] : []))
+    );
   }
   private async removeKnowledgeRefById(id: string): Promise<void> {
     const map = this.map;
@@ -7422,7 +7424,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Re-reads the original now (with its text) and shows it in a read-only window; says why when it cannot be used. */
   private async openKnowledgeRef(ref: KnowledgeRef): Promise<void> {
-    const result = (await resolveKnowledgeRefs([ref], this.plugin.repo.knowledgeRefIO(), { withBody: true })).get(ref.id);
+    const result = (await resolveKnowledgeRefs([ref], this.plugin.repo.knowledgeRefIO(), { withBody: true })).get(
+      ref.id
+    );
     if (this.closed) return;
     if (!result?.ok) {
       new Notice(t(result?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
@@ -7433,7 +7437,10 @@ export class VisualAgentMapView extends ItemView {
       onOpen(): void {
         this.modalEl.addClass("vam-topic-modal", "vam-knowledge-ref-modal");
         this.contentEl.createEl("h3", { text: result.title });
-        this.contentEl.createDiv({ cls: "vam-knowledge-ref-source", text: t("ui.knowledge_ref_from_0", result.mapTitle) });
+        this.contentEl.createDiv({
+          cls: "vam-knowledge-ref-source",
+          text: t("ui.knowledge_ref_from_0", result.mapTitle)
+        });
         this.contentEl.createEl("p", { cls: "vam-knowledge-ref-hint", text: t("ui.knowledge_ref_modal_hint") });
         if (result.summary) this.contentEl.createEl("p", { cls: "vam-knowledge-ref-summary", text: result.summary });
         if (result.detail) this.contentEl.createDiv({ cls: "vam-knowledge-ref-detail", text: result.detail });

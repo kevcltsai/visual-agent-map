@@ -894,13 +894,11 @@ S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; t
   assert.throws(() => norm(out('   ')), /invalid-web-excerpt/);
   assert.throws(() => norm(out('x'.repeat(301))), /invalid-web-excerpt/);
   assert.throws(() => norm({ webExcerpts: [{ url: 'https://example.com/never', excerpt: 'q' }], operations: [] }), /unauthorized-web-excerpt/);
-  // The id binds URL and normalized excerpt: whitespace and NFC differences keep it, a different excerpt gives a new id.
+  // The id is the pre-V1.1 web id (URL only): the excerpt is validated model text, never part of the id.
   const id = envelope => norm(envelope).context.evidence.find(e => e.source === url).id;
   const a = id(out('Price  100\n today'));
-  assert.equal(a, id(out('Price 100 today')));
-  assert.equal(id(out('Café 100')), id(out('Café 100')));
-  assert.notEqual(a, id(out('Price 120 today')));
-  assert.match(a, /^web:/);
+  assert.equal(a, 'web:' + livingSnapshotRevision(url));
+  assert.equal(a, id(out('Price 120, reworded')));
   // Branch b: an excerpt is a model summary, so web evidence alone cannot correct or invalidate a claim.
   const rec = { id: 'r1', subject: 's', scope: 'c', granularity: 'change', eventTime: null, claim: 'old', evidence: [{ id: 'note:1', source: 'n', retrievedAt: 't' }], validity: 'active', owner: 'ai', history: [] };
   const base = { revision: 'base', records: [rec], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } };
@@ -914,13 +912,17 @@ S.integrationTest('A40: web evidence needs a model excerpt from an opened URL; t
   const disputed = apply({ kind: 'dispute', id: 'r1', claim: 'conflict', reason: 'r', evidence: [webId] }, webCtx);
   assert.equal(disputed.records[0].claim, 'old');
   assert.equal(disputed.records[0].validity, 'disputed');
-  // Local evidence next to web evidence still corrects.
-  const mixed = { at: 't', evidence: [...webCtx.evidence, { id: 'note:2', source: 'n2', retrievedAt: 't' }] };
+  // Web plus the record's own unchanged old note evidence is still web-only for this purpose: refused.
+  const mixed = { at: 't', evidence: [...webCtx.evidence, { id: 'note:1', source: 'n', retrievedAt: 't2' }, { id: 'note:2', source: 'n2', retrievedAt: 't' }] };
+  assert.throws(() => apply({ kind: 'correct', id: 'r1', claim: 'new', reason: 'r', evidence: [webId, 'note:1'] }, mixed), /unverified-web-correction/);
+  assert.throws(() => apply({ kind: 'invalidate', id: 'r1', reason: 'r', evidence: [webId, 'note:1'] }, mixed), /unverified-web-correction/);
+  // Web plus a new note revision (an id not in the record's old evidence) still corrects.
   assert.equal(apply({ kind: 'correct', id: 'r1', claim: 'new', reason: 'r', evidence: [webId, 'note:2'] }, mixed).records[0].claim, 'new');
-  // Identical re-check (same URL and excerpt) is a no-op on an existing record.
+  // Re-check of the same URL, even with different excerpt wording, is a no-op on an existing record.
   const withWeb = { ...base, records: [{ ...rec, evidence: [...rec.evidence, webCtx.evidence[0]] }] };
-  const again = applyLivingChanges(withWeb, { baseRevision: 'base', operations: [{ kind: 'supplement', id: 'r1', evidence: [webId] }] }, norm(out('Price 100')).context);
+  const again = applyLivingChanges(withWeb, { baseRevision: 'base', operations: [{ kind: 'supplement', id: 'r1', evidence: [webId] }] }, norm(out('Price 100, reworded this run')).context);
   assert.equal(again.changed, false);
+  assert.equal(again.records[0].evidence.length, 2);
 });
 
 S.integrationTest('A41: required web records a checked artifact; no tool call, unrelated URL or missing citation is not success', async () => {

@@ -152,7 +152,7 @@ const normalizeExcerpt = (value: string): string => value.normalize("NFC").trim(
  *
  * Trust: the provider stream reports only the URL (or query) of a page it opened, never the fetched text (the Claude
  * WebFetch result is a model summary and its tool_result body is not forwarded). So a web excerpt is the model's own
- * summary: it binds the evidence id to a (URL, excerpt) version but is NOT verified page text, and web evidence alone
+ * summary: its version stays unknown and it is NOT verified page text, and web evidence alone
  * can never correct or invalidate a claim (enforced in applyLivingChanges). */
 export function normalizeLivingProposal(
   raw: unknown,
@@ -179,7 +179,8 @@ export function normalizeLivingProposal(
     openedUrls.add(parsed.toString());
   }
   if ((requiresWeb || envelope.requiresWeb) && !openedUrls.size) throw new Error("required-web-unavailable");
-  // Evidence exists per opened URL only once the model supplied an excerpt for it; id = hash(URL + excerpt).
+  // Evidence exists per opened URL only once the model supplied an excerpt for it. The excerpt is validated model text
+  // and never part of the id (id = hash(URL), as before), so a re-check with different wording adds no duplicate.
   const byUrl = new Map<string, LivingEvidence>();
   const rawExcerpts = envelope.webExcerpts === undefined ? [] : envelope.webExcerpts;
   if (!Array.isArray(rawExcerpts) || rawExcerpts.length > 100) throw new Error("invalid-web-excerpt");
@@ -194,7 +195,7 @@ export function normalizeLivingProposal(
     if (!excerpt || excerpt.length > MAX_EXCERPT) throw new Error("invalid-web-excerpt");
     if (!openedUrls.has(source)) throw new Error("unauthorized-web-excerpt");
     byUrl.set(source, {
-      id: "web:" + livingSnapshotRevision(source + "\n" + excerpt),
+      id: "web:" + livingSnapshotRevision(source),
       source,
       retrievedAt: at
     });

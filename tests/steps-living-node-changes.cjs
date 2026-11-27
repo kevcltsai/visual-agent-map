@@ -294,3 +294,14 @@ test('T06: an AI latest the owner deleted is not rewritten with the same text; a
   assert.deepEqual(plain(other.warnings), []);
   assert.deepEqual(plain(livingAiLatestBlocked(gone, 'same text')), 'ai-latest-deleted');
 });
+
+test('T06: the deletion memory also drops trivial variants of the deleted text (spacing, CRLF, NFD)', () => {
+  const sha = require('node:crypto').createHash('sha256').update('caf\u00e9 is open today').digest('hex');
+  const gone = base({ output: { text: 'manual', owner: 'user', evidence: [] }, aiLatestDeleted: sha });
+  for (const variant of ['cafe\u0301  is open\r\ntoday', '  caf\u00e9\tis   open today \n']) {
+    const result = apply(gone, { kind: 'output', text: variant, evidence: ['e1'] });
+    assert.deepEqual(plain(result.warnings), ['ai-latest-deleted']);
+    assert.equal(result.aiLatest, undefined);
+  }
+  assert.equal(apply(gone, { kind: 'output', text: 'cafe is open today', evidence: ['e1'] }).aiLatest.text, 'cafe is open today');
+});

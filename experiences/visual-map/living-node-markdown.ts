@@ -5,7 +5,7 @@ import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
   livingEventTombstone,
-  livingTextHash,
+  livingDeletedTextHash,
   livingSuppressionV2,
   livingSuppressionV2Entry,
   parseLivingEventTombstone,
@@ -363,7 +363,7 @@ function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
     ...(knowledge.aiLatest
-      ? [JSON.stringify(["aiLatest", aiLatestHash(knowledge.aiLatest), livingTextHash(knowledge.aiLatest.text)])]
+      ? [JSON.stringify(["aiLatest", aiLatestHash(knowledge.aiLatest), livingDeletedTextHash(knowledge.aiLatest.text)])]
       : knowledge.aiLatestDeleted
         ? [JSON.stringify(["aiLatestDeleted", knowledge.aiLatestDeleted])]
         : []),

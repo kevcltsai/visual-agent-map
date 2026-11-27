@@ -46,7 +46,9 @@ export interface LivingKnowledge {
   aiLatestDeleted?: string;
 }
 
-export const livingTextHash = (text: string): string => createHash("sha256").update(text.trim()).digest("hex");
+/** Deletion memory only (not the ownership hashes): trivial variants of the deleted text hash the same. */
+export const livingDeletedTextHash = (text: string): string =>
+  createHash("sha256").update(text.normalize("NFC").replace(/\r\n?/g, "\n").replace(/\s+/g, " ").trim()).digest("hex");
 
 export type LivingAiLatestBlock = "ai-latest-user-edited" | "ai-latest-deleted";
 
@@ -57,7 +59,7 @@ export function livingAiLatestBlocked(
 ): LivingAiLatestBlock | undefined {
   if (base.output.owner === "ai") return undefined;
   if (base.aiLatest) return base.aiLatest.owner === "user" ? "ai-latest-user-edited" : undefined;
-  return base.aiLatestDeleted && base.aiLatestDeleted === livingTextHash(text) ? "ai-latest-deleted" : undefined;
+  return base.aiLatestDeleted && base.aiLatestDeleted === livingDeletedTextHash(text) ? "ai-latest-deleted" : undefined;
 }
 
 /** Readable formal knowledge is required for a successful check; metadata alone is not a result. */

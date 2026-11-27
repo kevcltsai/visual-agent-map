@@ -1,4 +1,5 @@
 import type { ReferenceGroup } from "../../ai/reference-materials";
+import { livingNoteForModel } from "./living-node-markdown";
 import type { MultiResearchRequest } from "./multi-research-modal";
 
 /** A multi-topic research request that may also carry reference documents (only the chat sets them). */
@@ -21,7 +22,7 @@ export function chatResearchReferenceGroups(input: ChatReferenceInput): Referenc
   for (const file of [...input.files, ...(input.activeFile ? [input.activeFile] : [])]) {
     if (whole.has(file.path)) continue;
     whole.add(file.path);
-    documents.push({ path: file.path, content: file.content, key: file.path });
+    documents.push({ path: file.path, content: livingNoteForModel(file.content), key: file.path });
   }
   input.snippets.forEach((snippet, index) => {
     if (!snippet.text.trim()) return;

@@ -16,6 +16,7 @@ import {
   type LivingKnowledge,
   type LivingRecord
 } from "./living-node-changes";
+import { livingModelView } from "./living-node-retrieval";
 import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingCommitCheck } from "./living-node-state";
 
 import {
@@ -509,6 +510,38 @@ function readLivingData(content: string) {
 /** Reading never migrates or rewrites the legacy body. Recognizable manual edits become user-owned. */
 export function readLivingMarkdown(content: string): LivingKnowledge {
   return readLivingData(content).knowledge;
+}
+
+/**
+ * The only form of a note that may reach a provider when it might be a Living Node note read as ordinary text: the
+ * managed region becomes the card's model view (revision, records, output, AI latest) and every `living-node-*`
+ * frontmatter key (ownership index, hashes) is dropped, so suppression holds and deletion hashes never leave the vault.
+ * A torn or unreadable region is cut out entirely. A note with neither region nor metadata is returned unchanged.
+ */
+export function livingNoteForModel(content: string): string {
+  const keys = Object.keys(frontmatter(content)).filter(key => key.startsWith("living-node-"));
+  if (!keys.length && !content.includes(BEGIN) && !content.includes(END)) return content;
+  let view = "";
+  try {
+    view = JSON.stringify(livingModelView(readLivingMarkdown(content)));
+  } catch {
+    view = "";
+  }
+  let out = keys.length ? setFrontmatterKeys(content, Object.fromEntries(keys.map(key => [key, null]))) : content;
+  let first = true;
+  for (;;) {
+    const start = out.indexOf(BEGIN);
+    const end = out.indexOf(END, Math.max(start, 0));
+    if (start < 0 || end < 0) break;
+    out = out.slice(0, start) + (first ? view : "") + out.slice(end + END.length);
+    first = false;
+  }
+  // A lone marker means a torn region: fail closed by cutting from (or up to) it.
+  const lone = out.indexOf(BEGIN);
+  if (lone >= 0) out = out.slice(0, lone);
+  const loneEnd = out.indexOf(END);
+  if (loneEnd >= 0) out = out.slice(loneEnd + END.length);
+  return out;
 }
 
 /**

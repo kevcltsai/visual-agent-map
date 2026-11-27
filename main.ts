@@ -1731,10 +1731,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.app.vault.on("modify", file => {
         if (file instanceof TFile) this.collectUnsynced(file.path);
         if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file);
-        // Obsidian's own link update of a renamed file's referrers is done once it modified the note: VAM's held-back
-        // path rewrite of that note goes on top of the fresh content now (see Repository.replaceSourcePaths).
-        if (file instanceof TFile && this.repo.hasDeferredRewrite(file.path))
-          this.runMutation(() => this.repo.applyDeferredRewrite(file.path));
+        // Obsidian's stale-position link update of a note VAM just rewrote on rename is put right (RenameRepairWatch).
+        if (file instanceof TFile && this.repo.renameWatch.watching(file.path))
+          this.runMutation(() => this.repo.renameWatch.check(file.path, line => this.logs.appendLog("info", line)));
       })
     );
     this.registerEvent(
@@ -2615,6 +2614,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     this.markdownSelectionAi?.refreshLanguage();
+    for (const leaf of this.app.workspace.getLeavesOfType(LIVING_READER_VIEW))
+      if (leaf.view instanceof LivingReaderView) leaf.view.refreshLanguage();
     for (const { command, key } of this.localizedCommands)
       command.name = `${this.manifest?.name ?? "Visual Agent Map"}: ${translate(this.settings.language, key)}`;
   }

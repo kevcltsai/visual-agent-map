@@ -1,31 +1,4 @@
 import { parseYaml } from "obsidian";
-import type { RenamePair } from "./rename-batch";
-
-/** Whether `content` has a wiki or markdown link that points at the file a pair moved away from. */
-export function linksToRenamed(content: string, pairs: readonly RenamePair[]): boolean {
-  const targets: string[] = [];
-  for (const m of content.matchAll(/!?\[\[([^\]|#^]+)/g)) targets.push(m[1]);
-  for (const m of content.matchAll(/\]\(<?([^)#>]+)/g)) {
-    try {
-      targets.push(decodeURIComponent(m[1]));
-    } catch {
-      targets.push(m[1]);
-    }
-  }
-  const bare = (path: string): string =>
-    path
-      .trim()
-      .replace(/^\.?\//, "")
-      .replace(/\.md$/i, "");
-  return pairs.some(([from, to]) => {
-    if (from === to) return false;
-    const old = bare(from);
-    return targets.some(target => {
-      const t = bare(target);
-      return t === old || old.endsWith(`/${t}`);
-    });
-  });
-}
 
 /** Splits a frontmatter block into its top-level key blocks (the key line and the lines indented under it). */
 function yamlBlocks(yaml: string): { key: string | undefined; text: string }[] {

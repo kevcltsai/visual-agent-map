@@ -38,9 +38,15 @@ function object(value: unknown): Record<string, unknown> {
 }
 
 /** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
-export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string) {
+/** Explicit current-data wording is a conservative requirement floor; broader task semantics
+ * still require the model's declared decision and semantic acceptance fixtures. */
+export function explicitlyRequiresLivingWeb(prompt: string): boolean {
+  return /(?:即時|即时|最新|今天|今日|當前行情|当前行情|現在的(?:股價|價格|新聞)|现在的(?:股价|价格|新闻)|\blatest\b|\blive\s+(?:price|data|news)\b|\btoday(?:'s)?\b|\bcurrent\s+(?:price|quote|news|market data)\b)/i.test(prompt);
+}
+
+export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string, requiresWeb = false) {
   const envelope = object(raw);
-  if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb"].includes(key)))
+  if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb", "checkedWeb"].includes(key)))
     throw new Error("invalid-proposal-field");
   if (typeof envelope.requiresWeb !== "boolean") throw new Error("missing-search-decision");
   const byUrl = new Map<string, LivingEvidence>();
@@ -51,7 +57,8 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
     const source = parsed.toString();
     byUrl.set(source, { id: "web:" + livingSnapshotRevision(source), source, retrievedAt: at });
   }
-  if (envelope.requiresWeb && !byUrl.size) throw new Error("required-web-unavailable");
+  if ((requiresWeb || envelope.requiresWeb) && !byUrl.size) throw new Error("required-web-unavailable");
+  if (requiresWeb && !envelope.requiresWeb) throw new Error("required-web-decision-conflict");
   if (!Array.isArray(envelope.operations)) throw new Error("invalid-operations");
   const operations = (envelope.operations as unknown[]).map(value => {
     const operation = object(value);
@@ -69,10 +76,29 @@ export function normalizeLivingProposal(raw: unknown, opened: readonly string[],
   });
   // A changed answer requiring current web information must cite at least
   // one actually opened source. A genuine no-change check can have no operations.
-  const webIds = new Set([...byUrl.values()].map(entry => entry.id));
-  if (envelope.requiresWeb && operations.length && !operations.some(operation =>
-    operation.evidence.some(id => webIds.has(id))))
-    throw new Error("required-web-evidence-missing");
+  if (envelope.requiresWeb) {
+    if (!Array.isArray(envelope.checkedWeb) || !envelope.checkedWeb.length || envelope.checkedWeb.length > 100)
+      throw new Error("required-web-check-missing");
+    const checked = new Set<string>();
+    for (const value of envelope.checkedWeb as unknown[]) {
+      if (typeof value !== "string") throw new Error("invalid-web-check");
+      const url = allowedUrl(value);
+      if (!url) throw new Error("invalid-web-check");
+      url.hash = "";
+      const entry = byUrl.get(url.toString());
+      if (!entry) throw new Error("unauthorized-web-check");
+      checked.add(entry.id);
+    }
+    if (operations.length && !operations.some(operation => operation.evidence.some(id => checked.has(id))))
+      throw new Error("required-web-evidence-missing");
+    // A mixed proposal may include independent local observations, but any replaced
+    // current result of a live research task must itself cite a checked web source.
+    if (operations.some(operation => operation.kind === "output" &&
+        !operation.evidence.some(id => checked.has(id))))
+      throw new Error("required-web-output-evidence-missing");
+  } else if (envelope.checkedWeb !== undefined && (!Array.isArray(envelope.checkedWeb) || envelope.checkedWeb.length)) {
+    throw new Error("unexpected-web-check");
+  }
   return {
     proposal: { baseRevision: envelope.baseRevision, operations },
     context: { at, evidence: [...local, ...byUrl.values()] }
@@ -108,7 +134,8 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
         prepared.parse(raw),
         openedUrlsFromEvents(events),
         input.evidence,
-        new Date().toISOString()
+        new Date().toISOString(),
+        explicitlyRequiresLivingWeb(input.prompt)
       );
       applyLivingChanges(input.base, normalized.proposal, normalized.context);
       exchange.parsed();

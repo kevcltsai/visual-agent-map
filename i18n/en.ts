@@ -839,6 +839,8 @@ export const en = {
   "ui.map_menu": "Mind map menu",
   "ui.focus_mode": "Focus mode",
   "ui.exit_focus_mode": "Exit focus mode",
+  "ui.branch_focus_label": "Focus: {0}",
+  "ui.exit_branch_focus": "Exit focus",
   "ui.export_saved": "Saved {0} in the Vault.",
   "ui.export_downloaded": "Downloaded {0}.",
   "ui.export_scaled": "This map is large, so the image was scaled down to fit {0} px.",

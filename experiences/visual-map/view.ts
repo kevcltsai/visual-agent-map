@@ -108,7 +108,7 @@ import {
   type ChatWriteBaseline,
   type ChatRun
 } from "./chat-action-writer";
-import { TopicSelection, type SelectionChange } from "./topic-selection";
+import { TopicSelection, type SelectionChange, type SelectionSnapshot } from "./topic-selection";
 import {
   anchorLineKey,
   RELATION_NAME_KEY,
@@ -1890,6 +1890,13 @@ export class VisualAgentMapView extends ItemView {
   private presentation: PresentationState | null = null;
   /** Focus mode: the header and the canvas controls are hidden, one exit button stays; Esc or that button ends it. */
   private focusMode = false;
+  /** One branch shown alone (view-only): what to put back on leaving. Never written to Map.md. */
+  private branchFocus: {
+    id: string;
+    viewport: { x: number; y: number; zoom: number };
+    selection: SelectionSnapshot;
+    scroll: { left: number; top: number };
+  } | null = null;
   private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
@@ -2275,6 +2282,12 @@ export class VisualAgentMapView extends ItemView {
       // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (event.key === "Escape" && this.branchFocus) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.exitBranchFocus();
       return;
     }
     if (event.key === "Escape" && this.focusMode) {
@@ -2870,6 +2883,56 @@ export class VisualAgentMapView extends ItemView {
     area.setCssProps({ "--vam-summary-height": "auto" });
     area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
   }
+  /** Shows only `id` and its branch (by its own collapsed flags). Viewport, selection and scroll come back on leaving; nothing is written. */
+  enterBranchFocus(id: string): boolean {
+    if (!this.map || this.closed || this.presentation || !this.map.nodes.some(node => node.id === id)) return false;
+    const branch = new Set([id, ...descendants(this.map.nodes, id)]);
+    const saved = this.branchFocus;
+    this.branchFocus = {
+      id,
+      viewport: saved?.viewport ?? { ...this.map.viewport },
+      selection: saved?.selection ?? this.selection.stash(),
+      scroll: saved?.scroll ?? { left: this.viewportEl?.scrollLeft ?? 0, top: this.viewportEl?.scrollTop ?? 0 }
+    };
+    this.selection.restore(this.branchFocus.selection, branch);
+    this.render();
+    this.fitCards(branch);
+    return true;
+  }
+  exitBranchFocus(): boolean {
+    const saved = this.branchFocus;
+    if (!saved || !this.map) return false;
+    this.branchFocus = null;
+    this.map.viewport = { ...saved.viewport };
+    this.selection.restore(saved.selection, new Set(this.map.nodes.map(node => node.id)));
+    this.render();
+    this.viewportEl?.scrollTo?.(saved.scroll.left, saved.scroll.top);
+    return true;
+  }
+  /** The bar over the canvas while one branch is shown alone. */
+  private renderBranchFocusBar(parent: HTMLElement): void {
+    const focus = this.branchFocus;
+    if (!focus) return;
+    const node = this.mapNodeById(focus.id);
+    if (!node) {
+      this.branchFocus = null;
+      return;
+    }
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (
+      let item: MapNode | undefined = node;
+      item && !seen.has(item.id);
+      item = this.mapNodeById(item.parentId ?? "")
+    ) {
+      seen.add(item.id);
+      names.unshift(this.notes.get(item.id)?.title ?? item.id);
+    }
+    const bar = parent.createDiv("vam-branch-focus");
+    bar.createSpan({ cls: "vam-branch-focus-label", text: t("ui.branch_focus_label", names.join(" › ")) });
+    this.button(bar, t("ui.exit_branch_focus"), () => this.exitBranchFocus());
+    bar.createSpan({ cls: "vam-branch-focus-key", text: "Esc" });
+  }
   private setFocusMode(on: boolean): void {
     if (this.focusMode === on) return;
     this.focusMode = on;
@@ -3108,6 +3171,7 @@ export class VisualAgentMapView extends ItemView {
     else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
+    this.branchFocus = null;
     // A run-all batch stops with its view: nothing it has in flight is written afterwards.
     this.promptBatch?.leave?.();
     this.dropCanvasInteractionModes();
@@ -3574,6 +3638,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
       this.exitPresentation(false);
+      this.branchFocus = null;
     }
     if (this.viewportTimer !== null) {
       await this.flushPendingViewport();
@@ -12190,6 +12255,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }
+    this.renderBranchFocusBar(this.contentEl);
     const tools = createDiv("vam-map-tools");
     if (this.map?.aim) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
@@ -13128,7 +13194,7 @@ export class VisualAgentMapView extends ItemView {
   private canvasNodes(): MapNode[] {
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
-    const shown = visibleNodes(this.map.nodes);
+    const shown = visibleNodes(this.map.nodes, this.branchFocus ? { rootId: this.branchFocus.id } : undefined);
     // Topics hidden by a clicked anchor (and their branches) are left out; the other cards keep their places.
     const byAnchor = this.hiddenAnchors?.size
       ? anchorHiddenTopicIds(this.map.canvasItems ?? [], this.map.nodes, this.hiddenAnchors)
@@ -20349,6 +20415,8 @@ export class VisualAgentMapView extends ItemView {
     const now = this.map?.viewport;
     if (this.notesLoading() && frame && now && (now.x !== frame.x || now.y !== frame.y || now.zoom !== frame.zoom))
       this.toolbarClearedFor = this.path;
+    // One branch shown alone is a view-only state: its pan and zoom are not the map's saved view.
+    if (this.branchFocus) return;
     // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
@@ -20385,7 +20453,7 @@ export class VisualAgentMapView extends ItemView {
   private async persistViewport(): Promise<void> {
     if (!this.map || !this.path) return;
     const path = this.path;
-    const viewport = { ...this.map.viewport };
+    const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };
     const written = await this.plugin.repo.updateMap(path, map => {
       map.viewport = viewport;
     });

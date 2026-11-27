@@ -791,6 +791,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_menu": "心智图菜单",
   "ui.focus_mode": "专注模式",
   "ui.exit_focus_mode": "退出专注模式",
+  "ui.branch_focus_label": "聚焦：{0}",
+  "ui.exit_branch_focus": "退出聚焦",
   "ui.export_saved": "已将 {0} 存入 Vault。",
   "ui.export_downloaded": "已下载 {0}。",
   "ui.export_scaled": "这张地图很大，图片已缩小到 {0} px 以内。",

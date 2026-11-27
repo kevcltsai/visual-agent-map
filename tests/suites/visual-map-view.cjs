@@ -2303,7 +2303,7 @@ integrationTest('hypothesis-evidence: adding and removing a relation in the pane
   assert.equal(dom.byLabel(factPanel, 'Remove relation: Supports → HYP'), undefined, 'the row is gone after the change');
   await view.addRelation('fact', 'hyp', 'supports'); await view.addRelation('fact', 'hyp', 'supports'); await view.addRelation('fact', 'other', 'supports'); await view.addRelation('hyp', 'hyp', 'supports');
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'other' }], 'added once each; the duplicate and the self link are refused, an ordinary-topic target is allowed');
-  assert.equal(changes.length, 5);
+  assert.equal(changes.length, 3, 'one remove and the two allowed adds; a refused duplicate or self link never reaches mapChange (V3.3 A8 R1)');
 });
 integrationTest('hypothesis-evidence: adding from the sentence repaints the open panel at once', async () => {
   const { view } = heFixture({ topics: [node('fact'), node('hyp'), node('pre')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['pre', {}]]) });

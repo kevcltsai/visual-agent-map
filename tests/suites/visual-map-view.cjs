@@ -5069,6 +5069,45 @@ test('map sources: the removed task-dialog picker, its styles and its dead keys 
   assert.match(zh, /"ui\.map_sources_title": "這張心智圖的資料來源"/); assert.match(zh, /"ui\.map_sources_unreadable_description_0": "\{0\} 份讀不到"/);
   assert.equal(/"ui\.map_sources_[^"]*": "[^"]*地圖/.test(zh), false);
 });
+integrationTest('Living Node A29: chained undo and redo across two runs work with moving fence keys; an external edit mid-chain refuses the next undo', async () => {
+  const { fixture } = require('../support.cjs');
+  const { commitLivingMarkdown, livingGeneration, livingSnapshotRevision, readLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian });
+  const f = fixture('en');
+  const path = 'card.md';
+  const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\n---\n# Card\n\n## Detail\n\nManual notes.\n';
+  await f.app.vault.create(path, initial);
+  const { view } = heFixture();
+  view.plugin.repo = f.repo; view.closed = false;
+  const pushed = []; view.history = { push: entry => pushed.push(entry) }; view.updateHistoryButtons = () => {};
+  const ctx = { at: 't1', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };
+  const run = async (id, text) => {
+    const before = f.contents.get(path);
+    const candidate = { executionId: id, cardId: 'card', mapId: 'map', baseRevision: livingSnapshotRevision(before), inputRevision: 'i', viewSession: 'v' };
+    const base = readLivingMarkdown(before);
+    return commitLivingMarkdown(f.repo, {
+      path, expectedContent: before, candidate, base, baseGeneration: livingGeneration(before),
+      proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] }, context: ctx, signal: new AbortController().signal,
+      isCurrent: () => true, inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }),
+      onCommit: (p, b, a) => view.recordLivingCommit(p, b, a)
+    });
+  };
+  const bare = content => content.replace(/living-node-generation: \d+\n/, '').replace(/living-node-receipts:\n(  - ".*"\n)+/, '');
+  const state = () => f.contents.get(path);
+  assert.equal(await run('e1', 'First'), 'written'); const s1 = state();
+  assert.equal(await run('e2', 'Second'), 'written'); const s2 = state();
+  assert.equal(pushed.length, 2);
+  const gens = [livingGeneration(s2)];
+  await pushed[1].undo(); assert.equal(bare(state()), bare(s1)); gens.push(livingGeneration(state()));
+  await pushed[0].undo(); assert.equal(bare(state()), initial); gens.push(livingGeneration(state()));
+  await pushed[0].redo(); assert.equal(bare(state()), bare(s1)); gens.push(livingGeneration(state()));
+  await pushed[1].redo(); assert.equal(bare(state()), bare(s2)); gens.push(livingGeneration(state()));
+  assert.deepEqual(gens, [2, 3, 4, 5, 6], 'generation strictly increases');
+  await pushed[1].undo();
+  const edited = state() + '\nOwner typed mid-chain.\n';
+  await f.app.vault.process(f.files.get(path), () => edited);
+  await assert.rejects(() => pushed[0].undo());
+  assert.equal(state(), edited);
+});
 integrationTest('Living Node A29: a committed run is one undo step; undo and redo restore the knowledge under a new generation and refuse after a later external edit', async () => {
   const { fixture } = require('../support.cjs');
   const { commitLivingMarkdown, livingGeneration, livingSnapshotRevision, readLivingMarkdown } = load('experiences/visual-map/living-node-markdown.ts', { obsidian });

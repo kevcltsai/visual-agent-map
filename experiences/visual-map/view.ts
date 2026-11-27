@@ -220,7 +220,7 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import { livingRestoreSnapshot, renderLivingPreview } from "./living-node-markdown";
+import { livingRestoreSnapshot, livingWithoutFence, renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -20533,27 +20533,26 @@ export class VisualAgentMapView extends ItemView {
   }
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;
-    // Each restore moves the note to a new generation, so the bytes the next undo/redo must find are the ones just written.
-    let at = after;
-    const restore = async (replacement: string): Promise<void> => {
+    // Each restore moves the replay fence, so the guard compares the note with the fence keys removed: any other edit refuses.
+    const restore = async (expected: string, replacement: string): Promise<void> => {
       const repo = this.plugin.repo;
-      let written: string | undefined;
+      let written = false;
       const result = await repo.updateNoteRawGuarded(
         path,
-        current => (written = livingRestoreSnapshot(current, replacement)),
-        {
-          expectedContent: at,
-          authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path)
-        }
+        current => {
+          if (livingWithoutFence(current) !== livingWithoutFence(expected)) return current;
+          written = true;
+          return livingRestoreSnapshot(current, replacement);
+        },
+        { authorize: () => !repo.isDisposed() && !livingCoordinator(this.plugin).busy(path) }
       );
-      if (result !== "written" || written === undefined)
+      if (result !== "written" || !written)
         throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      at = written;
     };
     this.history.push({
       label: t("ui.living_node_run_card"),
-      undo: () => restore(before),
-      redo: () => restore(after)
+      undo: () => restore(after, before),
+      redo: () => restore(before, after)
     });
     this.updateHistoryButtons();
   }

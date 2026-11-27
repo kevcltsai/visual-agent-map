@@ -456,6 +456,10 @@ export function livingRestoreSnapshot(current: string, target: string): string {
   });
 }
 
+/** The note with the two replay-fence keys removed: the content an undo/redo guard compares, since every restore moves the fence. */
+export const livingWithoutFence = (content: string): string =>
+  setFrontmatterKeys(content, { [LIVING_GENERATION_KEY]: null, [LIVING_RECEIPTS_KEY]: null });
+
 /** Replay-fence generation stored in the note (0 for a note written before the fence existed). */
 export const livingGeneration = (content: string): number => readLivingFence(frontmatter(content)).generation;
 

@@ -372,15 +372,13 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
   }
   const records = current.records.map(record => {
     const v2 = livingSuppressionV2Entry(livingSuppressionV2(record));
-    // A record the ownership index does not know (new id, or changed since) that matches a hold already stored
-    // in the region was added back by a human: lift the hold and protect it. A record the index recognizes (an AI
-    // sibling in the same period) never lifts a hold on v2 equality alone, nor does a hold created by this read.
-    if (stored.has(v2) && index.records.get(record.id) !== recordHash(record)) {
-      suppressed.delete(v2);
-      return { ...record, owner: "user" as const };
-    }
-    if (suppressed.has(record.id)) {
-      // An explicit human re-add of the record is protected and releases its tombstone.
+    // Only an id the ownership index does not know (typed or pasted back by the user) lifts a hold. A known id whose
+    // text changed just becomes user-owned below and never lifts one, so an edited AI sibling cannot free a deleted
+    // event. A hold created by this very read never lifts either.
+    const added = !index.records.has(record.id);
+    if (added && stored.has(v2)) suppressed.delete(v2);
+    if (suppressed.has(record.id) || (added && stored.has(v2))) {
+      // An explicit human re-add of the record is protected and releases its id-only and v1 holds too.
       suppressed.delete(record.id);
       for (const value of suppressed) {
         if (parseLivingEventTombstone(value)?.recordId === record.id) suppressed.delete(value);

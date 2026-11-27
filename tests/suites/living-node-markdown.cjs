@@ -1880,3 +1880,32 @@ S.integrationTest('A39 resurrection: deleting one of two same-period AI records 
   const again = { ...a, id: 'r1-again' };
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: base2, candidate: { executionId: 'e3' }, proposal: { baseRevision: base2.revision, operations: [again] } })), /suppressed-record/);
 });
+
+S.integrationTest('A39 resurrection: a user edit of an AI sibling keeps the hold (known id never lifts); pasting the deleted record back under its own id lifts both its v2 and id-only holds', async () => {
+  const f = await setup();
+  const a = { kind: 'append', id: 'r1', subject: 'acme', scope: 'news', granularity: 'event', eventTime: '2026-11-26', claim: 'Acme recalls product', evidence: ['e1'] };
+  const b = { ...a, id: 'r2', claim: 'Acme CEO resigns' };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'F', evidence: ['e1'] }, a, b] } })), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.split('\n### Observation\n').filter((x, i) => !(i > 0 && x.includes('"r1"'))).join('\n### Observation\n');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base1 = readLivingMarkdown(edited);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base: base1, candidate: { executionId: 'e2' }, proposal: { baseRevision: base1.revision, operations: [{ kind: 'output', text: 'F2', evidence: ['e1'] }] } })), 'written');
+  const committed = f.contents.get(path);
+  const mid = committed.replace('Acme CEO resigns', 'Acme CEO resigns (confirmed)');
+  assert.notEqual(mid, committed);
+  await f.app.vault.process(f.files.get(path), () => mid);
+  const base2 = readLivingMarkdown(mid);
+  assert.deepEqual(S.plain(base2.records.map(r => r.id + ':' + r.owner)), ['r2:user']);
+  assert.ok(base2.suppressed.some(v => v.startsWith('@v2:')));
+  const again = { ...a, id: 'r1-again' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: base2, candidate: { executionId: 'e3' }, proposal: { baseRevision: base2.revision, operations: [again] } })), /suppressed-record/);
+  // The user pastes the deleted block back under its own id and drops its suppression line.
+  const block = saved.match(/\n### Observation\n[\s\S]*?(?=\n### Suppression)/)[0].split('\n### Observation\n').find(x => x.includes('"r1"'));
+  const pasted = committed.replace('\n### Suppression', '\n### Observation\n' + block.replace(/\n*$/, '\n') + '\n### Suppression').replace('### Suppression\n- ID: "r1"\n', '### Suppression\n');
+  assert.notEqual(pasted, committed);
+  const back = readLivingMarkdown(pasted);
+  assert.equal(back.records.find(r => r.id === 'r1').owner, 'user');
+  assert.equal(back.suppressed.some(v => v.startsWith('@v2:')), false);
+  assert.equal(back.suppressed.includes('r1'), false);
+});

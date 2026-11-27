@@ -142,6 +142,7 @@ integrationTest('outline reveal selects the topic without writing collapse, cent
   assert.equal(root.collapsed, true, 'collapse is not written'); assert.equal(child.collapsed, true, 'collapse is not written');
   assert.equal(changes, 0, 'no map change'); assert.equal(saves, 0, 'the camera move is not saved');
   assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0);
+  assert.equal(active.at(-1), 'leaf.md', 'the outline is told the active topic');
   assert.deepEqual(plain(doc.viewport), { x: 400 - (root.x + 140), y: 300 - (root.y + 80), zoom: 1 }, 'centered on the top collapsed ancestor');
   view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');

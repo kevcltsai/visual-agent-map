@@ -1,5 +1,5 @@
 import { errorMessage } from "../../core/error-message";
-import { livingEditorRefusal, livingRestoreSnapshot } from "../../core/living-node-region";
+import { livingEditorRefusal } from "../../core/living-node-region";
 import {
   cardOutputLanguage,
   defaultOutputLanguage,
@@ -220,7 +220,7 @@ import {
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
-import { renderLivingPreview } from "./living-node-markdown";
+import { livingRestoreSnapshot, renderLivingPreview } from "./living-node-markdown";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";

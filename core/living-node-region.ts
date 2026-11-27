@@ -1,5 +1,4 @@
 import { contentHash } from "./content-hash";
-import { frontmatter, setFrontmatterKeys } from "./repository-frontmatter";
 
 /** Saved configuration baseline shared by editor and chat; no knowledge or diagnostics. */
 export function livingConfigurationStamp(prompt: string, fm: Record<string, unknown>): string {
@@ -160,18 +159,6 @@ export function livingFenceAfterCommit(fence: LivingFence, executionId: string):
       -LIVING_RECEIPT_LIMIT
     )
   };
-}
-
-/**
- * Undo/redo: the knowledge and ownership snapshot of `target` is restored under a NEW generation, and the receipts of
- * `current` are kept, so a late callback built before the undo can neither match the generation nor repeat an execution.
- */
-export function livingRestoreSnapshot(current: string, target: string): string {
-  const fence = readLivingFence(frontmatter(current));
-  return setFrontmatterKeys(target, {
-    [LIVING_GENERATION_KEY]: fence.generation + 1,
-    [LIVING_RECEIPTS_KEY]: fence.receipts
-  });
 }
 
 /** Copy only formal knowledge and configuration. Run diagnostics belong to the original node. */

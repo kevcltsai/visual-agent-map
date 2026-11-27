@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const S = require('../support.cjs');
-const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown, livingDamageKind, livingGeneration } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
-const { livingRestoreSnapshot, readLivingFence } = S.load('core/living-node-region.ts', { obsidian: S.obsidian });
+const { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown, livingDamageKind, livingGeneration, livingRestoreSnapshot } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+const { readLivingFence } = S.load('core/living-node-region.ts', { obsidian: S.obsidian });
 const initial = '---\nagent-map-id: map\ntopic-id: map\nnode-id: card\nai-card: true\ncustom-key: keep\n---\n# Existing title\n\n## Detail\n\nManual notes, never replace.\n';
 const empty = () => ({ revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } });
 const context = { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] };

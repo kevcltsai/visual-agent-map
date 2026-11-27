@@ -18,6 +18,8 @@ import { canCommitLivingCandidate, type LivingCandidateIdentity, type LivingComm
 
 import {
   hasLivingCommitMetadata,
+  LIVING_GENERATION_KEY,
+  LIVING_RECEIPTS_KEY,
   livingFenceAfterCommit,
   readLivingFence,
   LIVING_NODE_BEGIN as BEGIN,
@@ -440,6 +442,18 @@ export function livingDamageKind(content: string): "rebuildable" | "unrecoverabl
       return "unrecoverable";
     }
   }
+}
+
+/**
+ * Undo/redo: the knowledge and ownership snapshot of `target` is restored under a NEW generation, and the receipts of
+ * `current` are kept, so a late callback built before the undo can neither match the generation nor repeat an execution.
+ */
+export function livingRestoreSnapshot(current: string, target: string): string {
+  const fence = readLivingFence(frontmatter(current));
+  return setFrontmatterKeys(target, {
+    [LIVING_GENERATION_KEY]: fence.generation + 1,
+    [LIVING_RECEIPTS_KEY]: fence.receipts
+  });
 }
 
 /** Replay-fence generation stored in the note (0 for a note written before the fence existed). */

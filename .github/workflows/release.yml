@@ -32,11 +32,23 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Build the release distribution files
+        env:
+          VAM_RELEASE_BUILD: "1"
+        run: npm run build
+
+      - name: Test release notice and product behavior
+        env:
+          VAM_RELEASE_BUILD: "1"
         run: npm test
 
       - name: Verify release artifacts
+        env:
+          VAM_RELEASE_BUILD: "1"
         run: npm run check:artifacts
+
+      - name: Prepare Corresponding Source archive and checksum
+        run: npm run release:source -- "$GITHUB_REF_NAME"
 
       - name: Generate artifact attestations
         uses: actions/attest@v4
@@ -55,5 +67,5 @@ jobs:
             exit 1
           else
             node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md" || { echo "CHANGELOG.md section for $GITHUB_REF_NAME is missing or empty; refusing to fall back to generated notes." >&2; exit 1; }
-            gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css LICENSE NOTICE LICENSES/Apache-2.0.txt LICENSES/ASSET-ATTRIBUTIONS.md "release-dist/visual-agent-map-$GITHUB_REF_NAME-source.tar.gz" "release-dist/visual-agent-map-$GITHUB_REF_NAME-source.tar.gz.sha256" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi

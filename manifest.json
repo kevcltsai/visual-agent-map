@@ -1,7 +1,7 @@
 {
   "id": "visual-agent-map",
   "name": "Visual Agent Map",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "minAppVersion": "1.13.7",
   "description": "Research questions with AI mind maps, turn a topic into an illustrated picture book, or explore from one picture, keeping everything as editable Markdown.",
   "author": "Kevin Tsai",

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The next release candidate is licensed under `AGPL-3.0-only`. Published versions 0.22.0–0.36.0 remain under Apache-2.0; 0.21.0 and earlier remain under AGPL-3.0-only. The candidate is not published.
+
 ## [0.36.0] - 2026-11-26
 
 ### Adjust a picture book by talking

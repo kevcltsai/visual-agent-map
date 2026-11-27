@@ -23,11 +23,11 @@ export function regression(app: App): string {
 });
 
 test('artifact gate rejects invalid manifests, version drift and missing distribution files', async () => {
-  const files = ['main.js', 'manifest.json', 'styles.css', 'README.md', 'README.zh-TW.md', 'INSTALL.md', 'LICENSE', 'response-schema.json', 'package.json', 'package-lock.json', 'versions.json'];
+  const files = ['main.js', 'manifest.json', 'styles.css', 'README.md', 'README.zh-TW.md', 'INSTALL.md', 'LICENSE', 'NOTICE', 'LICENSES/AGPL-3.0-only.txt', 'LICENSES/Apache-2.0.txt', 'LICENSES/ASSET-ATTRIBUTIONS.md', 'scripts/prepare-release-source.mjs', '.github/workflows/release.yml', 'response-schema.json', 'package.json', 'package-lock.json', 'versions.json'];
   const parent = mkdtempSync(join(tmpdir(), 'vam-compliance-'));
   let count = 0;
   // Each case gets its own directory (a copy-on-write clone where the file system has one, a plain copy otherwise; the case only ever writes to the copy), so the cases run side by side.
-  const prepare = change => { const directory = join(parent, String(count++)); mkdirSync(directory); for (const file of files) copyFileSync(join(root, file), join(directory, file), constants.COPYFILE_FICLONE); change?.(directory); return directory; };
+  const prepare = change => { const directory = join(parent, String(count++)); mkdirSync(directory); for (const file of files) { const target = join(directory, file); mkdirSync(resolve(target, '..'), { recursive: true }); copyFileSync(join(root, file), target, constants.COPYFILE_FICLONE); } change?.(directory); return directory; };
   const run = directory => new Promise(done => execFile(process.execPath, [join(root, 'scripts/check-artifacts.mjs')], { cwd: directory, encoding: 'utf8' }, (error, stdout, stderr) => done({ status: error ? error.code : 0, stderr })));
   const readJson = (directory, file) => JSON.parse(readFileSync(join(directory, file), 'utf8'));
   const edit = (file, change) => directory => { const path = join(directory, file); const data = readJson(directory, file); change(data, directory); writeFileSync(path, JSON.stringify(data)); };

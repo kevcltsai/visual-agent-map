@@ -85,7 +85,11 @@ if (depsDir) process.on('exit', () => {
 
 /** Same call shape as esbuild.buildSync; callers pass `entryPoints` and, when needed, `external`. */
 function buildSync(options) {
-  const resolved = { bundle: true, write: false, platform: 'node', format: 'cjs', loader: { '.md': 'text' }, ...(depsDir ? { metafile: true } : {}), ...options };
+  const resolved = { bundle: true, write: false, platform: 'node', format: 'cjs', loader: { '.md': 'text', '.txt': 'text' }, ...(depsDir ? { metafile: true } : {}), ...options };
+  resolved.define = {
+    __VAM_RELEASE_BUILD__: process.env.VAM_RELEASE_BUILD === '1' ? 'true' : 'false',
+    ...(options.define ?? {})
+  };
   const key = `${process.cwd()}\0${JSON.stringify(resolved)}`;
   if (!cacheEnabled) { const built = esbuild.buildSync(resolved); if (depsDir) { bundleSources.delete(key); record(key, built, resolved); } return built; }
   let result = cache.get(key);

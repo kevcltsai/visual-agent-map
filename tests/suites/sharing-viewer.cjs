@@ -100,13 +100,14 @@ test('sharing viewer: the bundle is built from the plugin\'s own layout and noth
   assert.equal(a[1].collapsed, true);
 });
 
-test('sharing viewer: the shell loads nothing from the network and holds no external reference', () => {
+test('sharing viewer: the shell loads nothing from the network and links only from its visible source notice', () => {
+  const version = JSON.parse(read('manifest.json')).version;
   for (const lang of LANGUAGES) {
     const shell = html.renderShareShell(text.shareViewerUiFor(lang));
-    const urls = [...shell.matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
+    const urls = [...shell.replace(/<pre>[\s\S]*?<\/pre>/g, '').matchAll(/https?:\/\/[^\s"'<>)\\]*/g)].map(match => match[0]);
     // P6: the only other addresses are YouTube's no-cookie player (the frame-src entry and the viewer's player address, used only
     // after a click) and the watch page a click opens in a new tab when the file is opened from disk.
-    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/', 'https://www.youtube.com/watch',
+    assert.deepEqual([...new Set(urls)].sort(), [INSTALL_URL, SVG_NAMESPACE, `https://github.com/kevcltsai/visual-agent-map/releases/download/${version}/visual-agent-map-${version}-source.tar.gz`, 'https://www.youtube-nocookie.com', 'https://www.youtube-nocookie.com/embed/', 'https://www.youtube.com/watch',
       // Facebook and Instagram players (frame-src) and the bases the viewer builds their embed and watch addresses from.
       'https://www.facebook.com', 'https://www.instagram.com', 'https://www.facebook.com/', 'https://www.instagram.com/', 'https://fb.watch/'].sort());
     assert.doesNotMatch(shell, /<script[^>]*\ssrc=/i);
@@ -120,6 +121,34 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
   assert.ok(bundle.SHARE_VIEWER_JS.includes(INSTALL_URL));
   assert.equal(INSTALL_URL, 'https://github.com/kevcltsai/visual-agent-map?ref=share');
   assert.ok(!/Open in VAM|在 VAM 開啟/.test(bundle.SHARE_VIEWER_JS + bundle.SHARE_VIEWER_CSS), 'P1 has no open-in-VAM');
+});
+
+test('AGPL distribution: plugin and share HTML carry both license texts and the candidate source offer', () => {
+  const version = JSON.parse(read('manifest.json')).version;
+  const isRelease = process.env.VAM_RELEASE_BUILD === '1';
+  const shell = html.renderShareShell(text.shareViewerUiFor('en'));
+  for (const [index, output] of [read('main.js'), shell].entries()) {
+    assert.match(output, /GNU AFFERO GENERAL PUBLIC LICENSE/);
+    assert.match(output, /AGPL-3\.0-only/);
+    assert.match(output, /Copyright © 2026 Kevin Tsai/);
+    assert.match(output, /Corresponding Source/);
+    assert.ok(output.includes(version));
+    assert.ok(output.includes(`releases/download/${version}/visual-agent-map-${version}-source.tar.gz`));
+    const channelMarker = isRelease
+      ? index === 0
+        ? `Visual Agent Map release ${version}`
+        : `Corresponding Source for release ${version}`
+      : `UNRELEASED CANDIDATE ${version}`;
+    assert.ok(output.includes(channelMarker));
+  }
+  const escape = value => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  for (const file of ['LICENSE', 'LICENSES/Apache-2.0.txt']) assert.ok(shell.includes(escape(read(file))), `${file} full text is embedded`);
+  assert.match(read('main.js'), /Apache License\n\/\/ Apache: Version 2\.0/);
+  assert.match(shell, /Your map and media remain your content and are not relicensed by this viewer/);
+  assert.match(shell, /#vam-license-notice\{position:fixed;inset-inline:0;inset-block-end:0/);
+  assert.match(shell, /max-height:18vh;overflow:auto/);
+  assert.match(shell, /pointer-events:none;user-select:text/);
+  assert.doesNotMatch(shell, /<a\b[^>]*href=["']https?:/i, 'source offer is visible text and causes no automatic network request');
 });
 
 test('sharing viewer: the viewer program has no eval and writes titles and summaries with textContent only', () => {
@@ -453,7 +482,7 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
     const clean = value => value.replace(/transform: translate\([^)]*\) scale\([^)]*\);/, 'transform: T;');
     // A line ends at offsetTop + offsetHeight / 2, and the card height follows the font (one wrapped line more or less per OS): the golden keeps the x of every line and the pixel y is checked against the cards below.
     const noLineY = value => value.replace(/(<path d=")([^"]*)(" class="vam-edge)/g, (_, a, d, c) => a + d.replace(/-?\d+(?:\.\d+)?/g, (n, i, all) => (all.slice(0, i).match(/-?\d+(?:\.\d+)?/g) ?? []).length % 2 ? 'Y' : n) + c);
-    const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<script type="application/json" id="vam-ui">')).trimEnd() + '\n';
+    const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<footer id="vam-license-notice">')).trimEnd() + '\n';
     assert.equal(noLineY(clean(app)), noLineY(clean(read('tests/fixtures/sharing/viewer-p1-app.html'))), 'cards, text and line x match the golden');
     const nodes = JSON.parse(read('tests/fixtures/sharing/viewer-payload.json')).nodes.filter(node => node.parentId);
     assert.equal(page.edges.length, nodes.length, 'one tree line per child topic');

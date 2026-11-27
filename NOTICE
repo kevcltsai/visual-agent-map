@@ -1,13 +1,19 @@
 Visual Agent Map
 Copyright © 2026 Kevin Tsai
 
-Licensed under the Apache License, Version 2.0 (see LICENSE).
+The unreleased 0.36.1 candidate is licensed under GNU AGPL version 3 only
+(see LICENSE). Published versions 0.22.0–0.36.0 remain licensed under the
+Apache License, Version 2.0; versions 0.21.0 and earlier remain under
+AGPL-3.0-only. The original Apache-2.0 license text is retained at
+LICENSES/Apache-2.0.txt.
 
 The name "Visual Agent Map", the VAM name and its logo are not licensed under
-the Apache License (see section 6). Forks and derivative works must use a
-different name and must not present themselves as the official plugin.
+the Apache License (see section 6) or GNU AGPL. This notice does not grant
+trademark rights or imply endorsement. Follow applicable law when naming and
+describing forks.
 
-Versions 0.21.0 and earlier were released under AGPL-3.0-only.
+See LICENSES/ASSET-ATTRIBUTIONS.md for the repository's tracked media inventory
+and the license basis recorded for each asset.
 
 Third-party data
 

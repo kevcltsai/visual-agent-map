@@ -2,6 +2,9 @@ import { serializeShareJson, type SharePayload } from "./share-format";
 import type { ShareViewerUi } from "./share-viewer-ui";
 import { shareViewerUiExtras } from "./share-viewer-text";
 import { SHARE_VIEWER_CSS, SHARE_VIEWER_JS } from "./viewer-bundle.generated";
+import AGPL_LICENSE_TEXT from "../../LICENSES/AGPL-3.0-only.txt";
+import APACHE_LICENSE_TEXT from "../../LICENSES/Apache-2.0.txt";
+import { DISTRIBUTION_IS_RELEASE, DISTRIBUTION_VERSION } from "../../core/distribution";
 
 /**
  * Meta policy of every shared file: nothing is fetched except pictures (data: images, and the web pictures a note links),
@@ -9,6 +12,10 @@ import { SHARE_VIEWER_CSS, SHARE_VIEWER_JS } from "./viewer-bundle.generated";
  */
 const CONTENT_SECURITY_POLICY =
   "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src https://www.youtube-nocookie.com https://www.facebook.com https://www.instagram.com";
+const CORRESPONDING_SOURCE_URL = `https://github.com/kevcltsai/visual-agent-map/releases/download/${DISTRIBUTION_VERSION}/visual-agent-map-${DISTRIBUTION_VERSION}-source.tar.gz`;
+const SOURCE_LABEL = DISTRIBUTION_IS_RELEASE
+  ? `Corresponding Source for release ${DISTRIBUTION_VERSION}`
+  : `UNRELEASED CANDIDATE ${DISTRIBUTION_VERSION}; the corresponding source archive will be published with this release`;
 
 const escapeText = (text: string): string =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -45,9 +52,18 @@ function buildHtml(
     `<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`,
     `<title>${escapeText(title)}</title>`,
     `<style>${SHARE_VIEWER_CSS}</style>`,
+    "<style>#vam-license-notice{position:fixed;inset-inline:0;inset-block-end:0;z-index:2147483647;max-height:18vh;overflow:auto;box-sizing:border-box;padding:4px 8px;background:Canvas;color:CanvasText;font:10px/1.25 system-ui,sans-serif;overflow-wrap:anywhere;pointer-events:none;user-select:text}#vam-license-notice p{margin:0}#vam-license-notice details{pointer-events:auto}#vam-license-notice details pre{max-height:14vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}</style>",
     "</head>",
     "<body>",
     '<div id="vam-app"></div>',
+    '<footer id="vam-license-notice">',
+    "<p>Viewer program: AGPL-3.0-only. Copyright © 2026 Kevin Tsai. Your map and media remain your content and are not relicensed by this viewer.</p>",
+    `<p>${SOURCE_LABEL}: ${CORRESPONDING_SOURCE_URL}</p>`,
+    "<details><summary>License texts</summary>",
+    `<h2>GNU AGPL-3.0-only</h2><pre>${escapeText(AGPL_LICENSE_TEXT)}</pre>`,
+    `<h2>Retained Apache License 2.0</h2><pre>${escapeText(APACHE_LICENSE_TEXT)}</pre>`,
+    "</details>",
+    "</footer>",
     `<script type="application/json" id="vam-ui">${jsonForScript(uiBlockFor(ui, languages))}</script>`,
     `<script type="application/json" id="vam-map">${mapJson}</script>`,
     `<script>${SHARE_VIEWER_JS}</script>`,

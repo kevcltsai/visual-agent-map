@@ -41,8 +41,8 @@ VAM 不含遙測，也不儲存 API key。AI 功能會在你的電腦上另外�
 
 ## 致謝與授權
 
-程式碼採用 Apache-2.0 授權，但 Visual Agent Map 的名稱與標誌不在授權範圍內，fork 請使用自己的名稱（見 [NOTICE](NOTICE)）。
+尚未發佈的 0.36.1 候選版採用 AGPL-3.0-only。已發佈的 0.22.0–0.36.0 仍採 Apache-2.0，0.21.0 及更早版本仍採 AGPL-3.0-only。Visual Agent Map 名稱與標誌不在授權範圍內，詳見 [NOTICE](NOTICE)。
 
-[回報問題](https://github.com/kevcltsai/visual-agent-map/issues) · [版本紀錄](CHANGELOG.md) · [Apache-2.0](LICENSE)
+[回報問題](https://github.com/kevcltsai/visual-agent-map/issues) · [版本紀錄](CHANGELOG.md) · [AGPL-3.0-only](LICENSE) · [保留的 Apache-2.0](LICENSES/Apache-2.0.txt)
 
 Copyright © 2026 Kevin Tsai

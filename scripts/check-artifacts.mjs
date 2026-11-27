@@ -23,6 +23,44 @@ if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("manifest.json ve
 if (versions[manifest.version] !== manifest.minAppVersion) throw new Error("versions.json must map the current release to manifest.minAppVersion.");
 
 for (const path of ["README.zh-TW.md", "INSTALL.md"]) if (!existsSync(path)) throw new Error(`Missing distribution document: ${path}`);
+for (const path of ["LICENSES/Apache-2.0.txt", "LICENSES/AGPL-3.0-only.txt", "LICENSES/ASSET-ATTRIBUTIONS.md", "NOTICE", "scripts/prepare-release-source.mjs"]) {
+  if (!existsSync(path)) throw new Error(`Missing license/distribution support file: ${path}`);
+}
+if (packageJson.license !== "AGPL-3.0-only" || packageLock.packages?.["" ]?.license !== "AGPL-3.0-only") {
+  throw new Error("package.json and package-lock.json root license must be AGPL-3.0-only.");
+}
+const agpl = readFileSync("LICENSE", "utf8");
+const apache = readFileSync("LICENSES/Apache-2.0.txt", "utf8");
+if (!agpl.startsWith("                    GNU AFFERO GENERAL PUBLIC LICENSE") || !apache.startsWith("Apache License\nVersion 2.0")) {
+  throw new Error("The full AGPL-3.0-only or retained Apache-2.0 license text is missing.");
+}
+if (readFileSync("LICENSES/AGPL-3.0-only.txt", "utf8") !== agpl) throw new Error("The copied AGPL-3.0-only text must match LICENSE byte for byte.");
+for (const [label, contents] of [["AGPL", agpl], ["Apache", apache]]) {
+  const bannerText = contents.trimEnd().split(/\r?\n/).map(line => line ? `// ${label}: ${line}` : "//").join("\n");
+  if (!productionBundle.includes(bannerText)) throw new Error(`main.js is missing the complete ${label} license text.`);
+}
+if (!productionBundle.includes("// Copyright © 2026 Kevin Tsai")) throw new Error("main.js is missing the copyright notice.");
+const expectedChannelMarker = process.env.VAM_RELEASE_BUILD === "1" ? `Visual Agent Map release ${manifest.version}` : `UNRELEASED CANDIDATE ${manifest.version}`;
+if (!productionBundle.includes(`${expectedChannelMarker} — AGPL-3.0-only. Corresponding Source: https://github.com/kevcltsai/visual-agent-map/releases/download/${manifest.version}/visual-agent-map-${manifest.version}-source.tar.gz`)) {
+  throw new Error("main.js must contain the exact Corresponding Source offer for its build channel.");
+}
+const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+for (const marker of ["npm run release:source", "LICENSE NOTICE", "source.tar.gz.sha256"]) {
+  if (!releaseWorkflow.includes(marker)) throw new Error(`Release workflow is missing ${marker}.`);
+}
+const releaseBuilder = readFileSync("scripts/prepare-release-source.mjs", "utf8");
+for (const marker of ['"archive"', 'createHash("sha256")', "manifest.version !== version", "writeFileSync(`${output}.sha256`"]) {
+  if (!releaseBuilder.includes(marker)) throw new Error(`Corresponding Source builder is missing ${marker}.`);
+}
+if (/agents-spec|product-intelligence|exchange-snapshot/.test(releaseBuilder)) throw new Error("The public source archive builder must not reference private corpus paths.");
+const buildStep = releaseWorkflow.indexOf("Build the release distribution files");
+const testStep = releaseWorkflow.indexOf("Test release notice and product behavior");
+const artifactStep = releaseWorkflow.indexOf("Verify release artifacts");
+if (!(buildStep >= 0 && buildStep < testStep && testStep < artifactStep)) throw new Error("Release mode must build before release tests and artifact validation.");
+const attribution = readFileSync("LICENSES/ASSET-ATTRIBUTIONS.md", "utf8");
+for (const asset of ["assets/screenshots/image-anchors.png", "assets/screenshots/map-overview.png", "assets/screenshots/picture-book.png", "tests/fixtures/color/mermaid/architecture.svg", "tests/fixtures/color/mermaid/gantt.svg", "tests/fixtures/color/mermaid/gitGraph.svg", "tests/fixtures/color/mermaid/mindmap.svg", "tests/fixtures/color/mermaid/xychart.svg", "tests/fixtures/sharing/Attachments/diagram.svg", "tests/fixtures/sharing/Attachments/photo.png", "tests/fixtures/taiwan-travel-regression/Attachments/east-coast-landscape.webp", "tests/fixtures/taiwan-travel-regression/Attachments/nine-day-timeline.webp", "tests/fixtures/taiwan-travel-regression/Attachments/rail-and-car-options.webp", "tests/fixtures/taiwan-travel-regression/Attachments/regional-food.webp", "tests/fixtures/taiwan-travel-regression/Attachments/taiwan-route-overview.webp"]) {
+  if (!attribution.includes(`\`${asset}\``)) throw new Error(`Asset attribution inventory is missing ${asset}.`);
+}
 const english = readFileSync("README.md", "utf8");
 const chinese = readFileSync("README.zh-TW.md", "utf8");
 if (!english.includes("[繁體中文](README.zh-TW.md)") || !chinese.includes("[English](README.md)")) throw new Error("README.md and README.zh-TW.md must link to each other.");

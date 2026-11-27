@@ -36,7 +36,8 @@ const bundled = await build({
   write: false,
   platform: "node",
   format: "cjs",
-  loader: { ".md": "text" },
+  loader: { ".md": "text", ".txt": "text" },
+  define: { __VAM_RELEASE_BUILD__: "false" },
   external: ["obsidian"],
   logLevel: "warning"
 });

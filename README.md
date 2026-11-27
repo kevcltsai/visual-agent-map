@@ -41,8 +41,8 @@ VAM has no telemetry and stores no API keys. AI features start the Codex or Clau
 
 ## Credits and license
 
-The code is licensed under Apache-2.0; the Visual Agent Map name and logo are not, so forks need their own name (see [NOTICE](NOTICE)).
+The unreleased 0.36.1 candidate is licensed under AGPL-3.0-only. Published versions 0.22.0–0.36.0 remain under Apache-2.0, while 0.21.0 and earlier remain under AGPL-3.0-only. The Visual Agent Map name and logo are not licensed; see [NOTICE](NOTICE).
 
-[Report an issue](https://github.com/kevcltsai/visual-agent-map/issues) · [Changelog](CHANGELOG.md) · [Apache-2.0](LICENSE)
+[Report an issue](https://github.com/kevcltsai/visual-agent-map/issues) · [Changelog](CHANGELOG.md) · [AGPL-3.0-only](LICENSE) · [Retained Apache-2.0](LICENSES/Apache-2.0.txt)
 
 Copyright © 2026 Kevin Tsai

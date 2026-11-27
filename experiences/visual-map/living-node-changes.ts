@@ -200,7 +200,7 @@ export function parseLivingSuppressionV2(value: string): LivingSuppressionV2 | u
     const hash = (x: unknown): x is string => typeof x === "string" && /^[a-f0-9]{64}$/.test(x);
     if (v !== 2 || type !== "event" || !hash(scopeKey) || !hash(fp2)) return undefined;
     if (period !== null && (typeof period !== "string" || !period || period.length > 100)) return undefined;
-    const entry: LivingSuppressionV2 = { v: 2, type: "event", scopeKey, periodKey: period as string | null, fp2 };
+    const entry: LivingSuppressionV2 = { v: 2, type: "event", scopeKey, periodKey: period, fp2 };
     return livingSuppressionV2Entry(entry) === value ? entry : undefined;
   } catch {
     return undefined;

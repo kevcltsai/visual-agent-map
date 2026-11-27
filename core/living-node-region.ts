@@ -1,5 +1,4 @@
 import { contentHash } from "./content-hash";
-import { frontmatter } from "./repository-frontmatter";
 
 /** Saved configuration baseline shared by editor and chat; no knowledge or diagnostics. */
 export function livingConfigurationStamp(prompt: string, fm: Record<string, unknown>): string {
@@ -44,10 +43,10 @@ export function livingMarkerState(content: string): LivingMarkerState {
 }
 
 /** True when the note is a Living Node: the markers, the ownership/commit metadata or the AI-card flag, whichever is present. */
-export function isLivingNodeNote(content: string, aiCard: boolean): boolean {
-  const fm = frontmatter(content);
+export function isLivingNodeNote(content: string, fm: Record<string, unknown>): boolean {
   return (
-    aiCard ||
+    fm["ai-card"] === true ||
+    fm["ai-card"] === "true" ||
     livingMarkerState(content) !== "none" ||
     fm["living-node-region-hash"] !== undefined ||
     fm["living-node-ownership"] !== undefined ||
@@ -57,14 +56,16 @@ export function isLivingNodeNote(content: string, aiCard: boolean): boolean {
 
 const withoutFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
 
+/** The frontmatter lines of every `living-node-*` key, with their continuation lines, compared as raw text. */
 function livingMetadata(content: string): string {
-  const fm = frontmatter(content);
-  return JSON.stringify(
-    Object.keys(fm)
-      .filter(key => key.startsWith("living-node-"))
-      .sort()
-      .map(key => [key, fm[key]])
-  );
+  const yaml = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1] ?? "";
+  const kept: string[] = [];
+  let inLiving = false;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (/^[^\s#-]|^-\S/.test(line) || /^["']/.test(line)) inLiving = /^["']?living-node-/.test(line);
+    if (inLiving) kept.push(line);
+  }
+  return kept.sort().join("\n");
 }
 
 /** Proof that a write left the body bytes and every `living-node-*` metadata value as they were (frontmatter-only). */

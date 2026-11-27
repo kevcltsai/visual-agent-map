@@ -1004,8 +1004,7 @@ export class Repository {
   private admitAiWriter(content: string): void {
     const state = livingMarkerState(content);
     if (state === "corrupt") throw new Error(this.message("error.living_node_markers_damaged"));
-    if (isLivingNodeNote(content, readAiCard(frontmatter(content))))
-      throw new Error(this.message("ui.living_node_use_run_card"));
+    if (isLivingNodeNote(content, frontmatter(content))) throw new Error(this.message("ui.living_node_use_run_card"));
   }
 
   /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */

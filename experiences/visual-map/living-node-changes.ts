@@ -31,6 +31,11 @@ export interface LivingKnowledge {
   output: { text: string; owner: "ai" | "user"; evidence: readonly LivingEvidence[] };
 }
 
+/** Readable formal knowledge is required for a successful check; metadata alone is not a result. */
+export function hasLivingResult(knowledge: Pick<LivingKnowledge, "records" | "output">): boolean {
+  return !!knowledge.output.text.trim() || knowledge.records.some(record => !!record.claim.trim());
+}
+
 export interface LivingChangeContext {
   /** Evidence collected by the trusted source resolver, not IDs invented by the model. */
   evidence: readonly LivingEvidence[];
@@ -255,6 +260,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     });
     changed = true;
   }
+  if (!hasLivingResult({ records: [...records.values()], output })) throw new Error("missing-formal-result");
   // Revision is assigned by the actual Markdown commit, not by model output.
   return { changed, records: [...records.values()], output };
 }

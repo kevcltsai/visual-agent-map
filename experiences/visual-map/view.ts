@@ -3082,9 +3082,9 @@ export class VisualAgentMapView extends ItemView {
         this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
-      // A new topic left with a blank name (V3.3 P1.3) (Enter or leaving) is cancelled the same way: no card, no note.
+      // A new topic left with a blank name (Enter or leaving, V3.3 P1.3) is cancelled the same way: no card, no note.
       if (value !== null && !value.trim() && edit?.created && edit.createdStep) {
-        this.discardNewTopic(edit.createdStep);
+        this.discardNewTopic(edit.createdStep, node.parentId ?? null);
         return;
       }
       // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.

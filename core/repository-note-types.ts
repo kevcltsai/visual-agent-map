@@ -67,6 +67,8 @@ export interface Note extends PipelineFields {
     lastSuccessfulCheck?: string;
     lastContentChange?: string;
     outcome: "never" | "ok" | "failed" | "blocked" | "cancelled";
+    /** Why the last run did not finish (a short code written with the outcome); cleared by the next success. */
+    reason?: string;
     damaged: boolean;
     /** Set with `damaged`: whether the managed region itself still decodes (index/metadata can be rebuilt) or not. */
     damageKind?: "rebuildable" | "unrecoverable";

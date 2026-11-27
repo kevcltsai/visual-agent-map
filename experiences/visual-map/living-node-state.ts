@@ -1,5 +1,26 @@
 import { createHash } from "node:crypto";
+import type { TranslationKey } from "../../i18n";
 import type { LivingValidity } from "./living-node-execution";
+
+const REASON_KEYS: Record<string, TranslationKey> = {
+  "source-replaced": "ui.living_node_source_replaced",
+  "upstream-trial": "ui.living_node_upstream_trial",
+  "missing-source": "ui.living_node_reason_missing_source",
+  "dependency-blocked": "ui.living_node_reason_dependency",
+  cycle: "ui.living_node_reason_cycle",
+  "range-too-large": "ui.living_node_reason_range_too_large",
+  failed: "ui.living_node_reason_failed"
+};
+
+/** The short line a card shows for an unfinished state; it comes from the note, so it survives a reopen. */
+export function livingReasonKey(
+  living: { damaged: boolean; outcome: string; reason?: string } | undefined
+): TranslationKey | undefined {
+  if (!living) return undefined;
+  if (living.damaged) return "ui.living_node_reason_markers_damaged";
+  if ((living.outcome === "failed" || living.outcome === "blocked") && living.reason) return REASON_KEYS[living.reason];
+  return undefined;
+}
 
 export interface LivingRead {
   id: string;

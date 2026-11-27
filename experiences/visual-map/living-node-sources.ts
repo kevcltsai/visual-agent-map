@@ -42,15 +42,17 @@ export function reconcileLivingDraftReferences(
   previousLinks: readonly string[],
   persisted: readonly LivingSourceRef[] | undefined,
   nextLinks: readonly string[],
-  resolveNew: (link: string) => LivingSourceRef
+  resolveNew: (link: string) => LivingSourceRef,
+  /** Links the user chose again on purpose: they are resolved anew even when the list did not change. */
+  forceNew?: ReadonlySet<string>
 ): LivingSourceRef[] {
   if (!nextLinks.length) return [];
   if (!persisted) return nextLinks.map(resolveNew);
-  if (JSON.stringify(previousLinks) === JSON.stringify(nextLinks)) return [...persisted];
+  if (!forceNew?.size && JSON.stringify(previousLinks) === JSON.stringify(nextLinks)) return [...persisted];
   if (previousLinks.length !== persisted.length && nextLinks.some(link => previousLinks.includes(link)))
     throw new Error("ambiguous-saved-references");
   const previous = new Map(previousLinks.map((link, index) => [link, persisted[index]]));
-  return nextLinks.map(link => previous.get(link) ?? resolveNew(link));
+  return nextLinks.map(link => (forceNew?.has(link) ? undefined : previous.get(link)) ?? resolveNew(link));
 }
 
 export type LivingSourceRole = "child" | "explicit" | "map";

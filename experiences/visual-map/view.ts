@@ -216,11 +216,13 @@ import {
   saveLivingConfig,
   validateLivingStructure,
   livingRemovalConsumers,
+  livingReplacedSources,
   livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import { livingRestoreSnapshot, livingWithoutFence, renderLivingPreview } from "./living-node-markdown";
+import { livingReasonKey } from "./living-node-state";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -3312,6 +3314,7 @@ export class VisualAgentMapView extends ItemView {
     await this.hydrate();
     // A language change: the chat window's fixed words are set again (the panel itself is kept, with its draft and messages).
     this.chat?.relabel();
+    this.aiCardOpen?.win.relabel();
     // Only this repaint (a change made in another window) is held back from taking focus; the map's own repaints are not.
     this.externalRefresh = true;
     try {
@@ -6750,9 +6753,17 @@ export class VisualAgentMapView extends ItemView {
     hover.detail.setText(preview?.detailTail ?? "");
     hover.detail.hidden = !preview?.detailTail;
   }
+  /** Researched topics, plus Living Node cards whose result is current and valid; a card that needs a rerun does not count. */
+  private researchedCount(): number {
+    return (this.map?.nodes ?? []).filter(node => {
+      const note = this.notes.get(node.id);
+      if (note?.status === "completed") return true;
+      return !!note && isAiCard(note) && !note.livingNode?.damaged && this.livingValidity.get(node.id) === "valid";
+    }).length;
+  }
   private renderResearchProgress(parent: HTMLElement): void {
     const nodes = this.map?.nodes ?? [];
-    const done = nodes.filter(node => this.notes.get(node.id)?.status === "completed").length;
+    const done = this.researchedCount();
     const progress = parent.createDiv("vam-research-progress");
     progress.setAttr("role", "progressbar");
     progress.setAttr("aria-valuemin", "0");
@@ -15578,13 +15589,18 @@ export class VisualAgentMapView extends ItemView {
                   promptOf(values)
                 );
                 let ready = false;
+                let started = false;
                 await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (currentTrial()) ready = await trial.run(prepared.request);
+                  if (!currentTrial()) return;
+                  started = true;
+                  ready = await trial.run(prepared.request);
                 });
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
-                  if (currentTrial()) {
+                  // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
+                  if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
+                    win.showTrialFailure(t("ui.living_node_trial_invalid"));
                   }
                   return false;
                 }
@@ -15618,7 +15634,9 @@ export class VisualAgentMapView extends ItemView {
               } catch (error) {
                 if (currentTrial()) {
                   invalidateTrial();
-                  new Notice(this.plugin.recordFailure(t("ui.living_node_trial"), error));
+                  const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
+                  new Notice(reason);
+                  win.showTrialFailure(reason);
                 }
                 return false;
               }
@@ -15681,6 +15699,12 @@ export class VisualAgentMapView extends ItemView {
       viewSession
     };
     win.mount(overlay);
+    if (node)
+      void livingReplacedSources(this.app, this.plugin.repo, this.map, node.id)
+        .then(names => {
+          if (current() && names.length) win.markReplaced(names);
+        })
+        .catch(() => undefined);
     if (node)
       void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
         if (current()) new Notice(error instanceof Error ? error.message : String(error));
@@ -15801,7 +15825,9 @@ export class VisualAgentMapView extends ItemView {
           expectedConfigRevision,
           stillCurrent,
           undefined,
-          firstCommit ? undefined : saved?.sourceRevision
+          firstCommit ? undefined : saved?.sourceRevision,
+          values.reconfirm,
+          firstCommit
         );
       })
       .editMap(mapPath, map => {
@@ -15809,6 +15835,8 @@ export class VisualAgentMapView extends ItemView {
       })
       .commit({ deferRebuild: true, label: t("ui.ai_card") });
     firstCommit = false;
+    // The user's explicit re-confirmation is recorded only once the whole step committed.
+    if (saved?.confirm) saved = { ...saved, sourceRevision: saved.confirm(), confirm: undefined };
     if (this.path === mapPath && this.map?.id === mapId && !this.closed) {
       this.history.push(entry);
       await this.refreshAfterSavedChange();
@@ -20646,6 +20674,7 @@ export class VisualAgentMapView extends ItemView {
         title.appendChild(glyph);
         parts.push(glyph);
       }
+      let questionLine: HTMLElement | undefined;
       const question =
         splitPrompt(note.prompt)
           .question.split(/\r?\n/)
@@ -20661,6 +20690,15 @@ export class VisualAgentMapView extends ItemView {
           this.whenEditing(() => this.openAiCardPopover(node));
         });
         title.after(line);
+        parts.push(line);
+        questionLine = line;
+      }
+      const reason = status === "running" ? undefined : livingReasonKey(note.livingNode);
+      if (reason) {
+        const line = createEl("p", { cls: "vam-ai-reason", text: t(reason) });
+        line.setAttr("title", t(reason));
+        line.setAttr("dir", "auto");
+        (questionLine ?? title).after(line);
         parts.push(line);
       }
     }

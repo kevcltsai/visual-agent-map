@@ -58,7 +58,8 @@ export const INTERNAL_FIELD_NAMES = [
   "living-node-last-attempt",
   "living-node-last-successful-check",
   "living-node-last-content-change",
-  "living-node-outcome"
+  "living-node-outcome",
+  "living-node-reason"
 ] as const;
 
 const NAMED_ENTITIES: Record<string, string> = {

@@ -27,8 +27,24 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
   };
 }
 
+/** A successful formal commit leaves evidence distinct from a failed first attempt or V2 stamps. */
+export function hasLivingCommitMetadata(metadata: Record<string, unknown>): boolean {
+  return (
+    metadata["living-node-outcome"] === "ok" ||
+    [
+      "living-node-last-execution",
+      "living-node-success-knowledge",
+      "living-node-last-successful-check",
+      "living-node-last-content-change"
+    ].some(key => metadata[key] !== undefined)
+  );
+}
+
 /** Copy only formal knowledge and configuration. Run diagnostics belong to the original node. */
 export function resetLivingCopyDiagnostics(metadata: Record<string, unknown>): void {
+  // Resetting diagnostics must not erase the only evidence of damaged ownership.
+  if (hasLivingCommitMetadata(metadata) && metadata["living-node-region-hash"] === undefined &&
+      metadata["living-node-ownership"] === undefined) throw new Error("unknown-ownership");
   if (metadata["ai-run-result"] === "ok" || metadata["living-node-copy-snapshot"] === true)
     metadata["living-node-copy-snapshot"] = true;
   for (const key of [

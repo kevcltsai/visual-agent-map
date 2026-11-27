@@ -863,14 +863,14 @@ test('#59 synthetic reply: an unsupported number is still refused', () => {
   bad(mod.needsStep, req, syntheticIdReplies.needs.response, /number 111/);
 });
 test('#59 synthetic reply: full and short ids in text are refused, and removal restores positive parsing', () => {
-  const ids = ['abcdefgh-ijkl-mnop-qrst-uvwxyzabcdef', 'fedcbafe-edcb-afed-cbaf-edcbafedcbaf', 'cafeabcd-abcd-abcd-abcd-cafeabcdabcd'];
-  const evidence = ids.map(id => ({ id, claim: '證據', quote: 'quote text here', url: 'https://example.org/a', stance: 'contradicts' }));
+  const ids = ['abcdef12-3456-4789-8abc-def012345678', 'fedcba98-7654-4321-8765-43210fedcba9', 'c001cafe-0000-4000-8000-000000000001'];
+  const evidence = ids.map(id => ({ id, claim: `synthetic evidence marker ${id}`, quote: `synthetic quote marker ${id}`, url: 'https://example.org/a', stance: 'contradicts' }));
   const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '近期更新可能提升服務穩定性' });
   bad(mod.facetVerdictStep, req, syntheticIdReplies.facetVerdict.response, /names an id/);
-  bad(mod.facetVerdictStep, req, { ...JSON.parse(syntheticIdReplies.facetVerdict.response), reason: 'abcdefgh matches' }, /names an id/);
+  bad(mod.facetVerdictStep, req, { ...JSON.parse(syntheticIdReplies.facetVerdict.response), reason: 'abcdef12 matches' }, /names an id/);
   const clean = JSON.parse(syntheticIdReplies.facetVerdict.response);
-  clean.reason = '假說主張治安改善，但證據顯示不安全感上升。';
-  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/abcdefgh/g, '某項證據') }));
+  clean.reason = '近期更新後服務的錯誤率有所變化。';
+  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/abcdef12/g, '某項證據') }));
   assert.equal(mod.facetVerdictStep.parse(reply(clean), req).citedNeeds.length, 2);
 });
 test('#59 verdict reason naming an evidence id (or its first 8 characters) is refused; short ids are not checked', () => {

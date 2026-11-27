@@ -817,3 +817,26 @@ S.integrationTest('Living Node share: only verified public web evidence is expor
   assert.match(shared, /https:\/\/example\.com\/article/);
   assert.doesNotMatch(shared, /secret|localhost|private|unverified|web:/);
 });
+
+const { normalizeLivingProposal, explicitlyRequiresLivingWeb } = S.load('experiences/visual-map/living-node-provider.ts', { obsidian: S.obsidian });
+S.integrationTest('Living Node web: actual checked source is required even for no-change, and current answer must cite it', async () => {
+  const url = 'https://example.com/current';
+  const other = 'https://example.com/other';
+  const envelope = { baseRevision: 'base', requiresWeb: true, checkedWeb: [url], operations: [] };
+  const normalize = (raw, opened = [url, other], required = false) => normalizeLivingProposal(raw, opened, [], 't1', required);
+  assert.equal(explicitlyRequiresLivingWeb('搜尋最新股價'), true);
+  assert.equal(explicitlyRequiresLivingWeb('Search the web for news'), true);
+  assert.equal(explicitlyRequiresLivingWeb('Summarize today’s local notes'), false);
+  assert.equal(explicitlyRequiresLivingWeb('不要上網，只用本地筆記分析最新股價'), false);
+  assert.deepEqual(S.plain(normalize(envelope).proposal.operations), []);
+  assert.throws(() => normalize(envelope, []), /required-web-unavailable/);
+  assert.throws(() => normalize({ ...envelope, requiresWeb: false, checkedWeb: [] }, [url], true), /required-web-decision-conflict/);
+  assert.throws(() => normalize({ ...envelope, checkedWeb: [] }), /required-web-check-missing/);
+  assert.throws(() => normalize({ ...envelope, checkedWeb: ['https://example.com/not-opened'] }), /unauthorized-web-check/);
+  const op = { kind: 'output', text: 'Current result', evidence: [url] };
+  const proposal = normalize({ ...envelope, operations: [op] });
+  assert.equal(proposal.proposal.operations[0].evidence[0], proposal.context.evidence[0].id);
+  assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [] }] }), /required-web-evidence-missing/);
+  assert.throws(() => normalize({ ...envelope, operations: [{ ...op, evidence: [other] }] }), /required-web-evidence-missing/);
+  assert.throws(() => normalize({ ...envelope, operations: [{ kind: 'supplement', id: 'r1', evidence: [url] }, { ...op, evidence: [] }] }), /required-web-output-evidence-missing/);
+});

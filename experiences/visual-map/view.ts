@@ -13352,64 +13352,7 @@ export class VisualAgentMapView extends ItemView {
       this.attachCornerHandle(card, node);
     }
     card.addEventListener("click", event => this.onCardClick(event, card, node));
-    card.addEventListener("keydown", event => {
-      if (event.target !== card) return;
-      // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
-      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
-        event.preventDefault();
-        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
-          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
-        return;
-      }
-      const target = this.keyboardNeighbor(node, event.key);
-      if (target) {
-        event.preventDefault();
-        this.moveKeyboardFocus(target);
-        return;
-      }
-      if (this.onCardSpaceDown(event, node)) return;
-      const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
-      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
-      if (editable && !event.isComposing) {
-        if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
-          event.preventDefault();
-          // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
-          if (!event.repeat) this.removeByKey(node);
-          return;
-        }
-        // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
-        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
-          if (event.defaultPrevented) return; // the view scope already added the subtopic
-          event.preventDefault();
-          this.whenEditing(() => this.enqueue(() => this.addNode(node)));
-          return;
-        }
-        if (event.key === "Enter" && event.shiftKey && plain) {
-          if (event.defaultPrevented) return; // the view scope already added the sibling
-          event.preventDefault();
-          const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
-          this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
-          return;
-        }
-      }
-      if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
-        if (event.defaultPrevented) return; // the view scope already handled this F2
-        event.preventDefault();
-        this.startCardTitleEdit(node, { select: true });
-        return;
-      }
-      if (event.key === "Enter") {
-        if (this.selection.state.multiSelectMode) {
-          this.applySelectionChange(this.selection.toggleByEnter(node.id));
-        } else {
-          // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
-          this.selectMapNode(node);
-          if (this.notesLoading() || !note || event.isComposing) return;
-          event.preventDefault();
-          this.startCardTitleEdit(node, { select: true });
-        }
-      }
-    });
+    card.addEventListener("keydown", event => this.onCardKeydown(event, card, node, note));
     const aimTopic = (on: boolean): void => {
       if (on) this.hoverTopic = node.id;
       else if (this.hoverTopic === node.id) this.hoverTopic = null;
@@ -13463,6 +13406,65 @@ export class VisualAgentMapView extends ItemView {
     const shapeKind = this.shapeKindOf(node.id);
     if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, shapeKind));
     else this.fitKindShape(card, shapeKind);
+  }
+  /** Keyboard handling for a focused card: sibling move, tree walk, delete, add, rename and select. */
+  private onCardKeydown(event: KeyboardEvent, card: HTMLElement, node: MapNode, note: Note | undefined): void {
+    if (event.target !== card) return;
+    // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
+    if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+      event.preventDefault();
+      if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
+        this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+      return;
+    }
+    const target = this.keyboardNeighbor(node, event.key);
+    if (target) {
+      event.preventDefault();
+      this.moveKeyboardFocus(target);
+      return;
+    }
+    if (this.onCardSpaceDown(event, node)) return;
+    const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (editable && !event.isComposing) {
+      if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault();
+        // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
+        if (!event.repeat) this.removeByKey(node);
+        return;
+      }
+      // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        if (event.defaultPrevented) return; // the view scope already added the subtopic
+        event.preventDefault();
+        this.whenEditing(() => this.enqueue(() => this.addNode(node)));
+        return;
+      }
+      if (event.key === "Enter" && event.shiftKey && plain) {
+        if (event.defaultPrevented) return; // the view scope already added the sibling
+        event.preventDefault();
+        const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
+        this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
+        return;
+      }
+    }
+    if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
+      if (event.defaultPrevented) return; // the view scope already handled this F2
+      event.preventDefault();
+      this.startCardTitleEdit(node, { select: true });
+      return;
+    }
+    if (event.key === "Enter") {
+      if (this.selection.state.multiSelectMode) {
+        this.applySelectionChange(this.selection.toggleByEnter(node.id));
+      } else {
+        // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
+        this.selectMapNode(node);
+        if (this.notesLoading() || !note || event.isComposing) return;
+        event.preventDefault();
+        this.startCardTitleEdit(node, { select: true });
+      }
+    }
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the

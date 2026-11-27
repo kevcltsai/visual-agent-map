@@ -37,13 +37,17 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-/** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
 /** Explicit current-data wording is a conservative requirement floor; broader task semantics
  * still require the model's declared decision and semantic acceptance fixtures. */
 export function explicitlyRequiresLivingWeb(prompt: string): boolean {
-  return /(?:即時|即时|最新|今天|今日|當前行情|当前行情|現在的(?:股價|價格|新聞)|现在的(?:股价|价格|新闻)|\blatest\b|\blive\s+(?:price|data|news)\b|\btoday(?:'s)?\b|\bcurrent\s+(?:price|quote|news|market data)\b)/i.test(prompt);
+  // Date words alone do not require the web: a task can analyze today's local notes.
+  const explicitSearch = /(?:上網|上网|網路搜尋|网络搜索|搜尋網路|搜索网络|\bsearch the web\b|\bweb research\b|\bbrowse the web\b)/i.test(prompt);
+  const currentPublicData = /(?:即時|即时|最新|今天|今日|現在|现在|當前|当前|today|latest|live|current)[\s\S]{0,16}(?:股價|股价|行情|新聞|新闻|市場價格|市场价格|stock price|market data|market quote|news headlines)/i.test(prompt);
+  const offline = /(?:不要上網|不要上网|禁止上網|禁止上网|只(?:用|讀|读)本地|only (?:use|read) local|do not (?:browse|search the web)|no web search)/i.test(prompt);
+  return !offline && (explicitSearch || currentPublicData);
 }
 
+/** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
 export function normalizeLivingProposal(raw: unknown, opened: readonly string[], local: readonly LivingEvidence[], at: string, requiresWeb = false) {
   const envelope = object(raw);
   if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb", "checkedWeb"].includes(key)))

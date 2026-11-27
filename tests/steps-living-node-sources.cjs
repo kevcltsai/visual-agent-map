@@ -150,3 +150,16 @@ test('canonical source rename changes exact paths, retains card IDs, legacy alia
   assert.equal(rebaseLivingNoteReferences(['note-path:Other.md'], change), null);
   assert.equal(rebaseLivingNoteReferences([42, 'note-path:A.md'], change), null);
 });
+
+test('A05: a deleted source card leaves a blocking dangling ID that resolves again when the same ID returns; a same-name card never substitutes', () => {
+  const withoutB = nodes.filter(n => n.id !== 'b');
+  const gone = resolve([card('b')], [], withoutB);
+  assert.deepEqual(plain(gone.failures.map(f => [f.reason, f.required])), [['missing-or-unauthorized', true]]);
+  assert.equal(gone.sources.some(s => s.cardId === 'b'), false);
+  const lookalike = resolve([card('b')], [], [...withoutB, { id: 'b2', path: 'b.md' }]);
+  assert.equal(lookalike.failures[0].reason, 'missing-or-unauthorized');
+  assert.equal(lookalike.sources.some(s => s.cardId === 'b2'), false);
+  const restored = resolve([card('b')]);
+  assert.equal(restored.failures.length, 0);
+  assert.deepEqual(plain(restored.dependencyIds), ['a', 'b']);
+});

@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const { load, obsidian, fixture, node, map } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 
-const loadOutline = () => load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } }).OutlineView;
+const loadOutline = () => load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } }, { document: { activeElement: null } }).OutlineView;
 // root > child > leaf, plus an unrelated sibling of root; root and child are collapsed.
 function outline() {
   const OutlineView = loadOutline();
@@ -42,6 +42,28 @@ test('B15: canvas selection opens the collapsed ancestor rows in the outline DOM
   assert.equal(rows().length, 4, 'the opened branch is hidden, its rows kept for reuse');
 });
 
+test('B15 batch UI: selecting a card inside a not-yet-opened branch clears the previous active row (one active row)', () => {
+  const { view } = outline();
+  view.setActive('other.md');
+  view.setActive('leaf.md');
+  const active = dom.findAll(view.contentEl, i => dom.hasCls(i, 'is-active')).map(i => i.attrs['data-path']);
+  const current = dom.findAll(view.contentEl, i => i.attrs?.['aria-current'] === 'true').map(i => i.attrs['data-path']);
+  assert.deepEqual(active, ['leaf.md']);
+  assert.deepEqual(current, ['leaf.md']);
+});
+test('B15 batch UI: a map repaint that hands the outline the same content keeps every row; a changed title still redraws', () => {
+  const { view, rows } = outline();
+  const content = () => [{ title: 'M', nodes: [
+    { id: 'root', parentId: null, path: 'root.md' }, { id: 'child', parentId: 'root', path: 'child.md' },
+    { id: 'leaf', parentId: 'child', path: 'leaf.md' }, { id: 'other', parentId: null, path: 'other.md' }
+  ] }, new Map([['root', 'Root'], ['child', 'Child'], ['leaf', 'Leaf'], ['other', 'Other']])];
+  const before = rows();
+  view.setMap(...content());
+  assert.ok(rows().every((row, i) => row === before[i]) && rows().length === before.length, 'same content: no rebuild');
+  const [map, titles] = content(); titles.set('other', 'Renamed');
+  view.setMap(map, titles);
+  assert.notEqual(rows()[rows().length - 1], before[before.length - 1], 'changed title: redrawn');
+});
 test('B15: syncing the active row keeps the outline rows and the search box as the same objects', () => {
   const { view, rows } = outline();
   const before = rows(), tree = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-tree'))[0];

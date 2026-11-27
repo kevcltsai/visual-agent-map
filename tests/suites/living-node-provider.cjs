@@ -559,5 +559,5 @@ S.integrationTest('A11 live: the change-set step tells the model to correct or i
   const f = S.fixture();
   await f.app.vault.create(path, initial);
   const { sent } = await round(f, [append(1)]);
-  assert.match(sent[0], /newer observation supersedes an older one for the same subject and scope[^.]*`correct` or `invalidate` the old record/);
+  assert.match(sent[0], /newer observation supersedes an older current-state fact of the same subject and scope[^.]*`correct` or `invalidate` the old record/);
 });

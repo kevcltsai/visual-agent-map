@@ -209,7 +209,12 @@ export async function resolveMapSources(
     if (signal.aborted) throw aborted();
     try {
       const group = await readExternalSource(source, deps.external!.scope, signal, mapRoots);
-      if (group) groups.push(group);
+      // An external folder may be another vault: a Living Node note there reaches the model only as its model view.
+      if (group)
+        groups.push({
+          ...group,
+          documents: group.documents.map(doc => ({ ...doc, content: livingNoteForModel(doc.content) }))
+        });
     } catch (error) {
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw aborted();
       externalUnreadable.push(source);

@@ -51,6 +51,7 @@ export class AiCardPopover {
   private readonly closeEl: HTMLButtonElement;
   private readonly failureEl: HTMLElement;
   private failure: string | null = null;
+  private failureDetail = "";
   private readonly labelled: Array<[HTMLElement, TranslationKey, string]> = [];
   private readonly sources: string[];
   private replaced = new Set<string>();
@@ -218,9 +219,10 @@ export class AiCardPopover {
   }
 
   /** The trial did not finish: say so inside the editor, with the reason and a way to try again. */
-  showTrialFailure(reason: string): void {
+  showTrialFailure(reason: string, detail = ""): void {
     if (this.destroyed) return;
     this.failure = reason;
+    this.failureDetail = detail;
     this.paintFailure();
     this.failureEl.querySelector<HTMLButtonElement>("button")?.focus();
   }
@@ -242,6 +244,12 @@ export class AiCardPopover {
     if (this.failure === null) return;
     this.failureEl.createDiv({ cls: "vam-living-editor-failure-title", text: t("ui.living_node_trial_failed_title") });
     this.failureEl.createDiv({ cls: "vam-living-editor-failure-reason", text: this.failure, attr: { dir: "auto" } });
+    if (this.failureDetail)
+      this.failureEl.createDiv({
+        cls: "vam-living-editor-failure-detail",
+        text: t("ui.living_node_trial_reason_code_0", this.failureDetail),
+        attr: { dir: "auto" }
+      });
     this.failureEl.createDiv({ cls: "vam-living-editor-failure-note", text: t("ui.living_node_trial_failed_note") });
     const retry = this.failureEl.createEl("button", {
       cls: "vam-living-editor-retry",

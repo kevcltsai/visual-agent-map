@@ -34,7 +34,7 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
  */
 export function livingNoteWithoutManaged(content: string): string {
   let out = content;
-  const match = /^(---\r?\n)([\s\S]*?)(\r?\n---(?:\r?\n|$))/.exec(out);
+  const match = /^(\uFEFF?---\r?\n)([\s\S]*?)(\r?\n---(?:\r?\n|$))/.exec(out);
   if (match && /(^|\n)["']?living-node-/.test(match[2])) {
     let inLiving = false;
     const kept = match[2].split(/\r?\n/).filter(line => {

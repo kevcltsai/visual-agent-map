@@ -168,3 +168,49 @@ test('setup window: a relabel puts the focus back on the equivalent rebuilt cont
     assert.equal(dom.focusedNow(), retryAgain, 'the keyboard stays on the retry');
   } finally { ui.setUiLanguage('en'); }
 });
+
+// ---- the trial failure reason -----------------------------------------------------------------------------------------
+const reasonModule = require('./support-replay.cjs').loadSource(`
+export { livingTrialReason } from "./experiences/visual-map/living-node-trial-reason";
+export { LivingTrial } from "./experiences/visual-map/living-node-trial";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: S.obsidian });
+
+test('trial failure: a provider error and a validation error each give a short reason, with the raw code only as a detail', () => {
+  reasonModule.setUiLanguage('en');
+  const provider = reasonModule.livingTrialReason(new Error('Request to /Users/me/secret prompt "my private question" failed'));
+  assert.equal(provider.reason, 'The AI provider failed or did not answer.');
+  assert.equal(provider.code, '', 'free-form error text is never passed on');
+  assert.equal(reasonModule.livingTrialReason(new Error('Request timed out')).reason, 'The AI took too long and timed out.');
+  const web = reasonModule.livingTrialReason(new Error('required-web-unavailable'));
+  assert.match(web.reason, /web search/);
+  assert.equal(web.code, 'required-web-unavailable');
+  assert.match(reasonModule.livingTrialReason(new Error('living-node-context-too-large')).reason, /too large/);
+  assert.match(reasonModule.livingTrialReason(new Error('stale-base')).reason, /replaced or changed/);
+  assert.match(reasonModule.livingTrialReason(new Error('ambiguous-living-node-region')).reason, /markers are damaged/);
+  const validation = reasonModule.livingTrialReason(new Error('missing-evidence'));
+  assert.equal(validation.reason, 'The AI answer was rejected by validation.');
+  assert.equal(validation.code, 'missing-evidence');
+  reasonModule.setUiLanguage('zh-TW');
+  assert.match(reasonModule.livingTrialReason(new Error('missing-evidence')).reason, /沒有通過檢查/);
+  reasonModule.setUiLanguage('zh-CN');
+  assert.match(reasonModule.livingTrialReason(new Error('missing-evidence')).reason, /没有通过检查/);
+  reasonModule.setUiLanguage('en');
+});
+
+test('trial failure: the setup window shows the reason and the code line; a failed run keeps its error code', async () => {
+  reasonModule.setUiLanguage('en');
+  const { win, el } = open();
+  win.showTrialFailure('The AI answer was rejected by validation.', 'missing-evidence');
+  const box = alertBox(el);
+  assert.ok(findAll(box, i => i.text === 'The AI answer was rejected by validation.').length === 1);
+  assert.ok(findAll(box, i => i.text === 'Code: missing-evidence').length === 1);
+  const lease = { signal: new AbortController().signal, current: () => true, release() {}, stop() {} };
+  const trial = new reasonModule.LivingTrial({ acquire: () => lease });
+  const ok = await trial.run({
+    candidate: { mapId: 'm', viewSession: 's', baseRevision: 'old' }, path: 'a.md', expectedContent: '', base: { revision: 'empty' },
+    context: {}, generate: async () => ({}), stillCurrent: async () => true
+  });
+  assert.equal(ok, false);
+  assert.equal(trial.failureCode, 'stale-base');
+});

@@ -114,6 +114,7 @@ function fixture(language = 'zh-TW', options = {}) {
     if (item.parent instanceof TFolder && !item.name.startsWith('.') && !item.parent.children.includes(item)) item.parent.children.push(item); };
   const renameTree = (from, to) => { const entries = Array.from(files.entries()).filter(([p]) => p === from || p.startsWith(`${from}/`)).sort((a, b) => a[0].length - b[0].length); for (const [old, item] of entries) { files.delete(old); if (item.parent?.children) item.parent.children = item.parent.children.filter(child => child !== item); const next = `${to}${old.slice(from.length)}`; item.path = next; item.name = next.split('/').at(-1); if (item instanceof TFile) { item.basename = item.name.replace(/\.md$/, ''); item.stat.mtime = Date.now(); const content = contents.get(old); contents.delete(old); contents.set(next, content); } files.set(next, item); } for (const [, item] of entries) attach(item); };
   const app = { vault: {
+    configDir: '.obsidian',
     getAbstractFileByPath: p => files.get(p),
     getMarkdownFiles: () => Array.from(files.values()).filter(file => file instanceof TFile && file.extension === 'md'),
     read: async file => contents.get(file.path), cachedRead: async file => contents.get(file.path),

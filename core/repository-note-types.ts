@@ -55,6 +55,8 @@ export interface Note extends PipelineFields {
   /** Read-only Living Node knowledge and attempt diagnostics derived from the authoritative note. */
   livingNode?: {
     summary: string;
+    /** The summary with private paths, secrets and embeds taken out: what leaves the app (share file); `summary` stays as the user wrote it. */
+    shareSummary?: string;
     /** Readable committed knowledge only, excluding execution metadata and private evidence paths. */
     shareMarkdown?: string;
     /** Snapshot of the saved configuration, not the knowledge or run diagnostics. */

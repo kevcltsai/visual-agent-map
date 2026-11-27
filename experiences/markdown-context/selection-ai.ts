@@ -8,9 +8,11 @@ import {
   Platform,
   setIcon,
   type App,
-  type Editor
+  type Editor,
+  type TFile
 } from "obsidian";
 import { noteTextAiLocked } from "../../note-values";
+import { livingEditorRefusal } from "../../core/living-node-region";
 import { getUiLanguage, t } from "../../i18n";
 import type { PreparedStep } from "../../core/step-runner";
 import { mermaidSyntaxCheck, unsafeMermaid } from "../../ai/mermaid-safety";
@@ -64,6 +66,8 @@ interface SelectionAiOptions {
   isManagedNote?: (notePath: string) => Promise<boolean>;
   /** Saves a generated image as an attachment of `notePath`; returns its vault path. */
   saveImage: (dataUrl: string, notePath: string, name: string) => Promise<string>;
+  /** Closed-file image writes go through the Repository-guarded vault. */
+  processNote?: (file: TFile, edit: (text: string) => string) => Promise<unknown>;
 }
 
 function findUnique(source: string, selected: string): number {
@@ -857,6 +861,14 @@ class SelectionAiPanel extends Component {
     return noteTextAiLocked(current, parseYaml);
   }
 
+  private currentEditorText(): string {
+    try {
+      return this.snapshot.view.editor.getValue();
+    } catch {
+      return this.snapshot.markdown;
+    }
+  }
+
   private applyResult(result: string, action: "append" | "replace" | "after", status: HTMLElement): void {
     // AI lock, at write time: a note locked while the draft was made is not written.
     if (this.noteLocked()) {
@@ -865,6 +877,14 @@ class SelectionAiPanel extends Component {
       return;
     }
     const { view, path, markdown, text, matchAt } = this.snapshot;
+    // Living Node admission on the text the editor holds right now, before any replaceRange.
+    const living = livingEditorRefusal(this.currentEditorText(), parseYaml);
+    if (living) {
+      const message = t(living === "damaged" ? "error.living_node_markers_damaged" : "ui.living_node_use_run_card");
+      status.setText(message);
+      new Notice(message);
+      return;
+    }
     const viewStillOpen = this.app.workspace.getLeavesOfType("markdown").some(leaf => leaf.view === view);
     if (!viewStillOpen || view.file?.path !== path || view.editor.getValue() !== markdown) {
       status.setText(t("ui.context_ai_note_changed"));

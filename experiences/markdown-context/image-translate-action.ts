@@ -1,5 +1,6 @@
 import { Component, MarkdownView, Notice, parseYaml, setIcon, type App, type TFile } from "obsidian";
 import { noteTextAiLocked } from "../../note-values";
+import { livingEditorRefusal } from "../../core/living-node-region";
 import { getUiLanguage, OUTPUT_LANGUAGE_CHOICES, SUPPORTED_LANGUAGES, t, type ContentLanguage } from "../../i18n";
 import { prepareStep, type PreparedStep } from "../../core/step-runner";
 import { imageTranslateStep } from "./steps/image-translate/step";
@@ -18,6 +19,8 @@ export interface ImageTranslateOptions {
   ) => Promise<string>;
   /** Saves a generated image as an attachment of `notePath`; returns its vault path. */
   saveImage: (dataUrl: string, notePath: string, name: string) => Promise<string>;
+  /** Closed-file writes go through the Repository-guarded vault when given (damaged Living Node markers refuse there too). */
+  processNote?: (file: TFile, edit: (text: string) => string) => Promise<unknown>;
 }
 
 interface ImageTarget {
@@ -333,6 +336,10 @@ export class ImageTranslateAction extends Component {
     const edit = (text: string): string => {
       // AI lock, at write time: a note locked meanwhile is not changed (the caller removes the saved image).
       if (noteTextAiLocked(text, parseYaml)) throw new Error(t("ui.ai_locked_notice"));
+      // Living Node admission, on the exact text being replaced (open editor and closed file alike).
+      const living = livingEditorRefusal(text, parseYaml);
+      if (living)
+        throw new Error(t(living === "damaged" ? "error.living_node_markers_damaged" : "ui.living_node_use_run_card"));
       // Find the clicked copy again: same copy number while the note has the same number of copies.
       const copies = target.token ? occurrences(text, target.token.text) : [];
       const at =
@@ -387,7 +394,7 @@ export class ImageTranslateAction extends Component {
         endAfter--;
       }
       editor.replaceRange(after.slice(start, endAfter), editor.offsetToPos(start), editor.offsetToPos(endBefore));
-    } else await this.app.vault.process(note, edit);
+    } else await (this.options.processNote ?? ((file, change) => this.app.vault.process(file, change)))(note, edit);
     return outcome;
   }
 }

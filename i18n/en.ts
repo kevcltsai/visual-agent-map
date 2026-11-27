@@ -1,6 +1,8 @@
 /** English dictionary: the source of every `TranslationKey` and the fallback for any language missing a key. */
 export const en = {
   "error.recovery_write_conflict": "The file changed before it could be saved. Reopen it and try again.",
+  "error.living_node_markers_damaged":
+    "The Living Node markers in this card are damaged (unpaired or duplicated), so VAM did not change the card. VAM did not repair anything; fix or remove the markers by hand.",
   "error.recovery_backup_failed": "Could not verify the recovery copy. The original file was not changed.",
   "log.recovery_snapshot_retained_0": "Recovery copy retained: {0}",
   "log.recovery_scan_failed": "Could not check for pending recovery copies.",

@@ -27,6 +27,90 @@ export function splitLivingNodeRegion(content: string): { body: string; region: 
   };
 }
 
+export type LivingMarkerState = "none" | "paired" | "corrupt";
+
+/** Marker presence, not the ai-card flag: exactly one begin then one end is paired; any other use of either marker is corrupt. */
+export function livingMarkerState(content: string): LivingMarkerState {
+  const start = content.indexOf(LIVING_NODE_BEGIN);
+  const end = content.indexOf(LIVING_NODE_END);
+  if (start < 0 && end < 0) return "none";
+  const damaged =
+    start < 0 ||
+    end < start ||
+    content.indexOf(LIVING_NODE_BEGIN, start + LIVING_NODE_BEGIN.length) >= 0 ||
+    content.indexOf(LIVING_NODE_END, end + LIVING_NODE_END.length) >= 0;
+  return damaged ? "corrupt" : "paired";
+}
+
+/** True when the note is a Living Node: the markers, the ownership/commit metadata or the AI-card flag, whichever is present. */
+export function isLivingNodeNote(content: string, fm: Record<string, unknown>): boolean {
+  return (
+    fm["ai-card"] === true ||
+    fm["ai-card"] === "true" ||
+    livingMarkerState(content) !== "none" ||
+    fm["living-node-region-hash"] !== undefined ||
+    fm["living-node-ownership"] !== undefined ||
+    hasLivingCommitMetadata(fm)
+  );
+}
+
+/**
+ * The refusal an editor-side AI writer (selection panel, image translate) must honour on the text it is about to replace:
+ * damaged markers first, then any Living Node (markers, metadata or the flag). Null means the write may go ahead.
+ */
+export function livingEditorRefusal(content: string, parse: (yaml: string) => unknown): "damaged" | "living" | null {
+  if (livingMarkerState(content) === "corrupt") return "damaged";
+  const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1] ?? "";
+  let fm: Record<string, unknown> = {};
+  try {
+    const parsed = block ? parse(block) : {};
+    if (parsed && typeof parsed === "object") fm = parsed as Record<string, unknown>;
+  } catch {
+    // Unreadable frontmatter: fail closed when it names a Living Node key.
+    return /(?:ai-card|living-node-[\w-]+)["']?\s*:/.test(block) ? "living" : null;
+  }
+  return isLivingNodeNote(content, fm) ? "living" : null;
+}
+
+const withoutFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+
+/** The frontmatter lines of every `living-node-*` key, with their continuation lines, compared as raw text. */
+function livingMetadata(content: string): string {
+  const yaml = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1] ?? "";
+  const kept: string[] = [];
+  let inLiving = false;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (/^[^\s#-]|^-\S/.test(line) || /^["']/.test(line)) inLiving = /^["']?living-node-/.test(line);
+    if (inLiving) kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+/** Proof that a write left the body bytes and every `living-node-*` metadata value as they were (frontmatter-only). */
+export function keepsLivingBodyAndMetadata(
+  before: string,
+  after: string,
+  readFrontmatter: (content: string) => Record<string, unknown>
+): boolean {
+  if (withoutFrontmatter(before) !== withoutFrontmatter(after) || livingMetadata(before) !== livingMetadata(after))
+    return false;
+  // The byte check can be fooled by quoted/escaped keys or reordered continuation lines; the parsed values must match too.
+  try {
+    const parsed = (content: string): string => {
+      const fm = readFrontmatter(content);
+      return JSON.stringify(
+        Object.keys(fm)
+          .filter(key => key.startsWith("living-node-"))
+          .sort()
+          .map(key => [key, fm[key]])
+      );
+    };
+    return parsed(before) === parsed(after);
+  } catch {
+    return false;
+  }
+}
+
 /** A successful formal commit leaves evidence distinct from a failed first attempt or V2 stamps. */
 export function hasLivingCommitMetadata(metadata: Record<string, unknown>): boolean {
   return (

@@ -1042,3 +1042,22 @@ test('place_image write (behaviour): one transaction adds an annotated image wit
   await h.view.travel(true);
   assert.ok((await h.saved()).canvasItems.some(i => i.id === written.id), 'redo brings it back');
 });
+
+for (const [name, flag] of [['paired region with the flag', true], ['converted paired region (no flag)', false]])
+  test(`map chat picture placement refuses a Living Node card (${name}): no detail write, no cover embed, bytes unchanged`, async () => {
+    const h = await harness();
+    const node = h.view.map.nodes.find(n => n.id === h.ids.a);
+    let text = h.contents.get(node.path);
+    if (flag) text = text.replace(/^---\n/, '---\nai-card: true\n');
+    h.contents.set(node.path, `${text.replace(/\s*$/, '\n')}\n<!-- vam-living-node:begin v1 -->\nregion\n<!-- vam-living-node:end v1 -->\n`);
+    const before = h.contents.get(node.path);
+    const block = { query: 'q', nodeId: node.id, nodeTitle: node.title, canvas: false, mapPath: MAP, mapId: 'map-a', state: 'searching', items: [] };
+    const candidate = { url: 'https://example.org/a.png', title: 'A', source: 'https://example.org' };
+    const noCover = await h.view.chatPlaceImageNow(block, candidate, () => true, null);
+    assert.equal(noCover.ok, false);
+    assert.equal(h.contents.get(node.path), before, 'the detail write is refused');
+    // The cover embed is a second write path of the same placement; it must refuse on its own bytes too.
+    const entry = await h.view.chatCoverWrite(block, { name: 'a.png', data: PNG.buffer.slice(0) }, () => true).catch(() => null);
+    assert.equal(entry, null);
+    assert.equal(h.contents.get(node.path), before, 'the cover embed is refused');
+  });

@@ -14,6 +14,8 @@ const suites = [
   'ai-tasks.cjs',
   'notes-repository.cjs',
   'living-node-markdown.cjs',
+  'living-node-writer-admission.cjs',
+  'living-node-writer-guard.cjs',
   'living-node-provider.cjs',
   'expansion-and-synthesis.cjs',
   'visual-map-view.cjs',

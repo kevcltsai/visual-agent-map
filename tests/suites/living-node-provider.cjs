@@ -444,22 +444,9 @@ S.integrationTest('privacy: a Living Node note delivered as a map-level source i
   assert.deepEqual(leaks(f.prompts[0], foreign), []);
 });
 
-// Every other AI reader of raw vault text: chat attachments, chat-started research and map-level file sources.
-const { buildMapChatContext } = S.load('core/map-chat-context.ts', { obsidian: S.obsidian });
+// Every other AI reader of raw vault text: chat-started research and map-level file sources (the chat's own attachments are sanitised in view.ts, where the turn is built).
 const { chatResearchReferenceGroups } = S.load('experiences/visual-map/chat-research-sources.ts', { obsidian: S.obsidian });
 const { resolveMapSources } = S.load('experiences/visual-map/map-sources.ts', { obsidian: S.obsidian });
-const chatBase = { mapTitle: 'M', outline: [], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] };
-
-S.integrationTest('privacy: chat context (attached file, active note, own file) never carries a Living Node note\'s holds or ownership', async () => {
-  const foreign = await foreignLivingNote();
-  const json = context => JSON.stringify(context);
-  for (const input of [{ files: [{ path: 'F.md', content: foreign }] }, { activeFile: { path: 'A.md', content: foreign } }, { ownFiles: [{ path: 'O.md', content: foreign }] }]) {
-    const sent = json(buildMapChatContext({ ...chatBase, ...input }));
-    assert.ok(sent.includes('FOREIGN-FINDINGS'), 'the model view still arrives');
-    assert.deepEqual(leaks(sent, foreign), [], Object.keys(input)[0]);
-  }
-});
-
 S.integrationTest('privacy: research started from the chat and map-level file sources get the model view of a Living Node note', async () => {
   const foreign = await foreignLivingNote();
   const groups = chatResearchReferenceGroups({ files: [{ path: 'F.md', content: foreign }], activeFile: null, snippets: [] });

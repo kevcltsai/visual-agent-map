@@ -340,6 +340,12 @@ function readLivingData(content: string) {
   const fm = frontmatter(content);
   const index = readOwnership(fm[OWNERSHIP_KEY]);
   const region = readRegion(content, fm[HASH_KEY], !!index);
+  // A previous formal commit with neither its region nor its ownership index
+  // is not a fresh/legacy card. Lost ownership cannot be reconstructed from
+  // diagnostics, so refuse automatic integration rather than resurrecting data.
+  if (!region && !index && [COMMIT_KEY, "living-node-success-knowledge",
+    "living-node-last-successful-check", "living-node-last-content-change"].some(key => fm[key] !== undefined))
+    throw new Error("unknown-ownership");
   const current = region ? decodeRegion(region, livingSnapshotRevision(region.text)) : emptyKnowledge();
   if (!index) return { region, knowledge: current };
   if (!region) {

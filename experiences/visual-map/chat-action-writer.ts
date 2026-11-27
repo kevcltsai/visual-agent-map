@@ -341,7 +341,9 @@ export class ChatActionWriter {
         // Existing ordinary cards cannot be implicitly converted by chat.
         if (current.note.aiCard !== true) return skipped("ui.living_node_chat_existing_only");
         const stamp = baseline.topicHashes[node.id]?.livingConfigRevision;
-        if (!createdHere && (!stamp || stamp !== current.note.livingNode?.configRevision))
+        // No stamp: the card went to the AI in the outline only (its saved Prompt was never shown), so it is not "changed".
+        if (!createdHere && !stamp) return skipped("ui.map_chat_skip_topic_not_seen");
+        if (!createdHere && stamp !== current.note.livingNode?.configRevision)
           return skipped("ui.map_chat_skip_topic_changed");
         // A model-generated new link may only name a card already in the map,
         // or a file authorized in this turn. Unchanged aliases retain their

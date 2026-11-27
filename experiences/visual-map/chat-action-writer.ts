@@ -279,7 +279,7 @@ export class ChatActionWriter {
         return false;
       return (
         !!map?.nodes.some(item => item.path === key) ||
-        Object.prototype.hasOwnProperty.call(hashes, key) ||
+        Object.prototype.hasOwnProperty.call(hashes, key) === true ||
         !!baseline.mapSourcePaths?.includes(key)
       );
     };

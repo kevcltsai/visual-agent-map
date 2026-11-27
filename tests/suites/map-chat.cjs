@@ -3750,8 +3750,8 @@ integrationTest('B1 fix 26: after create_map re-mounts the conversation in the n
 integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px of it; the tool group moves to the window\'s right edge and comes back; the hover preview is under the window', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const tools = h.rootEl.createDiv('vam-map-tools'); h.plugin.settings.mapChatWidth = 340;
   h.rootEl.clientWidth = 600; h.view.onResize(); assert.equal(chat.isNarrow, true); assert.equal(tools.style.left ?? '', '', 'folded: the group stays at the canvas corner');
-  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 44 + 12}px`, 'beside the window, like a docked one');
-  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 44 + 12}px`);
+  chat.toggleEl.click(); assert.equal(chat.isOverlay, true); assert.equal(chat.el.style.width, '340px'); assert.equal(tools.style.left, `${340 - 28 + 12}px`, 'beside the window, like a docked one');
+  h.rootEl.clientWidth = 400; h.view.onResize(); assert.equal(chat.el.style.width, '280px', 'under the 160px margin the window shrinks to its minimum'); assert.equal(tools.style.left, `${280 - 28 + 12}px`);
   h.rootEl.clientWidth = 500; h.view.onResize(); assert.equal(chat.el.style.width, '340px');
   chat.collapseOverlay(); assert.equal(tools.style.left, '', 'folded again: the group goes back');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const z = selector => Number(css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')} \\{[^}]*z-index: (\\d+)`))[1]);

@@ -4,6 +4,9 @@ import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatt
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
+  livingEventFingerprint,
+  livingEventTombstone,
+  parseLivingEventTombstone,
   type LivingChangeContext,
   type LivingEvidence,
   type LivingKnowledge,
@@ -276,6 +279,7 @@ function outputHash(output: LivingKnowledge["output"]): string {
 interface OwnershipIndex {
   output: string;
   records: Map<string, string>;
+  events: Map<string, string>;
   suppressed: Set<string>;
 }
 
@@ -283,7 +287,7 @@ interface OwnershipIndex {
 function ownership(knowledge: LivingKnowledge): string[] {
   return [
     JSON.stringify(["output", outputHash(knowledge.output)]),
-    ...knowledge.records.map(record => JSON.stringify(["record", record.id, recordHash(record)])),
+    ...knowledge.records.map(record => JSON.stringify(["record", record.id, recordHash(record), livingEventFingerprint(record)])),
     ...knowledge.suppressed.map(id => JSON.stringify(["suppressed", id]))
   ];
 }
@@ -291,7 +295,7 @@ function ownership(knowledge: LivingKnowledge): string[] {
 function readOwnership(raw: unknown): OwnershipIndex | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) throw new Error("invalid-ownership-index");
-  const index: OwnershipIndex = { output: "", records: new Map(), suppressed: new Set() };
+  const index: OwnershipIndex = { output: "", records: new Map(), events: new Map(), suppressed: new Set() };
   const validHash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
   for (const line of raw as unknown[]) {
     if (typeof line !== "string") throw new Error("invalid-ownership-index");
@@ -301,12 +305,13 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
       index.output = value[1];
     } else if (
       value[0] === "record" &&
-      value.length === 3 &&
+      (value.length === 3 || (value.length === 4 && validHash(value[3]))) &&
       typeof value[1] === "string" &&
       validHash(value[2]) &&
       !index.records.has(value[1])
     ) {
       index.records.set(value[1], value[2]);
+      if (value.length === 4) index.events.set(value[1], value[3]);
     } else if (value[0] === "suppressed" && value.length === 2 && typeof value[1] === "string") {
       index.suppressed.add(value[1]);
     } else throw new Error("invalid-ownership-index");
@@ -319,11 +324,19 @@ function readOwnership(raw: unknown): OwnershipIndex | undefined {
 function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): LivingKnowledge {
   const suppressed = new Set([...current.suppressed, ...index.suppressed]);
   const ids = new Set(current.records.map(record => record.id));
-  for (const id of index.records.keys()) if (!ids.has(id)) suppressed.add(id);
+  for (const id of index.records.keys()) {
+    if (ids.has(id)) continue;
+    suppressed.add(id);
+    const fingerprint = index.events.get(id);
+    if (fingerprint) suppressed.add(livingEventTombstone(id, fingerprint));
+  }
   const records = current.records.map(record => {
     if (suppressed.has(record.id)) {
       // An explicit human re-add of the record is protected and releases its tombstone.
       suppressed.delete(record.id);
+      for (const value of suppressed) {
+        if (parseLivingEventTombstone(value)?.recordId === record.id) suppressed.delete(value);
+      }
       return { ...record, owner: "user" as const };
     }
     return index.records.get(record.id) === recordHash(record)

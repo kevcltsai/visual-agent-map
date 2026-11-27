@@ -180,6 +180,27 @@ S.integrationTest('Living Node trial: preview never writes; adoption uses the sa
   assert.equal(readLivingMarkdown(f.contents.get(path)).output.text, 'Current findings');
 });
 
+S.integrationTest('Living Node: explicit no-match is persisted, but clearing it cannot produce a new successful check or adoptable trial', async () => {
+  const f = await setup();
+  const noMatch = { baseRevision: 'empty', operations: [{ kind: 'output', text: 'No matching observations found.', evidence: ['e1'] }] };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: noMatch })), 'written');
+  const committed = f.contents.get(path);
+  assert.equal(readLivingMarkdown(committed).output.text, 'No matching observations found.');
+  const edited = committed.replace('> No matching observations found.', '> ');
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base = readLivingMarkdown(edited);
+  assert.notEqual(base.revision, 'empty');
+  assert.equal(base.output.owner, 'user');
+  assert.equal(base.output.text, '');
+  const emptyProposal = { baseRevision: base.revision, operations: [] };
+  const retry = { base, proposal: emptyProposal, candidate: { executionId: 'e2' } };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, retry)), /missing-formal-result/);
+  const trial = new LivingTrial(new LivingCoordinator());
+  assert.equal(await trial.run(trialRequest(f, async () => emptyProposal, retry)), false);
+  assert.equal(trial.state, 'error');
+  assert.equal(f.contents.get(path), edited);
+});
+
 S.integrationTest('Living Node trial: stale source, lock or draft invalidation cannot commit preview', async () => {
   const f = await setup();
   const trial = new LivingTrial(new LivingCoordinator());

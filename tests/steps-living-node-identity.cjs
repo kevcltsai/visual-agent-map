@@ -152,3 +152,18 @@ test('settings: the saved identity state survives load, a non-list is dropped', 
   assert.deepEqual(plain(settingsFromSaved({ livingSourceIdentity: [entry] }).livingSourceIdentity), [entry]);
   assert.equal(settingsFromSaved({ livingSourceIdentity: 'bad' }).livingSourceIdentity, undefined);
 });
+
+test('config prompt: a link Obsidian rewrites after a source rename keeps the same configuration revision', () => {
+  const state = support.load('experiences/visual-map/living-node-state.ts');
+  const { livingConfigPrompt } = support.load('experiences/visual-map/living-node-sources.ts');
+  const store = make(); const files = { 'Old.md': stat(10, 5) };
+  resolve(store, files, [note('Old.md')]);
+  const idOf = link => store.at(link + '.md')?.refId;
+  const revision = prompt => state.livingConfigRevision(livingConfigPrompt(prompt, idOf), []);
+  const before = revision('Why?\nSources: [[Old]], [[Old#Part|alias]]');
+  store.renamed('Old.md', 'New.md');
+  assert.equal(revision('Why?\nSources: [[New]], [[New#Part|alias]]'), before, 'same source, rewritten link text');
+  assert.notEqual(revision('Why not?\nSources: [[New]], [[New#Part|alias]]'), before, 'other Prompt text still changes it');
+  assert.notEqual(revision('Why?\nSources: [[New]], [[Other]]'), before);
+  assert.equal(livingConfigPrompt('See [[Missing]]', () => undefined), 'See [[Missing]]', 'an unresolved link stays as written');
+});

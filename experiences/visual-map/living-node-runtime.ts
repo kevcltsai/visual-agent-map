@@ -14,6 +14,7 @@ import { isAiCard, promptSourceLinks, splitPrompt } from "./prompt-run";
 import { introducesLivingCycle, planLivingMap, type LivingMapCard } from "./living-node-map";
 import {
   readLivingReferences,
+  livingConfigPrompt,
   livingConfigRef,
   livingIdentityStore,
   reconcileLivingDraftReferences,
@@ -85,6 +86,8 @@ export interface LivingRoundPort {
   log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
   onStart(total: number): void;
+  /** Trial cards are an execution boundary: skipped themselves, used frozen when valid, otherwise blocking their dependents. */
+  onTrialBoundary?(boundary: { skipped: string[]; frozen: string[]; blocked: string[] }): void;
   onRunning(id: string): void;
   onSettled(id: string, result: LivingSettlement): void;
   onFailure(id: string, error: unknown): void;
@@ -194,7 +197,12 @@ function configKey(
   return livingSnapshotRevision(
     JSON.stringify([
       livingConfigRevision(
-        snapshot.note.prompt,
+        livingConfigPrompt(snapshot.note.prompt, link => {
+          const file = port.app.metadataCache.getFirstLinkpathDest(link, node.path);
+          return file instanceof TFile && allowedLivingNotePath(port.app, file.path)
+            ? noteIdentity(port.app, file).identity
+            : undefined;
+        }),
         refs(snapshot).map(ref =>
           livingConfigRef(ref, path => {
             const file = port.app.vault.getAbstractFileByPath(path);
@@ -456,8 +464,37 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   const initialMap = await port.repo.readMap(port.mapPath);
   const { cards, snapshots } = await prepareMap(port, initialMap);
   const resolver = sourceResolver(port.app);
-  const { plan, sources } = planLivingMap(cards, [], resolver, requested);
+  // A card being tried out is held by a non-formal lease: it never runs here, and cannot be asked for directly.
+  const trialIds = cards.filter(card => isAiCard(card) && !card.aiLocked && port.coordinator.trialBusy(card.path));
+  if (requested?.some(id => trialIds.some(card => card.id === id))) throw new Error("living-node-trial-busy");
+  const trialValidity = trialIds.length ? await inspectLivingValidity(port) : new Map<string, string>();
+  const boundary = new Map(trialIds.map(card => [card.id, trialValidity.get(card.id) === "valid"] as const));
+  const planCards = cards.map(card =>
+    boundary.has(card.id) ? { ...card, aiLocked: true, hasKnowledge: boundary.get(card.id)! } : card
+  );
+  const { plan, sources } = planLivingMap(planCards, [], resolver, requested);
   if (!port.current() || port.signal.aborted) return undefined;
+  if (trialIds.length) {
+    for (const card of trialIds) if (!plan.lockedTargets.includes(card.id)) plan.lockedTargets.push(card.id);
+    // Everything downstream of a trial card that cannot be used frozen is blocked, whatever the planner called it.
+    const upstream = new Set([...boundary].filter(([, valid]) => !valid).map(([id]) => id));
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const id of plan.blocked.keys())
+        if (
+          !upstream.has(id) &&
+          sources.get(id)?.sources.some(source => source.cardId && upstream.has(source.cardId))
+        ) {
+          upstream.add(id);
+          grew = true;
+        }
+    }
+    port.onTrialBoundary?.({
+      skipped: trialIds.map(card => card.id),
+      frozen: [...boundary].filter(([, valid]) => valid).map(([id]) => id),
+      blocked: [...plan.blocked.keys()].filter(id => upstream.has(id))
+    });
+  }
   const paths = plan.order.map(item => cards.find(card => card.id === item.id)!.path);
   if (!paths.length && !plan.blocked.size && !plan.lockedTargets.length) return new Map<string, LivingSettlement>();
   const lease = port.coordinator.acquire(initialMap.id, port.viewSession, paths.length ? paths : [port.mapPath], true);
@@ -547,11 +584,13 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     };
     const dispatch = async (): Promise<void> => {
       if (!current()) return;
-      port.onStart(plan.order.length + plan.blocked.size);
+      port.onStart(plan.order.length + plan.blocked.size + plan.lockedTargets.length);
       results = await executeLivingPlan(plan, {
         signal: lease.signal,
         inspect: async id => {
           if (!current()) return { current: false, locked: false, validity: "none" };
+          // The trial card's formal knowledge is read as it stood when the run began.
+          if (boundary.has(id)) return { current: true, locked: true, validity: boundary.get(id) ? "valid" : "none" };
           const checked = await checkCard(id);
           if (checked.snapshot.note.aiLocked)
             return {

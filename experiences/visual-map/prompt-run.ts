@@ -227,6 +227,8 @@ export interface PromptBatchState {
   /** The name of the topic running now. */
   current?: string;
   outcome?: PromptOutcome;
+  /** This view stops following the shared run; the last view to leave cancels it. */
+  leave?: () => void;
 }
 
 // ---- AI card records, status and question text ----------------------------------------------------------------------------

@@ -60,6 +60,7 @@ import {
   resetLivingCopyDiagnostics,
   splitLivingNodeRegion
 } from "./core/living-node-region";
+import { redactLivingShareText } from "./experiences/sharing/living-node-redaction";
 import { readLivingMarkdown, renderLivingShareKnowledge } from "./experiences/visual-map/living-node-markdown";
 import { rebaseMapNotePaths, moveNotePath, writeMapContent, coordinatePrint } from "./core/repository-map-content";
 import { escapeRegExp } from "./core/escape-regexp";
@@ -780,11 +781,14 @@ export class Repository {
     ) {
       let knowledgeRevision = "empty";
       let summary = "";
+      let shareSummary = "";
       let damaged = false;
       let shareMarkdown = "";
+      const base = (this.app.vault.adapter as { getBasePath?: () => unknown }).getBasePath?.();
+      const basePath = typeof base === "string" ? base : undefined;
       try {
         const knowledge = readLivingMarkdown(raw);
-        shareMarkdown = renderLivingShareKnowledge(knowledge);
+        shareMarkdown = redactLivingShareText(renderLivingShareKnowledge(knowledge), basePath);
         knowledgeRevision = knowledge.revision;
         summary =
           knowledge.output.text
@@ -792,6 +796,7 @@ export class Repository {
             .find(line => line.trim())
             ?.trim()
             .slice(0, 180) ?? "";
+        shareSummary = redactLivingShareText(summary, basePath);
       } catch {
         damaged = true;
       }
@@ -800,6 +805,7 @@ export class Repository {
         value === "ok" || value === "failed" || value === "blocked" || value === "cancelled" ? value : "never";
       livingNode = {
         summary,
+        shareSummary,
         shareMarkdown,
         configRevision: livingConfigurationStamp(section(content, "Prompt"), fm),
         knowledgeRevision,

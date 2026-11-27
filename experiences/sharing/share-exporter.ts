@@ -1071,7 +1071,7 @@ export class ShareExporter {
       if (!note) continue;
       const entry: ShareNoteInput = {
         title: plainWikilinks(note.title),
-        summary: plainWikilinks(note.livingNode?.summary || note.summary),
+        summary: plainWikilinks(note.livingNode ? note.livingNode.shareSummary || note.summary : note.summary),
         status: note.status,
         ...(note.topicKind && !argumentIds.has(node.id) ? { kind: note.topicKind } : {}),
         shape: TOPIC_KIND_SHAPES[shapeKindFor(note.topicKind ?? "topic", argumentIds.has(node.id))].shape,

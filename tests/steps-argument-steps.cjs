@@ -857,15 +857,15 @@ test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 an
 
 // ---- #59: replies that name an id; partial conclusion ----
 const syntheticIdReplies = require('./fixtures/argument-synthetic-id-replies.json');
-const P59_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
+const P59_PROP = '近期系統更新是否降低了線上服務的穩定性？';
 test('#59 synthetic reply: an unsupported number is still refused', () => {
-  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '警力配置與執法強度改變', statement: '治安感受的變化可能來自警力部署的調整', round: 3 }, data: [], existing: [], max: 1 };
+  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '更新影響服務穩定性', statement: '近期變更可能增加錯誤率', round: 3 }, data: [], existing: [], max: 1 };
   bad(mod.needsStep, req, syntheticIdReplies.needs.response, /number 111/);
 });
 test('#59 synthetic reply: full and short ids in text are refused, and removal restores positive parsing', () => {
   const ids = ['abcdefgh-ijkl-mnop-qrst-uvwxyzabcdef', 'fedcbafe-edcb-afed-cbaf-edcbafedcbaf', 'cafeabcd-abcd-abcd-abcd-cafeabcdabcd'];
   const evidence = ids.map(id => ({ id, claim: '證據', quote: 'quote text here', url: 'https://example.org/a', stance: 'contradicts' }));
-  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '監視器普及使治安改善' });
+  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '近期更新可能提升服務穩定性' });
   bad(mod.facetVerdictStep, req, syntheticIdReplies.facetVerdict.response, /names an id/);
   bad(mod.facetVerdictStep, req, { ...JSON.parse(syntheticIdReplies.facetVerdict.response), reason: 'abcdefgh matches' }, /names an id/);
   const clean = JSON.parse(syntheticIdReplies.facetVerdict.response);

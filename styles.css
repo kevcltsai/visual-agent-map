@@ -56,7 +56,7 @@
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
-/* The in-app toolbar is one faint icon; it brightens on hover or keyboard focus, and stays bright while selecting. It floats over the goal bar when open. */
+/* The in-app toolbar is one faint icon; it brightens on hover or keyboard focus, and stays bright while selecting. */
 .vam-map-tools.has-panel { z-index: 4; }
 .vam-tools-mini { z-index: 3; padding: 2px; opacity: .75; }
 .vam-tools-mini:hover, .vam-tools-mini:focus-within, .vam-tools-mini.is-open { opacity: 1; }
@@ -970,7 +970,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 
 .vam-task-cancel { margin: 6px 0; }
 
-/* Data sources: a toolbar button right after the goal button, and a panel under it (max about 440px, wraps in a narrow pane). */
+/* Data sources: a toolbar button in the map tools, and a panel under it (max about 440px, wraps in a narrow pane). */
 .vam-map-tools .vam-sources-button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 30px; width: 30px; height: 30px; padding: 0; color: var(--text-muted); }
 .vam-map-tools .vam-sources-button:hover, .vam-map-tools .vam-sources-button[aria-expanded="true"] { color: var(--text-normal); }
 .vam-sources-button-icon { display: inline-flex; flex: none; }

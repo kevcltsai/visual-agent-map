@@ -177,6 +177,11 @@ test('external map conflict UI retains file, screen, and manual merge choices', 
     assert.match(body, /ui\.use_file_contents/); assert.match(body, /ui\.keep_editor_contents/); assert.match(body, /ui\.save_merged_contents/);
   }
 });
+test('the empty-map text and button are centred in the canvas', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-empty \{[^}]*top: 50%;[^}]*left: 50%;[^}]*translate\(-50%, -50%\)/m, 'the empty-map text and button are centred in the canvas');
+});
+
 test('VAM notes hide properties in reading and live preview without removing frontmatter', () => {
   const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(styles, /\.markdown-preview-view\.visual-agent-map-node \.metadata-container/);

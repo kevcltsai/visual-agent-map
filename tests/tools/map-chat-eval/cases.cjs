@@ -94,8 +94,6 @@ const CASES = [
     [C.noRejected(), C.runAction("expand"), C.noKinds(["add_child"])]),
   kase("D7", "研究", "整合子議題", "prompt: synthesize 立刻開始", ["run_map_action"], { message: "把「部位」底下的子議題整合起來，比較口感差異", outline: STEAK, selected: [ref("a", "部位")] },
     [C.noRejected(), C.runAction("synthesize"), C.replyNoApprovalAsk()]),
-  kase("D8", "研究", "依學習目標分級", "prompt: rate_by_goal 需要 goal", ["run_map_action"], { message: "我的目標是開一間牛排館，幫我依目標分級", outline: STEAK },
-    [C.noRejected(), C.runAction("rate_by_goal", a => a.goal.trim() !== "", "goal filled")]),
   kase("D9", "研究", "替議題找圖", "prompt: find_images 每張一個、帶搜尋詞", ["run_map_action"], { message: "幫「肋眼」和「菲力」各找一張圖", outline: STEAK },
     [C.noRejected(), C.runAction("find_images", a => a.direction.trim() !== "", "search words"), C.findImagesFor(["a1", "a2"]), C.noRunAction("research_standard"), C.replyNotMatch(/已(?:經)?(?:找到|放入|放好)/, "says images were found")]),
 

@@ -161,18 +161,29 @@ function scopeWords(value: string): string {
     .trim();
 }
 
-/** The time truncated to its observation period, so a date, a timestamp and an offset form of one day agree. */
+/** The wall-clock time as written (in its own offset) truncated to its observation period. Offset-less dates stay as is. */
 function periodKey(record: LivingRecord): string | null {
-  const time = timeKey(record.eventTime);
-  if (time === null) return null;
+  const raw = record.eventTime?.trim();
+  if (!raw) return null;
   const granularity = granularityKey(record.granularity);
-  const iso = /^(\d{4})-(\d\d)(?:-(\d\d))?(?:T(\d\d))?/.exec(time);
-  if (!iso) return time;
-  if (granularity === "day") return iso[3] ? iso[1] + "-" + iso[2] + "-" + iso[3] : time;
-  if (granularity === "hour") return iso[3] && iso[4] ? iso[1] + "-" + iso[2] + "-" + iso[3] + "T" + iso[4] : time;
-  if (granularity === "month") return iso[1] + "-" + iso[2];
-  if (granularity === "year") return iso[1];
-  return time;
+  const iso = /^(\d{4})-(\d\d)-(\d\d)(?:T(\d\d))?/.exec(raw);
+  if (!iso) return timeKey(raw);
+  const [, year, month, day, hour] = iso;
+  if (granularity === "day") return year + "-" + month + "-" + day;
+  if (granularity === "hour") return hour ? year + "-" + month + "-" + day + "T" + hour : timeKey(raw);
+  if (granularity === "month") return year + "-" + month;
+  if (granularity === "year") return year;
+  if (granularity === "quarter") return year + "-Q" + (Math.floor((Number(month) - 1) / 3) + 1);
+  if (granularity === "week") {
+    // ISO 8601 week: the week belongs to the year of its Thursday.
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    const weekday = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - weekday);
+    const first = Date.UTC(date.getUTCFullYear(), 0, 1);
+    const week = Math.ceil(((date.getTime() - first) / 86_400_000 + 1) / 7);
+    return date.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
+  }
+  return timeKey(raw);
 }
 
 export function livingSuppressionV2(record: LivingRecord): LivingSuppressionV2 {

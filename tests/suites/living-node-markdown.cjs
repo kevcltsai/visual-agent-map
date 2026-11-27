@@ -1862,3 +1862,21 @@ S.integrationTest('A39 no downgrade: a region holding a v2 hold is not a V1-read
   await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base, expectedContent: bytes, candidate: { executionId: 'e3' }, proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'x', evidence: ['e1'] }] } })));
   assert.equal(f.contents.get(path), bytes);
 });
+
+S.integrationTest('A39 resurrection: deleting one of two same-period AI records keeps its hold; the AI sibling is not turned into a user record and the deleted event cannot be re-appended', async () => {
+  const f = await setup();
+  const a = { kind: 'append', id: 'r1', subject: 'acme', scope: 'news', granularity: 'event', eventTime: '2026-11-26', claim: 'Acme recalls product', evidence: ['e1'] };
+  const b = { ...a, id: 'r2', claim: 'Acme CEO resigns' };
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'F', evidence: ['e1'] }, a, b] } })), 'written');
+  const saved = f.contents.get(path);
+  const edited = saved.split('\n### Observation\n').filter((x, i) => !(i > 0 && x.includes('"r1"'))).join('\n### Observation\n');
+  assert.notEqual(edited, saved);
+  await f.app.vault.process(f.files.get(path), () => edited);
+  const base1 = readLivingMarkdown(edited);
+  assert.equal(await commitLivingMarkdown(f.repo, request(f, { base: base1, candidate: { executionId: 'e2' }, proposal: { baseRevision: base1.revision, operations: [{ kind: 'output', text: 'F2', evidence: ['e1'] }] } })), 'written');
+  const base2 = readLivingMarkdown(f.contents.get(path));
+  assert.deepEqual(S.plain(base2.records.map(r => r.id + ':' + r.owner)), ['r2:ai']);
+  assert.ok(base2.suppressed.some(v => v.startsWith('@v2:')));
+  const again = { ...a, id: 'r1-again' };
+  await assert.rejects(() => commitLivingMarkdown(f.repo, request(f, { base: base2, candidate: { executionId: 'e3' }, proposal: { baseRevision: base2.revision, operations: [again] } })), /suppressed-record/);
+});

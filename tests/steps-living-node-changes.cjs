@@ -223,3 +223,24 @@ test('A39: livingAppendSuppressed reports only appends the holds reject', () => 
   assert.equal(livingAppendSuppressed(b, { kind: 'supplement', id: 'r1', evidence: ['e1'] }), false);
   assert.equal(livingAppendSuppressed(b, { kind: 'append' }), false);
 });
+
+test('A39 suppression v2: period truncates on the wall-clock time in its own offset; week is ISO, quarter and year bucket', () => {
+  const key = (granularity, eventTime) => livingSuppressionV2(record({ granularity, eventTime })).periodKey;
+  assert.equal(key('day', '2026-11-26T23:30:00-05:00'), '2026-11-26');
+  assert.equal(key('day', '2026-11-26T23:30:00+08:00'), '2026-11-26');
+  assert.equal(key('day', '2026-11-26'), '2026-11-26');
+  assert.equal(key('hour', '2026-11-26T09:30:00+08:00'), '2026-11-26T09');
+  assert.equal(key('week', '2026-11-26'), '2026-W48');
+  assert.equal(key('week', '2026-01-01'), '2026-W01');
+  assert.equal(key('week', '2027-01-01'), '2026-W53');
+  assert.equal(key('weekly', '2026-12-31T10:00:00Z'), '2026-W53');
+  assert.equal(key('quarter', '2026-11-26'), '2026-Q4');
+  assert.equal(key('quarterly', '2026-03-31'), '2026-Q1');
+  assert.equal(key('year', '2026-11-26T10:00:00+08:00'), '2026');
+  const b = base({ records: [], suppressed: [v2(record({ granularity: 'week', eventTime: '2026-11-23' }))] });
+  assert.throws(() => apply(b, appendOp({ granularity: 'weekly', eventTime: '2026-11-29' })), /suppressed-record/);
+  assert.equal(apply(b, appendOp({ granularity: 'weekly', eventTime: '2026-11-30' })).records.length, 1);
+  const q = base({ records: [], suppressed: [v2(record({ granularity: 'quarter', eventTime: '2026-10-01' }))] });
+  assert.throws(() => apply(q, appendOp({ granularity: 'quarterly', eventTime: '2026-12-31' })), /suppressed-record/);
+  assert.equal(apply(q, appendOp({ granularity: 'quarterly', eventTime: '2027-01-01' })).records.length, 1);
+});

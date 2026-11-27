@@ -105,7 +105,7 @@ function renderPrompt(input: LivingProviderInput, knowledge: string): string {
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 1,
+  version: 2,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");

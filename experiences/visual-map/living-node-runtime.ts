@@ -25,7 +25,12 @@ import { commitLivingMarkdown, livingSnapshotRevision, readLivingMarkdown } from
 import { livingConfigRevision, livingInputRevision, type LivingRead } from "./living-node-state";
 import { generateLivingProposal } from "./living-node-provider";
 import type { LivingAdoptionCheck, LivingTrialRequest } from "./living-node-trial";
-import { applyLivingChanges, hasLivingResult, type LivingEvidence } from "./living-node-changes";
+import {
+  applyLivingChanges,
+  hasLivingResult,
+  livingLegacySuppressionIds,
+  type LivingEvidence
+} from "./living-node-changes";
 
 const coordinators = new WeakMap<object, LivingCoordinator>();
 export function livingCoordinator(owner: object): LivingCoordinator {
@@ -73,6 +78,7 @@ export interface LivingRoundPort {
   /** The model edited records it was not sent (a large card history); those edits were skipped. */
   onOmittedEditsSkipped?(id: string, count: number): void;
   onSuppressedDropped?(id: string, count: number): void;
+  log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
   onStart(total: number): void;
   onRunning(id: string): void;
@@ -547,6 +553,8 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
           const value = cache.get(id);
           if (!value || !current() || port.busy(pathOf(id))) throw new Error("living-node-busy-or-stale");
           const { snapshot, input } = value;
+          const legacy = livingLegacySuppressionIds(input.base);
+          if (legacy.length) port.log?.("debug", "Living Node legacy id-only suppression: " + legacy.join(", "));
           const candidate = {
             executionId: randomUUID(),
             cardId: id,

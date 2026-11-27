@@ -372,9 +372,10 @@ function reconcileOwnership(current: LivingKnowledge, index: OwnershipIndex): Li
   }
   const records = current.records.map(record => {
     const v2 = livingSuppressionV2Entry(livingSuppressionV2(record));
-    // A record matching a hold already stored in the region was added back by a human: lift the hold and protect it.
-    // Holds created by this very read (a sibling deleted just now) never lift.
-    if (stored.has(v2)) {
+    // A record the ownership index does not know (new id, or changed since) that matches a hold already stored
+    // in the region was added back by a human: lift the hold and protect it. A record the index recognizes (an AI
+    // sibling in the same period) never lifts a hold on v2 equality alone, nor does a hold created by this read.
+    if (stored.has(v2) && index.records.get(record.id) !== recordHash(record)) {
       suppressed.delete(v2);
       return { ...record, owner: "user" as const };
     }

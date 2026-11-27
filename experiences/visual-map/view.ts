@@ -20410,6 +20410,7 @@ export class VisualAgentMapView extends ItemView {
           onOmittedEditsSkipped: () => {
             if (current()) new Notice(t("ui.living_node_omitted_edits_skipped"));
           },
+          log: (level, message) => this.plugin.logs.appendLog(level, message),
           onSuppressedDropped: (_id, count) => {
             if (current()) new Notice(t("ui.living_node_suppressed_dropped_0", count));
           },

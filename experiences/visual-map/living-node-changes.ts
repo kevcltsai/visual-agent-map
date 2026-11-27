@@ -457,6 +457,7 @@ export function applyLivingChanges(base: LivingKnowledge, raw: unknown, context:
     // the record did not already cite.
     if (
       kind !== "dispute" &&
+      evidence.some(entry => entry.id.startsWith("web:")) &&
       !evidence.some(entry => !entry.id.startsWith("web:") && !old.evidence.some(e => e.id === entry.id))
     )
       throw new Error("unverified-web-correction");

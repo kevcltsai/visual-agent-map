@@ -47,6 +47,8 @@ export class LivingTrial {
   private closed = false;
   private adopting = false;
   private adoptionLease?: LivingLease;
+  /** The error code of the last failed run, for the setup window's reason line. */
+  failureCode?: string;
 
   constructor(private readonly coordinator: LivingCoordinator) {}
 
@@ -81,6 +83,7 @@ export class LivingTrial {
     const generation = ++this.generation;
     this.lease = lease;
     this.candidate = undefined;
+    this.failureCode = undefined;
     this.status = "running";
     const current = (): boolean => lease.current() && !this.closed && this.generation === generation;
     try {
@@ -121,8 +124,11 @@ export class LivingTrial {
       this.candidate = { snapshot, proposal, savedContent };
       this.status = "ready";
       return true;
-    } catch {
-      if (current()) this.status = "error";
+    } catch (error) {
+      if (current()) {
+        this.status = "error";
+        this.failureCode = error instanceof Error ? error.message : String(error);
+      }
       return false;
     } finally {
       lease.release();

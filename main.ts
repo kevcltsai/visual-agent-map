@@ -90,7 +90,8 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { TOPIC_KINDS } from "./note-values";
+import { TOPIC_KINDS, readAiCard } from "./note-values";
+import { frontmatter } from "./core/repository-frontmatter";
 import { kindIconId, kindIconSvg } from "./experiences/visual-map/topic-kind-shape";
 import {
   NoteStyleStore,
@@ -356,6 +357,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
   private readonly bookNoteWriter = createNoteWriter({
     openViews: path => this.openMarkdownViews(path),
+    canWrite: content => !readAiCard(frontmatter(content)),
     rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     rerender: path =>
       rerenderReadingViewsWhenLoaded(

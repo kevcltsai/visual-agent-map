@@ -24,6 +24,7 @@ import { allowsBranchLayout, branchDirectionOf, layoutDirectionFor } from "./lay
 import {
   arrangeMap,
   arrangeNewBranch,
+  type PushHints,
   arrangeNewTree,
   DEFAULT_CARD_HEIGHT,
   type HeightOf,
@@ -136,11 +137,12 @@ export function arrangeNewBranchWithText(
   heightOf?: HeightOf,
   minTop?: number,
   layout: LayoutKind | MapLayout = "right",
-  widthOf?: TextWidthOf
+  widthOf?: TextWidthOf,
+  hints?: PushHints
 ): { nodes: MapNode[]; items: CanvasItem[] } {
   const texts = visibleTexts(nodes, items);
   if (!texts.length)
-    return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
+    return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout, hints), items: [...items] };
   const virtual = virtualTree(nodes, texts, widthOf);
   const textIds = new Set(texts.map(text => text.id));
   const withNew = new Set(newIds);
@@ -158,7 +160,7 @@ export function arrangeNewBranchWithText(
     for (const id of brought) walkDescendants(index, id, below);
     for (const id of below) withNew.add(id);
   }
-  const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout);
+  const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout, hints);
   const real = new Set(nodes.map(node => node.id));
   return {
     nodes: mergePositions(nodes, placed),
@@ -524,7 +526,11 @@ export function solveRings(
           );
         let placed: MapNode[] = list;
         if (toPlace.size) {
-          const out = arrangeNewBranchWithText(list, textsNow(), card.id, toPlace, heightOf, undefined, own, widthOf);
+          // Everything already placed is an obstacle here: the ring's branches step past it, nothing is pushed.
+          const fixed = new Set(list.map(node => node.id).filter(id => !toPlace.has(id)));
+          const out = arrangeNewBranchWithText(list, textsNow(), card.id, toPlace, heightOf, undefined, own, widthOf, {
+            fixed
+          });
           placed = out.nodes;
           for (const item of out.items)
             if (item.kind === "text" && hereTexts.has((item as TextItem).id))
@@ -611,23 +617,27 @@ export function arrangeNewBranchWithRings(
   heightOf?: HeightOf,
   minTop?: number,
   layout: LayoutKind | MapLayout = "right",
-  widthOf?: TextWidthOf
+  widthOf?: TextWidthOf,
+  hints?: PushHints
 ): { nodes: MapNode[]; items: CanvasItem[] } {
   const trees = ringTreeIds(nodes, items);
-  if (!trees.size) return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+  // Ring members are obstacles the push never moves.
+  const pushHints: PushHints = { ...hints, fixed: new Set([...(hints?.fixed ?? []), ...trees]) };
+  if (!trees.size)
+    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf, hints);
   if (trees.has(parentId)) {
     let top = nodes.find(node => node.id === parentId);
     while (top?.parentId) top = nodes.find(node => node.id === top!.parentId);
     const direction = top && ringOutwardDirections(nodes, items, heightOf).get(top.id);
     const spacing = typeof layout === "string" ? undefined : layout.spacing;
     const own: MapLayout = { direction: direction ?? "right", ...(spacing ? { spacing } : {}) };
-    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, own, widthOf);
+    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, own, widthOf, pushHints);
   }
   const kind = typeof layout === "string" ? layout : layout.direction;
   if (kind !== "radial" && kind !== "timeline" && kind !== "fishbone")
-    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf, pushHints);
   const rest = nodes.filter(node => !trees.has(node.id));
-  const out = arrangeNewBranchWithText(rest, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+  const out = arrangeNewBranchWithText(rest, items, parentId, newIds, heightOf, minTop, layout, widthOf, hints);
   const placed = new Map(out.nodes.map(node => [node.id, node]));
   return { nodes: nodes.map(node => placed.get(node.id) ?? node), items: out.items };
 }

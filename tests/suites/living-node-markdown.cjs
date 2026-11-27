@@ -522,6 +522,12 @@ S.integrationTest('Living Node trial: unreadable upstream blocks even read-only 
   await assert.rejects(prepare, /missing-ai-knowledge/);
 });
 
+S.integrationTest('Living Node trial: legacy success metadata and title without knowledge do not authorize a locked upstream', async () => {
+  const { prepare, snapshots } = livingTrialRuntimeFixture({ locked: true });
+  snapshots.get('up.md').note.summary = '   ';
+  await assert.rejects(prepare, /missing-ai-knowledge/);
+});
+
 S.integrationTest('Living Node trial: a readable locked dependency is a disclosed frozen boundary and does not block adoption', async () => {
   const { prepare } = livingTrialRuntimeFixture({ locked: true });
   const prepared = await prepare();

@@ -7,7 +7,7 @@ const { load, fixture, DEFAULT_SETTINGS, obsidian } = require('./support.cjs');
 
 const quiet = { ...obsidian, Notice: class { setMessage() {} hide() {} } };
 const { default: Plugin } = load('main.ts', { obsidian: quiet });
-const { followRenamedLinks, isStaleLinkWrite, structureIsHealthy, markersLost } = load('core/rename-repair.ts');
+const { followRenamedLinks, isStaleLinkWrite, linkSpans, structureIsHealthy, markersLost } = load('core/rename-repair.ts');
 
 const REGION = ['<!-- vam-living-node:begin v1 -->', 'living text', '<!-- vam-living-node:end v1 -->'].join('\n');
 
@@ -142,8 +142,10 @@ test('a write that is not exactly a link replacement is never touched', async ()
   h.contents.set(h.note.path, typed);
   await modified(h);
   assert.equal(h.contents.get(h.note.path), typed);
-  assert.equal(isStaleLinkWrite('a [[X]] b', 'a [[Other]] b', [['Sources/Src0.md', 'Sources/S1.md']]), false);
-  assert.equal(isStaleLinkWrite('a XXXX b', 'a [[S1]] b', [['Sources/Src0.md', 'Sources/S1.md']]), true);
+  const pair = [['Sources/Src0.md', 'Sources/S1.md']];
+  assert.equal(isStaleLinkWrite('a [[X]] b', 'a [[Other]] b', pair, [[2, 7]]), false);
+  assert.equal(isStaleLinkWrite('a XXXX b', 'a [[S1]] b', pair, [[2, 6]]), true);
+  assert.equal(isStaleLinkWrite('a XXXX b', 'a [[S1]] b', pair, [[3, 6]]), false, 'a span that is not a recorded one');
   assert.equal(structureIsHealthy('<!-- vam-living-node:begin v1 -->'), false);
 });
 
@@ -182,4 +184,28 @@ test('after a repair the user\'s own links to the renamed note follow it too, ma
   assertIntact(text);
   assert.ok(text.includes('See [[Sources/S1|the source]] and [Src](Sources/S1.md) and [[S1]].'), text);
   assert.equal(text, followRenamedLinks(vam, [['Sources/Src0.md', 'Sources/S1.md']]));
+});
+
+test('a user replacing a marker-bearing paragraph with a link to the renamed note is not repaired', async () => {
+  const h = await harness();
+  await rename(h, 'Sources/Src0.md', 'Sources/S1.md');
+  const vam = h.contents.get(h.note.path);
+  const region = /<!-- vam-living-node:begin v1 -->[\s\S]*<!-- vam-living-node:end v1 -->/.exec(vam)[0];
+  const typed = vam.replace(region, '[[S1]]');
+  h.contents.set(h.note.path, typed);
+  await modified(h);
+  assert.equal(h.contents.get(h.note.path), typed, 'left as the user wrote it');
+  assert.equal(h.repo.renameWatch.watching(h.note.path), false);
+});
+
+test('a second rename of a watched note keeps the first one watched', async () => {
+  const h = await harness();
+  const staleFirst = obsidianUpdater(h, '[[Sources/Src0]]', '[[S1]]');
+  await rename(h, 'Sources/Src0.md', 'Sources/S1.md');
+  const vamFirst = h.contents.get(h.note.path);
+  assert.ok(linkSpans(vamFirst, [['Sources/Src2.md', 'Sources/S3.md']]).length === 0);
+  h.repo.renameWatch.remember(h.note.path, vamFirst, [['Sources/Src2.md', 'Sources/S3.md']], []);
+  await staleFirst();
+  await modified(h);
+  assert.equal(h.contents.get(h.note.path), vamFirst, 'the first rename is still repaired');
 });

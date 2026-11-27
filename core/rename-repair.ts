@@ -58,39 +58,59 @@ function linkLength(text: string, at: number, targets: readonly string[]): numbe
   return 0;
 }
 
+/** The `[start, end)` offsets of the links in `content` that point at a note a pair moved away from: what Obsidian's updater collects. */
+export function linkSpans(content: string, pairs: readonly RenamePair[]): [number, number][] {
+  const olds = pairs.filter(([from, to]) => from !== to).map(([from]) => bare(from));
+  const matches = (target: string): boolean => {
+    const found = bare(target);
+    return olds.some(old => old === found || old.endsWith(`/${found}`));
+  };
+  const spans: [number, number][] = [];
+  for (const m of content.matchAll(/!?\[\[([^\]|#^\n]+)(?:[#^|][^\]\n]*)?\]\]/g))
+    if (matches(m[1])) spans.push([m.index, m.index + m[0].length]);
+  for (const m of content.matchAll(/!?\[[^\]\n]*\]\(<?([^)#>\n]+)(?:#[^)\n]*)?>?\)/g)) {
+    let target = m[1];
+    try {
+      target = decodeURIComponent(target);
+    } catch {
+      /* keep the text as written */
+    }
+    if (matches(target)) spans.push([m.index, m.index + m[0].length]);
+  }
+  return spans.sort((x, y) => x[0] - y[0]);
+}
+
 /**
- * Whether `after` is `before` with one or more stretches replaced by link texts that point at a renamed note, and
- * nothing else changed: exactly what Obsidian's updater does with positions taken before `before` was written.
+ * Whether `after` is `before` with one or more of `spans` (the offsets Obsidian took before VAM's write) replaced by
+ * link texts that point at a renamed note, and nothing else changed: exactly what Obsidian's updater does with stale
+ * positions. A replaced stretch anywhere else is not an Obsidian write.
  */
-export function isStaleLinkWrite(before: string, after: string, pairs: readonly RenamePair[]): boolean {
+export function isStaleLinkWrite(
+  before: string,
+  after: string,
+  pairs: readonly RenamePair[],
+  spans: readonly (readonly [number, number])[]
+): boolean {
   if (before === after || before.length > MAX_LENGTH || after.length > MAX_LENGTH) return false;
   const targets = pairs.map(([, to]) => bare(to));
-  let prefix = 0;
-  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix++;
-  let suffix = 0;
-  while (
-    suffix < before.length - prefix &&
-    suffix < after.length - prefix &&
-    before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
-  )
-    suffix++;
-  const a = before.slice(prefix, before.length - suffix);
-  const b = after.slice(prefix, after.length - suffix);
+  const starts = new Map<number, number[]>();
+  for (const [start, end] of spans) if (end <= before.length) starts.set(start, [...(starts.get(start) ?? []), end]);
   const seen = new Set<string>();
-  // a[i..] must become b[j..]: copy equal text, or swap some stretch of `a` for a link text in `b`.
+  // before[i..] must become after[j..]: copy equal text, or swap one recorded span for a link text.
   const walk = (start: number, from: number): boolean => {
     let i = start,
       j = from;
     for (;;) {
-      if (j === b.length) return i === a.length;
+      if (j === after.length) return i === before.length;
       const key = `${i}:${j}`;
       if (seen.has(key)) return false;
-      const length = linkLength(b, j, targets);
-      if (length) {
+      const ends = starts.get(i);
+      if (ends) {
         seen.add(key);
-        for (let next = i; next <= a.length; next++) if (walk(next, j + length)) return true;
+        const length = linkLength(after, j, targets);
+        if (length) for (const end of ends) if (walk(end, j + length)) return true;
       }
-      if (i < a.length && a[i] === b[j]) {
+      if (i < before.length && before[i] === after[j]) {
         i++;
         j++;
       } else return false;
@@ -155,7 +175,10 @@ export function followRenamedLinks(content: string, pairs: readonly RenamePair[]
  * change ends the watch. A harmless stale write becomes the new baseline.
  */
 export class RenameRepairWatch {
-  private readonly watched = new Map<string, { content: string; pairs: RenamePair[]; at: number }>();
+  private readonly watched = new Map<
+    string,
+    { content: string; pairs: RenamePair[]; spans: [number, number][][]; at: number }
+  >();
 
   constructor(
     private readonly io: {
@@ -165,12 +188,21 @@ export class RenameRepairWatch {
     private readonly now: () => number = Date.now
   ) {}
 
-  remember(path: string, content: string, pairs: readonly RenamePair[]): void {
+  /** `spans`: where the links to the renamed notes were in the note before VAM rewrote it (see `linkSpans`). */
+  remember(path: string, content: string, pairs: readonly RenamePair[], spans: [number, number][]): void {
     if (!structureIsHealthy(content)) {
       this.watched.delete(path);
       return;
     }
-    this.watched.set(path, { content, pairs: [...pairs], at: this.now() });
+    // Another rename of the same note while it is watched adds to the watch: Obsidian may still apply either update.
+    const earlier = this.watched.get(path);
+    const live = earlier && this.now() - earlier.at <= WINDOW_MS ? earlier : undefined;
+    this.watched.set(path, {
+      content,
+      pairs: [...(live?.pairs ?? []), ...pairs],
+      spans: [...(live?.spans ?? []), spans],
+      at: this.now()
+    });
   }
 
   watching(path: string): boolean {
@@ -183,7 +215,8 @@ export class RenameRepairWatch {
     if (this.now() - watch.at > WINDOW_MS) return void this.watched.delete(path);
     const current = await this.io.read(path);
     if (current === watch.content) return;
-    if (!isStaleLinkWrite(watch.content, current, watch.pairs)) return void this.watched.delete(path);
+    if (!watch.spans.some(spans => isStaleLinkWrite(watch.content, current, watch.pairs, spans)))
+      return void this.watched.delete(path);
     if (!markersLost(watch.content, current)) {
       watch.content = current;
       return;

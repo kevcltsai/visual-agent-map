@@ -111,7 +111,7 @@ import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
 import { keepFrontmatterFormatting } from "./core/rename-link-guard";
-import { RenameRepairWatch } from "./core/rename-repair";
+import { linkSpans, RenameRepairWatch } from "./core/rename-repair";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
@@ -2242,7 +2242,7 @@ export class Repository {
               : content;
           const written = living ? setFrontmatterKeys(next, { "living-node-refs": living }) : next;
           if (written !== content && this.obsidianMayUpdateLinks())
-            this.renameWatch.remember(file.path, written, pairs);
+            this.renameWatch.remember(file.path, written, pairs, linkSpans(content, pairs));
           return written;
         });
       } catch (error) {

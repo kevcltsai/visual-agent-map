@@ -3,6 +3,7 @@
  * One level only: a note embed inside embedded content becomes a plain `[[link]]` (the cleaner then turns it into its
  * title), so embeds never nest or loop. Images and other file embeds inside the content stay as they are.
  */
+import { redactLivingShareText } from "./living-node-redaction";
 import { classifyShareTarget, markdownCodeRanges, normalizeNewlines, stripComments } from "./share-code";
 
 const FRONTMATTER = /^---[ \t]*\n[\s\S]*?\n(?:---|\.\.\.)[ \t]*(?:\n|$)/;
@@ -20,7 +21,9 @@ export function isManagedShareEmbed(text: string): boolean {
 }
 
 export function shareNoteMarkdown(note?: { detail?: string; livingNode?: { shareMarkdown?: string } }): string {
-  return [note?.detail, note?.livingNode?.shareMarkdown].filter(value => value?.trim()).join("\n\n");
+  // Only the Living Node projection is redacted; its note embeds become plain links so a non-shared note is never read into the file.
+  const living = note?.livingNode?.shareMarkdown;
+  return [note?.detail, living && flattenNoteEmbeds(redactLivingShareText(living))].filter(value => value?.trim()).join("\n\n");
 }
 
 export function stripFrontmatter(text: string): string {

@@ -194,11 +194,11 @@ export class MapChatRecordSession {
     writer.setTarget(this.ports.target());
   }
 
-  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
-  async readLatest(root: string): Promise<ReturnType<typeof pickLatest>> {
+  /** Every record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). Read only. */
+  async readAll(root: string): Promise<{ id: string; path: string; text: string }[]> {
     const adapter = this.ports.files;
     const dir = recordsDir(root, this.ports.configDir);
-    if (!(await adapter.exists(dir))) return null;
+    if (!(await adapter.exists(dir))) return [];
     const files: { id: string; path: string; text: string }[] = [];
     for (const path of (await adapter.list(dir)).files) {
       if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
@@ -208,7 +208,12 @@ export class MapChatRecordSession {
         text: await adapter.read(path)
       });
     }
-    return pickLatest(files);
+    return files;
+  }
+
+  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
+  async readLatest(root: string): Promise<ReturnType<typeof pickLatest>> {
+    return pickLatest(await this.readAll(root));
   }
 
   /**

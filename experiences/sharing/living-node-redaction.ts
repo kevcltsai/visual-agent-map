@@ -49,9 +49,9 @@ export function redactLivingShareText(text: string, basePath?: string): string {
   const base = basePath?.replace(/[\\/]+$/, "");
   if (base) out = out.replace(new RegExp(`${escapeRegExp(base)}(?:[\\\\/]${PATH_TAIL})?`, "g"), "");
   out = out.replace(LOCAL_PATH, "");
-  // Every embed becomes a plain link, also inside code, so no fence elsewhere in the note can change what is read in.
+  // Every image opener (`![[`, `![alt](`, `![alt][ref]`, nested or multiline alt) becomes a plain link, also inside code, so no
+  // fence elsewhere in the note can change what is read in.
   return out
-    .replace(/!\[\[/g, "[[")
-    .replace(/!(\[[^\]\n]*\]\()/g, "$1")
+    .replace(/!\[/g, "[")
     .replace(/\n{3,}/g, "\n\n");
 }

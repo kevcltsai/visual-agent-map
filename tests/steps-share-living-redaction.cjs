@@ -154,3 +154,11 @@ test('redactLivingShareText: Markdown-link embeds lose the leading bang everywhe
   assert.ok(out.includes('[alt](note.md)') && out.includes('[code](a.md)'));
   assert.equal(red.redactLivingShareText(out), out);
 });
+
+test('redactLivingShareText: every image opener loses its bang (nested brackets, multiline alt, reference style, wikilink, code)', () => {
+  const text = '> ![a [b]](x.md)\n> ![multi\n> line](y.md)\n> ![a][ref]\n> [ref]: private.md\n> ![[x]]\n> ```\n> ![c [d]](z.md) ![[w]]\n> ```';
+  const out = red.redactLivingShareText(text);
+  assert.ok(!out.includes('!['), out);
+  assert.ok(out.includes('[a [b]](x.md)') && out.includes('[a][ref]') && out.includes('[[x]]') && out.includes('[[w]]'));
+  assert.equal(red.redactLivingShareText(out), out);
+});

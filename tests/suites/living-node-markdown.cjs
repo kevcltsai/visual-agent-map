@@ -714,6 +714,16 @@ S.integrationTest('Living Node removal: surviving explicit consumers are identif
   assert.equal((await livingRemovalConsumers(port.app, port.repo, map, new Set(['root', 'up']))).length, 0);
 });
 
+S.integrationTest('Living Node removal: a consumer with corrupt managed knowledge still reports its explicit card reference', async () => {
+  const { map, port, snapshots } = livingTrialRuntimeFixture();
+  const raw = snapshots.get('root.md').content.replace('living-node-refs: []', 'living-node-refs:\n  - "card:up"');
+  snapshots.get('root.md').content = raw + '<!-- vam-living-node:begin v1 -->\n<!-- vam-living-node:begin v1 -->\n<!-- vam-living-node:end v1 -->\n';
+  const { livingRemovalConsumers } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': {} }, {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  const affected = await livingRemovalConsumers(port.app, port.repo, map, new Set(['up']));
+  assert.deepEqual(JSON.parse(JSON.stringify(affected)), ['root']);
+});
+
 S.integrationTest('Living Node configuration authorizes the actual resolved source path before any write', async () => {
   const f = await roundFixture();
   const before = f.contents.get('parent.md');

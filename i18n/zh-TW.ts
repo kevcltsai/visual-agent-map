@@ -1001,6 +1001,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.parent_topic": "所屬母議題",
   "ui.no_parent_root_topic": "無母議題（根議題）",
   "ui.circular_links_are_not_allowed": "不能建立循環連結。",
+  "ui.outline_move_readonly": "目前這張圖是唯讀，所以沒有移動。",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "母議題會影響下次 AI 讀到的背景。",
   "ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can":
     "筆記會移至目前主題的 Unassigned，可重新認領或復原。",

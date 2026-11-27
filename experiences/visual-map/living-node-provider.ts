@@ -6,6 +6,7 @@ import type { ModelChoice } from "../../ai/model-resolution";
 import {
   applyLivingChanges,
   livingAppendSuppressed,
+  livingSupersedeMismatch,
   type LivingChangeContext,
   type LivingEvidence,
   type LivingKnowledge
@@ -28,7 +29,7 @@ const projectionFor = (input: LivingProviderInput) => buildLivingPrompt(input);
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 6,
+  version: 7,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
@@ -247,8 +248,11 @@ export async function generateLivingProposal(calls: AiCalls, input: LivingProvid
       // which rejects the whole proposal in applyLivingChanges. A re-reported append is decided there too.
       const blind = (operation: Record<string, unknown>) =>
         operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id));
-      const droppedOperations = normalized.proposal.operations.filter(blind).length;
-      normalized.proposal.operations = normalized.proposal.operations.filter(operation => !blind(operation));
+      // A correction or invalidation stating another period than its target is a new observation, not a correction.
+      const refuse = (operation: Record<string, unknown>) =>
+        blind(operation) || livingSupersedeMismatch(input.base, operation);
+      const droppedOperations = normalized.proposal.operations.filter(refuse).length;
+      normalized.proposal.operations = normalized.proposal.operations.filter(operation => !refuse(operation));
       // Appends that deleted-observation holds reject are dropped locally and counted, not sent back or failed.
       const before = normalized.proposal.operations.length;
       normalized.proposal.operations = normalized.proposal.operations.filter(

@@ -7,6 +7,7 @@
 .vam-outline-search { margin: 4px 10px 8px; width: calc(100% - 20px); }
 .vam-outline-tree { overflow-y: auto; flex: 1; padding: 4px 6px 12px; }
 .vam-outline-row { display: flex; align-items: center; min-width: 0; min-height: 30px; }
+.vam-outline-tree .is-folded { display: none; }
 /* Scoped under the tree so these beat Obsidian's `button:not(.clickable-icon)` background. */
 .vam-outline-tree .vam-outline-toggle, .vam-outline-tree .vam-outline-note { border: 0; box-shadow: none; background: transparent; color: var(--text-normal); }
 .vam-outline-toggle, .vam-outline-spacer { flex: 0 0 22px; width: 22px; padding: 0; text-align: center; }
@@ -2146,3 +2147,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-ai-card-pop-chip.is-replaced { flex-wrap: wrap; border-color: var(--text-error); }
 .vam-ai-card-pop-chip-warn { color: var(--text-error); font-size: var(--font-ui-smaller); }
 .vam-ai-card-pop-chip-confirm { font-size: var(--font-ui-smaller); }
+.vam-outline-handle { flex: 0 0 14px; cursor: grab; color: var(--text-faint); font-size: var(--font-ui-smaller); line-height: 1; text-align: center; user-select: none; }
+.vam-outline-row:hover .vam-outline-handle { color: var(--text-muted); }
+.vam-outline-row.is-dragging { opacity: 0.5; }
+.vam-outline-row.is-drop-before { box-shadow: 0 -2px 0 0 var(--interactive-accent); }
+.vam-outline-row.is-drop-after { box-shadow: 0 2px 0 0 var(--interactive-accent); }
+.vam-outline-row.is-drop-into { background: var(--background-modifier-hover); outline: 1px solid var(--interactive-accent); outline-offset: -1px; }
+.vam-outline-reason { padding: 6px 12px; color: var(--text-error); font-size: var(--font-ui-small); }

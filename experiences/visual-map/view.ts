@@ -239,6 +239,7 @@ import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
+import type { OutlineMove } from "../../ui/outline-view";
 import { NameModal } from "../../ui/modals/name-modal";
 import {
   readSourceGroups,
@@ -10311,9 +10312,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
-   * its own descendants; the moved branches are laid out once, in the same entry.
+   * its own descendants; the moved branches are laid out once, in the same entry. With `before` (a child of `target`) the
+   * moved topics are placed right in front of it instead of last.
    */
-  private async moveBranches(roots: MapNode[], target: MapNode | null, clearSelection = true): Promise<void> {
+  private async moveBranches(
+    roots: MapNode[],
+    target: MapNode | null,
+    clearSelection = true,
+    before?: MapNode
+  ): Promise<void> {
     if (!this.map) return;
     if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
     await this.mapChange(map => {
@@ -10328,6 +10335,7 @@ export class VisualAgentMapView extends ItemView {
         moving.parentId = target?.id ?? null;
         delete moving.afterTextId;
         if (target) map.nodes = this.moveLastAmongSiblings(map.nodes, target.id, root.id);
+        if (target && before) map.nodes = reorderSiblings(map.nodes, target.id, root.id, before.id);
         const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -10342,6 +10350,47 @@ export class VisualAgentMapView extends ItemView {
     });
     this.selection.afterMove(clearSelection);
     this.render();
+  }
+  /**
+   * The topic outline's only way to move a topic: a drop next to a row or under it (`target`, `place`), or Alt+Up/Down (`shift`).
+   * Returns the reason in words when the move is refused (nothing is written then), null otherwise. The write is moveBranches
+   * (one history entry) or the canvas's Alt+arrow sibling shift; no other reparent code.
+   */
+  async outlineMove(id: string, to: OutlineMove): Promise<string | null> {
+    const map = this.map;
+    const node = map?.nodes.find(item => item.id === id);
+    if (!map || !node) return null;
+    if (this.presentation || this.notesLoading() || this.bookLock().structure || map.aim)
+      return t("ui.outline_move_readonly");
+    const merging = (ids: string[]): string | null =>
+      ids.some(item => this.isMerging(item)) ? t("ui.merge_locked") : null;
+    if ("shift" in to) {
+      if (!node.parentId) return null;
+      const reason = merging([node.id, node.parentId]);
+      if (reason) return reason;
+      this.enqueue(() => this.shiftSiblingByKey(node, to.shift));
+      return null;
+    }
+    const target = map.nodes.find(item => item.id === to.target);
+    const parent = to.place === "into" ? target : map.nodes.find(item => item.id === target?.parentId);
+    if (!target || !parent || (to.place !== "into" && (target.id === id || target.afterTextId))) return null;
+    if (!canParent(map.nodes, id, parent.id)) return t("ui.circular_links_are_not_allowed");
+    const reason = merging([parent.id, node.id]);
+    if (reason) return reason;
+    let before: MapNode | undefined;
+    if (to.place !== "into") {
+      const siblings = this.onScreenSiblingOrder(map).filter(item => item.parentId === parent.id && !item.afterTextId);
+      const others = siblings.filter(item => item.id !== id);
+      const at = others.findIndex(item => item.id === target.id);
+      before = to.place === "before" ? target : others[at + 1];
+      if (node.parentId === parent.id && !node.afterTextId) {
+        const slot = before ? others.indexOf(before) : others.length;
+        const next = [...others.slice(0, slot), node, ...others.slice(slot)];
+        if (next.every((item, index) => item.id === siblings[index].id)) return null;
+      }
+    }
+    this.enqueue(() => this.moveBranches([node], parent, false, before));
+    return null;
   }
   private async copySelected(target: MapNode): Promise<void> {
     await this.copyBranches(this.selectedRoots(), target, {});
@@ -14113,36 +14162,24 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map?.nodes.some(item => item.path === path);
   }
   /**
-   * Brings an outline topic into view: expands collapsed ancestors, centers the card and selects it.
+   * Brings an outline topic into view: selects its card and centers it. Never writes collapse or the map file.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
+   * A card inside a collapsed branch is not drawn: the camera goes to its nearest visible ancestor instead.
+   * P1.6b's view-only temporary expand replaces this fallback.
    */
   async revealPath(path: string): Promise<boolean> {
     const node = this.map?.nodes.find(item => item.path === path);
     if (!this.map || !node) return false;
-    const collapsed: string[] = [];
+    let visible: MapNode = node;
     for (let parent = node.parentId; parent;) {
       const ancestor = this.map.nodes.find(item => item.id === parent);
       if (!ancestor) break;
-      if (ancestor.collapsed) collapsed.push(ancestor.id);
+      if (ancestor.collapsed) visible = ancestor;
       parent = ancestor.parentId;
     }
-    if (collapsed.length) {
-      await this.plugin.mutate(() =>
-        this.mapChange(map => {
-          for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
-        })
-      );
-    }
-    const current = this.map?.nodes.find(item => item.id === node.id);
-    if (!current) return false;
-    if (!this.selection.state.multiSelectMode) {
-      // Opening collapsed ancestors already rendered; a plain reveal only moves the selection.
-      if (collapsed.length) {
-        this.selection.click(current.id);
-        this.render();
-      } else this.applySelectionChange(this.selection.click(current.id));
-    } else this.render();
-    this.focusNode(current);
+    if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
+    // Centering is the camera only: it is not saved, so an outline click never writes the map file.
+    this.focusNode(visible, false);
     return true;
   }
   private selectMapNode(node: MapNode): void {

@@ -7,6 +7,10 @@ import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 export const foldOutlineSearch = foldSearchText;
+/** Where the outline asks the map view to put a topic: next to a row (before / after it) or under it, or one step along its siblings. */
+export type OutlineMove = { target: string; place: "before" | "after" | "into" } | { shift: -1 | 1 };
+/** Asks the map view to move a topic; resolves to the reason in words when the move is refused (nothing is written then), null otherwise. */
+export type OutlineMover = (id: string, to: OutlineMove) => Promise<string | null>;
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
@@ -15,11 +19,24 @@ export class OutlineView extends ItemView {
   private collapsed = new Set<string>();
   /** The fold button of each row in the tree as last drawn, so focus can follow a rebuild. */
   private toggleEls = new Map<string, HTMLElement>();
+  /** Children containers of collapsed rows: filled the first time the row opens, hidden (not removed) when it closes. */
+  private noteEls = new Map<string, HTMLElement>();
+  private activeEl: HTMLElement | null = null;
+  private branches = new Map<string, { box: HTMLElement; filled: boolean; fill: () => void }>();
+  private parentOf = new Map<string, string | null>();
+  /** Collapsed rows opened only while the canvas selection sits below them: outline DOM state, never written to the map. */
+  private tempOpen = new Set<string>();
   private query = "";
   private activePath = "";
+  private dragId: string | null = null;
+  private dropRow: HTMLElement | null = null;
+  /** A row that took focus before a move rebuilds the tree: focus returns to the same topic. */
+  private refocusId: string | null = null;
+  private reasonEl: HTMLElement | null = null;
   constructor(
     leaf: WorkspaceLeaf,
-    private openNote: (path: string) => Promise<void>
+    private openNote: (path: string) => Promise<void>,
+    private moveTopic?: OutlineMover
   ) {
     super(leaf);
   }
@@ -48,7 +65,10 @@ export class OutlineView extends ItemView {
     this.titles = titles;
     this.markers = markers;
     this.links = links;
-    if (map) this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
+    if (map) {
+      this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
+      this.tempOpen = new Set([...this.tempOpen].filter(id => this.collapsed.has(id)));
+    }
     this.render();
     if (restoreFocus) {
       const updated = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
@@ -57,17 +77,68 @@ export class OutlineView extends ItemView {
         updated.setSelectionRange(selection[0], selection[1]);
     }
   }
-  /** Moves the active-row marker in place; the tree, its search box and scroll position stay untouched. */
+  /**
+   * Moves the active-row marker in place; the tree, its search box and scroll position stay untouched.
+   * Collapsed ancestors of the active row open for as long as it is active (outline DOM only) and it is scrolled into view.
+   * Nothing here takes focus.
+   */
   setActive(path: string): void {
     if (path === this.activePath) return;
     this.activePath = path;
+    const open = new Set<string>();
+    const node = path ? this.map?.nodes.find(item => item.path === path) : undefined;
+    const chain: string[] = [];
+    for (let id = node ? this.parentOf.get(node.id) : null; id; id = this.parentOf.get(id))
+      if (this.collapsed.has(id)) chain.push(id);
+    // Top-down, so a branch is filled before the nested branch inside it. Only the ancestor chain is walked.
+    for (const id of chain.reverse()) open.add(id);
+    const changed = [...this.tempOpen]
+      .filter(id => !open.has(id))
+      .concat([...open].filter(id => !this.tempOpen.has(id)));
+    this.tempOpen = open;
+    for (const id of [...open].filter(id => changed.includes(id))) {
+      const branch = this.branches.get(id);
+      if (branch && !branch.filled) branch.fill();
+    }
+    for (const id of changed) {
+      const closed = this.collapsed.has(id) && !open.has(id);
+      const branch = this.branches.get(id);
+      branch?.box.toggleClass("is-folded", closed);
+      const toggle = this.toggleEls.get(id);
+      if (!toggle) continue;
+      toggle.setText(closed ? "▸" : "▾");
+      toggle.setAttr("aria-label", closed ? t("ui.expand") : t("ui.collapse"));
+      toggle.setAttr("aria-expanded", String(!closed));
+    }
+    this.markActive(path);
+  }
+  private markActive(path: string): void {
+    if (this.noteEls.size) {
+      // Only the old and the new row change: no walk over the whole tree.
+      const next = path ? (this.noteEls.get(path) ?? null) : null;
+      if (this.activeEl && this.activeEl !== next) {
+        this.activeEl.toggleClass("is-active", false);
+        this.activeEl.removeAttribute("aria-current");
+      }
+      if (next) {
+        next.toggleClass("is-active", true);
+        next.setAttr("aria-current", "true");
+        next.scrollIntoView?.({ block: "nearest" });
+      }
+      this.activeEl = next;
+      return;
+    }
+    let activeRow: HTMLElement | null = null;
     const rows = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-outline-note"));
     for (const row of rows) {
       const active = !!path && row.getAttribute("data-path") === path;
       row.toggleClass("is-active", active);
-      if (active) row.setAttr("aria-current", "true");
-      else row.removeAttribute("aria-current");
+      if (active) {
+        row.setAttr("aria-current", "true");
+        activeRow = row;
+      } else row.removeAttribute("aria-current");
     }
+    activeRow?.scrollIntoView?.({ block: "nearest" });
   }
   private render(): void {
     this.contentEl.empty();
@@ -125,38 +196,118 @@ export class OutlineView extends ItemView {
     }
     return null;
   }
+  /** The move goes through the map view, which validates it; a refusal is shown as red text and nothing was written. */
+  private async requestMove(id: string, to: OutlineMove): Promise<void> {
+    let reason: string | null = null;
+    try {
+      reason = (await this.moveTopic?.(id, to)) ?? null;
+    } catch (error) {
+      reason = error instanceof Error ? error.message : String(error);
+    }
+    this.reasonEl?.remove();
+    this.reasonEl = null;
+    if (reason) {
+      this.refocusId = null;
+      this.reasonEl = this.contentEl.createDiv({ cls: "vam-outline-reason", text: reason });
+      this.reasonEl.setAttr("role", "alert");
+    }
+  }
+  /** Drag handle on the row's left; the row takes the drop: its top / bottom quarter puts the topic next to it, the middle puts it under it. */
+  private attachDrag(row: HTMLElement, node: MapNode): void {
+    const handle = row.createSpan({ cls: "vam-outline-handle", text: "⋮⋮", attr: { "aria-hidden": "true" } });
+    handle.setAttr("draggable", "true");
+    handle.addEventListener("dragstart", event => {
+      this.dragId = node.id;
+      event.dataTransfer?.setData("text/plain", node.id);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+      row.addClass("is-dragging");
+    });
+    handle.addEventListener("dragend", () => {
+      this.dragId = null;
+      row.removeClass("is-dragging");
+      this.markDrop(null);
+    });
+    const placeOf = (event: DragEvent): "before" | "after" | "into" => {
+      if (!node.parentId) return "into";
+      const box = row.getBoundingClientRect();
+      const at = box.height ? (event.clientY - box.top) / box.height : 0.5;
+      return at < 0.25 ? "before" : at > 0.75 ? "after" : "into";
+    };
+    row.addEventListener("dragover", event => {
+      if (!this.dragId) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      this.markDrop(row, placeOf(event));
+    });
+    row.addEventListener("dragleave", () => {
+      if (this.dropRow === row) this.markDrop(null);
+    });
+    row.addEventListener("drop", event => {
+      const id = this.dragId;
+      if (!id) return;
+      event.preventDefault();
+      const place = placeOf(event);
+      this.dragId = null;
+      this.markDrop(null);
+      void this.requestMove(id, { target: node.id, place });
+    });
+  }
+  /** The insertion line (before / after) or the "under this row" highlight; at most one row at a time. */
+  private markDrop(row: HTMLElement | null, place?: "before" | "after" | "into"): void {
+    if (this.dropRow && this.dropRow !== row) {
+      for (const name of ["is-drop-before", "is-drop-after", "is-drop-into"]) this.dropRow.removeClass(name);
+    }
+    this.dropRow = row;
+    if (!row) return;
+    for (const name of ["is-drop-before", "is-drop-after", "is-drop-into"]) row.removeClass(name);
+    row.addClass(`is-drop-${place}`);
+  }
   private renderTree(): void {
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
+    this.branches.clear();
+    this.noteEls.clear();
+    this.activeEl = null;
+    this.parentOf.clear();
+    this.reasonEl?.remove();
+    this.reasonEl = null;
     if (!this.map) return;
+    // Dragging works on the whole tree only: a search shows part of it, and "between two rows" would be a guess.
+    const movable = !!this.moveTopic && !this.map.aim && !this.query.trim();
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = new Map<string | null, MapNode[]>();
-    for (const node of this.map.nodes) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+    for (const node of this.map.nodes) {
+      children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+      this.parentOf.set(node.id, node.parentId);
+    }
     const query = foldOutlineSearch(this.query.trim());
     const matches = (node: MapNode): boolean => {
       if (!query) return true;
       if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return true;
       return (children.get(node.id) ?? []).some(matches);
     };
-    const append = (node: MapNode, depth: number): void => {
+    const closed = (id: string): boolean => this.collapsed.has(id) && !this.tempOpen.has(id);
+    const append = (node: MapNode, depth: number, into: HTMLElement): void => {
       if (!matches(node)) return;
       const descendants = children.get(node.id) ?? [];
-      const row = tree.createDiv("vam-outline-row");
+      const row = into.createDiv("vam-outline-row");
       row.style.paddingLeft = `${8 + depth * 16}px`;
+      if (movable) this.attachDrag(row, node);
       if (descendants.length) {
         const toggle = row.createEl("button", {
-          text: query || !this.collapsed.has(node.id) ? "▾" : "▸",
+          text: query || !closed(node.id) ? "▾" : "▸",
           cls: "vam-outline-toggle"
         });
         toggle.disabled = !!query;
-        toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
-        toggle.setAttr("aria-expanded", String(!!query || !this.collapsed.has(node.id)));
+        toggle.setAttr("aria-label", !query && closed(node.id) ? t("ui.expand") : t("ui.collapse"));
+        toggle.setAttr("aria-expanded", String(!!query || !closed(node.id)));
         this.toggleEls.set(node.id, toggle);
         toggle.addEventListener("click", () => {
           // The tree is rebuilt: a toggle that had focus (Space on the keyboard) keeps it on the new button of the same row.
           const hadFocus = (this.contentEl.ownerDocument as Document | undefined)?.activeElement === toggle;
-          if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
+          if (this.collapsed.has(node.id) && !this.tempOpen.has(node.id)) this.collapsed.delete(node.id);
           else this.collapsed.add(node.id);
+          this.tempOpen.delete(node.id);
           this.renderTree();
           if (hadFocus) this.toggleEls.get(node.id)?.focus();
         });
@@ -192,18 +343,47 @@ export class OutlineView extends ItemView {
         );
         button.createSpan({ cls: "vam-outline-links", text: "↗", attr: { "aria-hidden": "true" } });
       }
+      this.noteEls.set(node.path, button);
       if (node.path === this.activePath) {
+        this.activeEl = button;
         button.addClass("is-active");
         button.setAttr("aria-current", "true");
       }
+      if (movable)
+        button.addEventListener("keydown", event => {
+          if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return;
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+          event.preventDefault();
+          this.refocusId = node.id;
+          void this.requestMove(node.id, { shift: event.key === "ArrowUp" ? -1 : 1 });
+        });
       button.addEventListener("click", () => {
         // Mark the row in place: a re-render would drop keyboard focus from the outline.
         this.setActive(node.path);
         void this.openNote(node.path);
       });
-      if (query || !this.collapsed.has(node.id)) for (const child of descendants) append(child, depth + 1);
+      // Collapsed branches stay in the tree but folded away, so the canvas selection can open them without rebuilding rows.
+      if (!query && this.collapsed.has(node.id) && descendants.length) {
+        // Rows of a collapsed branch exist only once it has been opened; the container keeps their place in the order.
+        const box = into.createDiv(closed(node.id) ? "vam-outline-children is-folded" : "vam-outline-children");
+        const branch = {
+          box,
+          filled: false,
+          fill: () => {
+            branch.filled = true;
+            for (const child of descendants) append(child, depth + 1, box);
+          }
+        };
+        this.branches.set(node.id, branch);
+        if (!closed(node.id)) branch.fill();
+      } else for (const child of descendants) append(child, depth + 1, into);
     };
-    for (const root of children.get(null) ?? []) append(root, 0);
+    for (const root of children.get(null) ?? []) append(root, 0, tree);
+    if (this.refocusId) {
+      const path = this.map.nodes.find(node => node.id === this.refocusId)?.path;
+      this.refocusId = null;
+      if (path) this.noteEls.get(path)?.focus();
+    }
     if (!tree.childElementCount) {
       tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
       if (query)

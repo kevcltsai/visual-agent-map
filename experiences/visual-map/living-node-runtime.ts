@@ -69,6 +69,8 @@ export interface LivingRoundPort {
   language(map: MapDocument, note: Note): string;
   mapSources(signal: AbortSignal): Promise<LivingMapSources>;
   onOptionalSourcesUnavailable?(): void;
+  /** The model edited records it was not sent (a large card history); those edits were skipped. */
+  onOmittedEditsSkipped?(id: string, count: number): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
   onStart(total: number): void;
   onRunning(id: string): void;
@@ -553,6 +555,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
               },
               signal
             );
+            if (generated.droppedOperations) port.onOmittedEditsSkipped?.(id, generated.droppedOperations);
             const changes = applyLivingChanges(input.base, generated.proposal, generated.context);
             const outcome = await commitLivingMarkdown(port.repo, {
               path: pathOf(id),
@@ -843,6 +846,7 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
         },
         signal
       );
+      if (result.droppedOperations) prepared.warnings.push("omitted-edits-skipped");
       return result;
     },
     stillCurrent: async () => {

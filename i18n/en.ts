@@ -1249,6 +1249,8 @@ export const en = {
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_removed_source_0":
     "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",
+  "ui.living_node_omitted_edits_skipped":
+    "Some older-record edits were skipped because those records were not sent to the AI.",
   "ui.living_node_optional_source_unavailable":
     "Some optional map sources could not be read. Results use available material only.",
   "ui.living_node_trial_stale_sources":

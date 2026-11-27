@@ -30,9 +30,12 @@ function eventMillis(record: LivingKnowledge["records"][number]): number | undef
 function projectKnowledge(base: LivingKnowledge, budget: number): { text: string; omitted: Set<string> } {
   const recent = base.records
     .map((record, index) => ({ record, index, time: eventMillis(record) }))
-    .sort((a, b) =>
-      a.time === undefined || b.time === undefined || a.time === b.time ? b.index - a.index : b.time - a.time
-    );
+    // Total order: untimed records rank newest, then event time descending, then insertion index descending.
+    .sort((a, b) => {
+      const ta = a.time ?? Number.POSITIVE_INFINITY;
+      const tb = b.time ?? Number.POSITIVE_INFINITY;
+      return ta === tb ? b.index - a.index : ta > tb ? -1 : 1;
+    });
   const keep = new Set<number>();
   let used = 0;
   for (const { record, index } of recent) {
@@ -61,8 +64,24 @@ function projectionFor(input: LivingProviderInput) {
   const full = JSON.stringify(input.base);
   const whole = renderPrompt(input, full);
   if (whole.length <= MAX_PROMPT_CHARS) return { prompt: whole, omitted: new Set<string>() };
-  const shell = renderPrompt(input, projectKnowledge({ ...input.base, records: [] }, 0).text).length;
-  const projected = projectKnowledge(input.base, MAX_PROMPT_CHARS - shell - 40);
+  // Worst-case shell: both projection fields at their longest possible value, so the prompt never exceeds the cap.
+  const longest = input.base.records.reduce(
+    (best, record) =>
+      JSON.stringify(record.eventTime ?? "").length > JSON.stringify(best).length ? record.eventTime! : best,
+    ""
+  );
+  const shell = renderPrompt(
+    input,
+    JSON.stringify({
+      revision: input.base.revision,
+      records: [],
+      omittedOlderRecords: input.base.records.length,
+      oldestShownEventTime: longest,
+      suppressed: input.base.suppressed,
+      output: input.base.output
+    })
+  ).length;
+  const projected = projectKnowledge(input.base, MAX_PROMPT_CHARS - shell);
   return { prompt: renderPrompt(input, projected.text), omitted: projected.omitted };
 }
 

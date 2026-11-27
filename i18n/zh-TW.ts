@@ -1184,6 +1184,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_official": "正式內容",
   "ui.living_node_trial_unsaved": "試跑・尚未儲存",
   "ui.living_node_removed_source_0": "已移除下列 AI 卡片引用的來源：{0}。原引用仍保留，請修復來源或復原。",
+  "ui.living_node_omitted_edits_skipped": "部分對較舊紀錄的修改已略過，因為那些紀錄未送給 AI。",
   "ui.living_node_optional_source_unavailable": "部分心智圖級選用來源無法讀取；本次結果僅使用可取得的資料。",
   "ui.living_node_trial_stale_sources": "此試跑使用仍需更新的上游知識；請先正式執行卡片，再採用結果。",
   "ui.living_node_trial_frozen_sources": "此試跑使用已鎖定的上游知識，資訊可能不是最新。",

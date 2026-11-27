@@ -92,3 +92,32 @@ S.integrationTest('Living Node A33: a recent record with no parseable time stays
   const small = await bigCard(3);
   assert.ok(!(await round(small, [])).sent[0].includes('oldestShownEventTime":'));
 });
+
+const memBase = (count, mutate = () => ({})) => ({ revision: 'rev', suppressed: [], output: { text: '', owner: 'ai', evidence: [] },
+  records: Array.from({ length: count }, (_, n) => ({ id: 'r' + n, subject: 's' + n, scope: 'sc', granularity: 'day', eventTime: day(n) + 'T00:00:00.000Z', claim: 'c' + n + ' ' + 'x'.repeat(300), evidence: [], validity: 'active', owner: 'ai', history: [], ...mutate(n) })) });
+const sendOnce = async base => {
+  const sent = [];
+  const calls = { run: async (prepared, options, finish) => { sent.push(prepared.prompt); return finish(JSON.stringify({ baseRevision: base.revision, requiresWeb: false, operations: [] }), { signal: options.signal, parsed() {} }); } };
+  await generateLivingProposal(calls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base, context: '{}', evidence: [], mapPath: 'map.md' }, new AbortController().signal);
+  return sent;
+};
+
+S.integrationTest('Living Node A33: the projected prompt never exceeds 100,000 chars however little room is left', async () => {
+  for (let pad = 0; pad < 450; pad++) {
+    const base = memBase(330, n => (n === 329 ? { claim: 'x'.repeat(300 + pad) } : {}));
+    const sent = await sendOnce(base);
+    assert.equal(sent.length, 1);
+    assert.ok(sent[0].length <= 100_000, 'pad ' + pad + ' length ' + sent[0].length);
+  }
+});
+
+S.integrationTest('Living Node A33: untimed records rank newest, then time descending, then insertion descending', async () => {
+  const base = memBase(330, n => (n % 3 === 0 ? { eventTime: null } : {}));
+  const shown = [...(await sendOnce(base))[0].matchAll(/"id":"r(\d+)"/g)].map(m => Number(m[1]));
+  const untimed = Array.from({ length: 330 }, (_, n) => n).filter(n => n % 3 === 0);
+  assert.ok(untimed.every(n => shown.includes(n)), 'all untimed shown ' + shown.length + ' ' + shown.slice(0, 5));
+  const timedShown = shown.filter(n => n % 3 !== 0);
+  assert.ok(timedShown.length > 0 && timedShown.length < 220);
+  const cutoff = Math.min(...timedShown);
+  assert.ok(Array.from({ length: 330 - cutoff }, (_, i) => cutoff + i).filter(n => n % 3 !== 0).every(n => shown.includes(n)), 'timed shown form a newest suffix');
+});

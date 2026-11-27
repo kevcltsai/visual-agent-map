@@ -15584,7 +15584,9 @@ export class VisualAgentMapView extends ItemView {
                       ? "ui.living_node_trial_stale_sources"
                       : warning === "frozen-source"
                         ? "ui.living_node_trial_frozen_sources"
-                        : "ui.living_node_optional_source_unavailable"
+                        : warning === "omitted-edits-skipped"
+                          ? "ui.living_node_omitted_edits_skipped"
+                          : "ui.living_node_optional_source_unavailable"
                   )
                 );
                 const shown = await this.plugin.showLivingTrial(
@@ -20401,6 +20403,9 @@ export class VisualAgentMapView extends ItemView {
             if (!current() || warnedOptionalSources) return;
             warnedOptionalSources = true;
             new Notice(t("ui.living_node_optional_source_unavailable"));
+          },
+          onOmittedEditsSkipped: () => {
+            if (current()) new Notice(t("ui.living_node_omitted_edits_skipped"));
           },
           confirm: (model, run) => this.plugin.confirmAiUsage(model, run),
           onStart: total => {

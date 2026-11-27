@@ -1712,3 +1712,20 @@ S.integrationTest('Living Node: a Detail write without text after the region lea
   await f.repo.updateNote(path, { detail: 'New detail' });
   assert.equal(f.contents.get(path).replace(/updated: .*\n/, ''), first.replace(/updated: .*\n/, ''));
 });
+
+S.integrationTest('Living Node A33: dropped omitted-record edits are disclosed in the trial warnings and the formal round callback', async () => {
+  const trial = livingTrialRuntimeFixture({ generate: async () => ({ proposal: { baseRevision: 'r', operations: [] }, context: { at: 't', evidence: [] }, droppedOperations: 2 }) });
+  const prepared = await trial.prepare();
+  assert.ok(!JSON.parse(JSON.stringify(prepared.warnings)).includes('omitted-edits-skipped'));
+  await prepared.request.generate(new AbortController().signal);
+  assert.ok(JSON.parse(JSON.stringify(prepared.warnings)).includes('omitted-edits-skipped'));
+  const { runLivingRound: stubbedRound } = S.load('experiences/visual-map/living-node-runtime.ts',
+    { obsidian: S.obsidian, './living-node-provider': { generateLivingProposal: async (_calls, input) => ({
+      proposal: { baseRevision: input.base.revision, operations: [{ kind: 'output', text: 'Result', evidence: [] }] }, context: { at: 't', evidence: [] }, droppedOperations: 3 }) } },
+    {}, { external: ['obsidian', 'node:*', './living-node-provider'] });
+  const f = await roundFixture([['solo']]);
+  const skipped = [];
+  f.port.onOmittedEditsSkipped = (id, count) => skipped.push([id, count]);
+  assert.equal((await stubbedRound(f.port)).get('solo'), 'changed');
+  assert.deepEqual(skipped, [['solo', 3]]);
+});

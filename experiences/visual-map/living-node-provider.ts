@@ -105,7 +105,7 @@ function renderPrompt(input: LivingProviderInput, knowledge: string): string {
 
 const step: StepDefinition<LivingProviderInput, unknown> = {
   id: "living-node-change-set",
-  version: 2,
+  version: 3,
   render: input => projectionFor(input).prompt,
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
@@ -143,7 +143,17 @@ export function explicitlyRequiresLivingWeb(prompt: string): boolean {
   return livingWebPolicy(prompt) === "required";
 }
 
-/** Web URLs only become authorized evidence if the runtime reports opening them during this call. */
+const MAX_EXCERPT = 300;
+
+/** Documented normalization for an excerpt: Unicode NFC, then whitespace collapsed. */
+const normalizeExcerpt = (value: string): string => value.normalize("NFC").trim().replace(/\s+/g, " ");
+
+/** Web URLs only become authorized evidence if the runtime reports opening them during this call.
+ *
+ * Trust: the provider stream reports only the URL (or query) of a page it opened, never the fetched text (the Claude
+ * WebFetch result is a model summary and its tool_result body is not forwarded). So a web excerpt is the model's own
+ * summary: it binds the evidence id to a (URL, excerpt) version but is NOT verified page text, and web evidence alone
+ * can never correct or invalidate a claim (enforced in applyLivingChanges). */
 export function normalizeLivingProposal(
   raw: unknown,
   opened: readonly string[],
@@ -153,19 +163,42 @@ export function normalizeLivingProposal(
   forbidWeb = false
 ) {
   const envelope = object(raw);
-  if (Object.keys(envelope).some(key => !["baseRevision", "operations", "requiresWeb", "checkedWeb"].includes(key)))
+  if (
+    Object.keys(envelope).some(
+      key => !["baseRevision", "operations", "requiresWeb", "checkedWeb", "webExcerpts"].includes(key)
+    )
+  )
     throw new Error("invalid-proposal-field");
   if (typeof envelope.requiresWeb !== "boolean") throw new Error("missing-search-decision");
   if (forbidWeb && (envelope.requiresWeb || opened.length)) throw new Error("forbidden-web-search");
-  const byUrl = new Map<string, LivingEvidence>();
+  const openedUrls = new Set<string>();
   for (const url of opened) {
     const parsed = allowedUrl(url);
     if (!parsed) continue;
     parsed.hash = "";
-    const source = parsed.toString();
-    byUrl.set(source, { id: "web:" + livingSnapshotRevision(source), source, retrievedAt: at });
+    openedUrls.add(parsed.toString());
   }
-  if ((requiresWeb || envelope.requiresWeb) && !byUrl.size) throw new Error("required-web-unavailable");
+  if ((requiresWeb || envelope.requiresWeb) && !openedUrls.size) throw new Error("required-web-unavailable");
+  // Evidence exists per opened URL only once the model supplied an excerpt for it; id = hash(URL + excerpt).
+  const byUrl = new Map<string, LivingEvidence>();
+  const rawExcerpts = envelope.webExcerpts === undefined ? [] : envelope.webExcerpts;
+  if (!Array.isArray(rawExcerpts) || rawExcerpts.length > 100) throw new Error("invalid-web-excerpt");
+  for (const value of rawExcerpts as unknown[]) {
+    const entry = object(value);
+    if (Object.keys(entry).some(key => key !== "url" && key !== "excerpt")) throw new Error("invalid-web-excerpt");
+    const parsed = typeof entry.url === "string" ? allowedUrl(entry.url) : undefined;
+    if (!parsed || typeof entry.excerpt !== "string") throw new Error("invalid-web-excerpt");
+    parsed.hash = "";
+    const source = parsed.toString();
+    const excerpt = normalizeExcerpt(entry.excerpt);
+    if (!excerpt || excerpt.length > MAX_EXCERPT) throw new Error("invalid-web-excerpt");
+    if (!openedUrls.has(source)) throw new Error("unauthorized-web-excerpt");
+    byUrl.set(source, {
+      id: "web:" + livingSnapshotRevision(source + "\n" + excerpt),
+      source,
+      retrievedAt: at
+    });
+  }
   if (requiresWeb && !envelope.requiresWeb) throw new Error("required-web-decision-conflict");
   if (!Array.isArray(envelope.operations)) throw new Error("invalid-operations");
   const operations = (envelope.operations as unknown[]).map(
@@ -177,8 +210,10 @@ export function normalizeLivingProposal(
         const url = allowedUrl(item);
         if (!url) return item;
         url.hash = "";
-        const known = byUrl.get(url.toString());
-        if (!known) throw new Error("unauthorized-evidence");
+        const source = url.toString();
+        if (!openedUrls.has(source)) throw new Error("unauthorized-evidence");
+        const known = byUrl.get(source);
+        if (!known) throw new Error("web-excerpt-missing");
         return known.id;
       });
       return { ...operation, evidence };
@@ -186,6 +221,7 @@ export function normalizeLivingProposal(
   );
   // A changed answer requiring current web information must cite at least
   // one actually opened source. A genuine no-change check can have no operations.
+  const checkedUrls: string[] = [];
   if (envelope.requiresWeb) {
     if (!Array.isArray(envelope.checkedWeb) || !envelope.checkedWeb.length || envelope.checkedWeb.length > 100)
       throw new Error("required-web-check-missing");
@@ -195,9 +231,11 @@ export function normalizeLivingProposal(
       const url = allowedUrl(value);
       if (!url) throw new Error("invalid-web-check");
       url.hash = "";
-      const entry = byUrl.get(url.toString());
-      if (!entry) throw new Error("unauthorized-web-check");
-      checked.add(entry.id);
+      const source = url.toString();
+      if (!openedUrls.has(source)) throw new Error("unauthorized-web-check");
+      checkedUrls.push(source);
+      const entry = byUrl.get(source);
+      if (entry) checked.add(entry.id);
     }
     if (operations.length && !operations.some(operation => operation.evidence.some(id => checked.has(id))))
       throw new Error("required-web-evidence-missing");
@@ -210,7 +248,9 @@ export function normalizeLivingProposal(
   }
   return {
     proposal: { baseRevision: envelope.baseRevision, operations },
-    context: { at, evidence: [...local, ...byUrl.values()] }
+    context: { at, evidence: [...local, ...byUrl.values()] },
+    /** What this run actually checked and when (a no-change or no-match result is only valid with this). */
+    checked: checkedUrls.map(url => ({ url, at }))
   };
 }
 

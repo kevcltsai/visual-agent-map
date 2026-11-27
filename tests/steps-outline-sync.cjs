@@ -18,32 +18,39 @@ function outline() {
     { id: 'leaf', parentId: 'child', path: 'leaf.md' }, { id: 'other', parentId: null, path: 'other.md' }
   ] }, new Map([['root', 'Root'], ['child', 'Child'], ['leaf', 'Leaf'], ['other', 'Other']]));
   const rows = () => dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-row'));
-  const folded = () => rows().map(row => dom.hasCls(row, 'is-folded'));
-  return { view, doc, rows, folded };
+  // The paths of the rows a reader can see: rows inside a folded container do not count.
+  const visible = () => {
+    const out = [];
+    const walk = el => { if (dom.hasCls(el, 'is-folded')) return; if (dom.hasCls(el, 'vam-outline-note')) out.push(el.attrs['data-path']); el.children.forEach(walk); };
+    walk(dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-tree'))[0]);
+    return out;
+  };
+  return { view, doc, rows, visible };
 }
 
 test('B15: canvas selection opens the collapsed ancestor rows in the outline DOM only, and the next selection folds them back', () => {
-  const { view, rows, folded } = outline();
-  assert.deepEqual(folded(), [false, true, true, false], 'collapsed branches start folded');
+  const { view, rows, visible } = outline();
+  assert.deepEqual(visible(), ['root.md', 'other.md'], 'collapsed branches start folded');
+  assert.equal(rows().length, 2, 'rows of a collapsed branch are not created until it opens');
   view.setActive('leaf.md');
-  assert.deepEqual(folded(), [false, false, false, false], 'ancestors of the active row are open');
+  assert.deepEqual(visible(), ['root.md', 'child.md', 'leaf.md', 'other.md'], 'ancestors of the active row are open');
   assert.deepEqual([...view.collapsed].sort(), ['child', 'root'], 'the collapse state itself is untouched');
   const active = dom.findAll(view.contentEl, i => dom.hasCls(i, 'is-active'));
   assert.equal(active.length, 1); assert.equal(active[0].attrs['data-path'], 'leaf.md');
   view.setActive('other.md');
-  assert.deepEqual(folded(), [false, true, true, false], 'the temporary opening ends with the selection');
-  assert.equal(rows().length, 4);
+  assert.deepEqual(visible(), ['root.md', 'other.md'], 'the temporary opening ends with the selection');
+  assert.equal(rows().length, 4, 'the opened branch is hidden, its rows kept for reuse');
 });
 
-test('B15: syncing the active row keeps every outline row and the search box as the same objects, with the search text', () => {
+test('B15: syncing the active row keeps the outline rows and the search box as the same objects', () => {
   const { view, rows } = outline();
-  const search = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-search'))[0];
-  search.value = '';
   const before = rows(), tree = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-tree'))[0];
+  const search = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-search'))[0];
   for (const path of ['leaf.md', 'other.md', 'child.md', 'root.md', 'leaf.md']) view.setActive(path);
-  const after = rows();
-  assert.equal(after.length, before.length);
-  after.forEach((row, index) => assert.equal(row, before[index], `row ${index} is the same object`));
+  const opened = rows();
+  before.forEach(row => assert.ok(opened.includes(row), 'a row that was drawn is still the same object'));
+  view.setActive('other.md'); view.setActive('leaf.md');
+  assert.deepEqual(rows(), opened, 'closing and reopening a branch reuses its rows');
   assert.equal(dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-search'))[0], search);
   assert.equal(dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-tree'))[0], tree);
 });
@@ -60,11 +67,11 @@ test('B15: a canvas selection while focus is in a reader editor leaves document.
 });
 
 test('B15: toggling a temporarily opened row folds it, and a fold click on a real collapse still expands for good', () => {
-  const { view, folded } = outline();
+  const { view, visible } = outline();
   view.setActive('leaf.md');
   const toggles = () => dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-toggle'));
   toggles()[0].click(); // root is open only temporarily: the click closes it
-  assert.deepEqual(folded(), [false, true, true, false]);
+  assert.deepEqual(visible(), ['root.md', 'other.md']);
   toggles()[0].click(); // now an ordinary expand
   assert.ok(!view.collapsed.has('root'));
 });

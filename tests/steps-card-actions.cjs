@@ -157,8 +157,9 @@ const TABLE = [
   ['search', 'key', null, 'ok ro ok ok pr ok ok ok'], // Mod+F: presentation || notesLoading swallowed
   // Selection bar (renderSelectionBar) and its ⋯ (openSelectionMoreMenu): only in topic selection mode; no presentation or notesLoading check.
   // B19a (P1.9): an AI-locked or merging card in the selection refuses Merge and Move to as a whole, naming the cards.
-  // B19b: Color is a batch write: presentation, loading notes and the structure lock refuse it too (changeSelectionColor rechecks).
-  ['batch-color', 'toolbar', ['a', 'd'], 'ok ro lk lk pr ok ok bk'],
+  // B19b: Color is a batch write: presentation and loading notes refuse it too (changeSelectionColor rechecks). Parent ruling:
+  // the picture-book structure lock covers parent and order only, so a colour stays available under both book locks.
+  ['batch-color', 'toolbar', ['a', 'd'], 'ok ro lk lk pr ok ok ok'],
   ['merge', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
   ['multi-research', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['move-to', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok ok bk'], // chooseSelectedParent refuses merging branches

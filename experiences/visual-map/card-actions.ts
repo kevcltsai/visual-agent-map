@@ -748,7 +748,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   // The topic selection (renderSelectionBar, openSelectionMoreMenu, and the right-click on a selection). The bar reads
   // neither presentation nor notesLoading; the picture-book lock takes the AI actions, and the structure ones.
   {
-    // P1.9 (B19b): one colour for the whole selection, one write and one undo step (changeSelectionColor rechecks these).
+    // P1.9 (B19b): one colour for the whole selection, one write and one undo step (changeSelectionColor rechecks these). A
+    // colour changes neither parent nor order, so the picture-book locks (card AI, structure) leave it on.
     id: "batch-color",
     titleKey: "ui.batch_color",
     icon: "palette",
@@ -756,7 +757,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["toolbar"],
     order: 295,
     group: 1,
-    available: ctx => then(gate(ctx, ["presentation", "readOnly", "bookStructure"]), () => selectionLock(ctx)),
+    available: ctx => then(gate(ctx, ["presentation", "readOnly"]), () => selectionLock(ctx)),
     run: (ctx, options) => ctx.host.openBatchColor(options?.opener)
   },
   {

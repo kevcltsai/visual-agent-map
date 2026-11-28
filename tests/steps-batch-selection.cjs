@@ -183,7 +183,7 @@ test('B19b: an AI-locked or merging card in the selection turns Color off with t
   assert.deepEqual(h.files(), held, 'zero writes while merging');
 });
 
-test('B19b: while the notes load Color is off with the loading reason; under the picture-book structure lock it leaves the bar like Move to; neither writes', async () => {
+test('B19b: while the notes load Color is off with the loading reason and neither the click nor the write entry writes', async () => {
   const h = await harness(SPEC);
   h.select(['A', 'C']);
   const ids = ['A', 'C'].map(title => h.named(title).id);
@@ -194,13 +194,24 @@ test('B19b: while the notes load Color is off with the loading reason; under the
   assert.equal(loading.pop, null);
   await h.view.changeSelectionColor(ids, 'red');
   assert.deepEqual(h.files(), before);
-  h.view.notesLoading = () => false;
+});
+
+test('B19b (parent ruling: the picture-book structure lock covers parent and order only): under the book locks Color stays on and colours the selection, only topic-color changes, Map.md unchanged', async () => {
+  const h = await harness(SPEC);
+  h.select(['A', 'C']);
+  const before = h.files();
   h.view.bookLock = () => ({ ai: true, structure: true });
-  const bar = h.bar();
-  assert.equal(buttonOf(bar, 'Color ▾'), undefined); assert.equal(buttonOf(bar, 'Move to…'), undefined);
-  await h.view.changeSelectionColor(ids, 'red');
-  assert.deepEqual(h.files(), before, 'zero writes under the structure lock');
-  h.view.bookLock = () => ({ ai: false, structure: false });
-  await h.view.changeSelectionColor(ids, 'red');
-  assert.match(h.files().get(NOTE('A')), /^topic-color: "red"$/m, 'control: the same call writes once the lock is gone');
+  const { bar, button, pop } = openColor(h);
+  assert.equal(button.attrs['aria-disabled'], undefined, 'neither hidden nor off'); assert.ok(pop);
+  assert.equal(buttonOf(bar, 'Move to…'), undefined, 'control: Move to still leaves the bar under the structure lock');
+  assert.equal(bar.children.some(child => child.cls.includes('vam-selection-why')), false);
+  swatch(pop, 'red').fire('click');
+  await h.settled();
+  const after = h.files();
+  for (const title of ['A', 'C']) {
+    assert.match(after.get(NOTE(title)), /^topic-color: "red"$/m, title);
+    assert.equal(withoutColor(after.get(NOTE(title))), withoutColor(before.get(NOTE(title))), `${title}: every other byte is the same`);
+  }
+  for (const title of ['Root', 'A1', 'B']) assert.equal(after.get(NOTE(title)), before.get(NOTE(title)), `${title} is not selected`);
+  assert.equal(after.get(MAP), before.get(MAP), 'Map.md unchanged');
 });

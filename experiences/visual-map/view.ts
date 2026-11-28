@@ -20593,8 +20593,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Sets (or, with null, clears) the colour of every selected topic in one undoable step (P1.9). It rechecks the Color
-   * button's gates first (presentation, loading notes, the picture-book structure lock, an AI-locked or merging card): a
-   * refused write says why and writes nothing. Only the notes whose colour really changes are written; Map.md changes only
+   * button's gates first (presentation, loading notes, an AI-locked or merging card; not the picture-book locks, a colour
+   * is neither card AI nor structure): a refused write says why and writes nothing. Only the notes whose colour really changes are written; Map.md changes only
    * its viewport. Not changeTopicColor: that one is for a single card outside selection mode (markersEditable).
    */
   private async changeSelectionColor(ids: readonly string[], color: TopicColor | null): Promise<void> {

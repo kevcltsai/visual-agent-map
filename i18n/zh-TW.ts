@@ -2925,6 +2925,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_searched_0": "查過 {0} 種寫法，筆記裡有記錄",
   "ui.argument_paused_reason_user": "你已停止",
   "ui.argument_paused_reason_error": "AI 回覆格式不對，重試一次仍失敗",
+  "ui.argument_paused_reason_write_discarded": "這則筆記在步驟進行時被改過或鎖定，這一步沒有寫入；可以接續",
   "ui.argument_paused_reason_interrupted": "上次中斷",
   "ui.argument_paused_reason_limit": "研究次數已用完",
   "ui.argument_paused_resume_aria": "接續研究，從停下的地方繼續",

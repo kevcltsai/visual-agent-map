@@ -84,6 +84,8 @@ export interface ChatPreviewMove {
   anchorId: string;
   x: number;
   y: number;
+  /** The picture file the position was meant for; a picture replaced by another file is no longer drawn on. */
+  imageRef?: string;
 }
 /** What applying a plan is given beyond the reply: the context the basis is judged by and where the started work is collected. */
 export interface ChatPlanApplyOptions {
@@ -276,7 +278,15 @@ export class MapChatConversation {
     const ghosts = planGhostSpecs(result.actions);
     const movesToShow = result.actions.flatMap(action =>
       action.kind === "move_anchor"
-        ? [{ imageId: action.imageId, anchorId: action.anchorId, x: action.x, y: action.y }]
+        ? [
+            {
+              imageId: action.imageId,
+              anchorId: action.anchorId,
+              x: action.x,
+              y: action.y,
+              ...(action.imageRef !== undefined ? { imageRef: action.imageRef } : {})
+            }
+          ]
         : []
     );
     this.ports.showPreview(token, anchorsToPlace, ghosts, planGhostRelations(result.actions), movesToShow);

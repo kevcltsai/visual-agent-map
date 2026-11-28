@@ -1264,3 +1264,13 @@ test('G06b (counter-example): the preview is a drawing only: the map, file, shar
   assert.equal(moveTargets(el()).length, 1, 'only the finite one is drawn');
   assert.deepEqual(plain([moveTargets(el())[0].style.left, moveTargets(el())[0].style.top]), ['100%', '0%']);
 });
+
+test('G06b (counter-example): the picture file replaced while the preview is up: no marker, no link and no mention in the label, as Apply would skip it', async () => {
+  const { h } = await movePlanned({ ...moveAnchor('old1', 0.6123, 0.7), imageRef: 'attachments/a.png' });
+  assert.equal(moveTargets(dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'))).length, 1, 'same file: drawn');
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, path: 'attachments/other.png' } : i));
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  const again = dom.find(h.view.stageEl, i => i.hasClass?.('is-annotated'));
+  assert.equal(moveTargets(again).length, 0); assert.equal(moveLinks(again).length, 0);
+  assert.equal(again.attrs['aria-label'], 'Annotated image: Cow cuts');
+});

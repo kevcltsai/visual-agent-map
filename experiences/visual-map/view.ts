@@ -1336,7 +1336,7 @@ export class VisualAgentMapView extends ItemView {
     anchors: { imageId: string; x: number; y: number; note: string }[];
     cards?: PlanGhostSpec[];
     relations?: PlanGhostRelation[];
-    moves?: { imageId: string; anchorId: string; x: number; y: number }[];
+    moves?: { imageId: string; anchorId: string; x: number; y: number; imageRef?: string }[];
   } | null = null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
@@ -8282,6 +8282,8 @@ export class VisualAgentMapView extends ItemView {
     if (!preview?.moves || preview.token !== this.chatPlanToken) return [];
     return preview.moves.flatMap(move => {
       if (move.imageId !== image.id || !Number.isFinite(move.x) || !Number.isFinite(move.y)) return [];
+      // The same check Apply makes: another file under the same id is stale, so nothing is drawn.
+      if (move.imageRef !== undefined && move.imageRef !== image.path) return [];
       const anchor = image.anchors.find(entry => entry.id === move.anchorId);
       return anchor && isImage2dAnchor(anchor)
         ? [{ x: move.x, y: move.y, from: { x: anchor.at.x, y: anchor.at.y } }]

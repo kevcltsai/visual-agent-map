@@ -17,7 +17,6 @@ function sandbox() {
   fs.mkdirSync(bin);
   const marker = path.join(dir, 'REAL-PROVIDER-RAN');
   for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $*" >> "${marker}"\nexit 0\n`, { mode: 0o755 });
-const marked = box => fs.existsSync(box.marker) ? fs.readFileSync(box.marker, 'utf8') : '';
   return { dir, bin, marker, vault: path.join(dir, 'vault') };
 }
 const marked = box => fs.existsSync(box.marker) ? fs.readFileSync(box.marker, 'utf8') : '';
@@ -30,7 +29,7 @@ test('every harness vault is fail-closed by default (no option, no env); only st
   const before = process.env.VAM_STUB_PROVIDERS;
   try {
     delete process.env.VAM_STUB_PROVIDERS;
-    for (const profile of ['normal', 'onboarding', 'reinstall']) {
+    for (const profile of ['normal', 'reinstall']) {
       const vault = path.join(box.dir, profile);
       createTestVault({ vault, profile });
       const saved = settingsOf(vault);
@@ -45,6 +44,44 @@ test('every harness vault is fail-closed by default (no option, no env); only st
     if (before !== undefined) process.env.VAM_STUB_PROVIDERS = before;
     fs.rmSync(box.dir, { recursive: true, force: true });
   }
+});
+
+test('onboarding is the exception: no data.json (it would skip the first-install flow), so no guard files either; bare names resolve with PATH last, so a PATH guard could not win', async () => {
+  const { createTestVault } = await vaultLib();
+  const box = sandbox();
+  try {
+    createTestVault({ vault: box.vault, profile: 'onboarding' });
+    assert.equal(fs.existsSync(path.join(box.vault, '.obsidian/plugins/visual-agent-map/data.json')), false);
+    const { executableCandidates } = load('main.ts', { obsidian: require('../support.cjs').obsidian });
+    const order = Array.from(executableCandidates('codex', '/Users/u', '/guard/bin:/usr/bin', ['v20.1.0']));
+    assert.equal(order.indexOf('/guard/bin/codex') > order.indexOf('/opt/homebrew/bin/codex'), true, order.join(' > '));
+    assert.equal(order.indexOf('/guard/bin/codex') > order.indexOf('/Users/u/.local/bin/codex'), true);
+    assert.equal(order.indexOf('/guard/bin/codex'), order.length - 2, 'the PATH entries come after every fixed folder');
+  } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
+});
+
+test('session vaults get the guard on every run, including reload; an onboarding vault without data.json stays without; the owner vault is never touched', async () => {
+  const { createTestVault } = await vaultLib();
+  const { applySessionGuard } = await import(pathToFileURL(path.join(root, 'scripts', 'test-harness.mjs')).href);
+  const box = sandbox();
+  try {
+    createTestVault({ vault: box.vault, profile: 'normal', stubProviders: false });
+    assert.equal(settingsOf(box.vault).codexPath, undefined, 'an older session vault without the guard');
+    assert.ok(applySessionGuard(box.vault));
+    assert.ok(settingsOf(box.vault).codexPath.startsWith(box.vault));
+    const owner = path.join(box.dir, 'owner');
+    createTestVault({ vault: owner, profile: 'normal', stubProviders: false });
+    const before = fs.readFileSync(path.join(owner, '.obsidian/plugins/visual-agent-map/data.json'), 'utf8');
+    assert.equal(applySessionGuard(owner, null, owner), null);
+    assert.equal(fs.readFileSync(path.join(owner, '.obsidian/plugins/visual-agent-map/data.json'), 'utf8'), before);
+    const fresh = path.join(box.dir, 'onboarding');
+    createTestVault({ vault: fresh, profile: 'onboarding' });
+    assert.equal(applySessionGuard(fresh), null);
+    assert.equal(fs.existsSync(path.join(fresh, '.obsidian/plugins/visual-agent-map/data.json')), false);
+    // The reload branch of the harness runs the guard too (it used to return before it).
+    const source = fs.readFileSync(path.join(root, 'scripts/test-harness.mjs'), 'utf8');
+    assert.match(source, /if \(reload\) \{\n\s+ensureSessionProfile\(vault, runtime, \{ running: true \}\);\n\s+applySessionGuard\(vault\);/);
+  } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
 });
 
 test('--live parsing: a model alone means claude, claude:<model> is the same, anything else is refused', async () => {

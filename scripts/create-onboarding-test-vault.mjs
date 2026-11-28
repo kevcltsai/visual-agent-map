@@ -56,9 +56,9 @@ export function createTestVault({ vault, artifact = root, profile: requested = "
   writeFileSync(join(config, "appearance.json"), JSON.stringify({ nativeMenus: false }, null, 2));
 
   // Stub mode is the default (stubProviders: false is for nothing in the harness): every provider path in this vault is a guard that fails and logs, so a call no stub caught cannot reach a real claude / codex.
-  const guard = stubProviders ? installProviderGuard(config, { live }) : null;
+  // The onboarding profile is the exception: it must have no data.json (main.ts initializeFirstInstall treats saved settings as "not a first install"), so it cannot carry the guard paths.
+  const guard = stubProviders && requested !== "onboarding" ? installProviderGuard(config, { live }) : null;
   const guardSettings = guard ? { codexPath: guard.codexPath, claudePath: guard.claudePath } : {};
-  if (guard && requested === "onboarding") writeFileSync(join(plugin, "data.json"), JSON.stringify(guardSettings, null, 2));
 
   function filesBelow(folder) {
     return readdirSync(folder, { withFileTypes: true }).flatMap(entry => {

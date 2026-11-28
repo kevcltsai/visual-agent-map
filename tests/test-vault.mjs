@@ -243,8 +243,7 @@ test('onboarding is clean and reinstall preserves Markdown and attachment bytes 
   const { vault } = environment(t);
   prepareTestVault({ vault, profile: 'onboarding' });
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
-  // Onboarding has no user settings; the only thing in data.json is the stub-mode provider guard.
-  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(plugin, 'data.json'), 'utf8'))).sort(), ['claudePath', 'codexPath']);
+  assert.equal(existsSync(join(plugin, 'data.json')), false);
   assert.equal(existsSync(join(vault, 'Agent Workspace')), false);
   prepareTestVault({ vault, profile: 'reinstall' });
   const verify = phase => execFileSync(process.execPath, [join(root, 'scripts/verify-reinstall-test-vault.mjs'), vault, phase], { stdio: 'pipe' });

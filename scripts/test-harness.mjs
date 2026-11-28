@@ -471,6 +471,11 @@ export function prepareSessionCandidate({
   return { fingerprint: before, verification, artifacts: built };
 }
 
+/** Session vaults are fail-closed on every run (create, update in place, reload); the owner vault is never touched. */
+export function applySessionGuard(vault, live = null, owner = canonicalVault) {
+  return isOwnerVault(vault, owner) ? null : applyProviderGuard(vault, live);
+}
+
 // `--live=<model>` / `--live=claude:<model>`: the only provider call a harness vault may really make (see scripts/provider-guard.mjs).
 const liveOf = args => { const values = args.filter(arg => arg.startsWith("--live=")); if (values.length > 1) throw new Error("Give --live once."); return values.length ? parseLive(values[0].slice("--live=".length)) : null; };
 
@@ -515,6 +520,7 @@ function sessionMainLocked(args, vault, mode) {
   checkCandidate();
   if (reload) {
     ensureSessionProfile(vault, runtime, { running: true });
+    applySessionGuard(vault); // an older session vault gets the guard on reload too (no --live on reload: it is reset to blocked)
     return timedAsync("session-reload", () => reloadSessionVault({ vault, source, checkCandidate })).then(record => {
       process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
     });
@@ -524,7 +530,7 @@ function sessionMainLocked(args, vault, mode) {
     ? updateCurrentTestVault({ vault, source })
     : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source, live }));
   // Session vaults are always fail-closed: an older vault gets the guard too, and --live is re-decided on every run.
-  if (exists && !isOwnerVault(vault)) applyProviderGuard(vault, live);
+  if (exists) applySessionGuard(vault, live);
   ensureSessionProfile(vault, runtime);
   launchObsidian(appProfile);
   const cdp = `node scripts/obsidian-cdp.mjs --vault=${vault}`;

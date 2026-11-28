@@ -61,11 +61,13 @@ exit ${guardExitCode}
 }
 
 // Puts the guard into an existing harness vault (a session vault updated in place): shims rewritten, data.json paths pointed at them.
+// A vault with no data.json (onboarding before its first run) is left alone: a data.json would count as "saved settings" and skip the first-install flow.
 export function applyProviderGuard(vault, live = null, env = process.env) {
   const config = join(vault, ".ob" + "sidian");
-  const guard = installProviderGuard(config, { live, env });
   const file = join(config, "plugins/visual-agent-map/data.json");
-  const saved = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  if (!existsSync(file)) return null;
+  const guard = installProviderGuard(config, { live, env });
+  const saved = JSON.parse(readFileSync(file, "utf8"));
   writeFileSync(file, JSON.stringify({ ...saved, codexPath: guard.codexPath, claudePath: guard.claudePath }, null, 2));
   return guard;
 }

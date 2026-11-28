@@ -197,6 +197,15 @@ test('budget: a turn has MAX_CONDENSE_CALLS requests; what the condensing used i
   await assert.rejects(spent.reserve(), e => e.name === 'BudgetExhaustedError');
 });
 
+test('rank step: the prompt asks for every offered id and never allows an empty list (the step refuses an empty reply)', () => {
+  for (const language of ['en', 'zh', 'zh-CN']) {
+    const prompt = rankStep.cardRankStep.render({ message: 'm', cards: [{ id: 'c1', title: 'T', excerpt: 'x' }], language, model: 'm', reasoning: 'low' });
+    const text = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+    assert.match(text, /id of every candidate/, language);
+    assert.doesNotMatch(text, /empty list when none|leave out a candidate/, language);
+  }
+});
+
 test('pickRanked: up to five candidates need no call; more take the ranked ones first, the rest in word order; a failure keeps the word order and says so', async () => {
   const items = Array.from({ length: 8 }, (_, i) => ({ k: `k${i}` }));
   let asked = 0;

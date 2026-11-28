@@ -35,7 +35,7 @@ export async function runCardRank(
       failMessage: () => "failed",
       usage: { action: "other", mapPath: request.usageMapPath },
       admission: run.admission,
-      task: { textOnly: true, searchBudget: 0, timeoutMs: 90 * 1000 }
+      task: { textOnly: true, searchBudget: 0, timeoutMs: 20 * 1000 }
     },
     raw => prepared.parse(raw)
   );

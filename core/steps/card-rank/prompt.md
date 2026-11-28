@@ -1,6 +1,6 @@
 Order the candidate cards below by how well each one helps answer the user's message. Judge by meaning, not by shared words. Do not answer the message, do not research and do not rewrite any card.
 
-Rules: every id you return must be copied exactly from the candidate list. Return the ids of the candidates that are relevant, the most relevant first; leave out a candidate that does not help. Return at most {{limit}} ids and never repeat one. Return an empty list when none of them helps.
+Rules: every id you return must be copied exactly from the candidate list. Return the id of every candidate, the most relevant first; do not leave any out, even one that barely helps; with more than {{limit}} candidates, return the {{limit}} most relevant. Never repeat an id and never return an empty list.
 
 Return only JSON: {"ranked":["id","id"]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 

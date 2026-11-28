@@ -199,3 +199,28 @@ test('C08: outline search also reads summaries and Details; a row matched only b
   const hit = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-body-hit'))[0];
   assert.equal(hit.text, 'In text');
 });
+
+// B15-y: the reader opened by an outline click takes width from the map; the card is centred on the width left after it opens.
+async function outlineClick(readerOpen) {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  let width = readerOpen ? 500 : 800; // the canvas: 800px, 500px once the 300px reader is beside it
+  const centred = [];
+  const view = { leaf: {}, hasPath: () => true, revealPath: async () => { centred.push(width / 2); return true; } };
+  const host = {
+    views: () => [view], app: { workspace: { revealLeaf: async () => {} } }, repo: { file: path => ({ path }) },
+    openDetails: async () => { width = 500; }
+  };
+  await Plugin.prototype.revealFromOutline.call(host, 'leaf.md');
+  return { centred, visibleCentre: width / 2 };
+}
+
+test('B15-y: the first outline click with the reader closed centres the card on the canvas left after the reader opens (≤1px)', async () => {
+  const { centred, visibleCentre } = await outlineClick(false);
+  assert.ok(centred.length >= 1);
+  assert.ok(Math.abs(centred.at(-1) - visibleCentre) <= 1, `centred at ${centred.at(-1)}, visible centre ${visibleCentre}`);
+});
+
+test('B15-y: with the reader already open an outline click centres once, as before', async () => {
+  const { centred, visibleCentre } = await outlineClick(true);
+  assert.deepEqual(centred, [visibleCentre]);
+});

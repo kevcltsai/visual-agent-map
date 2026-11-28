@@ -380,6 +380,93 @@ integrationTest('external rename reconciliation only follows a unique matching n
   assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
   assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
 });
+integrationTest('a crash between a new card note and its Map.md write leaves no orphan after the next load recovery (DX-crash)', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Crash window'), doc = await repo.readMap(mapPath);
+  // The note is written first (createNote); the process dies before Map.md lists it, so saveMap never runs.
+  const orphan = await repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
+  // Next load, in the order main.ts onload runs it: adoption first, then the derived-data rebuild (which strips the
+  // map id from any note no map lists, so it must never run before adoption).
+  assert.equal(await repo.adoptOrphanNodeNotes(), 1);
+  await repo.rebuildDerivedData();
+  const map = await repo.readMap(mapPath);
+  assert.ok(contents.has(orphan.path), 'the user note is never deleted');
+  assert.ok(map.nodes.some(item => item.id === orphan.id && item.parentId === null), 'the orphan note is listed in Map.md again');
+  assert.match(contents.get(orphan.path), /agent-map-id: /, 'the note keeps its map id');
+});
+integrationTest('DX-crash order: a derived-data rebuild before adoption strips the orphan\'s map id, so adoption must come first', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Order'), doc = await repo.readMap(mapPath);
+  const orphan = await repo.createNote('Late', 'a', doc, mapPath, 'workspace');
+  await repo.rebuildDerivedData();
+  assert.doesNotMatch(contents.get(orphan.path), /agent-map-id: /);
+  assert.equal(await repo.adoptOrphanNodeNotes(), 0);
+});
+integrationTest('adoption leaves an orphan that names another map or lies outside this map\'s topic root alone', async () => {
+  const { repo, app, contents } = fixture();
+  const mapA = await repo.createMap('Alpha'), mapB = await repo.createMap('Beta');
+  const docA = await repo.readMap(mapA), docB = await repo.readMap(mapB);
+  const own = await repo.createNote('Own', 'a', docA, mapA, 'workspace');
+  const namesB = await repo.createNote('Names B', 'a', docA, mapA, 'workspace');
+  contents.set(namesB.path, contents.get(namesB.path).replace(`agent-map-id: ${docA.id}`, `agent-map-id: ${docB.id}`));
+  const inB = await repo.createNote('In B', 'a', docB, mapB, 'workspace');
+  contents.set(inB.path, contents.get(inB.path).replace(`agent-map-id: ${docB.id}`, `agent-map-id: ${docA.id}`));
+  await app.vault.create('Elsewhere/Stray.md', contents.get(own.path).replace(/node-id: \S+/, 'node-id: stray-1'));
+  const untouched = ['Elsewhere/Stray.md', namesB.path, inB.path], before = untouched.map(path => contents.get(path));
+  assert.equal(await repo.adoptOrphanNodeNotes(), 1, 'only the note naming A inside A\'s root is adopted');
+  assert.equal(JSON.stringify((await repo.readMap(mapA)).nodes.map(item => item.id)), JSON.stringify([own.id]));
+  assert.equal((await repo.readMap(mapB)).nodes.length, 0);
+  assert.equal(JSON.stringify(untouched.map(path => contents.get(path))), JSON.stringify(before), 'the other notes are not rewritten');
+});
+integrationTest('adoption skips a copy whose node-id is already used and leaves Map.md unchanged', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('Copies'), doc = await repo.readMap(mapPath);
+  const real = await repo.createNote('Real', 'a', doc, mapPath, 'workspace');
+  await repo.updateMap(mapPath, current => { current.nodes.push(real); });
+  const copyPath = real.path.replace(/\.md$/, ' (conflict).md');
+  await app.vault.create(copyPath, contents.get(real.path));
+  const mapBefore = contents.get(mapPath), skipped = [];
+  assert.equal(await repo.adoptOrphanNodeNotes({ skipped: path => skipped.push(path) }), 0);
+  assert.equal(JSON.stringify(skipped), JSON.stringify([copyPath]));
+  assert.equal(contents.get(mapPath), mapBefore);
+});
+integrationTest('adoption keeps the original of an id collision, not its "(1)", iCloud "2" or conflict copy, whatever the path order', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('Order of copies'), doc = await repo.readMap(mapPath);
+  const original = await repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
+  const dir = original.path.replace(/\/[^/]+$/, ''), base = original.path.split('/').pop().replace(/\.md$/, '');
+  const copies = [`${dir}/${base} (1).md`, `${dir}/${base} 2.md`, `${dir}/${base}.sync-conflict-20260101.md`];
+  for (const path of copies) await app.vault.create(path, contents.get(original.path));
+  const skipped = [];
+  assert.equal(await repo.adoptOrphanNodeNotes({ skipped: path => skipped.push(path) }), 1);
+  assert.equal(JSON.stringify((await repo.readMap(mapPath)).nodes.map(node => node.path)), JSON.stringify([original.path]));
+  assert.equal(JSON.stringify(skipped.sort()), JSON.stringify([...copies].sort()));
+});
+integrationTest('adoption of one map failing does not stop the later maps', async () => {
+  const { repo } = fixture();
+  const mapA = await repo.createMap('Aaa'), mapB = await repo.createMap('Bbb');
+  const a = await repo.createNote('A', 'a', await repo.readMap(mapA), mapA, 'workspace');
+  const b = await repo.createNote('B', 'a', await repo.readMap(mapB), mapB, 'workspace');
+  const original = repo.updateMap.bind(repo), failures = [];
+  repo.updateMap = (path, ...rest) => path === mapA ? Promise.reject(new Error('read-only')) : original(path, ...rest);
+  assert.equal(await repo.adoptOrphanNodeNotes({ failed: (path, error) => failures.push([path, error.message]) }), 1);
+  assert.equal(JSON.stringify(failures), JSON.stringify([[mapA, 'read-only']]));
+  assert.ok((await repo.readMap(mapB)).nodes.some(node => node.id === b.id));
+  assert.equal((await repo.readMap(mapA)).nodes.some(node => node.id === a.id), false);
+});
+integrationTest('adoption twice gives identical Map.md bytes and no duplicate node', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Twice'), doc = await repo.readMap(mapPath);
+  const a = await repo.createNote('A', 'a', doc, mapPath, 'workspace'), b = await repo.createNote('B', 'a', doc, mapPath, 'workspace');
+  assert.equal(await repo.adoptOrphanNodeNotes(), 2);
+  const once = contents.get(mapPath);
+  assert.equal(await repo.adoptOrphanNodeNotes(), 0);
+  assert.equal(contents.get(mapPath), once);
+  const map = await repo.readMap(mapPath);
+  assert.equal(JSON.stringify(map.nodes.map(item => item.id).sort()), JSON.stringify([a.id, b.id].sort()));
+  assert.equal(new Set(map.nodes.map(item => item.path)).size, 2);
+});
 integrationTest('missing path reconciliation keeps an external map edit during citation updates', async () => {
   const { repo, app } = fixture();
   const mapPath = await repo.createMap('Recovery race'), doc = await repo.readMap(mapPath);

@@ -25454,6 +25454,9 @@ export class VisualAgentMapView extends ItemView {
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
     options: ChatApplyOptions = {}
   ): Promise<MapChatLine[]> {
+    // Waits for startup adoption before anything is collected or staged: it could list a staged note whose Map.md write is
+    // pending, and an edit made during the wait must not fall into this reply's undo group.
+    await this.plugin.orphansAdopted;
     const touched = new Set<string>([anchor.path]);
     // The turn this reply belongs to (switch on): undo and redo of its writes are noted in that turn's conversation.
     const scope = options.topicScope;

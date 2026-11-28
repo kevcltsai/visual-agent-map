@@ -1982,6 +1982,84 @@ export class Repository {
     return repaired;
   }
 
+  /**
+   * Startup recovery for a crash between a card note and its Map.md write (batch chat writes notes first, Map.md at the
+   * end): a node note that names a map by `agent-map-id`, lies under that map's topic root, is active and is listed by
+   * no map is added to that map as a root node, after the existing nodes. Nothing is deleted or rewritten except Map.md.
+   * Must run only when no chat batch can be in flight (plugin startup), and before any rebuildDerivedData, which
+   * strips `agent-map-id` from notes no map owns. Returns how many notes were adopted.
+   */
+  async adoptOrphanNodeNotes(
+    report: { skipped?: (path: string) => void; failed?: (mapPath: string, error: unknown) => void } = {}
+  ): Promise<number> {
+    const maps = await this.readableMaps();
+    const listed = new Set<string>(),
+      usedIds = new Set<string>();
+    for (const { map } of maps)
+      for (const node of map.nodes) {
+        listed.add(node.path);
+        usedIds.add(node.id);
+      }
+    const candidates: { path: string; id: string; mapId: string }[] = [];
+    for (const file of await this.markedFiles("agent-map-node")) {
+      if (listed.has(file.path)) continue;
+      const fm = frontmatter(await this.app.vault.cachedRead(file));
+      const mapId = text(fm["agent-map-id"]);
+      if (!mapId || text(fm["topic-state"], "active") !== "active") continue;
+      candidates.push({ path: file.path, id: text(fm["node-id"]), mapId });
+    }
+    // The original wins an id collision: a "name (1)", iCloud "name 2" or conflict copy sorts after the file it copies.
+    const copyLike = (path: string): boolean => /(?: \(\d+\)| \d+)\.md$|conflict[^/]*\.md$/i.test(path);
+    candidates.sort((a, b) => Number(copyLike(a.path)) - Number(copyLike(b.path)) || a.path.localeCompare(b.path));
+    let adopted = 0;
+    for (const { file, map } of maps) {
+      const root = this.topicRoot(file.path);
+      const own = candidates.filter(
+        item =>
+          item.mapId === map.id &&
+          item.path.startsWith(`${root}/`) &&
+          !item.path.startsWith(`${root}/Archive/`) &&
+          !item.path.startsWith(`${root}/Unassigned/`)
+      );
+      if (!own.length) continue;
+      let added = 0;
+      try {
+        await this.updateMap(file.path, current => {
+          added = 0;
+          const present = new Set(current.nodes.map(node => node.path));
+          const fresh = own.filter(
+            item => !present.has(item.path) && this.app.vault.getAbstractFileByPath(item.path) instanceof TFile
+          );
+          const top = current.nodes.reduce((max, node) => Math.max(max, node.y), -140) + 220;
+          let index = 0;
+          for (const item of fresh) {
+            // A real crash orphan has a node id nobody uses; a taken or missing id is a sync-conflict or hand-made copy.
+            if (!item.id || usedIds.has(item.id)) {
+              report.skipped?.(item.path);
+              continue;
+            }
+            usedIds.add(item.id);
+            current.nodes.push({
+              id: item.id,
+              path: item.path,
+              parentId: null,
+              x: 80 + Math.floor(index / 6) * 340,
+              y: top + (index % 6) * 220,
+              collapsed: false
+            });
+            index++;
+            added++;
+          }
+        });
+        adopted += added;
+      } catch (error) {
+        // One unwritable map must not keep the later maps from getting their orphans back.
+        report.failed?.(file.path, error);
+      }
+    }
+    return adopted;
+  }
+
   async topics(): Promise<TopicInfo[]> {
     const topics: TopicInfo[] = [];
     for (const { file, map } of await this.readableMaps()) {

@@ -255,6 +255,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     save: () => this.saveSettings()
   });
   ready: Promise<void> = Promise.resolve();
+  /** Settles once startup adoption of crash-orphaned card notes is done; a chat batch waits for it before staging cards. */
+  orphansAdopted: Promise<void> = Promise.resolve();
   /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
@@ -1420,13 +1422,35 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     this.repo = new Repository(this.app, this.settings, recovery);
     this.repo.onUnreadableMaps = failures => this.reportUnreadableMaps(failures);
+    // Takes back card notes whose Map.md write a crash cut off, before any rebuildDerivedData strips their map id and
+    // before a chat batch stages cards (the view awaits `orphansAdopted` first). `ready` does not wait for the layout:
+    // Obsidian sets layoutReady only after every visible VAM tab opened, and a tab's onOpen awaits `ready`. So a vault
+    // already migrated adopts on layout ready, when Obsidian has finished scanning the vault folder (a note added while VAM
+    // was closed is not in the file list before that). An unmigrated vault adopts at once, ahead of its migrate and rebuild,
+    // inside `ready`. A failure is logged by mutate, not fatal; views open meanwhile re-read the map through mutate.
+    const adopt = (): Promise<void> =>
+      this.mutate(async () => {
+        const adopted = await this.repo.adoptOrphanNodeNotes({
+          skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
+          failed: (mapPath, error) =>
+            this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
+        });
+        if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
+      }).catch(() => undefined);
+    // An unmigrated vault adopts once inside `ready` (ahead of its migrate rebuild) and again after the layout, which
+    // catches notes Obsidian had not scanned yet; adoption is idempotent. `orphansAdopted` is the last of these.
+    const firstAdopt = this.settings.migrated ? Promise.resolve() : adopt();
+    const layoutReady = new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve));
+    this.orphansAdopted = firstAdopt.then(() => layoutReady).then(adopt);
     const initialize = (
       this.settings.migrated
         ? Promise.resolve()
-        : this.repo.migrate().then(async () => {
-            await this.repo.rebuildDerivedData();
-            this.settings.migrated = true;
-          })
+        : firstAdopt
+            .then(() => this.repo.migrate())
+            .then(async () => {
+              await this.repo.rebuildDerivedData();
+              this.settings.migrated = true;
+            })
     ).then(async () => {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {

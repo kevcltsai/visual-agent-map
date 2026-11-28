@@ -464,6 +464,28 @@ test('B32: an outline reveal shows the same opened-for-now mark as search, and r
   assert.equal(labels().length, 0, 'folded back: label gone');
 });
 
+test('B32-x: Esc folds an outline reveal back, and a click on a card off the opened path does too', async () => {
+  const reveal = async h => { h.view.viewportEl.toggleClass = () => {}; h.doc.querySelector = () => null; const path = h.view.map.nodes.find(n => n.id === h.ids.deep).path; await h.view.revealPath(path); await h.settle(); };
+  const marked = h => h.card('branch')?.classes.has('is-temp-open');
+  const esc = h => { const e = { key: 'Escape', target: null, defaultPrevented: false, prevented: false, preventDefault() { this.prevented = true; }, stopPropagation() {} }; h.view.onMapKeydown(e); return e; };
+  const click = (h, key) => h.view.onCardClick({ target: { closest: () => null }, metaKey: false, ctrlKey: false }, h.card(key), h.view.map.nodes.find(n => n.id === h.ids[key]));
+  const h = await harness();
+  await reveal(h);
+  assert.ok(marked(h)); assert.equal(h.view.mapSearch, null);
+  assert.equal(esc(h).prevented, true);
+  await h.settle();
+  assert.equal(h.view.searchOpen, null, 'Esc folded it back');
+  assert.equal(h.card('deep'), undefined);
+  assert.equal(marked(h), false, 'mark gone');
+  const g = await harness();
+  await reveal(g);
+  click(g, 'deep'); await g.settle();
+  assert.ok(g.view.searchOpen, 'a click inside the opened branch keeps it');
+  click(g, 'alpha'); await g.settle();
+  assert.equal(g.view.searchOpen, null, 'a click elsewhere folded it back');
+  assert.equal(g.card('deep'), undefined);
+});
+
 test('B14: a hit that is already on screen jumps without repainting', async () => {
   const h = await harness({ collapse: false });
   h.press(h.card('alpha')); h.type('plan');

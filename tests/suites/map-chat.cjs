@@ -10562,6 +10562,42 @@ const makeLivingCard = async h => {
   await h.view.hydrate();
   return path;
 };
+// D1-x4: a rename is an AI write too, so a lock set while the reply ran refuses it at commit; a Living Node card's rename stays allowed.
+integrationTest('map chat: D1-x4 - a rename whose card got ai-locked after the gate is skipped, writes nothing and pushes no undo step', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.node('a').path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Locked rename' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the title on disk is unchanged');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed');
+});
+
+integrationTest('map chat: D1-x4 - a rename of an unlocked Living Node card still writes (the rename exemption)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const path = await makeLivingCard(h);
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Living renamed' }], {}, undefined, livingBaseline(h));
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal((await h.note('a')).title, 'Living renamed');
+  assert.match(h.contents.get(path), /Known output/);
+});
+
+integrationTest('map chat: D1-x4 - a normal rename writes and leaves one undo step', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Plain rename' }], {}, undefined, topicBaseline(h));
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal((await h.note('a')).title, 'Plain rename');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+
 integrationTest('map chat: configure_ai_card on an existing AI card applies when stamped; a genuine edit is "changed"; an outline-only card is "not shown"', async () => {
   const h = await harness(); await h.view.hydrate();
   const path = await makeLivingCard(h);

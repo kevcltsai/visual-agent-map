@@ -1457,7 +1457,12 @@ export class VisualAgentMapView extends ItemView {
         }
       ),
     noteChange: (node, patch) =>
-      this.noteChange(node, patch, undefined, patch.summary !== undefined || patch.detail !== undefined),
+      this.noteChange(
+        node,
+        patch,
+        undefined,
+        patch.summary !== undefined || patch.detail !== undefined ? true : "lock"
+      ),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
     chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
@@ -12667,8 +12672,8 @@ export class VisualAgentMapView extends ItemView {
     patch: NotePatch,
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry),
-    /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
-    rejectAiCard = false
+    /** Chat writes: the AI-card refusal (true, content) or only the AI lock ("lock", a rename) is checked on the bytes at the write, not on this view's cached note. */
+    rejectAiCard: boolean | "lock" = false
   ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
@@ -12685,7 +12690,13 @@ export class VisualAgentMapView extends ItemView {
     }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
     // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
-    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+    if (
+      (await this.plugin.repo.updateNoteGuarded(
+        node.path,
+        patch,
+        rejectAiCard === "lock" ? { rejectAiLock: true } : { rejectAiCard }
+      )) === "discarded"
+    )
       return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {

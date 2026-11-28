@@ -91,6 +91,9 @@ import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAG
 import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
 import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
 import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from "./map-focus";
+import { CrossMapSearch } from "./cross-map-search";
+import { renderCrossMapResults } from "./cross-map-results";
+import type { CorpusCard } from "./cross-map-corpus";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -514,6 +517,7 @@ import {
 } from "../../core/map-chat-basis";
 import {
   buildMapChatContext,
+  MAP_CHAT_OTHER_CARDS_LIMIT,
   type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
@@ -2114,6 +2118,8 @@ export class VisualAgentMapView extends ItemView {
     returnNodeId: string | null;
     returnEl: HTMLElement | null;
     cancelAnnouncement: (() => void) | null;
+    /** The scope switch and the cross-map snapshot (P4.2); "This map" until the user presses "All maps". */
+    cross?: CrossMapSearch;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
@@ -2691,6 +2697,16 @@ export class VisualAgentMapView extends ItemView {
     this.applySearchMarks();
     this.focusMapSearch();
   }
+  /** The scope switch of an open search, made when first needed (it reads nothing until "All maps" is pressed). */
+  private crossOf(search: { cross?: CrossMapSearch }): CrossMapSearch {
+    const made: CrossMapSearch = (search.cross ??= new CrossMapSearch(
+      () => this.plugin.repo.knowledgeRefIO(),
+      () => {
+        if (!this.closed && this.mapSearch?.cross === made) this.applySearchMarks();
+      }
+    ));
+    return made;
+  }
   private mountMapSearch(): void {
     const search = this.mapSearch;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -2699,6 +2715,19 @@ export class VisualAgentMapView extends ItemView {
     const bar = buildMapSearchBar(overlay, {
       query: search.query,
       label: t("ui.map_search_label"),
+      scope: {
+        value: this.crossOf(search).scope,
+        groupLabel: t("ui.map_search_scope_label"),
+        mapLabel: t("ui.map_search_scope_map"),
+        allLabel: t("ui.map_search_scope_all")
+      },
+      onScope: scope => {
+        if (!live()) return;
+        search.currentId = null;
+        this.crossOf(search).setScope(scope);
+        this.mapSearchBar?.setScope(scope);
+        this.applySearchMarks();
+      },
       closeLabel: t("ui.map_search_close"),
       countText: this.mapSearchCountText(),
       onInput: value => {
@@ -2789,6 +2818,11 @@ export class VisualAgentMapView extends ItemView {
   private mapSearchCountText(): string {
     const search = this.mapSearch;
     if (!search || search.query === "") return "";
+    if (this.crossOf(search).scope === "all") {
+      if (this.crossOf(search).state !== "ready") return "";
+      const total = this.crossOf(search).hits(search.query).total;
+      return total ? t("ui.map_search_count_0", total) : t("ui.map_search_none");
+    }
     const matches = this.mapSearchResult()?.matches ?? [];
     if (!matches.length) return t("ui.map_search_none");
     const at = search.currentId === null ? -1 : matches.indexOf(search.currentId);
@@ -2797,7 +2831,10 @@ export class VisualAgentMapView extends ItemView {
   /** Marks the matching cards (the current one stronger) and refreshes the visible count. Never touches how a card is built. */
   private applySearchMarks(): void {
     const search = this.mapSearch;
-    const matches = new Set(search ? (this.mapSearchResult()?.matches ?? []) : []);
+    // The canvas marks belong to "This map"; the other scope lists its hits in the box instead.
+    const matches = new Set(
+      search && this.crossOf(search).scope === "map" ? (this.mapSearchResult()?.matches ?? []) : []
+    );
     this.clearSearchBadges();
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
@@ -2808,6 +2845,123 @@ export class VisualAgentMapView extends ItemView {
         this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));
     }
     this.mapSearchBar?.setCount(this.mapSearchCountText());
+    this.renderCrossResults();
+  }
+  /** The cross-map hits under the search field: the snapshot filtered by the query now. Empty while the scope is this map. */
+  private renderCrossResults(): void {
+    const search = this.mapSearch;
+    const host = this.mapSearchBar?.results;
+    if (!search || !host || !this.map) return;
+    renderCrossMapResults(
+      host,
+      {
+        state: this.crossOf(search).state,
+        query: search.query,
+        hits: this.crossOf(search).hits(search.query),
+        currentMapId: this.map.id
+      },
+      {
+        loading: t("ui.map_search_all_loading"),
+        failed: t("ui.map_search_all_failed"),
+        none: t("ui.map_search_none"),
+        more: (shown, total) => t("ui.map_search_all_more_0_1", shown, total),
+        locate: t("ui.map_search_locate"),
+        cite: t("ui.map_search_cite"),
+        toChat: t("ui.map_search_to_chat")
+      },
+      {
+        locate: card => void this.locateCrossMapCard(card),
+        cite: card => this.citeCrossMapCard(card),
+        toChat: card => this.addCrossMapCardToChat(card)
+      }
+    );
+  }
+  /**
+   * Locate: the card of this map, or of another one, shown with the camera only (no layout, no collapse, no Map.md write). Another
+   * map follows switchToMap: a tab that has it open shows it; while this tab has running work it opens in a new tab; else this tab.
+   */
+  async locateCrossMapCard(card: CorpusCard): Promise<void> {
+    const here = this.map;
+    if (!here || this.closed) return;
+    try {
+      let target: VisualAgentMapView | null | "this" = null;
+      if (card.mapId === here.id) target = "this";
+      else {
+        const open = this.plugin.findMapLeaf(card.mapPath);
+        if (open) {
+          await this.plugin.showLeaf(open);
+          target = open.view instanceof VisualAgentMapView ? open.view : null;
+        } else if (this.hasRunningWork()) target = await this.plugin.openMapInNewTab(card.mapPath);
+        else {
+          await this.plugin.mutate(() => this.openMapInMutation(card.mapPath));
+          target = !this.closed && this.path === card.mapPath ? "this" : null;
+        }
+      }
+      if (!target || !(await (target === "this" ? this : target).revealPath(card.notePath)))
+        new Notice(t("ui.map_search_locate_failed"));
+    } catch (error) {
+      errorNotice(error);
+    }
+  }
+  /** Cite: a read-only reference to the card under the selected card (the root when none is selected), through the one addKnowledgeRef entry. */
+  citeCrossMapCard(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId">): void {
+    const map = this.map;
+    if (!map) return;
+    const selected = this.selection.state.selected;
+    const parentId =
+      (selected && map.nodes.some(node => node.id === selected) ? selected : undefined) ??
+      map.nodes.find(node => node.parentId === null)?.id;
+    if (!parentId) {
+      new Notice(t("ui.knowledge_ref_need_card"));
+      return;
+    }
+    const target = { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath };
+    this.enqueue(() => this.addKnowledgeRef(target, parentId));
+  }
+  /** Cards of other maps the user added to the next chat message: only the identity is kept; the text is read again when it is sent. */
+  private chatOtherCards = new Map<string, { mapId: string; nodeId: string; mapPath: string }>();
+  addCrossMapCardToChat(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId" | "title">): void {
+    const key = `${card.mapId}\u0000${card.nodeId}`;
+    if (this.chatOtherCards.has(key)) {
+      new Notice(t("ui.map_search_chat_already"));
+      return;
+    }
+    if (this.chatOtherCards.size >= MAP_CHAT_OTHER_CARDS_LIMIT) {
+      new Notice(t("ui.map_search_chat_full_0", MAP_CHAT_OTHER_CARDS_LIMIT));
+      return;
+    }
+    this.chatOtherCards.set(key, { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath });
+    new Notice(t("ui.map_search_chat_added_0", card.title));
+  }
+  /** The waiting cards for this message, read again now under the reference rules (a card that is gone, archived or unreadable is dropped), then forgotten. */
+  async takeOtherMapCards(): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
+    const picked = [...this.chatOtherCards.values()];
+    this.chatOtherCards.clear();
+    if (!picked.length) return [];
+    const found = await resolveKnowledgeRefs(
+      picked.map((card, index) => ({
+        id: String(index),
+        mapId: card.mapId,
+        nodeId: card.nodeId,
+        pathHint: card.mapPath
+      })),
+      this.plugin.repo.knowledgeRefIO(),
+      { withBody: true }
+    );
+    return picked.flatMap((_, index) => {
+      const card = found.get(String(index));
+      return card?.ok
+        ? [
+            {
+              mapTitle: card.mapTitle,
+              title: card.title,
+              summary: card.summary ?? "",
+              detail: card.detail ?? "",
+              notePath: card.notePath
+            }
+          ]
+        : [];
+    });
   }
   /** The small "opened for search" labels; kept outside renderNode and removed whenever the marks are redone or the search ends. */
   private searchBadges: HTMLElement[] = [];
@@ -2816,7 +2970,11 @@ export class VisualAgentMapView extends ItemView {
     this.searchBadges = [];
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
-  private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
+  private announceSearchLater(search: {
+    query: string;
+    cancelAnnouncement: (() => void) | null;
+    cross?: CrossMapSearch;
+  }): void {
     search.cancelAnnouncement?.();
     const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
     const cancel = (): void => {
@@ -2828,7 +2986,10 @@ export class VisualAgentMapView extends ItemView {
       if (search.cancelAnnouncement !== cancel) return;
       search.cancelAnnouncement = null;
       if (this.closed || this.mapSearch !== search || search.query === "") return;
-      const total = this.mapSearchResult()?.matches.length ?? 0;
+      const total =
+        this.crossOf(search).scope === "all"
+          ? this.crossOf(search).hits(search.query).total
+          : (this.mapSearchResult()?.matches.length ?? 0);
       this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
     }, 300);
     search.cancelAnnouncement = cancel;
@@ -2838,6 +2999,7 @@ export class VisualAgentMapView extends ItemView {
     const search = this.mapSearch;
     if (!search || !this.map || this.closed) return;
     search.cancelAnnouncement?.();
+    if (this.crossOf(search).scope === "all") return; // the hits of every map are rows with a Locate button, not steps
     const query = search.query;
     const result = this.mapSearchResult();
     const step = result ? stepSearch(result, search.currentId, delta) : null;
@@ -2899,6 +3061,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     search.cancelAnnouncement?.();
+    search.cross?.dispose();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
@@ -23164,6 +23327,7 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
+    const otherMapCards = await this.takeOtherMapCards();
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();
@@ -23205,6 +23369,7 @@ export class VisualAgentMapView extends ItemView {
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
       ...(mapSources ? { mapSources } : {}),
+      ...(otherMapCards.length ? { otherMapCards } : {}),
       ...(bookPlan ? { bookPlan } : {}),
       ...(continuation ? { continuation } : {})
     });
@@ -23513,6 +23678,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatAutoApply = false;
     this.chatResearched.clear();
     this.chatResearchSent.clear();
+    this.chatOtherCards.clear();
     this.chatStartedResearch = false;
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;

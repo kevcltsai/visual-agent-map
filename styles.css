@@ -1707,6 +1707,20 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-map-search-count { flex: none; min-width: 3ch; color: var(--text-muted); font-size: var(--font-ui-small); white-space: nowrap; }
 .vam-view .vam-map-search-close { flex: none; padding: 0 8px; background: transparent; box-shadow: none; }
 .vam-view .vam-map-search-close:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search { flex-wrap: wrap; }
+.vam-view .vam-map-search-scope { display: flex; flex: none; gap: 2px; }
+.vam-view .vam-map-search-scope-btn { padding: 0 8px; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-scope-btn.is-on { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-view .vam-map-search-scope-btn:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search-results { display: none; flex: 1 0 100%; max-height: 40vh; overflow-y: auto; }
+.vam-view .vam-map-search-results.is-open { display: block; }
+.vam-view .vam-map-search-results-note { padding: 4px 2px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px; border-top: 1px solid var(--background-modifier-border); }
+.vam-view .vam-map-search-result-label { display: flex; flex-direction: column; min-width: 0; }
+.vam-view .vam-map-search-result-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-view .vam-map-search-result-map { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-search-result-actions { display: flex; flex: none; gap: 4px; }
+.vam-view .vam-map-search-result-actions button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-view .vam-node.is-search-match { outline: 2px dashed var(--interactive-accent); outline-offset: 2px; }
 .vam-view .vam-node.is-search-current { outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
 /* A branch the search opened only for itself: dotted, so it reads as temporary. */

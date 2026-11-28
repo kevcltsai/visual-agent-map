@@ -3894,6 +3894,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // A diff alone is the whole card; one next to other actions still says them (summary, danger mark, details) like any plan.
     const diffOnly = !!diff && !plan.groups?.length;
     if (!diffOnly) this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
+    // Why nothing was written is said on the folded card too, not only behind "View details".
+    const notAsked = this.notRequestedLine(plan);
+    if (notAsked && !diffOnly) card.createDiv({ cls: "vam-map-chat-plan-not-requested", text: notAsked });
     // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts. Always
     // shown (never behind "View details") and only for a plan that does start AI work.
     if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
@@ -4075,13 +4078,24 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     for (const card of rest) one(more, card);
   }
   /** The plan's one sentence: its own summary, or the reasons (a waiting plan says it needs the user's yes). */
-  private planSentence(plan: MapChatPlanCard): string {
+  private planSentence(plan: MapChatPlanCard, skip?: string): string {
+    const reasons = skip ? plan.reasons.filter(reason => reason !== skip) : plan.reasons;
+    if (skip && !reasons.length) return "";
     return (
       plan.summary ??
       (plan.state === "pending"
-        ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
-        : plan.reasons.join(t("ui.map_chat_count_separator")))
+        ? t("ui.map_chat_plan_summary_0", reasons.join(t("ui.map_chat_count_separator")))
+        : reasons.join(t("ui.map_chat_count_separator")))
     );
+  }
+  /**
+   * The "you did not ask for changes" reason, when the folded summary (group labels) would not say it: the summary row shows it
+   * itself, so the detail does not repeat it. Empty when the summary already carries the reasons or the plan has its own summary.
+   */
+  private notRequestedLine(plan: MapChatPlanCard): string {
+    const text = t("ui.map_chat_plan_reason_not_requested");
+    const labelled = (plan.groups ?? []).some(group => group.label);
+    return plan.state === "pending" && !plan.summary && labelled && plan.reasons.includes(text) ? text : "";
   }
   /** One line for a plan: its group labels (the group that removes cards says so in words); the sentence when none has a label. */
   private buildPlanSummary(parent: HTMLElement, plan: MapChatPlanCard): void {
@@ -4103,11 +4117,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** Title, sentence, the actions folded by kind of work, and the estimate. */
   private buildPlanBody(card: HTMLElement, plan: MapChatPlanCard, title: string): void {
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
-    card.createDiv({
-      cls: "vam-map-chat-plan-sentence",
-      // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
-      text: this.planSentence(plan)
-    });
+    // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
+    const sentence = this.planSentence(plan, this.notRequestedLine(plan));
+    if (sentence) card.createDiv({ cls: "vam-map-chat-plan-sentence", text: sentence });
     const groups = plan.groups ?? (plan.items.length ? [{ label: "", items: plan.items }] : []);
     for (const group of groups) {
       const danger = "danger" in group ? group.danger : undefined;

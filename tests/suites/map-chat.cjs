@@ -2656,6 +2656,17 @@ integrationTest('E4a question only: a reply with a write and changeRequested fal
     assert.notEqual(vaultState(h), before, 'Apply writes it');
   }
 });
+// E4a-x: the label that says why nothing was written must be readable while the plan is folded (not only behind View details).
+const textOutsideDetail = el => hasClass(el, 'vam-map-chat-plan-detail') ? '' : (el.text ?? '') + el.children.map(textOutsideDetail).join('');
+integrationTest('E4a-x question only: "You did not ask for changes" is shown on the folded plan card (outside the View details block) and only once when opened', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => ({ reply: 'These two may contradict each other.', actions: [contradiction(h)], rejected: [], remaining: '', changeRequested: false });
+  h.type('do these two contradict?'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending');
+  assert.match(textOutsideDetail(planCard(h)[0]), new RegExp(NOT_ASKED), 'visible while folded');
+  openDetails(h.view.chat.logEl);
+  assert.equal(visibleText(planCard(h)[0]).split(NOT_ASKED).length - 1, 1, 'once in total when opened');
+});
 integrationTest('E4a question only: select and focus go on at once; the same reply asked for (changeRequested true) is written at once as before', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
   h.control.reply = async () => say('Here it is.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }, { kind: 'focus_topic', nodeId: h.ids.a }], '', false);

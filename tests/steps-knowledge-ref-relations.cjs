@@ -1,6 +1,6 @@
 // P4.4 (F07b): a relation to a card of ANOTHER map needs a read-only knowledge reference in this map first.
 // Red until implemented: sanitizer accepts an end that is a reference id of this map; chat add_relation refuses a card of
-// another map (asks the user to reference it first) and accepts a reference id; removing a reference removes its relations;
+// another map (unknown_node: the model is never given such ids; the user references it first) and accepts a reference id; removing a reference removes its relations;
 // Reference Links and the share file never carry a relation to a reference.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -71,10 +71,10 @@ const context = (extra = {}) => ({ nodeIds: ['r', 'c', 'd'], parents: { r: null,
 const reply = (...actions) => JSON.stringify({ reply: 'ok', actions });
 const addRel = (fromId, toId, relationKind = 'supports') => ({ kind: 'add_relation', fromId, toId, relationKind, description: '' });
 
-test('P4.4 chat: add_relation to a card of another map is refused with a "reference it first" code, nothing is planned', () => {
-  const result = plain(parseMapChat(reply(addRel('c', 'other-card')), context({ otherMapIds: ['other-card'], refIds: [] })));
+test('P4.4 chat: add_relation to a card of another map (an id the context never offered) is refused as unknown_node, nothing is planned', () => {
+  const result = plain(parseMapChat(reply(addRel('c', 'other-card')), context({ refIds: [] })));
   assert.deepEqual(result.actions, []);
-  assert.deepEqual(result.rejected, [{ index: 0, code: 'needs_reference' }]);
+  assert.deepEqual(result.rejected, [{ index: 0, code: 'unknown_node' }]);
 });
 
 test('P4.4 chat: add_relation to a reference id of this map is planned as written', () => {

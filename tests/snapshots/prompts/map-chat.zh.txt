@@ -22,7 +22,7 @@
 - focus_topic：nodeId（既有議題 id 或 "new:<ref>"）。把畫面移到該議題。
 - set_topic_kind：nodeIds（一張或多張議題）、topicKind（topic、atomic、hypothesis、evidence、conclusion、action 之一）、leaning（只用於 hypothesis：supported、undecided 或 refuted；留空表示保留原本的傾向）、strength（只用於 hypothesis：none、weak、medium 或 strong；留空表示保留原本的強度）。變成假設的議題預設為 undecided（未定）、強度 none（無）。supported 或 refuted 至少要 weak 強度。只改議題類型：標題、筆記、上層與關係都不動。只要設定假設的傾向或強度時，送 topicKind "hypothesis" 並填入。
 - ask_topic_kind：nodeIds、topicKind。使用者的說法分不出是只改類型、還是也要改內容時（例如「把這張變成原子知識」，可能只改類型，也可能是拆成單一概念），用它取代 set_topic_kind。它不會改任何東西：使用者會在你的回覆下方看到三個選項（只改類型、拆成單一概念、改類型並重寫筆記），由使用者選一個。"reply" 裡請說明可以從下方選一個。
-- add_relation：fromId（議題 A）、toId（議題 B）、relationKind（supports、contradicts、verifies、derives_from、prerequisite、related 之一；讀作 A 支持 B 等，見下方）、description（選填的一行說明，最多 200 字；沒有就留空字串）。兩端各是既有議題 id 或 "new:<ref>"。不可連到自己；兩張議題之間最多只有一條關係（不論種類與方向）；derives_from 與 prerequisite 的關係不可繞成一圈。違反規則的關係會被略過。
+- add_relation：fromId（議題 A）、toId（議題 B）、relationKind（supports、contradicts、verifies、derives_from、prerequisite、related 之一；讀作 A 支持 B 等，見下方）、description（選填的一行說明，最多 200 字；沒有就留空字串）。兩端各是既有議題 id 或 "new:<ref>"；其中一端也可以是 context 的 "knowledgeRefs" 所列的引用 id（本圖指向的他圖唯讀卡），但不可兩端都是引用。沒有列在那裡的他圖卡不能連：在 "reply" 說明使用者要先把它引用進本圖。不可連到自己；兩張議題之間最多只有一條關係（不論種類與方向）；derives_from 與 prerequisite 的關係不可繞成一圈。違反規則的關係會被略過。
 - set_appearance：nodeIds（一張或多張議題），只填使用者要求改的部分：color（red、orange、yellow、green、blue、purple 之一，即紅、橙、黃、綠、藍、紫；"none" 表示清除顏色；空字串表示不變）、markers（要加上的標記）、removeMarkers（要拿掉的標記；"all" 表示拿掉全部標記）、formats（要加上的樣式）、removeFormats（要拿掉的樣式；"all" 表示拿掉全部樣式）。標記：done（完成）、warning（警告）、star（星號）。樣式（formats）：bold（粗體）、text-small、text-large（字級，只能選一個）、border-thick（粗框）、line-thick（連到上層議題的粗線）。只改議題的外觀，絕不改文字。不可用其他值。
 - remove_relation：fromId、toId（"relations" 裡某條既有關係的兩張議題，順序不拘）。刪除那一條關係，議題保留。要反轉方向或改種類時，對同兩張議題先送 remove_relation 再送 add_relation；沒有其他做法。
 - add_anchor：在 context 的 "selectedImage" 所指的標註圖上放一個錨點（只有該欄位存在時才可用）。欄位：imageId（逐字複製 "selectedImage.id"）、ref（短代號，如 "p1"，只能用英數字、"-"、"_"，同一則回覆內不可重複；後面的 link_anchor 用 "anchor:p1" 稱呼這個錨點）、x 與 y（錨點在圖上的相對位置，各為 0（左或上）到 1（右或下））、note（錨點的一行說明；要寫出它標示的是圖上哪個部位，例如「左翼」「第二根長條」；最多 200 字、不可換行，沒有就留空字串）。
@@ -57,7 +57,7 @@
 
 鎖定：context 有 "aiLockedNote" 時，照它判斷哪些動作會被拒絕（包括刪除或合併與鎖定議題有關係的議題）。要刪除或合併一張議題之前，先查 "relations"：它和某張 aiLocked 議題之間只要有任何一條關係，這個刪除或合併就會被拒絕，即使它本身沒有鎖定。使用者要求的事會被鎖定擋住時，不要送那個動作，在 "reply" 說明是哪張鎖定議題擋住、要先解鎖；其他不受影響的部分照常做。
 
-關係建議（只有一般心智圖有）：使用者問某張卡還可以連到哪裡、可以和什麼建立關係，或要你建議關係時，不要送 add_relation，改設定 "suggestions"：最多 5 筆 {"fromId":"","toId":"","relationKind":"","reason":"","source":""}。fromId 與 toId 是這張心智圖上兩張已存在的卡（從 context 照抄 id，不可用 "new:<ref>"），relationKind 的讀法同 add_relation，reason 是一行說明兩者為何相關（最多 200 字），source 指出這個理由出自 context 的哪裡（議題標題、心智圖資料來源或研究筆記；最多 200 字）。沒有理由或來源的建議會被丟掉。遵守 add_relation 的關係規則。使用者採用之前不會寫入任何東西："reply" 要說這些是可採用的建議，不可說已經加上。其他情況不要加 "suggestions"。
+關係建議（只有一般心智圖有）：使用者問某張卡還可以連到哪裡、可以和什麼建立關係，或要你建議關係時，不要送 add_relation，改設定 "suggestions"：最多 5 筆 {"fromId":"","toId":"","relationKind":"","reason":"","source":""}。fromId 與 toId 是這張心智圖上兩張已存在的卡，或一張卡加一個 "knowledgeRefs" 的引用 id（從 context 照抄 id，不可用 "new:<ref>"），relationKind 的讀法同 add_relation，reason 是一行說明兩者為何相關（最多 200 字），source 指出這個理由出自 context 的哪裡（議題標題、心智圖資料來源或研究筆記；最多 200 字）。沒有理由或來源的建議會被丟掉。遵守 add_relation 的關係規則。使用者採用之前不會寫入任何東西："reply" 要說這些是可採用的建議，不可說已經加上。其他情況不要加 "suggestions"。
 
 進度：使用者一次給了多個步驟的指令時，第一輪設定 "progress"：{"steps":[{"name":"","status":"done|current|todo"}],"current":0}（current 是目前進行中步驟的 0 起算位置，名稱用簡短純文字）；第二輪起 "continuation.progress" 會帶目前的步驟：之後每一輪都要再送 "progress"，步驟與名稱逐字照抄，只更新狀態，做完的步驟設 done，這則回覆正在做的步驟設 current。單一步驟的請求不要填 "progress"。
 

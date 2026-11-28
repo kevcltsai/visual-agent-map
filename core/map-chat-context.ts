@@ -281,6 +281,8 @@ export interface MapChatContextInput {
   summaries?: MapChatSummary[];
   /** The map's relations between cards; a relation with an end not in the outline is left out. Omitted or empty sends none. */
   relations?: MapChatRelation[];
+  /** The map's own knowledge references (V3.3 P4.4): id, and the title only when already resolved. A relation may end at one. Omitted or empty sends none. */
+  knowledgeRefs?: { id: string; title?: string }[];
   /** An AIM map: it has no topic types, strengths or relations, so none of them is sent even when given. */
   aim?: boolean;
   activeFile?: MapChatFile | null;
@@ -367,6 +369,8 @@ export interface MapChatContext {
   parents: Record<string, string | null>;
   /** The relations sent (none on an AIM map), for the parser's checks of a relation the reply adds or removes. */
   relations?: MapChatRelation[];
+  /** Ids of the knowledge references sent (none on an AIM map): a relation may end at one of them. */
+  refIds?: string[];
   /** The selected image the reply may act on (absent when none was selected), for the parser's anchor checks. */
   selectedImage?: MapChatImageScope;
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
@@ -763,11 +767,18 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     0,
     MAP_CHAT_MAP_TITLE_LIMIT
   );
-  // Only relations whose two ends are cards in the outline; the description is sent whole (it is one line of at most 200).
+  const knowledgeRefs = input.aim
+    ? []
+    : (input.knowledgeRefs ?? []).map(ref => ({
+        id: ref.id,
+        ...(ref.title ? { title: clip(ref.title, TITLE_LIMIT) } : {})
+      }));
+  const refSent = new Set(knowledgeRefs.map(ref => ref.id));
+  // Only relations whose two ends are cards in the outline (or a knowledge reference of this map); the description is sent whole (it is one line of at most 200).
   const relations = input.aim
     ? []
     : (input.relations ?? [])
-        .filter(link => byId.has(link.from) && byId.has(link.to))
+        .filter(link => (byId.has(link.from) || refSent.has(link.from)) && (byId.has(link.to) || refSent.has(link.to)))
         .map(link => ({
           kind: link.kind,
           from: link.from,
@@ -883,6 +894,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
         }
       : {}),
     ...(relations.length ? { relations } : {}),
+    ...(knowledgeRefs.length ? { knowledgeRefs } : {}),
     selected: selectedOut,
     references: referencesOut,
     snippets,
@@ -957,6 +969,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     sourcePaths: [...input.files.map(file => file.path), ...(input.activeFile ? [input.activeFile.path] : [])],
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     relations: relations.map(link => ({ kind: link.kind, from: link.from, to: link.to })),
+    ...(knowledgeRefs.length ? { refIds: knowledgeRefs.map(ref => ref.id) } : {}),
     ...(image ? { selectedImage: image.scope } : {}),
     mdHashes: hashes,
     topicHashes,

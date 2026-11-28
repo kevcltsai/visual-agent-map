@@ -252,7 +252,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { collapseForEditorRoom, type SideDock } from "./living-editor-room";
+import { collapseForEditorRoom, restoreEditorRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -1747,6 +1747,8 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController;
     viewSession: string;
     adoption?: LivingAdoptionCheck;
+    /** Side panels this editor folded to make room; opened again when it closes. */
+    folded: Set<SideDock>;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -17010,7 +17012,8 @@ export class VisualAgentMapView extends ItemView {
       win,
       trial,
       controller,
-      viewSession
+      viewSession,
+      folded: new Set()
     };
     win.mount(overlay);
     this.makeRoomForAiCard();
@@ -17032,6 +17035,7 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
+    restoreEditorRoom(open.folded);
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
@@ -17179,7 +17183,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.aiCardOpen) return;
     const width = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay")?.clientWidth ?? 0;
     const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
-    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit]);
+    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit], this.aiCardOpen.folded);
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {

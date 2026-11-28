@@ -10695,6 +10695,8 @@ export class VisualAgentMapView extends ItemView {
     if (!viewport) return;
     // V3.3 G04-y: the right-click is bound in every state, or the image menu (rows greyed with a reason) never opens while
     // several topics are picked or the notes load. Without edit rights only the image's own menu answers; the rest stays shut.
+    // Safe only while openImageMenu greys its writing rows in every state where canEditCanvasItems() is false: a new
+    // condition there must also set the image menu's `off` reason.
     viewport.addEventListener("contextmenu", event => {
       if (this.canEditCanvasItems() || (event.target as Element | null)?.closest?.(".vam-canvas-image"))
         this.onCanvasContextMenu(event);

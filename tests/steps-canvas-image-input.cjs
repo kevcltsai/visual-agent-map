@@ -227,7 +227,7 @@ test('dragover accepts only files on a map that can be edited', async () => {
   assert.equal(text.defaultPrevented, false, 'plain text is not ours');
 });
 
-test('D11: topic selection mode registers no entry; a normal map registers all of them', async () => {
+test('D11: topic selection mode registers only the right-click (greyed image menu), no drag, drop or paste entry; a normal map registers all of them', async () => {
   for (const [name, options] of [['integration', { integration: true }]]) {
     const h = await harness(options);
     h.view.setupCanvasImageInput();

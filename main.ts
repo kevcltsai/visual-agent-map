@@ -6,6 +6,7 @@ import { markPictureParagraphs } from "./experiences/markdown-context/picture-pa
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
+import { KnowledgeIndex } from "./experiences/visual-map/knowledge-retrieval";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
@@ -245,6 +246,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   mermaidZoom: MermaidZoomHandle | null = null;
   settings: Settings = { ...DEFAULT_SETTINGS };
   repo!: Repository;
+  /** Past cards a chat message can find (P4.1), in memory only; any vault change drops it. */
+  readonly knowledgeIndex = new KnowledgeIndex(() => this.repo.knowledgeRefIO());
   /** Reads the note style files once per run and resolves a topic's style; writes files only on a user action. */
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
@@ -1786,7 +1789,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       );
     }
   }
+  private dropKnowledgeIndex(file: unknown, oldPath?: string): void {
+    if (file instanceof TFile)
+      this.knowledgeIndex.changed(oldPath ? [file.path, oldPath] : [file.path], this.isMap(file));
+  }
   registerVaultEvents(): void {
+    // Only a map file or a card's note (a rename also reports the old path) can change which cards exist or are authorised: the next
+    // message reads them again. Any other note leaves the index alone.
+    this.registerEvent(this.app.vault.on("modify", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("create", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("delete", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.dropKnowledgeIndex(file, oldPath)));
     this.registerEvent(
       this.app.vault.on("modify", file => {
         if (file instanceof TFile) this.collectUnsynced(file.path);

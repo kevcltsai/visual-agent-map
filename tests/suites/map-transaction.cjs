@@ -30,19 +30,19 @@ async function harness() {
   const spy = Object.create(repo);
   for (const name of ['moveUnique', 'moveExact', 'setLifecycle', 'saveMap']) {
     let n = 0;
-    spy[name] = async (...args) => {
+    spy[name] = async function (...args) {
       n++;
       calls.push(name);
       if (fail[name]?.(n, args)) throw new Error(`injected ${name} ${n}`);
-      return repo[name](...args);
+      return repo[name].apply(this, args);
     };
   }
   const deps = {
     repo: spy,
-    rebuildDerivedData: async () => {
+    rebuildDerivedData: async scope => {
       counts.rebuild++;
       if (fail.rebuild?.(counts.rebuild)) throw new Error(`injected rebuild ${counts.rebuild}`);
-      return repo.rebuildDerivedData();
+      return (scope ?? repo).rebuildDerivedData();
     },
     onApplied: (mapPath, map) => { counts.applied.push([mapPath, map.nodes.map(n => n.path)]); },
     checkConflict: async mapPath => { if (fail.conflict) throw new Error(`conflict ${mapPath}`); }
@@ -644,7 +644,7 @@ integrationTest('map transaction: undoing a saved configuration after a Living r
     const path = h.notes[0], file = h.app.vault.getAbstractFileByPath(path);
     const original = h.contents.get(path);
     const entry = await begin(h.deps)
-      .rewriteNote(path, async p => { await h.repo.updateNoteRawGuarded(p, text => text + '\nSAVED-CONFIG\n'); })
+      .rewriteNote(path, async (p, _attachment, scoped) => { await scoped.updateNoteRawGuarded(p, text => text + '\nSAVED-CONFIG\n'); })
       .editMap(MAP, map => { map.title = 'Config step'; }).commit();
     const configured = h.contents.get(path);
     const ran = livingRestoreSnapshot(configured, configured + 'RUN-RESULT\n');

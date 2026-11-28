@@ -392,7 +392,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    repo, settings, running: new Set(), views: () => ctx.otherViews ?? [], logs: { appendLog() {} }, rebuildDerivedData: (_scope, scoped) => (scoped ?? repo).rebuildDerivedData(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false, activeTasks: new Map(), quickExpandPending: new Set(), recordFailure: error => String(error?.message ?? error),
     // Like the real mutate: a promise queue that is not re-entrant. A call made from inside a running write waits for it, forever.
     mutate(work) {

@@ -5085,7 +5085,7 @@ test('P2a a stop before the global result is used writes nothing of the structur
 
 test('P2a a failed transaction (rollback ok): map and notes as before, the run goes on with the old structure, the failure is logged', async () => {
   let throws = 1;
-  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const wrap = repo => { const proxy = new Proxy(repo, { get: (t, k, rcv) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(rcv === proxy && k !== 'withNoteWriteGuard' ? t : rcv) : t[k] }); return proxy; };
   const { r, requests } = await structureRig(SOP, { wrap });
   const order = await idsNow(r);
   const raws = r.nodes.map((n, i) => r.raw(i));
@@ -5107,7 +5107,7 @@ test('P2a a failed transaction (rollback ok): map and notes as before, the run g
 
 test('P2a a failed rollback stops the run as failed (structure_rollback)', async () => {
   let saves = 0;
-  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (saves++ > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const wrap = repo => { const proxy = new Proxy(repo, { get: (t, k, rcv) => k === 'saveMap' ? (...a) => { if (saves++ > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(rcv === proxy && k !== 'withNoteWriteGuard' ? t : rcv) : t[k] }); return proxy; };
   const { r } = await structureRig(SOP, { wrap, rebuild: async () => { throw new Error('rebuild'); } });
   await r.runs.start(r.mapPath);
   const s = await r.state();
@@ -5355,7 +5355,7 @@ test('P2b materials homed on a merged card are pointed back at it by the undo', 
 
 test('P2b a failed apply (rollback ok) writes the materials homes back to the cards as they were', async () => {
   let throws = 1;
-  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const wrap = repo => { const proxy = new Proxy(repo, { get: (t, k, rcv) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(rcv === proxy && k !== 'withNoteWriteGuard' ? t : rcv) : t[k] }); return proxy; };
   const holder = {};
   const { r } = await structureRig(SOP, { wrap, script: { global: request => HOME_GLOBAL(holder)(request) } });
   holder.r = r;

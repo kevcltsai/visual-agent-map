@@ -13374,7 +13374,7 @@ export class VisualAgentMapView extends ItemView {
     )
       this.plugin.topicRuns.stopTask(node.path);
     sink({
-      undo: async () => {
+      undo: async (scope?: Repository) => {
         let restore = before;
         if (written) {
           // The preview is put back only while it is still exactly what this change wrote; a later edit of it stays.
@@ -13386,9 +13386,9 @@ export class VisualAgentMapView extends ItemView {
             delete restore.previewAutoHash;
           }
         }
-        await this.plugin.repo.updateNote(node.path, restore);
+        await (scope ?? this.plugin.repo).updateNote(node.path, restore);
       },
-      redo: () => this.plugin.repo.updateNote(node.path, patch)
+      redo: (scope?: Repository) => (scope ?? this.plugin.repo).updateNote(node.path, patch)
     });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
     this.render();

@@ -17,7 +17,7 @@ async function harness() {
   };
   await add('root'); await add('f1', 'root'); await add('f2', 'root'); await add('x', 'root'); await add('y', 'root');
   let queue = Promise.resolve();
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate(work) { queue = queue.then(work); return queue; }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map(), currentModelChoice() { return { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }; } };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: (_scope, scoped) => (scoped ?? repo).rebuildDerivedData(), mutate(work) { queue = queue.then(work); return queue; }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map(), currentModelChoice() { return { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }; } };
   const notices = [];
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices) } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, plugin);

@@ -56,7 +56,7 @@ function world(options = {}) {
         editMap(path, change) { transaction.edits.push(path); change(map); return transaction; },
         async commit(commitOptions) {
           transaction.commits.push(commitOptions);
-          for (const [path, change] of transaction.rewrites) await change(path);
+          for (const [path, change] of transaction.rewrites) await change(path, undefined, plugin.repo);
           return { undo: async () => {}, redo: async () => {}, label: commitOptions.label };
         }
       };

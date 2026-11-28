@@ -265,7 +265,7 @@ async function harness(spec, extra = {}) {
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
   let pending = Promise.resolve();
   const plugin = support.withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: (_scope, scoped) => (scoped ?? repo).rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -562,10 +562,10 @@ test('E2-y: one card still writes Map.md once', async () => {
 
 // Runs `during` right after the nth card note of a reply is made (the reply is mid-batch then).
 const afterNthCard = (h, nth, during) => {
-  const original = h.repo.createNote.bind(h.repo);
+  const original = h.repo.createNote;
   let count = 0;
-  h.repo.createNote = async (...args) => {
-    const made = await original(...args);
+  h.repo.createNote = async function (...args) {
+    const made = await original.apply(this, args);
     if (++count === nth) await during();
     return made;
   };

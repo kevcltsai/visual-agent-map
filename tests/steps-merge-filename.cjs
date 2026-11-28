@@ -24,7 +24,7 @@ async function harness(titles) {
   await repo.saveMap(MAP, mapDoc);
   const host = withExpansionCoordinator({
     repo, settings: { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', cliReasoning: 'low' }, running: new Set(),
-    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: () => repo.rebuildDerivedData(),
+    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: (_scope, scoped) => (scoped ?? repo).rebuildDerivedData(),
     recordFailure: (_label, error) => String(error?.message ?? error), views: () => [], mutate: async work => work()
   });
   repo.settings = host.settings;

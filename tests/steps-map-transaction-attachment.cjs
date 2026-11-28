@@ -87,25 +87,25 @@ async function harness({ attachmentFolder = 'fixed', setting } = {}) {
   const spy = Object.create(repo);
   for (const name of ['moveUnique', 'moveExact', 'setLifecycle', 'saveMap']) {
     let n = 0;
-    spy[name] = async (...args) => {
+    spy[name] = async function (...args) {
       n++;
       if (hooks[name]) await hooks[name](n, args);
       if (fail[name]?.(n, args)) throw new Error(`injected ${name} ${n}`);
-      return repo[name](...args);
+      return repo[name].apply(this, args);
     };
   }
   const deps = {
     repo: spy,
-    rebuildDerivedData: async () => { counts.rebuild++; if (fail.rebuild?.(counts.rebuild)) throw new Error(`injected rebuild ${counts.rebuild}`); return repo.rebuildDerivedData(); },
+    rebuildDerivedData: async scope => { counts.rebuild++; if (fail.rebuild?.(counts.rebuild)) throw new Error(`injected rebuild ${counts.rebuild}`); return (scope ?? repo).rebuildDerivedData(); },
     onApplied: () => {},
     checkConflict: async () => {}
   };
   const seen = [];
   /** Writes an embed of attachment `key` into the note; `fail.write` makes it throw after writing. */
-  const embed = (key = 'img') => async (path, attachment) => {
+  const embed = (key = 'img') => async (path, attachment, scoped) => {
     const target = attachment(key);
     seen.push(target);
-    await repo.updateNote(path, { detail: `Picture: ![[${target}]]` });
+    await scoped.updateNote(path, { detail: `Picture: ![[${target}]]` });
     if (fail.write?.()) throw new Error('injected write');
   };
   /** Attachment + note embed + a parked child + a Map.md edit that records the attachment path. */
@@ -249,7 +249,7 @@ test('A6: two keys with the same data in one step create one file and a failure 
   const transaction = begin(h.deps)
     .createAttachment('img', { name: 'pic.png', data: PNG(), sourcePath: h.parent })
     .createAttachment('copy', { name: 'copy.png', data: PNG(), sourcePath: h.parent })
-    .rewriteNote(h.parent, async (path, attachment) => { h.seen.push(attachment('img'), attachment('copy')); await h.repo.updateNote(path, { detail: `![[${attachment('img')}]] ![[${attachment('copy')}]]` }); })
+    .rewriteNote(h.parent, async (path, attachment, scoped) => { h.seen.push(attachment('img'), attachment('copy')); await scoped.updateNote(path, { detail: `![[${attachment('img')}]] ![[${attachment('copy')}]]` }); })
     .editMap(MAP, map => { map.title = 'edited'; });
   await h.rejected(transaction.commit());
   assert.deepEqual(h.seen, [`${MEDIA}/pic.png`, `${MEDIA}/pic.png`]);
@@ -366,7 +366,7 @@ test('A18: two different files in one step and the second createBinary throws: o
   const transaction = begin(h.deps)
     .createAttachment('one', { name: 'one.png', data: PNG(), sourcePath: h.parent })
     .createAttachment('two', { name: 'two.png', data: bytes(5, 5, 5, 5, 5, 5, 5, 5), sourcePath: h.parent })
-    .rewriteNote(h.parent, async (path, attachment) => { await h.repo.updateNote(path, { detail: `![[${attachment('one')}]] ![[${attachment('two')}]]` }); });
+    .rewriteNote(h.parent, async (path, attachment, scoped) => { await scoped.updateNote(path, { detail: `![[${attachment('one')}]] ![[${attachment('two')}]]` }); });
   assert.equal((await h.rejected(transaction.commit())).message, 'injected createBinary 2');
   assert.deepEqual(h.trashed, [`${MEDIA}/one.png`]);
   assert.deepEqual(h.inFolder(MEDIA), []);

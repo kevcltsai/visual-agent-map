@@ -32,21 +32,21 @@ async function harness() {
   const spy = Object.create(repo);
   for (const name of ['moveUnique', 'moveExact', 'setLifecycle', 'saveMap']) {
     let n = 0;
-    spy[name] = async (...args) => {
+    spy[name] = async function (...args) {
       n++;
       calls.push(name);
       if (fail[name]?.(n, args)) throw new Error(`injected ${name} ${n}`);
-      return repo[name](...args);
+      return repo[name].apply(this, args);
     };
   }
   const deps = {
     repo: spy,
-    rebuildDerivedData: async () => { state.rebuild++; if (fail.rebuild?.(state.rebuild)) throw new Error(`injected rebuild ${state.rebuild}`); return repo.rebuildDerivedData(); },
+    rebuildDerivedData: async scope => { state.rebuild++; if (fail.rebuild?.(state.rebuild)) throw new Error(`injected rebuild ${state.rebuild}`); return (scope ?? repo).rebuildDerivedData(); },
     onApplied: () => {},
     checkConflict: async () => {}
   };
   const writes = [];
-  const write = async path => { writes.push(path); await repo.updateNote(path, { summary: 'Merged summary', detail: 'Merged detail\n\nSee [[Child A]].' }); };
+  const write = async (path, _attachment, scoped) => { writes.push(path); await scoped.updateNote(path, { summary: 'Merged summary', detail: 'Merged detail\n\nSee [[Child A]].' }); };
   const merge = () => begin(deps).rewriteNote(parent, write).park(a, UNASSIGNED, 'map-u', 'unassigned').park(b, UNASSIGNED, 'map-u', 'unassigned')
     .editMap(MAP, (map, resolve) => { for (const node of map.nodes) if (node.path === a || node.path === b) node.path = resolve(node.path); });
   const snapshot = () => new Map(contents);
@@ -182,7 +182,7 @@ test('N8: a parent whose body links to the moved children is back to its exact t
   const writeSpy = h.app.vault.process;
   h.app.vault.process = async (file, change) => { if (file.path === h.parent) order.push('note'); return writeSpy(file, change); };
   const moveSpy = h.deps.repo.moveExact;
-  h.deps.repo.moveExact = async (...args) => { order.push('move'); return moveSpy(...args); };
+  h.deps.repo.moveExact = async function (...args) { order.push('move'); return moveSpy.apply(this, args); };
   await entry.redo();
   assert.equal(order[0], 'note', 'redo writes the note before the moves');
   order.length = 0;
@@ -216,7 +216,7 @@ test('N10: rewriting a note that is also moved is rejected before anything is wr
 test('N11: rewriteNote alone (no moves, no map edit) commits, undoes and guards like a merge', async () => {
   const h = await harness();
   const original = h.contents.get(h.parent);
-  const entry = await begin(h.deps).rewriteNote(h.parent, h.writes.push.bind(h.writes) && (async path => { await h.repo.updateNote(path, { summary: 'Only note' }); })).commit();
+  const entry = await begin(h.deps).rewriteNote(h.parent, h.writes.push.bind(h.writes) && (async (path, _attachment, scoped) => { await scoped.updateNote(path, { summary: 'Only note' }); })).commit();
   assert.match(h.contents.get(h.parent), /Only note/);
   assert.equal(h.calls.length, 0, 'no file or map writes');
   await entry.undo();
@@ -229,7 +229,7 @@ test('N11: rewriteNote alone (no moves, no map edit) commits, undoes and guards 
 test('N12: a failing write callback restores the note text and nothing else moved', async () => {
   const h = await harness();
   const original = h.contents.get(h.parent);
-  const tx = begin(h.deps).rewriteNote(h.parent, async path => { await h.repo.updateNote(path, { summary: 'Half written' }); throw new Error('injected write'); })
+  const tx = begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => { await scoped.updateNote(path, { summary: 'Half written' }); throw new Error('injected write'); })
     .park(h.a, UNASSIGNED, 'map-u', 'unassigned');
   const error = await h.rejected(tx.commit());
   assert.equal(error.message, 'injected write');
@@ -242,8 +242,8 @@ test('N13: settle runs at commit after the moves (it sees the rewritten links), 
   const h = await harness();
   const original = h.contents.get(h.parent);
   const seen = [];
-  const settle = async path => { seen.push(h.contents.get(path)); await h.repo.updateNote(path, { detail: `${(await h.repo.readNote(path)).detail}\n\nSETTLED` }); };
-  const entry = await begin(h.deps).rewriteNote(h.parent, h.writes.push.bind(h.writes) && (async path => { await h.repo.updateNote(path, { summary: 'Merged summary', detail: 'Merged detail\n\nSee [[Child A]].' }); }), settle)
+  const settle = async (path, scoped) => { seen.push(h.contents.get(path)); await scoped.updateNote(path, { detail: `${(await h.repo.readNote(path)).detail}\n\nSETTLED` }); };
+  const entry = await begin(h.deps).rewriteNote(h.parent, h.writes.push.bind(h.writes) && (async (path, _attachment, scoped) => { await scoped.updateNote(path, { summary: 'Merged summary', detail: 'Merged detail\n\nSee [[Child A]].' }); }), settle)
     .park(h.a, UNASSIGNED, 'map-u', 'unassigned').park(h.b, UNASSIGNED, 'map-u', 'unassigned')
     .editMap(MAP, (map, resolve) => { for (const node of map.nodes) if (node.path === h.a || node.path === h.b) node.path = resolve(node.path); })
     .commit();
@@ -263,14 +263,14 @@ test('N13: settle runs at commit after the moves (it sees the rewritten links), 
 test('N14: a failing settle rolls the whole step back (note text, files and map), at commit and at redo', async () => {
   const h = await harness();
   const before = h.snapshot();
-  const error = await h.rejected(begin(h.deps).rewriteNote(h.parent, async path => { await h.repo.updateNote(path, { summary: 'Merged' }); }, async () => { throw new Error('injected settle'); })
+  const error = await h.rejected(begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => { await scoped.updateNote(path, { summary: 'Merged' }); }, async () => { throw new Error('injected settle'); })
     .park(h.a, UNASSIGNED, 'map-u', 'unassigned').commit());
   assert.equal(error.message, 'injected settle');
   assert.equal(h.contents.get(h.parent), before.get(h.parent));
   assert.equal(h.exists(h.a), true, 'the parked child is back');
   assert.equal(h.unassigned().length, 0);
   let fail = false;
-  const entry = await begin(h.deps).rewriteNote(h.parent, async path => { await h.repo.updateNote(path, { summary: 'Merged' }); }, async () => { if (fail) throw new Error('injected redo settle'); })
+  const entry = await begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => { await scoped.updateNote(path, { summary: 'Merged' }); }, async () => { if (fail) throw new Error('injected redo settle'); })
     .park(h.a, UNASSIGNED, 'map-u', 'unassigned').commit();
   await entry.undo();
   const undone = h.snapshot();
@@ -302,8 +302,8 @@ test('N15: failed map write never rolls a note back over an external edit', asyn
 
 test('N16: undo refuses changes to user-owned Markdown outside the four old guard fields', async () => {
   const h = await harness();
-  const entry = await begin(h.deps).rewriteNote(h.parent, async path => {
-    await h.repo.updateNote(path, { summary: 'Changed summary' });
+  const entry = await begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => {
+    await scoped.updateNote(path, { summary: 'Changed summary' });
   }).commit();
   const external = h.contents.get(h.parent).replace('---\n', '---\nuser-key: preserve-me\n');
   h.contents.set(h.parent, external);
@@ -313,8 +313,8 @@ test('N16: undo refuses changes to user-owned Markdown outside the four old guar
 
 test('N17: note undo refuses a write queued behind an external edit', async () => {
   const h = await harness();
-  const entry = await begin(h.deps).rewriteNote(h.parent, async path => {
-    await h.repo.updateNote(path, { summary: 'Changed summary' });
+  const entry = await begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => {
+    await scoped.updateNote(path, { summary: 'Changed summary' });
   }).commit();
   const external = h.contents.get(h.parent) + '\nUser edit after preflight.\n';
   const process = h.app.vault.process;
@@ -336,11 +336,11 @@ test('N18: an independent writer is not part of the note transaction and its upd
   let entered, resume;
   const ready = new Promise(resolve => { entered = resolve; });
   const release = new Promise(resolve => { resume = resolve; });
-  const tx = begin(h.deps).rewriteNote(h.parent, async path => {
-    await h.repo.updateNote(path, { summary: 'Transaction summary' });
+  const tx = begin(h.deps).rewriteNote(h.parent, async (path, _attachment, scoped) => {
+    await scoped.updateNote(path, { summary: 'Transaction summary' });
     entered();
     await release;
-    await h.repo.updateNote(path, { detail: 'Transaction detail' });
+    await scoped.updateNote(path, { detail: 'Transaction detail' });
   }).commit();
   await ready;
   await h.repo.updateNote(h.parent, { summary: 'Independent user update' });
@@ -352,7 +352,7 @@ test('N18: an independent writer is not part of the note transaction and its upd
 
 test('N19: grouped history accepts its verified preimage but refuses an edit queued during its write', async () => {
   const h = await harness();
-  const entry = await begin(h.deps).rewriteNote(h.parent, path => h.repo.updateNote(path, { summary: 'Changed summary' })).commit();
+  const entry = await begin(h.deps).rewriteNote(h.parent, (path, _attachment, scoped) => scoped.updateNote(path, { summary: 'Changed summary' })).commit();
   // A sibling history entry may have legitimately changed metadata after this child recorded its original postimage.
   await h.repo.updateNote(h.parent, { title: 'Group title' });
   const file = h.repo.file(h.parent);
@@ -363,6 +363,6 @@ test('N19: grouped history accepts its verified preimage but refuses an edit que
     if (item === file) h.contents.set(h.parent, external);
     return process(item, change);
   };
-  assert.equal((await h.rejected(withVerifiedNoteHistory(h.repo, verified, () => entry.undo()))).kind, 'guard');
+  assert.equal((await h.rejected(withVerifiedNoteHistory(h.repo, verified, scoped => entry.undo(scoped)))).kind, 'guard');
   assert.equal(h.contents.get(h.parent), external);
 });

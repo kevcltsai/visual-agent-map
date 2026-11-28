@@ -893,7 +893,7 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
   const {repo,app} = fixture(), path = await repo.createMap('Root operations', []), mapDoc = await repo.readMap(path);
   const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
   let pending=Promise.resolve();
-  const plugin={abortChartJobs:()=>{},addChartsAfterWrite:()=>{},repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
+  const plugin={abortChartJobs:()=>{},addChartsAfterWrite:()=>{},repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:(_scope,scoped)=>(scoped??repo).rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
   const {VisualAgentMapView}=load('experiences/visual-map/view.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.selection.toggleMultiSelect();view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.createIntegratedNode('Combined',[first,second],'Combine','');
   const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.selection.state.multiSelectMode,false);
@@ -1113,7 +1113,7 @@ const mergeHarness = async ({ details = ['Alpha detail', '', 'Gamma detail'], pa
   const kid = await repo.createNote('Alpha child','a',mapDoc,path,'workspace'); kid.parentId = sources[0].id; mapDoc.nodes.push(kid);
   await repo.saveMap(path, mapDoc);
   let pending=Promise.resolve();
-  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),mutate(work){pending=pending.then(work);return pending},running:new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {},quickExpandPending:new Set(),activeTasks:new Map(),expansionBatches:new Map(),currentModelChoice(){return {model:this.settings.cliModel,reasoning:'auto'}}};
+  const plugin={repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:(_scope,scoped)=>(scoped??repo).rebuildDerivedData(),mutate(work){pending=pending.then(work);return pending},running:new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {},quickExpandPending:new Set(),activeTasks:new Map(),expansionBatches:new Map(),currentModelChoice(){return {model:this.settings.cliModel,reasoning:'auto'}}};
   const {VisualAgentMapView}=load('experiences/visual-map/view.ts',{obsidian:shim},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){},...globals}); const view=new VisualAgentMapView({app},plugin);
   view.path=path;view.map=mapDoc;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.hydrate();
@@ -1715,8 +1715,8 @@ integrationTest('parent merge: redo is refused when the parent was edited after 
 integrationTest('parent merge: a failure while moving a subtopic puts the parent text, files and map back, with no history', async () => {
   const h = await mergeHarness(); await parentOf(h);
   const text = h.contents.get(h.parent.path); const original = await h.shape(); const originalMap = JSON.stringify((await h.repo.readMap(h.path)).nodes);
-  const move = h.repo.moveUnique.bind(h.repo); let calls = 0;
-  h.repo.moveUnique = async (...args) => { calls++; if (calls === 2) throw new Error('disk full'); return move(...args); };
+  const move = h.repo.moveUnique; let calls = 0;
+  h.repo.moveUnique = async function (...args) { calls++; if (calls === 2) throw new Error('disk full'); return move.apply(this, args); };
   await assert.rejects(() => parentMerge(h, 'Renamed parent'), /disk full/);
   h.repo.moveUnique = move;
   assert.equal(h.contents.get(h.parent.path), text, 'the parent file is exactly as before'); assert.deepEqual(await h.shape(), original);

@@ -78,7 +78,8 @@ async function harness({ items, caps = { imageInput: { maxEdgePx: 1568, maxBytes
     writing: 0,
     mutate(work) { queue = queue.then(async () => { plugin.writing++; try { await work(); } finally { plugin.writing--; } }); return queue; },
     confirmAiUsage: async (model, run) => { control.confirms++; control.calls.push('confirm'); await run(); return true; },
-    mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress); } }
+    // A reply here is one the user asked for (decision 2026-11-28-vam-v3-3#33); a reply that says otherwise keeps its own flag.
+    mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return { changeRequested: true, ...(await control.reply(request, signal, onReply, onProgress)) }; } }
   });
   const view = new VisualAgentMapView({ app }, plugin);
   // The outside-edit path of the view (changed() reloads the map and clears the history), recorded instead of run.

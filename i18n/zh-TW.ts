@@ -1324,6 +1324,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_chain_end_call_limit_0": "已用 {0} 次 AI 呼叫，先停在這裡。",
   "ui.map_chat_chain_left_call_limit_0": "剩下：{0}。",
   "ui.map_chat_plan_reason_call_budget_0": "這一輪會讓自動接續超過 {0} 次 AI 呼叫，等你確認",
+  "ui.map_chat_plan_reason_not_requested": "你沒有要求修改",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "自動套用打開時，刪除、合併、建立或切換心智圖、改心智圖資料夾外的檔案仍要你確認",
   "ui.map_chat_plan_reason_book_plan_edit": "這會改動書的企劃，等你確認",
@@ -2662,6 +2663,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_failed_0": "沒有完成：{0}",
   "ui.topic_chat_no_children": "這個議題還沒有子議題可以整合。",
   "ui.topic_chat_out_of_scope": "超出這個議題的部分已略過。",
+  "ui.topic_chat_not_requested": "你沒有要求修改，所以 AI 建議的改動沒有套用；要套用，請直接說要改什麼。",
   "ui.topic_chat_too_big": "這個要求動到的地方太多，請改用左側欄的 AI 對話。",
   "ui.topic_chat_result_unknown": "這次的結果請看議題本身。",
   "ui.topic_chat_failed_children": "沒有子議題研究成功。",

@@ -142,9 +142,23 @@ export class TopicChatRun {
         ? planFor(allowed, request.context, {
             diagrams: this.ports.addDiagrams(),
             mapAiMode: map.aiMode,
-            chatReadSources: entry.readsSources === true
+            chatReadSources: entry.readsSources === true,
+            changeRequested: result.changeRequested === true
           })
         : null;
+      // A question that came back with changes (decision 2026-11-28-vam-v3-3#33): the answer is shown, the changes only as a suggestion.
+      if (plan?.reasons.includes("not_requested")) {
+        this.settle(
+          entry,
+          [result.reply.trim(), t("ui.topic_chat_not_requested")].filter(Boolean).join("\n\n"),
+          live,
+          true,
+          "done",
+          true,
+          true
+        );
+        return;
+      }
       if (plan) {
         this.settle(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
         return;

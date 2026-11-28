@@ -1402,6 +1402,7 @@ export const en = {
   "ui.map_chat_chain_left_call_limit_0": "Left: {0}.",
   "ui.map_chat_plan_reason_call_budget_0":
     "This round would take the automatic continuation past {0} AI calls; it waits for your confirmation",
+  "ui.map_chat_plan_reason_not_requested": "You did not ask for changes",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "Automatic apply is on, but this reply deletes, merges, creates or switches mind maps, or changes files outside the map folder; it waits for your confirmation",
   "ui.map_chat_plan_reason_book_plan_edit": "This changes the plan of your book; it waits for your confirmation",
@@ -2831,6 +2832,8 @@ export const en = {
   "ui.topic_chat_failed_0": "Did not finish: {0}",
   "ui.topic_chat_no_children": "This topic has no subtopics to synthesize yet.",
   "ui.topic_chat_out_of_scope": "Parts outside this topic were skipped.",
+  "ui.topic_chat_not_requested":
+    "You did not ask for changes, so the changes the AI suggested were not applied; to apply them, ask for the change directly.",
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",

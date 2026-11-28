@@ -290,6 +290,11 @@ export interface MapChatResult {
   actions: MapChatAction[];
   /** What is still to do after this reply, one line of at most {@link MAP_CHAT_REMAINING_LIMIT} characters; "" = everything asked is done (or a reply that has no such field). The program continues on its own when it is not empty. */
   remaining: string;
+  /**
+   * The model's judgement that the user's message explicitly asks to change the map (add, edit, delete, build, tidy up and the like).
+   * Absent, not `true` or a reply that could not be read = not asked (decision 2026-11-28-vam-v3-3#33): every write is then a plan.
+   */
+  changeRequested?: boolean;
   /** The steps of a whole multi-step instruction and where it stands; absent or malformed = none (never fails the reply). */
   progress?: MapChatProgress;
   /** Items that were dropped (never applied) or, for `no_topic_kinds`, applied without their type; shown only as a count. */
@@ -461,6 +466,7 @@ export const MAP_CHAT_SCHEMA = {
       }
     },
     remaining: STRING,
+    changeRequested: { type: "boolean" },
     progress: {
       type: "object",
       additionalProperties: false,
@@ -1087,6 +1093,7 @@ export function parseMapChat(
     actions,
     rejected,
     remaining: normalizeRemaining(body.remaining),
+    changeRequested: body.changeRequested === true,
     ...(progress ? { progress } : {})
   };
 }
@@ -1102,7 +1109,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 33,
+  version: 34,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

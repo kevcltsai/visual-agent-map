@@ -1323,6 +1323,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_chain_end_call_limit_0": "已用 {0} 次 AI 调用，先停在这里。",
   "ui.map_chat_chain_left_call_limit_0": "剩下：{0}。",
   "ui.map_chat_plan_reason_call_budget_0": "这一轮会让自动接续超过 {0} 次 AI 调用，等你确认",
+  "ui.map_chat_plan_reason_not_requested": "你没有要求修改",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "自动套用打开时，删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍要你确认",
   "ui.map_chat_plan_reason_book_plan_edit": "这会改动书的企划，等你确认",
@@ -2662,6 +2663,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_failed_0": "没有完成：{0}",
   "ui.topic_chat_no_children": "这个议题还没有子议题可以整合。",
   "ui.topic_chat_out_of_scope": "超出这个议题的部分已略过。",
+  "ui.topic_chat_not_requested": "你没有要求修改，所以 AI 建议的改动没有套用；要套用，请直接说要改什么。",
   "ui.topic_chat_too_big": "这个要求动到的地方太多，请改用左侧栏的 AI 对话。",
   "ui.topic_chat_result_unknown": "这次的结果请看议题本身。",
   "ui.topic_chat_failed_children": "没有子议题研究成功。",

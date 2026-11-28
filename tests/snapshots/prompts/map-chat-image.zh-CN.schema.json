@@ -371,6 +371,9 @@
     "remaining": {
       "type": "string"
     },
+    "changeRequested": {
+      "type": "boolean"
+    },
     "progress": {
       "type": "object",
       "additionalProperties": false,

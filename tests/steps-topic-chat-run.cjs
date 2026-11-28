@@ -21,7 +21,7 @@ const addChild = { kind: 'add_child', parentId: 'root', title: 'T' };
 const addOut = { kind: 'add_child', parentId: 'other', title: 'T' };
 const ignored = { kind: 'read_md_file', path: 'a.md' };
 const del = { kind: 'delete_topic', nodeId: 'c1' };
-const reply = (actions = [], text = 'R') => ({ reply: text, actions, remaining: 'none' });
+const reply = (actions = [], text = 'R') => ({ reply: text, actions, remaining: 'none', changeRequested: true });
 const request = () => ({ context: { parents: [], selectedCount: 0, basis: 'x' } });
 
 function newEntry(extra = {}) {

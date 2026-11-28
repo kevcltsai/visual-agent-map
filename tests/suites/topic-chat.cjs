@@ -906,7 +906,8 @@ const mockChat = (h, make) => {
   h.requests = [];
   h.plugin.mapChat = { chat: async (request, signal) => { h.requests.push(request); return typeof make === 'function' ? make(request, signal) : make; } };
 };
-const answer = (actions, reply = 'ok') => ({ reply, actions, rejected: [], remaining: '' });
+// The user asked for these changes (decision 2026-11-28-vam-v3-3#33); a question-only reply is a raw object or passes false.
+const answer = (actions, reply = 'ok', changeRequested = true) => ({ reply, actions, rejected: [], remaining: '', changeRequested });
 const snapshot = async h => {
   const out = new Map();
   for (const [p, file] of h.files) if (file.extension === 'md') out.set(p, await h.app.vault.read(file));
@@ -973,6 +974,25 @@ integrationTest('topic chat counterexample 3: a reply that reaches outside the s
   assert.equal(h.view.map.title, 'Sleep map');
   const sentence = h.entry('a').session.turns.at(-1).text;
   assert.ok(sentence.includes('Done.') && sentence.includes(t('ui.topic_chat_out_of_scope')), sentence);
+});
+
+integrationTest('E4a topic chat (counter-example, row 10): a question that comes back with a rename leaves every note byte for byte the same; the answer is shown and the rename only as a suggestion', async () => {
+  for (const raw of [h => ({ reply: 'It reads more like a REM stage.', actions: [{ kind: 'rename_topic', nodeId: h.ids.c, title: 'REM stage' }], rejected: [], remaining: '' }), h => answer([{ kind: 'rename_topic', nodeId: h.ids.c, title: 'REM stage' }], 'It reads more like a REM stage.', false)]) {
+    const h = await harness(); const before = await snapshot(h); const mapBefore = JSON.stringify(await h.saved());
+    mockChat(h, raw(h));
+    await h.host('a').submit('ask', 'is this title right?'); await finished(h);
+    const after = await snapshot(h);
+    assert.deepEqual(changedPaths(before, after).filter(p => !p.includes('/Chats/')), [], 'no note changed');
+    assert.equal(JSON.stringify(await h.saved()), mapBefore, 'Map.md is the same');
+    assert.notEqual((await h.repo.readNote(h.node('c').path)).title, 'REM stage');
+    const sentence = h.entry('a').session.turns.at(-1).text;
+    assert.ok(sentence.includes('It reads more like a REM stage.') && sentence.includes(t('ui.topic_chat_not_requested')), sentence);
+    assert.equal((await topicLines(h, 'a')).at(-1).status, 'done');
+  }
+  const h = await harness();
+  mockChat(h, answer([{ kind: 'rename_topic', nodeId: h.ids.c, title: 'REM stage' }], 'Renamed.'));
+  await h.host('a').submit('ask', 'rename it to REM stage'); await finished(h);
+  assert.equal((await h.repo.readNote(h.node('c').path)).title, 'REM stage', 'asked for: written as before');
 });
 
 integrationTest('topic chat ask: a non-root topic can be renamed and re-summarised by its own free question (its real parent is the baseline, not null)', async () => {

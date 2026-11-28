@@ -176,6 +176,30 @@ test('chat action writer: add_relation and remove_relation change Map.md through
   assert.equal(w.only('mapChange').length, 2, 'a refused one writes nothing');
 });
 
+test('chat action writer: a relation to a reference is re-checked at write time: reference removed between plan and write is skipped, two references are refused', async () => {
+  const kr = (id, extra = {}) => ({ id, mapId: 'other', nodeId: 'n1', parentId: 'a', x: 1, y: 1, pathHint: 'O/Map.md', ...extra });
+  const w = world();
+  w.map.knowledgeRefs = [kr('ref-1'), kr('ref-2')];
+  const ok = await apply(w, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(ok.outcome, { status: 'done' });
+  assert.deepEqual(plain(w.map.topicRelations), [{ kind: 'supports', from: 'a', to: 'ref-1' }]);
+  const both = await apply(w, { kind: 'add_relation', fromId: 'ref-1', toId: 'ref-2', relationKind: 'related' });
+  assert.deepEqual(both.outcome, skippedOutcome('ui.map_chat_skip_relation_not_allowed'));
+  // The reference is removed after the check on the screen map but before the write: the second check on the map being edited sees it gone.
+  const w2 = world();
+  w2.map.knowledgeRefs = [kr('ref-1')];
+  const real = w2.ports.mapChange;
+  w2.ports.mapChange = async change => { w2.map.knowledgeRefs = []; return real(change); };
+  const gone = await apply(w2, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(gone.outcome, skippedOutcome('ui.map_chat_skip_topic_gone'));
+  assert.deepEqual(plain(w2.map.topicRelations ?? []), []);
+  // Already gone when the item is applied: skipped before any write.
+  const w3 = world();
+  const early = await apply(w3, { kind: 'add_relation', fromId: 'a', toId: 'ref-1', relationKind: 'supports' });
+  assert.deepEqual(early.outcome, skippedOutcome('ui.map_chat_skip_topic_gone'));
+  assert.equal(w3.only('mapChange').length, 0);
+});
+
 test('chat action writer: set_appearance writes only the cards whose appearance changes, in one transaction and one history step', async () => {
   const w = world({ notes: { a: { title: 'A' }, b: { title: 'B', color: 'red' }, c: { title: 'C' } } });
   const { outcome, run } = await apply(w, { kind: 'set_appearance', nodeIds: ['a', 'b'], color: 'red' });

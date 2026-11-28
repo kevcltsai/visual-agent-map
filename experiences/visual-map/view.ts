@@ -1915,6 +1915,8 @@ export class VisualAgentMapView extends ItemView {
   /** What the references on this map resolved to the last time they were read (memory only; never saved). */
   private refResolved = new Map<string, RefResolution>();
   private refLayerEl: HTMLElement | null = null;
+  /** The drawn references that resolved (an unavailable or orphan one is not here): a relation line may end at one (V3.3 P4.4). */
+  private readonly refEls = new Map<string, HTMLElement>();
   private refResolveSeq = 0;
   private shareRefTitles = new Map<string, string | null>();
   private refResolveTimer: number | null = null;
@@ -7890,6 +7892,9 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
     this.refResolved = found;
     this.paintKnowledgeRefs();
+    // A relation line to a reference appears (or goes) with what the reference resolved to.
+    const refIds = new Set(refs.map(ref => ref.id));
+    if ((map.topicRelations ?? []).some(link => refIds.has(link.from) || refIds.has(link.to))) this.drawEdges();
   }
   /**
    * Draws the references of the open map in a layer after the cards. They are not cards of the map: they live in
@@ -7898,6 +7903,7 @@ export class VisualAgentMapView extends ItemView {
   private paintKnowledgeRefs(): void {
     this.refLayerEl?.remove();
     this.refLayerEl = null;
+    this.refEls.clear();
     const stage = this.stageEl,
       map = this.map;
     if (!stage || !map) return;
@@ -7917,6 +7923,7 @@ export class VisualAgentMapView extends ItemView {
       if (!found) missing = true;
       const el = layer.createDiv("vam-knowledge-ref");
       el.dataset.refId = ref.id;
+      if (found?.ok) this.refEls.set(ref.id, el);
       el.setAttr("role", "note");
       el.tabIndex = 0;
       el.style.left = `${parent.x + ref.x}px`;
@@ -18706,6 +18713,11 @@ export class VisualAgentMapView extends ItemView {
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
   }
+  /** The resolved title of one of this map's knowledge references; undefined when it is not one or not resolved (V3.3 P4.4). */
+  private knowledgeRefTitle(id: string): string | undefined {
+    const found = this.refResolved.get(id);
+    return found?.ok ? found.title : undefined;
+  }
   /** The notes of these cards read again from disk (a missing card or note is left out). */
   private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
     const fresh = new Map<string, Note>();
@@ -23829,6 +23841,13 @@ export class VisualAgentMapView extends ItemView {
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
+      // This map's own references (V3.3 P4.4): a relation may end at one; the title only when it is already resolved.
+      knowledgeRefs: this.relationsEnabled()
+        ? visibleKnowledgeRefs(map).map(ref => {
+            const found = this.refResolved.get(ref.id);
+            return { id: ref.id, ...(found?.ok ? { title: found.title } : {}) };
+          })
+        : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
@@ -24357,7 +24376,11 @@ export class VisualAgentMapView extends ItemView {
   ): string {
     const nodes = this.map?.nodes ?? [];
     const title = (id: string): string =>
-      refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
+      refTitles?.get(id) ??
+      this.notes.get(id)?.title ??
+      nodes.find(node => node.id === id)?.path ??
+      this.knowledgeRefTitle(id) ??
+      id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {
       case "add_child": {
@@ -28007,8 +28030,8 @@ export class VisualAgentMapView extends ItemView {
       anchor?: AnchorLine;
     }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
-      const from = this.cardEls.get(relation.from),
-        to = this.cardEls.get(relation.to);
+      const from = this.cardEls.get(relation.from) ?? this.refEls.get(relation.from),
+        to = this.cardEls.get(relation.to) ?? this.refEls.get(relation.to);
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }

@@ -579,6 +579,8 @@ export function parseMapChat(
     aim?: boolean;
     relations?: readonly MapChatRelation[];
     selectedImage?: MapChatImageScope;
+    /** Ids of this map's knowledge references (V3.3 P4.4): one end of an add_relation or a suggestion, never both. */
+    refIds?: readonly string[];
   }
 ): MapChatResult {
   let value: unknown;
@@ -592,6 +594,7 @@ export function parseMapChat(
   if (typeof body.reply !== "string") throw invalid("reply");
   if (!Array.isArray(body.actions)) throw invalid("actions");
   const known = new Set(context.nodeIds);
+  const referenceIds = new Set((context.refIds ?? []).filter(id => !known.has(id)));
   // Parent links of the supplied cards, plus those of the cards this reply creates, as each kept move leaves them (for the
   // cycle check and the `beforeId` of a move).
   const parents: Record<string, string | null | undefined> = { ...context.parents };
@@ -1041,10 +1044,13 @@ export function parseMapChat(
             const id = text(key);
             if (!id.startsWith(MAP_CHAT_NEW_PREFIX) && !created && !known.has(id) && refs.has(id))
               return `${MAP_CHAT_NEW_PREFIX}${id}`;
+            if (!created && referenceIds.has(id)) return id;
             return resolve(id, true);
           };
           const fromId = end("fromId"),
             toId = end("toId");
+          // A reference of this map may be one end, not both (it is read-only and the relation belongs to this map).
+          if (referenceIds.has(fromId) && referenceIds.has(toId)) throw new Dropped("relation_not_allowed");
           const given = text("relationKind");
           if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(given)) throw new Dropped("bad_value");
           const relationKind = given as TopicRelationKind;
@@ -1127,8 +1133,13 @@ export function parseMapChat(
           break;
         }
         case "remove_relation": {
-          const fromId = node("fromId", true),
-            toId = node("toId", true);
+          // An end may be a knowledge reference of this map, as in add_relation (the writer allows it).
+          const end = (key: string): string => {
+            const id = text(key);
+            return !created && referenceIds.has(id) ? id : resolve(id, true);
+          };
+          const fromId = end("fromId"),
+            toId = end("toId");
           if (context.aim) throw new Dropped("no_relations");
           if (!relations.some(link => samePair(link, fromId, toId))) throw new Dropped("unknown_relation");
           relations = relations.filter(link => !samePair(link, fromId, toId));
@@ -1148,7 +1159,7 @@ export function parseMapChat(
   if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
   const suggestions = Array.isArray(body.suggestions)
-    ? relationSuggestions(body.suggestions, known, context.relations ?? [], context.aim === true)
+    ? relationSuggestions(body.suggestions, known, referenceIds, context.relations ?? [], context.aim === true)
     : undefined;
   return {
     reply: body.reply,
@@ -1162,12 +1173,13 @@ export function parseMapChat(
 
 /**
  * The first {@link MAP_CHAT_SUGGESTION_LIMIT} usable suggestions, in reply order. One is left out when it lacks a reason or a source
- * (or either is longer than one relation description), when an end is not a card of this map, when the map could not hold it
+ * (or either is longer than one relation description), when an end is not a card or a knowledge reference of this map (or both ends are references), when the map could not hold it
  * beside its present relations (`relationAllowed`), or when an earlier kept one is on the same pair. None on an AIM map.
  */
 function relationSuggestions(
   raw: readonly unknown[],
   known: ReadonlySet<string>,
+  referenceIds: ReadonlySet<string>,
   relations: readonly MapChatRelation[],
   aim: boolean
 ): MapChatRelationSuggestion[] {
@@ -1184,7 +1196,14 @@ function relationSuggestions(
       reason = line(item.reason),
       source = line(item.source);
     const kind = line(item.relationKind);
-    if (!reason || !source || !known.has(fromId) || !known.has(toId)) continue;
+    if (
+      !reason ||
+      !source ||
+      !(known.has(fromId) || referenceIds.has(fromId)) ||
+      !(known.has(toId) || referenceIds.has(toId))
+    )
+      continue;
+    if (referenceIds.has(fromId) && referenceIds.has(toId)) continue;
     if ([...reason].length > RELATION_DESCRIPTION_MAX_LENGTH || [...source].length > RELATION_DESCRIPTION_MAX_LENGTH)
       continue;
     if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(kind)) continue;
@@ -1209,7 +1228,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 34,
+  version: 35,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

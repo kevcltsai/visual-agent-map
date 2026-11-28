@@ -950,6 +950,47 @@ test('E2-tx: the commit never returns after note 3: the reply ends with every ca
   assert.deepEqual(await unlistedOf(h, before), []);
 });
 
+test('E2-tx L1: a card write that was still running when the reply gave up writes nothing when it goes on (its line says it was not kept)', async () => {
+  const h = await harness(tree4);
+  serialQueue(h);
+  h.view.chatBatchWriteTimeoutMs = 150; h.view.chatBatchTailTimeoutMs = 150;
+  const before = liveNotes(h);
+  let free;
+  const hung = new Promise(resolve => { free = resolve; });
+  beforeNthCard(h, 2, () => hung);
+  const lines = await within(chatApply(h, kidsOf(h, 12)), 3000, 'the reply ends');
+  assert.equal(failedLines(lines).length, 12, 'every card says it was not kept');
+  free();
+  await within(h.view.plugin.mutate(async () => {}), 3000, 'the queue is free');
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.deepEqual(kidNotes(h, before), [], 'the late write made no note');
+  assert.equal((await h.saved()).nodes.some(n => /Kid/.test(n.path)), false, 'and Map.md lists no card');
+  assert.equal(h.view.map.nodes.some(n => /Kid/.test(n.path)), false, 'nor does the screen');
+});
+
+test('E2-tx M1: the write limit of a reply that stages no card says only that this step was not written; the cards of an earlier flush stay done', async () => {
+  // A reply without added cards: one rename, the queue stuck.
+  const a = await harness(tree4);
+  serialQueue(a);
+  a.view.chatBatchWriteTimeoutMs = 150; a.view.chatBatchTailTimeoutMs = 150;
+  void a.view.plugin.mutate(() => new Promise(() => {}));
+  const single = await within(chatApply(a, [{ kind: 'rename_topic', nodeId: a.named('A').id, title: 'Renamed' }]), 3000, 'the reply ends');
+  assert.equal(failedLines(single).length, 1);
+  assert.match(failedLines(single)[0].text, /not written in time/);
+  assert.doesNotMatch(failedLines(single)[0].text, /nothing was kept|cards/, 'it does not speak of cards the reply never had');
+  // A batch whose cards were written, then a rename that times out: the cards are kept and say so.
+  const b = await harness(tree4);
+  serialQueue(b);
+  b.view.chatBatchWriteTimeoutMs = 150; b.view.chatBatchTailTimeoutMs = 150;
+  const flush = b.view.flushChatMapBatch.bind(b.view);
+  b.view.flushChatMapBatch = async () => { await flush(); void b.view.plugin.mutate(() => new Promise(() => {})); };
+  const mixed = await within(chatApply(b, [...kidsOf(b, 6), { kind: 'rename_topic', nodeId: b.named('A').id, title: 'Renamed' }]), 3000, 'the mixed reply ends');
+  assert.equal(mixed.filter(line => line.status === 'done').length, 6, 'the six cards were written and stay');
+  assert.equal(failedLines(mixed).length, 1);
+  assert.doesNotMatch(failedLines(mixed)[0].text, /nothing was kept/, 'the cards of the flush are kept');
+  assert.equal((await b.saved()).nodes.filter(n => /Kid/.test(n.path)).length, 6);
+});
+
 test('E2-tx: a card made with the name field (no title given) is a note file at once, as before', async () => {
   const h = await harness(tree4);
   const before = liveNotes(h);

@@ -1490,7 +1490,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_attached_read_only": "檔案在這張心智圖的資料夾之外，對話只能讀、不能改",
   "ui.map_chat_skip_stale": "送出後檔案又被修改過",
   "ui.map_chat_fail_changed": "目標卡在送出後被改過，這一步沒有寫入",
-  "ui.map_chat_fail_batch_timeout": "卡片沒能及時寫入，沒有保留任何內容；請再問一次",
+  "ui.map_chat_fail_batch_timeout": "這一步沒能及時寫入，沒有保留（標為完成的行已保留）；請再問一次",
   "ui.map_chat_fail_unknown": "這一步無法完成",
   "ui.map_chat_skip_topic_gone": "議題已不在心智圖上",
   "ui.map_chat_skip_find_failed": "要取代的文字沒有剛好出現一次",

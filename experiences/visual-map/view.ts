@@ -1541,8 +1541,9 @@ export class VisualAgentMapView extends ItemView {
     freshNotes: () => this.freshNotes(),
     freshNotesOf: ids => this.freshNotesOf(ids),
     topicState: (id, fresh) => this.chatTopicState(id, fresh),
-    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart, summary) =>
-      this.addNode(
+    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart, summary) => {
+      const batch = this.chatMapBatch;
+      return this.addNode(
         parentNode,
         suggestedTitle,
         rebuildDerivedData,
@@ -1552,8 +1553,9 @@ export class VisualAgentMapView extends ItemView {
         hypothesisStart,
         undefined,
         undefined,
-        { summary }
-      ),
+        { summary, refused: () => !!batch?.abandoned }
+      );
+    },
     createLivingNode: (parent, action, rebuild, current, allowSource) =>
       this.createNode(
         parent,
@@ -19744,7 +19746,10 @@ export class VisualAgentMapView extends ItemView {
       onSaved: (saved: LivingConfigSave) => void;
     },
     /** A titled card's finished summary: it is part of the note when the note is made (never a second write). */
-    start: { summary?: string } = {}
+    start: {
+      summary?: string;
+      /** True once the reply this card belongs to gave up: the write goes no further. */ refused?: () => boolean;
+    } = {}
   ): Promise<MapNode | undefined> {
     if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
     const creationMapPath = this.path;
@@ -19855,6 +19860,10 @@ export class VisualAgentMapView extends ItemView {
           fresh: true,
           created: true
         };
+      if (start.refused?.()) {
+        this.notes.delete(node.id);
+        throw new Error("batch-timeout");
+      }
       await this.mapChangeSnapshots(
         map => {
           if (livingConfig && (map.id !== creationMapId || graph(map) !== configurationGraph))
@@ -25743,6 +25752,8 @@ export class VisualAgentMapView extends ItemView {
       done.catch(() => {});
       if (!(await this.waitAtMost(done, this.chatBatchWriteTimeoutMs))) {
         gaveUp = true;
+        // A card write already running goes on in the background: it must not write what its line says was not kept.
+        if (stage) stage.abandoned = true;
         throw new Error("batch-timeout");
       }
     };

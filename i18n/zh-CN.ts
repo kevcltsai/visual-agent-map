@@ -1489,7 +1489,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_attached_read_only": "文件在这张地图的文件夹之外，对话只能读、不能改",
   "ui.map_chat_skip_stale": "发送后文件又被修改过",
   "ui.map_chat_fail_changed": "目标卡在发送后被改过，这一步没有写入",
-  "ui.map_chat_fail_batch_timeout": "卡片没能及时写入，没有保留任何内容；请再问一次",
+  "ui.map_chat_fail_batch_timeout": "这一步没能及时写入，没有保留（标为完成的行已保留）；请再问一次",
   "ui.map_chat_fail_unknown": "这一步无法完成",
   "ui.map_chat_skip_topic_gone": "议题已不在心智图上",
   "ui.map_chat_skip_find_failed": "要替换的文字没有刚好出现一次",

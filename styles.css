@@ -2155,4 +2155,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-selection-bar > .vam-selection-why { flex: 1 0 100%; order: 1; overflow: visible; white-space: normal; color: var(--vam-muted); }
 .vam-canvas.has-selection-bar.has-selection-why { padding-bottom: 68px; }
 .vam-canvas.has-selection-bar.has-selection-why .vam-zoom-controls, .vam-canvas.has-selection-bar.has-selection-why .vam-canvas-hint { margin-bottom: 68px; }
-.vam-menu-item-why { font-size: var(--font-ui-smaller); color: var(--vam-muted); white-space: normal; }
+.menu-item.vam-menu-item-has-why { flex-wrap: wrap; }
+.vam-menu-item-why { flex-basis: 100%; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: normal; }

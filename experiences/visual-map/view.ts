@@ -19612,6 +19612,7 @@ export class VisualAgentMapView extends ItemView {
           // The reason goes under the greyed row (a menu item has no subtitle of its own).
           const dom = (item as unknown as { dom?: HTMLElement }).dom;
           dom?.setAttr?.("title", t(availability.reasonKey));
+          dom?.addClass?.("vam-menu-item-has-why");
           dom?.createDiv?.({ cls: "vam-menu-item-why", text: t(availability.reasonKey) });
         }
       });

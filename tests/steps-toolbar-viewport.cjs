@@ -932,7 +932,9 @@ test('selection bar: nothing before the first card is picked; then a narrow bott
 });
 
 test('selection bar (B09): an action that cannot run keeps its button (aria-disabled, never natively disabled) and the reason is one line under the row; "Selected N" reads in every language', () => {
+  const notices = [], RealNotice = obsidian.Notice; obsidian.Notice = class { constructor(m) { notices.push(m); } };
   const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] }, path: 'Map.md' });
+  obsidian.Notice = RealNotice; let merges = 0; view.openMerge = () => { merges++; };
   view.multiResearchKey = () => 'k';
   const host = () => { const el = fakeEl(); el.toggleClass = (name, on) => (on ? el.classes.add(name) : el.classes.delete(name)); return el; };
   const { translate } = load('i18n.ts');
@@ -943,6 +945,7 @@ test('selection bar (B09): an action that cannot run keeps its button (aria-disa
   assert.equal(merge.disabled, false); assert.equal(merge.attrs['aria-disabled'], 'true'); assert.equal(merge.attrs.title, translate('en', 'ui.merge_needs_two'));
   const why = off.children.filter(c => c.tag === 'span' && c.text === translate('en', 'ui.merge_needs_two'));
   assert.equal(why.length, 1); assert.equal(why[0].text, translate('en', 'ui.merge_needs_two'));
+  merge.handlers.get('click')({ stopPropagation() {} }); assert.equal(merges, 0, 'a click on the aria-disabled Merge never opens the merge'); assert.deepEqual(notices, [translate('en', 'ui.merge_needs_two')], 'and says why');
   assert.equal(off.children.at(-1), why[0], 'the reason line is below the row'); assert.ok(off.classes.has('has-why')); assert.ok(workspace.classes.has('has-selection-why'));
   view.mergeCheck = () => ({ ok: true });
   setSelection(view, true, ['a', 'b']);

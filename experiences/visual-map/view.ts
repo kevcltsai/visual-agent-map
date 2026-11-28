@@ -11641,7 +11641,26 @@ export class VisualAgentMapView extends ItemView {
       if (target) {
         map.nodes.find(node => node.id === target.id)!.collapsed = false;
         // One layout for the moved branches under the target, in the same history entry as the move.
-        this.arrangeBranch(map, target.id, moved, undefined);
+        if (roots.length > 1 && !before && this.placesLocally(map)) {
+          // A batch move keeps the branches' distances to each other: the top branch is laid out, the rest shift by the same offset, then only overlaps are pushed apart.
+          const lead = roots
+            .map(root => map.nodes.find(item => item.id === root.id)!)
+            .reduce((a, b) => (b.y < a.y ? b : a));
+          const start = new Map(
+            map.nodes.filter(node => moved.has(node.id)).map(node => [node.id, { x: node.x, y: node.y }])
+          );
+          const first = start.get(lead.id)!;
+          this.arrangeBranch(map, target.id, branchOf.get(lead.id)!, undefined);
+          const placed = map.nodes.find(node => node.id === lead.id)!;
+          const dx = placed.x - first.x,
+            dy = placed.y - first.y;
+          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          for (const node of map.nodes) {
+            const was = rest.has(node.id) ? start.get(node.id) : undefined;
+            if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });
+          }
+          this.pushFrom(map, rest);
+        } else this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }

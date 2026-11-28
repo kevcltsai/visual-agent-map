@@ -18,6 +18,7 @@ import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { fixAgainPlan } from "../../core/book-pipeline/machine";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
+  closingPageSkipped,
   effectiveOrder,
   mapDifference,
   readBookRole,
@@ -76,6 +77,8 @@ export interface BookBarState {
   again?: { done: number; total: number };
   /** A finished book with AI proofread problems a round could fix: what the "fix again" button and its card say (absent: no button). */
   fixAgain?: { chapters: number; items: number; calls: number; stubborn: number; statusItems: number; book: boolean };
+  /** A finished book that has no closing page (every chapter AI-locked, nothing checked): the bar shows no button to it. */
+  noClosingPage?: true;
   /** Gate 1 only: what the editor changed in the book's structure (absent when it changed nothing and refused nothing). */
   structureEdit?: BookStructureEditView;
 }
@@ -237,6 +240,7 @@ export function bookBarState(
     ...(rerunning ? { rerun: true as const } : {}),
     ...(again ? { again: { ...again } } : {}),
     ...(fixAgain?.items ? { fixAgain } : {}),
+    ...(mode === "done" && closingPageSkipped(data) ? { noClosingPage: true as const } : {}),
     ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
@@ -530,7 +534,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     });
     if (state.again) makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
     else {
-      if (actions.openIssues)
+      if (actions.openIssues && !state.noClosingPage)
         makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
       if (actions.fixAgain && state.fixAgain) {
         const again = makeButton(buttons, t("ui.book_fix_again"), "vam-book-fix-again", actions.fixAgain.ask);
@@ -888,7 +892,8 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   backup_failed: "ui.book_refused_backup_failed",
   text_changed: "ui.book_refused_text_changed",
   nothing: "ui.book_refused_nothing",
-  unsafe: "ui.book_refused_unsafe"
+  unsafe: "ui.book_refused_unsafe",
+  not_slot: "ui.book_refused_not_slot"
 };
 
 /** A plain localized reason for an error that is not a runner refusal; the raw message (English, internal) is never shown. */

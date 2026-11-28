@@ -191,6 +191,14 @@ S.test('A43 grammar: YYYY, YYYY-MM, YYYY-MM-DD, a day range, Qn YYYY and known r
   // Not selectors: impossible dates, a reversed range, digits inside words, quarters 0 and 5, plain numbers.
   for (const text of ['2024-13', '2024-02-30', '2024-03-09..2024-03-05', 'v12024', 'id2024-03', 'price 12345', 'build 2024x'])
     assert.deepEqual(range(text), [], text);
+  // D2-6b: everyday range wording reads as the same day range; "and" alone still names two days.
+  for (const text of ['between 2020-03-01 and 2020-03-10', 'Between 2020-03-01 AND 2020-03-10', '2020-03-01 到 2020-03-10', '從 2020-03-01至2020-03-10', '2020-03-01–2020-03-10', '2020-03-01 — 2020-03-10', '2020-03-01~2020-03-10', '2020-03-01～2020-03-10'])
+    assert.deepEqual(range(text), [['2020-03-01', '2020-03-10']], text);
+  assert.deepEqual(range('compare 2020-03-01 and 2020-03-10'), [['2020-03-01', '2020-03-01'], ['2020-03-10', '2020-03-10']]);
+  // Not loosened: a reversed or impossible new-wording range is no selector, and an incomplete end date keeps the old reading.
+  for (const text of ['between 2020-03-10 and 2020-03-01', '2020-03-10 到 2020-03-01', '2020-03-10–2020-03-01', '2020-02-30~2020-03-10'])
+    assert.deepEqual(range(text), [], text);
+  assert.deepEqual(range('2020-03 到 2020-03-10'), [['2020-03-01', '2020-03-31'], ['2020-03-10', '2020-03-10']]);
   assert.deepEqual(S.plain(parseLivingSelectors('compare r5 with evt:9, not r6 or r50.', ['r5', 'evt:9']).ids), ['r5', 'evt:9']);
   assert.deepEqual(S.plain(parseLivingSelectors('Use "Notes > Plan > Risks" and 「Notes > Plan」 but not "no path" or "a > "', []).paths), [['Notes', 'Plan', 'Risks'], ['Notes', 'Plan']]);
 });
@@ -270,6 +278,13 @@ S.integrationTest('A43: a 600-record history answers an exact old date in one ca
   assert.ok(!f.prompts[0].includes('"id":"r0"') && f.prompts[0].includes('"id":"r599"'), 'the rest is newest first');
   assert.match(f.prompts[0], /"omitted":\{"count":\d+/);
   assert.ok(elapsed < baseline * 40 + 1000, 'a 600-record round costs about a small one, not a scan per record (' + elapsed + ' vs ' + baseline + ' ms)');
+});
+
+S.integrationTest('D2-6b A43: "between X and Y" on a 600-record history sends every record of those ten days', async () => {
+  const f = await runtimeFixture({ count: 600, prompt: 'Summarize what was recorded between 2020-03-01 and 2020-03-10 from the existing history.' });
+  await runLivingRound(f.port, ['parent']);
+  assert.equal(f.prompts.length, 1);
+  for (let n = 60; n <= 69; n++) assert.ok(f.prompts[0].includes('"id":"r' + n + '"'), 'r' + n + ' is in the range and must be sent');
 });
 
 S.integrationTest('A43: a required range that cannot fit fails closed before any call and leaves every byte unchanged', async () => {
@@ -560,4 +575,86 @@ S.integrationTest('A11 live: the change-set step tells the model to correct or i
   await f.app.vault.create(path, initial);
   const { sent } = await round(f, [append(1)]);
   assert.match(sent[0], /newer observation supersedes an older current-state fact of the same subject and scope[^.]*`correct` or `invalidate` the old record/);
+});
+
+// ---- D2-5 (A36): one repair re-send for an evidence rejection ----
+// The stub transport answers each call from `replies` in order; every reply is checked by the production validator.
+async function repairRound(replies, opened = [], seed = []) {
+  const f = S.fixture();
+  await f.app.vault.create(path, initial);
+  if (seed.length) assert.equal(await commit(f, readLivingMarkdown(f.contents.get(path)), seed), 'written');
+  const base = readLivingMarkdown(f.contents.get(path));
+  const sent = [];
+  const calls = { run: async (prepared, options, finish) => {
+    sent.push({ prompt: prepared.prompt, options });
+    for (const url of opened) options.task.onWebSearchEvent({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url } } } });
+    const operations = replies[Math.min(sent.length - 1, replies.length - 1)];
+    const body = typeof operations === 'string' ? operations : JSON.stringify({ baseRevision: base.revision, requiresWeb: false, operations });
+    return finish(body, { signal: options.signal, parsed() {} });
+  } };
+  const input = { model: 'm', reasoning: 'auto', prompt: 'track competitor', language: 'en', base, context: '{}', evidence: context.evidence, mapPath: 'map.md' };
+  const result = generateLivingProposal(calls, input, new AbortController().signal);
+  return { f, base, sent, result };
+}
+const good = { kind: 'append', id: 'n1', subject: 'Beta', scope: 'pricing', granularity: 'day', eventTime: '2026-11-27', claim: 'Beta cut prices', evidence: ['e1'] };
+
+S.integrationTest('D2-5 A36: an unknown evidence id gets one repair call; the corrected reply is used (2 calls, writes)', async () => {
+  const { f, base, sent, result } = await repairRound([[{ ...good, evidence: ['competitor-2026-11-27'] }], [good]]);
+  const generated = await result;
+  assert.equal(sent.length, 2);
+  assert.deepEqual(S.plain(generated.proposal.operations.map(op => op.id)), ['n1']);
+  // The repair names only the code, the operation number and the allowed ids: never the rejected reply's own text.
+  const repair = sent[1].prompt.slice(sent[0].prompt.length);
+  assert.match(repair, /unauthorized-evidence/);
+  assert.match(repair, /operation 1\b/);
+  assert.match(repair, /"e1"/);
+  assert.ok(!repair.includes('competitor-2026-11-27') && !repair.includes('Beta cut prices'));
+  assert.equal(await commit(f, base, generated.proposal.operations), 'written');
+});
+
+S.integrationTest('D2-5 A36: missing and missing-new evidence are repaired once too; both attempts wrong stays refused (2 calls, 0 writes)', async () => {
+  const empty = await repairRound([[{ ...good, evidence: [] }], [good]]);
+  assert.equal((await empty.result).proposal.operations.length, 1);
+  assert.equal(empty.sent.length, 2);
+  // A correction citing only the record's old evidence: repaired once, and the second answer stands.
+  const correct = { kind: 'correct', id: 'n1', claim: 'Beta raised prices', reason: 'new filing', evidence: ['e1'] };
+  const noNew = await repairRound([[correct]], [], [good]);
+  await assert.rejects(() => noNew.result, /missing-new-evidence/);
+  assert.equal(noNew.sent.length, 2);
+  assert.match(noNew.sent[1].prompt.slice(noNew.sent[0].prompt.length), /missing-new-evidence at operation 1\b/);
+  // Both attempts wrong: the round is refused after exactly two calls and nothing is written.
+  const twice = await repairRound([[{ ...good, evidence: ['forged'] }]]);
+  await assert.rejects(() => twice.result, /unauthorized-evidence/);
+  assert.equal(twice.sent.length, 2);
+  assert.equal(twice.f.contents.get(path), initial);
+  // The repair only re-cites: it never starts a new web search.
+  assert.equal(twice.sent[1].options.task.searchBudget, 0);
+  assert.equal(twice.sent[1].options.task.textOnly, true);
+  // A web URL the run never opened is the same class of rejection.
+  const url = await repairRound([[{ ...good, evidence: ['https://evil.example/x'] }], [good]]);
+  assert.equal((await url.result).proposal.operations.length, 1);
+  assert.equal(url.sent.length, 2);
+});
+
+S.integrationTest('D2-5 A36: an unknown record, bad JSON or a stop is never re-sent (1 call)', async () => {
+  const unknown = await repairRound([[{ kind: 'supplement', id: 'ghost', evidence: ['e1'] }], [good]]);
+  await assert.rejects(() => unknown.result, /unknown-record/);
+  assert.equal(unknown.sent.length, 1);
+  const json = await repairRound(['not json', [good]]);
+  await assert.rejects(() => json.result);
+  assert.equal(json.sent.length, 1);
+  // A stop during the first call is final: no repair is sent.
+  const stopped = new AbortController();
+  let stopCount = 0;
+  const stopCalls = { run: async (prepared, options, finish) => {
+    stopCount++;
+    stopped.abort();
+    return finish(JSON.stringify({ baseRevision: 'x', requiresWeb: false, operations: [{ ...good, evidence: ['forged'] }] }), { signal: options.signal, parsed() {} });
+  } };
+  await assert.rejects(() => generateLivingProposal(stopCalls, { model: 'm', reasoning: 'auto', prompt: 'track', language: 'en', base: readLivingMarkdown(initial), context: '{}', evidence: context.evidence, mapPath: 'map.md' }, stopped.signal), /cancelled/);
+  assert.equal(stopCount, 1);
+  // The operation number points at the model's own list, past an earlier valid operation.
+  const second = await repairRound([[good, { ...good, id: 'n2', evidence: ['forged'] }], [good]]);
+  await second.result;
+  assert.match(second.sent[1].prompt.slice(second.sent[0].prompt.length), /unauthorized-evidence at operation 2\b/);
 });

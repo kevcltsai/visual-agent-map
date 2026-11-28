@@ -416,6 +416,54 @@ test('04 charts: a chart result for a topic locked meanwhile is not written; loc
   assert.equal(jobs.length, 0, 'a locked topic gets no chart job at all');
 });
 
+// P3.9 F07 (living-node §5.4, §8.4; A19 late chart): a chart queued while the card was ordinary does not land once the
+// card became an AI card, whether by the flag alone or by a converted managed region whose flag was cleared.
+const { commitLivingMarkdown, livingSnapshotRevision, livingGeneration } = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian: S.obsidian });
+for (const [name, becomeAi] of [
+  ['the `ai-card: true` flag alone', async (h, a) => { await h.repo.writeAiCard(a.path, true); }],
+  ['a converted managed Living Node region without the flag', async (h, a) => {
+    await h.repo.writeAiCard(a.path, true);
+    const expectedContent = h.raw(a);
+    const candidate = { executionId: 'p39-late-chart', cardId: a.id, mapId: h.view.map.id, baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i1', viewSession: 'v1' };
+    assert.equal(await commitLivingMarkdown(h.repo, {
+      path: a.path, expectedContent, baseGeneration: livingGeneration(expectedContent), candidate, signal: new AbortController().signal, isCurrent: () => true,
+      base: { revision: 'empty', records: [], suppressed: [], output: { text: '', owner: 'ai', evidence: [] } },
+      proposal: { baseRevision: 'empty', operations: [{ kind: 'output', text: 'Living findings', evidence: ['e1'] }] },
+      context: { at: '2026-11-28T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] },
+      inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false })
+    }), 'written');
+    await h.repo.writeAiCard(a.path, false);
+    assert.match(h.raw(a), /vam-living-node:begin/, 'the managed region stays after the flag is cleared');
+  }]
+]) test(`P3.9 late chart: a chart queued on an ordinary card is not written after it became AI through ${name}; the exchange is marked failed`, async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  const failed = [], release = [];
+  h.host.researchProgress = new Proxy({}, { get: () => () => {} });
+  h.host.aiTasks = {
+    chartEligible: () => true,
+    chartDetail: async request => { request.onExchange?.('chart-x'); await new Promise(resolve => release.push(resolve)); return `${request.detail}\n\nCHART`; },
+    failExchange: (id, reason) => failed.push([id, reason])
+  };
+  const applied = [];
+  h.host.addChartsAfterWrite = job => h.host.topicRuns.addChartsAfterWrite({ ...job, apply: async charted => { const ok = await job.apply(charted); applied.push(ok); return ok; } });
+  delete h.view.queueCharts; // the harness stubs it out; this test drives the real one
+  await h.repo.updateNote(a.path, { detail: 'Written detail' });
+  const saved = await h.repo.readNote(a.path);
+  assert.ok(!saved.aiCard, 'the card is ordinary when the chart is queued');
+  h.view.queueCharts({ path: a.path, saved, context: { title: 'A' }, detail: saved.detail, model: 'gpt-6-luna', language: 'zh-TW' });
+  await until(() => release.length === 1);
+  await becomeAi(h, a);
+  const before = h.raw(a);
+  release[0]();
+  await until(() => failed.length === 1);
+  assert.equal(h.raw(a), before, 'the note keeps its bytes');
+  assert.equal(failed[0][0], 'chart-x', 'the chart exchange is marked failed');
+  assert.equal(failed[0][1], t('log.chart_stale_not_applied'), 'with the stale-chart reason');
+  assert.deepEqual(applied, [false], 'apply refuses the late chart with a false outcome (§5.4: a refused writer reports its outcome to the caller)');
+  assert.equal(h.calls.length, 0, 'no research call');
+});
+
 // UI audit bugfix-2 P2 (FLOWS.md AI 任務): a synthesis that picks a locked topic is refused before any AI call, with the reason.
 test('04 integrate selection: a locked source refuses the synthesis before any AI call; no topic is added or written', async () => {
   const h = await harness(['A', 'B']);
@@ -627,12 +675,14 @@ test('V3.3 #02 structure: a card changed on disk after the review abandons the s
   const files = JSON.stringify([...h.contents]);
   const count = h.view.map.nodes.length;
   const stale = t('ui.structure_review_stale_content');
+  // The real mutate() shows a failed write's message as a notice (errorNotice); the stub does not, so mirror it here.
+  h.view.plugin.mutate = work => work().catch(error => { h.notices.push(error.message); throw error; });
   for (const suggestion of [{ kind: 'strengthen', targetId: a.id, basis }, { kind: 'move', targetId: b.id, newParentId: a.id, basis }]) {
     await assert.rejects(h.view.applyStructureSuggestion(suggestion, 'New', () => null, id => seen.get(id)), error => error.message === stale, suggestion.kind);
     assert.equal(h.view.map.nodes.length, count, suggestion.kind);
     assert.equal(JSON.stringify([...h.contents]), files, `${suggestion.kind}: every file byte for byte as before`);
   }
-  assert.equal(h.notices.filter(message => message === stale).length, 2);
+  assert.equal(h.notices.filter(message => message === stale).length, 2, 'one notice per stale apply, not two');
   // Unchanged since the review: applied as before.
   await h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: b.id, basis }, 'New', () => null, id => seen.get(id));
   assert.equal(h.view.map.nodes.length, count + 1);

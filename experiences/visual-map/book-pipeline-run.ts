@@ -53,6 +53,14 @@ import {
   type CommonsRunBudget
 } from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
+import {
+  figureLines,
+  readFigure,
+  retagRecordLine,
+  slotsRecordLine,
+  swapFigureStamped,
+  type FigureSwap
+} from "../../core/book-pipeline/refind-slot";
 import { composeOpenIssuesNote, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
 import {
   PipelineStore,
@@ -71,6 +79,7 @@ import {
   abandonAi,
   closeAiRound,
   fixAgainPlan,
+  keptForLocked,
   reopenAiRound,
   rekeyBookProof,
   aiChapterDue,
@@ -116,6 +125,7 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  closingPageSkipped,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -260,6 +270,7 @@ import {
   composeSlotsRecord,
   imageIssueTokens,
   latestSlotsRecord,
+  shortHash,
   pictureShortfallToken,
   captionLatinIssue,
   pictureMismatchToken,
@@ -403,7 +414,59 @@ export type BookRunRefusal =
   /** A rewrite the reader allowed was for a text that has changed since: nothing is rewritten. */
   | "text_changed"
   /** An undo that would make a card the editor did not add disappear: nothing is changed. */
-  | "unsafe";
+  | "unsafe"
+  /** Refind: the picture is not one the fill placed and recorded (the reader's own, moved or doubled): it is not searched for again. */
+  | "not_slot";
+/** The parts of a drive the picture search uses (see `searchPictures`): a refind of one slot builds its own. */
+type PictureJob = Pick<Drive, "mapPath" | "controller" | "admission" | "config" | "commonsBudget" | "probeGate">;
+/** What the picture search of one chapter found, and its counts for the log. */
+interface PictureSearch {
+  perSlot: Map<number, ProbedCandidate[]>;
+  hints: Map<number, { subject?: string; search?: string }>;
+  /** `${slot}|${url}` of the finder's unfit pictures offered as the last resort. */
+  unfitKeys: Set<string>;
+  /** `${slot}|${url}` of the pictures the look step said fit. */
+  lookedFit: Set<string>;
+  drawnDiagrams: Map<number, SlotDiagram>;
+  commonsCut: Set<number>;
+  commonsAsked: number;
+  /**
+   * Search calls asked (the finder's and Commons' requests) and how many of them answered: none of several answered is a provider that
+   * failed (sign-in, connection), not a search that found nothing. Only the refind reads it; the fill keeps its own handling.
+   */
+  searchesAsked: number;
+  searchesAnswered: number;
+  commonsLimited: boolean;
+  commonsNoHint: number;
+  commonsRejected: Partial<Record<CommonsRejection, number>>;
+  rounds: (FoundImages | undefined)[];
+  finderUnfit: number;
+  finderUnchecked: number;
+  finderLookups: number;
+  looks: number;
+  looksUnfit: number;
+  looksDropped: number;
+  looksUnchecked: Set<string>;
+  diagramStats: { asked: number; drawn: number; rejected: Record<string, number> };
+}
+/**
+ * Why a placed picture is recorded as off its text: the finder's unfit picture taken as the last resort, or a file whose title and
+ * description (the finder's caption for its own pictures) name none of the words its slot asks for and that no look said fits.
+ */
+function offText(
+  slot: ImageSlot,
+  figure: SlotFigure,
+  found: Pick<PictureSearch, "perSlot" | "hints" | "unfitKeys" | "lookedFit">
+): "unfit" | "words" | undefined {
+  const placed = (found.perSlot.get(slot.index) ?? []).find(item => item.href === figure.href)?.candidate;
+  if (!placed) return undefined;
+  if (found.unfitKeys.has(`${slot.index}|${placed.imageUrl}`)) return "unfit";
+  const about = `${placed.title} ${placed.description ?? placed.caption}`;
+  const words = askWords({ explains: slot.explains, terms: slot.search, ...found.hints.get(slot.index) });
+  return words.length && !wordHits(words, about) && !found.lookedFit.has(`${slot.index}|${placed.imageUrl}`)
+    ? "words"
+    : undefined;
+}
 /** The ids a needs-review proof names: its unmet fact points, else its unmet structure points, else the empty text. */
 function unmetIds(items: readonly { id: string; type: string; status: string }[]): string {
   const unmet = items.filter(item => item.status === "unmet");
@@ -1220,6 +1283,15 @@ export interface NotesApplyResult {
   refused?: { id: string; reason: string }[];
 }
 
+/**
+ * What one refind job did: nothing found, every search call failed (the picture service did not answer; not the same as "none"), both
+ * writing nothing, or the swap it wrote with the chapter's text before and after (the undo's input).
+ */
+export type RefindResult =
+  | { kind: "none" }
+  | { kind: "failed"; reason: "search_failed" }
+  | { kind: "replaced"; path: string; before: string; after: string; swap: FigureSwap; language: string };
+
 export class BookPipelineRuns {
   private readonly drives = new Map<string, Drive>();
   /** Maps with a gate press waiting for the drive that reached the gate to end (a second press meanwhile is refused as busy). */
@@ -1944,6 +2016,8 @@ export class BookPipelineRuns {
       if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
       if (!fixAgainPlan(data, 0).items) throw new BookPipelineRunError("nothing");
       // Only the units that will really run are counted (the same key check the round makes: a hand-edited chapter is skipped), so the limit is raised for them alone.
+      // A locked chapter (ai-flows AI lock) is not a unit; a round left with nothing but locked units is refused as locked, before any call.
+      let lockedOut = false;
       const chapterKey = async (id: string): Promise<string | undefined> => {
         const info = drive.cards.get(id);
         const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
@@ -1951,18 +2025,32 @@ export class BookPipelineRuns {
           ? aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)))
           : undefined;
       };
+      const keyOf = (input: { chapters: readonly { text: string }[] }): string =>
+        aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n"));
       const bookKey = async (): Promise<string | undefined> => {
         const input = await this.bookProofInput(drive).catch(() => undefined);
-        return input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : undefined;
+        return input ? keyOf(input) : undefined;
       };
       const chapterIds: string[] = [];
       for (const id of effectiveOrder(data)) {
         const key = await chapterKey(id);
-        if (key !== undefined && reopenAiRound(data, id, key).accepted) chapterIds.push(id);
+        if (key === undefined || !reopenAiRound(data, id, key).accepted) continue;
+        const info = drive.cards.get(id);
+        if (info && (await this.ports.readCard(info.path).catch(() => undefined))?.aiLocked) lockedOut = true;
+        else chapterIds.push(id);
       }
-      const bookNow = await bookKey();
-      const withBook = bookNow !== undefined && reopenAiRound(data, undefined, bookNow).accepted;
-      if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
+      const input = await this.bookProofInput(drive).catch(() => undefined);
+      const reopened = input !== undefined ? reopenAiRound(data, undefined, keyOf(input)) : undefined;
+      let withBook = !!reopened?.accepted;
+      // The book's round sends only its targets outside locked chapters: with none left it is refused as locked, not run as a bare re-check.
+      if (
+        withBook &&
+        (reopened?.state.bookProof?.pending ?? []).every(t => input?.chapters[(t.chapter ?? 1) - 1]?.locked)
+      ) {
+        withBook = false;
+        lockedOut = true;
+      }
+      if (!chapterIds.length && !withBook) throw new BookPipelineRunError(lockedOut ? "ai_locked" : "nothing");
       // The card says about 2 calls per unit; a step may be tried up to MAX_STEP_ATTEMPTS times, so the limit leaves room for
       // those retries (it is a cap, not a spend) and one failed call does not pause the round on "budget used up".
       const calls = (2 * chapterIds.length + (withBook ? 2 : 0)) * MAX_STEP_ATTEMPTS;
@@ -2574,6 +2662,215 @@ export class BookPipelineRuns {
     if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
     if (done.applied.length) await this.markNeighbourSeams(mapPath, again.data, nodeId, config.language, fresh);
     return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied, refused };
+  }
+
+  /**
+   * "Find another picture" for one placed picture of a chapter (V3.3 P5.1b). The notes slot: refused while a drive or another notes or
+   * refind job holds the map. Only a picture the fill placed and recorded (the slot record's hash of `url`) is searched for again; a picture
+   * the reader put in is refused ("not_slot"). The search is the fill's own (finder asked again with the book's pictures excluded, the
+   * fit test, the probes, the look, Commons, the last resort), each model call one budget unit; no diagram is drawn. Order as the notes
+   * job: reservation check, backup, the search, a re-check (same run, card in order, same path, not ai-locked, not cancelled), then one
+   * writer transform that swaps only the picture's lines, its Sources entry and its record item. Nothing found, a cancel, a failure or
+   * a text changed meanwhile writes nothing.
+   */
+  async refindSlot(
+    mapPath: string,
+    nodeId: string,
+    url: string,
+    options: { signal?: AbortSignal } = {}
+  ): Promise<RefindResult> {
+    if (this.disposed) throw new BookPipelineRunError("disposed");
+    if (this.drives.has(mapPath)) throw new BookPipelineRunError("drive_running");
+    if (this.notesJobs.has(mapPath)) throw new BookPipelineRunError("notes_busy");
+    const job = new AbortController();
+    this.notesJobs.set(mapPath, job);
+    const onAbort = (): void => job.abort();
+    if (options.signal?.aborted) job.abort();
+    else options.signal?.addEventListener("abort", onAbort, { once: true });
+    const started = Date.now();
+    const runId = { value: "-" };
+    const line = (result: string): void =>
+      this.ports.log(
+        formatPipelineLog({
+          event: "refind_slot",
+          runId: runId.value,
+          card: nodeId,
+          step: "write",
+          attempt: 0,
+          result,
+          ms: Date.now() - started
+        })
+      );
+    try {
+      const result = await this.runRefind(mapPath, nodeId, url, job, runId);
+      line(result.kind === "replaced" ? "ok" : result.kind === "failed" ? result.reason : "none");
+      return result;
+    } catch (error) {
+      line(error instanceof BookPipelineRunError ? error.code : internalCode(error));
+      throw error;
+    } finally {
+      options.signal?.removeEventListener("abort", onAbort);
+      this.notesJobs.delete(mapPath);
+    }
+  }
+
+  private async runRefind(
+    mapPath: string,
+    nodeId: string,
+    url: string,
+    job: AbortController,
+    runIdOut: { value: string }
+  ): Promise<RefindResult> {
+    const signal = job.signal;
+    const gone = (): boolean => signal.aborted || this.disposed;
+    const refuseIfGone = (): void => {
+      if (gone()) throw new BookPipelineRunError(this.disposed ? "disposed" : "cancelled");
+    };
+    refuseIfGone();
+    const notes = this.ports.notes;
+    if (!notes) throw new BookPipelineRunError("unreadable");
+    if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
+    const map = await this.ports.readMap(mapPath);
+    refuseIfGone();
+    const read = readBookPipeline(map);
+    if (read.kind === "absent") throw new BookPipelineRunError("missing");
+    if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
+    const state = read.data;
+    runIdOut.value = state.runId;
+    const order = effectiveOrder(state);
+    const node = map.nodes.find(item => item.id === nodeId);
+    if (!node || !order.includes(nodeId)) throw new BookPipelineRunError("missing");
+    if (!reserveBudget(state.budget)) throw new BookPipelineRunError("budget");
+    const path = node.path;
+    let raw: string;
+    let card: PipelineCard;
+    try {
+      [raw, card] = await Promise.all([notes.readText(path), this.ports.readCard(path)]);
+    } catch {
+      throw new BookPipelineRunError("unreadable");
+    }
+    refuseIfGone();
+    if (card.aiLocked) throw new BookPipelineRunError("ai_locked");
+    const config = this.ports.config(mapPath);
+    const language = config.language;
+    // Only a picture the fill placed and recorded, still where it wrote it: a picture the reader put in (or moved, or doubled) is theirs.
+    const detail = detailBlockOf(raw) ?? "";
+    const item = latestSlotsRecord(detail)?.slots.find(
+      entry => entry.state === "placed" && entry.hash === shortHash(url)
+    );
+    const slot = item ? parseImageSlots(card.prompt)?.find(entry => entry.index === item.index) : undefined;
+    const block = readFigure(raw, url, language);
+    const recordLine = slotsRecordLine(raw);
+    if (!item || !slot || !block || !recordLine) throw new BookPipelineRunError("not_slot");
+    // The copy comes first: when it fails nothing is spent and nothing is replaced.
+    const saved = await this.ports.backupNote(path, raw).catch(() => ({ ok: false as const }));
+    refuseIfGone();
+    if (!saved.ok) throw new BookPipelineRunError("backup_failed");
+    // What the book shows elsewhere (the other chapters' pictures and covers), this chapter's other pictures and cover, and the picture
+    // being replaced: none of them is offered again.
+    const avoid = new Set<string>([imageKey(url), ...bodyImageUrls(detail).map(imageKey)]);
+    const own = coverSourceKey(raw);
+    if (own) avoid.add(own);
+    for (const id of order) {
+      const other = id === nodeId ? undefined : map.nodes.find(entry => entry.id === id);
+      const page = other ? await this.ports.readCard(other.path).catch(() => undefined) : undefined;
+      if (!page) continue;
+      for (const href of bodyImageUrls(page.detail)) avoid.add(imageKey(href));
+      const cover = coverSourceKey(page.raw);
+      if (cover) avoid.add(cover);
+    }
+    refuseIfGone();
+    // Every model call is one unit, saved through the map guard before the provider is asked (as the notes job's).
+    const store = new PipelineStore(state, next =>
+      this.ports.mutate(async () => {
+        refuseIfGone();
+        await this.ports.updateMap(mapPath, doc => {
+          refuseIfGone();
+          const found = readBookPipeline(doc);
+          if (found.kind !== "usable" || found.data.runId !== state.runId) throw new BookPipelineRunError("stale");
+          doc.bookPipeline = {
+            ...found.data,
+            budget: { used: Math.max(found.data.budget.used, next.budget.used), limit: found.data.budget.limit },
+            revision: found.data.revision + 1
+          };
+        });
+      })
+    );
+    const pictures: PictureJob = {
+      mapPath,
+      controller: job,
+      admission: createBudgetAdmission(createStoreBudgetPort(store)),
+      config,
+      commonsBudget: { waited: 0, spent: false },
+      probeGate: { active: 0, waiters: [] }
+    };
+    const taken = (key: string): boolean => avoid.has(key);
+    let found: PictureSearch;
+    try {
+      refuseIfGone();
+      found = await this.searchPictures(
+        pictures,
+        card,
+        [slot],
+        new Map([[slot.index, 0]]),
+        undefined,
+        [...avoid],
+        taken,
+        { again: true, draw: false }
+      );
+    } catch (error) {
+      if (error instanceof BookPipelineRunError) throw error;
+      if (isBudgetExhausted(error)) throw new BookPipelineRunError("budget");
+      refuseIfGone();
+      throw error;
+    } finally {
+      store.dispose();
+    }
+    refuseIfGone();
+    const outcome = choosePictures([slot], found.perSlot, taken, language).get(slot.index);
+    const figure = outcome && "figure" in outcome ? outcome.figure : undefined;
+    if (!figure)
+      return found.searchesAsked > 0 && found.searchesAnswered === 0
+        ? { kind: "failed", reason: "search_failed" }
+        : { kind: "none" };
+    const to = figureLines(figure, block.lines[0].endsWith("\r"));
+    // The exit check: the new lines may show this one picture and nothing else.
+    if (this.exitCheck(to.join("\n"), new Set([figure.href]))) throw new Error("slots_unsafe");
+    const retagged = retagRecordLine(recordLine, slot.index, shortHash(figure.href), !!offText(slot, figure, found));
+    if (!retagged) throw new BookPipelineRunError("not_slot");
+    const swap: FigureSwap = {
+      block: { from: block.lines, to },
+      entry: {
+        ...(block.entry !== undefined ? { from: block.entry, ...(block.href ? { fromHref: block.href } : {}) } : {}),
+        ...(figure.source ? { to: figure.source.entry, href: figure.source.href } : {})
+      },
+      record: { from: recordLine, to: retagged }
+    };
+    // Re-check before the commit: same run, the card still in order and on the map at the same path, not locked meanwhile, no cancel.
+    const fresh = await this.ports.readMap(mapPath);
+    const again = readBookPipeline(fresh);
+    refuseIfGone();
+    if (again.kind !== "usable" || again.data.runId !== state.runId || !effectiveOrder(again.data).includes(nodeId))
+      throw new BookPipelineRunError("stale");
+    if (fresh.nodes.find(entry => entry.id === nodeId)?.path !== path) throw new BookPipelineRunError("stale");
+    if ((await this.ports.readCard(path).catch(() => undefined))?.aiLocked) throw new BookPipelineRunError("ai_locked");
+    refuseIfGone();
+    let done: { before: string; after: string } | undefined;
+    const written = await notes.write(path, text => {
+      done = undefined;
+      // The last gate, inside the write: a cancel that came while the writer waited changes nothing.
+      if (gone()) return text;
+      const next = swapFigureStamped(text, swap, language);
+      if (next === undefined) return text;
+      done = { before: text, after: next };
+      return next;
+    });
+    if (!(written === "written" && done)) {
+      refuseIfGone();
+      throw new BookPipelineRunError("stale");
+    }
+    const { before, after } = done;
+    return { kind: "replaced", path, before, after, swap, language };
   }
 
   /** The body changed: both neighbours' joins are worth a look, as after a rerun. */
@@ -3639,12 +3936,16 @@ export class BookPipelineRuns {
       report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
     }
   }
-  /** The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints. */
+  /**
+   * The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints.
+   * A chapter with `ai-locked: true` is marked `locked`: it stays in the list (its text keeps the key), but the calls leave it out, and the
+   * hints neither quote it nor count it (they number the chapters the call is sent).
+   */
   private async bookProofInput(drive: Drive): Promise<{
-    chapters: { id: string; title: string; text: string; raw: string; place?: AiBookChapter["place"] }[];
+    chapters: { id: string; title: string; text: string; raw: string; locked?: true; place?: AiBookChapter["place"] }[];
     hints: string[];
   }> {
-    const ordered: (ReferenceChapter & { raw: string; place?: AiBookChapter["place"] })[] = [];
+    const ordered: (ReferenceChapter & { raw: string; locked?: true; place?: AiBookChapter["place"] })[] = [];
     const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
     for (const id of effectiveOrder(drive.store.state)) {
       const info = drive.cards.get(id);
@@ -3662,6 +3963,7 @@ export class BookPipelineRuns {
         title: card?.title ?? info.title,
         text: card ? aiProofBody(chapterBody(card.detail)) : "",
         raw: card?.raw ?? "",
+        ...(card?.aiLocked ? { locked: true as const } : {}),
         ...(chapter !== undefined ? { chapter } : {}),
         ...(place?.kind === "section" ? { section: true as const } : {}),
         ...(place
@@ -3676,8 +3978,10 @@ export class BookPipelineRuns {
       });
     }
     const chapters = ordered.filter(chapter => chapter.text);
+    const sent = chapters.filter(chapter => !chapter.locked);
+    const locked = new Set(chapters.filter(chapter => chapter.locked).map(chapter => chapter.id));
     const number = (id: string): string => {
-      const at = chapters.findIndex(chapter => chapter.id === id);
+      const at = sent.findIndex(chapter => chapter.id === id);
       return at < 0 ? "?" : String(at + 1);
     };
     const findings = [
@@ -3685,7 +3989,7 @@ export class BookPipelineRuns {
       ...directionFindings(ordered),
       ...numericFindings(chapters, []),
       ...removedChapterRefs(drive.store.state, chapters)
-    ];
+    ].filter(finding => !locked.has(finding.a) && !locked.has(finding.b));
     const hints = findings.map(
       finding =>
         `item ${number(finding.a)}: "${finding.claimA}"; ${
@@ -3711,6 +4015,29 @@ export class BookPipelineRuns {
     };
     if (!input) return giveUp();
     const { chapters, hints } = input;
+    // ai-flows AI lock: a locked chapter is left out of both calls (not only refused at the write); the key still covers it, so a lock alone
+    // does not start the book over. `shown` maps the check's positions back to the book's chapter numbers.
+    const shown = chapters.flatMap((chapter, at) => (chapter.locked ? [] : [at]));
+    const isLocked = (number: number | undefined): boolean => !!chapters[(number ?? 1) - 1]?.locked;
+    const lockedIds = chapters.filter(chapter => chapter.locked).map(chapter => chapter.id);
+    // The known problems of a locked chapter stay open (it is not checked again), as long as their quote is still in its text.
+    const squash = (text: string): string => text.replace(/\s+/g, "");
+    const kept = (): ReturnType<typeof keptForLocked> =>
+      keptForLocked(
+        drive.store.state.bookProof,
+        item =>
+          isLocked(item.chapter) && squash(chapters[(item.chapter ?? 1) - 1]?.text ?? "").includes(squash(item.quote))
+      );
+    if (!shown.length && chapters.length) {
+      this.log(drive, "ai_locked_skipped", drive.rootId, "proof", "ai_locked");
+      const open = kept();
+      await drive.store.commit(state =>
+        state.status === "running"
+          ? { state: abandonAi(state, undefined, { ids: lockedIds, open }), accepted: true }
+          : { state, accepted: false }
+      );
+      return;
+    }
     const joined = (texts: readonly string[]): string => texts.join("\n\u0000\n");
     const key = aiProofKey(0, joined(chapters.map(chapter => chapter.text)));
     const stored = drive.store.state.bookProof;
@@ -3744,14 +4071,18 @@ export class BookPipelineRuns {
     const run = { signal, admission: drive.admission };
     try {
       if (step === "proof") {
-        const prior = priorOf(same?.pending ?? []);
-        const review = await untilAborted(
+        const prior = priorOf((same?.pending ?? []).filter(target => !isLocked(target.chapter)));
+        const carried = kept();
+        const reviewed = await untilAborted(
           signal,
           this.ports.aiBookProof(
             {
               ...this.base(drive, drive.config.proofModel),
-              chapters: compactChapters(chapters.map(chapter => ({ title: chapter.title, text: chapter.text }))).map(
-                (chapter, at) => ({ ...chapter, ...(chapters[at].place ? { place: chapters[at].place } : {}) })
+              chapters: compactChapters(shown.map(at => ({ title: chapters[at].title, text: chapters[at].text }))).map(
+                (chapter, at) => ({
+                  ...chapter,
+                  ...(chapters[shown[at]].place ? { place: chapters[shown[at]].place } : {})
+                })
               ),
               hints,
               ...(prior.length ? { prior } : {})
@@ -3760,6 +4091,15 @@ export class BookPipelineRuns {
           )
         );
         if (this.dead(drive)) return;
+        const inBook = (number: number): number => (shown[number - 1] ?? number - 1) + 1;
+        const review = {
+          ...reviewed,
+          checks: reviewed.checks.map(check => ({
+            ...check,
+            ...(check.chapter ? { chapter: inBook(check.chapter) } : {}),
+            ...(check.otherChapter ? { otherChapter: inBook(check.otherChapter) } : {})
+          }))
+        };
         const pending = fixTargetsOf(review.checks);
         const open = review.checks
           .filter(check => checkState(check) === "unfixable")
@@ -3769,9 +4109,15 @@ export class BookPipelineRuns {
             quote: check.quote,
             problem: check.problem,
             reason: check.why ?? "unfixable"
-          }));
+          }))
+          .concat(carried);
         const done = await drive.store.commit(state =>
-          applyAiProof(state, token, { checked: review.checks.length, pending, open })
+          applyAiProof(state, token, {
+            checked: review.checks.length,
+            pending,
+            open,
+            ...(lockedIds.length ? { locked: lockedIds } : {})
+          })
         );
         if (!done?.accepted) {
           await drive.store.commit(state => applyAiStopped(state, token, false));
@@ -3779,23 +4125,26 @@ export class BookPipelineRuns {
         }
         return report("ok", { checked: review.checks.length, pending: pending.length, open: open.length });
       }
-      const targets = same?.pending ?? [];
+      // A target in a chapter locked after the check is not asked for (it stays unfixed; the next check leaves that chapter out).
+      const targets = (same?.pending ?? []).filter(target => !isLocked(target.chapter));
       const rootInfo = drive.cards.get(drive.rootId);
       const root = rootInfo ? await this.ports.readCard(rootInfo.path).catch(() => undefined) : undefined;
       const range = root
         ? lengthRange(effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)).length)
         : undefined;
-      const edits = await untilAborted(
-        signal,
-        this.ports.aiFix(
-          {
-            ...this.base(drive, drive.config.authorModel),
-            chapters: chapters.map((chapter, at) => ({ number: at + 1, title: chapter.title, text: chapter.text })),
-            targets
-          },
-          run
-        )
-      );
+      const edits = targets.length
+        ? await untilAborted(
+            signal,
+            this.ports.aiFix(
+              {
+                ...this.base(drive, drive.config.authorModel),
+                chapters: shown.map(at => ({ number: at + 1, title: chapters[at].title, text: chapters[at].text })),
+                targets
+              },
+              run
+            )
+          )
+        : [];
       if (this.dead(drive)) return;
       const refused: Record<string, AiFixRefusal> = {};
       const changed: string[] = [];
@@ -3915,7 +4264,9 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      if (state.bookProof.incomplete) incomplete("");
+      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
+      if (state.bookProof.incomplete)
+        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);
@@ -3973,6 +4324,8 @@ export class BookPipelineRuns {
     if (!this.ports.writeOpenIssues || !root) return !this.ports.writeOpenIssues;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.dead(drive)) return false;
+      // ai-flows AI lock: a book whose every chapter is locked and that nothing checked gets no page (no file is added for it).
+      if (closingPageSkipped(drive.store.state)) return true;
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
         const content = composeOpenIssuesNote({
@@ -4037,7 +4390,7 @@ export class BookPipelineRuns {
     const map = await this.ports.readMap(mapPath).catch(() => undefined);
     if (map && !this.dead(drive)) drive.members = new Set(map.nodes.map(node => node.id));
   }
-  private base(drive: Drive, model: string): BookStepBase {
+  private base(drive: Pick<Drive, "config" | "mapPath">, model: string): BookStepBase {
     return { language: drive.config.language, model, reasoning: drive.config.reasoning, usageMapPath: drive.mapPath };
   }
   /** The card's current path when it is still on the map, else undefined (checked after the call, before any write). */
@@ -5193,7 +5546,6 @@ export class BookPipelineRuns {
     slots: ImageSlot[] | undefined,
     authorize: () => boolean
   ): Promise<Outcome | undefined> {
-    const signal = drive.controller.signal;
     const language = drive.config.language;
     const attempt = attemptsOf(drive.store.state, nodeId).write;
     if (!slots) return this.settleStrayMarkers(path, authorize);
@@ -5230,6 +5582,232 @@ export class BookPipelineRuns {
           }
         }
     }
+    const exclude = [...new Set([...drive.usedImages, ...others])];
+    // A work key another chapter of this run claimed is taken; this chapter's own (a rerun) is not.
+    const taken = (key: string): boolean =>
+      drive.usedImages.has(key) || others.has(key) || (drive.usedWorks.get(key) ?? nodeId) !== nodeId;
+    let unfitPlaced = 0;
+    let found: PictureSearch;
+    try {
+      found = await this.searchPictures(drive, first, slots, marked, coverSlot, exclude, taken);
+    } catch (error) {
+      if (isBudgetExhausted(error)) return { kind: "budget" };
+      throw error;
+    }
+    const {
+      perSlot,
+      hints,
+      drawnDiagrams,
+      commonsCut,
+      commonsAsked,
+      commonsLimited,
+      commonsNoHint,
+      commonsRejected,
+      rounds,
+      finderUnfit,
+      finderUnchecked,
+      finderLookups,
+      looks,
+      looksUnfit,
+      looksDropped,
+      looksUnchecked,
+      diagramStats
+    } = found;
+    // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
+    let latest = await this.ports.readCard(path);
+    // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
+    if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
+    // Addresses or works refused because this book already shows them (counted for the log).
+    const refusedTaken = new Set<string>();
+    // The cover is slot 0 and decided first, so it takes its picture before any body slot can; its key is claimed with the rest.
+    const outcomes = choosePictures(
+      coverSlot ? [coverSlot, ...slots] : slots,
+      perSlot,
+      key => {
+        const used = taken(key);
+        if (used) refusedTaken.add(key);
+        return used;
+      },
+      language
+    );
+    // A slot still not found whose chart passed the checks is filled by the chart (the guarded write refuses a card edited meanwhile).
+    for (const [index, diagram] of drawnDiagrams) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found") outcomes.set(index, { diagram });
+    }
+    // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
+    for (const index of commonsCut) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
+        outcomes.set(index, { reasonCode: "rate_limited" });
+    }
+    // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
+    const claimed = [...outcomes.values()].flatMap(outcome =>
+      "figure" in outcome ? [imageKey(outcome.figure.href)] : []
+    );
+    for (const key of claimed) drive.usedImages.add(key);
+    const works = [...outcomes.values()].flatMap(outcome =>
+      "figure" in outcome && outcome.figure.work && !drive.usedWorks.has(outcome.figure.work)
+        ? [outcome.figure.work]
+        : []
+    );
+    for (const key of works) drive.usedWorks.set(key, nodeId);
+    // A placed file whose title and description (the finder's caption for its own pictures) name none of the words its slot asks
+    // for is recorded as off its text: the proof then reports it as a mismatch without asking a model.
+    const off = new Set<number>();
+    for (const slot of slots) {
+      const outcome = outcomes.get(slot.index);
+      if (!outcome || !("figure" in outcome)) continue;
+      const why = offText(slot, outcome.figure, found);
+      if (why) off.add(slot.index);
+      if (why === "unfit") unfitPlaced++;
+    }
+    const release = (): void => {
+      for (const key of claimed) drive.usedImages.delete(key);
+      for (const key of works) drive.usedWorks.delete(key);
+    };
+    // The cover: download and save its file, then re-read the card (the download took time) before the one write that carries it.
+    const coverOutcome = coverSlot ? outcomes.get(COVER_INDEX) : undefined;
+    const coverFigure = coverOutcome && "figure" in coverOutcome ? coverOutcome.figure : undefined;
+    const coverKey = coverFigure ? imageKey(coverFigure.href) : undefined;
+    // A cover claim that ends up on no card is given back so another card may use that picture.
+    const releaseCover = (): void => {
+      if (coverKey) drive.usedImages.delete(coverKey);
+      if (coverFigure?.work && works.includes(coverFigure.work)) drive.usedWorks.delete(coverFigure.work);
+    };
+    let coverWrite: CoverWrite | undefined;
+    let coverResult: "placed" | "missing" | "download_failed" | "owner_kept" | undefined;
+    if (coverSlot) {
+      try {
+        const placed = coverFigure
+          ? (perSlot.get(COVER_INDEX) ?? []).find(item => item.href === coverFigure.href)?.candidate
+          : undefined;
+        const words = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
+        const coverOff =
+          !!placed && words.length > 0 && !wordHits(words, `${placed.title} ${placed.description ?? placed.caption}`);
+        const prepared = await this.prepareCover(drive, latest.title, coverFigure, coverOff);
+        if (!(await this.stillOnMap(drive, nodeId))) {
+          release();
+          return { kind: "failed", reason: "card_removed" };
+        }
+        latest = await this.ports.readCard(path);
+        const ownership = coverOwnership(latest.raw);
+        if (ownership === "owner") {
+          coverResult = "owner_kept";
+          releaseCover();
+        } else if (prepared.kind === "placed") {
+          coverResult = "placed";
+          coverWrite = { record: prepared.record, link: prepared.link, source: prepared.source };
+        } else {
+          coverResult = prepared.kind === "failed" ? "download_failed" : "missing";
+          releaseCover();
+          // A cover the program placed earlier stays when this run finds none (a flaky search must not take a good cover away).
+          if (ownership === "none") coverWrite = { record: { missing: 1 } };
+        }
+      } catch (error) {
+        release();
+        throw error;
+      }
+    }
+    try {
+      const bodyOutcomes = new Map([...outcomes].filter(([index]) => index !== COVER_INDEX));
+      const result = await this.writeFilled(latest, slots, bodyOutcomes, language, authorize, off, coverWrite);
+      if (typeof result === "string") {
+        release();
+        return { kind: "failed", reason: result };
+      }
+      // The owner took the cover over between the re-read and the write: nothing was written for it, so its claim is given back.
+      if (coverWrite?.held) {
+        coverResult = "owner_kept";
+        releaseCover();
+      }
+      if (coverResult)
+        this.ports.log(
+          formatPipelineLog({
+            event: `cover_${coverResult}`,
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt,
+            result: "ok",
+            ms: 0
+          })
+        );
+      this.ports.log(
+        formatPipelineLog({
+          event: "slots",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: "ok",
+          ms: 0,
+          counts: {
+            placed: result.placed.length,
+            missing: result.missing.length,
+            ...(commonsAsked ? { commons: commonsAsked } : {}),
+            ...(commonsLimited ? { commons_limited: 1 } : {}),
+            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
+            ...(finderLookups ? { finder_lookup: finderLookups } : {}),
+            ...(finderUnfit ? { finder_unfit: finderUnfit } : {}),
+            ...(unfitPlaced ? { finder_unfit_placed: unfitPlaced } : {}),
+            ...(finderUnchecked ? { finder_unchecked: finderUnchecked } : {}),
+            ...(looks ? { look: looks } : {}),
+            ...(looksUnfit ? { look_unfit: looksUnfit } : {}),
+            ...(looksDropped ? { look_dropped: looksDropped } : {}),
+            ...(looksUnchecked.size ? { look_unchecked: looksUnchecked.size } : {}),
+            ...Object.fromEntries(
+              rounds.flatMap((round, i) =>
+                round
+                  ? [
+                      [`r${i + 1}_found`, round.found],
+                      [`r${i + 1}_offTopic`, round.offTopic]
+                    ]
+                  : []
+              )
+            ),
+            ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
+            ...(diagramStats.asked
+              ? {
+                  diagram_asked: diagramStats.asked,
+                  diagram_drawn: result.diagrams?.length ?? 0,
+                  diagram_declined:
+                    diagramStats.asked -
+                    drawnDiagrams.size -
+                    Object.values(diagramStats.rejected).reduce((a, b) => a + b, 0)
+                }
+              : {}),
+            ...Object.fromEntries(Object.entries(diagramStats.rejected).map(([code, n]) => [`diagram_rej_${code}`, n])),
+            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
+          },
+          hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
+        })
+      );
+      return undefined;
+    } catch (error) {
+      release();
+      throw error;
+    }
+  }
+
+  /**
+   * The picture search of one chapter's slots (the fill's, and a refind's of one slot): the finder search (a second one for the slots
+   * still lacking), the fit test of its Commons files, the probes, the look at its other pictures, the program's Commons search and the
+   * last resort, then the diagram call (off with `draw: false`). Nothing is claimed or written here; a budget or Stop error is thrown.
+   * `again` sends the first finder search as a repeat (a refind asks for another picture than the one shown).
+   */
+  private async searchPictures(
+    drive: PictureJob,
+    first: PipelineCard,
+    slots: ImageSlot[],
+    marked: ReadonlyMap<number, number>,
+    coverSlot: ImageSlot | undefined,
+    exclude: string[],
+    taken: (key: string) => boolean,
+    options: { again?: boolean; draw?: boolean } = {}
+  ): Promise<PictureSearch> {
+    const signal = drive.controller.signal;
+    const language = drive.config.language;
     const wanted = slots.filter(slot => marked.has(slot.index));
     // The cover rides in the first search (after the body slots, so the probe limit never takes a body picture's place); it is never asked again.
     const asked = coverSlot ? [...wanted, coverSlot] : wanted;
@@ -5243,7 +5821,6 @@ export class BookPipelineRuns {
             )
           }
         : from;
-    const exclude = [...new Set([...drive.usedImages, ...others])];
     // One search call for `list`; a failed or timed-out call is an optional gain lost (undefined), never a failure of the chapter.
     const search = async (
       list: ImageSlot[],
@@ -5251,8 +5828,9 @@ export class BookPipelineRuns {
       avoid: readonly string[]
     ): Promise<FoundImages | undefined> => {
       if (!list.length || !this.ports.findImages) return undefined;
+      searchesAsked++;
       try {
-        return await untilAborted(
+        const answer = await untilAborted(
           signal,
           this.ports.findImages(
             {
@@ -5265,6 +5843,8 @@ export class BookPipelineRuns {
             { signal, admission: drive.admission }
           )
         );
+        if (answer) searchesAnswered++;
+        return answer;
       } catch (error) {
         if (isBudgetExhausted(error)) throw error;
         if (signal.aborted) throw error;
@@ -5313,14 +5893,13 @@ export class BookPipelineRuns {
       );
     };
     const perSlot = new Map<number, ProbedCandidate[]>();
-    // A work key another chapter of this run claimed is taken; this chapter's own (a rerun) is not.
-    const taken = (key: string): boolean =>
-      drive.usedImages.has(key) || others.has(key) || (drive.usedWorks.get(key) ?? nodeId) !== nodeId;
     const hints = new Map<number, { subject?: string; search?: string }>();
     const keepHints = (from: FoundImages | undefined): void => {
       for (const [index, hint] of from?.hints ?? []) hints.set(index, { ...hints.get(index), ...hint });
     };
     let commonsAsked = 0;
+    let searchesAsked = 0;
+    let searchesAnswered = 0;
     let commonsLimited = false;
     const commonsCut = new Set<number>();
     let commonsNoHint = 0;
@@ -5330,7 +5909,6 @@ export class BookPipelineRuns {
     let finderUnchecked = 0;
     let finderLookups = 0;
     const unfitKeys = new Set<string>();
-    let unfitPlaced = 0;
     // The finder's body-slot pictures go through the same fit test as the program's own Commons search, on the file page's title,
     // description and categories (one request per chapter and search). An unfit one is not dropped (word matching also refuses correct
     // pictures): it is held back here, so its slot still counts as lacking for the second search and the Commons search, and it is placed
@@ -5493,361 +6071,199 @@ export class BookPipelineRuns {
         perSlot.set(slot.index, kept);
       }
     };
-    try {
-      const round1 = await search(asked, false, exclude);
-      rounds.push(round1);
-      keepHints(round1);
-      const fit1 = await fitFound(round1);
-      for (const [index, list] of await probeFound(asked, coverOnly(fit1))) perSlot.set(index, list);
-      await lookRound();
-      // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
-      if (round1) {
-        const provisional = choosePictures(slots, perSlot, taken, language);
-        const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
-        const tried = [
-          ...new Set([
-            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
-            ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
-          ])
-        ];
-        const second = await search(lacking, true, [...tried, ...exclude]);
-        rounds.push(second);
-        keepHints(second);
-        if (second) {
-          for (const [index, list] of await probeFound(lacking, await fitFound(second)))
-            perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
-          await lookRound();
-        }
-      }
-      // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
-      // per chapter; its candidates are probed, deduped and chosen like the finder's.
-      if (this.ports.fetchCommons) {
-        const provisional = choosePictures(coverSlot ? [coverSlot, ...slots] : slots, perSlot, taken, language);
-        // The cover is the last one asked of Commons, so it never takes a body picture's share of the chapter's requests.
-        const lacking = asked.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
-        if (lacking.length) {
-          const seen = new Set([
-            ...exclude,
-            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
-            ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
-          ]);
-          const commons = await searchCommons(
-            lacking.map(slot => ({
-              index: slot.index,
-              kind: slot.kind,
-              explains: slot.explains,
-              ...(slot.search?.length ? { terms: slot.search } : {}),
-              ...hints.get(slot.index)
-            })),
-            this.ports.fetchCommons,
-            {
-              signal,
-              skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
-              run: drive.commonsBudget,
-              // The run's clock (a test's fake clock too): the chapter deadline and a Retry-After date are judged on it.
-              now: () => Date.parse(this.ports.now()),
-              ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
-            }
-          );
-          commonsAsked = commons.requests;
-          commonsLimited = commons.limited;
-          commonsRejected = commons.rejected;
-          for (const index of commons.cut) commonsCut.add(index);
-          // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
-          commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
-          if (signal.aborted) throw new Error("aborted");
-          const asFound: FoundImages = {
-            bySlot: commons.bySlot,
-            found: [...commons.bySlot.values()].reduce((n, list) => n + list.length, 0),
-            offTopic: 0
-          };
-          for (const [index, list] of await probeFound(lacking, coverOnly(asFound) ?? asFound))
-            perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
-        }
-      }
-      // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
-      const canDraw = !!this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true);
-      if (heldUnfit.size) {
-        const provisional = choosePictures(slots, perSlot, taken, language);
-        const usable = new Map<number, FoundImage[]>();
-        for (const [index, list] of heldUnfit) {
-          // Held back from the last resort only when the diagram step will really be asked for this slot; otherwise it is placed, off.
-          const willDraw = canDraw && marked.has(index) && !commonsCut.has(index);
-          const kept = willDraw ? list.filter(item => !noLastResort.has(`${index}|${item.url}`)) : list;
-          if (kept.length) usable.set(index, kept);
-        }
-        const last = slots.filter(slot => usable.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {})));
-        const asHeld: FoundImages = { bySlot: usable, found: 0, offTopic: 0 };
-        for (const [index, list] of await probeFound(last, asHeld)) {
-          for (const item of usable.get(index) ?? []) unfitKeys.add(`${index}|${item.url}`);
+    const round1 = await search(asked, options.again ?? false, exclude);
+    rounds.push(round1);
+    keepHints(round1);
+    const fit1 = await fitFound(round1);
+    for (const [index, list] of await probeFound(asked, coverOnly(fit1))) perSlot.set(index, list);
+    await lookRound();
+    // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
+    if (round1) {
+      const provisional = choosePictures(slots, perSlot, taken, language);
+      const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+      const tried = [
+        ...new Set([
+          ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
+          ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
+        ])
+      ];
+      const second = await search(lacking, true, [...tried, ...exclude]);
+      rounds.push(second);
+      keepHints(second);
+      if (second) {
+        for (const [index, list] of await probeFound(lacking, await fitFound(second)))
           perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
-        }
+        await lookRound();
       }
-      // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
-      if (this.ports.drawDiagrams && canDraw) {
-        const provisional = choosePictures(slots, perSlot, taken, language);
-        const want = slots.filter(slot => {
-          const outcome = provisional.get(slot.index);
-          return (
-            marked.has(slot.index) &&
-            !commonsCut.has(slot.index) &&
-            isDiagramKind(slot.kind) &&
-            !!outcome &&
-            "reasonCode" in outcome &&
-            outcome.reasonCode === "not_found"
-          );
-        });
-        if (want.length) {
-          diagramStats.asked = want.length;
-          const text = stripImageLines(chapterBody(first.detail));
-          // A figure already in the chapter (maybe hand-edited) is not a source of numbers for the checks.
-          const checkText = stripFigureFences(text);
-          let drafts: DiagramDraft[] = [];
-          try {
-            drafts = await untilAborted(
-              signal,
-              this.ports.drawDiagrams(
-                {
-                  ...this.base(drive, drive.config.authorModel),
-                  chapter: text,
-                  slots: want.map(({ index, kind, explains }) => ({ index, kind, explains }))
-                },
-                { signal, admission: drive.admission }
-              )
-            );
-          } catch (error) {
-            if (isBudgetExhausted(error) || signal.aborted) throw error;
+    }
+    // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
+    // per chapter; its candidates are probed, deduped and chosen like the finder's.
+    if (this.ports.fetchCommons) {
+      const provisional = choosePictures(coverSlot ? [coverSlot, ...slots] : slots, perSlot, taken, language);
+      // The cover is the last one asked of Commons, so it never takes a body picture's share of the chapter's requests.
+      const lacking = asked.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+      if (lacking.length) {
+        const seen = new Set([
+          ...exclude,
+          ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
+          ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
+        ]);
+        const commons = await searchCommons(
+          lacking.map(slot => ({
+            index: slot.index,
+            kind: slot.kind,
+            explains: slot.explains,
+            ...(slot.search?.length ? { terms: slot.search } : {}),
+            ...hints.get(slot.index)
+          })),
+          this.ports.fetchCommons,
+          {
+            signal,
+            skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
+            run: drive.commonsBudget,
+            // The run's clock (a test's fake clock too): the chapter deadline and a Retry-After date are judged on it.
+            now: () => Date.parse(this.ports.now()),
+            ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
           }
-          for (const draft of drafts) {
-            const slot = want.find(item => item.index === draft.slot);
-            if (!slot) continue;
-            if (draft.mermaid === undefined) {
-              const figure = checkFigureDraft(draft, checkText);
-              let figureCode: string | undefined = figure.ok ? undefined : figure.code;
-              const figureTitle = diagramTitle(draft.title, slot.explains, language);
-              if (
-                figure.ok &&
-                this.exitCheck(
-                  ["```vam-figure", figure.body, "```", "", diagramCaption(figureTitle, language)].join("\n"),
-                  new Set()
-                )
-              )
-                figureCode = "unsafe";
-              if (figureCode || !figure.ok) {
-                diagramStats.rejected[figureCode ?? "unsafe"] =
-                  (diagramStats.rejected[figureCode ?? "unsafe"] ?? 0) + 1;
-                continue;
-              }
-              drawnDiagrams.set(slot.index, { title: figureTitle, mermaid: figure.body, fence: "vam-figure" });
-              continue;
-            }
-            const checked = checkDiagram(draft, checkText);
-            let code: string | undefined = checked.ok ? undefined : checked.code;
-            let title = "";
-            if (checked.ok) {
-              title = diagramTitle(draft.title, slot.explains, language);
-              const lines = ["```mermaid", checked.mermaid, "```", "", diagramCaption(title, language)].join("\n");
-              // The fill's exit check refuses a whole chapter for one such line, so a chart it would refuse is dropped alone here.
-              if (this.exitCheck(lines, new Set())) code = "unsafe";
-              else if (this.ports.mermaidSyntax) {
-                const verdict = await untilAborted(signal, this.ports.mermaidSyntax(checked.mermaid));
-                if (verdict === "invalid") code = "syntax";
-              }
-            }
-            if (code || !checked.ok) {
-              diagramStats.rejected[code ?? "unsafe"] = (diagramStats.rejected[code ?? "unsafe"] ?? 0) + 1;
-              continue;
-            }
-            drawnDiagrams.set(slot.index, { title, mermaid: checked.mermaid });
-          }
-          diagramStats.drawn = drawnDiagrams.size;
-        }
-      }
-    } catch (error) {
-      if (isBudgetExhausted(error)) return { kind: "budget" };
-      throw error;
-    }
-    // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
-    let latest = await this.ports.readCard(path);
-    // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
-    if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    // Addresses or works refused because this book already shows them (counted for the log).
-    const refusedTaken = new Set<string>();
-    // The cover is slot 0 and decided first, so it takes its picture before any body slot can; its key is claimed with the rest.
-    const outcomes = choosePictures(
-      coverSlot ? [coverSlot, ...slots] : slots,
-      perSlot,
-      key => {
-        const used = taken(key);
-        if (used) refusedTaken.add(key);
-        return used;
-      },
-      language
-    );
-    // A slot still not found whose chart passed the checks is filled by the chart (the guarded write refuses a card edited meanwhile).
-    for (const [index, diagram] of drawnDiagrams) {
-      const outcome = outcomes.get(index);
-      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found") outcomes.set(index, { diagram });
-    }
-    // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
-    for (const index of commonsCut) {
-      const outcome = outcomes.get(index);
-      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
-        outcomes.set(index, { reasonCode: "rate_limited" });
-    }
-    // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
-    const claimed = [...outcomes.values()].flatMap(outcome =>
-      "figure" in outcome ? [imageKey(outcome.figure.href)] : []
-    );
-    for (const key of claimed) drive.usedImages.add(key);
-    const works = [...outcomes.values()].flatMap(outcome =>
-      "figure" in outcome && outcome.figure.work && !drive.usedWorks.has(outcome.figure.work)
-        ? [outcome.figure.work]
-        : []
-    );
-    for (const key of works) drive.usedWorks.set(key, nodeId);
-    // A placed file whose title and description (the finder's caption for its own pictures) name none of the words its slot asks
-    // for is recorded as off its text: the proof then reports it as a mismatch without asking a model.
-    const off = new Set<number>();
-    for (const slot of slots) {
-      const outcome = outcomes.get(slot.index);
-      if (!outcome || !("figure" in outcome)) continue;
-      const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
-      if (!placed) continue;
-      const about = `${placed.title} ${placed.description ?? placed.caption}`;
-      const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
-      if (unfitKeys.has(`${slot.index}|${placed.imageUrl}`)) {
-        off.add(slot.index);
-        unfitPlaced++;
-      } else if (words.length && !wordHits(words, about) && !lookedFit.has(`${slot.index}|${placed.imageUrl}`))
-        off.add(slot.index);
-    }
-    const release = (): void => {
-      for (const key of claimed) drive.usedImages.delete(key);
-      for (const key of works) drive.usedWorks.delete(key);
-    };
-    // The cover: download and save its file, then re-read the card (the download took time) before the one write that carries it.
-    const coverOutcome = coverSlot ? outcomes.get(COVER_INDEX) : undefined;
-    const coverFigure = coverOutcome && "figure" in coverOutcome ? coverOutcome.figure : undefined;
-    const coverKey = coverFigure ? imageKey(coverFigure.href) : undefined;
-    // A cover claim that ends up on no card is given back so another card may use that picture.
-    const releaseCover = (): void => {
-      if (coverKey) drive.usedImages.delete(coverKey);
-      if (coverFigure?.work && works.includes(coverFigure.work)) drive.usedWorks.delete(coverFigure.work);
-    };
-    let coverWrite: CoverWrite | undefined;
-    let coverResult: "placed" | "missing" | "download_failed" | "owner_kept" | undefined;
-    if (coverSlot) {
-      try {
-        const placed = coverFigure
-          ? (perSlot.get(COVER_INDEX) ?? []).find(item => item.href === coverFigure.href)?.candidate
-          : undefined;
-        const words = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
-        const coverOff =
-          !!placed && words.length > 0 && !wordHits(words, `${placed.title} ${placed.description ?? placed.caption}`);
-        const prepared = await this.prepareCover(drive, latest.title, coverFigure, coverOff);
-        if (!(await this.stillOnMap(drive, nodeId))) {
-          release();
-          return { kind: "failed", reason: "card_removed" };
-        }
-        latest = await this.ports.readCard(path);
-        const ownership = coverOwnership(latest.raw);
-        if (ownership === "owner") {
-          coverResult = "owner_kept";
-          releaseCover();
-        } else if (prepared.kind === "placed") {
-          coverResult = "placed";
-          coverWrite = { record: prepared.record, link: prepared.link, source: prepared.source };
-        } else {
-          coverResult = prepared.kind === "failed" ? "download_failed" : "missing";
-          releaseCover();
-          // A cover the program placed earlier stays when this run finds none (a flaky search must not take a good cover away).
-          if (ownership === "none") coverWrite = { record: { missing: 1 } };
-        }
-      } catch (error) {
-        release();
-        throw error;
-      }
-    }
-    try {
-      const bodyOutcomes = new Map([...outcomes].filter(([index]) => index !== COVER_INDEX));
-      const result = await this.writeFilled(latest, slots, bodyOutcomes, language, authorize, off, coverWrite);
-      if (typeof result === "string") {
-        release();
-        return { kind: "failed", reason: result };
-      }
-      // The owner took the cover over between the re-read and the write: nothing was written for it, so its claim is given back.
-      if (coverWrite?.held) {
-        coverResult = "owner_kept";
-        releaseCover();
-      }
-      if (coverResult)
-        this.ports.log(
-          formatPipelineLog({
-            event: `cover_${coverResult}`,
-            runId: token.runId,
-            card: nodeId,
-            step: "write",
-            attempt,
-            result: "ok",
-            ms: 0
-          })
         );
-      this.ports.log(
-        formatPipelineLog({
-          event: "slots",
-          runId: token.runId,
-          card: nodeId,
-          step: "write",
-          attempt,
-          result: "ok",
-          ms: 0,
-          counts: {
-            placed: result.placed.length,
-            missing: result.missing.length,
-            ...(commonsAsked ? { commons: commonsAsked } : {}),
-            ...(commonsLimited ? { commons_limited: 1 } : {}),
-            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
-            ...(finderLookups ? { finder_lookup: finderLookups } : {}),
-            ...(finderUnfit ? { finder_unfit: finderUnfit } : {}),
-            ...(unfitPlaced ? { finder_unfit_placed: unfitPlaced } : {}),
-            ...(finderUnchecked ? { finder_unchecked: finderUnchecked } : {}),
-            ...(looks ? { look: looks } : {}),
-            ...(looksUnfit ? { look_unfit: looksUnfit } : {}),
-            ...(looksDropped ? { look_dropped: looksDropped } : {}),
-            ...(looksUnchecked.size ? { look_unchecked: looksUnchecked.size } : {}),
-            ...Object.fromEntries(
-              rounds.flatMap((round, i) =>
-                round
-                  ? [
-                      [`r${i + 1}_found`, round.found],
-                      [`r${i + 1}_offTopic`, round.offTopic]
-                    ]
-                  : []
-              )
-            ),
-            ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
-            ...(diagramStats.asked
-              ? {
-                  diagram_asked: diagramStats.asked,
-                  diagram_drawn: result.diagrams?.length ?? 0,
-                  diagram_declined:
-                    diagramStats.asked -
-                    drawnDiagrams.size -
-                    Object.values(diagramStats.rejected).reduce((a, b) => a + b, 0)
-                }
-              : {}),
-            ...Object.fromEntries(Object.entries(diagramStats.rejected).map(([code, n]) => [`diagram_rej_${code}`, n])),
-            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
-          },
-          hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
-        })
-      );
-      return undefined;
-    } catch (error) {
-      release();
-      throw error;
+        commonsAsked = commons.requests;
+        searchesAsked += commons.requests;
+        searchesAnswered += commons.answered;
+        commonsLimited = commons.limited;
+        commonsRejected = commons.rejected;
+        for (const index of commons.cut) commonsCut.add(index);
+        // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
+        commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
+        if (signal.aborted) throw new Error("aborted");
+        const asFound: FoundImages = {
+          bySlot: commons.bySlot,
+          found: [...commons.bySlot.values()].reduce((n, list) => n + list.length, 0),
+          offTopic: 0
+        };
+        for (const [index, list] of await probeFound(lacking, coverOnly(asFound) ?? asFound))
+          perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+      }
     }
+    // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
+    const canDraw = options.draw !== false && !!this.ports.drawDiagrams && (this.ports.diagramsOn?.() ?? true);
+    if (heldUnfit.size) {
+      const provisional = choosePictures(slots, perSlot, taken, language);
+      const usable = new Map<number, FoundImage[]>();
+      for (const [index, list] of heldUnfit) {
+        // Held back from the last resort only when the diagram step will really be asked for this slot; otherwise it is placed, off.
+        const willDraw = canDraw && marked.has(index) && !commonsCut.has(index);
+        const kept = willDraw ? list.filter(item => !noLastResort.has(`${index}|${item.url}`)) : list;
+        if (kept.length) usable.set(index, kept);
+      }
+      const last = slots.filter(slot => usable.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {})));
+      const asHeld: FoundImages = { bySlot: usable, found: 0, offTopic: 0 };
+      for (const [index, list] of await probeFound(last, asHeld)) {
+        for (const item of usable.get(index) ?? []) unfitKeys.add(`${index}|${item.url}`);
+        perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+      }
+    }
+    // Diagram-kind slots still without a picture get one extra call (a chart drawn from the chapter text), never one per slot.
+    if (this.ports.drawDiagrams && canDraw) {
+      const provisional = choosePictures(slots, perSlot, taken, language);
+      const want = slots.filter(slot => {
+        const outcome = provisional.get(slot.index);
+        return (
+          marked.has(slot.index) &&
+          !commonsCut.has(slot.index) &&
+          isDiagramKind(slot.kind) &&
+          !!outcome &&
+          "reasonCode" in outcome &&
+          outcome.reasonCode === "not_found"
+        );
+      });
+      if (want.length) {
+        diagramStats.asked = want.length;
+        const text = stripImageLines(chapterBody(first.detail));
+        // A figure already in the chapter (maybe hand-edited) is not a source of numbers for the checks.
+        const checkText = stripFigureFences(text);
+        let drafts: DiagramDraft[] = [];
+        try {
+          drafts = await untilAborted(
+            signal,
+            this.ports.drawDiagrams(
+              {
+                ...this.base(drive, drive.config.authorModel),
+                chapter: text,
+                slots: want.map(({ index, kind, explains }) => ({ index, kind, explains }))
+              },
+              { signal, admission: drive.admission }
+            )
+          );
+        } catch (error) {
+          if (isBudgetExhausted(error) || signal.aborted) throw error;
+        }
+        for (const draft of drafts) {
+          const slot = want.find(item => item.index === draft.slot);
+          if (!slot) continue;
+          if (draft.mermaid === undefined) {
+            const figure = checkFigureDraft(draft, checkText);
+            let figureCode: string | undefined = figure.ok ? undefined : figure.code;
+            const figureTitle = diagramTitle(draft.title, slot.explains, language);
+            if (
+              figure.ok &&
+              this.exitCheck(
+                ["```vam-figure", figure.body, "```", "", diagramCaption(figureTitle, language)].join("\n"),
+                new Set()
+              )
+            )
+              figureCode = "unsafe";
+            if (figureCode || !figure.ok) {
+              diagramStats.rejected[figureCode ?? "unsafe"] = (diagramStats.rejected[figureCode ?? "unsafe"] ?? 0) + 1;
+              continue;
+            }
+            drawnDiagrams.set(slot.index, { title: figureTitle, mermaid: figure.body, fence: "vam-figure" });
+            continue;
+          }
+          const checked = checkDiagram(draft, checkText);
+          let code: string | undefined = checked.ok ? undefined : checked.code;
+          let title = "";
+          if (checked.ok) {
+            title = diagramTitle(draft.title, slot.explains, language);
+            const lines = ["```mermaid", checked.mermaid, "```", "", diagramCaption(title, language)].join("\n");
+            // The fill's exit check refuses a whole chapter for one such line, so a chart it would refuse is dropped alone here.
+            if (this.exitCheck(lines, new Set())) code = "unsafe";
+            else if (this.ports.mermaidSyntax) {
+              const verdict = await untilAborted(signal, this.ports.mermaidSyntax(checked.mermaid));
+              if (verdict === "invalid") code = "syntax";
+            }
+          }
+          if (code || !checked.ok) {
+            diagramStats.rejected[code ?? "unsafe"] = (diagramStats.rejected[code ?? "unsafe"] ?? 0) + 1;
+            continue;
+          }
+          drawnDiagrams.set(slot.index, { title, mermaid: checked.mermaid });
+        }
+        diagramStats.drawn = drawnDiagrams.size;
+      }
+    }
+    return {
+      perSlot,
+      hints,
+      unfitKeys,
+      lookedFit,
+      drawnDiagrams,
+      commonsCut,
+      commonsAsked,
+      searchesAsked,
+      searchesAnswered,
+      commonsLimited,
+      commonsNoHint,
+      commonsRejected,
+      rounds,
+      finderUnfit,
+      finderUnchecked,
+      finderLookups,
+      looks,
+      looksUnfit,
+      looksDropped,
+      looksUnchecked,
+      diagramStats
+    };
   }
 
   /**
@@ -5923,7 +6339,7 @@ export class BookPipelineRuns {
   }
 
   /** One probe through the run-wide gate: true when the picture loads. A probe that throws (not a Stop) counts as not loaded. */
-  private async probeGated(drive: Drive, href: string): Promise<boolean> {
+  private async probeGated(drive: Pick<Drive, "controller" | "probeGate">, href: string): Promise<boolean> {
     const signal = drive.controller.signal;
     const gate = drive.probeGate;
     if (signal.aborted) throw new Error("aborted");

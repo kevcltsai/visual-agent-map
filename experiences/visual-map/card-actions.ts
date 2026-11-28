@@ -47,6 +47,7 @@ export type CardActionId =
   | "zoom-reset"
   | "search"
   | "shortcuts"
+  | "batch-color"
   | "merge"
   | "multi-research"
   | "move-to"
@@ -67,7 +68,9 @@ export type CardActionId =
 export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge" | "canvas";
 /** What an action acts on: an ordinary card, an AI card, a topic selection, the map itself, or one canvas image (P5.3). */
 export type CardScope = "card" | "ai-card" | "multi" | "map" | "image";
-export type CardAvailability = { ok: true } | { ok: false; reasonKey: TranslationKey };
+/** An unavailable action's reason; `reasonArgs` fill its {0}, {1}… (the locked cards of a selection, P1.9). */
+export type CardAvailability =
+  { ok: true } | { ok: false; reasonKey: TranslationKey; reasonArgs?: readonly (string | number)[] };
 
 /** The six plain reasons an action cannot run now (more specific ones come from the selection, such as mergeCheck's). */
 export const CARD_ACTION_REASONS = {
@@ -121,6 +124,8 @@ export interface CardActionHost {
   zoomReset(): void;
   search(): void;
   shortcuts(): void;
+  /** The selection's Color popover (batch-popover.ts) above its button (`opener`) in the selection bar. */
+  openBatchColor(opener?: HTMLElement): void;
   merge(): void;
   multiResearch(): void;
   chooseParent(copy: boolean): void;
@@ -163,6 +168,8 @@ export interface CardActionContext {
   knowledgeRefs: { editable: boolean; copied: boolean };
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
+  /** The cards' titles as one list, joined with the language's list separator. */
+  titles(ids: readonly string[]): string;
   isArgumentCard(id: string): boolean;
   /** Add summary (an empty summary the card face does not draw). */
   summaryFieldOffered(): boolean;
@@ -235,6 +242,16 @@ const then = (first: CardAvailability, next: () => CardAvailability): CardAvaila
 const merging = (ctx: CardActionContext, ids: Iterable<string | null>): CardAvailability => {
   for (const id of ids) if (id && ctx.isMerging(id)) return off(CARD_ACTION_REASONS.merging);
   return OK;
+};
+/**
+ * P1.9: a selection holding an AI-locked or merging card refuses its batch actions (colour, size, position, merge) as a
+ * whole, and the reason names those cards.
+ */
+const selectionLock = (ctx: CardActionContext): CardAvailability => {
+  const locked = ctx.ids.filter(id => ctx.note(id)?.aiLocked === true || ctx.isMerging(id));
+  return locked.length
+    ? { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] }
+    : OK;
 };
 const branch = (ctx: CardActionContext, id: string): string[] => {
   const out = [id];
@@ -395,9 +412,9 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     order: 35,
     group: 2,
     // B08: the toolbar's Style (an AI card has it in its ⋯); each choice in the popover goes through whenEditing and
-    // mergeUnlocked. Hidden under the picture-book structure lock.
+    // mergeUnlocked. A colour or style is neither card AI nor structure (decision #62), so the picture-book locks keep it.
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.stylesEditable,
-    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    available: ctx => gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openStyle(card(ctx), options?.opener)
   },
   {
@@ -731,6 +748,19 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   // The topic selection (renderSelectionBar, openSelectionMoreMenu, and the right-click on a selection). The bar reads
   // neither presentation nor notesLoading; the picture-book lock takes the AI actions, and the structure ones.
   {
+    // P1.9 (B19b): one colour for the whole selection, one write and one undo step (changeSelectionColor rechecks these). A
+    // colour changes neither parent nor order, so the picture-book locks (card AI, structure) leave it on.
+    id: "batch-color",
+    titleKey: "ui.batch_color",
+    icon: "palette",
+    scope: ["multi"],
+    surfaces: ["toolbar"],
+    order: 295,
+    group: 1,
+    available: ctx => then(gate(ctx, ["presentation", "readOnly"]), () => selectionLock(ctx)),
+    run: (ctx, options) => ctx.host.openBatchColor(options?.opener)
+  },
+  {
     id: "merge",
     titleKey: "ui.merge",
     icon: "combine",
@@ -739,10 +769,12 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     order: 300,
     group: 1,
     available: ctx =>
-      then(gate(ctx, ["bookAi"]), () => {
-        const reason = ctx.mergeBlock();
-        return reason ? off(reason) : OK;
-      }),
+      then(gate(ctx, ["bookAi"]), () =>
+        then(selectionLock(ctx), () => {
+          const reason = ctx.mergeBlock();
+          return reason ? off(reason) : OK;
+        })
+      ),
     run: ctx => ctx.host.merge()
   },
   {
@@ -765,7 +797,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["toolbar"],
     order: 320,
     group: 1,
-    available: ctx => then(gate(ctx, ["bookStructure"]), () => merging(ctx, selectionBranches(ctx))),
+    available: ctx =>
+      then(gate(ctx, ["bookStructure"]), () => then(selectionLock(ctx), () => merging(ctx, selectionBranches(ctx)))),
     run: ctx => ctx.host.chooseParent(false)
   },
   {
@@ -900,7 +933,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
   card: ["research", "style", "open-note"],
   "ai-card": ["stop-run-all", "run-stop", "ai-lock", "research", "ai-settings", "open-note"],
-  multi: ["move-to", "merge", "multi-research", "finish-selection"]
+  multi: ["batch-color", "move-to", "merge", "multi-research", "finish-selection"]
 };
 
 /** The palette commands (main.ts registers them by these ids) and the mapCommand action each one runs today. */

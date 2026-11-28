@@ -184,6 +184,8 @@ export interface MapChatSelectedImage {
   relations?: { kind: TopicRelationKind; from: string; to: string; description?: string }[];
   /** True when the picture itself is sent with this turn. */
   imageAttached: boolean;
+  /** The picture file's path when the selection was made: kept only in the parser's scope (a move_anchor's `imageRef`), never sent. */
+  path?: string;
 }
 /** What the parser needs of {@link MapChatSelectedImage}: the image a reply may name, its anchor ids and its relation pairs. */
 export interface MapChatImageScope {
@@ -191,6 +193,8 @@ export interface MapChatImageScope {
   kind: "annotated" | "plain";
   anchorIds: string[];
   relations: { from: string; to: string }[];
+  /** The picture file's path at selection time (never sent to the model). */
+  path?: string;
 }
 /** The fixed note next to a selected annotated image (a constant, never built from the image's own text). */
 export const MAP_CHAT_IMAGE_NOTE =
@@ -344,6 +348,11 @@ export interface MapChatContext {
   nodeIds: string[];
   /** How many cards were selected when the message was sent (an action with no targets means these). */
   selectedCount: number;
+  /**
+   * The cards selected when the message was sent, fixed then: an action with no targets works on these, never on what is
+   * selected when the reply (or its plan) is applied. Not serialized.
+   */
+  selectedIds?: string[];
   /** The reply must start with `create_map` (see {@link MapChatContextInput.noEditableMap}). */
   noEditableMap: boolean;
   /** An AIM map: a reply's topic types are skipped (see {@link MapChatContextInput.aim}). */
@@ -507,7 +516,8 @@ function imageParts(image: MapChatSelectedImage): {
       id: image.id,
       kind: "annotated",
       anchorIds: anchors.map(anchor => anchor.id),
-      relations: relations.map(link => ({ from: link.from, to: link.to }))
+      relations: relations.map(link => ({ from: link.from, to: link.to })),
+      ...(image.path ? { path: image.path } : {})
     }
   };
 }
@@ -975,6 +985,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     json,
     nodeIds: [...ids],
     selectedCount: input.selected.length,
+    selectedIds: input.selected.map(ref => ref.id),
     noEditableMap: !!input.noEditableMap,
     aim: !!input.aim,
     sourcePaths: [...input.files.map(file => file.path), ...(input.activeFile ? [input.activeFile.path] : [])],

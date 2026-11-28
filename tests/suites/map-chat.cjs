@@ -492,8 +492,9 @@ const topicBaseline = (h, { full = true } = {}) => {
 };
 const NOT_UNDOABLE = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.';
 // Resolves with the action lines; the closing "cannot be undone" line is left out and reported as `.notice` (true when it was there).
+// The selection is snapshotted when apply is called, as a send fixes it; the view never reads the live selection while applying.
 const apply = async (h, actions, hashes = {}, alive, topicHashes) => {
-  const all = await withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicHashes ?? topicBaseline(h) }, alive));
+  const all = await withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicHashes ?? topicBaseline(h), selectedIds: h.view.chatSelectionIds() }, alive));
   const lines = all.filter(l => l.text !== NOT_UNDOABLE); lines.notice = lines.length !== all.length;
   return lines;
 };
@@ -517,6 +518,27 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   assert.equal(h.view.history.undoEntry.label, 'AI chat reply', 'the reply is one undo step, named as the chat\'s'); assert.equal(lines.notice, false, 'no AI work: no closing note');
   h.view.history.undo(); assert.equal(h.view.history.undoEntry.label, 'earlier', 'the earlier entry is kept under it'); h.view.history.redo();
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
+});
+
+// D1-x2 (V3.3 D1 P3.9): the guarded writer says "discarded" when the note changed between the chat's gate and the write; that action
+// is reported as skipped, pushes no undo step and leaves the bytes as the other writer left them.
+integrationTest('map chat: D1-x2 - an edit discarded at commit (the card got locked after the gate) is skipped, pushes no undo step and writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.view.map.nodes.find(n => n.id === h.ids.a).path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the file is byte-identical to what the other writer left');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed for the discarded write');
+  assert.notEqual(lines[0].text.split(':')[0], 'Done');
 });
 
 integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no summary still adds it; it keeps the placeholder and stays unresearched', async () => {
@@ -942,6 +964,43 @@ integrationTest('map chat: in a manual selection mode an action that names no ca
   const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
   eq(lines.map(l => l.status), ['done']); await tick();
   eq(started[0].selected.sort(), [b, c].sort(), 'the user picked b and c in selection mode; the earlier AI pick a does not replace them');
+});
+
+integrationTest('map chat: a plan card applied after the user picked other cards still works on the cards selected when the message was sent', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  const [a, b, c] = [h.ids.a, h.ids.b, h.ids.c];
+  h.view.selection.selectSubtopics([a, b]);
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }], rejected: [] });
+  h.type('add and research'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending');
+  h.view.selection.selectSubtopics([c]);
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await tick();
+  assert.equal(started.length, 1); eq(started[0].selected.sort(), [a, b].sort(), 'the selection fixed at send, not the card picked while the plan waited');
+});
+
+integrationTest('map chat: P2.2d: with one card selected, a research action that names no card researches that card (the send-time selection)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  h.view.selection.setSelected(h.ids.b);
+  assert.equal(h.view.selection.state.multiSelectMode, false);
+  eq(h.view.chatSelectionIds(), [h.ids.b]);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
+  eq(lines.map(l => l.status), ['done']); await tick();
+  assert.equal(started.length, 1); eq(started[0].selected, [h.ids.b], 'only the one selected card is researched');
+});
+
+integrationTest('map chat: with no selection snapshot an action that names no card does not fall back to the live selection', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  h.view.selection.selectSubtopics([h.ids.b, h.ids.c]);
+  const all = await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  await tick();
+  assert.equal(started.length, 0, 'the live selection b, c is not read: nothing was selected at send');
+  eq(all.map(l => l.status), ['skipped']);
 });
 
 integrationTest('map chat: select_topics(all) then research_standard starts the research once on every topic (Quick when nothing names a mode), outside any mutate', async () => {
@@ -2784,13 +2843,85 @@ integrationTest('B1 view operations: collapse, expand, auto layout and focus eac
   await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
 });
 // A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
-integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view shows the whole map and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
+integrationTest('P2.4: after a reply adds five cards the corner says so (role=status) and Locate goes to the first new card without Show all; it times out and a map switch clears it; four cards show nothing', async () => {
+  const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
+  const withCorner = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.corner = h.view.contentEl.createDiv('vam-canvas-overlay vam-canvas-controls'); h.view.canvasControlsEl = h.corner; return h; };
+  const hint = h => findAll(h.corner, i => hasClass(i, 'vam-chat-added-hint'));
+  const four = await withCorner(); await apply(four, tree(4)); assert.equal(hint(four).length, 0, 'four cards: no hint');
+  const five = await withCorner(); await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
+  assert.equal(hint(five).length, 1); assert.equal(hint(five)[0].attrs.role, 'status'); assert.match(visibleText(hint(five)[0]), /Added 5 cards/); eq(five.fits, [], 'the view is not re-framed');
+  find(hint(five)[0], i => hasClass(i, 'vam-chat-added-locate')).click();
+  eq(five.focused, [root.id], 'Locate goes to the first new card'); eq(five.fits, []); assert.equal(hint(five).length, 0, 'and the hint is gone');
+  const late = await withCorner(); await apply(late, tree(5)); late.clock.advance(8000); assert.equal(hint(late).length, 0, 'it goes away by itself');
+  const moved = await withCorner(); await apply(moved, tree(5)); moved.view.clearChatHighlight(); assert.equal(hint(moved).length, 0, 'leaving the map clears it');
+});
+integrationTest('P2.4a: each result line names the one card it is about (the card an add_child made, a new: ref, a single nodeIds), none for many cards', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [addRoot('r', 'Root'), { kind: 'rename_topic', nodeId: 'new:r', title: 'Root 2' }, { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'select_topics', nodeIds: [h.ids.b], all: false }, { kind: 'select_topics', nodeIds: [h.ids.b, h.ids.c], all: false }]);
+  const made = h.view.map.nodes.find(n => n.title === 'Root 2' || n.path.includes('Root'));
+  eq(lines.map(l => l.nodeId), [made.id, made.id, h.ids.a, h.ids.b, undefined]);
+  assert.match(lines[2].text, /Body clock/, 'the line text is as before');
+});
+integrationTest('P2.4a: Locate on a result goes to the card at the same zoom and flashes it once; a card that is gone gets no button', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  delete h.view.focusNode; h.view.viewportEl = { clientWidth: 800, clientHeight: 600 }; h.view.transform = () => {}; h.view.saveViewport = () => { throw new Error('Locate does not save the viewport'); };
+  h.view.map.viewport = { x: 40, y: 30, zoom: 0.3 };
+  const card = h.view.cardEls.get(h.ids.b) ?? h.rootEl.createDiv('card'); h.view.cardEls.set(h.ids.b, card);
+  const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.b, title: 'Moved here' }, { kind: 'rename_topic', nodeId: 'zzz', title: 'Nope' }]);
+  chat.begin('move'); chat.finish('ok', lines); openDetails(chat.logEl);
+  const rows = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
+  const locates = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line-locate'));
+  assert.equal(locates.length, 1, 'only the line whose card is on the map'); eq(rows.map(r => r.text), lines.map(l => l.text), 'the row text is the line text');
+  assert.equal(locates[0].text, 'Locate ›');
+  const before = { ...h.view.map.viewport }; locates[0].click();
+  const after = h.view.map.viewport; const node = h.view.map.nodes.find(n => n.id === h.ids.b);
+  assert.equal(after.zoom, 0.3, 'the zoom stays'); assert.notDeepEqual([after.x, after.y], [before.x, before.y], 'the view moved');
+  assert.ok(Math.abs(after.x + (node.x + (node.width ?? 260) / 2) * 0.3 - 400) < 200, 'the card is near the middle');
+  assert.ok(hasClass(card, 'is-chat-located'), 'the card flashes'); h.clock.advance(1200); assert.ok(!hasClass(card, 'is-chat-located'), 'once');
+});
+test('P2.4a: the panel offers Locate only for a line whose card is on the map; the click goes to the host; a restored turn has none', () => {
+  const located = []; const f = panelFixture({ locateTopic: id => { located.push(id); return true; } }); f.panel.setOpen(true); f.panel.begin('q');
+  f.panel.finish('r', [{ status: 'failed', text: 'Failed: A (x)', nodeId: 'a' }, { status: 'skipped', text: 'Skipped: gone', nodeId: 'gone' }, { status: 'done', text: 'Done: B', nodeId: 'b' }, { status: 'done', text: 'Done: map' }]);
+  const locates = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line-locate'));
+  assert.equal(locates().length, 1, 'folded: the loud line with a card'); locates()[0].click(); eq(located, ['a']);
+  openDetails(f.panel.logEl); assert.equal(locates().length, 2, 'open: the done line with a card too');
+  eq(findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text), ['Failed: A (x)', 'Skipped: gone', 'Done: B', 'Done: map']);
+  const old = panelFixture({ locateTopic: () => true }); old.panel.restore(restoredConversation()); openDetails(old.panel.logEl);
+  assert.ok(findAll(old.panel.logEl, i => hasClass(i, 'vam-map-chat-line')).length > 0); assert.equal(findAll(old.panel.logEl, i => hasClass(i, 'vam-map-chat-line-locate')).length, 0, 'an old record has no card on its lines: no Locate');
+});
+test('P2.4a: the record keeps a line as {status, text}: the card id stays in memory, so a restored turn offers no Locate', () => {
+  const { MapChatTurnRecord } = load('experiences/visual-map/map-chat-turn-record.ts', { obsidian }); const { restoreConversation } = load('core/map-chat-records.ts'); const written = [];
+  const answer = { reply: 'ok', lines: [{ status: 'done', text: 'Renamed A', nodeId: 'a' }], modelLabel: 'Sonnet' };
+  const record = new MapChatTurnRecord({ conversationId: 'c1', write: line => written.push({ v: 1, at: 'a', ...line }) }, 'c1', 1, answer, () => {});
+  record.end('done', { lines: answer.lines });
+  eq(written.find(l => l.type === 'turn_end').lines, [{ status: 'done', text: 'Renamed A' }]);
+  const restored = restoreConversation('c1', [{ v: 1, type: 'turn_start', turn: 1, at: 'a', message: 'm' }, ...written]);
+  eq(restored.turns[0].lines, [{ status: 'done', text: 'Renamed A' }]);
+  const f = panelFixture({ locateTopic: () => true }); f.panel.restore({ id: 'c1', restoredAt: new Date(2026, 10, 5).toISOString(), turns: restored.turns }); openDetails(f.panel.logEl);
+  assert.equal(findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line-locate')).length, 0);
+});
+test('P2.2a: the line above the message box says what this turn may change: the whole map, and the selection an action without cards uses; three languages', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const scope = () => find(f.panel.el, i => hasClass(i, 'vam-map-chat-scope'));
+  const form = scope().parent; assert.ok(form.children.indexOf(scope()) < form.children.findIndex(c => hasClass(c, 'vam-map-chat-composer')), 'before the message box');
+  assert.equal(scope().text, 'This turn may change: every card on this map.');
+  f.select(['a']); assert.equal(scope().text, 'This turn may change: every card on this map; an action that names no card uses the selected card (fixed at send).');
+  f.select(['a', 'b']); assert.equal(scope().text, 'This turn may change: every card on this map; an action that names no card uses the 2 selected cards (fixed at send).');
+  f.select(['a', 'gone']); assert.match(scope().text, /uses the selected card/, 'a card no longer on the map is not counted');
+  f.setLanguage('zh-TW'); f.select(['a', 'b']); assert.equal(scope().text, '這輪可改：這張心智圖的所有卡；沒指定卡片的動作用已選的 2 張卡（送出時固定）。');
+  f.select(['a']); assert.equal(scope().text, '這輪可改：這張心智圖的所有卡；沒指定卡片的動作用已選的這張卡（送出時固定）。');
+  f.select([]); assert.equal(scope().text, '這輪可改：這張心智圖的所有卡。');
+  f.setLanguage('zh-CN'); f.select(['a', 'b']); assert.equal(scope().text, '这轮可改：这张地图的所有卡；没指定卡片的动作用已选的 2 张卡（发送时固定）。');
+  f.select([]); assert.equal(scope().text, '这轮可改：这张地图的所有卡。');
+  f.setLanguage('en');
+});
+integrationTest('B1 view operations: a reply that adds five cards is arranged once, the view keeps its frame, and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
   const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
   const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   const four = await counted(); const fourLines = await apply(four, tree(4));
   assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); eq(four.fits, []); eq([four.view.selection.state.selected], [four.view.map.nodes.find(n => !n.parentId).id]); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
   const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
-  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(!fiveLines.some(l => /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines)); // A9: the batch is placed locally, no whole-map layout line
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 0, 'P2.4: no Show all after the batch'); eq([five.view.selection.state.selected], [root.id]); assert.ok(!fiveLines.some(l => /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines)); // A9: the batch is placed locally, no whole-map layout line
   assert.equal(fiveLines.length, 5, 'one line per card, nothing after the last card line'); // A9: no whole-map layout line any more
   const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
   assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
@@ -3580,12 +3711,12 @@ test('B1 fix 5: a new message, and a pick in any list, end every list of maps sh
   findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).at(-1).click(); eq(findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).map(b => !b.disabled), [false, false], 'a pick ends every list');
 });
 
-integrationTest('B1 fix 6: a reply that asks to look at a card keeps that view; showing the whole map is only the default', async () => {
+integrationTest('B1 fix 6: a reply that asks to look at a card keeps that view; without it the view keeps its frame', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();
   const tree = [addRoot('r', 'Root'), ...Array.from({ length: 5 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   await apply(h, [...tree, { kind: 'focus_topic', nodeId: 'new:c2' }]);
   const kid = h.view.map.nodes.filter(n => n.parentId)[2]; eq(h.focused, [kid.id], 'only the card the reply named'); eq(h.fits, [], 'the view is not moved to show the whole map');
-  const plain = await harness({ empty: true }); await plain.view.hydrate(); await apply(plain, tree); eq(plain.focused, [], 'no centring on one card'); eq(plain.fits.length, 1, 'without focus_topic the whole map is shown');
+  const plain = await harness({ empty: true }); await plain.view.hydrate(); await apply(plain, tree); eq(plain.focused, [], 'no centring on one card'); eq(plain.fits.length, 0, 'without focus_topic the view keeps its frame too (P2.4)');
 });
 
 test('B1 fix 8: the count a plan names is the one it was judged by (a selection made earlier in the reply counts)', () => {
@@ -6399,6 +6530,26 @@ test('F26: showPlan scrolls the log to its end after the hint line is laid out (
   assert.equal(log.scrollTop, 1080, 'and again once the final height is known');
 });
 
+// ---- V3.3 E3: one gate for Apply; the line under a plan with a dashed preview -------------------------------------------
+test('E3 gate: a plan whose map is read-only shows Apply greyed with the reason; pressing it writes nothing and redraws; once writable it applies once', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  let reason = 'Apply is off: the map is read-only while it is presented.'; let applied = 0;
+  f.panel.showPlan({ reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', previewNote: 'The dashed cards on the canvas are the new cards.', blocked: () => reason, apply() { applied++; }, cancel() {} });
+  const apply = () => f.panel.logEl.querySelector('.vam-map-chat-plan-apply');
+  const blocked = () => f.panel.logEl.querySelector('.vam-map-chat-plan-blocked');
+  assert.equal(apply().disabled, true, 'greyed');
+  assert.equal(blocked()?.text, reason, 'the reason is written');
+  assert.equal(findAll(f.panel.logEl, i => i.text === 'The dashed cards on the canvas are the new cards.').length, 0, 'the reason takes the place of the preview line');
+  apply().click();
+  assert.equal(applied, 0, 'nothing applied');
+  reason = null; f.panel.refreshPlan();
+  assert.equal(apply().disabled, false); assert.equal(blocked(), null);
+  assert.equal(findAll(f.panel.logEl, i => i.text === 'The dashed cards on the canvas are the new cards.').length, 1, 'the preview line');
+  const button = apply(); button.click(); button.click();
+  assert.equal(applied, 1, 'applied once');
+});
+
 // ---- persona G12: a move_topic without beforeId leaves no hole in the old branch (real Lane L coordinates: parent above, old parent below) ----
 integrationTest('persona G12: moving a card with its own branch up under another parent pulls the old parent\'s other children up to it, no big hole', async () => {
   const h = await harness(); await h.view.hydrate();
@@ -6426,7 +6577,7 @@ integrationTest('persona G12: moving a card with its own branch up under another
 });
 
 // ---- P4a: picture chip, "before AI edits the picture" switch, "AI looked at this picture", "Undo this reply" ---------------------
-const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }) => {
+const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }, extra = {}) => {
   const state = { image: start, mode: 'preview', listeners: [], sets: [], undo: new Map(), undone: [], later: 0 };
   const token = { label: 'reply' };
   const f = panelFixture({
@@ -6434,7 +6585,8 @@ const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts
     watchImage: changed => { state.listeners.push(changed); return () => { state.listeners.splice(state.listeners.indexOf(changed), 1); }; },
     setImageMode: mode => { state.sets.push(mode); state.mode = mode; },
     replyUndoState: t2 => state.undo.get(t2) ?? 'top',
-    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; }
+    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; },
+    ...extra
   });
   f.panel.setOpen(true);
   const set = image => { state.image = image; state.listeners.forEach(fn => fn()); };
@@ -6462,6 +6614,29 @@ test('P4a chip: an annotated picture reads "Selected: annotated image · words" 
   f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(chipTexts(), ['Selected: image · b.png']);
   f.set(null); assert.deepEqual(chipTexts(), []);
   f.panel.dispose(); assert.equal(f.state.listeners.length, 0, 'the panel stops listening when the view closes');
+});
+
+// V3.3 G05 / P5.4: the chip says the picture goes to the AI; a runtime that cannot read pictures is told at selection time, Send is off.
+test('G05 chip: an annotated picture chip says "This image goes to the AI" beside its label; an ordinary one does not', () => {
+  const f = imageHostFixture(); const sent = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-sent')).map(i => i.text);
+  f.panel.refreshSelection();
+  assert.deepEqual(sent(), ['This image goes to the AI']);
+  f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(sent(), [], 'an ordinary picture is never sent');
+});
+
+test('G05 no image input: the explanation shows under the chip at once, Send is disabled and pressing Send or Enter asks the host for nothing; with image input there is no explanation', () => {
+  const state = { notice: 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.' };
+  const f = imageHostFixture(undefined, { imageNotice: () => state.notice });
+  f.panel.refreshSelection();
+  const notice = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-image-notice')).map(i => i.text);
+  assert.deepEqual(notice(), [state.notice]);
+  assert.equal(f.parts.send().disabled, true);
+  f.panel.inputEl.value = 'hello'; f.panel.inputEl.fire('input');
+  f.parts.send().click(); pressEnter(f.panel);
+  assert.equal(f.calls.send, 0, 'nothing is sent');
+  state.notice = null; f.panel.refreshSelection();
+  assert.deepEqual(notice(), []); assert.equal(f.parts.send().disabled, false);
+  f.parts.send().click(); assert.equal(f.calls.send, 1);
 });
 
 test('P4a switch: a named group of two aria-pressed buttons, only while a picture is chosen; clicking switches, remembers through the host, and a second click on the same button changes nothing', () => {

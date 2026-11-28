@@ -9,6 +9,8 @@ const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/ru
 const model = S.load('core/argument-map/model.ts');
 const machine = S.load('core/argument-map/machine.ts');
 const { translate } = S.load('i18n.ts');
+const { describeArgumentProgress } = S.load('experiences/visual-map/argument-progress.ts');
+const { describeArgumentCard } = S.load('experiences/visual-map/argument-card.ts');
 
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
 const URL_OK = 'https://stats.example.org/report';
@@ -2130,4 +2132,92 @@ test('P1b: Stop while the one call is out pauses with user and writes nothing; t
   assert.equal(state.run.stopReason, 'user');
   assert.equal(state.hypotheses.length, 0);
   assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 3);
+});
+
+// ---- D1-x1: the guarded writer's outcome reaches the runner ----
+test('D1-x1: a discarded note write (lock / changed version) is not success: the run does not conclude and stops with error', async () => {
+  const r = await rig({ script: { step: steps() }, ports: { updateNote: async () => 'discarded' } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.notEqual(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, 'error');
+});
+test('D1-x1: a refused note write (admitAiWriter throws) is not success either', async () => {
+  const r = await rig({ script: { step: steps() }, ports: { updateNote: async () => { throw new Error('refused'); } } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.notEqual(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, 'error');
+});
+
+// ---- D1-x3: a discarded write is not retried; a discarded conclusion leaves the run paused ----
+test('D1-x3: a discarded note write does not retry the step: one model call for it, then the error pause', async () => {
+  let r;
+  r = await rig({ script: { step: steps() }, ports: { updateNote: async (path, patch) => (r.stat.steps.includes('verdict') ? 'discarded' : r.repo.updateNote(path, patch)) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'error');
+  assert.ok(r.stat.logs.some(l => l.includes('note write discarded')));
+  assert.ok(r.stat.steps.includes('verdict'));
+  assert.equal(r.stat.logs.filter(l => l.includes('step failed attempt=2')).length, 0, `a discarded write was retried: ${r.stat.logs.join(' | ')}`);
+  assert.equal(r.stat.steps.filter(n => n === 'verdict').length, 1, r.stat.steps.join(','));
+});
+// ---- D1-x6: a discarded write says the note changed, not that the AI failed ----
+const GENERIC_AI_FAIL = { en: 'The AI reply could not be used', zh: 'AI 回覆無法使用' };
+test('D1-x6: a discarded note write pauses with its own reason on the bar and the card, not the AI-failure text', async () => {
+  let r;
+  let discard = true;
+  r = await rig({ script: { step: steps() }, ports: { updateNote: async (path, patch) => (discard && r.stat.steps.includes('verdict') ? 'discarded' : r.repo.updateNote(path, patch)) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.stopReason, 'error');
+  const t = r.ports.t;
+  const bar = describeArgumentProgress(state, true, t);
+  assert.equal(bar.detail, t('ui.argument_paused_reason_write_discarded'));
+  assert.ok(!bar.detail.includes(GENERIC_AI_FAIL.zh), bar.detail);
+  const lines = describeArgumentCard(state, state.roles.conclusion, t).lines.concat(describeArgumentCard(state, state.roles.situation, t).lines).join('|');
+  assert.ok(lines.includes(t('ui.argument_paused_reason_write_discarded')), lines);
+  assert.ok(!lines.includes(t('ui.argument_paused_reason_error')), lines);
+  discard = false;
+  await r.runs.resume(r.mapPath);
+  const after = await r.state();
+  assert.equal(after.run.errorDetail, undefined, 'the detail does not outlive the pause');
+  assert.equal(after.run.phase, 'concluded');
+});
+test('D1-x6: an ordinary step error still shows the generic AI-failure text (regression)', async () => {
+  const r = await rig({ script: { step: steps({ add_needs: () => { throw new Error('provider down'); } }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.stopReason, 'error');
+  const t = r.ports.t;
+  assert.equal(describeArgumentProgress(state, true, t).detail, t('ui.argument_bar_error'));
+  assert.ok(t('ui.argument_bar_error').includes(GENERIC_AI_FAIL.zh));
+});
+test('D1-x3: a transient step error still retries once', async () => {
+  const r = await rig({ script: { step: steps({ add_needs: (request, n) => { if (n === 1) throw new Error('provider hiccup'); return { needs: [{ text: 'need one' }, { text: 'need two' }] }; } }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  assert.ok(r.stat.steps.filter(n => n === 'add_needs').length >= 2);
+  assert.equal((await r.state()).run.phase, 'concluded');
+});
+test('D1-x3: a discarded conclusion write leaves the run paused with error, not concluded; resume asks for the conclusion again', async () => {
+  let failConclusion = true;
+  let r;
+  r = await rig({ script: { step: steps() }, ports: { updateNote: async (path, patch) => {
+    const state = await r.state();
+    const conclusionPath = (await r.repo.readMap(r.mapPath)).nodes.find(n => n.id === state.roles.conclusion)?.path;
+    if (failConclusion && path === conclusionPath) return 'discarded';
+    return r.repo.updateNote(path, patch);
+  } } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  let state = await r.state();
+  assert.notEqual(state.run.phase, 'concluded');
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'error');
+  assert.equal(r.stat.steps.filter(n => n === 'conclude').length, 1, 'no retry of the conclusion');
+  failConclusion = false;
+  await r.runs.resume(r.mapPath);
+  state = await r.state();
+  assert.equal(r.stat.steps.filter(n => n === 'conclude').length, 2);
+  assert.equal(state.run.phase, 'concluded');
 });

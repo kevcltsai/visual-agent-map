@@ -101,7 +101,7 @@ test('runPromptItems: post-order calls, statuses, outcome counts; a failing chil
   assert.equal(statuses.get('a').status, 'blocked'); assert.equal(statuses.get('a').reason, 'below: A1');
   assert.equal(statuses.get('root').status, 'blocked', 'the grandparent is stuck too');
   assert.match(statuses.get('a1').reason, /boom/);
-  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false });
+  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 });
 
 test('runPromptItems: Stop returns the running card to idle and starts nothing new', async () => {
@@ -243,7 +243,8 @@ async function harness(spec, { confirm = true } = {}) {
     view.livingValidity = await inspectLivingValidity({
       app, repo, calls: host.aiCalls, mapPath: MAP, viewSession: 'test-validity',
       signal: new AbortController().signal, current: () => true,
-      language: () => 'English', mapSources: async () => []
+      language: () => 'English', mapSources: async () => [],
+      onDependencies: graph => { view.livingGraph = graph; }
     });
   };
   // A second view of the same map on the same plugin (another pane or window).
@@ -345,7 +346,7 @@ test('Run All: one call per unlocked AI card, dependency order, optional web on 
     assert.equal(call.options.task.webSearchOnly, true);
     assert.equal(call.options.task.optionalWebSearch, true);
   }
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   for (const [key] of TREE) assert.equal(stamp(h, key).result, 'ok');
   assert.match(h.raw('root'), /> Result: root/);
 });
@@ -501,6 +502,72 @@ test('toolbar Run all: disabled with a hint without an AI card; progress "n / N"
   assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
+// ---- V3.3 P3.6: n / N only once the round is planned, and the last count (D2-2) ---------------------------------------
+const MISSING = { prompt: 'Find facts\nSources: [[Missing]]' };
+const countOf = h => {
+  const bar = element('div');
+  h.view.renderRunAllButton(bar);
+  const button = find(bar, i => i.tag === 'button' && i.cls?.includes('is-running'));
+  return { button, count: button && find(button, i => i.cls?.includes('vam-run-all-count'))?.text };
+};
+
+test('D2-2 progress: no "n / N" before the round is planned; N leaves out cards blocked before the start and locked cards', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING], ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  const early = countOf(h);
+  assert.ok(early.button, 'the stop button shows at once');
+  assert.equal(early.count, undefined, 'no "0 / 0" before the total is known');
+  await until(() => h.calls.length === 1);
+  assert.equal(countOf(h).count, '1 / 5', 'the blocked "solo" and the locked "lk" are not in N, nor counted as finished');
+  h.view.stopPromptBatch(); await h.done();
+  const g = await harness([['solo', null, MISSING]]);
+  await g.runAll(); await g.done();
+  assert.equal(g.view.promptBatch.total, 0, 'nothing to process: N is 0, so no "0 / 0" either');
+  assert.equal(g.view.promptBatch.outcome.blocked, 1);
+});
+
+test('D2-2 last count: the end notice lists each class that happened; "done" is changed + no-change only, reused is not done', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.fail.add('leaf1');
+  await h.runAll(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 2, failed: 1, blocked: 3, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 2 done, 1 failed, 3 blocked');
+  h.plan.fail.delete('leaf1');
+  h.view.promptBatch = undefined;
+  await h.runAll(); await h.done();
+  // Run All forces every card: the two that were already done run again and write nothing new.
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 1, stopped: false, noChange: 2, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 5 done (2 with no change), 1 blocked');
+  // Run Card on root: its valid dependencies are reused, and reused is not done.
+  h.view.promptBatch = undefined;
+  h.view.startPromptRun([h.node('root').id]); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: false, noChange: 1, cancelled: 0, skipped: 0, reused: 4 });
+  assert.equal(h.notices.at(-1), 'Run finished: 1 done (1 with no change), 4 already up to date');
+  const s = await harness(TREE);
+  s.plan.hang.add('leaf1');
+  await s.runAll();
+  await until(() => s.calls.length === 1);
+  s.view.stopPromptBatch(); await s.done();
+  eq(s.view.promptBatch.outcome, { done: 0, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 5, skipped: 0, reused: 0 });
+  assert.equal(s.notices.at(-1), 'Run stopped: 5 cancelled');
+});
+
+test('D2-2 chat: a run_living_* round where every card was already current says so, not "done"', async () => {
+  const h = await harness(TREE);
+  const first = await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] });
+  eq(first, { status: 'done' });
+  // The planner forces its targets today, so a whole reused round comes from the round's count, stubbed here.
+  const counts = { done: 0, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0 };
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 5 });
+  for (const [action, nodeIds] of [['run_living_all', []], ['run_living_card', [h.node('side').id]]]) {
+    const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action, nodeIds });
+    eq(outcome, { status: 'skipped', reason: 'already up to date, nothing was run' }, action);
+  }
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 0 });
+  eq(await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }), { status: 'skipped', reason: 'There are no Prompt topics to run.' });
+});
+
 // ---- menus ------------------------------------------------------------------------------------------------------------
 const canvasEvent = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
 const titles = menu => menu.items.map(i => i.title ?? '|');
@@ -570,6 +637,103 @@ test('arrows: a line whose parent is an AI card gets a marker-start arrow and a 
   assert.equal(g.view.edgesEl.children.some(c => c.tag === 'defs' && c.children.length), false);
 });
 
+test('D2-4 dependency highlight: selecting an AI card marks the planner edges in place; semantic lines never; no selection leaves the DOM as without a graph', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['C', 'A'], ['O', 'A', { noAi: true }], ['D', 'C'], ['E', null], ['F', null, { noAi: true }]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  const refs = async (key, ...targets) => {
+    const file = h.app.vault.getAbstractFileByPath(h.node(key).path);
+    await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + targets.map(t => `  - "card:${id(t)}"\n`).join('')));
+  };
+  await refs('B', 'D');
+  await refs('A', 'E');
+  // A-F is a semantic line; A-C is a parent and child that also hold a relation, so only the relation line is drawn.
+  h.mapDoc.topicRelations = [{ kind: 'supports', from: id('A'), to: id('F') }, { kind: 'related', from: id('A'), to: id('C') }];
+  await view.hydrate();
+  assert.ok(view.livingGraph, 'the graph comes with the validity pass');
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  const snap = () => JSON.stringify(view.edgesEl.children);
+  const graph = view.livingGraph;
+  view.livingGraph = undefined;
+  view.drawEdges();
+  const noGraph = snap();
+  view.livingGraph = graph;
+  view.drawEdges();
+  const before = snap();
+  assert.equal(before, noGraph, 'a graph with no selection changes nothing');
+  let draws = 0;
+  const draw = view.drawEdges;
+  view.drawEdges = function () { draws++; return draw.call(this); };
+  const marked = cls => view.edgesEl.children.filter(c => c.classes?.includes(cls));
+  const pair = c => c.getAttribute('data-dep') ?? [...view.edgeEls].find(([, p]) => p === c)?.[0];
+  const keyName = new Map(h.mapDoc.nodes.map(n => [n.id, [...h.byKey].find(([, v]) => v.id === n.id)[0]]));
+  const label = list => list.map(c => pair(c).split('\u0000').map(x => keyName.get(x)).join('>')).sort();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.deepEqual(label(marked('is-dep-run')), ['A>B', 'A>C', 'A>E', 'B>D', 'C>D']);
+  assert.deepEqual(label(marked('is-dep-read')), ['A>O']);
+  const overlays = marked('vam-edge-dep-overlay');
+  assert.deepEqual(label(overlays), ['A>C', 'A>E', 'B>D'], 'pairs without a drawn tree line get an overlay');
+  assert.ok(overlays.every(o => o.getAttribute('d')), 'each overlay has a path');
+  assert.equal(view.edgesEl.children.at(-1), overlays.at(-1), 'overlays sit on top');
+  for (const path of view.relationEls.values()) assert.equal(path.classes.some(c => c.startsWith('is-dep')), false, 'semantic lines never');
+  view.applySelectionChange(view.selection.click(id('O')));
+  assert.equal(marked('is-dep-run').length + marked('is-dep-read').length, 0, 'an ordinary card highlights nothing');
+  view.applySelectionChange(view.selection.click(id('A')));
+  view.applySelectionChange(view.selection.clickEmpty());
+  assert.equal(snap(), before, 'clearing the selection restores the DOM');
+  assert.equal(draws, 0, 'selection never redraws the edges');
+});
+
+test('D2-4 dependency highlight: a structural change drops the stale graph (no highlight until the next hydrate); a position-only change keeps it', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['X', null]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  await view.hydrate();
+  assert.ok(view.livingGraph);
+  view.render = () => {};
+  const setup = () => {
+    view.cardEls = new Map(view.map.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+    view.edgesEl = dom.createSvg('svg');
+    view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+    view.drawEdges();
+  };
+  const marks = () => view.edgesEl.children.filter(c => c.classes?.some(cls => cls.startsWith('is-dep') || cls === 'vam-edge-dep-overlay'));
+  // Position only (and the sibling order, as a drop among siblings rewrites it): the planner sees the same cards.
+  await view.mapChange(map => {
+    map.nodes.find(n => n.id === id('B')).x += 40;
+    map.nodes.reverse();
+  });
+  assert.ok(view.livingGraph, 'a position-only write keeps the graph');
+  await view.mapChange(map => { map.nodes.find(n => n.id === id('B')).parentId = id('X'); });
+  setup();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.equal(marks().length, 0, 'the old parent shows no A>B line or overlay');
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().length, 0, 'the new parent waits for the next hydrate');
+  await view.hydrate();
+  setup();
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().filter(c => c.classes.includes('is-dep-run')).length, 1, 'after hydrate X marks X>B');
+});
+
+test('D2-4 dependency highlight: an AI child reading its ordinary parent marks the tree line, no overlay', async () => {
+  const h = await harness([['P', null, { noAi: true }], ['C', 'P']]);
+  const { view } = h;
+  const file = h.app.vault.getAbstractFileByPath(h.node('C').path);
+  await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + `  - "card:${h.node('P').id}"\n`));
+  await view.hydrate();
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  view.drawEdges();
+  view.applySelectionChange(view.selection.click(h.node('C').id));
+  const tree = view.edgeEls.get(`${h.node('P').id}\u0000${h.node('C').id}`);
+  assert.ok(tree.classes.includes('is-dep-read'));
+  assert.equal(view.edgesEl.children.filter(c => c.classes?.includes('vam-edge-dep-overlay')).length, 0);
+});
+
 test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {
   const h = await harness([['a', null, { prompt: 'Why is the sky blue?\nsecond line' }]]);
   const node = h.node('a');
@@ -596,7 +760,7 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
-test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+test('V3.3 P1.2 / D2-3: running, waiting, failed, blocked, stopped and stale AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
   const face = () => {
@@ -610,7 +774,7 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
     return f;
   };
   const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
-  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['waiting', 'vam-status-waiting', 'Waiting'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Failed'], ['blocked', 'vam-status-blocked', 'Blocked'], ['stopped', 'vam-status-stopped', 'Stopped']]) {
     const f = paint(status);
     const [chip, ...rest] = chips(f.header);
     assert.equal(rest.length, 0, `${status}: one label`);
@@ -622,6 +786,68 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
   }
   for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
   assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+  assert.equal(find(paint('pending').title, i => i.cls?.includes('vam-ai-glyph-pending'))?.attrs.title.split('\n')[0], 'Not run yet', 'pending: its glyph has words too');
+});
+
+test('D2-3 card face: a failed, blocked or stopped card whose knowledge is out of date shows both labels; repainting keeps two', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  h.view.livingValidity.set(node.id, 'stale');
+  for (const [status, text] of [['failed', 'Failed'], ['blocked', 'Blocked'], ['stopped', 'Stopped']]) {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+    card.createEl('h3', { cls: 'vam-card-title' });
+    const texts = () => findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text);
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], `${status}: repainting does not stack labels`);
+  }
+  h.view.livingValidity.set(node.id, 'valid');
+  const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+  card.createEl('h3', { cls: 'vam-card-title' });
+  h.view.aiStatusMemo.set(node.id, 'failed');
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  eq(findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text), ['Failed'], 'old knowledge still valid: no rerun label');
+});
+
+test('D2-3 real round: queued cards wait, the running one runs, a blocked one says blocked; Stop leaves the unreached ones stopped', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  const state = key => { h.view.aiStatusMemo.clear(); return h.view.aiStatusOf(h.node(key).id); };
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['running', 'waiting', 'waiting', 'blocked']);
+  h.view.stopPromptBatch(); await h.done();
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['stopped', 'stopped', 'stopped', 'blocked'], 'after the round');
+  const f = await harness(TREE);
+  f.plan.fail.add('leaf1');
+  await f.runAll(); await f.done();
+  f.view.aiStatusMemo.clear();
+  eq(['leaf1', 'mid', 'root'].map(key => f.view.aiStatusOf(f.node(key).id)), ['failed', 'blocked', 'blocked'], 'a failure is "failed", the cards that needed it "blocked"');
+});
+
+test('D2-3 Stop: a locked card was never part of the round, so it is skipped in the count and not stopped on its face', async () => {
+  const h = await harness([...TREE, ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  // The toolbar refuses a locked target; a caller that does not (chat tools) puts it in the round as excluded.
+  void h.view.runLivingBatch([h.node('root').id, h.node('lk').id]);
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  h.view.stopPromptBatch(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 4, skipped: 1, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run stopped: 1 done, 4 cancelled, 1 skipped');
+  h.view.aiStatusMemo.clear();
+  assert.notEqual(h.view.aiStatusOf(h.node('lk').id), 'stopped');
+  assert.equal(h.view.aiStatusOf(h.node('leaf1').id), 'stopped');
+});
+
+test('D2-3 Stop before the round is planned still says the run stopped', async () => {
+  const h = await harness(TREE);
+  await h.runAll();
+  h.view.stopPromptBatch(); await h.done();
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
+  assert.equal(h.notices.at(-1), 'Run stopped: no card ran');
 });
 
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
@@ -651,7 +877,7 @@ test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown 
 });
 
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
-test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
+test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (waiting, its knowledge stale after a Prompt edit)', async () => {
   const h = await harness([['Y', null], ['X', null]]);
   await h.runAll(); await h.done();
   assert.equal(h.status('X'), 'done');
@@ -662,9 +888,10 @@ test('two batches: a card not yet reached by batch 2 is not shown done from batc
   h.plan.hang.add('Y');
   await h.runAll();
   await until(() => h.calls.filter(c => c.key === 'Y').length === 2);
-  assert.equal(h.status('X'), undefined, 'batch 1 left nothing for X');
+  assert.equal(h.status('X'), 'waiting', 'batch 2 queued X; batch 1 left nothing for it');
   h.view.aiStatusMemo.clear();
-  assert.equal(h.view.aiStatusOf(h.node('X').id), 'stale');
+  assert.equal(h.view.aiStatusOf(h.node('X').id), 'waiting', 'not reached yet: waiting, never done');
+  assert.equal(h.view.livingValidity.get(h.node('X').id), 'stale', 'its knowledge is still out of date');
   h.view.stopPromptBatch(); await h.done();
 });
 
@@ -905,6 +1132,61 @@ test('save path: a new card is made only on save; the popover blocks an empty qu
   assert.match(h.contents.get(made.path), /Brand new\?/);
 });
 
+test('P3.2 cancelling a new AI card (switch map, close view, Esc) leaves nothing; only Cmd/Ctrl+Enter makes the card, and one undo removes it', async () => {
+  const { actionsFor } = S.load('experiences/visual-map/card-actions.ts', { obsidian });
+  const snapshot = h => JSON.stringify([...h.contents.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
+  const runActions = h => ['toolbar', 'more', 'context', 'command'].flatMap(surface =>
+    [...actionsFor(surface, h.view.cardActionContext(null)), ...h.mapDoc.nodes.flatMap(n => [...actionsFor(surface, h.view.cardActionContext(n))])]
+      .map(entry => entry.action.id).filter(id => id === 'run-stop' || id === 'run-card'));
+  const leaves = [
+    ['switching map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+    ['closing the view', h => h.view.onClose().catch(() => {})],
+    // Esc on a typed draft only offers Save / Discard / Keep editing (nothing is written, the editor stays); Discard closes it.
+    ['Esc then Discard', h => {
+      const choices = find(h.pop(), i => i.cls?.includes('vam-living-editor-close-choices'));
+      h.pop().keydown({ key: 'Escape' });
+      assert.equal(choices.hidden, false, 'Esc on a draft asks first');
+      assert.equal(h.view.aiCardOpen === null, false, 'the editor is still open');
+      assert.equal(h.mapDoc.nodes.length, 1, 'and nothing was made yet');
+      find(choices, i => i.tag === 'button' && i.text === 'Discard').click();
+    }]
+  ];
+  for (const [name, leave] of leaves) {
+    const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+    const count = h.mapDoc.nodes.length;
+    const past = h.view.history.past.length;
+    const before = snapshot(h);
+    h.view.openAiCardPopover(null, null);
+    h.question().value = 'A draft not yet saved?';
+    h.question().input();
+    assert.equal(h.saveButton().disabled, false, `${name}: the draft is ready to save`);
+    await leave(h);
+    await dom.tick(); await dom.tick();
+    assert.equal(h.view.aiCardOpen, null, `${name}: the editor is closed`);
+    assert.equal(findAll(h.overlay, i => i.cls?.includes('vam-living-editor')).length, 0, `${name}: no .vam-living-editor left`);
+    assert.equal(snapshot(h), before, `${name}: Map.md and every note byte for byte`);
+    assert.equal(h.mapDoc.nodes.length, count, `${name}: no card`);
+    assert.equal(h.view.history.past.length, past, `${name}: no history entry`);
+    assert.equal(h.calls.length, 0, `${name}: no AI call`);
+    eq(runActions(h), [], `${name}: no run-stop / run-card anywhere`);
+  }
+  // Control: Cmd/Ctrl+Enter is the one way a card appears.
+  const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+  const count = h.mapDoc.nodes.length;
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(null, null);
+  h.question().value = 'Saved?';
+  h.question().input();
+  h.pop().keydown({ key: 'Enter', ctrlKey: true });
+  await until(() => h.mapDoc.nodes.length === count + 1);
+  await until(() => h.view.history.past.length === past + 1);
+  const made = h.mapDoc.nodes.at(-1);
+  assert.match(h.contents.get(made.path), /^ai-card: true$/m);
+  await h.view.history.undoEntry.undo();
+  assert.equal(h.mapDoc.nodes.length, count, 'one undo removes the card');
+  assert.equal(h.contents.has(made.path), false, 'and its note');
+});
+
 test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fence alone', () => {
   const { load, obsidian } = require('./support.cjs');
   const body = load('core/repository-note-body.ts', { obsidian });
@@ -946,8 +1228,8 @@ test('two views: a second view joins the running progress instead of starting or
   assert.ok(second.promptRunning());
   h.plan.go();
   await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.equal(h.calls.length, 5);
   assert.equal(second.promptBatch.finished, second.promptBatch.total);
   assert.equal(h.status('root'), 'done');
@@ -996,7 +1278,7 @@ test('closing a view only unsubscribes; the last view closing cancels the run', 
   assert.equal(second.promptBatch.outcome, undefined, 'the run goes on for the remaining view');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 
   const g = await harness(TREE);
   const other = await g.otherView();
@@ -1096,7 +1378,7 @@ test('a view that switches maps leaves the run; the round it started keeps readi
   const before = h.raw('side');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
   eq([...new Set(reads)], [MAP], 'sources come from the original map');
   eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');
@@ -1192,6 +1474,10 @@ test('reason codes map to lines: unknown code gets the generic line, trial-reaso
   assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
   assert.equal(code(new Error('cancelled')), 'failed');
   assert.equal(code('plain text'), 'provider-failed');
+  // D1-x5: a search that did not happen is stamped as a web failure, so the card shows the web line.
+  const notSearched = S.load('ai/search-not-performed.ts').searchNotPerformedError();
+  assert.equal(code(notSearched), 'web-required');
+  assert.equal(mapped(code(notSearched)), 'ui.living_node_trial_reason_web');
 });
 
 test('reason: a missing required source is reported as missing-source', async () => {
@@ -1424,6 +1710,182 @@ test('trial cancel: declining the usage confirmation or pressing Stop shows no f
   tryButton(failed).click();
   await until(() => box(failed).hidden === false);
   assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
+});
+
+// ---- P3.4 trial and adoption through the central editor ---------------------------------------------------------------
+const sha = text => require('node:crypto').createHash('sha256').update(String(text)).digest('hex');
+// A ready trial of A, which reads the note N. The vault raises `modify` for every write, as Obsidian's does.
+const trialHarness = async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  const listeners = new Set();
+  h.app.vault.on = (name, fn) => { const ref = { name, fn }; listeners.add(ref); return ref; };
+  h.app.vault.offref = ref => { listeners.delete(ref); };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    for (const ref of [...listeners]) if (ref.name === 'modify') ref.fn(file);
+    return result;
+  };
+  const reader = [], registered = [];
+  h.view.registerEvent = ref => { registered.push(ref); };
+  h.host.showLivingTrial = async (file, _markdown, owner, isCurrent) => { reader.push(['trial', file?.path, owner]); return isCurrent(); };
+  h.host.invalidateLivingTrial = owner => { reader.push(['invalid', owner]); };
+  h.host.restoreLivingOfficial = async (file, owner, release) => { reader.push(['official', file?.path, owner, !!release]); };
+  h.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  const button = text => find(h.pop(), i => i.tag === 'button' && i.text === text);
+  const bytes = () => [sha(h.raw('A')), sha(h.raw('N'))];
+  const ready = async () => {
+    h.view.openAiCardPopover(h.node('A'));
+    button('Try prompt').click();
+    await until(() => h.view.aiCardOpen?.trial.state === 'ready' && reader.some(r => r[0] === 'trial'));
+    await dom.tick(); await dom.tick();
+    assert.equal(button('Adopt trial').disabled, false, 'the preview is ready to adopt');
+  };
+  return { ...h, listeners, registered, reader, button, bytes, ready };
+};
+
+for (const [name, leave] of [
+  ['switching to another map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+  ['closing the view', h => h.view.onClose().catch(() => {})]
+]) test(`P3.4 ${name} discards a ready trial: the editor is gone, a retained adoption check writes nothing, the reader shows the formal note`, async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial, adoption, viewSession } = h.view.aiCardOpen;
+  const before = h.bytes();
+  const calls = h.calls.length;
+  const leaving = leave(h);
+  assert.equal(h.view.aiCardOpen, null, 'the editor closes before anything else');
+  await leaving;
+  assert.equal(trial.state, 'none');
+  assert.equal(trial.result, undefined);
+  assert.equal(await trial.adopt(h.repo, adoption), 'discarded');
+  eq(h.bytes(), before, 'Map notes byte for byte as before');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  const official = h.reader.filter(r => r[0] === 'official' && r[2] === viewSession);
+  assert.equal(official.length, 1, 'the reader is handed back once');
+  assert.equal(official[0][3], true, 'and released');
+  if (name.startsWith('switching')) assert.equal(official[0][1], h.node('A').path, 'it shows the formal note of the card again');
+});
+
+test('P3.4 trial, preview, stop or close: the card and its source keep their bytes; one AI call per trial; saving the configuration calls nothing', async () => {
+  const h = await trialHarness();
+  const before = h.bytes();
+  await h.ready();
+  assert.equal(h.calls.length, 1, 'one AI call for the trial');
+  eq(h.bytes(), before, 'a ready preview wrote nothing');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  eq(h.bytes(), before, 'closing wrote nothing');
+  // Stop while it runs.
+  h.plan.hang.add('A');
+  h.view.openAiCardPopover(h.node('A'));
+  h.button('Try prompt').click();
+  await until(() => h.calls.length === 2);
+  h.button('Stop').click();
+  await until(() => h.view.aiCardOpen?.trial.state !== 'running');
+  await dom.tick(); await dom.tick();
+  assert.equal(h.calls.length, 2, 'one more call for the second trial, none for stopping');
+  eq(h.bytes(), before, 'stopping wrote nothing');
+  h.view.closeAiCardPopover();
+  // Saving the configuration writes the card but never calls the AI.
+  h.view.openAiCardPopover(h.node('A'));
+  h.question().value = 'Why not?'; h.question().input();
+  h.saveButton().click();
+  await until(() => /Why not\?/.test(h.raw('A')));
+  assert.equal(h.calls.length, 2, 'saving made no AI call');
+  assert.equal(sha(h.raw('N')), before[1], 'the source is untouched');
+});
+
+test('P3.4 a change to a source of a ready preview turns it invalid at once: the label says so, Adopt is off, the preview stays readable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const calls = h.calls.length;
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'The source changed' });
+  await until(() => h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession));
+  await dom.tick();
+  assert.equal(trial.state, 'invalid');
+  assert.ok(trial.result, 'the preview stays readable');
+  assert.equal(h.button('Adopt trial').disabled, true, 'Adopt is off without pressing it');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  assert.equal(h.listeners.size, 0, 'nothing listens for an invalid preview');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'official'), false, 'the reader keeps the preview');
+});
+
+test('P3.4 the target card changed elsewhere turns the preview invalid; saving the same configuration keeps it adoptable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const seen = h.reader.length;
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'an identical save is not a change of the trial inputs');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession), false);
+  assert.equal(h.button('Adopt trial').disabled, false);
+  const calls = h.calls.length;
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+  assert.equal(h.calls.length, calls, 'adopting makes no AI call');
+  await h.ready();
+  await h.repo.updateNote(h.node('A').path, { summary: 'The owner edited the card' });
+  await until(() => h.view.aiCardOpen.trial.state === 'invalid');
+  await dom.tick();
+  assert.equal(h.button('Adopt trial').disabled, true);
+});
+
+test('P3.4 an identical save pressed while a source check is reading does not invalidate the preview', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial } = h.view.aiCardOpen;
+  const target = h.node('A').path;
+  // The next read of the card waits; the card is written while it waits, and the save then pauses before it returns.
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let gated = false;
+  const read = h.repo.readNoteSnapshot.bind(h.repo);
+  h.repo.readNoteSnapshot = async (path, ...rest) => {
+    if (path === target && !gated) { gated = true; await gate; }
+    return read(path, ...rest);
+  };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    if (file.path === target) { release(); for (let i = 0; i < 40; i++) await dom.tick(); }
+    return result;
+  };
+  // A modify of the source starts a check, which stops on the card read.
+  for (const ref of [...h.listeners]) ref.fn(h.app.vault.getAbstractFileByPath(h.node('N').path));
+  await until(() => gated);
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 40; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'the save is checked by its result, not mid-way');
+  assert.equal(h.button('Adopt trial').disabled, false);
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+});
+
+test('P3.4 the source listener ends with the editor: a later change does nothing, and reopening keeps one listener', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'one listener while a preview is ready');
+  assert.ok(h.registered.includes([...h.listeners][0]), 'registered with the view, so unloading the plugin removes it too');
+  h.view.closeAiCardPopover();
+  assert.equal(h.listeners.size, 0, 'closing removes it');
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'Changed after close' });
+  for (let i = 0; i < 6; i++) await dom.tick();
+  eq(h.reader.slice(seen), [], 'a later change does nothing');
+  await h.ready();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'a second trial replaces the first listener');
+  h.view.closeAiCardPopover();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'no leak across reopen');
+  await h.view.onClose().catch(() => {});
+  assert.equal(h.listeners.size, 0, 'closing the view removes it');
 });
 
 test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note and ⋯ (its rows greyed, decision #35), and Note still opens the details', async () => {

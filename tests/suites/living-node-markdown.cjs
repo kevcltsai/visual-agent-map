@@ -816,6 +816,50 @@ S.integrationTest('Living Node cross-map cut preserves referenced ordinary input
   assert.deepEqual(f.calls, []);
 });
 
+// P3.9 F06 (living-node §5.2, §8.3; A44): moving a referenced same-map card to another map does not silently keep the
+// consumer running across maps or rebind it to a same-named card; the reference is kept for repair, and moving back restores.
+S.integrationTest('P3.9 cross-map move: a moved source blocks its consumer with a reason and no call; a same-named card is not bound; moving back restores', async () => {
+  const f = await roundFixture();
+  await saveLivingConfig(f.app, f.repo, f.map, 'parent', 'Read ordinary\n\nSources: [[ordinary]]');
+  const refs = text => text.match(/living-node-refs:[\s\S]*?(?=\n[a-z-]+:|\n---)/)[0];
+  const saved = refs(f.contents.get('parent.md'));
+  const { livingCrossCut } = S.load('experiences/visual-map/living-node-runtime.ts', { obsidian: S.obsidian });
+  const { begin } = S.load('experiences/visual-map/map-transaction.ts', { obsidian: S.obsidian });
+  const move = (path, folder, mapId) => begin({ repo: f.repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} })
+    .unpark(path, folder, mapId, mapId).commit();
+  const original = f.map.nodes.find(n => n.id === 'ordinary');
+  const destination = { ...f.map, id: 'other', nodes: [] };
+  const checked = await livingCrossCut(f.app, f.repo, f.map, destination, new Set(['ordinary']));
+  assert.equal(checked.preserveIdentity, true);
+  assert.deepEqual(S.plain(checked.affected), ['parent'], 'the consumer is named before the move');
+  await move('ordinary.md', 'other', 'other');
+  const movedPath = [...f.contents.keys()].find(p => p.startsWith('other/'));
+  assert.ok(movedPath, 'the note moved to the other map');
+  f.map.nodes = f.map.nodes.filter(n => n.id !== 'ordinary');
+  destination.nodes.push({ ...original, path: movedPath });
+  const calls = () => f.calls.filter(prompt => prompt.startsWith('Read ordinary')).length;
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'blocked');
+  assert.equal(calls(), 0, 'no provider call for the blocked consumer');
+  const metadata = text => S.obsidian.parseYaml(text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]);
+  assert.equal(metadata(f.contents.get('parent.md'))['living-node-outcome'], 'blocked');
+  assert.ok(String(metadata(f.contents.get('parent.md'))['living-node-reason'] ?? '').length > 0, 'the block says why');
+  assert.equal(refs(f.contents.get('parent.md')), saved, 'the reference is kept as written for repair');
+  // A new card with the same name on the original map is not bound to the reference.
+  await f.app.vault.create('same/ordinary.md', '---\nagent-map-node: true\nagent-map-id: map\ntopic-id: map\nnode-id: lookalike\n---\n# ordinary\n\n## Detail\n\nLookalike\n');
+  f.map.nodes.push({ ...original, id: 'lookalike', path: 'same/ordinary.md' });
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'blocked');
+  assert.equal(calls(), 0, 'the same-named card is not read');
+  assert.equal(refs(f.contents.get('parent.md')), saved);
+  // Moving the original back (same ID) restores the consumer.
+  f.map.nodes = f.map.nodes.filter(n => n.id !== 'lookalike');
+  await move(movedPath, '', 'map');
+  const backPath = [...f.contents.keys()].find(p => /(^|\/)ordinary\.md$/.test(p) && !p.startsWith('other/') && !p.startsWith('same/'));
+  assert.ok(backPath, 'the note is back on the original map');
+  f.map.nodes.push({ ...original, path: backPath });
+  assert.equal((await runLivingRound(f.port, ['parent'])).get('parent'), 'changed');
+  assert.equal(calls(), 1);
+});
+
 
 S.integrationTest('Living Node config: external file path is canonical, follows rename and never falls back to an alias', async () => {
   const f = await roundFixture();
@@ -2459,4 +2503,86 @@ S.integrationTest('Living Node rebuild: a Living card whose derived fields reall
   const after = f.contents.get(node.path);
   assert.match(after, /Child topics: .*\[\[.*Child\]\]/);
   assert.equal(readLivingMarkdown(after).output.text, 'Result');
+});
+
+// ---- D2-8: living-node-last-change (ids + kinds only, diagnostic, only on a changed commit that has a baseline) ----
+const LAST_CHANGE = 'living-node-last-change';
+const SECRET = 'SECRET-CLAIM-TEXT-9f3';
+const appendOp = (id, claim = SECRET) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-27', claim, evidence: ['e1'] });
+const lastChange = content => {
+  const raw = S.obsidian.parseYaml(content.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])[LAST_CHANGE];
+  return raw === undefined ? undefined : JSON.parse(raw);
+};
+async function committedTwice() {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const first = f.contents.get(path);
+  const base = readLivingMarkdown(first);
+  const second = request(f, { base, baseGeneration: livingGeneration(first), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
+  return { f, first, second: f.contents.get(path) };
+}
+
+S.integrationTest('Living Node last change: written only for a changed commit with a baseline; ids and kinds only, never body text', async () => {
+  const { f, first, second } = await committedTwice();
+  assert.equal(first.includes(LAST_CHANGE), false, 'the first commit has no baseline, so no key');
+  assert.deepEqual(lastChange(second), { at: 't2', added: ['r1'], supplemented: [], corrected: [], disputed: [], invalidated: [], output: false });
+  const line = second.split('\n').find(l => l.startsWith(LAST_CHANGE));
+  assert.equal(line.includes(SECRET) || line.includes('Current findings'), false, 'no claim, output or evidence text in the key');
+  // A no-change commit writes nothing new into the key.
+  const base = readLivingMarkdown(second);
+  const third = request(f, { base, baseGeneration: livingGeneration(second), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e3' }, context: { ...context, at: 't3' } });
+  assert.equal(await commitLivingMarkdown(f.repo, third), 'written');
+  assert.equal(f.contents.get(path).split('\n').find(l => l.startsWith(LAST_CHANGE)), line);
+  assert.ok(f.contents.get(path).includes('living-node-last-successful-check: "t3"'));
+});
+
+S.integrationTest('Living Node last change: failed, blocked, discarded and stale commits leave the note without the key', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const before = f.contents.get(path);
+  const base = readLivingMarkdown(before);
+  const make = extra => request(f, { base, baseGeneration: livingGeneration(before), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e9' }, ...extra });
+  const aborted = new AbortController(); aborted.abort();
+  assert.equal(await commitLivingMarkdown(f.repo, make({ signal: aborted.signal })), 'discarded');
+  assert.equal(await commitLivingMarkdown(f.repo, make({ isCurrent: () => false })), 'discarded');
+  await assert.rejects(() => commitLivingMarkdown(f.repo, make({ proposal: { baseRevision: base.revision, operations: [appendOp('r1', '  ')] } })));
+  assert.equal(f.contents.get(path), before);
+  assert.equal(before.includes(LAST_CHANGE), false);
+});
+
+S.integrationTest('Living Node last change: the key does not change the knowledge revision or the region', async () => {
+  const { second } = await committedTwice();
+  const stripped = second.split('\n').filter(l => !l.startsWith(LAST_CHANGE)).join('\n');
+  assert.notEqual(stripped, second);
+  assert.equal(readLivingMarkdown(second).revision, readLivingMarkdown(stripped).revision);
+  assert.equal(second.match(/living-node-success-knowledge: .+/)[0], stripped.match(/living-node-success-knowledge: .+/)[0]);
+  const region = text => text.slice(text.indexOf('<!-- vam-living-node:begin'), text.indexOf('<!-- vam-living-node:end'));
+  assert.equal(region(second), region(stripped));
+});
+
+S.integrationTest('Living Node last change: a copy drops the key; share text and share scan treat it as internal', async () => {
+  const { f, second } = await committedTwice();
+  assert.ok(lastChange(second));
+  const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const copy = await f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md', { keepTitle: true });
+  assert.equal(f.contents.get(copy.path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(copy.path)).revision, readLivingMarkdown(second).revision);
+  const shared = S.load('experiences/sharing/living-node-redaction.ts').redactLivingShareText(second);
+  assert.equal(shared.includes(LAST_CHANGE) || shared.includes('"added"'), false);
+  assert.ok(S.load('experiences/sharing/share-leak-scan.ts').INTERNAL_FIELD_NAMES.includes(LAST_CHANGE));
+});
+
+S.integrationTest('Living Node last change: an old card without the key round-trips byte-identical and reads as no baseline', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  assert.equal(lastChange(old), undefined);
+  const { readLivingLastChange } = S.load('experiences/visual-map/living-node-changes.ts');
+  assert.equal(readLivingLastChange(old, S.obsidian.parseYaml), undefined);
+  const base = readLivingMarkdown(old);
+  const again = request(f, { base, baseGeneration: livingGeneration(old), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, again), 'written');
+  assert.equal(f.contents.get(path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, base.revision);
 });

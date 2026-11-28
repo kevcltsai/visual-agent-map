@@ -32,7 +32,7 @@ async function harness(items, lang = 'en') {
   const menus = [];
   class Menu {
     constructor() { this.items = []; menus.push(this); }
-    addItem(cb) { const item = { title: '', disabled: false, setTitle(t) { this.title = t; return this; }, setIcon(i) { this.icon = i; return this; }, setWarning() { this.warning = true; return this; }, setDisabled(d) { this.disabled = d; return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items.push(item); return this; }
+    addItem(cb) { const item = { title: '', disabled: false, dom: element('div'), setTitle(t) { this.title = t; return this; }, setIcon(i) { this.icon = i; return this; }, setWarning() { this.warning = true; return this; }, setDisabled(d) { this.disabled = d; return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items.push(item); return this; }
     addSeparator() { return this; } showAtMouseEvent() { this.mouse = true; return this; } showAtPosition(at) { this.at = at; return this; }
   }
   const modals = [];
@@ -321,7 +321,8 @@ test('counter-example (read-only): selection mode draws the look but give no men
       assert.equal(el.listeners.pointerdown, undefined, mode);
       assert.equal(el.listeners.keydown, undefined, mode);
     }
-    assert.equal(h.contextMenu(), null, mode);
+    // V3.3 G04-x: the menu opens, every row greyed (an annotated image has no read-only row) and none runs.
+    assert.ok(h.contextMenu().items.every(i => i.disabled && !i.fn), mode);
     const before = h.fileText();
     h.view.convertImageDialog('img2');
     await h.view.removeCanvasItem('img1');
@@ -582,7 +583,7 @@ test('first anchor on an image without a note: a Notice, once per image', async 
     h.view.render();
   };
   await place();
-  assert.deepEqual(h.notices, ['This image has no note yet. Research and expansion cannot see pictures; add one sentence on what it is and what to research.']);
+  assert.deepEqual(h.notices, ['This image has no note yet. Research and expansion don\'t look at images; add one sentence on what it is and what to research. Mind map chat can see the image you select.']);
   await place();
   assert.equal(h.notices.length, 1, 'only once');
   const withNote = await harness([annotated({ note: 'has note' })]);
@@ -1398,6 +1399,21 @@ test('the click that ends an anchor drag does not toggle the anchor', async () =
   assert.equal(h.view.anchorClickSuppressed, false);
 });
 
+// V3.3 G05 / P5.4: only a picture that would really be sent (an annotated one) becomes the chat picture by focus or click.
+test('focus and click: an annotated image becomes the chat picture; an ordinary image does not (and drops an earlier choice)', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  h.imageEl().fire('focus');
+  assert.equal(h.view.chatImageId, 'img1');
+  const g = await harness([image()]);
+  g.view.render();
+  g.imageEl().fire('focus'); g.imageEl().click();
+  assert.equal(g.view.chatImageId, null, 'a plain image is not sent, so it is not the chat picture');
+  assert.equal(g.view.chatImage(), null);
+  g.view.chatImageId = 'other'; g.imageEl().fire('focus');
+  assert.equal(g.view.chatImageId, null, 'focusing an ordinary image takes the earlier choice off');
+});
+
 // V3.3 G04 / P5.3: "Image exploration" is the image right-click's first row, drawn from the card action list (image-explore).
 test('image exploration (annotated): the menu row makes the image the chat picture at once and writes nothing', async () => {
   const h = await harness([annotated({ note: 'n' })]);
@@ -1467,8 +1483,123 @@ test('counter-example (stale menu): a row clicked after the map turned read-only
     }
 });
 
+// V3.3 G04-x (decision #35): while the notes load or topics are picked the image menu still opens; every row that writes or
+// asks the AI is greyed with the reason on the next line and a click does nothing. Open original file (read-only) stays.
+const reasonOf = item => find(item.dom, i => i.hasClass('vam-menu-reason'))?.text;
+for (const [mode, reason] of [['loading', 'Notes are still loading'], ['selection', 'Not available while selecting several topics']])
+  test(`G04-x: ${mode}: the image menu opens, its writing rows greyed with "${reason}"; a click writes nothing and sets no chat picture`, async () => {
+    for (const [items, titles] of [
+      [[image()], ['Image exploration…', 'Convert to annotated image…', 'Open original file', 'Delete image']],
+      [[annotated({ note: 'n' })], ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']]
+    ]) {
+      const h = await harness(items);
+      h.view.render();
+      if (mode === 'loading') h.view.notesLoading = () => true;
+      if (mode === 'selection') h.view.selection.toggleMultiSelect();
+      const before = h.fileText(), entries = h.view.history.past.length;
+      const menu = h.contextMenu();
+      assert.ok(menu && menu.prevented && menu.mouse, mode);
+      assert.deepEqual(menu.items.map(h.titleOf), titles, mode);
+      for (const row of menu.items) {
+        const readOnly = h.titleOf(row) === 'Open original file';
+        assert.equal(row.disabled, !readOnly, `${mode}: ${h.titleOf(row)}`);
+        assert.equal(reasonOf(row), readOnly ? undefined : reason, `${mode}: ${h.titleOf(row)}`);
+        if (!readOnly) assert.equal(row.fn, undefined, `${mode}: ${h.titleOf(row)} has no click`);
+      }
+      menu.items.find(row => h.titleOf(row) === 'Open original file')?.fn();
+      await h.settle();
+      assert.equal(h.modals.length, 0, mode);
+      assert.equal(h.view.chatImageId, null, mode);
+      assert.equal(h.view.placing ?? null, null, mode);
+      assert.equal(h.fileText(), before, mode);
+      assert.equal(h.view.history.past.length, entries, mode);
+      assert.deepEqual(h.opened, items[0].kind === 'image' ? ['attachments/a.png'] : [], mode);
+    }
+  });
+
+test('G04-x: the loading reason in Traditional Chinese is 筆記載入中', async () => {
+  const h = await harness([image()], 'zh-TW');
+  h.view.render();
+  h.view.notesLoading = () => true;
+  assert.equal(reasonOf(h.contextMenu().items[0]), '筆記載入中');
+});
+
+test('G04-x counter-example (presentation): the image menu does not open, loading or not', async () => {
+  for (const loading of [false, true]) {
+    const h = await harness([image()]);
+    h.view.render();
+    h.view.presentation = {};
+    if (loading) h.view.notesLoading = () => true;
+    assert.equal(h.contextMenu(), null, `loading ${loading}`);
+  }
+});
+
 test('image exploration: the plain image row in Traditional Chinese (the annotated name is checked in steps-card-actions)', async () => {
   const h = await harness([image()], 'zh-TW');
   h.view.render();
   assert.equal(h.titleOf(h.contextMenu().items[0]), '圖像探索…');
+});
+
+// V3.3 G04-y: the right-click goes through the real binding (setupCanvasImageInput on the viewport), not the handler. It was
+// bound only while the canvas was editable, so with several topics picked (or the notes loading) no menu ever opened.
+/** Binds a fresh viewport like a render does, then right-clicks the image on it; returns the menu it opened, if any. */
+const boundRightClick = h => {
+  const el = h.imageEl(), before = h.menus.length;
+  h.view.viewportEl = element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: sel => (sel === '.vam-canvas-image' ? el : null) }, clientX: 5, clientY: 5 });
+  return h.menus.length > before ? h.menus.at(-1) : null;
+};
+const G04Y_ITEMS = [
+  ['plain', [image()], ['Image exploration…', 'Convert to annotated image…', 'Open original file', 'Delete image']],
+  ['annotated', [annotated({ note: 'n' })], ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']]
+];
+const assertGreyed = (h, menu, titles, reason, label) => {
+  assert.ok(menu, label);
+  assert.deepEqual(menu.items.map(h.titleOf), titles, label);
+  for (const row of menu.items) {
+    const readOnly = h.titleOf(row) === 'Open original file';
+    assert.equal(row.disabled, !readOnly, `${label}: ${h.titleOf(row)}`);
+    assert.equal(reasonOf(row), readOnly ? undefined : reason, `${label}: ${h.titleOf(row)}`);
+    if (!readOnly) assert.equal(row.fn, undefined, `${label}: ${h.titleOf(row)} has no click`);
+  }
+};
+
+for (const [kind, items, titles] of G04Y_ITEMS) {
+  test(`G04-y: ${kind} image, several topics picked: the real contextmenu binding opens the menu, writing rows greyed with the reason`, async () => {
+    const h = await harness(items);
+    h.view.selection.toggleMultiSelect();
+    h.view.render();
+    assertGreyed(h, boundRightClick(h), titles, 'Not available while selecting several topics', 'multi-select');
+  });
+  test(`G04-y: ${kind} image, re-render while the notes load: the real binding opens the menu, writing rows greyed`, async () => {
+    const h = await harness(items);
+    h.view.render();
+    h.view.notesLoading = () => true;
+    h.view.render();
+    assertGreyed(h, boundRightClick(h), titles, 'Notes are still loading', 'loading');
+  });
+  test(`G04-y: ${kind} image in a presentation: the real binding opens no menu; editable state still opens the full one`, async () => {
+    const h = await harness(items);
+    h.view.render();
+    h.view.presentation = {};
+    assert.equal(boundRightClick(h), null);
+    h.view.presentation = null;
+    const menu = boundRightClick(h);
+    assert.deepEqual(menu.items.map(h.titleOf), titles);
+    assert.ok(menu.items.filter(row => h.titleOf(row) !== 'Convert back to plain image').every(row => !row.disabled && row.fn));
+  });
+}
+
+test('G04-y counter-example: without edit rights the binding answers only the image; other targets get no menu and no drop/drag listener', async () => {
+  const h = await harness([image()]);
+  h.view.selection.toggleMultiSelect();
+  h.view.render();
+  const before = h.menus.length;
+  h.view.viewportEl = element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: () => null }, clientX: 5, clientY: 5 });
+  assert.equal(h.menus.length, before);
+  for (const name of ['dragover', 'dragleave', 'drop', 'dragstart', 'dragend', 'pointerdown', 'pointermove'])
+    assert.equal(h.view.viewportEl.listeners[name], undefined, name);
 });

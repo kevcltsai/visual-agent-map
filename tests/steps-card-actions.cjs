@@ -26,7 +26,9 @@ const nodes = [
   { id: 'a', parentId: null, path: 'a.md', collapsed: false },
   { id: 'b', parentId: 'a', path: 'b.md', collapsed: false },
   { id: 'ai', parentId: null, path: 'ai.md', collapsed: false },
-  { id: 'd', parentId: null, path: 'd.md', collapsed: false }
+  { id: 'd', parentId: null, path: 'd.md', collapsed: false },
+  { id: 'p', parentId: null, path: 'p.md', collapsed: false },
+  { id: 'e', parentId: null, path: 'e.md', collapsed: false }
 ];
 const byId = id => nodes.find(node => node.id === id);
 const recorder = () => {
@@ -38,7 +40,7 @@ const CONTEXTS = ['normal', 'readOnly', 'merging', 'aiLocked', 'presentation', '
 function ctxFor(target, state, extra = {}) {
   const single = typeof target === 'string' ? byId(target) : null;
   const ids = single ? [single.id] : Array.isArray(target) ? target : [];
-  const notes = { a: { prompt: '' }, b: { prompt: '' }, d: { prompt: '' }, ai: { prompt: 'go', aiCard: true } };
+  const notes = { a: { prompt: '' }, b: { prompt: '' }, d: { prompt: '' }, ai: { prompt: 'go', aiCard: true }, p: { prompt: 'go' }, e: { prompt: '  ', aiCard: true } };
   if (state === 'aiLocked') for (const id of ids) notes[id] = { ...notes[id], aiLocked: true };
   return {
     node: single,
@@ -56,6 +58,7 @@ function ctxFor(target, state, extra = {}) {
     knowledgeRefs: { editable: false, copied: false },
     note: id => notes[id],
     isMerging: () => state === 'merging',
+    titles: list => list.map(id => id.toUpperCase()).join(', '),
     isArgumentCard: () => false,
     summaryFieldOffered: () => true,
     stylesEditable: true,
@@ -69,7 +72,7 @@ function ctxFor(target, state, extra = {}) {
   };
 }
 const R = CARD_ACTION_REASONS;
-const CODE = { ok: { ok: true }, ro: { ok: false, reasonKey: R.readOnly }, mg: { ok: false, reasonKey: R.merging }, al: { ok: false, reasonKey: R.aiLock }, pr: { ok: false, reasonKey: R.presentation }, ms: { ok: false, reasonKey: R.multiSelect }, bk: { ok: false, reasonKey: R.bookLock } };
+const CODE = { ok: { ok: true }, ro: { ok: false, reasonKey: R.readOnly }, mg: { ok: false, reasonKey: R.merging }, al: { ok: false, reasonKey: R.aiLock }, pr: { ok: false, reasonKey: R.presentation }, ms: { ok: false, reasonKey: R.multiSelect }, bk: { ok: false, reasonKey: R.bookLock }, lk: { ok: false, reasonKey: 'ui.selection_locked_0_1', reasonArgs: [2, 'A, D'] } };
 const action = id => CARD_ACTIONS.find(item => item.id === id);
 const availability = (id, surface, ctx) => {
   const row = actionsFor(surface, ctx).find(entry => entry.action.id === id);
@@ -97,8 +100,9 @@ const TABLE = [
   // Card toolbar (paintCardToolbar, from CARD_TOOLBAR since B08): drawn only outside topic selection; a button refused for
   // loading or a picture-book lock is not drawn; every other button runs through whenEditing (presentation, notesLoading).
   ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
-  // B08: Style (hidden under the structure lock; each popover choice also goes through mergeUnlocked).
-  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'],
+  // B08: Style (each popover choice also goes through mergeUnlocked). B19b-x (decision #62): the structure lock covers parent
+  // and order only, so Style stays under both picture-book locks.
+  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'],
   // B08: the AI card's Run (as Run card), Lock and Settings (as Edit AI card).
   ['run-stop', 'toolbar', 'ai', 'ok ro ok al pr ms bk ok'],
   ['ai-lock', 'toolbar', 'ai', 'ok ro ok ok pr ms ok ok'],
@@ -153,9 +157,13 @@ const TABLE = [
   ['reorder-sibling', 'key', 'b', 'ok ro mg ok pr ms ok ok'], // Alt+arrow; shiftSiblingByKey refuses a merging card or parent
   ['search', 'key', null, 'ok ro ok ok pr ok ok ok'], // Mod+F: presentation || notesLoading swallowed
   // Selection bar (renderSelectionBar) and its ⋯ (openSelectionMoreMenu): only in topic selection mode; no presentation or notesLoading check.
-  ['merge', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
+  // B19a (P1.9): an AI-locked or merging card in the selection refuses Merge and Move to as a whole, naming the cards.
+  // B19b: Color is a batch write: presentation and loading notes refuse it too (changeSelectionColor rechecks). Parent ruling:
+  // the picture-book structure lock covers parent and order only, so a colour stays available under both book locks.
+  ['batch-color', 'toolbar', ['a', 'd'], 'ok ro lk lk pr ok ok ok'],
+  ['merge', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok bk ok'], // if (!bookLock.ai); aria-disabled by mergeCheck (below)
   ['multi-research', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
-  ['move-to', 'toolbar', ['a', 'd'], 'ok ok mg ok ok ok ok bk'], // chooseSelectedParent refuses merging branches
+  ['move-to', 'toolbar', ['a', 'd'], 'ok ok lk lk ok ok ok bk'], // chooseSelectedParent refuses merging branches
   ['finish-selection', 'toolbar', ['a', 'd'], 'ok ok ok ok ok ok ok ok'],
   ['synthesize', 'more', ['a', 'd'], 'ok ok ok ok ok ok bk ok'],
   ['copy-to', 'more', ['a', 'd'], 'ok ok mg ok ok ok ok bk'],
@@ -183,6 +191,22 @@ test('card actions: available matches every current entry under each context', (
   }
 });
 
+// P3.2: Run Card / Stop belong to a real AI card only (`ai-card` plus a non-empty Prompt). The ordinary card, AI lock and picture-book
+// lock rows are in the table above; a Prompt without `ai-card` and an `ai-card` with a blank Prompt are not AI cards.
+test('card actions: a Prompt-only card and an AI card with a blank Prompt never offer run-stop or run-card on any surface', () => {
+  const surfaces = ['toolbar', 'more', 'context', 'command', 'key', 'edge', 'canvas'];
+  for (const id of ['p', 'e'])
+    for (const state of CONTEXTS)
+      for (const surface of surfaces) {
+        const offered = actionsFor(surface, ctxFor(id, state)).map(entry => entry.action.id);
+        assert.ok(!offered.includes('run-stop') && !offered.includes('run-card'), `${id} (${state}) on ${surface}: ${offered}`);
+      }
+  assert.notEqual(cardActionKind(ctxFor('p', 'normal')), 'ai-card');
+  assert.notEqual(cardActionKind(ctxFor('e', 'normal')), 'ai-card');
+  assert.equal(cardActionKind(ctxFor('ai', 'normal')), 'ai-card', 'control: a real AI card still is one');
+  assert.ok(actionsFor('more', ctxFor('ai', 'normal')).some(entry => entry.action.id === 'run-card'), 'control: it offers Run Card');
+});
+
 test('card actions: the table covers every action, and every unavailable answer has a reason in all three languages', () => {
   const covered = new Set(TABLE.map(([id]) => id));
   eq(CARD_ACTIONS.map(item => item.id).filter(id => !covered.has(id)), []);
@@ -204,6 +228,16 @@ test('card actions: selection reasons that come from the selection itself', () =
   eq(availability('merge', 'toolbar', ctxFor(['a', 'd'], 'normal', { mergeBlock: () => 'ui.select_at_least_two_topics' })), { ok: false, reasonKey: 'ui.select_at_least_two_topics' });
   eq(availability('synthesize', 'more', ctxFor(['a'], 'normal')), { ok: false, reasonKey: 'ui.select_at_least_two_topics' });
   eq(availability('multi-research', 'toolbar', ctxFor(['a', 'd'], 'normal', { multiResearchRunning: () => true })), { ok: false, reasonKey: 'ui.multi_research_already_running' });
+  // B19a: one locked card of three names only that card; the lock is said before mergeCheck's reason; a merging card
+  // below a selected one (not itself selected) still gives Move to the old merging reason.
+  const oneLocked = ctxFor(['a', 'd', 'b'], 'normal', { note: id => (id === 'd' ? { prompt: '', aiLocked: true } : { prompt: '' }), mergeBlock: () => 'ui.merge_ancestor_selected' });
+  const lockOne = { ok: false, reasonKey: 'ui.selection_locked_0_1', reasonArgs: [1, 'D'] };
+  eq(availability('merge', 'toolbar', oneLocked), lockOne);
+  eq(availability('move-to', 'toolbar', oneLocked), lockOne);
+  eq(availability('batch-color', 'toolbar', oneLocked), lockOne);
+  eq(availability('multi-research', 'toolbar', oneLocked), { ok: true }, 'Research is not a batch change');
+  eq(availability('merge', 'toolbar', ctxFor(['a', 'b'], 'normal', { mergeBlock: () => 'ui.merge_ancestor_selected' })), { ok: false, reasonKey: 'ui.merge_ancestor_selected' });
+  eq(availability('move-to', 'toolbar', ctxFor(['a'], 'normal', { isMerging: id => id === 'b' })), { ok: false, reasonKey: R.merging });
 });
 
 test('card actions: what a card offers follows the card, as the entries decide it now', () => {
@@ -267,8 +301,8 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
   eq(ids('context', ctxFor('ai', 'normal')), ['research', 'open-note', ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
-  // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
-  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
+  // renderSelectionBar (B09, B19b): Color, Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
+  eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['batch-color', 'move-to', 'merge', 'multi-research', 'finish-selection']);
   eq(actionsFor('more', ctxFor(['a', 'd'], 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`), ['1:synthesize', '1:copy-to', '1:add-frame', '1:summary-add-selected', '1:ai-lock-selected', '2:clear-selection', '2:remove-selected', '2:selection-help']);
   // The rules B06/B07 move to: ⋯ = the card's menu actions minus the toolbar set; right-click = toolbar, separator, ⋯.
   for (const kind of ['card', 'ai-card']) {
@@ -369,6 +403,7 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('merge', ['a', 'd'], 'toolbar'), [['merge']]);
   eq(run('multi-research', ['a', 'd'], 'toolbar'), [['multiResearch']]);
   eq(run('move-to', ['a', 'd'], 'toolbar'), [['chooseParent', false]]);
+  eq(run('batch-color', ['a', 'd'], 'toolbar', { opener: 'button' }), [['openBatchColor', 'button']]);
   eq(run('copy-to', ['a', 'd'], 'more'), [['chooseParent', true]]);
   eq(run('synthesize', ['a', 'd'], 'more'), [['synthesize']]);
   eq(run('add-frame', ['a', 'd'], 'more'), [['addFrame']]);
@@ -455,7 +490,8 @@ test('card actions: the view builds the context next to mapCommand; the palette,
   assert.equal(count(body('private paintCardToolbar')), 1, 'paintCardToolbar');
   assert.equal(count(body('private repaintRunTool')), 1, 'repaintRunTool');
   assert.equal(count(body('private cardKeyAction')), 1, 'B10: the map keys (cardKeyAction)');
-  assert.equal(count(view), 7, 'B08 toolbar and repaint, B10 key entry; no other entry reads the registry yet');
+  assert.equal(count(body('private async changeSelectionColor')), 1, 'B19b: the batch colour write rechecks the Color gates');
+  assert.equal(count(view), 8, 'B08 toolbar and repaint, B10 key entry, B19b batch colour write; no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);

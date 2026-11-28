@@ -259,6 +259,11 @@ export interface AiProofState {
   applied?: string[];
   /** One more fix-and-check round over a finished proofread is in progress (`reopenAiRound`); an older save has none. */
   again?: true;
+  /**
+   * The whole book only: the chapters (card ids) the last check left out because they were AI-locked. With it the proofread is
+   * `incomplete` (never shown as all solved) yet may still take one more round ("fix again") once a chapter is unlocked.
+   */
+  locked?: string[];
 }
 
 /**
@@ -339,6 +344,7 @@ function aiProofShape(value: unknown): boolean {
   if (value.done !== undefined && typeof value.done !== "boolean") return false;
   if (value.incomplete !== undefined && typeof value.incomplete !== "boolean") return false;
   if (value.again !== undefined && value.again !== true) return false;
+  if (value.locked !== undefined && !isTextList(value.locked)) return false;
   if (!isCount(value.checked) || !isCount(value.fixed)) return false;
   const items = (list: unknown, extra: readonly string[]): boolean =>
     Array.isArray(list) &&
@@ -522,6 +528,17 @@ export function bookCardLock(phase: PipelinePhase | undefined): { ai: boolean; s
 export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">): string[] {
   const gone = data.removed;
   return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
+}
+/**
+ * ai-flows AI lock: the run has no closing page to write (and the bar no button to it) when the whole-book check left every card out as
+ * locked and nothing was checked or is open. Read from the saved state only, so the runner and the bar agree.
+ */
+export function closingPageSkipped(data: BookPipelineData): boolean {
+  const order = effectiveOrder(data);
+  const locked = data.bookProof?.locked;
+  if (!order.length || !locked || !order.every(id => locked.includes(id))) return false;
+  const slots = [data.bookProof, ...order.map(id => data.aiProof?.[id])];
+  return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
 }
 /** How the map's cards (`mapIds`) differ from what the run accepted: new cards, and cards of the run that are gone. */
 export function mapDifference(

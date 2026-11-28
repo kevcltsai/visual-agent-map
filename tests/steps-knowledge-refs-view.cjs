@@ -32,7 +32,7 @@ async function harness({ aim = false } = {}) {
   const Notice = dom.makeNotice(notices);
   class Menu {
     constructor() { this.items = []; menus.push(this); }
-    addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick(h) { this.click = h; return this; } }; cb(item); this.items.push(item); return this; }
+    addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning() { return this; }, setDisabled(v) { this.disabled = v; return this; }, onClick(h) { this.click = h; return this; } }; cb(item); this.items.push(item); return this; }
     addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; }
   }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Menu, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment, setTimeout, clearTimeout });

@@ -3,12 +3,13 @@ import type { TranslationKey } from "../../i18n";
 import type { MapNode } from "../../map-model";
 import { MAP_KEYBOARD_SHORTCUTS } from "../../ui/modals/keyboard-shortcuts-modal";
 import { isAiCard, type PromptNoteRef } from "./prompt-run";
+import type { MapCommandAction } from "./view";
 
 /**
  * The card actions (V3.3 P1.8): one list for the command palette, the card toolbar and its ⋯, the right-click menu, the
  * selection bar and the keys. Each action says where it is offered, whether it applies to a card at all, whether it can run
- * now (and why not), and runs through the view's own method. Names, gates and order are the entries' as they are today;
- * the entries move onto this list one by one (B05–B10).
+ * now (and why not), and runs through the view's own method. The palette, the card ⋯ and the right-click menu are drawn from
+ * it (B05–B07); the other entries move onto it one by one (B08–B10).
  */
 export type CardActionId =
   | "stop-run-all"
@@ -30,8 +31,11 @@ export type CardActionId =
   | "ai-card"
   | "select-subtopics"
   | "summary-add"
+  | "tidy-branch"
   | "note-style"
   | "add-other"
+  | "knowledge-ref-copy"
+  | "knowledge-ref-paste"
   | "book"
   | "remove"
   | "reorder-sibling"
@@ -89,6 +93,8 @@ export interface CardActionHost {
   editAiCard(node: MapNode): void;
   selectSubtopics(node: MapNode): void;
   addSummary(ids: readonly string[]): void;
+  /** Tidy this branch (V3.3 A10): the preview of the card's branch laid out again (openTidyPreview). */
+  tidyBranch(node: MapNode): void;
   noteStyle(node: MapNode): void;
   fillAddMenu(menu: Menu, node: MapNode): void;
   fillBookMenu(menu: Menu, node: MapNode): void;
@@ -99,6 +105,9 @@ export interface CardActionHost {
   /** B13: shows the card's branch alone (enterBranchFocus); leaves it (exitBranchFocus). */
   enterBranchFocus(node: MapNode): void;
   exitBranchFocus(): void;
+  /** Copy as reference (copyAsKnowledgeRef) / Paste reference under the card (pasteKnowledgeRef). */
+  copyKnowledgeRef(node: MapNode): void;
+  pasteKnowledgeRef(node: MapNode): void;
   zoomFit(): void;
   zoomReset(): void;
   search(): void;
@@ -137,6 +146,8 @@ export interface CardActionContext {
   emptyCanvas: boolean;
   /** One branch is shown alone (B13's branch focus). */
   branchFocused: boolean;
+  /** This map's references may change here (canEditKnowledgeRefs) and the card is not merging; a card was copied as a reference. */
+  knowledgeRefs: { editable: boolean; copied: boolean };
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
   isArgumentCard(id: string): boolean;
@@ -162,7 +173,7 @@ export interface CardActionRunOptions {
 export interface CardAction {
   id: CardActionId;
   titleKey: TranslationKey;
-  /** The entries that name the action their own way today (the palette's command names among them). */
+  /** The entries that name the action their own way today (the toolbar's short names). */
   titles?: Partial<Record<CardSurface, TranslationKey>>;
   /** An aria-label that says more than the visible name (the edge entry's). */
   ariaLabelKey?: TranslationKey;
@@ -197,10 +208,12 @@ function gate(ctx: CardActionContext, gates: readonly Gate[]): CardAvailability 
   if (gates.includes("bookStructure") && ctx.bookLock.structure) return off(CARD_ACTION_REASONS.bookLock);
   return OK;
 }
-/** The card entries (toolbar, ⋯, right-click, keys): whenEditing refuses presentation and loading; selection mode has none of them. */
+/**
+ * The card entries (toolbar, ⋯, right-click, keys, palette): whenEditing refuses presentation and loading; selection mode has
+ * none of them. The gates that keep data safe (loading, the picture-book locks, the AI lock) hold on every entry, the palette
+ * included (decision #35): the surface only decides what is shown.
+ */
 const CARD: readonly Gate[] = ["presentation", "readOnly", "multiSelect"];
-/** mapCommand's `editable`: no presentation, no selection mode; it reads neither notesLoading nor bookLock. */
-const COMMAND: readonly Gate[] = ["presentation", "multiSelect"];
 const then = (first: CardAvailability, next: () => CardAvailability): CardAvailability => (first.ok ? next() : first);
 const merging = (ctx: CardActionContext, ids: Iterable<string | null>): CardAvailability => {
   for (const id of ids) if (id && ctx.isMerging(id)) return off(CARD_ACTION_REASONS.merging);
@@ -247,7 +260,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["command"],
     order: 10,
     group: 1,
-    available: ctx => gate(ctx, COMMAND),
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
     run: ctx => ctx.host.addTopic()
   },
   {
@@ -266,26 +279,13 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: ctx => ctx.host.setupAiCard(null)
   },
   {
-    id: "add-child",
-    titleKey: "ui.card_menu_add_child",
-    titles: { toolbar: "ui.card_tool_add", command: "ui.command_map_add_subtopic" },
-    icon: "plus",
-    shortcut: "ui.shortcut_add_subtopic",
-    scope: ["card", "ai-card"],
-    surfaces: ["toolbar", "context", "command", "key"],
-    order: 20,
-    group: 1,
-    available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : [...CARD, "bookStructure"]),
-    run: ctx => ctx.host.addChild(card(ctx))
-  },
-  {
     id: "edge-add-topic",
     titleKey: "ui.card_edge_add",
     ariaLabelKey: "ui.card_edge_add_label",
     icon: "plus",
     scope: ["card", "ai-card"],
     surfaces: ["edge"],
-    order: 25,
+    order: 20,
     group: 1,
     // paintCardEdgeEntries: a card with a note on a managed map; drawn while cardTextEditable and no structure lock, clicked through whenEditing.
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.managedMap,
@@ -299,7 +299,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     icon: "sparkles",
     scope: ["card", "ai-card"],
     surfaces: ["edge"],
-    order: 27,
+    order: 25,
     group: 1,
     // paintCardEdgeEntries (V3.3 A7): after "+ Topic card" under the same gates, and not under the picture-book AI lock.
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.managedMap,
@@ -307,81 +307,30 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: ctx => ctx.host.setupAiCard(card(ctx))
   },
   {
-    id: "add-sibling",
-    titleKey: "ui.card_menu_add_sibling",
-    titles: { command: "ui.command_map_add_sibling" },
-    icon: "list-plus",
-    shortcut: "ui.shortcut_add_sibling",
-    scope: ["card", "ai-card"],
-    surfaces: ["context", "command", "key"],
-    order: 30,
-    group: 1,
-    available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : [...CARD, "bookStructure"]),
-    run: ctx => ctx.host.addSibling(card(ctx))
-  },
-  {
     id: "research",
-    titleKey: "ui.card_menu_research",
-    titles: { toolbar: "ui.card_tool_research", command: "ui.command_map_ai_explore" },
+    titleKey: "ui.ai_explore",
+    titles: { toolbar: "ui.card_tool_research" },
     icon: "sparkles",
     scope: ["card", "ai-card"],
     surfaces: ["toolbar", "context", "command"],
-    order: 40,
+    order: 30,
     group: 2,
-    available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : [...CARD, "bookAi"]),
+    // openTopicChat refuses an AI-locked card with a notice; the menus say so up front.
+    available: ctx =>
+      then(gate(ctx, [...CARD, "bookAi"]), () =>
+        ctx.note(card(ctx).id)?.aiLocked ? off(CARD_ACTION_REASONS.aiLock) : OK
+      ),
     run: (ctx, options) => ctx.host.research(card(ctx), options?.opener)
-  },
-  {
-    id: "toggle-collapse",
-    titleKey: "ui.card_menu_collapse",
-    titles: { command: "ui.command_map_toggle_collapse" },
-    titleFor: ctx => (ctx.node?.collapsed ? "ui.card_menu_expand" : "ui.card_menu_collapse"),
-    icon: "chevrons-down-up",
-    iconFor: ctx => (ctx.node?.collapsed ? "chevrons-up-down" : "chevrons-down-up"),
-    shortcut: "ui.shortcut_toggle_collapse",
-    scope: ["card", "ai-card"],
-    surfaces: ["context", "command", "key"],
-    order: 50,
-    group: 2,
-    applies: hasChildren,
-    available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : CARD),
-    run: ctx => ctx.host.toggleCollapse(card(ctx), ctx.surface !== "context")
-  },
-  {
-    id: "focus-branch",
-    titleKey: "ui.focus_branch",
-    icon: "focus",
-    scope: ["card", "ai-card"],
-    surfaces: ["more", "context", "command"],
-    order: 55,
-    group: 2,
-    // A card with subtopics; while one branch is focused the map's "Leave focus" is offered instead. enterBranchFocus refuses
-    // while presenting; selection mode has no card entries.
-    applies: ctx => hasChildren(ctx) && !ctx.branchFocused,
-    available: ctx => gate(ctx, COMMAND),
-    run: ctx => ctx.host.enterBranchFocus(card(ctx))
-  },
-  {
-    id: "leave-focus",
-    titleKey: "ui.exit_branch_focus",
-    icon: "minimize-2",
-    scope: ["map"],
-    surfaces: ["command"],
-    order: 56,
-    group: 2,
-    applies: ctx => ctx.branchFocused,
-    available: () => OK,
-    run: ctx => ctx.host.exitBranchFocus()
   },
   {
     id: "open-note",
     titleKey: "ui.card_menu_open_note",
-    titles: { toolbar: "ui.card_tool_note", command: "ui.command_map_open_details" },
+    titles: { toolbar: "ui.card_tool_note" },
     icon: "file-text",
     scope: ["card", "ai-card"],
     surfaces: ["toolbar", "context", "command"],
-    order: 60,
-    group: 3,
+    order: 40,
+    group: 2,
     // The command opens the details whenever a card is selected, presenting or picking topics included. The toolbar's Note
     // only reads, so it works while loading and presenting (V3.3 A5); the toolbar is not drawn while picking topics.
     // B05: while the notes load the toolbar hides Research, Add, Add summary and ⋯ (not drawn) instead of refusing a click.
@@ -392,28 +341,15 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "rename",
     titleKey: "ui.shortcut_rename",
-    titles: { command: "ui.command_map_rename" },
     icon: "pencil",
     shortcut: "ui.shortcut_rename",
     scope: ["card", "ai-card"],
     surfaces: ["command", "key"],
-    order: 70,
-    group: 3,
+    order: 50,
+    group: 2,
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id),
-    available: ctx => gate(ctx, ctx.surface === "command" ? COMMAND : CARD),
-    run: ctx => ctx.host.rename(card(ctx))
-  },
-  {
-    id: "add-summary-field",
-    titleKey: "ui.card_tool_add_summary",
-    icon: "text",
-    scope: ["card", "ai-card"],
-    surfaces: ["toolbar"],
-    order: 80,
-    group: 3,
-    applies: ctx => ctx.summaryFieldOffered(),
     available: ctx => gate(ctx, CARD),
-    run: ctx => ctx.host.addSummaryField(card(ctx))
+    run: ctx => ctx.host.rename(card(ctx))
   },
   {
     id: "card-settings",
@@ -421,10 +357,99 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     icon: "settings-2",
     scope: ["card", "ai-card"],
     surfaces: ["more", "context"],
-    order: 90,
+    order: 60,
     group: 3,
     available: ctx => gate(ctx, [...CARD, "bookStructure"]),
     run: ctx => ctx.host.cardSettings(card(ctx))
+  },
+  {
+    id: "focus-branch",
+    titleKey: "ui.focus_branch",
+    icon: "focus",
+    scope: ["card", "ai-card"],
+    surfaces: ["more", "context", "command"],
+    order: 65,
+    group: 3,
+    // A card with subtopics; while one branch is focused the map's "Leave focus" is offered instead. enterBranchFocus refuses
+    // while presenting; selection mode has no card entries.
+    applies: ctx => hasChildren(ctx) && !ctx.branchFocused,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.enterBranchFocus(card(ctx))
+  },
+  {
+    id: "leave-focus",
+    titleKey: "ui.exit_branch_focus",
+    icon: "minimize-2",
+    scope: ["map"],
+    surfaces: ["command"],
+    order: 66,
+    group: 3,
+    applies: ctx => ctx.branchFocused,
+    available: () => OK,
+    run: ctx => ctx.host.exitBranchFocus()
+  },
+  {
+    id: "add-summary-field",
+    titleKey: "ui.card_tool_add_summary",
+    icon: "text",
+    scope: ["card", "ai-card"],
+    surfaces: ["toolbar"],
+    order: 70,
+    group: 3,
+    applies: ctx => ctx.summaryFieldOffered(),
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.addSummaryField(card(ctx))
+  },
+  {
+    id: "select-subtopics",
+    titleKey: "ui.select_subtopics",
+    icon: "list-checks",
+    scope: ["card", "ai-card"],
+    surfaces: ["more"],
+    order: 80,
+    group: 3,
+    applies: ctx => hasChildren(ctx) && !ctx.node!.collapsed,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: ctx => ctx.host.selectSubtopics(card(ctx))
+  },
+  {
+    id: "summary-add",
+    titleKey: "ui.summary_add",
+    icon: "brackets",
+    scope: ["card", "ai-card"],
+    surfaces: ["more"],
+    order: 90,
+    group: 3,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.addSummary([card(ctx).id])
+  },
+  {
+    id: "tidy-branch",
+    titleKey: "ui.tidy_branch",
+    icon: "workflow",
+    scope: ["card", "ai-card"],
+    surfaces: ["more"],
+    order: 95,
+    group: 3,
+    applies: hasChildren,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.tidyBranch(card(ctx))
+  },
+  {
+    id: "note-style",
+    titleKey: "ui.note_style_menu",
+    icon: "palette",
+    scope: ["card", "ai-card", "multi"],
+    surfaces: ["more", "context"],
+    order: 100,
+    group: 3,
+    // A card has it in its ⋯ and right-click; a selection only in the right-click menu, and only for one topic.
+    applies: ctx => !!ctx.node || (ctx.surface === "context" && ctx.ids.length === 1),
+    available: ctx => gate(ctx, ctx.node ? CARD : ["presentation", "readOnly"]),
+    run: ctx => {
+      const node = ctx.node ?? ctx.nodes.find(item => item.id === ctx.ids[0]);
+      if (node) ctx.host.noteStyle(node);
+    }
   },
   {
     id: "run-card",
@@ -432,7 +457,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     icon: "play",
     scope: ["ai-card"],
     surfaces: ["more", "context"],
-    order: 100,
+    order: 110,
     group: 3,
     available: ctx =>
       then(gate(ctx, [...CARD, "bookAi"]), () =>
@@ -447,64 +472,12 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     icon: "star",
     scope: ["card", "ai-card"],
     surfaces: ["more", "context"],
-    order: 110,
+    order: 120,
     group: 3,
-    // canSetAiCard: an ordinary note card (its picture-book lock is the gate below).
+    // An ordinary note card (no argument card); the picture-book lock is the gate below.
     applies: ctx => !!ctx.node && !ctx.isArgumentCard(ctx.node.id) && !!ctx.note(ctx.node.id),
     available: ctx => gate(ctx, [...CARD, "bookAi"]),
     run: ctx => ctx.host.editAiCard(card(ctx))
-  },
-  {
-    id: "select-subtopics",
-    titleKey: "ui.select_subtopics",
-    icon: "list-checks",
-    scope: ["card", "ai-card"],
-    surfaces: ["more"],
-    order: 120,
-    group: 3,
-    applies: ctx => hasChildren(ctx) && !ctx.node!.collapsed,
-    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
-    run: ctx => ctx.host.selectSubtopics(card(ctx))
-  },
-  {
-    id: "summary-add",
-    titleKey: "ui.summary_add",
-    icon: "brackets",
-    scope: ["card", "ai-card"],
-    surfaces: ["more"],
-    order: 130,
-    group: 3,
-    available: ctx => gate(ctx, CARD),
-    run: ctx => ctx.host.addSummary([card(ctx).id])
-  },
-  {
-    id: "note-style",
-    titleKey: "ui.note_style_menu",
-    icon: "palette",
-    scope: ["card", "ai-card", "multi"],
-    surfaces: ["more", "context"],
-    order: 140,
-    group: 3,
-    // A card has it in its ⋯; a selection only in the right-click menu, and only for one topic.
-    applies: ctx => (ctx.node ? ctx.surface !== "context" : ctx.surface === "context" && ctx.ids.length === 1),
-    available: ctx => gate(ctx, ctx.node ? CARD : ["presentation", "readOnly"]),
-    run: ctx => {
-      const node = ctx.node ?? ctx.nodes.find(item => item.id === ctx.ids[0]);
-      if (node) ctx.host.noteStyle(node);
-    }
-  },
-  {
-    id: "add-other",
-    titleKey: "ui.card_tool_add_other",
-    icon: "plus",
-    scope: ["card", "ai-card"],
-    surfaces: ["more"],
-    order: 150,
-    group: 4,
-    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
-    run: (ctx, options) => {
-      if (options?.menu) ctx.host.fillAddMenu(options.menu, card(ctx));
-    }
   },
   {
     id: "book",
@@ -512,7 +485,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     icon: "book-open",
     scope: ["card", "ai-card"],
     surfaces: ["context"],
-    order: 160,
+    order: 130,
     group: 3,
     applies: ctx => ctx.bookMenu(),
     available: ctx => gate(ctx, CARD),
@@ -521,13 +494,91 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     }
   },
   {
+    id: "add-child",
+    titleKey: "ui.card_menu_add_child",
+    titles: { toolbar: "ui.card_tool_add" },
+    icon: "plus",
+    shortcut: "ui.shortcut_add_subtopic",
+    scope: ["card", "ai-card"],
+    surfaces: ["toolbar", "context", "command", "key"],
+    order: 140,
+    group: 4,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: ctx => ctx.host.addChild(card(ctx))
+  },
+  {
+    id: "add-sibling",
+    titleKey: "ui.card_menu_add_sibling",
+    icon: "list-plus",
+    shortcut: "ui.shortcut_add_sibling",
+    scope: ["card", "ai-card"],
+    surfaces: ["context", "command", "key"],
+    order: 150,
+    group: 4,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: ctx => ctx.host.addSibling(card(ctx))
+  },
+  {
+    id: "add-other",
+    titleKey: "ui.card_tool_add_other",
+    icon: "plus",
+    scope: ["card", "ai-card"],
+    surfaces: ["more"],
+    order: 160,
+    group: 4,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: (ctx, options) => {
+      if (options?.menu) ctx.host.fillAddMenu(options.menu, card(ctx));
+    }
+  },
+  {
+    id: "knowledge-ref-copy",
+    titleKey: "ui.knowledge_ref_copy",
+    icon: "link",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 163,
+    group: 4,
+    // Only where the map's references may change (not AIM, not picking, not loading) and not on a merging card.
+    applies: ctx => ctx.knowledgeRefs.editable,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.copyKnowledgeRef(card(ctx))
+  },
+  {
+    id: "knowledge-ref-paste",
+    titleKey: "ui.knowledge_ref_paste",
+    icon: "clipboard-paste",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 166,
+    group: 4,
+    applies: ctx => ctx.knowledgeRefs.editable && ctx.knowledgeRefs.copied,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.pasteKnowledgeRef(card(ctx))
+  },
+  {
+    id: "toggle-collapse",
+    titleKey: "ui.card_menu_collapse",
+    titleFor: ctx => (ctx.node?.collapsed ? "ui.card_menu_expand" : "ui.card_menu_collapse"),
+    icon: "chevrons-down-up",
+    iconFor: ctx => (ctx.node?.collapsed ? "chevrons-up-down" : "chevrons-down-up"),
+    shortcut: "ui.shortcut_toggle_collapse",
+    scope: ["card", "ai-card"],
+    surfaces: ["context", "command", "key"],
+    order: 170,
+    group: 5,
+    applies: hasChildren,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.toggleCollapse(card(ctx), ctx.surface !== "context")
+  },
+  {
     id: "remove",
     titleKey: "ui.remove_from_map",
     icon: "trash-2",
     shortcut: "ui.shortcut_remove",
     scope: ["card", "ai-card"],
     surfaces: ["context", "key"],
-    order: 170,
+    order: 180,
     group: 5,
     warning: true,
     // removeByKey: a leaf refuses itself merging, a card with subtopics its whole branch (confirmRemoveNode).
@@ -544,7 +595,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     shortcut: "ui.shortcut_reorder_sibling",
     scope: ["card", "ai-card"],
     surfaces: ["key"],
-    order: 180,
+    order: 190,
     group: 5,
     applies: ctx => !!ctx.node?.parentId,
     available: ctx => then(gate(ctx, CARD), () => merging(ctx, [card(ctx).id, card(ctx).parentId])),
@@ -760,7 +811,7 @@ export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonl
 };
 
 /** The palette commands (main.ts registers them by these ids) and the mapCommand action each one runs today. */
-export const CARD_COMMANDS: readonly { commandId: string; mapAction: string; action: CardActionId }[] = [
+export const CARD_COMMANDS: readonly { commandId: string; mapAction: MapCommandAction; action: CardActionId }[] = [
   { commandId: "map-add-topic", mapAction: "add-topic", action: "add-topic" },
   { commandId: "map-add-subtopic", mapAction: "add-subtopic", action: "add-child" },
   { commandId: "map-add-sibling", mapAction: "add-sibling", action: "add-sibling" },
@@ -768,6 +819,7 @@ export const CARD_COMMANDS: readonly { commandId: string; mapAction: string; act
   { commandId: "map-rename-selected", mapAction: "rename", action: "rename" },
   { commandId: "map-open-selected-details", mapAction: "open-details", action: "open-note" },
   { commandId: "map-toggle-collapse-selected", mapAction: "toggle-collapse", action: "toggle-collapse" },
+  { commandId: "map-focus-branch", mapAction: "focus-branch", action: "focus-branch" },
   { commandId: "map-zoom-to-fit", mapAction: "zoom-fit", action: "zoom-fit" },
   { commandId: "map-zoom-reset", mapAction: "zoom-reset", action: "zoom-reset" },
   { commandId: "map-search", mapAction: "search", action: "search" },
@@ -788,13 +840,25 @@ export function actionsFor(
   const ctx = { ...context, surface };
   const kind = cardActionKind(ctx);
   const toolbar = surface === "toolbar" && kind !== "map" ? CARD_TOOLBAR[kind] : null;
-  const offered = CARD_ACTIONS.filter(
-    action =>
-      action.surfaces.includes(surface) &&
-      (action.scope.includes(kind) || action.scope.includes("map")) &&
-      (!toolbar || toolbar.includes(action.id)) &&
-      (action.applies?.(ctx) ?? true)
-  );
+  // A card's ⋯ and right-click follow the rules below (B06, B07); everything else reads the action's own surfaces.
+  const rule =
+    kind === "card" || kind === "ai-card"
+      ? surface === "more"
+        ? ruleMoreSet(kind)
+        : surface === "context"
+          ? ruleContextSet(kind).filter((id): id is CardActionId => id !== "separator")
+          : null
+      : null;
+  const offered = (
+    rule
+      ? rule.map(id => CARD_ACTIONS.find(action => action.id === id)!)
+      : CARD_ACTIONS.filter(
+          action =>
+            action.surfaces.includes(surface) &&
+            (action.scope.includes(kind) || action.scope.includes("map")) &&
+            (!toolbar || toolbar.includes(action.id))
+        )
+  ).filter(action => action.applies?.(ctx) ?? true);
   if (toolbar) offered.sort((a, b) => toolbar.indexOf(a.id) - toolbar.indexOf(b.id));
   return offered.map(action => ({ action, availability: action.available(ctx) }));
 }
@@ -803,12 +867,17 @@ export function titleKeyFor(action: CardAction, surface: CardSurface, ctx: CardA
   return action.titles?.[surface] ?? action.titleFor?.({ ...ctx, surface }) ?? action.titleKey;
 }
 
+/** The palette name of an action (main.ts names the CARD_COMMANDS by it): the action list's name, as the card ⋯ and right-click show it. */
+export function commandTitleKey(id: CardActionId): TranslationKey {
+  return CARD_ACTIONS.find(item => item.id === id)!.titleKey;
+}
+
 /** The action's keys, from the same rows the Keyboard shortcuts dialog lists. */
 export function shortcutKeysFor(action: CardAction): readonly string[] | undefined {
   return action.shortcut ? MAP_KEYBOARD_SHORTCUTS.find(row => row.action === action.shortcut)?.keys : undefined;
 }
 
-/** The ⋯ rule the entries move to (B06): the card's menu actions minus its toolbar set, in order. */
+/** The card ⋯ (B06): the card's menu actions minus its toolbar set, in order. */
 export function ruleMoreSet(kind: "card" | "ai-card"): CardActionId[] {
   return CARD_ACTIONS.filter(
     action =>
@@ -820,7 +889,7 @@ export function ruleMoreSet(kind: "card" | "ai-card"): CardActionId[] {
 
 /** Toolbar actions the right-click menu never repeats (Run all's Stop belongs to the running card's toolbar only). */
 const TOOLBAR_ONLY: readonly CardActionId[] = ["stop-run-all"];
-/** The right-click rule the entries move to (B07): the toolbar set (minus TOOLBAR_ONLY), a separator, then the ⋯ set. */
+/** The card right-click (B07): the toolbar set (minus TOOLBAR_ONLY), a separator, then the ⋯ set. */
 export function ruleContextSet(kind: "card" | "ai-card"): (CardActionId | "separator")[] {
   return [...CARD_TOOLBAR[kind].filter(id => !TOOLBAR_ONLY.includes(id)), "separator", ...ruleMoreSet(kind)];
 }

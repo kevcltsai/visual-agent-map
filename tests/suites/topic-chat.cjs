@@ -527,12 +527,12 @@ integrationTest('topic chat counterexample 7: openTopicChat does not open while 
   assert.ok(h.win(), 'a plain topic opens'); assert.ok(find(h.overlay(), i => hasClass(i, 'vam-topic-chat')), 'in the canvas overlay');
 });
 
-integrationTest('topic chat counterexample 7: the card menu (Research this card) and the command offer AI explore and open the topic chat', async () => {
+integrationTest('topic chat counterexample 7: the card menu (AI explore) and the command offer AI explore and open the topic chat', async () => {
   const item = () => { const it = { setTitle(title) { it.title = title; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; return it; };
   const menuOf = (h) => { const items = []; return { items, menu: { addItem(cb) { const it = item(); cb(it); items.push(it); return this; }, addSeparator() { return this; } } }; };
   const h = await harness();
   const m = menuOf(h); h.view.addCardMenuActions(m.menu, h.node('a'));
-  const entry = m.items.find(i => i.title === t('ui.card_menu_research'));
+  const entry = m.items.find(i => i.title === t('ui.ai_explore'));
   assert.ok(entry, 'the plain map has the menu entry'); entry.fn();
   assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.a, 'the right-click entry opens the topic chat');
   h.view.closeTopicChatWindow();
@@ -550,7 +550,14 @@ integrationTest('topic chat entries: the empty suggestion panel, the card toolba
   assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.c, 'the panel button opens the topic chat');
   // The card toolbar is built by renderNode, which needs the full page; its source is checked instead (the tester sees the real button).
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  const sites = [...source.matchAll(/t\("ui\.(?:ai_explore|card_tool_research|card_menu_research)"\)/g)].map(m => source.slice(m.index, m.index + 170));
+  const sites = [...source.matchAll(/t\("ui\.(?:ai_explore|card_tool_research)"\)/g)].map(m => source.slice(m.index, m.index + 170));
+  // The right-click entry is drawn from the card action list (B07): its research action, named AI explore, runs host.research.
+  const list = fs.readFileSync(path.join(root, 'experiences/visual-map/card-actions.ts'), 'utf8');
+  const research = list.slice(list.indexOf('id: "research"'), list.indexOf('id: "open-note"'));
+  assert.match(research, /titleKey: "ui\.ai_explore"/);
+  assert.match(research, /run: \(ctx, options\) => ctx\.host\.research\(/);
+  const host = source.match(/research: \(card, opener\) => [^\n]*/)?.[0] ?? '';
+  sites.push(host);
   assert.ok(sites.length >= 3); assert.ok(sites.every(site => site.includes('openTopicChat') && !/NextStep|Modal/.test(site)), sites.join('\n'));
 });
 
@@ -1094,7 +1101,7 @@ integrationTest('topic chat Escape gives the focus back: to the button that open
   assert.deepEqual(plain(focused), ['card:b'], 'the command entry returns to the card');
   focused.length = 0; h.view.closeTopicChatWindow();
   const items = []; const menu = { addItem(cb) { const it = { setTitle(x) { it.title = x; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; cb(it); items.push(it); return this; }, addSeparator() { return this; } };
-  h.view.addCardMenuActions(menu, h.node('a')); items.find(i => i.title === t('ui.card_menu_research')).fn(); escape();
+  h.view.addCardMenuActions(menu, h.node('a')); items.find(i => i.title === t('ui.ai_explore')).fn(); escape();
   assert.deepEqual(plain(focused), ['card:a'], 'the right-click entry returns to the card');
 });
 

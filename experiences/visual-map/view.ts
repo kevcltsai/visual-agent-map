@@ -16307,7 +16307,8 @@ export class VisualAgentMapView extends ItemView {
                   renderLivingPreview(trial.result),
                   viewSession,
                   currentTrial,
-                  warnings
+                  warnings,
+                  trial.changes
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 if (shown && currentTrial()) watchTrial(prepared);

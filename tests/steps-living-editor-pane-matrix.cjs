@@ -47,8 +47,9 @@ class EmptyView { constructor(leaf) { this.leaf = leaf; this.containerEl = { isS
 const Component = class { load() {} unload() {} };
 const MarkdownRenderer = { render: async (_app, markdown, el) => { el.rendered = markdown; } };
 
+const notices = [];
 const bundle = load('tests/support-right-pane-entry.ts',
-  { obsidian: { ...obsidian, ItemView, MarkdownView, View: class {}, Component, MarkdownRenderer, Notice: dom.makeNotice([]), Modal: dom.makeModal(), Setting, setTooltip() {} } },
+  { obsidian: { ...obsidian, ItemView, MarkdownView, View: class {}, Component, MarkdownRenderer, Notice: dom.makeNotice(notices), Modal: dom.makeModal(), Setting, setTooltip() {} } },
   { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: dom.createSvg, createSpan: value => make('span', typeof value === 'string' ? { cls: value } : value), createEl: (tag, value) => make(tag, value), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
 const { default: Plugin, VisualAgentMapView, LivingReaderView, LIVING_READER_VIEW } = bundle;
 
@@ -383,6 +384,97 @@ for (const width of [600, 700, 1024])
           if (w.log.focus.length) failures.push(`focus taken: ${w.log.focus}`);
           assert.deepEqual(failures, []);
         });
+
+// D1-x12: the previous editor's close is bounded. If it hangs (its pane release stuck in the pane queue) or fails (the
+// release or the side-panel restore throws), the next editor still gets its room and the user is told, in plain words,
+// that the side panels or the right pane could not be put back. A close that settles late changes nothing any more.
+const RESTORE_FAILED = 'Could not put the side panels and the right pane back as they were. Unfold them yourself; Note reopens the right pane.';
+const closeAThenOpenB = async (w, breakA) => {
+  const plugin = w.view.plugin;
+  const real = plugin.restoreLivingOfficial;
+  const rejected = [];
+  const onRejection = reason => rejected.push(String(reason?.message ?? reason));
+  process.on('unhandledRejection', onRejection);
+  try {
+    w.view.aiCardCloseTimeoutMs = 40;
+    await openAiEditor(w);
+    const roomA = w.view.aiCardOpen.room;
+    assert.ok(roomA, 'A has its room');
+    const late = breakA(plugin, roomA, real);
+    notices.length = 0;
+    w.view.openAiCardPopover(w.node('B'));
+    await w.settle();
+    for (let i = 0; i < 40 && !w.view.aiCardOpen?.room; i++) { await new Promise(resolve => setTimeout(resolve, 10)); await w.settle(); }
+    plugin.restoreLivingOfficial = real;
+    return { roomA, late, rejected, stop: () => process.off('unhandledRejection', onRejection) };
+  } catch (error) { process.off('unhandledRejection', onRejection); throw error; }
+};
+for (const width of [600, 700])
+  test(`D1-x12: ${width}px, the previous editor's close hangs → the next editor gets its room in time; the late close is a no-op`, async () => {
+    const w = await world({ width });
+    const { leftSplit: left, rightSplit: right } = w.ws;
+    await w.host.openDetails(w.file('A'));
+    await w.click('A');
+    const before = { left: left.collapsed, right: right.collapsed };
+    let finish;
+    const run = await closeAThenOpenB(w, plugin => { plugin.restoreLivingOfficial = () => new Promise(resolve => { finish = resolve; }); return () => finish(); });
+    try {
+      const failures = [];
+      const open = w.view.aiCardOpen;
+      if (open?.nodeId !== w.node('B').id) failures.push('B did not open');
+      if (!open?.room) failures.push('B never got its room (the hung close blocked it)');
+      if (w.host.sidePanelRoom !== open?.room) failures.push('B\'s room is not the registered one');
+      if (w.ws.central() < 320) failures.push(`B open: central pane ${w.ws.central()}px`); // I5
+      if (!notices.includes(RESTORE_FAILED)) failures.push(`no Notice: ${JSON.stringify(notices)}`);
+      // The old close settles late: it restores nothing again and leaves B's room and pane alone.
+      const changes = w.log.changes.length;
+      const panels = { left: left.collapsed, right: right.collapsed };
+      const shown = pane(w);
+      const noticed = notices.length;
+      run.late();
+      await w.settle(); await w.settle();
+      if (w.log.changes.length !== changes) failures.push(`late close changed panels: ${w.log.changes.slice(changes)}`);
+      if (JSON.stringify({ left: left.collapsed, right: right.collapsed }) !== JSON.stringify(panels)) failures.push('late close moved a panel');
+      if (pane(w) !== shown) failures.push(`late close changed the pane: ${pane(w)}`);
+      if (w.host.sidePanelRoom !== open?.room) failures.push('late close unregistered B\'s room');
+      if (notices.length !== noticed) failures.push('late close showed another Notice');
+      await closeAiEditor(w);
+      // I3: closing B gives the panels back as they were before A opened.
+      const after = { left: left.collapsed, right: right.collapsed };
+      if (JSON.stringify(after) !== JSON.stringify(before)) failures.push(`B closed: panels ${JSON.stringify(after)}, expected ${JSON.stringify(before)}`);
+      if (run.rejected.length) failures.push(`unhandled rejection: ${run.rejected}`);
+      if (w.log.focus.length) failures.push(`focus taken: ${w.log.focus}`);
+      assert.deepEqual(failures, []);
+    } finally { run.stop(); }
+  });
+
+const breaks = {
+  'the side-panel restore throws': (_plugin, roomA) => { roomA.restore = () => { throw new Error('restore broke'); }; },
+  'the pane release rejects': plugin => { plugin.restoreLivingOfficial = () => Promise.reject(new Error('release broke')); },
+  'the pane release throws': plugin => { plugin.restoreLivingOfficial = () => { throw new Error('release broke'); }; }
+};
+for (const [label, breakA] of Object.entries(breaks))
+  test(`D1-x12: ${label} → the next editor still starts, the user is told, no unhandled rejection`, async () => {
+    const w = await world({ width: 700 });
+    await w.host.openDetails(w.file('A'));
+    await w.click('A');
+    const run = await closeAThenOpenB(w, breakA);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 60)); await w.settle();
+      const failures = [];
+      const open = w.view.aiCardOpen;
+      if (open?.nodeId !== w.node('B').id) failures.push('B did not open');
+      if (!open?.room) failures.push('B never got its room');
+      if (w.host.sidePanelRoom !== open?.room) failures.push('B\'s room is not the registered one');
+      if (w.ws.central() < 320) failures.push(`B open: central pane ${w.ws.central()}px`); // I5
+      if (notices.filter(n => n === RESTORE_FAILED).length !== 1) failures.push(`Notice: ${JSON.stringify(notices)}`);
+      if (notices.some(n => n.includes('broke'))) failures.push('the raw error text was shown');
+      if (run.rejected.length) failures.push(`unhandled rejection: ${run.rejected}`);
+      await closeAiEditor(w);
+      if (w.view.aiCardOpen !== null) failures.push('B did not close');
+      assert.deepEqual(failures, []);
+    } finally { run.stop(); }
+  });
 
 // ---- Matrix B: the right pane ---------------------------------------------------------------------------------------
 // Each state starts from a pane the user opened once (the 「筆記」 button), then card A selected.

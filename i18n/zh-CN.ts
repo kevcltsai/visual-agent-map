@@ -1264,6 +1264,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial_stale_sources": "此试跑使用仍需更新的上游知识；请先正式执行卡片，再采用结果。",
   "ui.living_node_trial_frozen_sources": "此试跑使用已锁定的上游知识，信息可能不是最新。",
   "ui.living_node_trial_invalid": "试跑・已失效",
+  "ui.living_node_close_restore_failed": "无法把左右侧栏恢复成原本的样子。请自行展开侧栏；“笔记”可重新打开右侧栏。",
   "ui.living_node_trial_run_refused": "这张卡正在试跑，请先完成或关闭试跑。",
   "ui.living_node_trial_skipped": "试跑中，已略过",
   "ui.living_node_upstream_trial": "上游试跑中",

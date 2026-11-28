@@ -912,6 +912,8 @@ const CHAT_ADDED_HINT_MS = 8000;
 const CHAT_LOCATE_FLASH_MS = 1200;
 /** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
 const MERGE_FINDINGS_NOTICE_LIMIT = 5;
+/** How long a new AI editor waits for the previous one to give the pane and side panels back before it takes them anyway. */
+const AI_CARD_CLOSE_TIMEOUT_MS = 3000;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1777,6 +1779,7 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** The closing editor's pane and side panels, still being given back: the next editor starts on the state after it. */
   private aiCardClosing: Promise<void> | null = null;
+  private aiCardCloseTimeoutMs = AI_CARD_CLOSE_TIMEOUT_MS;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   private backgroundEpoch = 0;
@@ -17317,16 +17320,43 @@ export class VisualAgentMapView extends ItemView {
         : undefined;
     const aiCard = node ? this.notes.get(node.id)?.aiCard : undefined;
     // The pane is given back first (it never unfolds a side panel), then the side panels.
-    const released = Promise.resolve(
-      this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true, aiCard)
-    ).catch(() => {});
+    const released = (async () =>
+      this.plugin.restoreLivingOfficial(
+        target instanceof TFile ? target : undefined,
+        open.viewSession,
+        true,
+        aiCard
+      ))().then(
+      () => true,
+      () => false
+    );
+    // Not the raw error: what the user can do. The 「筆記」 entry reopens the pane; the side panels unfold by hand.
+    const failed = (): void => void new Notice(t("ui.living_node_close_restore_failed"));
     const room = open.room;
     // Closed before its room started: the previous editor's close, still running, gives the side panels back.
-    if (!room) return;
-    const closing = released.then(() => {
-      room.restore();
-      this.plugin.useSidePanelRoom?.(null, room);
-      if (this.aiCardClosing === closing) this.aiCardClosing = null;
+    if (!room) {
+      void released.then(ok => ok || failed());
+      return;
+    }
+    // Given back once: when the pane is released, or when that takes too long (the next editor must not wait on it).
+    const closing = new Promise<void>(resolve => {
+      let done = false;
+      const giveBack = (ok: boolean): void => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        try {
+          room.restore();
+        } catch {
+          ok = false;
+        }
+        this.plugin.useSidePanelRoom?.(null, room);
+        if (this.aiCardClosing === closing) this.aiCardClosing = null;
+        if (!ok) failed();
+        resolve();
+      };
+      const timer = window.setTimeout(() => giveBack(false), this.aiCardCloseTimeoutMs);
+      void released.then(giveBack);
     });
     this.aiCardClosing = closing;
   }

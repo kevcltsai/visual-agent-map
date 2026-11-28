@@ -1340,6 +1340,8 @@ export const en = {
     "The preview uses existing upstream knowledge that needs updating. Run Card before adoption.",
   "ui.living_node_trial_frozen_sources": "The preview uses locked upstream knowledge; its information may be old.",
   "ui.living_node_trial_invalid": "Trial · invalidated",
+  "ui.living_node_close_restore_failed":
+    "Could not put the side panels and the right pane back as they were. Unfold them yourself; Note reopens the right pane.",
   "ui.living_node_trial_run_refused": "This card is being tried out. Finish or close the trial first.",
   "ui.living_node_trial_skipped": "Being tried out, skipped",
   "ui.living_node_upstream_trial": "An upstream card is being tried out",

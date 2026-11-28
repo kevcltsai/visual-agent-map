@@ -855,6 +855,101 @@ for (const nth of [1, 2]) for (const memory of [true, false])
     assert.deepEqual(liveNotes(h), before);
   });
 
+// The plugin's write queue runs one write at a time and is not re-entrant (main.ts mutate); the harness's own mutate runs writes at once.
+const serialQueue = h => {
+  let queue = Promise.resolve();
+  h.view.plugin.mutate = work => { const result = queue.then(work); queue = result.catch(() => {}); return result; };
+};
+const within = (promise, ms, what) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout: ${what}`)), ms).unref())]);
+
+for (const nth of [1, 3])
+  test(`E2-tx: the parent card is removed to Unassigned while the batch commits (after note ${nth}): neither waits on the other, and no conflict window opens`, async () => {
+    const h = await harness(tree4);
+    serialQueue(h);
+    const parent = h.named('B');
+    const conflicts = [];
+    const resolve = h.view.resolveMapConflict.bind(h.view);
+    h.view.resolveMapConflict = async () => { const differs = await resolve(); if (differs) conflicts.push(new Error().stack); return differs; };
+    let removal;
+    afterNthNote(h, nth, async () => { if (!removal) removal = h.view.removeToUnassigned(parent, false); });
+    const lines = await within(chatApply(h, kidsOf(h, 12).map(a => ({ ...a, parentId: parent.id }))), 3000, 'the reply is applied');
+    assert.ok(removal, 'the removal was requested during the commit');
+    await within(removal, 3000, 'the removal runs after the commit');
+    assert.deepEqual(conflicts, [], 'the removal found Map.md and the screen the same: no conflict window');
+    assert.ok(lines.length === 12);
+  });
+
+// While the cards are only staged (on screen, Map.md not written) the map on screen differs from Map.md by design; another write must not read that as an outside edit
+// (its conflict window waits for the user, and the write queue with it: the reply sat at "applying" until Obsidian was restarted).
+for (const nth of [1, 3])
+  test(`E2-tx: the parent card is removed to Unassigned after card ${nth} is staged: no conflict window; the batch is refused, the queue is free, no note is left`, async () => {
+    const h = await harness(tree4);
+    serialQueue(h);
+    const parent = h.named('B');
+    const before = liveNotes(h);
+    const conflicts = [];
+    const resolve = h.view.resolveMapConflict.bind(h.view);
+    h.view.resolveMapConflict = async () => { const differs = await resolve(); if (differs) conflicts.push(true); return differs; };
+    let removal;
+    afterNthCard(h, nth, async () => { if (!removal) removal = h.view.removeToUnassigned(parent, false); });
+    const lines = await within(chatApply(h, kidsOf(h, 12).map(a => ({ ...a, parentId: parent.id }))), 3000, 'the reply is applied');
+    await within(removal, 3000, 'the removal runs');
+    assert.deepEqual(conflicts, [], 'the staged cards are not an outside edit of Map.md');
+    assert.equal(lines.some(line => line.status === 'done'), false, 'no card of the refused batch is reported as written');
+    assert.deepEqual(newNotesOf(h, before).filter(path => !/\/Unassigned\//.test(path)), [], 'no card note is left');
+    assert.equal((await h.saved()).nodes.some(n => n.id === parent.id), false, 'the parent is off the map');
+    assert.equal((await h.saved()).nodes.some(n => /Kid/.test(n.path)), false, 'and Map.md lists none of the batch');
+  });
+
+// The write of a reply's cards has a limit (D1-x12 principle: a stuck step ends as a visible failure the user can retry, never "applying" for ever).
+const failedLines = lines => lines.filter(line => line.status === 'failed');
+const kidNotes = (h, before) => newNotesOf(h, before);
+test('E2-tx: the write queue is stuck (an earlier write never ends): the reply ends with every card failed, nothing is kept, and asking again works', async () => {
+  const h = await harness(tree4);
+  serialQueue(h);
+  h.view.chatBatchWriteTimeoutMs = 150; h.view.chatBatchTailTimeoutMs = 150;
+  const before = liveNotes(h);
+  let free;
+  afterNthCard(h, 3, async () => { void h.view.plugin.mutate(() => new Promise(resolve => { free = resolve; })); });
+  const lines = await within(chatApply(h, kidsOf(h, 12)), 3000, 'the reply ends');
+  assert.equal(failedLines(lines).length, 12, 'every card says it was not written');
+  assert.match(failedLines(lines)[0].text, /not written in time/);
+  assert.equal(h.view.chatMapBatch, null, 'no batch is left staging');
+  assert.equal(h.view.map.nodes.some(n => /Kid/.test(h.view.notes.get(n.id)?.title ?? '')), false, 'the cards are off the screen');
+  assert.deepEqual(kidNotes(h, before), [], 'no note was made');
+  free();
+  await within(h.view.plugin.mutate(async () => {}), 3000, 'the queue is free again');
+  assert.deepEqual(kidNotes(h, before), [], 'the dropped write wrote nothing when the queue freed');
+  h.view.chatBatchWriteTimeoutMs = 60000;
+  const again = await within(chatApply(h, kidsOf(h, 12)), 10000, 'the retry ends');
+  assert.equal(again.filter(line => line.status === 'done').length, 12, 'asking again writes the cards');
+  assert.deepEqual(await unlistedOf(h, before), []);
+});
+
+test('E2-tx: the commit never returns after note 3: the reply ends with every card failed; when it does return it takes its notes back, and asking again works', async () => {
+  const h = await harness(tree4);
+  serialQueue(h);
+  h.view.chatBatchWriteTimeoutMs = 150; h.view.chatBatchTailTimeoutMs = 150;
+  const before = liveNotes(h);
+  let free;
+  const hung = new Promise(resolve => { free = resolve; });
+  let count = 0;
+  const make = h.repo.createNote.bind(h.repo);
+  h.repo.createNote = async (...args) => { const made = await make(...args); if (++count === 3) await hung; return made; };
+  const lines = await within(chatApply(h, kidsOf(h, 12)), 3000, 'the reply ends');
+  assert.equal(failedLines(lines).length, 12, 'every card says it was not written');
+  assert.equal(h.view.chatMapBatch, null);
+  free();
+  await within(h.view.plugin.mutate(async () => {}), 3000, 'the queue is free once the commit ends');
+  assert.deepEqual(kidNotes(h, before), [], 'the commit that was given up took its notes back');
+  assert.equal((await h.saved()).nodes.some(n => /Kid/.test(n.path)), false, 'and Map.md lists none');
+  assert.equal(h.view.map.nodes.some(n => /Kid/.test(n.path)), false);
+  h.view.chatBatchWriteTimeoutMs = 60000;
+  const again = await within(chatApply(h, kidsOf(h, 12)), 10000, 'the retry ends');
+  assert.equal(again.filter(line => line.status === 'done').length, 12);
+  assert.deepEqual(await unlistedOf(h, before), []);
+});
+
 test('E2-tx: a card made with the name field (no title given) is a note file at once, as before', async () => {
   const h = await harness(tree4);
   const before = liveNotes(h);

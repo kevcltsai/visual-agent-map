@@ -124,6 +124,7 @@ const CHANGED_CODES = new Set([
 export function chatFailureReason(error: unknown): string {
   const message = errorMessage(error);
   if (!/^[a-z0-9]+(-[a-z0-9]+)+$/.test(message)) return message;
+  if (message === "batch-timeout") return t("ui.map_chat_fail_batch_timeout");
   if (CHANGED_CODES.has(message)) return t("ui.map_chat_fail_changed");
   const key = livingSaveReason(error);
   return key ? t(key) : t("ui.map_chat_fail_unknown");

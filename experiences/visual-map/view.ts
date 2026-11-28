@@ -922,6 +922,10 @@ const MERGE_DONE_NOTICE_MS = 15000;
 const CHAT_ADDED_HINT_MS = 8000;
 /** How long a located card flashes (Locate on a chat result, resume item or the corner hint). */
 const CHAT_LOCATE_FLASH_MS = 1200;
+/** How long a reply's card batch may wait for its write (the queue and the commit) before the reply gives up: the cards fail with a reason the user can retry. */
+const CHAT_BATCH_WRITE_TIMEOUT_MS = 60000;
+/** How long a reply waits for the queue after its writes (rebuild, re-read) before it stops waiting; that work still runs when the queue frees. */
+const CHAT_BATCH_TAIL_TIMEOUT_MS = 10000;
 /** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
 const MERGE_FINDINGS_NOTICE_LIMIT = 5;
 /**
@@ -1703,7 +1707,11 @@ export class VisualAgentMapView extends ItemView {
     path: string;
     mapId: string;
     historyAt: number;
+    /** The reply stopped waiting for the write: a commit that is still running refuses to write on (see settleStaged). */
+    abandoned: boolean;
   } | null = null;
+  private chatBatchWriteTimeoutMs = CHAT_BATCH_WRITE_TIMEOUT_MS;
+  private chatBatchTailTimeoutMs = CHAT_BATCH_TAIL_TIMEOUT_MS;
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
@@ -7193,7 +7201,7 @@ export class VisualAgentMapView extends ItemView {
             node.path = made(card.node.id).path;
           }
         })
-        .commit({ deferRebuild: true });
+        .commit({ deferRebuild: true, authorize: () => !batch.abandoned });
       this.history.pushAt(entry, batch.historyAt);
     } catch (error) {
       forget();
@@ -7208,7 +7216,10 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return false;
     const disk = await this.plugin.repo.readMap(this.path);
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
-    if (structure(disk) === structure(this.map)) return false;
+    // While a reply's cards are only staged, the map on screen is ahead of Map.md by design: what is on disk is compared with
+    // the map the batch began from (the flush merges another write in), not with the staged cards.
+    const staged = this.chatMapBatch?.base;
+    if (structure(disk) === structure(staged ?? this.map)) return false;
     const local = clone(this.map);
     // A cross-map cut refuses to touch this map while its conflict window is still open.
     this.conflictOpen = true;
@@ -25548,6 +25559,18 @@ export class VisualAgentMapView extends ItemView {
     this.renderHold++;
     for (const view of this.heldViews) view.syncHold++;
   }
+  /** Waits for `work` at most `ms`; false when it is still running (it goes on, only this wait ends). */
+  private async waitAtMost(work: Promise<unknown>, ms: number): Promise<boolean> {
+    let timer: number | undefined;
+    const limit = new Promise<false>(resolve => {
+      timer = window.setTimeout(() => resolve(false), ms);
+    });
+    try {
+      return await Promise.race([work.then(() => true), limit]);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
   private async releaseChatBatch(): Promise<void> {
     const held = this.heldViews;
     if (!held.length) return;
@@ -25562,7 +25585,10 @@ export class VisualAgentMapView extends ItemView {
     for (const view of held) view.syncPending = false;
     try {
       // An empty write: its tail re-reads every view once.
-      await this.plugin.mutate(async () => {});
+      await this.waitAtMost(
+        this.plugin.mutate(async () => {}),
+        this.chatBatchTailTimeoutMs
+      );
     } catch {
       // mutate() has logged it; the views catch up at their next write.
     }
@@ -25573,9 +25599,12 @@ export class VisualAgentMapView extends ItemView {
       run.ownershipDirty = false;
       try {
         // plugin.rebuildDerivedData reports its own failure; the queue only keeps it from running between two writes.
-        await this.plugin.mutate(async () => {
-          await this.plugin.rebuildDerivedData();
-        });
+        await this.waitAtMost(
+          this.plugin.mutate(async () => {
+            await this.plugin.rebuildDerivedData();
+          }),
+          this.chatBatchTailTimeoutMs
+        );
       } catch {
         // mutate() has logged it.
       }
@@ -25691,14 +25720,51 @@ export class VisualAgentMapView extends ItemView {
     // memory and written as one transaction before anything else writes, or at the end.
     const stage =
       adds > 0 && batched && !scope
-        ? { on: false, base: null, created: [], cards: [], path: "", mapId: "", historyAt: 0 }
+        ? { on: false, base: null, created: [], cards: [], path: "", mapId: "", historyAt: 0, abandoned: false }
         : null;
     const staged: { index: number; label: string; ids: string[] }[] = [];
     this.chatMapBatch = stage;
+    // One write of this reply. It waits for the queue at most the batch limit; past it the reply gives up (`gaveUp`): the write
+    // is dropped if it has not started, every later write of the reply fails at once, and the staged cards are taken back.
+    let gaveUp = false;
+    const queued = async (work: () => Promise<void>): Promise<void> => {
+      if (gaveUp) throw new Error("batch-timeout");
+      const done = this.plugin.mutate(async () => {
+        if (!gaveUp) await work();
+      });
+      done.catch(() => {});
+      if (!(await this.waitAtMost(done, this.chatBatchWriteTimeoutMs))) {
+        gaveUp = true;
+        throw new Error("batch-timeout");
+      }
+    };
+    const dropStaged = (): void => {
+      if (!stage?.base) return;
+      this.adoptSavedMap(stage.base);
+      for (const card of stage.cards as PendingCard[]) this.notes.delete(card.node.id);
+      stage.base = null;
+      stage.created = [];
+      stage.cards = [];
+      this.render();
+    };
     const settleStaged = async (): Promise<void> => {
       if (!stage?.base) return;
       try {
-        await this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        if (gaveUp) {
+          dropStaged();
+          throw new Error("batch-timeout");
+        }
+        // The wait has a limit: a write queue that is stuck (another write waiting for the user) or a commit that never returns
+        // must not leave the reply at "applying". On the limit the cards fail (retry by asking again); a flush that has not
+        // started is dropped, one that has started is told to stop at its next check and takes its notes back.
+        const write = this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        write.catch(() => {});
+        if (!(await this.waitAtMost(write, this.chatBatchWriteTimeoutMs))) {
+          gaveUp = true;
+          stage.abandoned = true;
+          dropStaged();
+          throw new Error("batch-timeout");
+        }
         wrote = true;
       } catch (error) {
         // All or nothing: the cards of the batch were not written, so their lines say so and the run forgets them.
@@ -25762,6 +25828,13 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        if (gaveUp) {
+          lines[index] = this.chatLine(label, {
+            status: "failed",
+            reason: chatFailureReason(new Error("batch-timeout"))
+          });
+          continue;
+        }
         const staging = !!stage && action.kind === "add_child" && !action.livingPrompt;
         if (!staging) await settleStaged();
         if (action.kind === "rename_map") {
@@ -25814,7 +25887,7 @@ export class VisualAgentMapView extends ItemView {
             // The run's own write takes the mutation queue, so this one must not wait inside it.
             box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
           else
-            await this.plugin.mutate(async () => {
+            await queued(async () => {
               // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
             });
@@ -25857,7 +25930,7 @@ export class VisualAgentMapView extends ItemView {
       ) {
         try {
           if (stage) stage.on = true;
-          await this.plugin.mutate(() =>
+          await queued(() =>
             this.history.ownWrites(async () => {
               if (!same() || !this.map) return;
               // The layout measures the cards, so the held repaint comes first.
@@ -25884,7 +25957,7 @@ export class VisualAgentMapView extends ItemView {
         if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
             if (stage) stage.on = true;
-            await this.plugin.mutate(() =>
+            await queued(() =>
               this.history.ownWrites(async () => {
                 if (!same() || !this.map) return;
                 await this.mapChange(map => {
@@ -25920,7 +25993,7 @@ export class VisualAgentMapView extends ItemView {
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           if (stage) stage.on = true;
-          await this.plugin.mutate(() =>
+          await queued(() =>
             this.history.ownWrites(async () => {
               if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
               this.flushChatRender();

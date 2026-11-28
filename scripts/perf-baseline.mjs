@@ -116,6 +116,19 @@ await new Promise(r=>setTimeout(r,300));[...v.containerEl.querySelectorAll(".vam
   throw new Error(`Map ${mapPath} did not render ${expected} cards.`);
 }
 
+// Big maps: "show all" shrinks cards to a few pixels or leaves them off screen, so clicks miss. Bring the card into view first
+// (zoom back to 100% when its on-screen width is tiny, then centre the camera on it), judged by its real DOM rect.
+async function reveal(cdp, id) {
+  const probeExpr = `(()=>{const v=${view};const vr=v.containerEl.querySelector(".vam-viewport").getBoundingClientRect();const n=v.containerEl.querySelector('.vam-node[data-node-id="${id}"]');if(!n)return {ok:false,tiny:false};
+const r=n.getBoundingClientRect();return {ok:r.left>=vr.left+10&&r.right<=vr.right-10&&r.top>=vr.top+10&&r.bottom<=vr.bottom-10,tiny:r.width<60}})()`;
+  const state = await cdp.evaluate(probeExpr);
+  if (state.ok && !state.tiny) return;
+  if (state.tiny) { await cdp.evaluate(`(()=>{${view}.containerEl.querySelector(".vam-zoom-controls .vam-zoom")?.click()})()`); await delay(400); }
+  await cdp.evaluate(`(()=>{const v=${view};const n=v.map.nodes.find(x=>x.id==="${id}");if(n)v.focusNode(n,false)})()`);
+  await delay(600);
+  if (!(await cdp.evaluate(probeExpr)).ok) throw new Error(`Card ${id} could not be brought on screen.`);
+}
+
 // Points are viewport CSS pixels (what Input.dispatchMouseEvent takes).
 const emptyPointExpr = `(()=>{const v=${view};const r=v.containerEl.querySelector(".vam-viewport").getBoundingClientRect();
 for(let y=r.top+r.height*0.85;y>r.top+20;y-=17)for(let x=r.left+40;x<r.right-40;x+=23){const el=document.elementFromPoint(x,y);
@@ -155,6 +168,7 @@ async function measureMap(cdp, samples) {
   for (let i = 0; i < samples; i++)
     out.zoom.push(await measureInput(cdp, "wheel", "wheel", () => cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: centre.x, y: centre.y, deltaX: 0, deltaY: i % 2 ? 100 : -100 })));
   // Select: click visible cards in turn.
+  if ((await cdp.evaluate(cardPointsExpr)).length < 3) await reveal(cdp, "perf-b1");
   const points = await cdp.evaluate(cardPointsExpr);
   if (points.length < 3) throw new Error(`Only ${points.length} cards are visible to click.`);
   for (let i = 0; i < samples; i++) {
@@ -176,10 +190,13 @@ async function measureMap(cdp, samples) {
     await mouse(cdp, "mouseReleased", x, p.y);
   }
   // Expand: fold and unfold one branch with Space on the focused branch card (keydown arms, keyup toggles), alternating.
+  await reveal(cdp, "perf-b1");
   const branch = await cdp.evaluate(`(()=>{const n=${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]');if(!n)return null;const r=n.getBoundingClientRect();return {x:r.left+r.width*0.06,y:r.top+r.height/2}})()`);
   if (!branch) throw new Error("Branch card perf-b1 is not on screen.");
   await mouse(cdp, "mousePressed", branch.x, branch.y, 1);
   await mouse(cdp, "mouseReleased", branch.x, branch.y);
+  if (!(await cdp.evaluate(`document.activeElement?.closest?.('.vam-node')?.dataset.nodeId==="perf-b1"`)))
+    await cdp.evaluate(`${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')?.focus()`);
   const folded = `${view}.map.nodes.find(n=>n.id==="perf-b1").collapsed===true`;
   for (let i = 0; i < samples; i++) {
     const before = await cdp.evaluate(folded);

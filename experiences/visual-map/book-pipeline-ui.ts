@@ -240,7 +240,7 @@ export function bookBarState(
     ...(rerunning ? { rerun: true as const } : {}),
     ...(again ? { again: { ...again } } : {}),
     ...(fixAgain?.items ? { fixAgain } : {}),
-    ...(mode === "done" && closingPageSkipped(data, counts["needs-review"]) ? { noClosingPage: true as const } : {}),
+    ...(mode === "done" && closingPageSkipped(data) ? { noClosingPage: true as const } : {}),
     ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),

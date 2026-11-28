@@ -162,6 +162,11 @@ export interface BookPipelineData {
   changed?: { added: string[]; missing: string[] };
   /** With pauseReason "failed": a neutral code (letters, digits, `_.:-`) of what stopped the run. Never owner text. */
   failureCode?: string;
+  /**
+   * The runner's last closing-page decision: true when the page's only items were chapters the whole-book check skipped as locked (no new
+   * page, a notice instead), false when the page was written. The bar reads it; absent on saves from before it existed.
+   */
+  closingSkipped?: boolean;
   order: string[];
   globalPlanned: boolean;
   attempts: Record<"global", number> & Record<string, StepAttempts | number>;
@@ -530,22 +535,17 @@ export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">
   return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
 }
 /**
- * ai-flows AI lock: the run has no closing page to write (and the bar no button to it) when the only gap the whole-book check left is
- * chapters it skipped as locked: every card locked and nothing checked or open, or some cards locked and nothing open, no other chapter's
- * check unfinished and no chapter (`needsReview`, the needs-review stage count) to look at. Read from the saved state and the stage count
- * only, so the runner and the bar agree. The book keeps `incomplete` and `locked`, so "fix again" takes the chapters back once unlocked.
+ * ai-flows AI lock: whether the book has no closing page (and the bar no button to it). The runner decides it from the page's own items
+ * and saves it (`closingSkipped`); a save from before that field falls back to the older rule: every card left out as locked and
+ * nothing checked or open.
  */
-export function closingPageSkipped(data: BookPipelineData, needsReview: number): boolean {
+export function closingPageSkipped(data: BookPipelineData): boolean {
+  if (typeof data.closingSkipped === "boolean") return data.closingSkipped;
   const order = effectiveOrder(data);
   const locked = data.bookProof?.locked;
-  if (!order.length || !locked?.length) return false;
+  if (!order.length || !locked || !order.every(id => locked.includes(id))) return false;
   const slots = [data.bookProof, ...order.map(id => data.aiProof?.[id])];
-  if (order.every(id => locked.includes(id))) return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
-  return (
-    !needsReview &&
-    slots.every(slot => !slot?.open.length) &&
-    order.every(id => locked.includes(id) || !data.aiProof?.[id]?.incomplete)
-  );
+  return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
 }
 /** How the map's cards (`mapIds`) differ from what the run accepted: new cards, and cards of the run that are gone. */
 export function mapDifference(

@@ -923,7 +923,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       return view ? view.probeBookImage(url, signal) : { ok: false, reason: "no_view" };
     },
     backupNote: (path, raw) => this.backupBookNote(path, raw),
-    writeOpenIssues: (folder, language, content) =>
+    writeOpenIssues: (folder, language, content, existingOnly) =>
       writeOpenIssuesFile(
         {
           read: async path => {
@@ -941,7 +941,8 @@ export default class VisualAgentMapPlugin extends Plugin {
         },
         folder,
         language,
-        content
+        content,
+        existingOnly
       ),
     lockedSkipped: titles => void new Notice(lockedSkippedNotice(titles)),
     notes: {

@@ -622,31 +622,29 @@ test('P8c bar: a finished book whose every chapter was locked and nothing checke
   const allLocked = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] }) }));
   assert.equal(one(allLocked, 'vam-book-open-issues'), undefined, 'no button to a page that was not written');
   assert.ok(one(allLocked, 'vam-book-done-counts'), 'the counts line stays');
-  // B33-z: a chapter merely not locked no longer writes a page by itself; one with an open item does.
-  const someOpen = draw(aiData({ phase: 'done', aiProof: { ...proof, d: slot({ done: true, checked: 1, open: [{ id: 'x', quote: 'q', problem: 'p', reason: 'unfixable' }] }) }, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c'] }) }));
-  assert.ok(one(someOpen, 'vam-book-open-issues'), 'one chapter not locked and open: the page is written, the button stays');
+  const someOpen = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c'] }) }));
+  assert.ok(one(someOpen, 'vam-book-open-issues'), 'one chapter not locked: the page is written, the button stays');
 });
 
-test('B33-z bar: one chapter skipped as locked and nothing else open: no closing page, no button; a chapter to look at, an open item or an unfinished chapter keeps it', () => {
+test('B33-z bar: the button follows the runner\'s saved decision (closingSkipped), whatever the bar could count itself; older saves keep the B33-x rule', () => {
   setUiLanguage('zh-TW');
   const done = { done: true, checked: 2 };
   const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
-  const book = over => slot({ done: true, checked: 3, incomplete: true, locked: ['b'], ...over });
-  const stages = review => id => (review && id === 'c' ? 'needs-review' : 'checked');
-  const draw = (data, review = false) => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, stages(review)), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
-  assert.equal(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book() })), 'vam-book-open-issues'), undefined, 'only a locked chapter skipped: no button');
-  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book() }), true), 'vam-book-open-issues'), 'a chapter to look at: the page is written');
-  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book({ open: [{ id: 'x', chapter: 2, quote: 'q', problem: 'p', reason: 'ai_locked' }] }) })), 'vam-book-open-issues'), 'an open item: the page is written');
-  assert.ok(one(draw(aiData({ phase: 'done', aiProof: { ...proof, c: slot({ done: true, incomplete: true }) }, bookProof: book() })), 'vam-book-open-issues'), 'an unlocked chapter that did not finish: the page is written');
-  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, checked: 3 }) })), 'vam-book-open-issues'), 'no lock: the page as before');
+  const book = slot({ done: true, checked: 3, incomplete: true, locked: ['b'] });
+  const draw = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => 'checked'), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
+  assert.equal(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: true })), 'vam-book-open-issues'), undefined, 'saved as skipped: no button');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: false })), 'vam-book-open-issues'), 'saved as written (say, a cover item): the button');
+  const allLocked = slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] });
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: { a: slot({ done: true }), b: slot({ done: true }), c: slot({ done: true }), d: slot({ done: true }) }, bookProof: allLocked, closingSkipped: false })), 'vam-book-open-issues'), 'the saved decision wins over the older rule');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book })), 'vam-book-open-issues'), 'an older save, partly locked: the button as before');
 });
 test('B33-z: the notice for chapters skipped as locked names them, in each UI language', () => {
   setUiLanguage('zh-TW');
-  assert.equal(bundle.lockedSkippedNotice(['甲', '乙']), 'AI 校對略過了已鎖定的章：甲、乙。其他章都沒有問題，所以沒有建立「仍有問題」頁。');
+  assert.equal(bundle.lockedSkippedNotice(['甲', '乙']), 'AI 校對略過了已鎖定的章：甲、乙。其他章都沒有問題。');
   setUiLanguage('zh-CN');
-  assert.equal(bundle.lockedSkippedNotice(['甲']), 'AI 校对略过了已锁定的章：甲。其他章都没有问题，所以没有建立“仍有问题”页。');
+  assert.equal(bundle.lockedSkippedNotice(['甲']), 'AI 校对略过了已锁定的章：甲。其他章都没有问题。');
   setUiLanguage('en');
-  assert.equal(bundle.lockedSkippedNotice(['A', 'B']), 'The AI proofread skipped these locked chapters: A, B. Nothing else is open, so no "Still open" page was made.');
+  assert.equal(bundle.lockedSkippedNotice(['A', 'B']), 'The AI proofread skipped these locked chapters: A, B. Nothing else is open.');
   setUiLanguage('zh-TW');
 });
 test('bar: with a book structure the fix line names the card by its place (preface / chapter / section) and counts cards', () => {

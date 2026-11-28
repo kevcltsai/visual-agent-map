@@ -1228,7 +1228,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(outlined.map, null, 'no map left: the outline empties');
 });
-integrationTest('card toolbar: a selected card shows labelled AI explore, Style, Note and ⋯ buttons (an AI card Run, Lock, AI explore, Settings, Note, ⋯; read-only only Note); no Add, no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
+integrationTest('card toolbar: a selected card shows labelled AI explore, Style, Note and ⋯ buttons (an AI card Run, Lock, AI explore, Settings, Note, ⋯; read-only only Note and ⋯); no Add, no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until focus or selection (no longer hover), and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
@@ -1268,7 +1268,7 @@ integrationTest('card toolbar: a selected card shows labelled AI explore, Style,
   const locked = toolsOf(aiCard(view => { view.notes.get('a').aiLocked = true; }));
   assert.deepEqual(names(locked), ['Run', 'Locked', 'AI explore', 'Settings', 'Note', '⋯'], 'AI card, locked');
   assert.equal(locked[1].attrs['aria-pressed'], 'true', 'the lock shows pressed');
-  assert.deepEqual(names(toolsOf(({ view }) => { view.noteLoad = { pending: true }; })), ['Note'], 'read-only: only Note');
+  assert.deepEqual(names(toolsOf(({ view }) => { view.noteLoad = { pending: true }; })), ['Note', '⋯'], 'read-only: Note and ⋯ (its rows greyed, decision #35)');
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.ai_explore', 'ui.topic_style', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['AI 探索', '樣式', '筆記', '更多卡片動作']);
   assert.deepEqual(['ui.card_tool_run', 'ui.card_tool_lock', 'ui.card_tool_ai_settings', 'ui.card_tool_stop'].map(key => translate('zh-TW', key)), ['執行', '鎖定', '設定', '停止']);

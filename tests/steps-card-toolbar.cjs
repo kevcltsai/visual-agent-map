@@ -158,10 +158,10 @@ test('B08 toolbar: an AI card shows Run | Lock | AI explore | Settings | Note | 
   assert.equal(locked.text, 'Locked');
 });
 
-test('B08 toolbar: read-only (notes still loading) leaves only Note on an ordinary and an AI card (stage A rule, unchanged)', async () => {
+test('B08 toolbar: read-only (notes still loading) leaves only Note and ⋯ (its rows greyed, decision #35) on an ordinary and an AI card', async () => {
   const h = await harness([['a', null, { noAi: true }], ['b', null]]);
   h.view.noteLoad = { pending: true };
-  for (const key of ['a', 'b']) assert.deepEqual(kinds(paint(h, key)), ['vam-detail-button'], `${key} while loading`);
+  for (const key of ['a', 'b']) assert.deepEqual(kinds(paint(h, key)), ['vam-detail-button', 'vam-card-tool-more'], `${key} while loading`);
 });
 
 test('B08 style popover: changing the colour writes only the topic-color key, in one step that one undo reverts byte for byte', async () => {

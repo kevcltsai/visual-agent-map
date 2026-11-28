@@ -222,7 +222,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import { sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
+import { documentsSnapshot, sourceNodeId, sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -1460,7 +1460,12 @@ export class VisualAgentMapView extends ItemView {
         }
       ),
     noteChange: (node, patch) =>
-      this.noteChange(node, patch, undefined, patch.summary !== undefined || patch.detail !== undefined),
+      this.noteChange(
+        node,
+        patch,
+        undefined,
+        patch.summary !== undefined || patch.detail !== undefined ? true : "lock"
+      ),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
     chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
@@ -7194,8 +7199,8 @@ export class VisualAgentMapView extends ItemView {
     const group = await this.topicReferenceGroup(sources, "strong", { origin: false });
     const mapGroups = await this.readMapSourceGroups(signal);
     const content = mapGroups.length
-      ? `${JSON.stringify(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
-      : JSON.stringify(group.documents);
+      ? `${documentsSnapshot(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
+      : documentsSnapshot(group.documents);
     return { group, mapGroups, content };
   }
   /** Compares the merged summary and Detail with what the sources hold (numbers, links, embeds; no invented numbers). */
@@ -10698,7 +10703,16 @@ export class VisualAgentMapView extends ItemView {
   /** Registers the three entries on the canvas; AIM maps and topic selection mode get none (D11). */
   private setupCanvasImageInput(): void {
     const viewport = this.viewportEl;
-    if (!viewport || !this.canEditCanvasItems()) return;
+    if (!viewport) return;
+    // V3.3 G04-y: the right-click is bound in every state, or the image menu (rows greyed with a reason) never opens while
+    // several topics are picked or the notes load. Without edit rights only the image's own menu answers; the rest stays shut.
+    // Safe only while openImageMenu greys its writing rows in every state where canEditCanvasItems() is false: a new
+    // condition there must also set the image menu's `off` reason.
+    viewport.addEventListener("contextmenu", event => {
+      if (this.canEditCanvasItems() || (event.target as Element | null)?.closest?.(".vam-canvas-image"))
+        this.onCanvasContextMenu(event);
+    });
+    if (!this.canEditCanvasItems()) return;
     viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
     viewport.addEventListener("dragleave", event => this.onCanvasDragLeave(event));
     viewport.addEventListener("drop", event => this.onCanvasDrop(event));
@@ -10714,7 +10728,6 @@ export class VisualAgentMapView extends ItemView {
       viewport.addEventListener(name, () => {
         this.internalDrag = false;
       });
-    viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
   }
   private onCanvasPointerMove(event: { clientX: number; clientY: number }): void {
@@ -10942,8 +10955,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The toolbar Style popover (style-popover.ts) for the card, under its Style button. Each choice is one write and one undo
-   * step through changeTopicColor or changeTopicStyle, after whenEditing, the structure lock and mergeUnlocked (the whole
-   * branch when the box is ticked); a refused choice puts the saved state back.
+   * step through changeTopicColor or changeTopicStyle, after whenEditing and mergeUnlocked (the whole branch when the box
+   * is ticked; not the picture-book locks, decision #62); a refused choice puts the saved state back.
    */
   private openStyleFor(node: MapNode, opener?: HTMLElement): void {
     this.styleOpen?.pop.close();
@@ -10956,7 +10969,7 @@ export class VisualAgentMapView extends ItemView {
       let queued = false;
       this.whenEditing(() => {
         const live = this.mapNodeById(id);
-        if (!live || this.bookLock().structure || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
+        if (!live || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
         queued = true;
         this.enqueue(async () => {
           await change(live);
@@ -12766,8 +12779,8 @@ export class VisualAgentMapView extends ItemView {
     patch: NotePatch,
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry),
-    /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
-    rejectAiCard = false
+    /** Chat writes: the AI-card refusal (true, content) or only the AI lock ("lock", a rename) is checked on the bytes at the write, not on this view's cached note. */
+    rejectAiCard: boolean | "lock" = false
   ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
@@ -12784,7 +12797,13 @@ export class VisualAgentMapView extends ItemView {
     }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
     // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
-    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+    if (
+      (await this.plugin.repo.updateNoteGuarded(
+        node.path,
+        patch,
+        rejectAiCard === "lock" ? { rejectAiLock: true } : { rejectAiCard }
+      )) === "discarded"
+    )
       return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
@@ -16534,17 +16553,23 @@ export class VisualAgentMapView extends ItemView {
                 );
                 let ready = false;
                 let started = false;
-                await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (!currentTrial()) return;
-                  started = true;
-                  ready = await trial.run(prepared.request);
-                });
+                win.setTrialWaiting(true);
+                try {
+                  await this.plugin.confirmAiUsage(prepared.model, async () => {
+                    win.setTrialWaiting(false);
+                    if (!currentTrial()) return;
+                    started = true;
+                    ready = await trial.run(prepared.request);
+                  });
+                } finally {
+                  win.setTrialWaiting(false);
+                }
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
                   // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
                   if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failureCode ?? "");
+                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
                     win.showTrialFailure(failed.key, failed.code);
                   }
                   return false;
@@ -21179,7 +21204,7 @@ export class VisualAgentMapView extends ItemView {
           options?.signal
         );
         childSources = await readSources();
-        const sourceSnapshot = JSON.stringify(childSources.documents);
+        const sourceSnapshot = documentsSnapshot(childSources.documents);
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
         const language = this.plugin.settings.language;
@@ -21202,7 +21227,7 @@ export class VisualAgentMapView extends ItemView {
             this.path !== mapPath ||
             this.map?.id !== mapId ||
             childIds() !== startIds,
-          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+          sourcesChanged: async () => documentsSnapshot((await readSources()).documents) !== sourceSnapshot
         };
       },
       onStarted: async () => {
@@ -22085,6 +22110,13 @@ export class VisualAgentMapView extends ItemView {
     const notes = await Promise.all(
       sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
     );
+    // The file as the other source paths read it, so a citation of this topic carries its node id and file revision, not those of the text below.
+    const files = await Promise.all(
+      sources.map(async source => {
+        const file = this.app.vault.getAbstractFileByPath(source.path);
+        return file instanceof TFile ? livingNoteForModel(await this.app.vault.read(file)) : undefined;
+      })
+    );
     const documents = sources.map((source, index) => {
       const note = notes[index];
       const finding = note.newFindings.trim();
@@ -22100,7 +22132,10 @@ export class VisualAgentMapView extends ItemView {
       ]
         .filter(Boolean)
         .join("\n\n");
-      return { path: source.path, content };
+      const file = files[index];
+      return file === undefined
+        ? { path: source.path, content }
+        : { path: source.path, content, nodeId: sourceNodeId(file), rev: sourceRevision(file) };
     });
     return {
       id: `mind-map:${this.map?.id ?? "selected"}`,
@@ -22178,7 +22213,7 @@ export class VisualAgentMapView extends ItemView {
       task.options.outputLanguage
     );
     if (
-      JSON.stringify(latest.documents) !== task.sourceContent ||
+      documentsSnapshot(latest.documents) !== task.sourceContent ||
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -23762,6 +23797,7 @@ export class VisualAgentMapView extends ItemView {
       },
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
+      mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).

@@ -2729,6 +2729,7 @@ export class VisualAgentMapView extends ItemView {
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
       card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
+      card.toggleClass("is-temp-open", !!search && !!this.searchOpen?.expanded.has(id));
     }
     this.mapSearchBar?.setCount(this.mapSearchCountText());
   }
@@ -2763,12 +2764,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     search.currentId = step.id;
-    const collapsed = collapsedAncestors(this.map.nodes, step.id);
-    if (collapsed.length) {
-      await this.mapChange(map => {
-        for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
-      });
-    }
+    // P1.6: a match in a folded branch opens it only for the search; the map, its history and Map.md stay as they are.
+    this.openForSearch(collapsedAncestors(this.map.nodes, step.id));
     if (this.closed || this.mapSearch !== search || search.query !== query || search.currentId !== step.id) return;
     const target = this.map?.nodes.find(item => item.id === step.id);
     if (!target) return;
@@ -2779,6 +2776,35 @@ export class VisualAgentMapView extends ItemView {
       t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "")
     );
   }
+  /** Shows exactly `ancestors` open (the rest of an earlier jump folds back) and works out where the revealed cards stand, on a copy. */
+  private openForSearch(ancestors: string[]): void {
+    const map = this.map;
+    if (!map) return;
+    const had = this.searchOpen;
+    const same = !!had && had.expanded.size === ancestors.length && ancestors.every(id => had.expanded.has(id));
+    if (same && had.signature === mapSignature(map)) return;
+    if (!ancestors.length) {
+      this.searchOpen = null;
+    } else {
+      const open = new Set(ancestors);
+      const before = new Set(visibleNodes(map.nodes).map(node => node.id));
+      const { positions } = computeTidy(map, copy => {
+        for (const node of copy.nodes) if (open.has(node.id)) node.collapsed = false;
+        // The same placement as unfolding by hand: stored places stay, only what the revealed cards cover is pushed.
+        if (!this.placesLocally(copy)) return this.arrangeAll(copy);
+        const revealed = new Set(
+          visibleNodes(copy.nodes)
+            .map(node => node.id)
+            .filter(id => !before.has(id))
+        );
+        if (!revealed.size) return;
+        this.pushFrom(copy, revealed);
+        if (cardsOverlapAny(copy.nodes, revealed, this.cardHeightOf)) this.arrangeAll(copy);
+      });
+      this.searchOpen = { expanded: open, positions, signature: mapSignature(map) };
+    }
+    if (!this.closed) this.render();
+  }
   /** Closes the box and clears the marks. Esc passes `restoreFocus`: focus returns to where the search began, else to the map. */
   private closeMapSearch(restoreFocus: boolean): void {
     const search = this.mapSearch;
@@ -2787,9 +2813,13 @@ export class VisualAgentMapView extends ItemView {
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
+    const hadOpen = this.searchOpen !== null;
+    this.searchOpen = null;
+    if (hadOpen && restoreFocus && !this.closed && this.map) this.render();
     for (const card of this.cardEls.values()) {
       card.toggleClass("is-search-match", false);
       card.toggleClass("is-search-current", false);
+      card.toggleClass("is-temp-open", false);
     }
     if (!restoreFocus || this.closed) return;
     const card = search.returnNodeId ? this.cardEls.get(search.returnNodeId) : undefined;
@@ -5295,6 +5325,12 @@ export class VisualAgentMapView extends ItemView {
   /** The pending Tidy preview: where cards would go. Display only; cleared by any change of the map. */
   private tidy: (TidyPreview & { branchId?: string; mapId: string; signature: string }) | null = null;
   private tidyBarEl: HTMLElement | null = null;
+  /** Folded branches the search has opened for itself (memory only; never written) and where the revealed cards are drawn. */
+  private searchOpen: {
+    expanded: Set<string>;
+    positions: Map<string, { x: number; y: number }>;
+    signature: string;
+  } | null = null;
   private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
   private tidyArrange(map: MapDocument, branchId?: string): void {
     if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
@@ -13216,6 +13252,8 @@ export class VisualAgentMapView extends ItemView {
     this.edgesEl.setAttribute("aria-hidden", "true");
     this.stageEl.appendChild(this.edgesEl);
     this.dropStaleTidy();
+    // A change to the map while the search has branches open drops the temporary view (its places were made for the old map).
+    if (this.searchOpen && (!this.map || this.searchOpen.signature !== mapSignature(this.map))) this.searchOpen = null;
     const shown = this.canvasNodes();
     this.selection.prune(new Set(shown.map(node => node.id)));
     if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
@@ -14179,7 +14217,11 @@ export class VisualAgentMapView extends ItemView {
   private canvasNodes(): MapNode[] {
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
-    const shown = visibleNodes(this.map.nodes, this.branchFocus ? { rootId: this.branchFocus.id } : undefined);
+    const open = this.searchOpen;
+    const shown = visibleNodes(this.map.nodes, {
+      ...(this.branchFocus ? { rootId: this.branchFocus.id } : {}),
+      ...(open ? { expand: open.expanded } : {})
+    });
     // Topics hidden by a clicked anchor (and their branches) are left out; the other cards keep their places.
     const byAnchor = this.hiddenAnchors?.size
       ? anchorHiddenTopicIds(this.map.canvasItems ?? [], this.map.nodes, this.hiddenAnchors)
@@ -14189,7 +14231,8 @@ export class VisualAgentMapView extends ItemView {
         ? shown.filter(node => !superseded.has(node.id) && !byAnchor?.has(node.id))
         : shown;
     // A view only: these copies carry display positions and must never be written back to the map.
-    return this.tidy ? overlayPositions(nodes, this.tidy.positions) : nodes;
+    const placed = open?.positions.size ? overlayPositions(nodes, open.positions) : nodes;
+    return this.tidy ? overlayPositions(placed, this.tidy.positions) : placed;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   private keyboardNeighbor(node: MapNode, key: string): MapNode | undefined {

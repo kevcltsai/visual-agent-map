@@ -7,8 +7,10 @@
  *
  * Left alone: code (fenced or inline), images and embeds (`![](url)`, the video rules own those), HTML tags and reference
  * definitions (a marker there would break the syntax), and a URL already followed by the marker. A marker never goes between a
- * link's `](` and its `)`: it follows the `)`, or is left out when the destination cannot be read. A URL opened this run (or
- * given by the user, the task or a reference) that still carries a copied marker loses it.
+ * link's `](` and its `)`: it follows the `)`, or is left out when the destination cannot be read. An HTML link
+ * `<a href="url">text</a>` on one line is a link too: its marker follows the `</a>`, never inside the tag or the text; one without
+ * a `</a>` on its line is left alone. A URL opened this run (or given by the user, the task or a reference) that still carries a
+ * copied marker loses it.
  */
 
 /** The same page under http and https, with or without a trailing slash or a fragment, is one URL. */
@@ -38,6 +40,8 @@ const TOKENS = new RegExp(
     // Any other [text](destination) up to its matching `)` (two levels of parentheses, quotes): the marker goes after the `)`.
     String.raw`${LINK_TEXT}\(((?:[^()\n]|\((?:[^()\n]|\([^()\n]*\))*\))*)\)`,
     String.raw`<(https?:\/\/[^>\s]+)>`, // autolink
+    // <a href="url">text</a> on one line: the marker goes after the `</a>`.
+    String.raw`<a\s(?:[^>\n]*?\s)?href\s*=\s*(?:"([^"\n]*)"|'([^'\n]*)')[^>\n]*>[^\n]*?<\/a\s*>`,
     String.raw`<\/?[A-Za-z][^>\n]*>`, // HTML tag
     `(${URL_BODY})` // bare URL
   ].join("|"),
@@ -63,7 +67,19 @@ function eachUrl(
   const follows = (rest: string): boolean => markers.some(item => rest.trimStart().startsWith(item));
   return text.replace(
     TOKENS,
-    (match: string, _fence, angleLink, plainLink, destination, autolink, bare, offset: number, whole: string) => {
+    (
+      match: string,
+      _fence,
+      angleLink,
+      plainLink,
+      destination,
+      autolink,
+      hrefDouble,
+      hrefSingle,
+      bare,
+      offset: number,
+      whole: string
+    ) => {
       const after = whole.slice(offset + match.length);
       let linked = (angleLink ?? plainLink ?? autolink) as string | undefined;
       if (destination !== undefined) {
@@ -71,6 +87,11 @@ function eachUrl(
         const url = written.startsWith("<") ? written.slice(1).split(">")[0] : written.split(/\s+/)[0];
         if (!/^https?:\/\//i.test(url)) return match;
         linked = url;
+      }
+      const href = (hrefDouble ?? hrefSingle) as string | undefined;
+      if (href !== undefined) {
+        if (!/^https?:\/\//i.test(href.trim())) return match;
+        linked = href.trim();
       }
       if (linked !== undefined) return visit(linked, follows(after), match, "", offset + match.length);
       if (bare === undefined) return match;
@@ -120,7 +141,7 @@ export function markUnverifiedUrls(
   });
   let text = detail;
   for (const at of stale.reverse()) {
-    const space = /^\s*/.exec(text.slice(at))?.[0] ?? "";
+    const space = /^[ \t]*/.exec(text.slice(at))?.[0] ?? "";
     const found = markers.find(item => text.startsWith(item, at + space.length));
     if (found) text = text.slice(0, at) + text.slice(at + space.length + found.length);
   }

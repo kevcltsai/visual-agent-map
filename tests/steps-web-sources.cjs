@@ -53,6 +53,23 @@ test('a copied marker after a verified URL is removed (any locale); an unverifie
   assert.equal(mark(`[f](https://f.example/a) ${M}`, ['https://f.example/a']), `[f](https://f.example/a) ${M}`, 'only known, not verified: kept');
   assert.equal(mark(`[f](https://f.example/a) ${M} (source not verified) text`, [], ['https://f.example/a']), `[f](https://f.example/a) (source not verified) text`, 'only the marker right after the URL');
 });
+test('a removed marker takes only same-line spaces: the next line stays its own line', () => {
+  const text = `[f](https://f.example/a)\n（來源未驗證） next`;
+  assert.equal(mark(text, [], ['https://f.example/a']), text);
+  assert.equal(mark(`[f](https://f.example/a) \t${M}\nnext`, [], ['https://f.example/a']), '[f](https://f.example/a)\nnext');
+});
+test('an HTML link is a link: its href is checked, the marker goes after the </a>, never inside the tag or the text', () => {
+  const link = '<a href="https://marketingprofs.com/6/chandon1.asp">MarketingProfs：Title</a>';
+  assert.equal(mark(`[^1]: ${link}`), `[^1]: ${link} ${M}`, 'a footnote definition');
+  assert.equal(mark(`See ${link}.`), `See ${link} ${M}.`);
+  assert.equal(mark("<A class='x' HREF='https://f.example/p' target=\"_blank\">https://f.example/p</A>"), `<A class='x' HREF='https://f.example/p' target="_blank">https://f.example/p</A> ${M}`, 'single quotes, any case, URL as the text');
+  assert.equal(mark(link, [], ['https://marketingprofs.com/6/chandon1.asp']), link, 'opened: plain');
+  assert.equal(mark(link, ['http://marketingprofs.com/6/chandon1.asp/']), link, 'known: plain');
+  assert.equal(mark(`${link} ${M} more`, [], ['https://marketingprofs.com/6/chandon1.asp']), `${link} more`, 'a copied marker after a verified HTML link is removed');
+  assert.equal(mark(`${link}（來源未驗證）`), `${link}（來源未驗證）`, 'already marked: once');
+  for (const text of ['<a href="https://f.example/p">no closing tag', '<a href="https://f.example/p">text\n</a>', '<a href="/local">x</a>', '<a data-href="https://f.example/p">x</a>'])
+    assert.equal(mark(text), text, text);
+});
 test('webUrlsIn finds the URLs of any text without trailing punctuation', () => {
   assert.deepEqual([...webUrlsIn('a https://x.example/1, b [t](http://y.example/2) c <https://z.example/3>.')], ['https://x.example/1', 'http://y.example/2', 'https://z.example/3']);
 });

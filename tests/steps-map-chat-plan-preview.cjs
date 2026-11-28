@@ -48,6 +48,7 @@ async function harness() {
   await add('root', 'Beef'); await add('a', 'Ribeye', 'root'); await add('b', 'Filet', 'root');
   await repo.saveMap(MAP, doc);
   await repo.rebuildDerivedData();
+  app.workspace = { getLeavesOfType: () => [] };
   const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }) };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice([]) } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   let queue = Promise.resolve();
@@ -381,4 +382,77 @@ test('E3-x layout: with a card in the way the dashed cards step past it in any a
     assert.ok([p1.x, p1.x + p1.width].includes(layout.relations[0].to.x), `${direction}: the relation reaches the moved card`);
   }
   assert.equal(nodes[1].x, 360, 'no card on the canvas moves');
+});
+
+test('E3-y stale (counter-example): a target card\'s note changed after the proposal: Apply is refused, greyed with the reason, 0 writes', async () => {
+  const { h, card } = await planned();
+  let writes = 0; const real = h.view.applyMapChatActions.bind(h.view);
+  h.view.applyMapChatActions = (...args) => { writes++; return real(...args); };
+  const file = await h.file();
+  const target = h.app.vault.getAbstractFileByPath(h.view.map.nodes.find(n => n.id === h.ids.a).path);
+  await h.app.vault.process(target, text => text + '\nuser edit after the proposal\n');
+  card.apply(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(writes, 0, 'no write at all');
+  assert.equal(card.state, 'pending', 'the plan is not applied');
+  assert.equal(card.blocked(), 'Apply is off: a target card was changed after this proposal. Send your message again to get a new one.');
+  assert.equal((await h.saved()).nodes.length, 3);
+  assert.equal(await h.file(), file, 'Map.md untouched');
+  assert.ok(h.chat.calls.some(c => c[0] === 'refreshPlan'), 'the card is drawn again with the reason');
+});
+
+test('E3-y stale: with the targets unchanged (and a card the plan does not name edited) Apply writes', async () => {
+  const h = await harness();
+  const actions = [];
+  for (let i = 1; i <= 16; i++) actions.push(child(h.ids.a, `OnlyA${i}`));
+  h.control.reply = async () => ({ reply: 'Plan', actions, rejected: [] });
+  await h.send('add many');
+  const card = h.chat.plans[0];
+  const b = h.app.vault.getAbstractFileByPath(h.view.map.nodes.find(n => n.id === h.ids.b).path);
+  await h.app.vault.process(b, text => text + '\nunrelated edit\n');
+  card.apply();
+  await until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+  assert.equal(card.state, 'applied');
+  assert.equal((await h.saved()).nodes.length, 19);
+});
+
+test('E3-y merge: a card of the plan is merging: Apply is greyed with the reason and writes nothing; when the merge ends it can be pressed', async () => {
+  const { h, card } = await planned();
+  let writes = 0; const real = h.view.applyMapChatActions.bind(h.view);
+  h.view.applyMapChatActions = (...args) => { writes++; return real(...args); };
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a }, { id: h.ids.b }] });
+  assert.equal(card.blocked(), 'Merging; try again when it finishes');
+  card.apply(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(writes, 0); assert.equal(card.state, 'pending'); assert.equal((await h.saved()).nodes.length, 3);
+  h.view.mergeDrafts.tasks.clear();
+  assert.equal(card.blocked(), null);
+  card.apply();
+  await until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+  assert.equal(card.state, 'applied'); assert.equal(writes, 1);
+  assert.equal((await h.saved()).nodes.length, 21);
+});
+
+test('E3-y merge (counter-example): a merge of cards the plan does not name leaves Apply on', async () => {
+  const { h, card } = await planned();
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'unrelated' }] });
+  assert.equal(card.blocked(), null);
+});
+
+test('E3-y branch delete (counter-example): a descendant of the deleted branch changed after the proposal: Apply is refused with the reason and nothing is deleted', async () => {
+  const h = await harness();
+  const deep = await h.repo.createNote('Deep', 'gpt-6-luna', h.view.map, MAP, 'inherited');
+  Object.assign(deep, { parentId: h.ids.a, x: 700, y: 400 });
+  h.view.map.nodes.push(deep);
+  await h.repo.saveMap(MAP, h.view.map);
+  h.control.reply = async () => ({ reply: 'Plan', actions: [{ kind: 'delete_topic', nodeId: h.ids.a, branch: true }, ...Array.from({ length: 16 }, (_, i) => child(h.ids.root, `Extra${i}`))], rejected: [] });
+  await h.send('delete the ribeye branch');
+  assert.equal(h.chat.plans.length, 1, 'the plan waits for Apply');
+  const card = h.chat.plans[0];
+  await new Promise(r => setTimeout(r, 20)); // the proposal's stamps are read
+  const before = h.view.map.nodes.length;
+  const file = h.app.vault.getAbstractFileByPath(deep.path);
+  await h.app.vault.process(file, text => text + '\nuser edit after the proposal\n');
+  card.apply(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(card.state, 'pending');
+  assert.equal(h.view.map.nodes.length, before, 'nothing deleted');
+  assert.match(card.blocked(), /changed after this proposal/);
 });

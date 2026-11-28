@@ -52,6 +52,17 @@ export function blockFolderNames(role: BlockFolderRole): string[] {
 }
 
 /**
+ * True for a file inside a note backup folder (`<anything>/<Backups>/<Notes>/<file>`, any registered spelling). A backup of a
+ * map is a byte copy that still carries the map marker and id, so it must never be taken for a map.
+ */
+export function isNoteBackupPath(path: string): boolean {
+  const dirs = path.replace(/\\/g, "/").split("/").slice(0, -1);
+  const backups = blockFolderNames("backup");
+  const notes = [...new Set(CANONICAL_LANGUAGES.map(code => translate(code, "ui.style_folder_backup_notes")))];
+  return dirs.some((dir, i) => backups.includes(dir) && i + 1 < dirs.length && notes.includes(dirs[i + 1]));
+}
+
+/**
  * The folder of `role` inside `parent`: the first spelling that already exists (so a vault keeps the folders it has),
  * else the spelling of the interface language, which is where a new folder is created.
  */

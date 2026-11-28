@@ -1,11 +1,12 @@
 /**
  * The cards the cross-map search reads (P4.2), on demand only: nothing is indexed in the background and nothing is written. A card
- * is in the corpus under the same four conditions as a knowledge reference (P4.3): its map carries the marker, the map's own
+ * is in the corpus under the same four conditions (a note backup is never a map) as a knowledge reference (P4.3): its map carries the marker, the map's own
  * `map.id` is usable (present and held by no other marked map: an id two maps share cannot tell them apart), the card exists in
  * that map as just read, and its note is not an archived VAM note. Titles and text are folded once, here, when they are read; a
  * search then only compares strings. Pure: the vault is reached only through the `KnowledgeRefIO` the caller passes.
  */
 import { foldSearchText } from "../../i18n/han-fold";
+import { isNoteBackupPath } from "../../core/blocks/block-files";
 import { readAiLocked } from "../../note-values";
 import { isArchivedVamNote } from "./archived-note";
 import type { KnowledgeRefIO } from "./knowledge-refs";
@@ -36,7 +37,7 @@ type MapRead = Awaited<ReturnType<KnowledgeRefIO["readMap"]>>;
  */
 export async function loadAuthorizedCards(io: KnowledgeRefIO, signal: AbortSignal): Promise<CorpusCard[]> {
   if (signal.aborted) return [];
-  const paths = [...new Set(await io.mapPaths())];
+  const paths = [...new Set(await io.mapPaths())].filter(path => !isNoteBackupPath(path));
   if (signal.aborted) return [];
   const maps: { path: string; map: NonNullable<MapRead> }[] = [];
   const holders = new Map<string, number>();

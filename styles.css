@@ -823,6 +823,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-plan { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-plan-title { font-weight: var(--font-semibold); }
 .vam-map-chat-plan-group-title { cursor: pointer; font-size: var(--font-ui-small); }
+.vam-map-chat-plan-blocked { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-plan-items { margin: 4px 0 0; padding-inline-start: 1.6em; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-map-chat-plan-estimate { font-weight: var(--font-semibold); font-size: var(--font-ui-small); }
 .vam-map-chat-plan-note, .vam-map-chat-plan-state { color: var(--text-muted); font-size: var(--font-ui-smaller); }
@@ -1798,12 +1799,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-anchor.is-preview { border-style: dashed; border-color: var(--interactive-accent); background: color-mix(in srgb, var(--background-primary) 55%, transparent); pointer-events: none; cursor: default; }
 .vam-view .vam-anchor-preview-note { position: absolute; left: 0; top: 100%; margin-top: 6px; font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
 /* A waiting plan's new cards (V3.3 E3): dashed, in the accent colour, marked Preview; drawn only, they take no pointer. */
-.vam-plan-ghosts { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; user-select: none; }
-.vam-plan-ghost-edge { position: absolute; height: 0; border-top: 1.5px dashed var(--interactive-accent); transform-origin: 0 0; }
-.vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow-wrap: anywhere; }
-.vam-plan-ghost-label { display: block; font-size: var(--font-ui-smaller); font-weight: 400; opacity: 0.8; }
-.vam-plan-ghost.is-more { font-style: italic; }
-.vam-map-chat-plan-blocked { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-plan-ghosts { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; user-select: none; }
+.vam-view .vam-plan-ghost-edge { position: absolute; height: 0; border-top: 1.5px dashed var(--interactive-accent); transform-origin: 0 0; }
+.vam-view .vam-plan-ghost { position: absolute; box-sizing: border-box; padding: 6px 10px; border: 1.5px dashed var(--interactive-accent); border-radius: var(--vam-radius-card, 12px); background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)); color: var(--interactive-accent); font-weight: 500; overflow-wrap: anywhere; }
+.vam-view .vam-plan-ghost-label { display: block; font-size: var(--font-ui-smaller); font-weight: 400; opacity: 0.8; }
+.vam-view .vam-plan-ghost.is-more { font-style: italic; }
 .vam-view .vam-anchor.is-linked { border-color: var(--background-primary); background: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
 .vam-view .vam-anchor:hover, .vam-view .vam-anchor:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-view .vam-anchor-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; display: none; flex-direction: column; gap: 2px; width: max-content; max-width: 240px; padding: 4px 8px; transform: translateX(-50%); font-size: var(--font-ui-smaller); line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 4px; box-shadow: var(--shadow-s); pointer-events: none; }

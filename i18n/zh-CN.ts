@@ -2288,6 +2288,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.operation_failed_0": "操作失败：{0}",
   "log.plugin_loaded_0": "Visual Agent Map {0} 加载",
   "log.exchange_log_save_failed_0": "AI 往返记录保存失败：{0}",
+  "log.store_replace_fallback_0": "数据文件无法一次替换，已改用先删除再重命名：{0}",
   "log.pending_suggestions_save_failed_0": "待确认建议保存失败：{0}",
   "log.initialization_incomplete_0": "初始化未完成：{0}",
   "log.codex_recheck_failed": "Codex App Server 重新检查失败",

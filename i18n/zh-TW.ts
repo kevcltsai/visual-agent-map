@@ -2288,6 +2288,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "log.operation_failed_0": "操作失敗：{0}",
   "log.plugin_loaded_0": "Visual Agent Map {0} 載入",
   "log.exchange_log_save_failed_0": "AI 往返紀錄儲存失敗：{0}",
+  "log.store_replace_fallback_0": "資料檔無法一次取代，已改用先刪除再改名：{0}",
   "log.pending_suggestions_save_failed_0": "待確認建議儲存失敗：{0}",
   "log.initialization_incomplete_0": "初始化未完成：{0}",
   "log.codex_recheck_failed": "Codex App Server 重新檢查失敗",

@@ -1,7 +1,7 @@
 import type { AiCalls } from "../../core/ai-calls";
 import { allowedUrl, openedUrlsFromEvents, searchQueriesFromEvents } from "../../core/argument-map/source-proof";
 import { stepEffort } from "../../core/provider-step-runner";
-import { prepareStep, type StepDefinition } from "../../core/step-runner";
+import { prepareStep, renderTemplate, type StepDefinition } from "../../core/step-runner";
 import type { ModelChoice } from "../../ai/model-resolution";
 import {
   applyLivingChanges,
@@ -13,6 +13,7 @@ import {
 } from "./living-node-changes";
 import { livingSnapshotRevision } from "./living-node-markdown";
 import { buildLivingPrompt, LIVING_PROMPT_BUDGET } from "./living-node-retrieval";
+import { livingNodeRepairTemplate } from "./steps/fragments";
 
 export interface LivingProviderInput extends ModelChoice {
   prompt: string;
@@ -27,10 +28,32 @@ const MAX_PROMPT_CHARS = LIVING_PROMPT_BUDGET;
 
 const projectionFor = (input: LivingProviderInput) => buildLivingPrompt(input);
 
-const step: StepDefinition<LivingProviderInput, unknown> = {
+/** Evidence rejections the model can fix by citing an allowed id. Everything else (an unknown record, bad JSON, a web
+ * policy refusal, a stop) stays final and is never re-sent. */
+const REPAIRABLE = new Set(["unauthorized-evidence", "missing-evidence", "missing-new-evidence"]);
+
+/** What a repair re-send tells the model: the rejection code, the 1-based operation and the ids it may cite. Never the
+ * rejected reply or any source text. */
+interface LivingRepair {
+  code: string;
+  operation?: number;
+  allowed: readonly string[];
+}
+
+type LivingStepInput = LivingProviderInput & { repair?: LivingRepair };
+
+const repairNote = (repair: LivingRepair): string =>
+  "\n\n" +
+  renderTemplate(livingNodeRepairTemplate, {
+    code: repair.code,
+    operation: repair.operation ? " at operation " + repair.operation : "",
+    allowed: JSON.stringify(repair.allowed)
+  });
+
+const step: StepDefinition<LivingStepInput, unknown> = {
   id: "living-node-change-set",
-  version: 7,
-  render: input => projectionFor(input).prompt,
+  version: 8,
+  render: input => projectionFor(input).prompt + (input.repair ? repairNote(input.repair) : ""),
   policy: text => {
     if (text.length > MAX_PROMPT_CHARS) throw new Error("living-node-context-too-large");
   },
@@ -201,76 +224,128 @@ export function normalizeLivingProposal(
 
 export async function generateLivingProposal(calls: AiCalls, input: LivingProviderInput, signal: AbortSignal) {
   const policy = livingWebPolicy(input.prompt);
-  const prepared = prepareStep(step, input);
   const events: unknown[] = [];
   // What the run actually did on the web, stamped when each event arrived (never taken from model text).
   const activity: { url?: string; query?: string; at: string }[] = [];
   const { omitted } = projectionFor(input);
-  return calls.run(
-    prepared,
-    {
-      model: input.model,
-      effort: stepEffort(input.reasoning),
-      topic: "Living Node",
-      taskName: "living-node",
-      signal,
-      localCodex: false,
-      noContentLog: true,
-      usage: { mapPath: input.mapPath },
-      task: {
-        webSearch: policy !== "forbidden",
-        webSearchOnly: policy !== "forbidden",
-        textOnly: policy === "forbidden",
-        optionalWebSearch: policy === "optional",
-        searchBudget: policy === "forbidden" ? 0 : 8,
-        timeoutMs: 300_000,
-        onWebSearchEvent: event => {
-          events.push(event);
-          const at = new Date().toISOString();
-          for (const url of openedUrlsFromEvents([event])) activity.push({ url, at });
-          for (const query of searchQueriesFromEvents([event])) activity.push({ query, at });
-        }
+  /** Every reply passes the same checks; a repair reply is still judged against pages the first call opened. */
+  const check = (parsed: unknown) => {
+    const normalized = normalizeLivingProposal(
+      parsed,
+      openedUrlsFromEvents(events),
+      input.evidence,
+      new Date().toISOString(),
+      policy === "required",
+      policy === "forbidden",
+      activity.some(item => !!item.query)
+    );
+    // The model never saw omitted records: every non-append edit of one (supplement included) is refused and
+    // counted, and the rest of the round still runs. These are safely omitted, unlike an unknown or unauthorised id,
+    // which rejects the whole proposal in applyLivingChanges. A re-reported append is decided there too.
+    const blind = (operation: Record<string, unknown>) =>
+      operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id));
+    // A correction or invalidation stating another period than its target is a new observation, not a correction.
+    const refuse = (operation: Record<string, unknown>) =>
+      blind(operation) || livingSupersedeMismatch(input.base, operation);
+    const droppedOperations = normalized.proposal.operations.filter(refuse).length;
+    normalized.proposal.operations = normalized.proposal.operations.filter(operation => !refuse(operation));
+    // Appends that deleted-observation holds reject are dropped locally and counted, not sent back or failed.
+    const before = normalized.proposal.operations.length;
+    normalized.proposal.operations = normalized.proposal.operations.filter(
+      operation => !livingAppendSuppressed(input.base, operation)
+    );
+    const suppressedDropped = before - normalized.proposal.operations.length;
+    // The model's echoed revision is not trusted: context documents carry their own revision fields and models
+    // confuse them. Real staleness is fenced at commit by the expected file content and snapshot revision.
+    normalized.proposal.baseRevision = input.base.revision;
+    // An AI output the owner's edit or deletion blocks is dropped by applyLivingChanges; it is disclosed, not failed.
+    const aiLatestDropped = applyLivingChanges(input.base, normalized.proposal, normalized.context).warnings[0];
+    return { normalized, droppedOperations, suppressedDropped, aiLatestDropped };
+  };
+  /** The first operation (1-based) whose prefix fails with `code`: the same checks on fewer operations, no model call. */
+  const locate = (parsed: unknown, code: string): number | undefined => {
+    const operations = (parsed as { operations?: unknown } | null)?.operations;
+    if (!Array.isArray(operations)) return undefined;
+    for (let count = 1; count <= operations.length; count++) {
+      try {
+        check({ ...(parsed as object), operations: operations.slice(0, count) });
+      } catch (error) {
+        if (error instanceof Error && error.message === code) return count;
       }
-    },
-    (raw, exchange) => {
-      if (exchange.signal.aborted) throw new Error("cancelled");
-      const normalized = normalizeLivingProposal(
-        prepared.parse(raw),
-        openedUrlsFromEvents(events),
-        input.evidence,
-        new Date().toISOString(),
-        policy === "required",
-        policy === "forbidden",
-        activity.some(item => !!item.query)
-      );
-      // The model never saw omitted records: every non-append edit of one (supplement included) is refused and
-      // counted, and the rest of the round still runs. These are safely omitted, unlike an unknown or unauthorised id,
-      // which rejects the whole proposal in applyLivingChanges. A re-reported append is decided there too.
-      const blind = (operation: Record<string, unknown>) =>
-        operation.kind !== "append" && operation.kind !== "output" && omitted.has(String(operation.id));
-      // A correction or invalidation stating another period than its target is a new observation, not a correction.
-      const refuse = (operation: Record<string, unknown>) =>
-        blind(operation) || livingSupersedeMismatch(input.base, operation);
-      const droppedOperations = normalized.proposal.operations.filter(refuse).length;
-      normalized.proposal.operations = normalized.proposal.operations.filter(operation => !refuse(operation));
-      // Appends that deleted-observation holds reject are dropped locally and counted, not sent back or failed.
-      const before = normalized.proposal.operations.length;
-      normalized.proposal.operations = normalized.proposal.operations.filter(
-        operation => !livingAppendSuppressed(input.base, operation)
-      );
-      const suppressedDropped = before - normalized.proposal.operations.length;
-      // The model's echoed revision is not trusted: context documents carry their own revision fields and models
-      // confuse them. Real staleness is fenced at commit by the expected file content and snapshot revision.
-      normalized.proposal.baseRevision = input.base.revision;
-      // An AI output the owner's edit or deletion blocks is dropped by applyLivingChanges; it is disclosed, not failed.
-      const aiLatestDropped = applyLivingChanges(input.base, normalized.proposal, normalized.context).warnings[0];
-      exchange.parsed();
-      // The checked artifact is what the provider was observed doing, deduplicated per URL or query (latest time).
-      const seen = new Map<string, { url?: string; query?: string; at: string }>();
-      for (const item of activity) seen.set((item.url ? "u:" : "q:") + (item.url ?? item.query), item);
-      const observed = [...seen.values()].slice(-20);
-      const context: LivingChangeContext = { ...normalized.context, checked: observed };
-      return { ...normalized, context, checked: observed, droppedOperations, suppressedDropped, aiLatestDropped };
     }
-  );
+    return undefined;
+  };
+  // The first reply's parsed JSON, kept here and never on the error, so only locate() reads it.
+  let lastParsed: unknown;
+  const send = (stepInput: LivingStepInput, repairing: boolean) => {
+    const prepared = prepareStep(step, stepInput);
+    lastParsed = undefined;
+    return calls.run(
+      prepared,
+      {
+        model: input.model,
+        effort: stepEffort(input.reasoning),
+        topic: "Living Node",
+        taskName: "living-node",
+        signal,
+        localCodex: false,
+        noContentLog: true,
+        usage: { mapPath: input.mapPath },
+        // The repair only re-cites what the first call already saw: no new search.
+        task: repairing
+          ? {
+              webSearch: false,
+              webSearchOnly: false,
+              textOnly: true,
+              optionalWebSearch: false,
+              searchBudget: 0,
+              timeoutMs: 300_000
+            }
+          : {
+              webSearch: policy !== "forbidden",
+              webSearchOnly: policy !== "forbidden",
+              textOnly: policy === "forbidden",
+              optionalWebSearch: policy === "optional",
+              searchBudget: policy === "forbidden" ? 0 : 8,
+              timeoutMs: 300_000,
+              onWebSearchEvent: event => {
+                events.push(event);
+                const at = new Date().toISOString();
+                for (const url of openedUrlsFromEvents([event])) activity.push({ url, at });
+                for (const query of searchQueriesFromEvents([event])) activity.push({ query, at });
+              }
+            }
+      },
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw new Error("cancelled");
+        const parsed = prepared.parse(raw);
+        lastParsed = parsed;
+        const { normalized, droppedOperations, suppressedDropped, aiLatestDropped } = check(parsed);
+        exchange.parsed();
+        // The checked artifact is what the provider was observed doing, deduplicated per URL or query (latest time).
+        const seen = new Map<string, { url?: string; query?: string; at: string }>();
+        for (const item of activity) seen.set((item.url ? "u:" : "q:") + (item.url ?? item.query), item);
+        const observed = [...seen.values()].slice(-20);
+        const context: LivingChangeContext = { ...normalized.context, checked: observed };
+        return { ...normalized, context, checked: observed, droppedOperations, suppressedDropped, aiLatestDropped };
+      }
+    );
+  };
+  try {
+    return await send(input, false);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (!REPAIRABLE.has(code) || signal.aborted) throw error;
+    const parsed = lastParsed;
+    const allowed = [...input.evidence.map(item => item.id), ...openedUrlsFromEvents(events)];
+    let repairInput: LivingStepInput;
+    try {
+      repairInput = { ...input, repair: { code, operation: locate(parsed, code), allowed } };
+      prepareStep(step, repairInput);
+    } catch {
+      // A repair that no longer fits the prompt budget is not sent; the original rejection stands.
+      throw error;
+    }
+    return send(repairInput, true);
+  }
 }

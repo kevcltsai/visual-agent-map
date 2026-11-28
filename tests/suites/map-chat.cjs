@@ -520,6 +520,27 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
+// D1-x2 (V3.3 D1 P3.9): the guarded writer says "discarded" when the note changed between the chat's gate and the write; that action
+// is reported as skipped, pushes no undo step and leaves the bytes as the other writer left them.
+integrationTest('map chat: D1-x2 - an edit discarded at commit (the card got locked after the gate) is skipped, pushes no undo step and writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.view.map.nodes.find(n => n.id === h.ids.a).path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the file is byte-identical to what the other writer left');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed for the discarded write');
+  assert.notEqual(lines[0].text.split(':')[0], 'Done');
+});
+
 integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no summary still adds it; it keeps the placeholder and stays unresearched', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [
@@ -6507,6 +6528,26 @@ test('F26: showPlan scrolls the log to its end after the hint line is laid out (
   assert.ok(f.panel.logEl.querySelector('.vam-map-chat-plan-apply'), 'Apply is a descendant of the scrolling log');
   height = 1080; clock.run();
   assert.equal(log.scrollTop, 1080, 'and again once the final height is known');
+});
+
+// ---- V3.3 E3: one gate for Apply; the line under a plan with a dashed preview -------------------------------------------
+test('E3 gate: a plan whose map is read-only shows Apply greyed with the reason; pressing it writes nothing and redraws; once writable it applies once', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  let reason = 'Apply is off: the map is read-only while it is presented.'; let applied = 0;
+  f.panel.showPlan({ reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', previewNote: 'The dashed cards on the canvas are the new cards.', blocked: () => reason, apply() { applied++; }, cancel() {} });
+  const apply = () => f.panel.logEl.querySelector('.vam-map-chat-plan-apply');
+  const blocked = () => f.panel.logEl.querySelector('.vam-map-chat-plan-blocked');
+  assert.equal(apply().disabled, true, 'greyed');
+  assert.equal(blocked()?.text, reason, 'the reason is written');
+  assert.equal(findAll(f.panel.logEl, i => i.text === 'The dashed cards on the canvas are the new cards.').length, 0, 'the reason takes the place of the preview line');
+  apply().click();
+  assert.equal(applied, 0, 'nothing applied');
+  reason = null; f.panel.refreshPlan();
+  assert.equal(apply().disabled, false); assert.equal(blocked(), null);
+  assert.equal(findAll(f.panel.logEl, i => i.text === 'The dashed cards on the canvas are the new cards.').length, 1, 'the preview line');
+  const button = apply(); button.click(); button.click();
+  assert.equal(applied, 1, 'applied once');
 });
 
 // ---- persona G12: a move_topic without beforeId leaves no hole in the old branch (real Lane L coordinates: parent above, old parent below) ----

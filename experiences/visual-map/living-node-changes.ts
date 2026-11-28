@@ -71,6 +71,46 @@ export function hasLivingResult(knowledge: Pick<LivingKnowledge, "records" | "ou
   );
 }
 
+/** What a trial would change against the committed formal knowledge. Computed on demand, never stored. */
+export interface LivingChangeSummary {
+  /** No formal result exists yet, so there is nothing to compare against. */
+  firstRun: boolean;
+  added: string[];
+  supplemented: string[];
+  corrected: string[];
+  disputed: string[];
+  invalidated: string[];
+  /** The formal output or the AI latest result text differs. */
+  outputUpdated: boolean;
+}
+
+export function summarizeLivingChanges(
+  base: Pick<LivingKnowledge, "records" | "output" | "aiLatest">,
+  next: Pick<LivingKnowledge, "records" | "output" | "aiLatest">
+): LivingChangeSummary {
+  const summary: LivingChangeSummary = {
+    firstRun: !hasLivingResult(base),
+    added: [],
+    supplemented: [],
+    corrected: [],
+    disputed: [],
+    invalidated: [],
+    outputUpdated: next.output.text !== base.output.text || (next.aiLatest?.text ?? "") !== (base.aiLatest?.text ?? "")
+  };
+  if (summary.firstRun) return { ...summary, outputUpdated: false };
+  const old = new Map(base.records.map(record => [record.id, record]));
+  for (const record of next.records) {
+    const before = old.get(record.id);
+    if (!before) summary.added.push(record.id);
+    else if (record.validity !== before.validity && record.validity === "invalidated")
+      summary.invalidated.push(record.id);
+    else if (record.validity !== before.validity && record.validity === "disputed") summary.disputed.push(record.id);
+    else if (record.claim !== before.claim) summary.corrected.push(record.id);
+    else if (record.evidence.length > before.evidence.length) summary.supplemented.push(record.id);
+  }
+  return summary;
+}
+
 export interface LivingChangeContext {
   /** Evidence collected by the trusted source resolver, not IDs invented by the model. */
   evidence: readonly LivingEvidence[];

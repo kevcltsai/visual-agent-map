@@ -157,7 +157,7 @@ test('R2-N4: a synthesis topic whose rebuild fails keeps the synthesis label on 
     options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
   };
   view.plugin.topicRuns.syntheses(view).selection = task;
-  task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
+  task.sourceContent = JSON.stringify((await view.recombinationGroup(sources, [], 'strong')).documents);
   const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
   // The note is saved and on disk, so a failing rebuild is reported but does not fail the save.
   await view.saveIntegratedNode('Synth', sources, 'goal', '', 'gpt-6-luna', result, 'en', task, {});
@@ -179,7 +179,7 @@ test('persona-03: a synthesis topic is a conclusion and derives from every sourc
     options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
   };
   view.plugin.topicRuns.syntheses(view).selection = task;
-  task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
+  task.sourceContent = JSON.stringify((await view.recombinationGroup(sources, [], 'strong')).documents);
   const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
   await view.saveIntegratedNode('Synth', sources, 'goal', '', 'gpt-6-luna', result, 'en', task, {});
   const made = view.map.nodes.find(n => !sources.some(s => s.id === n.id));

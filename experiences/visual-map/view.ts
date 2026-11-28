@@ -21401,22 +21401,33 @@ export class VisualAgentMapView extends ItemView {
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
     const cardNames = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
-    // The read-only references hanging on the selected cards are synthesized too (P4.6): the dialog names them.
-    const refNames = this.recombinedRefs(nodes).flatMap(ref => {
-      const title = referenceTitle(this.refResolved.get(ref.id));
-      return title ? [`${t("ui.knowledge_ref_export_prefix")} ${title}`] : [];
-    });
-    const names = [...cardNames, ...refNames];
     const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
+      // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
+      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      const refs = this.recombinedRefs(nodes);
+      const found = refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
+            () => new Map<string, RefResolution>()
+          )
+        : new Map<string, RefResolution>();
+      const listed = new Map<string, RefResolution>();
+      const refNames = refs.flatMap(ref => {
+        const resolution = found.get(ref.id);
+        const title = referenceTitle(resolution);
+        if (!title || !resolution) return [];
+        listed.set(ref.id, resolution);
+        return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
+      });
+      const names = [...cardNames, ...refNames];
       const dialog = new NextStepModal(
         this.app,
         this.plugin,
         (options, direction, failed, accepted, observer) =>
-          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
+          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer, undefined, listed),
         {
           names,
           initialTitle:
@@ -21494,7 +21505,9 @@ export class VisualAgentMapView extends ItemView {
     failed: (message: string) => void,
     accepted: () => void,
     observer?: SynthesisObserver,
-    errorSink?: (error: unknown) => void
+    errorSink?: (error: unknown) => void,
+    /** The references the dialog named, as it read them; only these are sent. Without it they are read at run time. */
+    listedRefs?: ReadonlyMap<string, RefResolution>
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
@@ -21530,7 +21543,7 @@ export class VisualAgentMapView extends ItemView {
       mapId,
       changed: () => this.render(),
       model: () => this.selectionModel(sources),
-      readSources: (mode, language) => this.recombinationGroup(sources, refs, mode, language),
+      readSources: (mode, language) => this.recombinationGroup(sources, refs, mode, language, listedRefs),
       startProgress: model => {
         return this.startTaskProgress(this.taskProgressKey("integration"), model);
       },
@@ -21711,11 +21724,14 @@ export class VisualAgentMapView extends ItemView {
     sources: MapNode[],
     refs: readonly KnowledgeRef[],
     mode: "strong" | "summary",
-    language?: ContentLanguage
+    language?: ContentLanguage,
+    resolved?: ReadonlyMap<string, RefResolution>
   ): Promise<ReferenceGroup> {
-    const found = refs.length
-      ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO())
-      : new Map<string, RefResolution>();
+    const found =
+      resolved ??
+      (refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO())
+        : new Map<string, RefResolution>());
     const cited: { id: string; path: string }[] = sources.map(node => ({ id: node.id, path: node.path }));
     for (const ref of refs) {
       const resolved = found.get(ref.id);

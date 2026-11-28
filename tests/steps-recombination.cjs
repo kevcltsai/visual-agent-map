@@ -152,6 +152,14 @@ test('P4.6 a read-only map or a merging card refuses before any AI call', async 
   assert.equal(failures.length, 1);
   assert.equal(h.view.map.nodes.length, 2);
 
+  const l = await harness();
+  l.view.noteLoad = { isCurrent: () => true };
+  const loading = [];
+  await run(l, loading);
+  assert.equal(l.asks.length, 0, 'no AI call while notes are loading');
+  assert.equal(loading.length, 1);
+  assert.equal(l.view.map.nodes.length, 2);
+
   const m = await harness();
   m.view.mergeDrafts = { isMerging: id => id === m.nodes[0].id };
   const merging = [];
@@ -159,4 +167,25 @@ test('P4.6 a read-only map or a merging card refuses before any AI call', async 
   assert.equal(m.asks.length, 0, 'no AI call while a source is being merged');
   assert.equal(merging.length, 1);
   assert.equal(m.view.map.nodes.length, 2);
+});
+
+test('P4.6 every reference sent to the AI is named in the synthesis dialog', async () => {
+  const h = await harness();
+  // The dialog opens before the references were read for the canvas (an empty cache): what it lists is what is sent.
+  let dialog = null;
+  h.view.openMapModal = modal => { dialog = modal; return modal; };
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  h.view.openSelectionSynthesis(null);
+  await until(() => dialog);
+  const names = dialog.selectionFlow.names;
+  const failures = [];
+  await dialog.synthesize({ ...options }, 'Combine across domains', message => failures.push(message), () => {});
+  assert.deepEqual(failures, []);
+  assert.equal(h.asks.length, 1);
+  const sent = h.asks[0].referenceGroups.flatMap(group => group.documents).filter(doc => !h.nodes.some(n => n.path === doc.path));
+  assert.ok(sent.length >= 1, 'the reference original is sent');
+  for (const doc of sent) {
+    const title = doc.path.split('/').pop().replace(/\.md$/, '');
+    assert.ok(names.some(name => name.includes(title)), `${doc.path} is sent but the dialog lists only ${JSON.stringify(names)}`);
+  }
 });

@@ -695,6 +695,7 @@ test('B10: a key whose card action cannot run now runs nothing and leaves the ev
   h.view.bookLock = () => ({ ai: false, structure: true });
   for (const [key, init] of [['Enter', { ctrlKey: true }], ['Enter', { shiftKey: true }], ['Delete', {}]]) assert.equal(send(h, 'leaf', key, init).defaultPrevented, false, `book lock: ${key}`);
   assert.deepEqual(rec.calls, [], 'book lock: nothing added or removed'); delete h.view.bookLock;
+  assert.deepEqual(rec.ids, [], 'book lock: Mod/Shift+Enter do not fall through to Rename'); assert.equal(h.view.inlineName, null, 'book lock: no title field opened');
   // Not offered at all: Alt+arrow on a root, Space on a leaf, F2 / Enter on a card without a read note.
   assert.equal(send(h, 'root', 'ArrowDown', { altKey: true }).defaultPrevented, false, 'a root has no sibling order to change');
   assert.equal(send(h, 'leaf', ' ', { code: 'Space' }).defaultPrevented, false, 'a leaf has nothing to fold'); h.view.onSpaceKeyUp();

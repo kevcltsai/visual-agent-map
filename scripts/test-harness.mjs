@@ -300,7 +300,8 @@ export function ensureTestApp(source = obsidianApp, directory = join(homedir(), 
 }
 
 // Electron writes its own log (V8 "Fatal error" lines included) into the test profile, so a renderer crash can be told apart: OOM vs. a product bug.
-export const launchArgs = (app, appProfile) => ["-g", "-n", "-a", app, "--args", `--user-data-dir=${appProfile}`, "--enable-logging=file", `--log-file=${join(appProfile, "electron.log")}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--use-mock-keychain", "--password-store=basic"];
+// V8's "...AndDie" fatal errors go to stderr, not to Electron's log, so `open` sends the app's stderr into the test profile too.
+export const launchArgs = (app, appProfile) => ["-g", "-n", "-a", app, "--stderr", join(appProfile, "stderr.log"), "--args", `--user-data-dir=${appProfile}`, "--enable-logging=file", `--log-file=${join(appProfile, "electron.log")}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--use-mock-keychain", "--password-store=basic"];
 
 function launchObsidian(appProfile) {
   if (!existsSync(obsidianApp)) throw new Error(`Obsidian app bundle not found at ${obsidianApp}.`);

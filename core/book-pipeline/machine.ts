@@ -296,14 +296,25 @@ const aiCurrent = (data: BookPipelineData, token: AiToken): AiProofState | undef
 export function isAiCurrent(data: BookPipelineData, token: AiToken): boolean {
   return aiCurrent(data, token) !== undefined;
 }
-/** Gives up a stuck AI step (it can never begin again): the slot is done and `incomplete`, never shown as all solved. */
-export function abandonAi(data: BookPipelineData, nodeId?: string): BookPipelineData {
+/**
+ * Gives up a stuck AI step (it can never begin again): the slot is done and `incomplete`, never shown as all solved. With `locked` (the
+ * whole book, every chapter AI-locked) the slot names those chapters and keeps their known problems (`keptForLocked`) instead of its own.
+ */
+export function abandonAi(
+  data: BookPipelineData,
+  nodeId?: string,
+  locked?: { ids: readonly string[]; open: readonly AiProofOpen[] }
+): BookPipelineData {
   const next = clone(data);
   const slot = aiSlot(next, nodeId);
   const base: AiProofState = slot ?? { key: "", attempts: 0, round: 0, step: "proof", checked: 0, fixed: 0, open: [] };
   const done: AiProofState = { ...base, done: true, incomplete: true };
   delete done.pending;
   delete done.again;
+  if (locked) {
+    done.open = locked.open.map(item => ({ ...item }));
+    done.locked = [...locked.ids];
+  }
   setAiSlot(next, nodeId, done);
   next.revision++;
   return next;
@@ -370,6 +381,33 @@ const withOpen = (
   }))
 ];
 /**
+ * The known problems (open, or waiting for a fix) of a slot that sit in a chapter the next check leaves out (AI-locked): `keep` says
+ * which, by the item's chapter and quote. They stay open instead of vanishing with the check that did not see them: a problem no edit can
+ * fix keeps its reason, any other one is `ai_locked` (one more round sends it once the chapter is unlocked). Ids get a `locked-` prefix
+ * so they never meet a new check's ids; one problem listed twice (open and pending in a round of "fix again") is kept once.
+ */
+export function keptForLocked(
+  slot: AiProofState | undefined,
+  keep: (item: { chapter?: number; quote: string }) => boolean
+): AiProofOpen[] {
+  const squash = (text: string): string => text.replace(/\s+/g, "");
+  const kept: AiProofOpen[] = [];
+  const items = [...(slot?.open ?? []), ...(slot?.pending ?? []).map(item => ({ ...item, reason: "ai_locked" }))];
+  for (const item of items) {
+    if (!keep(item)) continue;
+    if (kept.some(old => squash(old.quote) === squash(item.quote) && (old.chapter ?? 1) === (item.chapter ?? 1)))
+      continue;
+    kept.push({
+      id: item.id.startsWith("locked-") ? item.id : `locked-${item.id}`,
+      ...(item.chapter ? { chapter: item.chapter } : {}),
+      quote: item.quote,
+      problem: item.problem,
+      reason: AI_AGAIN_EXCLUDED.includes(item.reason) ? item.reason : "ai_locked"
+    });
+  }
+  return kept;
+}
+/**
  * A proofread call finished. `pending` are the fixable problems found, `open` the ones no edit can fix (the proofreader's own verdict).
  * Fixable problems and rounds left: the next step is a fix. Otherwise the proofread is done, and the fixable ones left are open
  * (`still_present`, or the reason a fix was blocked). A result under an old token is dropped.
@@ -377,7 +415,13 @@ const withOpen = (
 export function applyAiProof(
   data: BookPipelineData,
   token: AiToken,
-  result: { checked: number; pending: readonly AiProofPending[]; open: readonly AiProofOpen[] }
+  result: {
+    checked: number;
+    pending: readonly AiProofPending[];
+    open: readonly AiProofOpen[];
+    /** The whole book: the chapters (card ids) this check left out because they were AI-locked; any makes the proofread `incomplete`. */
+    locked?: readonly string[];
+  }
 ): Committed {
   const found = token.step === "proof" ? aiCurrent(data, token) : undefined;
   if (!found) return { state: data, accepted: false };
@@ -434,6 +478,14 @@ export function applyAiProof(
       slot.open = [...kept, ...fresh.filter(item => !seen(item))];
       delete slot.again;
     } else slot.open = fresh;
+  }
+  // A chapter the check did not see was not proofread: never shown as all solved. A check that saw every chapter again lifts it.
+  if (result.locked?.length) {
+    slot.incomplete = true;
+    slot.locked = [...result.locked];
+  } else if (found.locked) {
+    delete slot.locked;
+    delete slot.incomplete;
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -563,10 +615,11 @@ export const AI_AGAIN_EXCLUDED: readonly string[] = [
   "source_unreachable",
   "hand_edited"
 ];
+/** A finished proofread one more round may take: complete, or incomplete only because the book left AI-locked chapters out. */
+const settled = (slot: AiProofState | undefined): slot is AiProofState =>
+  !!slot?.done && (!slot.incomplete || !!slot.locked?.length);
 const againTargets = (slot: AiProofState | undefined, key: string): AiProofOpen[] =>
-  slot?.done && !slot.incomplete && slot.key === key
-    ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason))
-    : [];
+  settled(slot) && slot.key === key ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
 /**
  * One more fix-and-check round over a finished AI proofread (the book's `nodeId` is undefined): the slot goes back to the last round's
  * fix with the fixable open problems as its targets (no suggestion: the fix reads the problem and the quote). `open` stays as it is, so
@@ -632,8 +685,7 @@ export function fixAgainPlan(
   let items = 0;
   let stubborn = 0;
   const count = (slot: AiProofState | undefined): number => {
-    const fixable =
-      slot?.done && !slot.incomplete ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+    const fixable = settled(slot) ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
     stubborn += fixable.filter(item => item.reason === "still_present").length;
     return fixable.length;
   };

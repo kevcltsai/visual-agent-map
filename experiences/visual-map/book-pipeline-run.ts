@@ -71,6 +71,7 @@ import {
   abandonAi,
   closeAiRound,
   fixAgainPlan,
+  keptForLocked,
   reopenAiRound,
   rekeyBookProof,
   aiChapterDue,
@@ -1968,8 +1969,13 @@ export class BookPipelineRuns {
         else chapterIds.push(id);
       }
       const input = await this.bookProofInput(drive).catch(() => undefined);
-      let withBook = input !== undefined && reopenAiRound(data, undefined, keyOf(input)).accepted;
-      if (withBook && input?.chapters.every(chapter => chapter.locked)) {
+      const reopened = input !== undefined ? reopenAiRound(data, undefined, keyOf(input)) : undefined;
+      let withBook = !!reopened?.accepted;
+      // The book's round sends only its targets outside locked chapters: with none left it is refused as locked, not run as a bare re-check.
+      if (
+        withBook &&
+        (reopened?.state.bookProof?.pending ?? []).every(t => input?.chapters[(t.chapter ?? 1) - 1]?.locked)
+      ) {
         withBook = false;
         lockedOut = true;
       }
@@ -3733,9 +3739,24 @@ export class BookPipelineRuns {
     // does not start the book over. `shown` maps the check's positions back to the book's chapter numbers.
     const shown = chapters.flatMap((chapter, at) => (chapter.locked ? [] : [at]));
     const isLocked = (number: number | undefined): boolean => !!chapters[(number ?? 1) - 1]?.locked;
+    const lockedIds = chapters.filter(chapter => chapter.locked).map(chapter => chapter.id);
+    // The known problems of a locked chapter stay open (it is not checked again), as long as their quote is still in its text.
+    const squash = (text: string): string => text.replace(/\s+/g, "");
+    const kept = (): ReturnType<typeof keptForLocked> =>
+      keptForLocked(
+        drive.store.state.bookProof,
+        item =>
+          isLocked(item.chapter) && squash(chapters[(item.chapter ?? 1) - 1]?.text ?? "").includes(squash(item.quote))
+      );
     if (!shown.length && chapters.length) {
       this.log(drive, "ai_locked_skipped", drive.rootId, "proof", "ai_locked");
-      return giveUp();
+      const open = kept();
+      await drive.store.commit(state =>
+        state.status === "running"
+          ? { state: abandonAi(state, undefined, { ids: lockedIds, open }), accepted: true }
+          : { state, accepted: false }
+      );
+      return;
     }
     const joined = (texts: readonly string[]): string => texts.join("\n\u0000\n");
     const key = aiProofKey(0, joined(chapters.map(chapter => chapter.text)));
@@ -3771,6 +3792,7 @@ export class BookPipelineRuns {
     try {
       if (step === "proof") {
         const prior = priorOf((same?.pending ?? []).filter(target => !isLocked(target.chapter)));
+        const carried = kept();
         const reviewed = await untilAborted(
           signal,
           this.ports.aiBookProof(
@@ -3807,9 +3829,15 @@ export class BookPipelineRuns {
             quote: check.quote,
             problem: check.problem,
             reason: check.why ?? "unfixable"
-          }));
+          }))
+          .concat(carried);
         const done = await drive.store.commit(state =>
-          applyAiProof(state, token, { checked: review.checks.length, pending, open })
+          applyAiProof(state, token, {
+            checked: review.checks.length,
+            pending,
+            open,
+            ...(lockedIds.length ? { locked: lockedIds } : {})
+          })
         );
         if (!done?.accepted) {
           await drive.store.commit(state => applyAiStopped(state, token, false));
@@ -3956,7 +3984,9 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      if (state.bookProof.incomplete) incomplete("");
+      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
+      if (state.bookProof.incomplete)
+        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);

@@ -114,7 +114,7 @@ test('edge entry is hidden in multi-select, presentation, book structure lock, n
   assert.equal(addBtn(h, 'leaf'), undefined, 'note not loaded');
 });
 
-test('clicking the edge entry adds a subtopic under the card with the real addNode; the toolbar Add still works', async () => {
+test('clicking the edge entry adds a subtopic under the card with the real addNode; the toolbar has no Add (B08)', async () => {
   const h = await harness(); realAdd(h);
   const before = h.view.map.nodes.length;
   click(addBtn(h, 'leaf'));
@@ -122,9 +122,9 @@ test('clicking the edge entry adds a subtopic under the card with the real addNo
   const made = h.view.map.nodes.find(n => n.parentId === h.ids.leaf);
   assert.ok(made, 'child under the clicked card');
   const h2 = await harness();
-  const tool = findAll(h2.card('leaf'), i => i.classes.has('vam-add-child-tool'))[0];
-  h2.view.whenEditing = run => run(); tool.handlers.get('click')({ stopPropagation() {} });
-  await until(() => h2.added.length === 1);
+  // B08 (P1.8): the toolbar Add is gone; the edge + (above) and Cmd-Enter add a subtopic.
+  assert.equal(findAll(h2.card('leaf'), i => i.classes.has('vam-add-child-tool')).length, 0, 'no toolbar Add');
+  assert.ok(findAll(h2.card('leaf'), i => i.classes.has('vam-card-tool-style')).length === 1, 'the toolbar is drawn (its Style is there)');
 });
 
 test('two quick clicks make one card and one note; a stale old button after the repaint does nothing', async () => {

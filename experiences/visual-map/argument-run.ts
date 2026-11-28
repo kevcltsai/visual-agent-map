@@ -186,7 +186,8 @@ export interface ArgumentRunPorts {
   /** Creates a note file and returns its node (not yet in the map). */
   createNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode>;
   readNote(path: string): Promise<{ title: string; summary: string }>;
-  updateNote(path: string, patch: { summary?: string; detail?: string }): Promise<void>;
+  /** The guarded write's outcome: "discarded" (a lock or a changed version refused it) is a failure of the step, not a success. */
+  updateNote(path: string, patch: { summary?: string; detail?: string }): Promise<"written" | "discarded" | void>;
   askModel(context: TaskContext, model: string, reasoning: unknown, signal: AbortSignal): Promise<AiResult>;
   /** Runs one of the six text-only steps (no web, no tools). Production: `askArgumentStep` over `providerArgumentRunner`. */
   runStep<Request extends ArgumentStepBase, Output>(
@@ -239,6 +240,14 @@ interface Drive {
   /** The single quick call came back as a fact question: the ordinary plan step runs instead (memory only, per drive). */
   quickDeclined?: boolean;
 }
+/** A guarded note write was refused (stale version or lock): the cause is outside the step, so the step is not retried. */
+class DiscardedWriteError extends Error {
+  constructor() {
+    super("argument note write discarded");
+    this.name = "DiscardedWriteError";
+  }
+}
+
 interface Plan {
   next: ArgumentMapData;
   /** Nodes to add with their parent. */
@@ -326,11 +335,14 @@ export class ArgumentRuns {
     if (input.detail !== undefined) safe.detail = intakeAiMarkdown(input.detail, { kind: "argument-detail" });
     return this.ports.createNote(safe, map, mapPath);
   }
-  private writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
+  private async writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
     const safe: { summary?: string; detail?: string } = {};
     if (patch.summary !== undefined) safe.summary = plainLine(patch.summary);
     if (patch.detail !== undefined) safe.detail = intakeAiMarkdown(patch.detail, { kind: "argument-detail" });
-    return this.ports.updateNote(path, safe);
+    if ((await this.ports.updateNote(path, safe)) === "discarded") {
+      this.ports.log("argument-run note write discarded");
+      throw new DiscardedWriteError();
+    }
   }
 
   isRunning(mapPath: string): boolean {
@@ -632,7 +644,7 @@ export class ArgumentRuns {
         // Only a refusal the model can correct is passed on, as a short plain line; a provider error says nothing it could fix.
         drive.retryReason = known ? error.message.replace(/\s+/g, " ").trim().slice(0, 200) : undefined;
         this.ports.log(`argument-run step failed attempt=${attempt} kind=${known ? error.name : "other"}`);
-        if (attempt === 2) {
+        if (attempt === 2 || error instanceof DiscardedWriteError) {
           // A concurrent text step leaves the pause to the loop, which first waits for the calls still out.
           if (onFinalFailure) onFinalFailure();
           else await this.pause(drive, "error", false);
@@ -680,7 +692,19 @@ export class ArgumentRuns {
       });
       if (!wrote) return;
       this.ports.clearUndo(drive.mapPath);
-      if (plan.notes && !gone()) await plan.notes();
+      if (plan.notes && !gone()) {
+        try {
+          await plan.notes();
+        } catch (error) {
+          // The conclusion state was committed but its note was refused: put the state back so the run is not left concluded with an empty card.
+          if (plan.next.run.phase === "concluded" && before.run.phase !== "concluded")
+            await this.ports.updateMap(drive.mapPath, doc => {
+              const now = readArgumentMap(doc);
+              if (now.kind === "usable" && same(now.data, plan.next)) doc.argumentMap = before;
+            });
+          throw error;
+        }
+      }
     });
     return wrote;
   }

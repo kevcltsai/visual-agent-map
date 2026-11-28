@@ -33,7 +33,7 @@ export function backgroundResultNotice(
   if (!actions.length || typeof make !== "function") return new Notice(message, timeout);
   let notice: Notice | undefined;
   const fragment = make(el => {
-    el.createSpan({ text: message });
+    el.createSpan({ text: message, cls: "vam-background-notice-text" });
     for (const item of actions)
       el.createEl("button", { text: item.label, cls: "vam-background-notice-action" }).addEventListener("click", () => {
         notice?.hide();

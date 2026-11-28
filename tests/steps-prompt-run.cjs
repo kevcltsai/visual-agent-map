@@ -627,10 +627,13 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
+  // The real card (renderNode) so the toolbar is the one paintPromptState repaints; the card label needs a real DOM.
+  h.view.labelCard = () => {};
   const paint = status => {
-    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }); card.createEl('h3', { cls: 'vam-card-title' }); const tools = card.createDiv({ cls: 'vam-node-tools' });
     h.view.aiStatusMemo.set(node.id, status);
-    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    h.view.renderNode(node);
+    const card = h.view.cardEls.get(node.id);
+    const header = find(card, i => i.cls?.includes('vam-node-header')), tools = find(card, i => i.cls?.includes('vam-node-tools'));
     return { card, header, tools };
   };
   let stopped = 0; h.view.stopPromptBatch = () => { stopped++; };
@@ -900,6 +903,61 @@ test('save path: a new card is made only on save; the popover blocks an empty qu
   const made = h.mapDoc.nodes.at(-1);
   assert.match(h.contents.get(made.path), /^ai-card: true$/m);
   assert.match(h.contents.get(made.path), /Brand new\?/);
+});
+
+test('P3.2 cancelling a new AI card (switch map, close view, Esc) leaves nothing; only Cmd/Ctrl+Enter makes the card, and one undo removes it', async () => {
+  const { actionsFor } = S.load('experiences/visual-map/card-actions.ts', { obsidian });
+  const snapshot = h => JSON.stringify([...h.contents.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
+  const runActions = h => ['toolbar', 'more', 'context', 'command'].flatMap(surface =>
+    [...actionsFor(surface, h.view.cardActionContext(null)), ...h.mapDoc.nodes.flatMap(n => [...actionsFor(surface, h.view.cardActionContext(n))])]
+      .map(entry => entry.action.id).filter(id => id === 'run-stop' || id === 'run-card'));
+  const leaves = [
+    ['switching map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+    ['closing the view', h => h.view.onClose().catch(() => {})],
+    // Esc on a typed draft only offers Save / Discard / Keep editing (nothing is written, the editor stays); Discard closes it.
+    ['Esc then Discard', h => {
+      const choices = find(h.pop(), i => i.cls?.includes('vam-living-editor-close-choices'));
+      h.pop().keydown({ key: 'Escape' });
+      assert.equal(choices.hidden, false, 'Esc on a draft asks first');
+      assert.equal(h.view.aiCardOpen === null, false, 'the editor is still open');
+      assert.equal(h.mapDoc.nodes.length, 1, 'and nothing was made yet');
+      find(choices, i => i.tag === 'button' && i.text === 'Discard').click();
+    }]
+  ];
+  for (const [name, leave] of leaves) {
+    const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+    const count = h.mapDoc.nodes.length;
+    const past = h.view.history.past.length;
+    const before = snapshot(h);
+    h.view.openAiCardPopover(null, null);
+    h.question().value = 'A draft not yet saved?';
+    h.question().input();
+    assert.equal(h.saveButton().disabled, false, `${name}: the draft is ready to save`);
+    await leave(h);
+    await dom.tick(); await dom.tick();
+    assert.equal(h.view.aiCardOpen, null, `${name}: the editor is closed`);
+    assert.equal(findAll(h.overlay, i => i.cls?.includes('vam-living-editor')).length, 0, `${name}: no .vam-living-editor left`);
+    assert.equal(snapshot(h), before, `${name}: Map.md and every note byte for byte`);
+    assert.equal(h.mapDoc.nodes.length, count, `${name}: no card`);
+    assert.equal(h.view.history.past.length, past, `${name}: no history entry`);
+    assert.equal(h.calls.length, 0, `${name}: no AI call`);
+    eq(runActions(h), [], `${name}: no run-stop / run-card anywhere`);
+  }
+  // Control: Cmd/Ctrl+Enter is the one way a card appears.
+  const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+  const count = h.mapDoc.nodes.length;
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(null, null);
+  h.question().value = 'Saved?';
+  h.question().input();
+  h.pop().keydown({ key: 'Enter', ctrlKey: true });
+  await until(() => h.mapDoc.nodes.length === count + 1);
+  await until(() => h.view.history.past.length === past + 1);
+  const made = h.mapDoc.nodes.at(-1);
+  assert.match(h.contents.get(made.path), /^ai-card: true$/m);
+  await h.view.history.undoEntry.undo();
+  assert.equal(h.mapDoc.nodes.length, count, 'one undo removes the card');
+  assert.equal(h.contents.has(made.path), false, 'and its note');
 });
 
 test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fence alone', () => {
@@ -1421,6 +1479,182 @@ test('trial cancel: declining the usage confirmation or pressing Stop shows no f
   tryButton(failed).click();
   await until(() => box(failed).hidden === false);
   assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
+});
+
+// ---- P3.4 trial and adoption through the central editor ---------------------------------------------------------------
+const sha = text => require('node:crypto').createHash('sha256').update(String(text)).digest('hex');
+// A ready trial of A, which reads the note N. The vault raises `modify` for every write, as Obsidian's does.
+const trialHarness = async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  const listeners = new Set();
+  h.app.vault.on = (name, fn) => { const ref = { name, fn }; listeners.add(ref); return ref; };
+  h.app.vault.offref = ref => { listeners.delete(ref); };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    for (const ref of [...listeners]) if (ref.name === 'modify') ref.fn(file);
+    return result;
+  };
+  const reader = [], registered = [];
+  h.view.registerEvent = ref => { registered.push(ref); };
+  h.host.showLivingTrial = async (file, _markdown, owner, isCurrent) => { reader.push(['trial', file?.path, owner]); return isCurrent(); };
+  h.host.invalidateLivingTrial = owner => { reader.push(['invalid', owner]); };
+  h.host.restoreLivingOfficial = async (file, owner, release) => { reader.push(['official', file?.path, owner, !!release]); };
+  h.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  const button = text => find(h.pop(), i => i.tag === 'button' && i.text === text);
+  const bytes = () => [sha(h.raw('A')), sha(h.raw('N'))];
+  const ready = async () => {
+    h.view.openAiCardPopover(h.node('A'));
+    button('Try prompt').click();
+    await until(() => h.view.aiCardOpen?.trial.state === 'ready' && reader.some(r => r[0] === 'trial'));
+    await dom.tick(); await dom.tick();
+    assert.equal(button('Adopt trial').disabled, false, 'the preview is ready to adopt');
+  };
+  return { ...h, listeners, registered, reader, button, bytes, ready };
+};
+
+for (const [name, leave] of [
+  ['switching to another map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+  ['closing the view', h => h.view.onClose().catch(() => {})]
+]) test(`P3.4 ${name} discards a ready trial: the editor is gone, a retained adoption check writes nothing, the reader shows the formal note`, async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial, adoption, viewSession } = h.view.aiCardOpen;
+  const before = h.bytes();
+  const calls = h.calls.length;
+  const leaving = leave(h);
+  assert.equal(h.view.aiCardOpen, null, 'the editor closes before anything else');
+  await leaving;
+  assert.equal(trial.state, 'none');
+  assert.equal(trial.result, undefined);
+  assert.equal(await trial.adopt(h.repo, adoption), 'discarded');
+  eq(h.bytes(), before, 'Map notes byte for byte as before');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  const official = h.reader.filter(r => r[0] === 'official' && r[2] === viewSession);
+  assert.equal(official.length, 1, 'the reader is handed back once');
+  assert.equal(official[0][3], true, 'and released');
+  if (name.startsWith('switching')) assert.equal(official[0][1], h.node('A').path, 'it shows the formal note of the card again');
+});
+
+test('P3.4 trial, preview, stop or close: the card and its source keep their bytes; one AI call per trial; saving the configuration calls nothing', async () => {
+  const h = await trialHarness();
+  const before = h.bytes();
+  await h.ready();
+  assert.equal(h.calls.length, 1, 'one AI call for the trial');
+  eq(h.bytes(), before, 'a ready preview wrote nothing');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  eq(h.bytes(), before, 'closing wrote nothing');
+  // Stop while it runs.
+  h.plan.hang.add('A');
+  h.view.openAiCardPopover(h.node('A'));
+  h.button('Try prompt').click();
+  await until(() => h.calls.length === 2);
+  h.button('Stop').click();
+  await until(() => h.view.aiCardOpen?.trial.state !== 'running');
+  await dom.tick(); await dom.tick();
+  assert.equal(h.calls.length, 2, 'one more call for the second trial, none for stopping');
+  eq(h.bytes(), before, 'stopping wrote nothing');
+  h.view.closeAiCardPopover();
+  // Saving the configuration writes the card but never calls the AI.
+  h.view.openAiCardPopover(h.node('A'));
+  h.question().value = 'Why not?'; h.question().input();
+  h.saveButton().click();
+  await until(() => /Why not\?/.test(h.raw('A')));
+  assert.equal(h.calls.length, 2, 'saving made no AI call');
+  assert.equal(sha(h.raw('N')), before[1], 'the source is untouched');
+});
+
+test('P3.4 a change to a source of a ready preview turns it invalid at once: the label says so, Adopt is off, the preview stays readable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const calls = h.calls.length;
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'The source changed' });
+  await until(() => h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession));
+  await dom.tick();
+  assert.equal(trial.state, 'invalid');
+  assert.ok(trial.result, 'the preview stays readable');
+  assert.equal(h.button('Adopt trial').disabled, true, 'Adopt is off without pressing it');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  assert.equal(h.listeners.size, 0, 'nothing listens for an invalid preview');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'official'), false, 'the reader keeps the preview');
+});
+
+test('P3.4 the target card changed elsewhere turns the preview invalid; saving the same configuration keeps it adoptable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const seen = h.reader.length;
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'an identical save is not a change of the trial inputs');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession), false);
+  assert.equal(h.button('Adopt trial').disabled, false);
+  const calls = h.calls.length;
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+  assert.equal(h.calls.length, calls, 'adopting makes no AI call');
+  await h.ready();
+  await h.repo.updateNote(h.node('A').path, { summary: 'The owner edited the card' });
+  await until(() => h.view.aiCardOpen.trial.state === 'invalid');
+  await dom.tick();
+  assert.equal(h.button('Adopt trial').disabled, true);
+});
+
+test('P3.4 an identical save pressed while a source check is reading does not invalidate the preview', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial } = h.view.aiCardOpen;
+  const target = h.node('A').path;
+  // The next read of the card waits; the card is written while it waits, and the save then pauses before it returns.
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let gated = false;
+  const read = h.repo.readNoteSnapshot.bind(h.repo);
+  h.repo.readNoteSnapshot = async (path, ...rest) => {
+    if (path === target && !gated) { gated = true; await gate; }
+    return read(path, ...rest);
+  };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    if (file.path === target) { release(); for (let i = 0; i < 40; i++) await dom.tick(); }
+    return result;
+  };
+  // A modify of the source starts a check, which stops on the card read.
+  for (const ref of [...h.listeners]) ref.fn(h.app.vault.getAbstractFileByPath(h.node('N').path));
+  await until(() => gated);
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 40; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'the save is checked by its result, not mid-way');
+  assert.equal(h.button('Adopt trial').disabled, false);
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+});
+
+test('P3.4 the source listener ends with the editor: a later change does nothing, and reopening keeps one listener', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'one listener while a preview is ready');
+  assert.ok(h.registered.includes([...h.listeners][0]), 'registered with the view, so unloading the plugin removes it too');
+  h.view.closeAiCardPopover();
+  assert.equal(h.listeners.size, 0, 'closing removes it');
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'Changed after close' });
+  for (let i = 0; i < 6; i++) await dom.tick();
+  eq(h.reader.slice(seen), [], 'a later change does nothing');
+  await h.ready();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'a second trial replaces the first listener');
+  h.view.closeAiCardPopover();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'no leak across reopen');
+  await h.view.onClose().catch(() => {});
+  assert.equal(h.listeners.size, 0, 'closing the view removes it');
 });
 
 test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note and ⋯ (its rows greyed, decision #35), and Note still opens the details', async () => {

@@ -50,7 +50,7 @@ test('an accepted file reaches the new-map flow with its topics and the file nam
   const request = h.calls[0];
   assert.deepEqual(plain(request.source), { file: 'plan.opml' }); assert.equal(request.shallowResearch, false); assert.equal(request.placement, undefined);
   assert.deepEqual(request.nodes.map(n => [n.title, n.parent]), [['Root', null], ['Kid', 0]]);
-  assert.equal(notices.length, 0);
+  assert.equal(notices.length, 1); assert.match(notices[0], /Only titles and notes were imported/);
 });
 
 test('an import that throws is reported and returns false', async () => {

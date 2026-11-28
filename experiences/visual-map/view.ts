@@ -4845,10 +4845,9 @@ export class VisualAgentMapView extends ItemView {
           const read = id ? reviewed?.(id) : undefined;
           const note = id ? fresh.get(id) : undefined;
           if (read === undefined || !note) continue;
-          if (aiWriteGate({ owned: true, version: { read, now: structureContentVersion(note) } }).length) {
-            new Notice(t("ui.structure_review_stale_content"));
+          // The thrown message is the one notice (mutate() shows it); a Notice here as well showed it twice.
+          if (aiWriteGate({ owned: true, version: { read, now: structureContentVersion(note) } }).length)
             throw new Error(t("ui.structure_review_stale_content"));
-          }
         }
         await work();
       });

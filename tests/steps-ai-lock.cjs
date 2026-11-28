@@ -675,12 +675,14 @@ test('V3.3 #02 structure: a card changed on disk after the review abandons the s
   const files = JSON.stringify([...h.contents]);
   const count = h.view.map.nodes.length;
   const stale = t('ui.structure_review_stale_content');
+  // The real mutate() shows a failed write's message as a notice (errorNotice); the stub does not, so mirror it here.
+  h.view.plugin.mutate = work => work().catch(error => { h.notices.push(error.message); throw error; });
   for (const suggestion of [{ kind: 'strengthen', targetId: a.id, basis }, { kind: 'move', targetId: b.id, newParentId: a.id, basis }]) {
     await assert.rejects(h.view.applyStructureSuggestion(suggestion, 'New', () => null, id => seen.get(id)), error => error.message === stale, suggestion.kind);
     assert.equal(h.view.map.nodes.length, count, suggestion.kind);
     assert.equal(JSON.stringify([...h.contents]), files, `${suggestion.kind}: every file byte for byte as before`);
   }
-  assert.equal(h.notices.filter(message => message === stale).length, 2);
+  assert.equal(h.notices.filter(message => message === stale).length, 2, 'one notice per stale apply, not two');
   // Unchanged since the review: applied as before.
   await h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: b.id, basis }, 'New', () => null, id => seen.get(id));
   assert.equal(h.view.map.nodes.length, count + 1);

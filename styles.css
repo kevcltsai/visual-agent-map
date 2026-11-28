@@ -2220,3 +2220,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 @media (max-width: 480px) { .vam-view .vam-knowledge-ref { max-width: 200px; } }
 
 .vam-merge-draft-text { width: 100%; font-family: var(--font-monospace); font-size: var(--font-ui-small); }
+/* A Notice with actions: the message on its own block, the buttons on the next line (a Notice sits outside .vam-view, so the token carries its fallback). */
+.vam-background-notice-text { display: block; }
+.vam-background-notice-action { margin-top: var(--vam-space-2, 8px); margin-right: var(--vam-space-2, 8px); }

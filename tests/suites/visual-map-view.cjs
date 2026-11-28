@@ -19,21 +19,23 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   });
   const topic = node('parent');
   let detailsShown = false;
-  const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map([['parent.md', [{ title: 'Idea', task: 'Investigate', contribution: '' }]]]), expansionBatches: new Map(), detailsShown: () => detailsShown, setOutlineActive() {} });
-  view.stageEl = element('stage'); view.map = map([topic]);
+  const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map([['parent.md', [{ title: 'Idea', task: 'Investigate', contribution: '' }]]]), expansionBatches: new Map(), detailsShown: () => detailsShown, setOutlineActive() {}, settings: DEFAULT_SETTINGS });
+  view.stageEl = element('stage'); view.map = map([topic]); view.path = `${DEFAULT_SETTINGS.topicsFolder}/m/Map.md`;
   view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
   view.render = () => {};
   let added = 0, opened = [], details = [], next = [], renders = 0;
-  view.addNode = parent => { added += parent.id === topic.id ? 1 : 0; }; view.openAddMenu = () => { throw new Error('the toolbar Add adds right away, with no type menu'); }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
+  view.addNode = parent => { added += parent.id === topic.id ? 1 : 0; }; view.openAddMenu = () => { throw new Error('the edge + adds right away, with no type menu'); }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
   view.openDetails = topic => details.push(topic.id); view.openTopicChat = topic => next.push(topic.id); view.render = () => { renders++; };
   view.renderNode(topic);
   assert.equal(buttons.some(button => button.text === '+'), false, 'the + circle is gone');
-  const plus = buttons.find(button => button.text === 'Add');
+  // B08 (P1.8): the toolbar has no Add; the edge "+ Topic card" adds a subtopic right away.
+  assert.equal(buttons.some(button => button.text === 'Add'), false, 'no toolbar Add');
+  const plus = buttons.find(button => button.text === '+ Topic card');
   plus.click({ stopPropagation() {} });
-  assert.equal(added, 1, 'the toolbar Add adds a child right away');
+  assert.equal(added, 1, 'the edge + adds a child right away');
   const badge = buttons.find(button => button.text === 'View 1 expansion suggestions');
   badge.click({ stopPropagation() {} });
-  buttons.find(button => button.text === 'Research').click({ stopPropagation() {} });
+  buttons.find(button => button.text === 'AI explore').click({ stopPropagation() {} });
   view.newMenu = () => { throw new Error('the Note button opens no menu'); };
   buttons.find(button => button.text === 'Note').click({ stopPropagation() {}, metaKey: false, ctrlKey: false });
   assert.deepEqual(details, [topic.id], 'the Note button opens the details');
@@ -90,9 +92,10 @@ integrationTest('map cards keep the generic map actions; no card exposes an AIM 
   const ordinaryButtons = render(map([topic]));
   assert.ok(ordinaryButtons.some(button => button.text === '⋯' && button['aria-label'] === 'More card actions' && button['aria-haspopup'] === 'menu'), 'the toolbar has one labelled More button that opens a menu');
   assert.equal(ordinaryButtons.some(button => button.text === 'Structure' || button.text === 'Rename' || button.text === '+' || button['aria-label'] === 'This card'), false, 'Structure is in the More list, there is no Rename and no + circle');
-  assert.ok(ordinaryButtons.some(button => button.text === 'Research'), 'every card shows a labelled Research action');
+  assert.ok(ordinaryButtons.some(button => button.text === 'AI explore'), 'every card shows a labelled AI explore action');
   assert.ok(ordinaryButtons.some(button => button.text === 'Note' && /^Note: open in the right sidebar/.test(button['aria-label'])), 'Note names its action');
-  assert.ok(ordinaryButtons.some(button => button.text === 'Add'));
+  assert.ok(ordinaryButtons.some(button => button.text === 'Style'), 'and Style (B08)');
+  assert.equal(ordinaryButtons.some(button => button.text === 'Add'), false, 'no toolbar Add (B08: the edge + and Cmd-Enter add)');
   const ordinaryResult = node('ordinary-synthesis'); ordinaryResult.aimKind = 'synthesis';
   const ordinaryButtonsForResult = [], ordinaryResultView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
@@ -515,7 +518,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderBranchToggle() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources,
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources,
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
     // The on-screen sibling order is covered by the move tests in steps-after-text-view.cjs; here the stored order is kept.
     onScreenSiblingOrder: map => map.nodes, moveLastAmongSiblings: VisualAgentMapView.prototype.moveLastAmongSiblings,
@@ -758,7 +761,11 @@ const selectionDom = () => {
       setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
       toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
       setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
-      querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} };
+      querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {},
+      // The AI card toolbar redraws its first button (B08 repaintRunTool): it reads classList, takes the old one out and prepends.
+      prepend(child) { this.children = [child, ...this.children.filter(item => item !== child)]; child.parent = this; } };
+    el.classList = { contains: name => el.classes.has(name) };
+    const remove = el.remove; el.remove = function () { remove.call(this); if (this.parent) this.parent.children = this.parent.children.filter(item => item !== this); };
     return el;
   };
   return make;
@@ -1221,7 +1228,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(outlined.map, null, 'no map left: the outline empties');
 });
-integrationTest('card toolbar: a selected card shows labelled Research, Add, Note and ⋯ buttons; no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
+integrationTest('card toolbar: a selected card shows labelled AI explore, Style, Note and ⋯ buttons (an AI card Run, Lock, AI explore, Settings, Note, ⋯; read-only only Note and ⋯); no Add, no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until focus or selection (no longer hover), and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
@@ -1238,12 +1245,12 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
     return tools.children.filter(child => child.tag === 'button');
   };
   const names = buttons => buttons.map(button => button.text);
-  const expected = ['Research', 'Add', 'Note', '⋯'];
+  const expected = ['AI explore', 'Style', 'Note', '⋯'];
   // Unfolded card with a subtopic, a leaf and a folded card all show the same four buttons; Collapse, This card and Select subtopics are not tools any more.
   const buttons = toolsOf();
   assert.deepEqual(names(buttons), expected, 'four labelled buttons in order');
   assert.ok(buttons.every(button => button.classes.has('vam-card-tool') && !button.iconName), 'text buttons, no icon-only tool');
-  assert.deepEqual(buttons.map(button => [...button.classes].find(name => name !== 'vam-card-tool')), ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']);
+  assert.deepEqual(buttons.map(button => [...button.classes].find(name => name !== 'vam-card-tool')), ['vam-ai-explore', 'vam-card-tool-style', 'vam-detail-button', 'vam-card-tool-more']);
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
   const [, , note, more] = buttons;
   assert.match(note.attrs['aria-label'], /^Note: open in the right sidebar/); assert.equal(more.attrs['aria-label'], 'More card actions'); assert.equal(more.attrs['aria-haspopup'], 'menu');
@@ -1254,8 +1261,17 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
   // Select mode: no toolbar at all.
   assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); })), [], 'select mode');
   assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b')), [], 'select mode, leaf');
+  // B08: an AI card (idle, its own lock on), and read-only while the notes load.
+  const aiCard = (more = () => {}) => ({ view }) => { Object.assign(view.notes.get('a'), { aiCard: true, prompt: 'Look into it' }); more(view); };
+  assert.deepEqual(names(toolsOf(aiCard())), ['Run', 'Lock', 'AI explore', 'Settings', 'Note', '⋯'], 'AI card, idle');
+  // Running (Stop takes Run's place) needs the header chips this double cannot draw: steps-card-toolbar covers it.
+  const locked = toolsOf(aiCard(view => { view.notes.get('a').aiLocked = true; }));
+  assert.deepEqual(names(locked), ['Run', 'Locked', 'AI explore', 'Settings', 'Note', '⋯'], 'AI card, locked');
+  assert.equal(locked[1].attrs['aria-pressed'], 'true', 'the lock shows pressed');
+  assert.deepEqual(names(toolsOf(({ view }) => { view.noteLoad = { pending: true }; })), ['Note', '⋯'], 'read-only: Note and ⋯ (its rows greyed, decision #35)');
   const { translate } = load('i18n.ts');
-  assert.deepEqual(['ui.card_tool_research', 'ui.card_tool_add', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['研究', '新增', '筆記', '更多卡片動作']);
+  assert.deepEqual(['ui.ai_explore', 'ui.topic_style', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['AI 探索', '樣式', '筆記', '更多卡片動作']);
+  assert.deepEqual(['ui.card_tool_run', 'ui.card_tool_lock', 'ui.card_tool_ai_settings', 'ui.card_tool_stop'].map(key => translate('zh-TW', key)), ['執行', '鎖定', '設定', '停止']);
 });
 integrationTest('status pill: researched and unresearched topics show none (no success label on the card face, DELIVERY_V3_3 7 P1.2), other states keep theirs and screen readers still hear the status ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
@@ -1280,7 +1296,7 @@ integrationTest('status pill: researched and unresearched topics show none (no s
   const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
   assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
 });
-integrationTest('A4 two states: an unselected card keeps links, model, add-summary and the secondary actions out of its header; they sit in the card toolbar, and no success chip is drawn', () => {
+integrationTest('A4 two states: an unselected card keeps links, model and the secondary actions out of its header; they sit in the card toolbar (Add summary is in ⋯ since B08), and no success chip is drawn', () => {
   const f = heFixture({ notes: heNotes([
     ['fact', { summary: 'Has a summary', links: ['https://a.example/x'], modelOverride: true, model: 'gpt-x', status: 'completed' }],
     ['hyp', { summary: 'No conclusion yet', status: 'completed' }],
@@ -1303,11 +1319,11 @@ integrationTest('A4 two states: an unselected card keeps links, model, add-summa
   assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-node-model-tag') && c.text === 'M:gpt-x').length === 1, 'model name in the toolbar');
   const meta = part(0, 'vam-node-tools').children.at(-1);
   assert.ok(has(meta, 'vam-node-tools-meta'), 'link count and model close the toolbar');
-  assert.equal(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, 'a card with a summary has no add-summary button');
-  const add = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool-add-summary'));
-  assert.equal(add.length, 1, 'an empty-summary card offers Add summary in the toolbar'); assert.equal(add[0].text, 'Add summary');
+  // B08 (P1.8): Add summary left the toolbar (it is in the card ⋯ and right-click, steps-card-toolbar); no card has it here.
+  for (let i = 0; i < 3; i++) assert.equal(within(part(i, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, `card ${i}: no add-summary button`);
   const buttons = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool')).map(c => c.text);
-  assert.deepEqual(buttons.slice(-2), ['Add summary', '⋯'], 'Add summary sits just before More');
+  assert.equal(buttons.at(-1), '⋯', 'an empty-summary card still ends its toolbar with More');
+  assert.ok(!buttons.includes('Add summary'), 'and has no Add summary button');
   assert.equal(within(part(2, 'vam-node-header'), c => has(c, 'vam-status-error')).length, 1, 'the error chip stays in the header');
   // The card-level add-summary line takes no room and shows nothing (the stylesheet hides it).
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -3232,10 +3248,10 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads, flat (V3.3 P1.8), leaning and strength (hypothesis only), cover, type, parent topic search, markers, links, relations (folded), AI lock, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  // Colour and style stay last until the toolbar Style popover replaces them (B08).
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Leaning', 'Strength', 'Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock', 'Color', 'Style'], 'card settings: one flat list in the P1.8 order (a hypothesis starts with leaning and strength)');
+  // Colour and style live only in the toolbar Style popover (B08), not here.
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Leaning', 'Strength', 'Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock'], 'card settings: one flat list in the P1.8 order (a hypothesis starts with leaning and strength)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock', 'Color', 'Style'], 'no leaning or strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock'], 'no leaning or strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-leanings') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-card-search' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 6), ['vam-hypothesis-leanings', 'vam-hypothesis-strengths', 'vam-topic-kinds', 'vam-card-search', 'vam-hint', 'vam-card-search'], 'leaning, strength, the type, the parent search and its hint, then the relation search (the relations note is a different class)');
   const css = heCss();
@@ -3261,12 +3277,9 @@ integrationTest('card settings: titled "Card settings" with the card name as sub
   const inFold = text => dom.findAll(body, c => c.text === text).length > 0;
   for (const heading of ['Leaning', 'Strength', 'Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'AI lock']) { assert.ok(dom.find(hyp.content, c => c.text === heading), heading); assert.equal(inFold(heading), false, `${heading} is not folded`); }
   assert.ok(inFold('Relations'), 'the relation list is inside the fold');
+  // No colour or style section and no whole-branch checkbox, even on a card with a branch: the toolbar's Style popover has them (B08).
   const branchy = heBranchDialog();
-  const box = dom.find(branchy.content, c => (c.cls ?? '').includes('vam-branch-toggle-box'));
-  const branchBody = dom.find(branchy.content, c => (c.cls ?? '').includes('vam-disclosure-body'));
-  assert.equal(box.type, 'checkbox'); assert.equal(box.checked, false); assert.equal(dom.findAll(branchBody, c => c === box).length, 0, 'the checkbox is outside the fold');
-  assert.ok(dom.texts(dom.find(branchy.content, c => (c.cls ?? '').includes('vam-branch-toggle'))).includes('Change the whole branch too'));
-  assert.equal(dom.find(hyp.content, c => (c.cls ?? '').includes('vam-branch-toggle-box')), undefined, 'a card without subtopics has no checkbox');
+  for (const cls of ['vam-color-section', 'vam-style-section', 'vam-branch-toggle']) assert.equal(dom.find(branchy.content, c => (c.cls ?? '').split(' ').includes(cls)), undefined, cls);
   more.click(); assert.equal(more.attrs['aria-expanded'], 'true'); assert.equal(body.hidden, false);
   more.click(); assert.equal(more.attrs['aria-expanded'], 'false'); assert.equal(body.hidden, true);
   const plain = heDialog({}, 0);
@@ -3274,62 +3287,16 @@ integrationTest('card settings: titled "Card settings" with the card name as sub
   assert.equal(JSON.stringify(toggles.map(t => t.text)).includes('Structure'), false);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(load('i18n.ts').translate(lang, 'ui.structure_and_links'), /Structure|結構|结构/, lang);
 });
-integrationTest('card settings: the whole-branch checkbox needs a branch; ticking it sends colour and style to the whole branch, unticked to the card only', async () => {
+// V3.3 P1.8 (B11): colour, style and "whole branch" left card settings; the Style popover tests them, whole branch
+// included (tests/steps-style-popover.cjs "with apply to the whole branch ticked", tests/steps-card-toolbar.cjs
+// "apply to the whole branch styles the card and its subtopic in one step").
+integrationTest('card settings: a card with a branch has no colour, style or whole-branch control (they are in the toolbar Style popover)', async () => {
   const { view, content } = heBranchDialog();
-  const calls = [];
-  view.changeTopicColor = async (n, color, branch) => { calls.push(['color', n.id, color ?? null, !!branch]); };
-  view.changeTopicStyle = async (n, styles, branch) => { calls.push(['style', n.id, [...styles], !!branch]); };
-  const radio = name => dom.find(content, c => c.tag === 'button' && c.attrs.role === 'radio' && c.text === name);
-  const bold = () => dom.find(content, c => c.tag === 'button' && c.text === 'Bold');
-  radio('Red').click(); await dom.tick(); bold().click(); await dom.tick();
-  assert.deepEqual(calls, [['color', 'fact', 'red', false], ['style', 'fact', ['bold'], false]], 'unticked: the card only');
-  const box = dom.find(content, c => (c.cls ?? '').includes('vam-branch-toggle-box'));
-  if (box) { box.checked = true; box.fire('change'); radio('Blue').click(); await dom.tick(); bold().click(); await dom.tick(); calls.push('ticked'); }
-  assert.ok(box, 'a card with a subtopic has the checkbox');
-  assert.deepEqual(calls.slice(2).map(c => c === 'ticked' ? c : [c[0], c[1], c[3]]), [['color', 'fact', true], ['style', 'fact', true], 'ticked'], 'ticked: colour and style pass branch=true');
-  box.checked = false; box.fire('change'); radio('Green').click(); await dom.tick();
-  assert.equal(calls.at(-1)[3], false, 'unticking again goes back to the card only');
-  const leaf = heDialog({}, 0);
-  assert.equal(dom.find(leaf.content, c => (c.cls ?? '').includes('vam-branch-toggle-box')), undefined, 'a card without subtopics has no checkbox');
-});
-integrationTest('card settings: through the real dialog the ticked checkbox writes colour and style into every note of the branch (one undo step each); unticked writes only the card', async () => {
-  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
-  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
-  const { repo, contents } = fixture('en', { linkIndex: true });
-  repo.settings = { ...settings, language: 'en' };
-  const MAP = 'Agent Workspace/Topics/map-w/Map.md';
-  const doc = { id: 'map-w', title: 'w', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
-  await repo.ensureTopicFolders('Agent Workspace/Topics/map-w');
-  await repo.app.vault.create(MAP, core.serializeMap(doc));
-  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
-  const child = await repo.createNote('Child', 'gpt-6-luna', doc, MAP, 'workspace');
-  const grand = await repo.createNote('Grand', 'gpt-6-luna', doc, MAP, 'workspace');
-  const sibling = await repo.createNote('Sibling', 'gpt-6-luna', doc, MAP, 'workspace');
-  child.parentId = root.id; grand.parentId = child.id; child.collapsed = true;
-  doc.nodes.push(root, child, grand, sibling); await repo.saveMap(MAP, doc);
-  const { view } = heFixture({ topics: [root] });
-  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
-  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
-  view.beginMapTransaction = () => begin(deps);
-  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
-  const pushed = []; view.history = { push: entry => pushed.push(entry) };
-  await view.refreshAfterSavedChange();
-  view.enqueue = work => work(); view.referenceSourcePaths = () => [];
-  const content = dom.element('content'), host = dom.element('modal');
-  view.renderInspector(content, view.map.nodes.find(n => n.id === root.id), 'structure', () => {}, host);
-  const radio = name => dom.find(content, c => c.tag === 'button' && c.attrs.role === 'radio' && c.text === name);
-  const colorOf = n => view.notes.get(n.id).color ?? null, styleOf = n => [...(view.notes.get(n.id).style ?? [])];
-  radio('Red').click(); await dom.tick(); await new Promise(r => setTimeout(r, 20));
-  assert.deepEqual([root, child, grand, sibling].map(colorOf), ['red', null, null, null], 'unticked: the card only');
-  const box = dom.find(content, c => (c.cls ?? '').includes('vam-branch-toggle-box')); assert.ok(box, 'the root has a branch');
-  box.checked = true; box.fire('change');
-  radio('Blue').click(); await dom.tick(); await new Promise(r => setTimeout(r, 20));
-  assert.deepEqual([root, child, grand, sibling].map(colorOf), ['blue', 'blue', 'blue', null], 'ticked: root, the folded child and the grandchild, not the sibling');
-  dom.find(content, c => c.tag === 'button' && c.text === 'Bold').click(); await dom.tick(); await new Promise(r => setTimeout(r, 20));
-  assert.deepEqual([root, child, grand, sibling].map(styleOf), [['bold'], ['bold'], ['bold'], []], 'the style goes to the whole branch too');
-  box.checked = false; box.fire('change');
-  dom.find(content, c => c.tag === 'button' && c.text === 'Thick border').click(); await dom.tick(); await new Promise(r => setTimeout(r, 20));
-  assert.deepEqual([root, child, grand].map(styleOf), [['bold', 'border-thick'], ['bold'], ['bold']], 'unticked again: only the card');
+  view.changeTopicColor = async () => assert.fail('no colour write from card settings');
+  view.changeTopicStyle = async () => assert.fail('no style write from card settings');
+  assert.equal(dom.find(content, c => c.attrs.role === 'radiogroup' && c.attrs['aria-label'] === 'Color'), undefined, 'no colour radiogroup');
+  for (const text of ['Bold', 'Thick border', 'Thick line', 'Change the whole branch too']) assert.equal(dom.find(content, c => c.text === text), undefined, text);
+  assert.equal(dom.find(content, c => (c.cls ?? '').includes('vam-branch-toggle-box')), undefined, 'no whole-branch checkbox');
 });
 integrationTest('card dialog search: a card with a parent shows the branch layout and the parent search directly in the flat list (V3.3 P1.8: no More fold)', () => {
   const fx = heFixture();
@@ -3731,11 +3698,12 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
   f.view.refreshCard(node, false);
   assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
 });
-integrationTest('topic-markers, topic-color and topic-style: select mode has no marker, colour or style menu and refuse a change', async () => {
+// Colour and style have no card-settings menu any more (V3.3 P1.8, B11); their writes still refuse select mode.
+integrationTest('topic-markers, topic-color and topic-style: select mode has no marker menu and every one refuses a change', async () => {
   const sections = [
     ['markers', (view, panel, n) => view.renderMarkerSection(panel, n), (view, n) => view.changeTopicMarker(n, 'done')],
-    ['color', (view, panel, n) => view.renderColorSection(panel, n), (view, n) => view.changeTopicColor(n, 'red', true)],
-    ['style', (view, panel, n) => view.renderStyleSection(panel, n), (view, n) => view.changeTopicStyle(n, ['bold'], true)],
+    ['color', () => {}, (view, n) => view.changeTopicColor(n, 'red', true)],
+    ['style', () => {}, (view, n) => view.changeTopicStyle(n, ['bold'], true)],
   ];
   for (const [name, render, change] of sections) for (const options of [{ integration: true }]) {
     const { view, writes } = heFixture(options);
@@ -3855,30 +3823,15 @@ integrationTest('topic-color: the colour name sits with the marker and model par
   const spans = dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
   assert.equal(spans.length, 1, 'one label element, replaced in place');
 });
-integrationTest('topic-color: the menu is a radiogroup of None and six named colours with aria-checked, and choosing writes that colour for this topic only, or for the branch while the dialog checkbox is ticked', async () => {
+// V3.3 P1.8 (B11): the colour menu left card settings. Its radiogroup of None and six named colours and branch=true
+// are now the Style popover's (tests/steps-style-popover.cjs "six colours plus none", "with apply to the whole branch").
+integrationTest('topic-color: card settings has no colour menu (the toolbar Style popover has it)', () => {
   const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });
-  view.enqueue = work => work();
-  const calls = [];
-  view.changeTopicColor = async (node, color, branch) => { calls.push([node.id, color ?? null, !!branch]); const note = view.notes.get(node.id); note.color = color ?? undefined; };
-  const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[0]);
-  const group = () => dom.find(panel, c => c.attrs.role === 'radiogroup');
-  assert.equal(group().attrs['aria-label'], 'Color');
-  const radios = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs.role === 'radio');
-  assert.deepEqual(radios().map(r => r.text), ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple'], 'every swatch has a text name');
-  assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['true', 'false', 'false', 'false', 'false', 'false', 'false']);
-  const swatches = dom.findAll(group(), c => c.attrs['aria-hidden'] === 'true' && c.dataset.topicColorSwatch);
-  assert.deepEqual(swatches.map(s => s.dataset.topicColorSwatch), ['red', 'orange', 'yellow', 'green', 'blue', 'purple']);
-  radios()[2].click(); await dom.tick();
-  assert.deepEqual(calls, [['fact', 'orange', false]]);
-  assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['false', 'false', 'true', 'false', 'false', 'false', 'false'], 'repainted with the new choice');
-  assert.equal(radios().filter(r => r.attrs.tabIndex === '0' || r.tabIndex === 0).length <= 1, true);
-  radios()[0].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', null, false]);
-  assert.equal(dom.button(panel, 'Apply to whole branch'), undefined, 'the apply button is gone: the dialog has one whole-branch checkbox');
-  let whole = false; const wholePanel = dom.element('whole'); view.renderColorSection(wholePanel, view.map.nodes[0], () => whole);
-  const wholeRadios = () => dom.findAll(wholePanel, c => c.tag === 'button' && c.attrs.role === 'radio');
-  whole = true; wholeRadios()[3].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', 'yellow', true], 'with the checkbox ticked the colour chosen now goes to the whole branch');
+  view.referenceSourcePaths = () => [];
+  const content = dom.element('content');
+  view.renderInspector(content, view.map.nodes[0], 'structure', () => {}, dom.element('modal'));
+  assert.equal(dom.find(content, c => c.attrs.role === 'radiogroup' && c.attrs['aria-label'] === 'Color'), undefined);
+  assert.equal(dom.findAll(content, c => c.dataset?.topicColorSwatch).length, 0, 'no colour swatch');
 });
 integrationTest('topic-color: opening and redrawing a map of legacy notes (no topic-color key) writes nothing: every file is byte-identical and neither writeTopicColor nor vault.process runs', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -3985,35 +3938,15 @@ integrationTest('topic-style: a card carries only whitelisted data-topic-style-*
   note.style = undefined; g.view.refreshCard(node0, false);
   assert.equal(count(/Style:/g), 0); assert.equal('styleText' in card.dataset, false); assert.equal(count(/Color:/g), 1);
 });
-integrationTest('topic-style: bold, thick border and thick line are aria-pressed switches; text size is a radiogroup that arrow keys move; the dialog checkbox sends the change to the branch', async () => {
+// V3.3 P1.8 (B11): the style menu left card settings. Its switches, sizes and branch=true are now the Style popover's
+// (tests/steps-style-popover.cjs "bold, thick border and thick line toggle", "text size small writes text-small").
+integrationTest('topic-style: card settings has no style menu (the toolbar Style popover has it)', () => {
   const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });
-  view.enqueue = work => work();
-  const calls = [];
-  view.changeTopicStyle = async (n, styles, branch) => { calls.push([n.id, [...styles], !!branch]); const note = view.notes.get(n.id); note.style = [...styles]; };
-  const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[0]);
-  const pressed = () => dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] !== undefined);
-  assert.deepEqual(pressed().map(b => [b.text, b.attrs['aria-pressed']]), [['Bold', 'false'], ['Thick border', 'false'], ['Thick line', 'false']]);
-  const group = () => dom.find(panel, c => c.attrs.role === 'radiogroup');
-  assert.equal(group().attrs['aria-label'], 'Text size');
-  const radios = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs.role === 'radio');
-  assert.deepEqual(radios().map(r => [r.text, r.attrs['aria-checked']]), [['Standard', 'true'], ['Small', 'false'], ['Large', 'false']]);
-  pressed()[0].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', ['bold'], false]); assert.equal(pressed()[0].attrs['aria-pressed'], 'true');
-  pressed()[0].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', [], false], 'pressing the set value again turns it off');
-  radios()[2].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', ['text-large'], false]); assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['false', 'false', 'true']);
-  radios()[2].keydown({ key: 'ArrowRight', preventDefault() {} });
-  await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', [], false], 'ArrowRight wraps to Standard and clears the size');
-  pressed()[1].click(); await dom.tick(); radios()[1].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', ['border-thick', 'text-small'], false], 'a size keeps the other switches');
-  const sizeLabels = () => dom.findAll(panel, c => c.cls && c.cls.split(' ').includes('vam-topic-style-size-label'));
-  assert.deepEqual(sizeLabels().map(l => l.text), ['Text size'], 'the size label survives every repaint');
-  assert.equal(dom.button(panel, 'Apply to whole branch'), undefined, 'the apply button is gone');
-  let whole = false; const wholePanel = dom.element('whole'); view.renderStyleSection(wholePanel, view.map.nodes[0], () => whole);
-  whole = true; dom.findAll(wholePanel, c => c.tag === 'button' && c.attrs['aria-pressed'] !== undefined)[0].click(); await dom.tick();
-  assert.deepEqual(calls.at(-1), ['fact', ['text-small', 'border-thick', 'bold'], true], 'with the checkbox ticked a style switch goes to the whole branch');
+  view.referenceSourcePaths = () => [];
+  const content = dom.element('content');
+  view.renderInspector(content, view.map.nodes[0], 'structure', () => {}, dom.element('modal'));
+  for (const text of ['Bold', 'Thick border', 'Thick line', 'Text size']) assert.equal(dom.find(content, c => c.text === text), undefined, text);
+  assert.equal(dom.find(content, c => c.attrs.role === 'radiogroup' && c.attrs['aria-label'] === 'Text size'), undefined);
 });
 integrationTest('topic-style: a branch change is one transaction writing only the notes that differ, folded ones included; one undo restores all; a single topic leaves children alone; unknown tokens stay', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');

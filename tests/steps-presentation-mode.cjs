@@ -364,7 +364,7 @@ test('42: the new CSS stays out of the share viewer (every rule starts with .vam
 });
 
 // bug bash A #05: a presentation is read-only; the current card's tools and its "+" neither show nor act.
-test('bug bash #05: during a presentation the card toolbar (Research, Add, More) does nothing; after leaving it works again', async () => {
+test('bug bash #05: during a presentation the card toolbar (AI explore, Style, More) does nothing; after leaving the edge + adds again', async () => {
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8'), /\.vam-stage\[data-presenting\] \.vam-node-tools[^{]*\{[^}]*display: none/, 'the stylesheet hides the toolbar while presenting');
   const h = await harness();
   h.recordModalsOnly();
@@ -378,15 +378,17 @@ test('bug bash #05: during a presentation the card toolbar (Research, Add, More)
   const before = bytes();
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();
-  const tools = [byClass('root', 'vam-ai-explore'), byClass('root', 'vam-add-child-tool'), byClass('root', 'vam-card-tool-more')];
-  assert.ok(tools.every(Boolean), 'Research, Add and More exist on the card as their own buttons');
+  // B08: AI explore, Style, Note, More (no Add: the edge + and Cmd-Enter add a subtopic).
+  const tools = [byClass('root', 'vam-ai-explore'), byClass('root', 'vam-card-tool-style'), byClass('root', 'vam-card-tool-more')];
+  assert.ok(tools.every(Boolean), 'AI explore, Style and More exist on the card as their own buttons');
   assert.ok(byClass('root', 'vam-detail-button'), 'and Note');
   const countBefore = h.view.map.nodes.length;
   // Each does nothing while presenting (Note only reads, so it is not part of this list).
   for (const el of tools) click(el);
   await h.settle();
   assert.equal(menus.length, 0, 'no toolbar button opens a list while presenting');
-  assert.equal(h.view.map.nodes.length, countBefore, 'Add created no topic while presenting');
+  assert.equal(h.view.styleOpen, null, 'Style opened no popover while presenting');
+  assert.equal(h.view.map.nodes.length, countBefore, 'no tool created a topic while presenting');
   assert.equal(h.view.selection.state.multiSelectMode, false, 'nothing entered selection mode while presenting');
   assert.deepEqual(h.modals, [], 'no dialog opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
@@ -397,8 +399,9 @@ test('bug bash #05: during a presentation the card toolbar (Research, Add, More)
   await h.view.addNode(h.view.map.nodes[0], 'from AI', false, false); await h.settle();
   assert.equal(h.view.map.nodes.length, count + 1, 'the internal path (AI write-back) still creates a node during a presentation');
   h.view.exitPresentation();
-  click(byClass('root', 'vam-add-child-tool')); await h.settle();
-  assert.equal(h.view.map.nodes.length, count + 2, 'after leaving, Add creates a subtopic again');
+  // The toolbar has no Add since B08; Cmd-Enter on the card adds a subtopic (the edge + is covered in steps-card-edge-entry).
+  h.press('Enter', { metaKey: true }, h.card('root')); await h.settle();
+  assert.equal(h.view.map.nodes.length, count + 2, 'after leaving, Cmd-Enter creates a subtopic again');
 });
 
 // Overlaps the tools test above on purpose: there the stylesheet assertion fails first on the old code, so this one shows the undo assertion failing on its own.

@@ -8033,12 +8033,12 @@ test('E4b basis: the line under the answer shows the notes read, the research re
   const f = panelFixture(); f.panel.setOpen(true); const turn = f.panel.begin('q'); f.panel.finish('Answer.', []);
   eq(tags(f.parts.log()), [], 'no basis given (a restored or failed reply): no line');
   f.panel.setReplyBasis(turn, { notes: 2, research: true });
-  eq(tags(f.parts.log()), ['Read the notes of 2 cards', 'Read research sources', 'Inference']);
+  eq(tags(f.parts.log()), ['Read 2 notes', 'Read research sources', 'Inference']);
   eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), [], 'the result-line basis block is a different thing and stays empty');
-  f.panel.setReplyBasis(turn, { notes: 1, research: false }); eq(tags(f.parts.log()), ['Read the note of 1 card', 'Inference']);
+  f.panel.setReplyBasis(turn, { notes: 1, research: false }); eq(tags(f.parts.log()), ['Read 1 note', 'Inference']);
   f.panel.setReplyBasis(turn, { notes: 0, research: false }); eq(tags(f.parts.log()), ['Inference']);
   eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-reply-basis')).length, 1, 'exactly one line under the reply');
-  for (const [language, want] of [['zh-TW', ['讀到 2 張卡的筆記', '讀到研究來源', '推論']], ['zh-CN', ['读到 2 张卡的笔记', '读到研究来源', '推论']]]) {
+  for (const [language, want] of [['zh-TW', ['讀到 2 份筆記', '讀到研究來源', '推論']], ['zh-CN', ['读到 2 份笔记', '读到研究来源', '推论']]]) {
     const z = panelFixture(); z.setLanguage(language); z.panel.setOpen(true); const zt = z.panel.begin('q'); z.panel.finish('好', []);
     z.panel.setReplyBasis(zt, { notes: 2, research: true }); eq(tags(z.parts.log()), want, language);
     z.panel.setReplyBasis(zt, { notes: 0, research: false }); eq(tags(z.parts.log()), [want[2]], language);
@@ -8061,7 +8061,7 @@ integrationTest('E4b view: the line under the answer follows the notes the reque
   h.type('and now?'); await h.view.sendMapChat();
   const sent = contextOf(h.control.requests[1]); const read = [...sent.selected, ...sent.references].filter(item => item.detail).length;
   assert.equal(read, 2, 'both notes went out whole');
-  eq(tags().slice(-2), [`Read the notes of ${read} cards`, 'Inference']);
+  eq(tags().slice(-2), [`Read ${read} notes`, 'Inference']);
 });
 
 // ---- ticket 06: an automatic chain is one history turn ----------------------------------------------------------------

@@ -84,6 +84,8 @@ export interface RelationEditorPorts {
   app(): App;
   map(): MapDocument | null;
   notes(): ReadonlyMap<string, Note>;
+  /** The visible text of a knowledge-reference end (its card title and source map, or the unavailable text); null when `id` is not a reference. Never the internal id. */
+  refLabel(id: string): string | null;
   selection(): Pick<TopicSelection, "selectRelation" | "deselectRelation">;
   relationsEnabled(): boolean;
   anchorEditable(): boolean;
@@ -291,10 +293,14 @@ export class RelationEditor {
       end
     );
   }
+  /** A relation end named for the user: a card by its title, a knowledge reference by its card title and source map. */
+  private endTitle(id: string): string {
+    return this.ports.notes().get(id)?.title ?? this.ports.refLabel(id) ?? id;
+  }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   private relationRowText(link: TopicRelation, selfId: string): string {
     const name = t(RELATION_NAME_KEY[link.kind]),
-      titleOf = (id: string): string => this.ports.notes().get(id)?.title ?? id;
+      titleOf = (id: string): string => this.endTitle(id);
     if (link.kind === "related")
       return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
     return link.from === selfId
@@ -432,7 +438,7 @@ export class RelationEditor {
         return;
       }
       const titleOf = (id: string): string =>
-        id === ref.anchorId ? this.anchorEndText(ref.imageId, ref.anchorId) : (this.ports.notes().get(id)?.title ?? id);
+        id === ref.anchorId ? this.anchorEndText(ref.imageId, ref.anchorId) : this.endTitle(id);
       const summary = root.createDiv("vam-relation-editor-summary");
       this.relationSwatch(summary, current.kind);
       summary.createSpan({
@@ -535,11 +541,7 @@ export class RelationEditor {
     const self = t("ui.relation_this_topic"),
       // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
       titleOf = (id: string, object = false): string =>
-        id === selfId
-          ? object
-            ? t("ui.relation_this_topic_object")
-            : self
-          : (this.ports.notes().get(id)?.title ?? id);
+        id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : this.endTitle(id);
     if (link.kind === "related")
       return selfId === null
         ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to))

@@ -19196,11 +19196,6 @@ export class VisualAgentMapView extends ItemView {
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
   }
-  /** The resolved title of one of this map's knowledge references; undefined when it is not one or not resolved (V3.3 P4.4). */
-  private knowledgeRefTitle(id: string): string | undefined {
-    const found = this.refResolved.get(id);
-    return found?.ok ? found.title : undefined;
-  }
   /** The notes of these cards read again from disk (a missing card or note is left out). */
   private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
     const fresh = new Map<string, Note>();
@@ -25194,7 +25189,7 @@ export class VisualAgentMapView extends ItemView {
       refTitles?.get(id) ??
       this.notes.get(id)?.title ??
       nodes.find(node => node.id === id)?.path ??
-      this.knowledgeRefTitle(id) ??
+      this.knowledgeRefLabel(id) ??
       id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {

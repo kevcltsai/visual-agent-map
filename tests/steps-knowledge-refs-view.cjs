@@ -342,3 +342,20 @@ test('F07b-z. a relation line ending at a knowledge reference names the card and
     }
   }
 });
+
+test('F07b-z. chat add_relation / remove_relation action rows name the reference card, or the unavailable text, never the ref id', async () => {
+  const h = await harness();
+  for (const ok of [true, false]) {
+    h.view.refResolved = new Map([['ref-a', ok ? { ok: true, mapPath: OTHER, mapTitle: 'Other map', notePath: 'x.md', title: 'Ref card' } : { ok: false, reason: 'missing' }]]);
+    const rows = [
+      h.view.chatActionLabel({ kind: 'add_relation', fromId: h.ids.root, toId: 'ref-a', relationKind: 'supports' }),
+      h.view.chatActionLabel({ kind: 'add_relation', fromId: 'ref-a', toId: h.ids.root, relationKind: 'related' }),
+      h.view.chatActionLabel({ kind: 'remove_relation', fromId: h.ids.root, toId: 'ref-a' }),
+      h.view.chatActionLabel({ kind: 'remove_relation', fromId: 'ref-a', toId: h.ids.root })
+    ];
+    for (const text of rows) {
+      assert.ok(!text.includes('ref-'), `${ok}: ${text}`);
+      assert.ok(ok ? text.includes('Ref card') && text.includes('Reference from “Other map”') : text.includes('Original card unavailable'), text);
+    }
+  }
+});

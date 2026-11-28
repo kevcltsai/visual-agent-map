@@ -596,7 +596,8 @@ function livingReaderFixture() {
   };
   const workspace = {
     rightSplit: split, getLeavesOfType: () => leaf.view instanceof MarkdownView ? [leaf] : [],
-    getRightLeaf: () => leaf, async revealLeaf() {}, trigger() {}, getActiveViewOfType: () => null
+    getRightLeaf: () => leaf, async revealLeaf() {}, trigger() {}, getActiveViewOfType: () => null,
+    iterateAllLeaves: callback => callback(leaf) // the one leaf is never closed in these tests
   };
   const aiCards = new Set();
   const app = { workspace, metadataCache: { getFileCache: file => ({ frontmatter: { 'agent-map-node': true, ...(aiCards.has(file?.path) ? { 'ai-card': true } : {}) } }) } };

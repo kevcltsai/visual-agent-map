@@ -1449,6 +1449,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ready = initialize;
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(LIVING_READER_VIEW, leaf => new LivingReaderView(leaf));
+    this.app.workspace.onLayoutReady(() => this.nodeDetailsSidebar.closeEmptyReaders());
     this.registerView(
       OUTLINE_VIEW_TYPE,
       leaf =>

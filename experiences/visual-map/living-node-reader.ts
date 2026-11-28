@@ -1,4 +1,12 @@
-import { Component, ItemView, MarkdownRenderer, parseYaml, type TFile, type WorkspaceLeaf } from "obsidian";
+import {
+  Component,
+  ItemView,
+  MarkdownRenderer,
+  parseYaml,
+  TFile,
+  type ViewStateResult,
+  type WorkspaceLeaf
+} from "obsidian";
 import { getUiLanguage, t } from "../../i18n";
 import { readLivingLastChange, type LivingChangeSummary } from "./living-node-changes";
 import { localizeLivingReader, readableDate } from "./living-node-markdown";
@@ -77,6 +85,19 @@ export class LivingReaderView extends ItemView {
     this.changes = undefined;
     this.tab = "official";
     await this.paint();
+  }
+
+  /** workspace.json keeps which card the reader shows, so a restart reopens it with content instead of blank. */
+  getState(): Record<string, unknown> {
+    return this.file && !this.draft ? { file: this.file.path } : {};
+  }
+
+  /** A restored reader shows its card's formal content; without a card it stays empty and is closed at layout ready. */
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    const path: unknown = (state as { file?: unknown } | null)?.file;
+    const file = typeof path === "string" ? this.app.vault.getAbstractFileByPath(path) : null;
+    if (!this.file && file instanceof TFile) await this.showOfficial(file);
+    await super.setState(state, result);
   }
 
   async onOpen(): Promise<void> {

@@ -520,6 +520,27 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
+// D1-x2 (V3.3 D1 P3.9): the guarded writer says "discarded" when the note changed between the chat's gate and the write; that action
+// is reported as skipped, pushes no undo step and leaves the bytes as the other writer left them.
+integrationTest('map chat: D1-x2 - an edit discarded at commit (the card got locked after the gate) is skipped, pushes no undo step and writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const earlier = { undo: async () => {}, redo: async () => {}, label: 'earlier' };
+  h.view.history.push(earlier);
+  const path = h.view.map.nodes.find(n => n.id === h.ids.a).path;
+  const process = h.app.vault.process;
+  let injected = null;
+  h.app.vault.process = async (file, change) => {
+    if (file.path === path && !injected) { injected = h.contents.get(path).replace(/^---\n/, '---\nai-locked: true\n'); h.contents.set(path, injected); }
+    return process.call(h.app.vault, file, change);
+  };
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }], {}, undefined, topicBaseline(h));
+  assert.ok(injected, 'the lock was set after the gate, before the commit');
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(path), injected, 'the file is byte-identical to what the other writer left');
+  assert.equal(h.view.history.undoEntry, earlier, 'no undo step was pushed for the discarded write');
+  assert.notEqual(lines[0].text.split(':')[0], 'Done');
+});
+
 integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no summary still adds it; it keeps the placeholder and stays unresearched', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [

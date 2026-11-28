@@ -342,12 +342,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
-.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }
+.vam-status-idea::before, .vam-status-blocked::before { border: 1.5px solid var(--text-muted); background: transparent; }
 .vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }
 .vam-status-completed::before { background: var(--interactive-accent); }
-.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
-.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
+.vam-status-queued, .vam-status-waiting { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
+.vam-status-queued::before, .vam-status-waiting::before { border: 1.5px solid var(--interactive-accent); background: transparent; }
 .vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
 .vam-status-error::before { background: var(--color-red); }
 /* V3.3 P1.2: an AI card that needs a rerun (orange dot) or did not finish (red ×): a mark plus words, never colour alone. */
@@ -355,6 +355,10 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-status-stale::before { background: var(--vam-warning); }
 .vam-status-failed { color: color-mix(in srgb, var(--vam-error) 80%, var(--vam-text)); }
 .vam-status-failed::before { content: "\00d7"; width: auto; height: auto; border-radius: 0; background: none; color: var(--vam-error); font-weight: 700; vertical-align: 0; }
+/* D2-3: waiting is the queued ring above; blocked an orange ring (cannot run yet); stopped a grey square (stop). */
+.vam-status-blocked { color: color-mix(in srgb, var(--vam-warning) 80%, var(--vam-text)); }
+.vam-status-blocked::before { border-color: var(--vam-warning); }
+.vam-status-stopped::before { border-radius: 0; }
 /* An unsaved streaming summary: grey italic words in the header, the summary below shows the text as it comes. */
 .vam-status-preview { color: var(--vam-muted); font-style: italic; }
 .vam-status-preview::before { display: none; }
@@ -2148,6 +2152,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-run-all-track { stroke: color-mix(in srgb, var(--interactive-accent) 25%, transparent); }
 .vam-view .vam-run-all-arc { stroke: var(--interactive-accent); stroke-linecap: round; }
 .vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
+/* D2-4: a selected AI card shows what it depends on. Run = an AI dependency (accent, heavier); read = an ordinary card it reads (dashed, muted). An overlay joins a pair that has no tree line drawn; semantic lines are never marked. */
+.vam-edges .vam-edge-dep-overlay { fill: none; pointer-events: none; }
+.vam-edges .vam-edge.is-dep-run, .vam-edges .vam-edge-dep-overlay.is-dep-run { stroke: var(--interactive-accent); stroke-width: 3; opacity: 1; }
+.vam-edges .vam-edge.is-dep-read, .vam-edges .vam-edge-dep-overlay.is-dep-read { stroke: var(--text-muted); stroke-width: 2; stroke-dasharray: 4 4; opacity: 1; }
 .vam-prompt-arrow { fill: var(--text-faint); stroke: none; }
 .vam-menu-hint { margin-inline-start: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 

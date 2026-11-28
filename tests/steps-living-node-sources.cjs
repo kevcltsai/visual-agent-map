@@ -163,3 +163,39 @@ test('A05: a deleted source card leaves a blocking dangling ID that resolves aga
   assert.equal(restored.failures.length, 0);
   assert.deepEqual(plain(restored.dependencyIds), ['a', 'b']);
 });
+
+test('D2-4 dependency highlight: a plain card that is both a child and an explicit ref is read once', () => {
+  const { livingDependencyGraph, livingHighlight } = require('./support.cjs').load('experiences/visual-map/living-node-map.ts');
+  const n = (id, parentId, refs) => ({ id, path: `${id}.md`, parentId, ...(refs ? { aiCard: true, prompt: 'p', hasKnowledge: true, explicitRefs: refs } : { hasKnowledge: false, explicitRefs: [] }) });
+  const cards = [n('A', null, [card('O'), { kind: 'note', link: 'O' }]), n('O', 'A')];
+  const portWithO = { resolveAuthorized: link => (link === 'O' ? { identity: 'O.md', path: 'O.md' } : port.resolveAuthorized(link)) };
+  const graph = livingDependencyGraph(cards, planLivingMap(cards, [], portWithO));
+  assert.deepEqual(plain(livingHighlight(graph, 'A').read.map(([c, d]) => `${c}>${d}`)), ['A>O']);
+});
+
+test('D2-4 dependency highlight: the planner\'s own edges (diamond once, explicit AI refs), plain cards as read, locked deps not expanded, cycles empty', () => {
+  const { planLivingNodes } = require('./support.cjs').load('experiences/visual-map/living-node-plan.ts');
+  const { livingDependencyGraph, livingHighlight } = require('./support.cjs').load('experiences/visual-map/living-node-map.ts');
+  const n = (id, parentId, refs, extra = {}) => ({ id, path: `${id}.md`, parentId, ...(refs ? { aiCard: true, prompt: 'p', hasKnowledge: true, explicitRefs: refs } : { hasKnowledge: false, explicitRefs: [] }), ...extra });
+  const cards = [
+    n('A', null, [card('E'), card('P'), card('L')]), n('B', 'A', [card('D')]), n('C', 'A', []), n('O', 'A'), n('D', 'C', []),
+    n('E', null, []), n('P', null), n('L', null, [], { aiLocked: true }), n('M', 'L', []),
+    n('X', null, [card('Y')]), n('Y', null, [card('X')])
+  ];
+  const planned = planLivingMap(cards, [], port);
+  const graph = livingDependencyGraph(cards, planned);
+  const pairs = list => plain(list.map(([c, d]) => `${c}>${d}`).sort());
+  const a = livingHighlight(graph, 'A');
+  // Run pairs are exactly the planner's dependencies when A alone is requested.
+  const nodesForPlan = cards.map(card => card.aiCard ? { ...card, explicitCardIds: planned.sources.get(card.id)?.dependencyIds ?? [] } : card);
+  const expected = [...planLivingNodes(nodesForPlan, ['A']).dependencies].flatMap(([c, deps]) => deps.map(d => [c, d]));
+  assert.deepEqual(pairs(a.run), pairs(expected));
+  assert.deepEqual(pairs(a.run), ['A>B', 'A>C', 'A>E', 'A>L', 'B>D', 'C>D']);
+  assert.deepEqual(pairs(a.read), ['A>O', 'A>P'], 'plain child and plain explicit ref are read-only');
+  assert.deepEqual(pairs(livingHighlight(graph, 'C').run), ['C>D']);
+  assert.deepEqual(pairs(livingHighlight(graph, 'L').run), [], 'a locked card is not expanded');
+  for (const id of ['X', 'Y', 'O', 'P', 'missing']) {
+    const h = livingHighlight(graph, id);
+    assert.equal(h.run.length + h.read.length, 0, id);
+  }
+});

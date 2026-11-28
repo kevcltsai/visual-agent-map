@@ -7,7 +7,10 @@
  * (its own summary stands in). An ordinary card never runs and stops the chain (its children's results do not pass upward
  * through it, and their failure does not block its parent).
  */
-export type PromptRunStatus = "idle" | "running" | "done" | "blocked";
+import type { LivingSettlement } from "./living-node-execution";
+
+/** "waiting": queued in this round, not reached yet. */
+export type PromptRunStatus = "idle" | "waiting" | "running" | "done" | "blocked";
 
 export interface PromptNodeRef {
   id: string;
@@ -117,7 +120,7 @@ export function promptSourceLinks(prompt: string): string[] {
 }
 
 export interface PromptOutcome {
-  /** Topics that ran and wrote. */
+  /** Topics that ran and wrote: changed or no-change only, never reused. */
   done: number;
   /** Topics whose own run failed. */
   failed: number;
@@ -125,6 +128,14 @@ export interface PromptOutcome {
   blocked: number;
   /** True when Stop (or closing the view) ended the batch early. */
   stopped: boolean;
+  /** The no-change part of `done`. */
+  noChange: number;
+  /** Cancelled, or not reached in a stopped round. */
+  cancelled: number;
+  /** Not run in a round that was not stopped (a locked or trial card). */
+  skipped: number;
+  /** Already current: nothing ran. */
+  reused: number;
 }
 
 export interface PromptRunDeps {
@@ -150,7 +161,16 @@ export interface PromptRunDeps {
  * caller's run is aborted) and nothing new starts.
  */
 export async function runPromptItems(items: readonly PromptPlanItem[], deps: PromptRunDeps): Promise<PromptOutcome> {
-  const outcome: PromptOutcome = { done: 0, failed: 0, blocked: 0, stopped: false };
+  const outcome: PromptOutcome = {
+    done: 0,
+    failed: 0,
+    blocked: 0,
+    stopped: false,
+    noChange: 0,
+    cancelled: 0,
+    skipped: 0,
+    reused: 0
+  };
   let finished = 0;
   for (const item of items) {
     if (deps.signal.aborted) {
@@ -216,12 +236,17 @@ export interface PromptRunEntry {
   status: PromptRunStatus;
   /** Why a topic is stuck (its own failure or the children that did not succeed). */
   reason?: string;
+  /** This round's result for the card, and whether the round was stopped by then (a not-run card is then stopped). */
+  settlement?: LivingSettlement;
+  aborted?: boolean;
 }
 /** The run-all batch a view holds: live while `outcome` is unset, then the result until dismissed. */
 export interface PromptBatchState {
   mapPath: string;
   controller: AbortController;
   total: number;
+  /** Set once the round is planned: until then `total` is not known and no "n / N" shows. */
+  planned?: boolean;
   /** Topics settled so far. */
   finished: number;
   /** The name of the topic running now. */
@@ -269,7 +294,8 @@ export function promptInputKey(input: PromptInput): string {
   return fnv1a(JSON.stringify([input.prompt.trim(), children, sources]));
 }
 
-export type AiCardStatus = "pending" | "running" | "stale" | "failed" | "done";
+/** The card face: "pending" is a suggested card (never run, or nothing out of date to say), "stale" one that needs a rerun. */
+export type AiCardStatus = "pending" | "waiting" | "running" | "stale" | "failed" | "blocked" | "stopped" | "done";
 export interface AiCardStatusInput {
   /** True while this view's run (batch or single AI job) is working on the card. */
   running: boolean;

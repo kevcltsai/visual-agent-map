@@ -8817,11 +8817,23 @@ export class VisualAgentMapView extends ItemView {
         ] as const;
       })
     );
+    // The dashed cards keep clear of the cards and of each other the way new cards do (A9 local push); no card moves.
+    const hints = pushHintsFor(this.map, this.cardEls, this.summaryEls);
     const layout = planGhostLayout(
       preview.cards ?? [],
       boxes,
       parentId => shown.flatMap(node => (node.parentId === parentId ? [boxes.get(node.id)!] : [])),
-      preview.relations ?? []
+      preview.relations ?? [],
+      {
+        nodes: shown,
+        boxOf: id => {
+          const box = boxes.get(id);
+          return hints.boxOf?.(id) ?? (box ? { dx: 0, dy: 0, w: box.width, h: box.height } : undefined);
+        },
+        decorations: hints.decorations ?? [],
+        direction: layoutOf(this.map).direction,
+        gap: resolveLayout(layoutOf(this.map)).gap
+      }
     );
     if (!layout.cards.length && !layout.relations.length) return;
     const layer = stage.createDiv("vam-plan-ghosts");
@@ -8843,7 +8855,7 @@ export class VisualAgentMapView extends ItemView {
       el.style.left = `${card.x}px`;
       el.style.top = `${card.y}px`;
       el.style.width = `${card.width}px`;
-      el.style.minHeight = `${card.height}px`;
+      el.style.height = `${card.height}px`;
       el.createEl("small", { cls: "vam-plan-ghost-label", text: t("ui.map_chat_ghost_label") });
       el.createDiv({
         cls: "vam-plan-ghost-title",

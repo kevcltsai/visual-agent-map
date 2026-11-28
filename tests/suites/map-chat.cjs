@@ -3003,6 +3003,18 @@ test('P2.2a: the line above the message box says what this turn may change: the 
   f.select([]); assert.equal(scope().text, '这轮可改：这张地图的所有卡。');
   f.setLanguage('en');
 });
+test('E2-stop: in a narrow pane with chips and a wrapped scope line the message box and Stop stay reachable: the body scrolls and the form sticks to its bottom (proxy: real bounding box needs the UI re-check, UI NOT RUN)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = sel => css.split('\n').find(line => line.startsWith(`${sel} {`)) ?? '';
+  assert.match(rule('.vam-map-chat-body'), /overflow-y: auto/, 'what is taller than the pane scrolls inside it instead of being cut off');
+  const form = rule('.vam-map-chat-form');
+  assert.match(form, /position: sticky; bottom: 0/, 'the form (scope line, message box, Send/Stop) sticks to the pane bottom');
+  assert.match(form, /background: var\(--background-primary\)/, 'the stuck form hides what scrolls under it');
+  assert.doesNotMatch(form, /!important/);
+  const f = panelFixture(); f.panel.setOpen(true); f.select(['a', 'b', 'a']);
+  const box = find(f.panel.el, i => hasClass(i, 'vam-map-chat-composer')); const formEl = box.parent;
+  assert.ok(hasClass(formEl, 'vam-map-chat-form'), 'the message box is in the form'); assert.ok(find(box, i => hasClass(i, 'vam-map-chat-stop')), 'Stop is inside the message box, hence inside the sticky form');
+  assert.ok(find(box, i => hasClass(i, 'vam-map-chat-send')), 'Send is in the same sticky box');
+});
 integrationTest('B1 view operations: a reply that adds five cards is arranged once, the view keeps its frame, and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
   const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
   const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];

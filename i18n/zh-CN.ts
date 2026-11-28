@@ -1168,7 +1168,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_reason_failed": "上次运行没有完成，原因请看日志",
   "ui.living_node_reason_dependency": "它依赖的卡片没有完成",
   "ui.living_node_reason_missing_source": "来源笔记不见了或不允许使用",
-  "ui.living_node_reason_map_file": "思维导图文件（Map.md）是 VAM 的内部数据，不能作为来源；请从来源移除",
+  "ui.living_node_reason_map_file": "心智图文件（Map.md）是 VAM 的内部数据，不能作为来源；请从来源移除",
   "ui.living_node_reason_cycle": "卡片互相引用，形成循环",
   "ui.living_node_reason_range_too_large": "选取的段落或笔记太大，无法发送",
   "ui.living_node_reason_markers_damaged": "Living Node 标记已损坏，请手动修复",

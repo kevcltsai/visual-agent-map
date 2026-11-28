@@ -1,5 +1,6 @@
-// V3.3 P1.8a (ticket B04): the card action registry, experiences/visual-map/card-actions.ts. No entry uses it yet; every
-// expectation below is read from the entry that draws or runs the action today (experiences/visual-map/view.ts) and says where.
+// V3.3 P1.8a (ticket B04): the card action registry, experiences/visual-map/card-actions.ts. The palette, the card ⋯ and the
+// right-click read it since B05–B07; every other expectation is read from the entry that draws or runs the action today
+// (experiences/visual-map/view.ts) and says where.
 // The contexts are: normal, read-only (notes still loading: whenEditing / canEditSummary refuse), merging, AI-locked card,
 // presentation, topic selection mode, and the two picture-book locks (bookLock().ai / .structure).
 const { test } = require('node:test');
@@ -18,7 +19,7 @@ const { MAP_KEYBOARD_SHORTCUTS } = S.load('ui/modals/keyboard-shortcuts-modal.ts
 const { en } = S.load('i18n/en.ts');
 const { zhTW } = S.load('i18n/zh-TW.ts');
 const { zhCN } = S.load('i18n/zh-CN.ts');
-const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet } = actions;
+const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, commandTitleKey, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet } = actions;
 
 // a (root, child b), b (leaf under a), ai (an AI card), d (a second root).
 const nodes = [
@@ -52,6 +53,7 @@ function ctxFor(target, state, extra = {}) {
     managedMap: true,
     emptyCanvas: false,
     branchFocused: false,
+    knowledgeRefs: { editable: false, copied: false },
     note: id => notes[id],
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
@@ -75,22 +77,23 @@ const availability = (id, surface, ctx) => {
 
 // [action, surface, target, expected under CONTEXTS in order] — the current condition and where it is read.
 const TABLE = [
-  // Command palette (mapCommand): editable = !presentation && !multiSelectMode; the topic ones need a selected card. It reads neither notesLoading nor bookLock.
-  ['add-topic', 'command', null, 'ok ok ok ok pr ms ok ok'],
-  ['add-child', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['add-sibling', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['research', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['rename', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
+  // Command palette (mapCommand → actionsFor('command')): the card gates, the loading notes and the picture-book locks included
+  // (decision #35); the topic ones need a selected card.
+  ['add-topic', 'command', null, 'ok ro ok ok pr ms ok bk'],
+  ['add-child', 'command', 'a', 'ok ro ok ok pr ms ok bk'],
+  ['add-sibling', 'command', 'a', 'ok ro ok ok pr ms ok bk'],
+  ['research', 'command', 'a', 'ok ro ok al pr ms bk ok'],
+  ['rename', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
   ['open-note', 'command', 'a', 'ok ok ok ok ok ok ok ok'], // open-details: run(!!selected)
-  ['toggle-collapse', 'command', 'a', 'ok ok ok ok pr ms ok ok'],
-  ['focus-branch', 'context', 'a', 'ok ok ok ok pr ms ok ok'], // enterBranchFocus refuses presenting; B13
+  ['toggle-collapse', 'command', 'a', 'ok ro ok ok pr ms ok ok'],
+  ['focus-branch', 'context', 'a', 'ok ro ok ok pr ms ok ok'], // enterBranchFocus refuses presenting; B13 (loading too: #35, as the menus' whenEditing)
   ['leave-focus', 'command', null, 'ok ok ok ok ok ok ok ok', { branchFocused: true }],
   ['zoom-fit', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(!!this.viewportEl)
   ['zoom-reset', 'command', null, 'ok ok ok ok ok ok ok ok'],
   ['search', 'command', null, 'ok ok ok ok pr ok ok ok'], // run(!this.presentation)
   ['shortcuts', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(true)
   // Card toolbar (paintCardToolbar): drawn only outside topic selection; every button runs through whenEditing (presentation, notesLoading).
-  ['research', 'toolbar', 'a', 'ok ro ok ok pr ms bk ok'], // if (!bookLock.ai)
+  ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
   ['add-child', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'], // if (!bookLock.structure)
   // Note: a plain button since V3.3 A5 (no whenEditing): it works while loading and presenting.
   ['open-note', 'toolbar', 'a', 'ok ok ok ok ok ms ok ok'],
@@ -112,18 +115,22 @@ const TABLE = [
   ['ai-card', 'more', 'a', 'ok ro ok ok pr ms bk ok'], // canSetAiCard: !bookLock.ai
   ['select-subtopics', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   ['summary-add', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary
+  ['tidy-branch', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary and subtopics (A10)
   ['note-style', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // canEditSummary
   ['add-other', 'more', 'a', 'ok ro ok ok pr ms ok bk'],
   // Right-click (onCanvasContextMenu → addCardMenuActions): canEditSummary on a card; the single-card list only outside selection mode.
   ['add-child', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
   ['add-sibling', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
-  ['research', 'context', 'a', 'ok ro ok ok pr ms bk ok'],
+  ['research', 'context', 'a', 'ok ro ok al pr ms bk ok'],
   ['toggle-collapse', 'context', 'a', 'ok ro ok ok pr ms ok ok'],
   ['open-note', 'context', 'a', 'ok ro ok ok pr ms ok ok'],
   ['card-settings', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
   ['run-card', 'context', 'ai', 'ok ro ok al pr ms bk ok'],
   ['ai-card', 'context', 'a', 'ok ro ok ok pr ms bk ok'],
   ['book', 'context', 'a', 'ok ro ok ok pr ms ok ok'], // addBookMenu (its rows keep their own reasons)
+  // F01: shown only where references may change and not on a merging card (applies); the card gates otherwise.
+  ['knowledge-ref-copy', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: false } }],
+  ['knowledge-ref-paste', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: true } }],
   ['remove', 'context', 'a', 'ok ro mg ok pr ms ok bk'], // single && !bookLock.structure; removeByKey → confirmRemoveNode refuses a merging branch
   // Keys (card keydown in renderNode, the view scope in installUndoScope, searchKey).
   ['add-child', 'key', 'a', 'ok ro ok ok pr ms ok bk'], // Mod+Enter: presentation/notesLoading/bookLock.structure swallowed, selection mode passed on
@@ -234,12 +241,14 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
   eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
   eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
-  // openCardMoreMenu: settings, run, AI card, select subtopics, summary bracket, note style | add another type.
-  eq(ids('more', ctxFor('ai', 'normal')), ['card-settings', 'run-card', 'ai-card', 'summary-add', 'note-style', 'add-other']);
-  eq(ids('more', ctxFor('a', 'normal')), ['focus-branch', 'card-settings', 'ai-card', 'select-subtopics', 'summary-add', 'note-style', 'add-other']);
-  // addCardMenuActions then Remove: add child, sibling | research, fold | open note, settings, run, AI card, book | remove.
-  const context = actionsFor('context', ctxFor('a', 'normal')).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(context, ['1:add-child', '1:add-sibling', '2:research', '2:toggle-collapse', '2:focus-branch', '3:open-note', '3:card-settings', '3:ai-card', '3:book', '5:remove']);
+  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
+  // add sibling, add another type (add subtopic is on the toolbar) | fold, remove.
+  const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
+  eq(grouped('more', ctxFor('ai', 'normal')), ['3:card-settings', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
+  eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
+  eq(ids('context', ctxFor('ai', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
   // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
   eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
@@ -253,19 +262,39 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   assert.ok(ruleMoreSet('ai-card').includes('run-card') && !ruleMoreSet('card').includes('run-card'));
 });
 
-test('card actions: the eleven palette commands map to actions that keep their names', () => {
-  const source = read('main.ts');
-  const list = source.slice(source.indexOf('const mapCommands'), source.indexOf('for (const [id, key, action] of mapCommands)'));
-  const commands = [...list.matchAll(/\["([^"]+)", "([^"]+)", "([^"]+)"\]/g)].map(([, id, key, mapAction]) => ({ id, key, mapAction }));
-  assert.equal(commands.length, 11);
+test('card actions: the eleven palette commands keep their ids, B13 adds Focus on this branch, and all take the card action list names', () => {
+  // The ids and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids), plus B13's new one; each
+  // name is the list's name, the one the card ⋯ and right-click show (ticket 05).
+  const commands = [
+    ['map-add-topic', 'ui.command_map_add_topic', 'add-topic'],
+    ['map-add-subtopic', 'ui.card_menu_add_child', 'add-subtopic'],
+    ['map-add-sibling', 'ui.card_menu_add_sibling', 'add-sibling'],
+    ['map-ai-explore-selected', 'ui.ai_explore', 'ai-explore'],
+    ['map-rename-selected', 'ui.shortcut_rename', 'rename'],
+    ['map-open-selected-details', 'ui.card_menu_open_note', 'open-details'],
+    ['map-toggle-collapse-selected', 'ui.card_menu_collapse', 'toggle-collapse'],
+    ['map-focus-branch', 'ui.focus_branch', 'focus-branch'],
+    ['map-zoom-to-fit', 'ui.command_map_zoom_fit', 'zoom-fit'],
+    ['map-zoom-reset', 'ui.command_map_zoom_reset', 'zoom-reset'],
+    ['map-search', 'ui.command_map_search', 'search'],
+    ['map-keyboard-shortcuts', 'ui.command_map_shortcuts', 'shortcuts']
+  ].map(([id, key, mapAction]) => ({ id, key, mapAction }));
+  assert.equal(CARD_COMMANDS.length, 12);
   eq(CARD_COMMANDS.map(entry => entry.commandId), commands.map(entry => entry.id));
   for (const { id, key, mapAction } of commands) {
     const entry = CARD_COMMANDS.find(item => item.commandId === id);
     assert.equal(entry.mapAction, mapAction, id);
     const target = action(entry.action);
     assert.ok(target.surfaces.includes('command'), id);
-    assert.equal(titleKeyFor(target, 'command', ctxFor('a', 'normal')), key, id);
+    assert.equal(commandTitleKey(entry.action), key, id);
+    assert.equal(commandTitleKey(entry.action), target.titleKey, `${id}: the list's name`);
+    if (target.surfaces.includes('more')) assert.equal(commandTitleKey(entry.action), titleKeyFor(target, 'more', ctxFor('a', 'normal')), `${id}: the ⋯ name`);
   }
+  // main.ts registers exactly these, named by commandTitleKey, each checking through mapCommand.
+  const source = read('main.ts');
+  const loop = source.slice(source.indexOf('for (const { commandId, mapAction, action } of CARD_COMMANDS)'));
+  assert.ok(loop.length < source.length, 'main.ts registers the palette commands from CARD_COMMANDS');
+  assert.match(loop.slice(0, 600), /const key = commandTitleKey\(action\);[\s\S]*id: commandId,\s*name: t\(key\),[\s\S]*mapCommand\(mapAction, checking\)/);
 });
 
 test('card actions: shortcut hints come from MAP_KEYBOARD_SHORTCUTS, and the right-click hints match it', () => {
@@ -275,7 +304,8 @@ test('card actions: shortcut hints come from MAP_KEYBOARD_SHORTCUTS, and the rig
     eq(shortcutKeysFor(item), row.keys);
   }
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /t\("ui\.card_menu_add_child"\),\s*"plus",[\s\S]{0,80}shortcutLabel\("Mod\+Enter"\)/);
+  // The ⋯ and right-click rows (addCardActions) show the first key of the action's own row.
+  assert.match(view, /const keys = shortcutKeysFor\(action\);[\s\S]{0,200}else if \(keys\?\.length\) this\.menuHint\(item, shortcutLabel\(keys\[0\]\)\)/);
   eq(shortcutKeysFor(action('add-child')), ['Mod+Enter']);
   eq(shortcutKeysFor(action('add-sibling')), ['Shift+Enter']);
 });
@@ -305,6 +335,7 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('ai-card', 'a', 'more'), [['editAiCard', 'a']]);
   eq(run('select-subtopics', 'a', 'more'), [['selectSubtopics', 'a']]);
   eq(run('summary-add', 'a', 'more'), [['addSummary', ['a']]]);
+  eq(run('tidy-branch', 'a', 'more'), [['tidyBranch', 'a']]);
   eq(run('note-style', 'a', 'more'), [['noteStyle', 'a']]);
   eq(run('note-style', ['d'], 'context'), [['noteStyle', 'd']]);
   eq(run('add-other', 'a', 'more', { menu }), [['fillAddMenu', menu, 'a']]);
@@ -341,6 +372,9 @@ test('card actions: B13 focus this branch (card) and leave focus (map) as enterB
   assert.ok(!ids('context', ctxFor('a', 'normal', { branchFocused: true })).includes('focus-branch'), 'hidden while focused');
   for (const surface of ['toolbar', 'key', 'edge', 'canvas']) assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
   assert.ok(ruleMoreSet('card').includes('focus-branch') && ruleContextSet('card').includes('focus-branch'));
+  // The palette's entry (main.ts registers CARD_COMMANDS) runs the same action, named as the list names it.
+  eq(CARD_COMMANDS.filter(entry => entry.action === 'focus-branch').map(entry => [entry.commandId, entry.mapAction]), [['map-focus-branch', 'focus-branch']]);
+  assert.equal(commandTitleKey('focus-branch'), 'ui.focus_branch');
   // enterBranchFocus refuses while presenting; picking topics has no card entries.
   assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'normal'))), CODE.ok);
   assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'presentation'))), CODE.pr);
@@ -361,15 +395,46 @@ test('card actions: B13 focus this branch (card) and leave focus (map) as enterB
   for (const dictionary of [en, zhTW, zhCN]) for (const key of [focus.titleKey, leave.titleKey]) assert.ok(dictionary[key]?.trim(), key);
 });
 
-test('card actions: the view builds the context next to mapCommand, and only the selection bar and its ⋯ use the registry so far', () => {
+test('card actions: F01 Copy as reference / Paste reference join the card list (⋯ and right-click) where references may change', () => {
+  const ids = (surface, ctx) => actionsFor(surface, ctx).map(entry => entry.action.id);
+  const refs = list => list.filter(id => id.startsWith('knowledge-ref-'));
+  const editable = { knowledgeRefs: { editable: true, copied: false } };
+  const copied = { knowledgeRefs: { editable: true, copied: true } };
+  eq(refs(ids('context', ctxFor('a', 'normal'))), []);
+  eq(refs(ids('context', ctxFor('a', 'normal', editable))), ['knowledge-ref-copy']);
+  eq(refs(ids('context', ctxFor('a', 'normal', copied))), ['knowledge-ref-copy', 'knowledge-ref-paste']);
+  eq(refs(ids('more', ctxFor('ai', 'normal', copied))), ['knowledge-ref-copy', 'knowledge-ref-paste']);
+  eq(refs(ids('context', ctxFor('a', 'normal', { knowledgeRefs: { editable: false, copied: true } }))), [], 'not editable (AIM, picking, loading, a merging card): neither');
+  for (const surface of ['toolbar', 'command', 'key', 'edge', 'canvas']) eq(refs(ids(surface, ctxFor('a', 'normal', copied))), [], surface);
+  // After Add another type, before the fold / remove group.
+  const grouped = actionsFor('more', ctxFor('a', 'normal', copied)).map(entry => `${entry.action.group}:${entry.action.id}`);
+  eq(grouped.slice(grouped.indexOf('4:add-other')), ['4:add-other', '4:knowledge-ref-copy', '4:knowledge-ref-paste', '5:toggle-collapse', '5:remove']);
+  const calls = recorder();
+  for (const id of ['knowledge-ref-copy', 'knowledge-ref-paste']) action(id).run({ ...ctxFor('a', 'normal', copied), host: calls.host, surface: 'context' });
+  eq(calls.calls.map(([name, node]) => [name, node.id]), [['copyKnowledgeRef', 'a'], ['pasteKnowledgeRef', 'a']]);
+});
+
+test('card actions: the view builds the context next to mapCommand; the palette, the card ⋯, the right-click and the selection bar read the registry', () => {
   const view = read('experiences/visual-map/view.ts');
   const at = view.indexOf('  cardActionContext(');
   assert.ok(at > view.indexOf('  mapCommand(action: MapCommandAction'), 'cardActionContext follows mapCommand');
   assert.ok(at < view.indexOf('  openKeyboardShortcuts(): void'));
+  // B05 mapCommand, B06/B07 addCardActions (openCardMoreMenu and addCardMenuActions call it), B09 the selection bar and its ⋯; the other entries move in B08 and B10.
+  const body = name => {
+    const start = view.indexOf(`  ${name}(`);
+    assert.ok(start >= 0, name);
+    return view.slice(start, view.indexOf('\n  }\n', start));
+  };
+  const count = text => (text.match(/actionsFor\(/g) ?? []).length;
+  assert.equal(count(body('mapCommand')), 1, 'mapCommand');
+  assert.equal(count(body('private addCardActions')), 1, 'addCardActions');
   const selectionStart = view.indexOf('  private renderSelectionBar('), selectionEnd = view.indexOf("  /** The dialog's choices for each child's research");
   assert.ok(selectionStart > 0 && selectionEnd > selectionStart);
-  assert.equal((view.slice(selectionStart, selectionEnd).match(/actionsFor\(/g) ?? []).length, 2, 'B09: the bar and its ⋯');
-  assert.equal(((view.slice(0, selectionStart) + view.slice(selectionEnd)).match(/actionsFor\(|CARD_ACTIONS/g) ?? []).length, 0, 'the other entries migrate in B05–B08');
+  assert.equal(count(view.slice(selectionStart, selectionEnd)), 2, 'B09: the bar and its ⋯');
+  assert.equal(count(view), 4, 'no other entry reads the registry yet');
+  assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
+  assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
+  assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);
 });
 
 test('card actions: the edge "+ Topic card" (V3.3 A6) as paintCardEdgeEntries and addTopicFromEdge have it', () => {

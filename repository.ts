@@ -13,6 +13,8 @@ import { relocateFile } from "./core/repository-relocation";
 import { managedMapContainers, isManagedMapPath, type Settings } from "./core/repository-settings";
 import {
   DETAIL_START,
+  REFERENCE_START,
+  REFERENCE_END,
   splitOpenItems,
   noteContentLanguage,
   placeholder,
@@ -2413,8 +2415,15 @@ export class Repository {
     const textLanguage = owner?.map.aim
       ? noteLanguageOf(resolveMapOutputLanguage(owner.map, language))
       : (noteContentLanguage(fm) ?? language);
+    // User paragraphs written after the references block are kept byte-identical in place: the rebuild only sees the
+    // text up to the block, so they cannot fall into the Preview section once the block is taken out (B26).
+    const raw = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+    const referenceStart = raw.indexOf(REFERENCE_START);
+    const referenceEnd = referenceStart >= 0 ? raw.indexOf(REFERENCE_END, referenceStart) : -1;
+    const trailing = referenceEnd >= 0 ? raw.slice(referenceEnd + REFERENCE_END.length) : "";
+    const kept = trailing.trim() ? trailing : "";
     let body = ensurePreview(
-      decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")),
+      decodeCalloutSections(kept ? raw.slice(0, referenceEnd + REFERENCE_END.length) : raw),
       language,
       textLanguage
     );
@@ -2457,7 +2466,11 @@ export class Repository {
       textLanguage,
       isBookCardFrontmatter(fm)
     );
-    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
+    const derived = localizeHeadings(
+      withReferenceLinks(body, fm, language),
+      writtenHeadingSet(content, this.headingsFor(textLanguage))
+    );
+    return `---\n${stringifyYaml(fm)}---\n${kept ? `${derived.trimEnd()}${kept}` : derived}`;
   }
 
   async ensureNodePresentation(): Promise<void> {

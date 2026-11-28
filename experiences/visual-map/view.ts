@@ -198,6 +198,7 @@ import {
 } from "./card-cover";
 import { paintCardEdge, type CardEdgeEntry, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
+import { nextZoomTier, type ZoomTier } from "./zoom-tier";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
@@ -1907,13 +1908,23 @@ export class VisualAgentMapView extends ItemView {
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
   private cardHeightOf = (id: string): number | undefined =>
-    this.cardEls.get(id)?.offsetHeight ||
+    this.layoutCardHeightOf(id) ||
     // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
     this.map?.nodes.find(node => node.id === id)?.height ||
     // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
     (this.isTextId(id)
       ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
-      : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+      : medianHeight(
+          this.inZoomTier() ? [...this.heightsSeen.values()] : [...this.cardEls.values()].map(card => card.offsetHeight)
+        ));
+  private inZoomTier(): boolean {
+    return this.zoomTier === "overview" || this.zoomTier === "detail";
+  }
+  /** A drawn card's height for layout and share: at overview / detail zoom the cards are taller on purpose, so the last normal-zoom height counts. */
+  private layoutCardHeightOf(id: string): number | undefined {
+    if (this.inZoomTier()) return this.heightsSeenMap === this.map?.id ? this.heightsSeen.get(id) : undefined;
+    return this.cardEls.get(id)?.offsetHeight;
+  }
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -2244,6 +2255,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintBranchSize: ((id: string) => number) | null = null;
+  /** The map's child lists for the paint in progress (the detail line counts a card's direct sub-topics). */
+  private paintChildren: Map<string, MapNode[]> | null = null;
   /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
   private paintCardIndex: CardIndex | null = null;
   /** The book structure computed once for a whole paint (every card asks for its place); null outside a paint. */
@@ -2390,7 +2403,8 @@ export class VisualAgentMapView extends ItemView {
     const shown = new Map(this.canvasNodes().map(node => [node.id, node]));
     const fits: Array<() => void> = [];
     this.renderingCard = true;
-    this.paintBranchSize = branchSizeResolver(childIndex(this.map.nodes));
+    this.paintChildren = childIndex(this.map.nodes);
+    this.paintBranchSize = branchSizeResolver(this.paintChildren);
     this.paintCardIndex = cardIndex(this.map.nodes);
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
@@ -2412,6 +2426,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintBranchSize = null;
+      this.paintChildren = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -14436,7 +14451,8 @@ export class VisualAgentMapView extends ItemView {
     this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
     // Every card shows its branch size: count all branches once for this paint.
-    this.paintBranchSize = this.map ? branchSizeResolver(childIndex(this.map.nodes)) : null;
+    this.paintChildren = this.map ? childIndex(this.map.nodes) : null;
+    this.paintBranchSize = this.paintChildren ? branchSizeResolver(this.paintChildren) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     this.paintBookStructure = { value: this.bookStructureNow() };
     const fits: Array<() => void> = [];
@@ -14447,6 +14463,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintBranchSize = null;
+      this.paintChildren = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -14981,7 +14998,9 @@ export class VisualAgentMapView extends ItemView {
           text: label
         });
       if (batch.status === "running")
-        this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path));
+        this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path)).addClass(
+          "vam-node-stop"
+        );
       if (batch.failures.length) {
         const failure = header.createSpan({
           cls: "vam-status vam-status-error",
@@ -15020,12 +15039,14 @@ export class VisualAgentMapView extends ItemView {
           )
         ),
         () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
-      );
+      ).addClass("vam-node-stop");
     }
     if (research?.slow && research.resend)
       this.button(header, t("ui.research_resend"), () => this.plugin.researchProgress.get(node.path)?.resend?.());
     if (research?.stage === "charts")
-      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
+      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path)).addClass(
+        "vam-node-stop"
+      );
     const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(tools, t("ui.view_0_expansion_suggestions", pendingCount), () =>
@@ -15060,7 +15081,9 @@ export class VisualAgentMapView extends ItemView {
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
-        this.button(header, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path));
+        this.button(header, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path)).addClass(
+          "vam-node-stop"
+        );
       } else if (synthesis.state !== "directions") {
         header.createSpan({
           cls: "vam-status vam-status-error",
@@ -15169,6 +15192,16 @@ export class VisualAgentMapView extends ItemView {
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
     else if (this.inlineSummary?.id === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
+    // Built for every card and shown by the stylesheet only in the detail zoom tier, so a zoom change repaints nothing.
+    card.createEl("p", {
+      cls: "vam-card-detail-line",
+      text: t(
+        "ui.card_detail_line_0_1_2",
+        this.linksOf(node.id).length,
+        t(TOPIC_KIND_SHAPES[kind].labelKey),
+        this.paintChildren?.get(node.id)?.length ?? 0
+      )
+    });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -15896,6 +15929,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
     if (this.noteLoad) return;
+    // A zoom tier (overview / detail) changes card heights on purpose: that is never a reason to push a neighbour. Looked at again at normal zoom.
+    if (this.zoomTier === "overview" || this.zoomTier === "detail") return;
     // A chat reply or an active drag has not finished placing its cards. Preserve the previous heights until it is done.
     if (this.renderHold > 0 || this.history.grouping || this.dragging) return;
     const now = new Map<string, number>();
@@ -16338,7 +16373,7 @@ export class VisualAgentMapView extends ItemView {
       const card = this.cardEls.get(id);
       const cover = card ? cardCovers.get(card) : undefined;
       if (cover && !cover.frame.classList.contains("is-sized")) ringMeasured = false;
-      const height = card?.offsetHeight;
+      const height = this.layoutCardHeightOf(id);
       if (height) ringHeights.set(id, height);
     }
     if (!ringMeasured) ringHeights.clear();
@@ -22996,10 +23031,24 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
     // Below this zoom the tool rows are hidden (they would cover neighbouring cards), see styles.css.
     this.viewportEl?.toggleClass("is-zoomed-out", zoom < TOOLS_MIN_ZOOM);
+    // The zoom tier (overview / normal / detail) is a class on the viewport: toggled only when the tier changes or the viewport element is new.
+    const tier = nextZoomTier(this.zoomTier, zoom);
+    if (tier !== this.zoomTier || this.zoomTierEl !== this.viewportEl) {
+      this.zoomTier = tier;
+      this.zoomTierEl = this.viewportEl ?? null;
+      this.viewportEl?.toggleClass("is-zoom-overview", tier === "overview");
+      this.viewportEl?.toggleClass("is-zoom-detail", tier === "detail");
+    }
   }
+  /** The zoom tier the viewport classes show now, and the viewport element they were put on. */
+  private zoomTier: ZoomTier = "normal";
+  private zoomTierEl: HTMLElement | null = null;
   private transform(): void {
     if (!this.map || !this.stageEl) return;
+    const tierBefore = this.zoomTier;
     this.applyStageTransform();
+    // The detail tier gives summaries more lines, so card heights change: the lines between cards follow (no repaint, no tidy-up).
+    if (this.zoomTier !== tierBefore) this.drawEdges();
     this.topicChatOpen?.win.reposition();
     const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
@@ -23012,8 +23061,14 @@ export class VisualAgentMapView extends ItemView {
     // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");
-    this.zoomLabel?.setText(`${Math.round(zoom * 100)}%`);
-    this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
+    const tierWord =
+      this.zoomTier === "overview"
+        ? ` ${t("ui.zoom_tier_overview")}`
+        : this.zoomTier === "detail"
+          ? ` ${t("ui.zoom_tier_detail")}`
+          : "";
+    this.zoomLabel?.setText(`${Math.round(zoom * 100)}%${tierWord}`);
+    this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%${tierWord}`));
   }
   private saveViewport(): void {
     // The user moved the view while the notes were read: the final render must not clear the toolbar and shift it again.

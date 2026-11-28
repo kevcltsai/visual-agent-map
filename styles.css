@@ -2066,6 +2066,15 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Zoomed out, the label is dropped and the button sits in the card's bottom-right corner (not on the header row, so it never covers a status label), counter-scaled to a readable icon that stays inside the card. */
 .vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { position: absolute; right: 4px; bottom: 4px; font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.6 / var(--vam-zoom, 1))); transform-origin: right bottom; z-index: 2; }
+/* Zoom tiers (view-only, see zoom-tier.ts). Overview (below 60%): only the title, anomaly labels and the stop button show; the rest is hidden with visibility, so no card changes size. */
+.vam-viewport.is-zoom-overview .vam-node > :not(svg) { visibility: hidden; }
+.vam-viewport.is-zoom-overview .vam-node > .vam-card-title { visibility: visible; }
+.vam-viewport.is-zoom-overview .vam-node-header > :not(.vam-status-error):not(.vam-node-stop) { visibility: hidden; }
+.vam-viewport.is-zoom-overview .vam-node-header > .vam-status-error, .vam-viewport.is-zoom-overview .vam-node-header > .vam-node-stop { visibility: visible; transform: scale(calc(0.85 / var(--vam-zoom, 1))); transform-origin: left center; }
+/* Detail (above 125%): the summary may take up to 8 lines and one more line counts links, type and sub-topics (built into every card, shown here only). */
+.vam-card-detail-line { display: none; margin: 0; color: var(--vam-muted); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; }
+.vam-viewport.is-zoom-detail .vam-card-detail-line { display: block; }
+.vam-viewport.is-zoom-detail .vam-node .vam-card-summary { -webkit-line-clamp: 8; }
 .vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--vam-text, var(--text-normal))); }
 .vam-book-state.is-rerun::before { background: var(--color-blue); }
 .vam-book-menu-note { color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-smaller); pointer-events: none; }

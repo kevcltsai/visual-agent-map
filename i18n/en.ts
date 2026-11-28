@@ -1062,6 +1062,9 @@ export const en = {
   "ui.card_action_off_no_lockable": "None of the selected cards can be locked",
   "ui.selection_locked_0_1":
     "△ {0} of them are locked or being merged ({1}), so this group cannot change color, size, position or merge. Take them out of the selection, or unlock them first.",
+  "ui.batch_color": "Color ▾",
+  "ui.batch_color_title_0": "Color for {0} cards",
+  "ui.batch_color_mixed": "Mixed",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "Workspace default",
@@ -1668,6 +1671,12 @@ export const en = {
   "ui.map_chat_skip_map_not_opened": "the new map was created but could not be opened here",
   "ui.map_chat_plan_title": "Plan to review",
   "ui.map_chat_plan_intro": "Nothing changes until you choose Apply.",
+  "ui.map_chat_relation_suggest_heading": "Suggested relations (at most 5)",
+  "ui.map_chat_relation_suggest_reason_0_1": "Reason: {0} Source: {1}",
+  "ui.map_chat_relation_suggest_adopt": "Adopt",
+  "ui.map_chat_relation_suggest_adopted": "Adopted",
+  "ui.map_chat_relation_suggest_failed": "Not added",
+  "ui.map_chat_relation_suggest_summary": "Nothing is added until you adopt a suggestion.",
   "ui.map_chat_plan_preview_note":
     "The dashed cards on the canvas are the new cards. The map is checked again just before Apply.",
   "ui.map_chat_plan_blocked_stale": "Apply is off: this plan was made for a map that is no longer open.",

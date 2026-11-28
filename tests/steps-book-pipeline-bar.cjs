@@ -614,6 +614,18 @@ test('P8c bar: a finished book shows the chapters, what the AI fixed and the ope
   assert.equal(one(clean, 'vam-book-done-counts').text, '4 章・AI 修了 0 處・仍有問題 0 項');
 });
 
+test('P8c bar: a finished book whose every chapter was locked and nothing checked has no closing page, so no button to it; one chapter open keeps it', () => {
+  setUiLanguage('zh-TW');
+  const done = { done: true };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const draw = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
+  const allLocked = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] }) }));
+  assert.equal(one(allLocked, 'vam-book-open-issues'), undefined, 'no button to a page that was not written');
+  assert.ok(one(allLocked, 'vam-book-done-counts'), 'the counts line stays');
+  const someOpen = draw(aiData({ phase: 'done', aiProof: proof, bookProof: slot({ done: true, incomplete: true, locked: ['a', 'b', 'c'] }) }));
+  assert.ok(one(someOpen, 'vam-book-open-issues'), 'one chapter not locked: the page is written, the button stays');
+});
+
 test('bar: with a book structure the fix line names the card by its place (preface / chapter / section) and counts cards', () => {
   const order = ['p', 'c1', 's1', 'c2'];
   const places = { p: { kind: 'preface' }, c1: { kind: 'chapter', chapter: 1 }, s1: { kind: 'section', chapterId: 'c1', sectionIndex: 1, sectionCount: 1 }, c2: { kind: 'chapter', chapter: 2 } };

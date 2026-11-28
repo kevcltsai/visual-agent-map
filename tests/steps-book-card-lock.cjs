@@ -110,15 +110,15 @@ const menuRows = (h, nodeKey) => {
 const menuOf = (h, nodeKey) => menuRows(h, nodeKey).filter(i => !i.disabled).map(i => i.title);
 const atPhase = (h, phase) => { h.plugin.getBookPipelineProgress = () => (phase ? progress({ phase }) : undefined); h.view.bookPipelineSeen = null; };
 
-test('book lock: while the book writes, a card has no AI explore, no Style and no edge +; Note and More stay (the menu greys Research, the new topics, card settings and select subtopics, with the book lock as the reason)', async () => {
+test('book lock: while the book writes, a card has no AI explore and no edge +; Style (B19b-x, decision #62), Note and More stay (the menu greys Research, the new topics, card settings and select subtopics, with the book lock as the reason)', async () => {
   const h = await harness({ book: true, stages: { a: 'planned', b: 'planned' } });
   for (const phase of ['planning', 'writing', 'gate2']) {
     atPhase(h, phase);
     const stage = h.paint();
     assert.equal(byCls(stage, 'vam-ai-explore').length, 0, `${phase}: no Research`);
-    // B08: the toolbar has no Add; the edge + and Style go with the structure lock.
+    // B08: the toolbar has no Add; the edge + goes with the structure lock. B19b-x: Style is not structure, it stays.
     assert.equal(byCls(stage, 'vam-card-edge-add').length, 0, `${phase}: no edge +`);
-    assert.equal(byCls(stage, 'vam-card-tool-style').length, 0, `${phase}: no Style`);
+    assert.equal(byCls(stage, 'vam-card-tool-style').length, 3, `${phase}: Style stays on every card`);
     assert.equal(byCls(stage, 'vam-detail-button').length, 3, `${phase}: Note stays on every card`);
     assert.equal(byCls(stage, 'vam-card-tool-more').length, 3, `${phase}: More stays on every card`);
     const rows = menuRows(h, 'root');
@@ -131,6 +131,7 @@ test('book lock: while the book writes, a card has no AI explore, no Style and n
       assert.equal(row.cls, 'vam-menu-has-reason', `${phase}: ${gone}'s row wraps the reason onto its own line`);
       assert.equal(row.fn, undefined, `${phase}: ${gone} has no click`);
     }
+    assert.ok(items.includes(tr('ui.card_menu_style')), `${phase}: the right-click Style stays usable (B19b-x)`);
     assert.ok(items.includes(tr('ui.card_menu_open_note')), `${phase}: read-only items stay`);
     assert.ok(items.includes(tr('ui.book_card_menu')), `${phase}: the book's own submenu (chapter role) stays`);
   }
@@ -143,7 +144,7 @@ test('book lock: the saved phase counts when the runner knows nothing (after a r
   let stage = h.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'stopped but not abandoned: still locked');
   assert.equal(byCls(stage, 'vam-card-edge-add').length, 0, 'stopped: no edge +');
-  assert.equal(byCls(stage, 'vam-card-tool-style').length, 0, 'stopped: no Style');
+  assert.equal(byCls(stage, 'vam-card-tool-style').length, 3, 'stopped: Style stays (B19b-x)');
   atPhase(h, 'gate1');
   stage = h.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 0, 'gate 1: no AI');

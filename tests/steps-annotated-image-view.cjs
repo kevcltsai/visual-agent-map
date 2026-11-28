@@ -1068,7 +1068,7 @@ test('counter-example (preview anchor): a preview span without data-anchor-id st
   assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
 });
 
-test('counter-example (image blank area): right-click outside any anchor keeps the four-item image menu', async () => {
+test('counter-example (image blank area): right-click outside any anchor keeps the image menu (Image exploration first, then the four image items)', async () => {
   const h = await harness(withRelations);
   h.view.render();
   assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);

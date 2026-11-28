@@ -106,6 +106,7 @@ import { isOpenIssuesNote, openIssuesFileName } from "../../core/book-pipeline/o
 import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
+import { MergeDraftModal } from "./merge-draft-modal";
 import {
   begin as beginTransaction,
   isTransactionError,
@@ -340,7 +341,12 @@ import { branchDirectionResolver, edgeBoxReader, lineKind, treeDepthResolver } f
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
-import { checkMergePreservation, withSourceSupplement, type MergeCheckResult } from "../../core/steps/task/merge-check";
+import {
+  checkMergePreservation,
+  findingList,
+  withSourceSupplement,
+  type MergeCheckResult
+} from "../../core/steps/task/merge-check";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -535,6 +541,7 @@ import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
+import { aiWriteGate } from "../../core/ai-write-gate";
 import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   pickLatest,
@@ -654,6 +661,7 @@ import { StructureReviewModal } from "./structure-review-modal";
 import {
   buildStructureReviewNodes,
   isSuggestionStale,
+  structureContentVersion,
   type StructureReviewResult,
   type StructureSuggestion
 } from "../../core/structure-review-service";
@@ -786,6 +794,8 @@ const TASK_PROGRESS_PREFIX = "vam-task:";
 const EXPORT_TARGET_SLOT = "vam-export-target";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
+/** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
+const MERGE_FINDINGS_NOTICE_LIMIT = 5;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1553,8 +1563,11 @@ export class VisualAgentMapView extends ItemView {
     check: (task, result) => this.checkMergeResult(task, result),
     recordFailure: (label, error) => this.plugin.recordFailure(label, error),
     notice: message => new Notice(message),
-    write: (task, result, check) => this.writeMergeDraft(task, result, check)
+    write: (task, result) => this.writeMergeDraft(task, result),
+    failed: task => this.mergeDraftFailed(task)
   });
+  /** The Notice of the last merge whose content check failed (it stays until dismissed); hidden when its draft goes. */
+  private mergeFailureNotice: Notice | undefined;
   /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
   private chatReplyStep: ChatReplyStep | undefined;
   /**
@@ -2245,7 +2258,9 @@ export class VisualAgentMapView extends ItemView {
       ".vam-map-title-button",
       ".vam-map-switch-button",
       ".vam-new-map",
-      ".vam-zoom-controls"
+      ".vam-zoom-controls",
+      // A card's ⋯ opens while reading: every row that writes is greyed with the reason (decision #35).
+      ".vam-card-tool-more"
     ].join(", ");
     const lock = (host: ParentNode | null | undefined): void => {
       for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
@@ -3516,6 +3531,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesControl?.dispose();
     this.plugin.topicRuns.dropSyntheses(this);
     this.mergeDrafts.stopAll();
+    this.mergeFailureNotice?.hide();
     this.dropMapBackground();
     this.viewEpoch++;
     this.mapOpenEpoch++;
@@ -3970,6 +3986,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     if (this.path !== path) {
+      this.dropFailedMergeDraft();
       this.dropBookReviewSession();
       this.cancelPendingRefresh();
       this.dropCanvasInteractionModes();
@@ -4517,7 +4534,8 @@ export class VisualAgentMapView extends ItemView {
               .filter(item => item.parentId === node.id)
               .map(item => this.notes.get(item.id)?.title ?? "")
           },
-          signal
+          signal,
+          request.chatSources
         );
         check(signal);
         const result = await this.plugin.outlineGeneration.generate(requestWithSources, signal, steer);
@@ -4578,6 +4596,11 @@ export class VisualAgentMapView extends ItemView {
     const tree = (): ReturnType<typeof buildStructureReviewNodes> =>
       session() && this.map ? buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), scopeId) : [];
     const nodes = tree();
+    // The cards as the review sent them; the apply compares the notes on disk with this.
+    const reviewed = (id: string): string | undefined => {
+      const card = nodes.find(item => item.id === id);
+      return card ? structureContentVersion(card) : undefined;
+    };
     const rootQuestion = scopeId ? (this.describeForReview(scopeId)?.title ?? "") : this.map.title;
     const staleReason = (suggestion: StructureSuggestion): string | null => {
       if (!session()) return t("ui.structure_review_stale_missing");
@@ -4604,7 +4627,7 @@ export class VisualAgentMapView extends ItemView {
         scope: scopeId ? "branch" : "map",
         titleOf: id => (windowCurrent() ? (this.describeForReview(id)?.title ?? "") : ""),
         staleReason: windowStale,
-        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, windowStale),
+        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, windowStale, reviewed),
         highlight: ids => {
           if (windowCurrent()) this.highlightStructure(ids);
         },
@@ -4743,7 +4766,9 @@ export class VisualAgentMapView extends ItemView {
   private applyStructureSuggestion(
     suggestion: StructureSuggestion,
     title: string,
-    staleReason: (suggestion: StructureSuggestion) => string | null
+    staleReason: (suggestion: StructureSuggestion) => string | null,
+    /** The content version of a card as the review sent it; absent: no content check (the structure checks still run). */
+    reviewed?: (id: string) => string | undefined
   ): Promise<boolean> {
     const guard = (): void => {
       const reason = staleReason(suggestion);
@@ -4772,6 +4797,17 @@ export class VisualAgentMapView extends ItemView {
         const fresh = await this.freshNotes();
         guard();
         if (this.structureLockReason(suggestion, fresh)) throw new Error(t("ui.ai_locked_notice"));
+        // The shared AI write gate, content version: a card the suggestion names that changed on disk since the review
+        // (edited outside the window, the view not caught up yet) abandons the suggestion; nothing is written.
+        for (const id of [suggestion.targetId, suggestion.newParentId, suggestion.mergeIntoId]) {
+          const read = id ? reviewed?.(id) : undefined;
+          const note = id ? fresh.get(id) : undefined;
+          if (read === undefined || !note) continue;
+          if (aiWriteGate({ owned: true, version: { read, now: structureContentVersion(note) } }).length) {
+            new Notice(t("ui.structure_review_stale_content"));
+            throw new Error(t("ui.structure_review_stale_content"));
+          }
+        }
         await work();
       });
     if (suggestion.kind === "strengthen")
@@ -5380,7 +5416,27 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
   /** Where focus was when the preview opened; given back when it closes. */
-  private tidyReturnFocus: HTMLElement | null = null;
+  private tidyReturnFocus: { el: HTMLElement; key: string | null } | null = null;
+  /** A repaint replaces the elements, so the focus is remembered by a selector that finds the new one. */
+  private tidyFocusKey(el: HTMLElement): string | null {
+    const card = el.closest?.<HTMLElement>("[data-node-id]");
+    const id = card?.dataset.nodeId;
+    if (el.matches?.(".vam-map-actions-button")) return ".vam-map-actions-button";
+    if (id && el.matches?.(".vam-card-tool-more")) return `[data-node-id="${CSS.escape(id)}"] .vam-card-tool-more`;
+    if (id && card === el) return `[data-node-id="${CSS.escape(id)}"]`;
+    return null;
+  }
+  /** After the last repaint: the same element (or its replacement), else the selected card, else the viewport (which cannot take focus; it stays out of the Tab order). */
+  private restoreTidyFocus(back: { el: HTMLElement; key: string | null } | null): void {
+    if (this.closed) return;
+    const found = back?.key ? this.contentEl.querySelector<HTMLElement>(back.key) : null;
+    const selected = this.selection.state.selected;
+    const card = selected
+      ? this.contentEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(selected)}"]`)
+      : null;
+    const target = found ?? (back?.el.isConnected ? back.el : null) ?? card ?? this.viewportEl;
+    target?.focus?.({ preventScroll: true });
+  }
   private tidyArrange(map: MapDocument, branchId?: string): void {
     if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
     else this.arrangeAll(map);
@@ -5391,7 +5447,9 @@ export class VisualAgentMapView extends ItemView {
     // A view built without a document (tests) has nothing to give back.
     const active = typeof activeDocument === "undefined" ? null : (activeDocument.activeElement as HTMLElement | null);
     this.tidyReturnFocus =
-      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active) ? active : null;
+      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active)
+        ? { el: active, key: this.tidyFocusKey(active) }
+        : null;
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
@@ -5413,7 +5471,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
   }
   /** Drops the preview (and its key handler); `repaint` false when a repaint follows anyway. */
-  private clearTidy(repaint = true): void {
+  private clearTidy(repaint = true, restoreFocus = true): void {
     if (this.tidyKeys) this.contentEl.removeEventListener("keydown", this.tidyKeys, true);
     this.tidyKeys = null;
     this.tidyBarEl?.remove();
@@ -5423,16 +5481,21 @@ export class VisualAgentMapView extends ItemView {
     if (had && repaint && !this.closed) this.render();
     const back = this.tidyReturnFocus;
     this.tidyReturnFocus = null;
-    if (had && !this.closed) (back?.isConnected ? back : this.viewportEl)?.focus?.({ preventScroll: true });
+    if (had && restoreFocus) this.restoreTidyFocus(back);
   }
   /** One undo step. A map that changed since the preview is previewed again instead of written. */
   private applyTidy(): void {
     const tidy = this.tidy;
     if (!tidy || !this.map) return;
     const stale = tidy.mapId !== this.map.id || tidy.signature !== mapSignature(this.map);
-    this.clearTidy(false);
+    const back = this.tidyReturnFocus;
+    this.clearTidy(false, false);
     if (stale) return this.openTidyPreview(tidy.branchId);
-    this.enqueue(() => this.mapChange(map => this.tidyArrange(map, tidy.branchId), false));
+    // The write repaints asynchronously; focus goes back after that last repaint.
+    this.enqueue(async () => {
+      await this.mapChange(map => this.tidyArrange(map, tidy.branchId), false);
+      this.restoreTidyFocus(back);
+    });
   }
   /** Any change of the map, another file, or another layout clears the preview. */
   private dropStaleTidy(): void {
@@ -6725,7 +6788,13 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean; replyStep?: ChatReplyStep; appearance?: TopicAppearanceChange } = {}
+    options: {
+      keepTitle?: boolean;
+      replyStep?: ChatReplyStep;
+      appearance?: TopicAppearanceChange;
+      failedLine?: (text: string) => void;
+      referenceGroups?: ReferenceGroup[];
+    } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -6773,6 +6842,8 @@ export class VisualAgentMapView extends ItemView {
         ...(options.keepTitle ? { keepTitle: true } : {}),
         ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         ...(options.appearance ? { appearance: options.appearance } : {}),
+        ...(options.failedLine ? { failedLine: options.failedLine } : {}),
+        ...(options.referenceGroups?.length ? { referenceGroups: options.referenceGroups } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6787,12 +6858,16 @@ export class VisualAgentMapView extends ItemView {
         started();
         this.render();
       });
+      if (!this.mergeDrafts.failedDraft) {
+        this.mergeFailureNotice?.hide();
+        this.mergeFailureNotice = undefined;
+      }
     });
     if (accepted && !began && !signal.aborted) new Notice(t("ui.merge_draft_stale"));
     return began;
   }
   /** The merged result is written (History, the chat reply's step, Undo Notice); the run itself lives in MergeDrafts. */
-  private async writeMergeDraft(task: MergeTask, result: AiResult, check: MergeCheckResult): Promise<void> {
+  private async writeMergeDraft(task: MergeTask, result: AiResult): Promise<void> {
     const previous = this.history.undoEntry;
     await this.confirmMergeDraft(task, result.summary, result.detail);
     let entry = this.history.undoEntry;
@@ -6804,15 +6879,7 @@ export class VisualAgentMapView extends ItemView {
       entry = step.entry;
       folded = true;
     }
-    let done = t("ui.merge_done_0", task.title);
-    if (!check.ok) {
-      const found = check.missing.length + check.added.length;
-      this.plugin.recordFailure(
-        t("log.merge_check_warning"),
-        `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
-      );
-      done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
-    }
+    const done = t("ui.merge_done_0", task.title);
     // The Undo button only while this merge is still the newest history step.
     if (entry && (entry !== previous || folded))
       backgroundResultNotice(
@@ -6826,6 +6893,121 @@ export class VisualAgentMapView extends ItemView {
         MERGE_DONE_NOTICE_MS
       );
     else new Notice(done, MERGE_DONE_NOTICE_MS);
+  }
+  /** What the content check found, as lists (the same lists the repair request gets). */
+  private mergeFindings(check: MergeCheckResult, limit?: number): string {
+    const none = "";
+    return [
+      ...(check.missing.length ? [`${t("ui.merge_check_missing")}\n${findingList(check.missing, none, limit)}`] : []),
+      ...(check.added.length ? [`${t("ui.merge_check_added")}\n${findingList(check.added, none, limit)}`] : [])
+    ].join("\n");
+  }
+  /**
+   * The content check still failed after the one repair: nothing was written and the cards are free again. The Notice (it
+   * stays until dismissed) and the chat reply's result line say what is missing; Retry and View draft sit in the Notice.
+   */
+  private mergeDraftFailed(task: MergeTask): void {
+    const check = task.check;
+    if (!check) return;
+    this.plugin.recordFailure(
+      t("log.merge_check_warning"),
+      `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
+    );
+    // Where the focus was when the merge ended: View draft puts it back there when its window closes.
+    const back = this.contentEl?.ownerDocument?.activeElement;
+    const found = String(check.missing.length + check.added.length);
+    this.showMergeFailure(task, back);
+    const items = [...check.missing, ...check.added];
+    const shown =
+      items.slice(0, MERGE_FINDINGS_NOTICE_LIMIT).join(t("ui.list_separator")) +
+      (items.length > MERGE_FINDINGS_NOTICE_LIMIT ? "…" : "");
+    task.failedLine?.(t("ui.merge_check_failed_chat_0_1_2", task.title, found, shown));
+  }
+  /**
+   * The failure Notice of the kept draft (it stays until dismissed). Pressing either button hides it, so it is shown again
+   * when View draft closes or a Retry ends without starting, while that draft is still kept.
+   */
+  private showMergeFailure(task: MergeTask, back: Element | null | undefined): void {
+    const check = task.check;
+    if (!check || this.closed || this.mergeDrafts.failedDraft !== task) return;
+    const found = String(check.missing.length + check.added.length);
+    this.mergeFailureNotice?.hide();
+    this.mergeFailureNotice = backgroundResultNotice(
+      `${t("ui.merge_check_failed_0_1", task.title, found)}\n${this.mergeFindings(check, MERGE_FINDINGS_NOTICE_LIMIT)}`,
+      [
+        { label: t("ui.merge_retry"), open: () => this.retryFailedMerge(task, back) },
+        { label: t("ui.merge_view_draft"), open: () => this.viewFailedMergeDraft(task, back) }
+      ],
+      0
+    );
+  }
+  /** The kept draft of a failed merge goes (the map is switched); its Notice goes with it. */
+  private dropFailedMergeDraft(): void {
+    this.mergeDrafts.dropFailed();
+    this.mergeFailureNotice?.hide();
+    this.mergeFailureNotice = undefined;
+  }
+  /** Retry of a failed merge: the user's press only; it starts the merge again through the usage notice, as the dialog does. */
+  private retryFailedMerge(task: MergeTask, back: Element | null | undefined): void {
+    if (this.closed || this.mergeDrafts.failedDraft !== task || this.path !== task.mapPath) {
+      new Notice(t("ui.merge_draft_gone"));
+      return;
+    }
+    if (this.mergeOpen || this.mergeDrafts.has(this.path)) {
+      new Notice(t("ui.merge_locked"));
+      this.showMergeFailure(task, back);
+      return;
+    }
+    // A retry that did not start (usage declined, refused) leaves the draft kept: its Notice comes back. One that started
+    // dropped the draft (same cards), so nothing stale is shown.
+    const again = (): void => this.showMergeFailure(task, back);
+    this.startMergeDraft(
+      task.title,
+      {
+        path: task.mapPath,
+        mapId: task.mapId,
+        parentId: task.parentId,
+        targetId: task.targetId,
+        sources: task.sources
+      },
+      () => {},
+      new AbortController().signal,
+      {
+        ...(task.keepTitle ? { keepTitle: true } : {}),
+        ...(task.appearance ? { appearance: task.appearance } : {})
+      }
+    ).then(
+      began => {
+        if (!began) again();
+      },
+      error => {
+        new Notice(this.plugin.recordFailure(t("log.merge_failed"), error));
+        again();
+      }
+    );
+  }
+  /** The draft of a failed merge, read only and copyable; nothing can be applied from it. */
+  private viewFailedMergeDraft(task: MergeTask, back: Element | null | undefined): void {
+    const draft = task.draft,
+      check = task.check;
+    if (this.closed || this.mergeDrafts.failedDraft !== task || !draft || !check) {
+      new Notice(t("ui.merge_draft_gone"));
+      return;
+    }
+    new MergeDraftModal(
+      this.app,
+      {
+        title: task.title,
+        findings: `${t("ui.merge_check_failed_0_1", task.title, String(check.missing.length + check.added.length))}\n${this.mergeFindings(check)}`,
+        text: `${draft.summary}\n\n${draft.detail}`.trim()
+      },
+      () => {
+        const earlier = back as HTMLElement | null | undefined;
+        const target = earlier?.isConnected && earlier !== earlier.ownerDocument.body ? earlier : this.contentEl;
+        target.focus();
+        this.showMergeFailure(task, back);
+      }
+    ).open();
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
   private undoNotice(message: string, previous: Action | undefined): void {
@@ -7001,16 +7183,23 @@ export class VisualAgentMapView extends ItemView {
       repo = this.plugin.repo,
       before = clone(this.map),
       language = this.plugin.settings.language;
-    if (content) {
-      let latest: string | undefined;
+    // The sources must still be what the model was given (the shared AI write gate, version part). Compared here so a
+    // changed source writes nothing at all, and again inside the commit, right before its first write, so an edit made
+    // while the merge is being prepared abandons it too.
+    const sourcesUnchanged = async (): Promise<void> => {
+      if (!content) return;
+      let latest = "";
       try {
         latest = (await this.mergeSourceSnapshot(sources, new AbortController().signal)).content;
       } catch {
         /* An unreadable source is a changed source. */
+        latest = "\u0000unreadable";
       }
-      if (latest !== content.sourceContent) stale();
-    }
-    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked);
+      if (aiWriteGate({ owned: true, version: { read: content.sourceContent, now: latest } }).length) stale();
+    };
+    await sourcesUnchanged();
+    const beforeWrite = content ? sourcesUnchanged : undefined;
+    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked, beforeWrite);
     let detail = "";
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
@@ -7107,7 +7296,7 @@ export class VisualAgentMapView extends ItemView {
           this.takeRetargetDrops(retargetRelationsToTopic(map, ids, merged.id));
           if (adopted.size) this.arrangeBranch(map, merged.id, adopted, undefined);
         })
-        .commit({ label: t("ui.merge_topics_history") });
+        .commit({ label: t("ui.merge_topics_history"), ...(beforeWrite ? { beforeWrite } : {}) });
     } catch (error) {
       this.render();
       // The new note is created outside the transaction: park it (never delete it) and rebuild.
@@ -7174,7 +7363,9 @@ export class VisualAgentMapView extends ItemView {
         }
       | undefined,
     before: MapDocument,
-    asked?: TopicAppearanceChange
+    asked?: TopicAppearanceChange,
+    /** The AI merge's last look at its sources, inside the commit (see mergeSelected). */
+    beforeWrite?: () => Promise<void>
   ): Promise<void> {
     const [target, ...children] = sources,
       mapPath = this.path,
@@ -7253,7 +7444,7 @@ export class VisualAgentMapView extends ItemView {
           this.takeRetargetDrops(retargetRelationsToTopic(map, ids, target.id));
           if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })
-        .commit({ label: t("ui.merge_topics_history") });
+        .commit({ label: t("ui.merge_topics_history"), ...(beforeWrite ? { beforeWrite } : {}) });
     } catch (error) {
       this.render();
       throw this.mergeError(error);
@@ -8697,6 +8888,13 @@ export class VisualAgentMapView extends ItemView {
   private canEditText(): boolean {
     return this.canEditCanvasItems() && !this.presentation;
   }
+  /** A new text block changes the map's structure: refused while a picture-book run locks it (decision #35); existing blocks stay editable. */
+  textAddLocked(): boolean {
+    return this.bookLock().structure;
+  }
+  private canAddText(): boolean {
+    return this.canEditText() && !this.textAddLocked();
+  }
   /**
    * Draws the text nodes (decisions #1, #5): a node under a shown, unfolded topic, or a free one (orphan, parent gone) at
    * its own place. A node under a folded topic is not drawn. Text goes in through textContent only; the editor is a
@@ -9238,7 +9436,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Adds a free text block at a stage point and opens its editor; one undo step. */
   private async addFreeText(point: { x: number; y: number } | null): Promise<void> {
-    if (!this.map || !this.canEditText()) return;
+    if (!this.map || !this.canAddText()) return;
     const id = `txt-${randomUUID().slice(0, 8)}`,
       at = point ?? { x: 0, y: 0 };
     this.pendingTextEditId = id;
@@ -9506,7 +9704,7 @@ export class VisualAgentMapView extends ItemView {
   addTextNodeUnder(parent?: MapNode | null): void {
     this.enqueue(async () => {
       if (!this.map) return;
-      if (!this.canEditText()) {
+      if (!this.canAddText()) {
         // Selection mode blocks canvas edits; say so instead of doing nothing (other reasons stay silent).
         if (this.selection.state.multiSelectMode) new Notice(t("ui.text_node_add_multiselect"));
         return;
@@ -10415,14 +10613,16 @@ export class VisualAgentMapView extends ItemView {
     );
     note.addClass("vam-card-tool", "vam-detail-button");
     note.setAttr("aria-label", t("ui.card_tool_note_label"));
-    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
-    if (addSummary)
+    if (addSummary && !readOnly)
       addSummaryTools.set(
         tools,
         tool(t("ui.card_tool_add_summary"), "vam-card-tool-add-summary", () => this.startCardSummaryEdit(node, 0))
       );
-    const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
+    // ⋯ opens while the notes load too: its rows that write are greyed with the reason (decision #35, P1.1).
+    const more = this.button(tools, "⋯", () => {});
+    more.addEventListener("click", () => this.openCardMoreMenu(more, node));
+    more.addClass("vam-card-tool", "vam-card-tool-more");
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
   }
@@ -10515,8 +10715,8 @@ export class VisualAgentMapView extends ItemView {
       const next = toolbar.includes(action.id) ? "toolbar" : action.group;
       if (section !== null && next !== section) menu.addSeparator();
       section = next;
-      // The picture book draws its own row and submenu (addBookMenu).
-      if (action.id === "book") {
+      // The picture book draws its own row and submenu (addBookMenu); greyed, it is a plain row with the reason.
+      if (action.id === "book" && availability.ok) {
         action.run(ctx, { menu });
         continue;
       }
@@ -10849,11 +11049,18 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const card = hit?.closest?.<HTMLElement>(".vam-node");
-    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && this.canEditSummary()) {
+    // While the notes load one card's list still opens, its rows that write greyed with the reason (decision #35, P1.1).
+    const loadingCard =
+      !!this.map && !this.presentation && this.notesLoading() && !this.selection.state.multiSelectMode;
+    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && (this.canEditSummary() || loadingCard)) {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
       if (cardId) {
         event.preventDefault();
-        const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
+        // Loading: only the card's own list, never the selection's rows.
+        const ids =
+          !loadingCard && this.selection.state.multiSelected.has(cardId)
+            ? [...this.selection.state.multiSelected]
+            : [cardId];
         const menu = this.newMenu(cardId);
         // One topic outside topic selection: the card's whole list (its toolbar's, then its ⋯ list, Remove last), drawn by
         // Obsidian so a greyed row can show its reason.
@@ -10920,12 +11127,18 @@ export class VisualAgentMapView extends ItemView {
         .onClick(() => this.openCanvasImagePicker(point))
     );
     if (this.canEditText())
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.text_node_add_here"))
-          .setIcon("sticky-note")
-          .onClick(() => this.enqueue(() => this.addFreeText(point)))
-      );
+      menu.addItem(item => {
+        item.setTitle(t("ui.text_node_add_here")).setIcon("sticky-note");
+        // The picture-book lock greys the row and says why (decision #35).
+        if (this.textAddLocked()) {
+          this.drawInDom(menu);
+          item.setDisabled(true);
+          (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
+          this.menuHint(item, t(CARD_ACTION_REASONS.bookLock), "vam-menu-reason");
+          return;
+        }
+        item.onClick(() => this.enqueue(() => this.addFreeText(point)));
+      });
     if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs())
       menu.addItem(item =>
         item
@@ -15416,13 +15629,15 @@ export class VisualAgentMapView extends ItemView {
    */
   private async withOutlineSources(
     request: OutlineGenerateRequest,
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** Sent beside the map's sources (a chat turn's attachments), in the same untrusted block. */
+    extraGroups: ReferenceGroup[] = []
   ): Promise<OutlineGenerateRequest> {
     const session = this.captureBackgroundSession();
     const check = (): void => {
       if (!session() || signal.aborted) throw new DOMException("Aborted", "AbortError");
     };
-    const groups = await this.readMapSourceGroups(signal);
+    const groups = [...(await this.readMapSourceGroups(signal)), ...extraGroups];
     check();
     const sourceMaterial = await outlineSourceMaterial(request, groups, () => {
       check();
@@ -24917,6 +25132,8 @@ export class VisualAgentMapView extends ItemView {
         const expandChat = this.chat;
         const expandTurns = expandChat?.transcript().length ?? 0;
         const expandRecord = this.chatLastRecord;
+        // The same sources as a research this turn starts: the map's own (read by the outline request) plus this turn's attachments.
+        const expandGroups = this.chatTurnReferences;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,
           title: note.title,
@@ -24935,7 +25152,13 @@ export class VisualAgentMapView extends ItemView {
                   resolve({ status: "stopped" });
                   return;
                 }
-                const outcome = (await this.chatExpand(parent, action.direction, work?.controller.signal)) ?? {
+                const outcome = (await this.chatExpand(
+                  parent,
+                  action.direction,
+                  work?.controller.signal,
+                  undefined,
+                  expandGroups
+                )) ?? {
                   status: "succeeded" as const,
                   titles: []
                 };
@@ -25009,10 +25232,22 @@ export class VisualAgentMapView extends ItemView {
           snapshot.sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
         );
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
+          // A merge that fails its content check later says so under this reply, while the reply is still the last one.
+          const mergeChat = this.chat;
+          const mergeTurns = mergeChat?.transcript().length ?? 0;
+          const mergeRecord = this.chatLastRecord;
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
             keepTitle: true,
+            // The same sources as a research this turn starts: this turn's attachments join the map's in the supplement request.
+            referenceGroups: this.chatTurnReferences,
             ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}),
-            ...(held ? { appearance: held } : {})
+            ...(held ? { appearance: held } : {}),
+            failedLine: text => {
+              if (!mergeChat || this.chat !== mergeChat || this.closed || mergeChat.transcript().length !== mergeTurns)
+                return;
+              mergeChat.appendLines([{ status: "failed", text, loud: true }]);
+              mergeRecord?.relines();
+            }
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }
@@ -25446,7 +25681,9 @@ export class VisualAgentMapView extends ItemView {
     parent: MapNode,
     direction: string,
     signal?: AbortSignal,
-    steer?: ResearchSteer
+    steer?: ResearchSteer,
+    /** What the map chat's turn attached; they join the map's sources in the outline request (the topic chat sends none). */
+    turnGroups: ReferenceGroup[] = []
   ): Promise<ChatExpandOutcome> {
     // A batch that is still reading its sources has marked the parent but not registered yet.
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.quickExpandPending.has(parent.path)) {
@@ -25487,7 +25724,8 @@ export class VisualAgentMapView extends ItemView {
             this.outputLanguageMemory().outputLanguage,
             this.map?.title
           ),
-          limits
+          limits,
+          ...(turnGroups.length ? { chatSources: turnGroups } : {})
         },
         controller.signal,
         steer
@@ -25542,6 +25780,8 @@ export class VisualAgentMapView extends ItemView {
     if (!nodes.length) return skipped("ui.map_chat_skip_unavailable");
     const settings = this.plugin.settings;
     const remembered = this.outputLanguageMemory().outputLanguage;
+    // The same sources as a research this turn starts: the map's own plus what this turn attached (taken now, before any wait).
+    const turnGroups = this.chatTurnReferences;
     if (nodes.length === 1) {
       const node = nodes[0];
       if (!map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
@@ -25562,7 +25802,7 @@ export class VisualAgentMapView extends ItemView {
           remembered,
           map.title
         ),
-        referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
+        referenceGroups: [...(await this.readMapSourceGroups(new AbortController().signal)), ...turnGroups]
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)
@@ -25576,7 +25816,7 @@ export class VisualAgentMapView extends ItemView {
     const options = chatSynthesisOptions({
       outputLanguage: defaultOutputLanguage(settings.language, "", undefined, remembered),
       synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names),
-      referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
+      referenceGroups: [...(await this.readMapSourceGroups(new AbortController().signal)), ...turnGroups]
     });
     // The run lives on the selection bar, so the sources are the selection while it runs.
     this.chatSelect(nodes.map(node => node.id));

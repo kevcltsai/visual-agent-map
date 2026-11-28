@@ -315,6 +315,20 @@ test('top footnotes: a label the new part defines is renumbered after the old ma
   assert.ok(refOnly.detail.includes('只引用舊的[^2]'));
 });
 
+test('top footnotes (V3.3 #05): a new source definition with the %%vam-src%% comment names the same source as the old one without it; the old definition stays byte for byte', () => {
+  const ai = [
+    section(names.core, '新內容引用舊來源[^src-1]與新來源[^src-2]。'),
+    section(names.sources, '[^src-1]: [[舊來源]]%%vam-src:-:1aee8d83%%\n[^src-2]: [[新來源]]%%vam-src:n-1:1aee8d83%%')
+  ].join('\n\n');
+  const result = compose({ aiDetail: ai });
+  assert.equal(result.ok, true);
+  assert.equal(cutInserts(result), OLD);
+  assert.equal(count(result.detail, '[[舊來源]]%%vam-src'), 0, 'the old definition is not repeated in the new format');
+  assert.ok(!result.detail.includes('src-1-2'), 'the same source keeps its old label');
+  assert.ok(result.detail.includes('[^src-1]: [[舊來源]]\n'));
+  assert.ok(result.detail.includes('[^src-2]: [[新來源]]%%vam-src:n-1:1aee8d83%%'));
+});
+
 test('top sources: new items follow the last old item without a date heading, before the footnote definitions; repeated items are skipped', () => {
   const result = compose({ aiDetail: section(names.sources, '- [[舊來源]]\n- [[新來源]]') });
   assert.equal(result.ok, true);

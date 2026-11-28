@@ -256,6 +256,14 @@ export function parseStructureReview(
 }
 
 /**
+ * The content of a card as the review sends it (title and summary, clipped the same way): a suggestion is applied only when
+ * the card on disk still reads the same, so a card changed outside the review window since the review is not acted on.
+ */
+export function structureContentVersion(card: { title: string; summary: string }): string {
+  return JSON.stringify([clip(card.title, TITLE_LIMIT), clip(card.summary, SUMMARY_LIMIT)]);
+}
+
+/**
  * Pure check that a suggestion still matches the map it was made for. Stale when the target (or the move/merge
  * destination) no longer exists, the target changed title or parent since the review, or the move/merge would now
  * create a cycle or do nothing. A stale suggestion must be blocked, not applied.

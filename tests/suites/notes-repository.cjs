@@ -1233,11 +1233,11 @@ integrationTest('AI merge: the AI names the topic in the same single request; th
   assert.equal((await h.repo.readNote(merged.path)).title, 'AI chosen name');
   assert.match(h.contents.get(merged.path), /^# AI chosen name$/m);
 });
-// Merge content check: a program compares numbers, links and embeds with the sources; one repair request, then apply with a warning.
+// Merge content check: a program compares numbers, links and embeds with the sources; one repair request; still failing writes nothing (V3.3 #03).
 const checkedDetails = ['Alpha 42 units, see https://example.org/a', '', 'Gamma 7 units, see [[Notes/Other]]'];
 const good = { summary: 'Merged one-liner', detail: '### Facts\n\nAlpha 42 units https://example.org/a and Gamma 7 units [[Notes/Other]]', visualReferences: [], formatIssues: [], suggestions: [] };
 const lossy = { ...good, detail: '### Facts\n\nAlpha units and Gamma 7 units [[Notes/Other]] plus 99 invented' };
-const warnings = h => h.notices.filter(m => /may be missing or changed/.test(m));
+const warnings = h => h.notices.filter(m => /^Nothing was merged into/.test(m));
 integrationTest('AI merge check: a faithful result is applied with one request and no warning', async () => {
   const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => good;
   const { task } = await h.begin(); await h.untilSettled(task);
@@ -1312,27 +1312,165 @@ integrationTest('W2b merge: Stop while a preview shows clears it and writes noth
     assert.equal(h.store.get(h.key), undefined, `${scenario}: cleared`); assert.deepEqual(h.files(), files, `${scenario}: nothing written`); assert.deepEqual(await h.shape(), original);
   }
 });
-integrationTest('AI merge check: still failing after the repair applies anyway, with a warning Notice that has Undo and the tokens in the failure log', async () => {
-  const h = await aiMergeHarness({ details: checkedDetails }); const original = await h.shape();
+integrationTest('AI merge check: still failing after the repair writes nothing (original notes and Map.md unchanged), lists the missing items with Retry and View draft, and logs the tokens', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); const original = await h.shape(); const files = h.files();
   h.answer = async () => lossy;
   const { task } = await h.begin(); await h.untilSettled(task);
   assert.equal(h.asks.length, 2, 'never a second repair');
-  assert.ok(await h.mergedNode('AI merged'), 'not blocked: the merge is applied');
-  assert.deepEqual(warnings(h), ['Merged into “AI merged”. You can undo. 3 item(s) of source content may be missing or changed in the merge.']);
+  assert.equal(await h.mergedNode('AI merged'), undefined, 'nothing is merged');
+  assert.deepEqual(h.files(), files, 'the original notes and Map.md are byte-identical'); assert.deepEqual(await h.shape(), original);
+  assert.equal(h.view.history.canUndo, false, 'no history step');
+  assert.equal(h.view.mergeDrafts.tasks.size, 0, 'the merge lock is released'); for (const source of h.sources) assert.equal(h.view.isMerging(source.id), false);
+  assert.equal(task.state, 'draft-failed'); assert.equal(h.view.mergeDrafts.failedDraft, task, 'the draft is kept in memory');
   assert.deepEqual(h.failures, ['AI merge check: source content not preserved']);
-  const notice = h.undoNotice(); assert.ok(notice, 'the warning Notice carries Undo');
-  notice.actions.find(a => a.text === 'Undo').click(); await h.plugin.mutate(async () => {});
-  assert.deepEqual((await h.shape()).nodes, original.nodes); assert.equal(h.view.history.canUndo, false);
+  const listed = warnings(h); assert.equal(listed.length, 1);
+  assert.match(listed[0], /^Nothing was merged into “AI merged”: 3 item\(s\)/); assert.match(listed[0], /The original cards are unchanged\./);
+  assert.match(listed[0], /- 42\n/); assert.match(listed[0], /- https:\/\/example\.org\/a/); assert.match(listed[0], /- 99/);
+  const notice = h.shim.Notice.all.find(n => String(n.message).startsWith('Nothing was merged into'));
+  assert.deepEqual(notice.actions.map(a => a.text), ['Retry', 'View draft'], 'no Undo and no force-apply');
 });
-integrationTest('AI merge check: a repair that fails or makes it worse keeps the first result and still applies', async () => {
+integrationTest('AI merge check: a repair that fails or makes it worse writes nothing, keeps the first result as the draft and sends one repair request only', async () => {
   const worse = { ...lossy, detail: '### Facts\n\n1234 5678 only' };
   for (const second of ['throw', worse]) {
-    const h = await aiMergeHarness({ details: checkedDetails }); let calls = 0;
+    const h = await aiMergeHarness({ details: checkedDetails }); const files = h.files(); let calls = 0;
     h.answer = async () => { if (++calls === 1) return lossy; if (second === 'throw') throw new Error('provider down'); return second; };
     const { task } = await h.begin(); await h.untilSettled(task);
-    assert.equal(h.asks.length, 2); const merged = await h.mergedNode('AI merged'); assert.ok(merged);
-    assert.match((await h.repo.readNote(merged.path)).detail, /99 invented/, 'the first result, not the worse repair');
+    assert.equal(h.asks.length, 2); assert.equal(await h.mergedNode('AI merged'), undefined); assert.deepEqual(h.files(), files);
+    assert.match(h.view.mergeDrafts.failedDraft.draft.detail, /99 invented/, 'the draft is the first result, not the worse repair');
     assert.equal(warnings(h).length, 1);
+  }
+});
+integrationTest('AI merge check: Retry is user-triggered, goes through the usage notice again and can then merge; the old draft is dropped', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); let calls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  h.answer = async () => (++calls <= 2 ? lossy : (await gate, good));
+  const { task } = await h.begin(); await h.untilSettled(task);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.asks.length, 2, 'nothing more is asked until the user presses Retry'); assert.equal(h.usage.length, 1);
+  const notice = h.shim.Notice.all.find(n => String(n.message).startsWith('Nothing was merged into'));
+  notice.actions.find(a => a.text === 'Retry').click();
+  for (let i = 0; i < 50 && !h.view.mergeDrafts.tasks.get(h.path); i++) await new Promise(resolve => setImmediate(resolve));
+  const retry = h.view.mergeDrafts.tasks.get(h.path); assert.ok(retry && retry !== task, 'a new merge runs');
+  assert.equal(h.usage.length, 2, 'the usage notice is asked again');
+  assert.equal(h.view.mergeDrafts.failedDraft, undefined, 'merging the same cards again drops the draft');
+  release(); await h.untilSettled(retry);
+  assert.equal(h.asks.length, 3, 'one request: the retry passed the check'); assert.ok(await h.mergedNode('AI merged'));
+});
+integrationTest('AI merge check: View draft opens a read-only copyable draft; closing it puts the focus back', async () => {
+  const dom = require('../support-dom.cjs');
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy; h.view.contentEl = dom.element('div');
+  const files = h.files(); const opened = []; const open = h.shim.Modal.prototype.open; h.shim.Modal.prototype.open = function () { opened.push(this); return open.call(this); };
+  const { task } = await h.begin(); await h.untilSettled(task);
+  const notice = h.shim.Notice.all.find(n => String(n.message).startsWith('Nothing was merged into'));
+  notice.actions.find(a => a.text === 'View draft').click();
+  assert.equal(opened.length, 1); const modal = opened[0];
+  const area = dom.find(modal.contentEl, i => i.tag === 'textarea'); assert.ok(area);
+  assert.equal(area.attrs.readonly, '', 'read-only');
+  assert.match(area.value, /Merged one-liner/); assert.match(area.value, /99 invented/);
+  assert.ok(dom.button(modal.contentEl, 'Copy'), 'a Copy button');
+  assert.match(dom.texts(modal.contentEl).join(' '), /- 42/);
+  assert.deepEqual(h.files(), files); assert.equal(await h.mergedNode('AI merged'), undefined, 'viewing applies nothing');
+  modal.close(); assert.equal(dom.focusedNow(), h.view.contentEl, 'the focus goes back to the map');
+});
+integrationTest('AI merge check: the failure Notice lists only the kinds found and cuts a long list after five items', async () => {
+  const many = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'];
+  for (const [name, check] of [['missing', { ok: false, missing: ['42'], added: [] }], ['added', { ok: false, missing: [], added: ['99'] }], ['long', { ok: false, missing: many, added: [] }]]) {
+    const h = await aiMergeHarness({ details: checkedDetails }); h.view.checkMergeResult = async () => check;
+    const { task } = await h.begin(); await h.untilSettled(task);
+    const [message] = warnings(h); assert.ok(message, name);
+    if (name === 'missing') { assert.match(message, /Missing from the draft:\n- 42/); assert.doesNotMatch(message, /Not in any source/); }
+    if (name === 'added') { assert.match(message, /Not in any source:\n- 99/); assert.doesNotMatch(message, /Missing from the draft/); }
+    if (name === 'long') { assert.match(message, /7 item\(s\)/); assert.match(message, /- m5\n- … \(\+2\)/); assert.doesNotMatch(message, /- m6/); }
+  }
+});
+integrationTest('AI merge check: Retry or View draft after the draft was dropped says it is gone and starts nothing', async () => {
+  for (const action of ['Retry', 'View draft']) {
+    const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+    const { task } = await h.begin(); await h.untilSettled(task);
+    const notice = h.shim.Notice.all.find(n => String(n.message).startsWith('Nothing was merged into'));
+    h.view.mergeDrafts.dropFailed();
+    notice.actions.find(a => a.text === action).click(); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.notices.at(-1), 'This draft is no longer kept. Merge the cards again.', action);
+    assert.equal(h.usage.length, 1, `${action}: no new merge`); assert.equal(h.view.mergeDrafts.tasks.size, 0, action);
+  }
+});
+integrationTest('AI merge check: Retry declined at the usage notice keeps the draft and asks nothing', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+  const { task } = await h.begin(); await h.untilSettled(task);
+  h.decline = true;
+  h.shim.Notice.all.find(n => String(n.message).startsWith('Nothing was merged into')).actions.find(a => a.text === 'Retry').click();
+  for (let i = 0; i < 50 && h.usage.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.usage.length, 2, 'the usage notice is asked'); assert.equal(h.asks.length, 2, 'nothing more is asked');
+  assert.equal(h.view.mergeDrafts.failedDraft, task, 'the draft is kept'); assert.equal(h.view.mergeDrafts.tasks.size, 0);
+});
+// The failure Notice as the user sees it: pressing an action hides that Notice (backgroundResultNotice), so only a shown one can be pressed.
+const shownFailures = h => h.shim.Notice.all.filter(n => !n.hidden && String(n.message).startsWith('Nothing was merged into'));
+const pressFailure = (h, text) => {
+  const shown = shownFailures(h); assert.equal(shown.length, 1, `${text}: one failure Notice is on screen`);
+  shown[0].actions.find(a => a.text === text).click(); assert.equal(shown[0].hidden, true, `${text}: the press hides it`);
+  return shown[0];
+};
+const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve)); };
+const assertFailureShownAgain = (h, pressed, label) => {
+  const shown = shownFailures(h); assert.equal(shown.length, 1, `${label}: the failure Notice is shown again`);
+  assert.notEqual(shown[0], pressed); assert.equal(String(shown[0].message), String(pressed.message), `${label}: the same findings`);
+  assert.deepEqual(shown[0].actions.map(a => a.text), ['Retry', 'View draft'], label); assert.equal(shown[0].timeout, 0, `${label}: it stays until dismissed`);
+};
+integrationTest('AI merge check: closing View draft shows the failure Notice again with Retry and View draft', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy; h.view.contentEl = require('../support-dom.cjs').element('div');
+  const opened = []; const open = h.shim.Modal.prototype.open; h.shim.Modal.prototype.open = function () { opened.push(this); return open.call(this); };
+  const { task } = await h.begin(); await h.untilSettled(task);
+  const pressed = pressFailure(h, 'View draft'); assert.equal(opened.length, 1);
+  assert.equal(shownFailures(h).length, 0, 'not shown while the draft window is open');
+  opened[0].close(); assertFailureShownAgain(h, pressed, 'after close');
+  pressFailure(h, 'View draft'); assert.equal(opened.length, 2, 'the draft opens again from the shown Notice');
+});
+integrationTest('AI merge check: a Retry that does not start (usage declined, or another merge running) shows the failure Notice again and keeps the draft', async () => {
+  for (const scenario of ['declined', 'merging']) {
+    const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+    const { task } = await h.begin(); await h.untilSettled(task);
+    if (scenario === 'declined') h.decline = true; else h.view.mergeOpen = true;
+    const pressed = pressFailure(h, 'Retry'); await settle();
+    assert.equal(h.asks.length, 2, `${scenario}: nothing more is asked`); assert.equal(h.view.mergeDrafts.failedDraft, task, `${scenario}: the draft is kept`);
+    assertFailureShownAgain(h, pressed, scenario);
+  }
+});
+integrationTest('AI merge check: a Retry that starts shows no stale failure Notice, while running or after it merged', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); let calls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  h.answer = async () => (++calls <= 2 ? lossy : (await gate, good));
+  const { task } = await h.begin(); await h.untilSettled(task);
+  pressFailure(h, 'Retry'); await settle();
+  const retry = h.view.mergeDrafts.tasks.get(h.path); assert.ok(retry && retry !== task, 'the retry runs');
+  assert.equal(shownFailures(h).length, 0, 'no failure Notice while the retry runs');
+  release(); await h.untilSettled(retry); await settle();
+  assert.ok(await h.mergedNode('AI merged')); assert.equal(shownFailures(h).length, 0, 'none after it merged');
+});
+integrationTest('AI merge check: merging the same cards again drops the draft and hides its failure Notice', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+  const { task } = await h.begin(); await h.untilSettled(task);
+  const [first] = shownFailures(h); assert.ok(first);
+  h.answer = async () => good; const { task: again } = await h.begin();
+  assert.equal(h.view.mergeDrafts.failedDraft, undefined, 'the draft is dropped'); assert.equal(first.hidden, true, 'its Notice goes with it');
+  await h.untilSettled(again); assert.equal(shownFailures(h).length, 0);
+});
+integrationTest('AI merge: a source edit after the source comparison and before the commit abandons the merge (plain and parent mode)', async () => {
+  for (const mode of ['plain', 'parent']) {
+    const h = await aiMergeHarness({ details: checkedDetails }); if (mode === 'parent') await parentOf(h);
+    h.answer = async () => ({ ...good, suggestions: [{ title: mode === 'parent' ? 'Parent' : 'AI merged', task: '', contribution: '', parentTitle: '' }] });
+    const original = await h.shape(); const parentText = h.contents.get(h.parent.path); const edited = h.sources[2].path;
+    const begin = h.view.beginMapTransaction.bind(h.view);
+    h.view.beginMapTransaction = (...args) => {
+      const tx = begin(...args); const commit = tx.commit.bind(tx);
+      tx.commit = async options => { await h.repo.updateNote(edited, { detail: 'Changed in the gap' }); return commit(options); };
+      return tx;
+    };
+    const { task } = mode === 'parent' ? await parentBegin(h, 'Parent') : await h.begin(); await h.untilSettled(task);
+    assert.deepEqual((await h.shape()).nodes, original.nodes, `${mode}: the map is unchanged`);
+    assert.equal(h.view.history.canUndo, false, mode);
+    assert.match((await h.repo.readNote(edited)).detail, /Changed in the gap/, `${mode}: the edit is kept`);
+    if (mode === 'parent') assert.equal(h.contents.get(h.parent.path), parentText, 'the parent is not rewritten');
+    assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged'], mode);
   }
 });
 integrationTest('AI merge check: Stop, closing the view or a source edit during the repair writes nothing', async () => {
@@ -1355,13 +1493,16 @@ integrationTest('AI merge check: Stop, closing the view or a source edit during 
     assert.equal(h.asks.length, 2, scenario);
   }
 });
-integrationTest('AI merge check, parent mode: the warning path applies directly and Undo restores the parent verbatim', async () => {
+integrationTest('AI merge check, parent mode: a check still failing after the repair leaves the parent untouched, keeps the draft and pushes no undo', async () => {
   const h = await aiMergeHarness({ details: checkedDetails }); await parentOf(h);
-  const text = h.contents.get(h.parent.path); const original = await h.shape();
+  const text = h.contents.get(h.parent.path); const original = await h.shape(); const files = h.files();
   h.answer = async () => ({ ...lossy, suggestions: [{ title: 'Parent', task: '', contribution: '', parentTitle: '' }] });
   const { task } = await parentBegin(h, 'Parent'); await h.untilSettled(task);
-  assert.equal(h.asks.length, 2); assert.equal(warnings(h).length, 1); assert.match((await h.repo.readNote(h.parent.path)).detail, /99 invented/);
-  await h.view.travel(false); assert.equal(h.contents.get(h.parent.path), text); assert.deepEqual(await h.shape(), original);
+  assert.equal(h.asks.length, 2); assert.equal(warnings(h).length, 1);
+  assert.equal(h.contents.get(h.parent.path), text, 'the parent note is byte-identical'); assert.doesNotMatch((await h.repo.readNote(h.parent.path)).detail, /99 invented/);
+  assert.deepEqual(h.files(), files); assert.deepEqual(await h.shape(), original);
+  assert.equal(h.view.history.canUndo, false, 'no undo step');
+  assert.equal(h.view.mergeDrafts.failedDraft, task, 'the draft is kept'); assert.match(task.draft.detail, /99 invented/);
 });
 // Merge into a parent topic: the parent keeps its card; the selected direct subtopics are merged into its note.
 const parentOf = async (h, withOrigin = true) => {
@@ -2813,4 +2954,25 @@ integrationTest('a note whose managed marker is removed before a rename commit i
   await repo.replaceSourcePath('Personal/old.md', 'Personal/new.md');
   assert.ok(detached);
   assert.equal(contents.get(note.path), detached);
+});
+
+integrationTest('AI write gate: an AI writer (rejectAiCard) is refused on a note locked at commit; a manual guarded write is not', async () => {
+  const { repo, contents } = fixture();
+  const note = await topicNote(repo, 'Gated');
+  await repo.writeAiLocked(note.path, true);
+  const locked = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true }), 'discarded');
+  assert.equal(await repo.updateNoteRawGuarded(note.path, text => `${text}\nAI`, { rejectAiCard: true }), 'discarded');
+  assert.equal(contents.get(note.path), locked, 'the locked note is byte for byte unchanged');
+  // Owner part of the gate: a stopped AI run writes nothing; the version part: text the caller did not read is not replaced.
+  await repo.writeAiLocked(note.path, false);
+  const open = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, authorize: () => false }), 'discarded');
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, expectedContent: `${open}x` }), 'discarded');
+  assert.equal(contents.get(note.path), open);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, expectedContent: open }), 'written');
+  // A manual edit never calls the gate: the owner may edit a locked note.
+  await repo.writeAiLocked(note.path, true);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'Mine' }, { expectedContent: contents.get(note.path) }), 'written');
+  assert.equal((await repo.readNote(note.path)).summary, 'Mine');
 });

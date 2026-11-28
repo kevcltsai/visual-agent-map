@@ -41,6 +41,7 @@ import type { MapChatBasis } from "../../core/map-chat-basis";
 import { contentHash } from "../../core/content-hash";
 import { isMdStale, type MapChatContext, type MapChatTopicHash } from "../../core/map-chat-context";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
+import { aiWriteGate } from "../../core/ai-write-gate";
 import type { AiLockOp, AiLockReason } from "../../core/ai-lock";
 import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import type VisualAgentMapPlugin from "../../main";
@@ -246,7 +247,8 @@ export class ChatActionWriter {
     run: ChatRun
   ): Promise<ChatOutcome> {
     const hashes = baseline.mdHashes;
-    if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
+    // The shared AI write gate, owner part: the reply still writes to the map it was asked on.
+    if (aiWriteGate({ owned: same() }).length || !this.map) return skipped("ui.map_chat_skip_map_changed");
     const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
@@ -462,8 +464,16 @@ export class ChatActionWriter {
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
-        if (action.kind !== "rename_topic" && this.notes.get(node.id)?.aiCard === true)
-          return skipped("ui.living_node_use_run_card");
+        // The shared AI write gate on the card as the vault has it now (the stale check above read it again): a lock set
+        // since the lock check is refused, and a Living Node card's content is read-only for the chat (its title is not).
+        const now = this.notes.get(node.id);
+        const blocked = aiWriteGate({
+          owned: true,
+          aiLocked: now?.aiLocked === true,
+          readOnly: action.kind !== "rename_topic" && now?.aiCard === true
+        });
+        if (blocked.includes("ai_locked")) return skipped("ui.ai_locked_notice");
+        if (blocked.includes("read_only")) return skipped("ui.living_node_use_run_card");
         run.notes?.add(node.id);
         await this.ports.noteChange(
           node,

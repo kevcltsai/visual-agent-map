@@ -2466,7 +2466,10 @@ export class Repository {
       textLanguage,
       isBookCardFrontmatter(fm)
     );
-    const derived = localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)));
+    const derived = localizeHeadings(
+      withReferenceLinks(body, fm, language),
+      writtenHeadingSet(content, this.headingsFor(textLanguage))
+    );
     return `---\n${stringifyYaml(fm)}---\n${kept ? `${derived.trimEnd()}${kept}` : derived}`;
   }
 

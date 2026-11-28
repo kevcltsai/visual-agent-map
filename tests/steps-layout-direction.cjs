@@ -560,13 +560,23 @@ test('E2-y: one card still writes Map.md once', async () => {
   assert.equal(h.view.map.nodes.length, tree4.length + 1);
 });
 
-// Runs `during` right after the nth card note of a reply is made (the reply is mid-batch then).
+// Runs `during` right after the nth card of a reply is added (the reply is mid-batch then: with a batch the cards are only on screen).
 const afterNthCard = (h, nth, during) => {
+  const original = h.view.addNode.bind(h.view);
+  let count = 0;
+  h.view.addNode = async (...args) => {
+    const made = await original(...args);
+    if (++count === nth) await during();
+    return made;
+  };
+};
+// Runs `during(path)` right after the nth card note file is created (inside the map transaction that writes the cards).
+const afterNthNote = (h, nth, during) => {
   const original = h.repo.createNote.bind(h.repo);
   let count = 0;
   h.repo.createNote = async (...args) => {
     const made = await original(...args);
-    if (++count === nth) await during();
+    if (++count === nth) await during(made.path);
     return made;
   };
 };
@@ -651,6 +661,182 @@ test('E2-y: another write changes a card field the batch also changes: theirs is
   assert.equal(saved.nodes.length, tree4.length, 'no card of the batch is on disk');
   assert.equal(saved.nodes.find(n => n.id === root.id).x, 1007, 'their edit is still there');
   assert.equal(lines.filter(line => line.status === 'failed').length, 6);
+});
+
+// ---- E2-tx: a card note is made inside the map transaction that lists it, so a refused or failed write leaves no note behind ----
+// The matrix of E2 (failure type x batch size 1/4/5/12 x with or without a summary). The invariant of every cell: no card note
+// of the reply stays in the Notes folder unless Map.md lists it, or it is the user's (edited, listed elsewhere, linked).
+const liveNotes = h => h.view.app.vault.getMarkdownFiles().map(file => file.path).filter(path => path.startsWith('Agent Workspace/Topics/map-d/Notes/')).sort();
+const newNotesOf = (h, before) => liveNotes(h).filter(path => !before.includes(path));
+const unlistedOf = async (h, before) => { const listed = new Set((await h.saved()).nodes.map(n => n.path)); return newNotesOf(h, before).filter(path => !listed.has(path)); };
+const withSummary = (actions, on) => (on ? actions.map(a => ({ ...a, summary: `S ${a.title}` })) : actions);
+const chatApplyWhile = (h, actions, same) => {
+  h.view.plugin.views ??= () => [h.view];
+  return h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: {}, topicHashes: {} }, same);
+};
+const countNoteWrites = h => {
+  const vault = h.view.app.vault, seen = { paths: [] };
+  for (const name of ['process', 'modify']) {
+    const original = vault[name]?.bind(vault);
+    if (!original) continue;
+    vault[name] = async (target, ...rest) => { const path = target?.path ?? target; if (/\/Notes\/Kid/.test(path)) seen.paths.push(path); return original(target, ...rest); };
+  }
+  return seen;
+};
+
+// Each arm runs while the reply is mid-batch (after card k) or makes the write fail; it may name another parent for the cards.
+// `whole`: with a batch (5 or more cards) the failure refuses all of it.
+const failures = [
+  ['the write of Map.md is refused', h => { countMapWrites(h).refuse = true; }, { whole: true, nothing: true }],
+  ['the parent is deleted by another write', (h, N, parent) => afterNthCard(h, Math.min(3, N), outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); })), { whole: true }],
+  ['the parent is removed from disk and screen after the second card', (h, N, parent) => afterNthCard(h, Math.min(2, N), async () => { await outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); })(); h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== parent); }), { whole: true }],
+  ['another map opens', h => afterNthCard(h, 3, async () => { h.view.path = 'Agent Workspace/Topics/map-other/Map.md'; h.view.map = { id: 'map-other', title: 'Other', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }; }), { whole: true }],
+  ['the view closes', (h, N) => afterNthCard(h, Math.min(3, N), async () => { h.view.closed = true; h.view.map = null; }), { whole: true }],
+  ['another write changes a field the batch also changes', async (h, N) => {
+    const root = h.named('Root');
+    root.collapsed = true;
+    await h.repo.saveMap(MAP, h.view.map);
+    afterNthCard(h, Math.min(3, N), outsideEdit(h, doc => { doc.nodes.find(n => n.id === root.id).collapsed = false; doc.nodes.find(n => n.id === root.id).x += 7; }));
+    return root.id;
+  }, { whole: true }]
+];
+for (const summaries of [false, true])
+  for (const N of [1, 4, 5, 12])
+    for (const [name, arm, flags] of failures)
+      test(`E2-tx: ${name}, ${N} card${N > 1 ? 's' : ''}${summaries ? ' with summaries' : ''}: no card note is left that Map.md does not list`, async () => {
+        const h = await harness(tree4);
+        const before = liveNotes(h);
+        const parent = (await arm(h, N, h.named('B').id)) ?? h.named('B').id;
+        const lines = await chatApply(h, withSummary(kidsOf(h, N).map(a => ({ ...a, parentId: parent })), summaries));
+        assert.deepEqual(await unlistedOf(h, before), [], 'every new note is listed in Map.md');
+        const listed = (await h.saved()).nodes.filter(n => /Kid/.test(n.path));
+        assert.deepEqual(listed.map(n => n.path).filter(path => !liveNotes(h).includes(path)), [], 'every listed card has its note');
+        if (flags.whole && (N >= 5 || flags.nothing)) {
+          assert.equal(newNotesOf(h, before).length, 0, 'a refused reply leaves the Notes folder as it was');
+          assert.equal(listed.length, 0, 'and Map.md lists none of its cards');
+          assert.ok(lines.some(line => line.status === 'failed' || line.status === 'skipped'), 'the refusal is reported');
+        }
+        if (flags.nothing) assert.equal(lines.filter(line => line.status === 'failed').length, N, 'every card says it was not written');
+      });
+
+test('E2-tx: while a batch is staged (cards on screen, Map.md not written yet) the Notes folder holds no file of it', async () => {
+  const h = await harness(tree4);
+  const before = liveNotes(h);
+  const seen = [];
+  afterNthCard(h, 3, async () => { seen.push(liveNotes(h).length - before.length); });
+  afterNthCard(h, 6, async () => { seen.push(liveNotes(h).length - before.length); });
+  await chatApply(h, kidsOf(h, 6));
+  assert.deepEqual(seen, [0, 0], 'no note file before the transaction');
+  assert.equal(newNotesOf(h, before).length, 6, 'the notes appear with the write');
+  assert.deepEqual(await unlistedOf(h, before), []);
+});
+
+test('E2-tx: the cards of a batch show their title and summary on screen before they are written', async () => {
+  const h = await harness(tree4);
+  let shown;
+  afterNthCard(h, 2, async () => { shown = h.view.map.nodes.filter(n => h.view.notes.get(n.id)?.title?.startsWith('Kid')).map(n => [h.view.notes.get(n.id).title, h.view.notes.get(n.id).summary]); });
+  await chatApply(h, withSummary(kidsOf(h, 6), true));
+  assert.deepEqual(shown, [['Kid0', 'S Kid0'], ['Kid1', 'S Kid1']]);
+});
+
+for (const N of [1, 4, 5, 12])
+  test(`E2-tx: ${N} card${N > 1 ? 's' : ''} with summaries: each note is written once with its summary and listed; ${N >= 5 ? 'one Map.md write and one undo step' : 'one Map.md write and undo step each'}`, async () => {
+    const h = await harness(tree4);
+    const before = liveNotes(h);
+    const writes = countMapWrites(h), noteWrites = countNoteWrites(h);
+    const steps = h.view.history.past.length;
+    const lines = await chatApply(h, withSummary(kidsOf(h, N), true));
+    assert.equal(lines.filter(line => line.status === 'done').length, N);
+    assert.equal(newNotesOf(h, before).length, N);
+    assert.deepEqual(await unlistedOf(h, before), []);
+    assert.equal(writes.n, N >= 5 ? 1 : N);
+    assert.equal(h.view.history.past.length, steps + (N >= 5 ? 1 : N), 'undo steps');
+    assert.deepEqual(noteWrites.paths, [], 'a card note is written once, at its creation, with the summary in it');
+    for (const n of h.view.map.nodes.filter(item => /Kid/.test(item.path))) {
+      const note = await h.repo.readNote(n.path);
+      assert.equal(note.summary, `S ${note.title}`);
+      assert.equal(h.view.notes.get(n.id).path, n.path, 'the card on screen is the one on disk');
+    }
+  });
+
+test('E2-tx: a refused batch with summaries leaves no undo step that updates a note that is gone', async () => {
+  const h = await harness(tree4);
+  const parent = h.named('B').id, a1 = h.named('A1'), movedFrom = a1.parentId;
+  const before = liveNotes(h);
+  afterNthCard(h, 3, outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); }));
+  const actions = [...withSummary(kidsOf(h, 6).map(x => ({ ...x, parentId: parent })), true), { kind: 'move_topic', nodeId: a1.id, newParentId: h.named('Root').id }];
+  const lines = await chatApply(h, actions);
+  assert.equal(lines.at(-1).status, 'done', 'the later write still happens');
+  assert.deepEqual(liveNotes(h), before);
+  await h.view.travel(false);
+  assert.deepEqual(liveNotes(h), before, 'undo of the reply does not touch notes that were taken back');
+  assert.equal((await h.saved()).nodes.find(n => n.id === a1.id).parentId, movedFrom, 'undo took back the later write');
+});
+
+// A note the refused write must NOT take back: the user changed it, Map.md lists it, or another note links to it.
+const keptCases = [
+  ['the user edits one of the notes meanwhile', async (h, path) => { await h.view.app.vault.process(h.view.app.vault.getAbstractFileByPath(path), text => text + '\nMy own words.\n'); }, true],
+  ['another write lists one of the notes in Map.md', async (h, path) => { await outsideEdit(h, doc => { doc.nodes.push({ id: 'listed-elsewhere', parentId: null, path, x: 0, y: 900, collapsed: false }); })(); }, false],
+  ['another note links to one of them', async (h, path) => { await h.view.app.vault.create('Elsewhere.md', `See [[${path.split('/').pop().replace(/\.md$/, '')}]].`); }, true]
+];
+for (const summaries of [false, true])
+  for (const N of [1, 4, 5, 12])
+    for (const [name, act, refuse] of keptCases)
+      test(`E2-tx: a refused write keeps a note ${name}, ${N} card${N > 1 ? 's' : ''}${summaries ? ' with summaries' : ''}, and takes back the others`, async () => {
+        const h = await harness(tree4);
+        const before = liveNotes(h);
+        let kept;
+        afterNthNote(h, Math.min(3, N), async path => { kept = path; await act(h, path); if (refuse) countMapWrites(h).refuse = true; });
+        await chatApply(h, withSummary(kidsOf(h, N), summaries));
+        assert.ok(kept, 'the note was made');
+        assert.ok(liveNotes(h).includes(kept), 'the note that was not the transaction\'s to remove stays');
+        assert.deepEqual((await unlistedOf(h, before)).filter(path => path !== kept), [], 'the others are taken back or listed');
+        if (refuse && N >= 5) assert.deepEqual(newNotesOf(h, before), [kept], 'a refused batch leaves only that note');
+      });
+
+test('E2-tx: the reply is stopped after the second card: the cards made so far are written and listed, none is left unlisted', async () => {
+  for (const N of [1, 4, 5, 12]) {
+    const h = await harness(tree4);
+    const before = liveNotes(h);
+    let live = true;
+    afterNthCard(h, Math.min(2, N), async () => { live = false; });
+    await chatApplyWhile(h, kidsOf(h, N), () => live);
+    assert.deepEqual(await unlistedOf(h, before), [], `${N}: nothing unlisted`);
+    assert.equal(newNotesOf(h, before).length, Math.min(2, N), `${N}: the cards made before the stop are written`);
+  }
+});
+
+for (const N of [1, 4, 5, 12])
+  test(`E2-tx: a card skipped by validation among ${N} card${N > 1 ? 's' : ''}: it has no note, the others are written`, async () => {
+    const h = await harness(tree4);
+    const before = liveNotes(h);
+    const actions = [...kidsOf(h, N), { kind: 'add_child', ref: 'x', parentId: 'no-such-card', title: 'Orphan' }];
+    const lines = await chatApply(h, actions);
+    assert.equal(lines[N].status, 'skipped');
+    assert.equal(newNotesOf(h, before).length, N);
+    assert.deepEqual(await unlistedOf(h, before), []);
+    assert.equal(h.view.map.nodes.length, tree4.length + N);
+  });
+
+for (const nth of [1, 2]) for (const memory of [true, false])
+  test(`E2-tx: the parent card leaves the map after card ${nth} (${memory ? 'on disk and on screen' : 'on disk only'}): the batch is refused, Map.md stays readable, no note is left`, async () => {
+    const h = await harness(tree4);
+    const parent = h.named('B').id;
+    const before = liveNotes(h);
+    afterNthCard(h, nth, async () => { await outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); })(); if (memory) h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== parent); });
+    const lines = await chatApply(h, kidsOf(h, 6).map(a => ({ ...a, parentId: parent })));
+    const saved = await h.saved();
+    assert.equal(saved.nodes.some(n => /Kid/.test(n.path)), false, 'Map.md lists no card of the batch');
+    assert.equal(lines.some(line => line.status === 'done'), false, 'no card of the batch is reported as written');
+    assert.deepEqual(liveNotes(h), before);
+  });
+
+test('E2-tx: a card made with the name field (no title given) is a note file at once, as before', async () => {
+  const h = await harness(tree4);
+  const before = liveNotes(h);
+  await h.view.addNode(h.named('Root'));
+  assert.equal(newNotesOf(h, before).length, 1);
+  assert.deepEqual(await unlistedOf(h, before), []);
 });
 
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

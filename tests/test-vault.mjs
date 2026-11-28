@@ -975,4 +975,7 @@ test('test Obsidian runs from a background-only copy with a mock keychain', { sk
   const args = launchArgs(app, '/private/tmp/vam-e2e-x/.vam-app');
   assert.equal(args[args.indexOf('-a') + 1], app);
   assert.ok(args.includes('--use-mock-keychain') && args.includes('--password-store=basic'));
+  // Electron's log goes into this test profile only, after --args so it never reaches `open` itself.
+  assert.ok(args.indexOf('--enable-logging=file') > args.indexOf('--args'));
+  assert.ok(args.includes('--log-file=/private/tmp/vam-e2e-x/.vam-app/electron.log'));
 });

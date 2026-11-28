@@ -523,6 +523,7 @@ import {
   type RecordEventKind,
   type RecordTurnStatus
 } from "../../core/map-chat-records";
+import { buildResumeSummary, type ResumeSummary } from "../../core/map-chat-resume";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
@@ -583,6 +584,7 @@ import { canPasteCut, planPaste, resolveCrossSource } from "./clipboard-paste";
 import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } from "./clipboard-text";
 import { sessionFor, type ClipRecord } from "./clipboard-session";
 import { cutSourceProblem, ledgerFor, sameApartFromStamps } from "./cross-map-history";
+import { computeTidy, mapSignature, overlayPositions, type TidyPreview } from "./layout-preview";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -3265,6 +3267,7 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   async onClose(): Promise<void> {
+    this.clearTidy(false);
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
@@ -3777,6 +3780,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.path = path;
     this.map = map;
+    this.clearTidy(false);
     this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
@@ -4869,14 +4873,15 @@ export class VisualAgentMapView extends ItemView {
    * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
    * that order. One undo step. Nothing is written when the card is already first or last.
    */
-  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1): Promise<void> {
+  /** `focusCard` false: the caller (the outline) keeps the keyboard focus, so the repaint does not move it to the canvas card. */
+  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1, focusCard = true): Promise<void> {
     const map = this.map;
     if (!map || !node.parentId || map.aim) return;
     const aligned = this.onScreenSiblingOrder(map);
     if (shiftSibling(aligned, node.id, offset) === aligned) return;
     if (!this.mergeUnlocked([node.id, node.parentId])) return;
     const parentId = node.parentId;
-    this.focusNodeId = node.id;
+    if (focusCard) this.focusNodeId = node.id;
     try {
       await this.mapChange(change => {
         const next = shiftSibling(this.onScreenSiblingOrder(change), node.id, offset);
@@ -5173,12 +5178,94 @@ export class VisualAgentMapView extends ItemView {
       this.fit();
     });
   }
+  /** "Tidy map": shows the result first (a preview), writes only on Apply. */
   private autoLayout(): void {
-    this.enqueue(() =>
-      this.mapChange(map => {
-        this.arrangeAll(map);
-      }, false)
-    );
+    this.openTidyPreview();
+  }
+  /** The pending Tidy preview: where cards would go. Display only; cleared by any change of the map. */
+  private tidy: (TidyPreview & { branchId?: string; mapId: string; signature: string }) | null = null;
+  private tidyBarEl: HTMLElement | null = null;
+  private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
+  private tidyArrange(map: MapDocument, branchId?: string): void {
+    if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
+    else this.arrangeAll(map);
+  }
+  private openTidyPreview(branchId?: string): void {
+    if (!this.map || this.presentation || this.notesLoading()) return;
+    this.clearTidy(false);
+    const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
+    this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
+    this.tidyKeys = event => {
+      const target = event.target as HTMLElement | null;
+      const inField = !!target?.closest?.("button, input, textarea, [contenteditable]");
+      if (event.key === "Escape" && !event.isComposing && !inField) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.clearTidy();
+      } else if (event.key === "Enter" && !event.isComposing && !inField && this.tidy?.positions.size) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.applyTidy();
+      }
+    };
+    this.contentEl.addEventListener("keydown", this.tidyKeys, true);
+    this.render();
+  }
+  /** Drops the preview (and its key handler); `repaint` false when a repaint follows anyway. */
+  private clearTidy(repaint = true): void {
+    if (this.tidyKeys) this.contentEl.removeEventListener("keydown", this.tidyKeys, true);
+    this.tidyKeys = null;
+    this.tidyBarEl?.remove();
+    this.tidyBarEl = null;
+    const had = this.tidy !== null;
+    this.tidy = null;
+    if (had && repaint && !this.closed) this.render();
+  }
+  /** One undo step. A map that changed since the preview is previewed again instead of written. */
+  private applyTidy(): void {
+    const tidy = this.tidy;
+    if (!tidy || !this.map) return;
+    const stale = tidy.mapId !== this.map.id || tidy.signature !== mapSignature(this.map);
+    this.clearTidy(false);
+    if (stale) return this.openTidyPreview(tidy.branchId);
+    this.enqueue(() => this.mapChange(map => this.tidyArrange(map, tidy.branchId), false));
+  }
+  /** Any change of the map, another file, or another layout clears the preview. */
+  private dropStaleTidy(): void {
+    if (this.tidy && (!this.map || this.tidy.mapId !== this.map.id || this.tidy.signature !== mapSignature(this.map)))
+      this.clearTidy(false);
+  }
+  /** Dashed boxes where the moving cards stood, the moving cards marked, and the Apply / Cancel bar. */
+  private renderTidyPreview(canvas: HTMLElement): void {
+    const tidy = this.tidy;
+    if (!tidy || !this.map || !this.stageEl) return;
+    const before = new Map(this.map.nodes.map(node => [node.id, node]));
+    for (const id of tidy.positions.keys()) {
+      const old = before.get(id);
+      const card = this.cardEls.get(id);
+      if (!old || !card) continue;
+      card.addClass("is-layout-preview");
+      const ghost = createDiv("vam-layout-ghost");
+      ghost.setAttr("aria-hidden", "true");
+      ghost.style.left = `${old.x}px`;
+      ghost.style.top = `${old.y}px`;
+      ghost.style.width = `${card.offsetWidth || old.width || CARD_WIDTH}px`;
+      ghost.style.height = `${card.offsetHeight || old.height || 0}px`;
+      this.stageEl.prepend(ghost);
+    }
+    const bar = canvas.createDiv("vam-canvas-overlay vam-layout-preview-bar");
+    bar.setAttr("role", "status");
+    const main = bar.createDiv("vam-layout-preview-main");
+    main.createSpan({ text: t(tidy.branchId ? "ui.tidy_branch_preview" : "ui.tidy_map_preview", tidy.count) });
+    this.button(main, t("ui.apply"), () => this.applyTidy(), tidy.positions.size === 0).addClass("mod-cta");
+    this.button(main, t("ui.cancel"), () => this.clearTidy());
+    const notes: string[] = [];
+    if (this.map.canvasItems?.some(item => item.kind === "summary")) notes.push(t("ui.tidy_bracket_limit"));
+    if (tidy.branchId && ["radial", "timeline", "fishbone"].includes(layoutOf(this.map).direction))
+      notes.push(t("ui.tidy_whole_only"));
+    if (notes.length) bar.createDiv({ cls: "vam-layout-preview-note", text: notes.join(" ") });
+    this.tidyBarEl = bar;
+    bar.querySelector<HTMLElement>("button.mod-cta:not([disabled])")?.focus({ preventScroll: true });
   }
   /**
    * Stores the map's arrangement and spacing and re-arranges the whole map in one undo step. A right map at standard
@@ -5262,7 +5349,7 @@ export class VisualAgentMapView extends ItemView {
     }
     menu.addItem(item =>
       item
-        .setTitle(t("ui.auto_layout"))
+        .setTitle(t("ui.tidy_map"))
         .setIcon("workflow")
         .onClick(() => this.autoLayout())
     );
@@ -6184,6 +6271,7 @@ export class VisualAgentMapView extends ItemView {
     authorize?: () => boolean
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
+    this.clearTidy(false);
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
@@ -9868,6 +9956,13 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("brackets")
           .onClick(() => this.addSummaryOver([node.id]))
       );
+      if (map.nodes.some(item => item.parentId === node.id))
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.tidy_branch"))
+            .setIcon("workflow")
+            .onClick(() => this.openTidyPreview(node.id))
+        );
       menu.addItem(item =>
         item
           .setTitle(t("ui.note_style_menu"))
@@ -10524,7 +10619,7 @@ export class VisualAgentMapView extends ItemView {
       if (!node.parentId) return null;
       const reason = merging([node.id, node.parentId]);
       if (reason) return reason;
-      this.enqueue(() => this.shiftSiblingByKey(node, to.shift));
+      this.enqueue(() => this.shiftSiblingByKey(node, to.shift, false));
       return null;
     }
     const target = map.nodes.find(item => item.id === to.target);
@@ -12611,6 +12706,7 @@ export class VisualAgentMapView extends ItemView {
     this.edgesEl.addClass("vam-edges");
     this.edgesEl.setAttribute("aria-hidden", "true");
     this.stageEl.appendChild(this.edgesEl);
+    this.dropStaleTidy();
     const shown = this.canvasNodes();
     this.selection.prune(new Set(shown.map(node => node.id)));
     if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
@@ -12634,6 +12730,7 @@ export class VisualAgentMapView extends ItemView {
     }
     for (const fit of fits) fit();
     this.renderCanvasItems();
+    this.renderTidyPreview(canvas);
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -13382,64 +13479,7 @@ export class VisualAgentMapView extends ItemView {
       this.attachCornerHandle(card, node);
     }
     card.addEventListener("click", event => this.onCardClick(event, card, node));
-    card.addEventListener("keydown", event => {
-      if (event.target !== card) return;
-      // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
-      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
-        event.preventDefault();
-        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
-          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
-        return;
-      }
-      const target = this.keyboardNeighbor(node, event.key);
-      if (target) {
-        event.preventDefault();
-        this.moveKeyboardFocus(target);
-        return;
-      }
-      if (this.onCardSpaceDown(event, node)) return;
-      const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
-      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
-      if (editable && !event.isComposing) {
-        if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
-          event.preventDefault();
-          // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
-          if (!event.repeat) this.removeByKey(node);
-          return;
-        }
-        // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
-        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
-          if (event.defaultPrevented) return; // the view scope already added the subtopic
-          event.preventDefault();
-          this.whenEditing(() => this.enqueue(() => this.addNode(node)));
-          return;
-        }
-        if (event.key === "Enter" && event.shiftKey && plain) {
-          if (event.defaultPrevented) return; // the view scope already added the sibling
-          event.preventDefault();
-          const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
-          this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
-          return;
-        }
-      }
-      if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
-        if (event.defaultPrevented) return; // the view scope already handled this F2
-        event.preventDefault();
-        this.startCardTitleEdit(node, { select: true });
-        return;
-      }
-      if (event.key === "Enter") {
-        if (this.selection.state.multiSelectMode) {
-          this.applySelectionChange(this.selection.toggleByEnter(node.id));
-        } else {
-          // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
-          this.selectMapNode(node);
-          if (this.notesLoading() || !note || event.isComposing) return;
-          event.preventDefault();
-          this.startCardTitleEdit(node, { select: true });
-        }
-      }
-    });
+    card.addEventListener("keydown", event => this.onCardKeydown(event, card, node, note));
     const aimTopic = (on: boolean): void => {
       if (on) this.hoverTopic = node.id;
       else if (this.hoverTopic === node.id) this.hoverTopic = null;
@@ -13493,6 +13533,65 @@ export class VisualAgentMapView extends ItemView {
     const shapeKind = this.shapeKindOf(node.id);
     if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, shapeKind));
     else this.fitKindShape(card, shapeKind);
+  }
+  /** Keyboard handling for a focused card: sibling move, tree walk, delete, add, rename and select. */
+  private onCardKeydown(event: KeyboardEvent, card: HTMLElement, node: MapNode, note: Note | undefined): void {
+    if (event.target !== card) return;
+    // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
+    if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+      event.preventDefault();
+      if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
+        this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+      return;
+    }
+    const target = this.keyboardNeighbor(node, event.key);
+    if (target) {
+      event.preventDefault();
+      this.moveKeyboardFocus(target);
+      return;
+    }
+    if (this.onCardSpaceDown(event, node)) return;
+    const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (editable && !event.isComposing) {
+      if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault();
+        // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
+        if (!event.repeat) this.removeByKey(node);
+        return;
+      }
+      // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        if (event.defaultPrevented) return; // the view scope already added the subtopic
+        event.preventDefault();
+        this.whenEditing(() => this.enqueue(() => this.addNode(node)));
+        return;
+      }
+      if (event.key === "Enter" && event.shiftKey && plain) {
+        if (event.defaultPrevented) return; // the view scope already added the sibling
+        event.preventDefault();
+        const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
+        this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
+        return;
+      }
+    }
+    if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
+      if (event.defaultPrevented) return; // the view scope already handled this F2
+      event.preventDefault();
+      this.startCardTitleEdit(node, { select: true });
+      return;
+    }
+    if (event.key === "Enter") {
+      if (this.selection.state.multiSelectMode) {
+        this.applySelectionChange(this.selection.toggleByEnter(node.id));
+      } else {
+        // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
+        this.selectMapNode(node);
+        if (this.notesLoading() || !note || event.isComposing) return;
+        event.preventDefault();
+        this.startCardTitleEdit(node, { select: true });
+      }
+    }
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
@@ -13579,7 +13678,8 @@ export class VisualAgentMapView extends ItemView {
       superseded.size || byAnchor?.size
         ? shown.filter(node => !superseded.has(node.id) && !byAnchor?.has(node.id))
         : shown;
-    return nodes;
+    // A view only: these copies carry display positions and must never be written back to the map.
+    return this.tidy ? overlayPositions(nodes, this.tidy.positions) : nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   private keyboardNeighbor(node: MapNode, key: string): MapNode | undefined {
@@ -21713,7 +21813,9 @@ export class VisualAgentMapView extends ItemView {
       recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
       autoApply: () => this.chatAutoApply,
       setAutoApply: on => this.setChatAutoApply(on),
-      newConversation: () => this.newChatConversation()
+      newConversation: () => this.newChatConversation(),
+      resumeSummary: () => this.chatResumeSummary(),
+      locateTopic: id => this.locateChatTopic(id)
     };
   }
   /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
@@ -22478,6 +22580,26 @@ export class VisualAgentMapView extends ItemView {
     chat.addOpening(text);
     if (this.plugin.settings.mapChatRecords === true && isManagedMapPath(this.plugin.settings, this.path))
       this.chatRecordSession.openingSaid(key, text);
+  }
+  /** "Resume summary": built from this map's saved records only; nothing is written, no provider is called. */
+  private async chatResumeSummary(): Promise<ResumeSummary> {
+    const map = this.map;
+    if (!map || this.plugin.settings.mapChatRecords !== true || !isManagedMapPath(this.plugin.settings, this.path))
+      return { state: "empty", items: [] };
+    try {
+      const files = await this.chatRecordSession.readAll(this.plugin.repo.topicRoot(this.path));
+      return buildResumeSummary(files, map.id);
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat resume: ${errorMessage(error)}`);
+      return { state: "empty", items: [] };
+    }
+  }
+  /** "Locate" on a resume item: centres the card (the camera moves in memory only, the viewport is not saved). */
+  private locateChatTopic(id: string): boolean {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!node) return false;
+    this.focusNode(node, false);
+    return true;
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {

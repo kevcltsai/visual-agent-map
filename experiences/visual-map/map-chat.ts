@@ -483,6 +483,8 @@ export interface MapChatHost {
   stateChanged?(): void;
   /** The picture the chat is about now, or null (none chosen). */
   image?(): MapChatImageInfo | null;
+  /** Why the chosen picture cannot go to the AI with the current model (shown under the chip, Send is off), or null. */
+  imageNotice?(): string | null;
   /** Calls `changed` whenever the chosen picture changes; the returned function stops listening. */
   watchImage?(changed: () => void): () => void;
   /** "AI changes to a picture": show a preview first, or apply at once (remembered). */
@@ -2454,7 +2456,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       this.startResearch();
       return;
     }
+    if (this.imageNotice()) return;
     this.handOffFocus(() => this.host.send());
+  }
+  /** The explanation for a chosen picture the model cannot read; Send stays off while it shows. Only an annotated picture is sent. */
+  private imageNotice(): string | null {
+    return this.host.image?.()?.kind === "annotated" ? (this.host.imageNotice?.() ?? null) : null;
   }
   /** Runs `start` (which begins a turn); if the keyboard was in the window and fell out of it, Stop (the one control of a waiting turn) takes it. */
   private handOffFocus(start: () => void): void {
@@ -2596,6 +2603,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       if (this.draft.trim()) this.host.steer?.();
       return;
     }
+    if (this.imageNotice()) return;
     this.host.send();
   }
 
@@ -2890,6 +2898,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.modelEl.value = this.host.model();
     const shown = choices.find(choice => choice.value === this.modelEl.value)?.label;
     this.modelEl.setAttr("title", shown ? `${t("ui.map_chat_model_label")}\n${shown}` : t("ui.map_chat_model_label"));
+    // The model decides whether a chosen picture can go along.
+    this.renderChips();
   }
 
   private chipLabel(chip: MapChatChip): string {
@@ -3144,7 +3154,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           clip(picture.kind === "annotated" ? name : picture.name)
         )
       });
+      // Only an annotated picture goes along; an ordinary one is never sent.
+      if (picture.kind === "annotated")
+        chip.createSpan({ cls: "vam-map-chat-chip-sent", text: t("ui.map_chat_image_sent") });
     }
+    const unreadable = this.imageNotice();
+    if (unreadable)
+      this.chipsEl.createEl("p", { cls: "vam-map-chat-image-notice", text: unreadable, attr: { role: "status" } });
+    this.sendEl.disabled = !!unreadable;
+    this.sendEl.toggleClass("is-disabled", !!unreadable);
     for (const id of this.host.selectedIds()) {
       if (dragged.has(id)) continue;
       const title = this.host.topicTitle(id);

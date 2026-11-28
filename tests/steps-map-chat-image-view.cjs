@@ -275,12 +275,24 @@ test('send D5: a picture that cannot be read abandons the turn with a Notice: no
   await g.send('x'); assert.deepEqual(asked(g), []); assert.equal(g.chat.draft, 'x');
 });
 
-test('send: a runtime without image input abandons the turn with a Notice (nothing read, nothing sent)', async () => {
+test('send (G05): a runtime without image input says so at selection time and refuses to send: nothing read, no AI call, no Notice, the draft stays', async () => {
   const h = await harness({ caps: {} });
+  assert.equal(h.view.chatImageNotice(), null, 'no picture chosen: nothing to say');
   h.select('img1');
+  assert.equal(h.view.chatImageNotice(), 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.');
   await h.send('place anchors');
-  assert.deepEqual(asked(h), []); assert.equal(h.control.reads, 0); assert.equal(h.chat.draft, 'place anchors');
-  assert.deepEqual(plain(h.notices), ['This model cannot read pictures. Pick another model or select no picture. Nothing was sent.']);
+  assert.deepEqual(asked(h), []); assert.equal(h.control.requests.length, 0); assert.equal(h.control.reads, 0); assert.equal(h.chat.draft, 'place anchors');
+  assert.deepEqual(plain(h.notices), [], 'the explanation is on screen already, no late Notice');
+  h.select('img2');
+  assert.equal(h.view.chatImageNotice(), null, 'an ordinary picture is never sent, so the model does not matter');
+});
+
+test('send (G05): with image input there is no explanation and the picture goes', async () => {
+  const h = await harness();
+  h.select('img1');
+  assert.equal(h.view.chatImageNotice(), null);
+  await h.send('place anchors');
+  assert.equal(h.control.requests.length, 1);
 });
 
 test('send: Stop while the picture is being prepared abandons the turn: no AI call, draft back, the late read changes nothing', async () => {

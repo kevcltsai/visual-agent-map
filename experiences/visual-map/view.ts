@@ -8034,9 +8034,9 @@ export class VisualAgentMapView extends ItemView {
       // The outline is the chip's twin: it follows the picture selection of the chat, not the keyboard focus (a picture that kept
       // focus after Esc has no chip, so it has no outline; a press or focus on it selects it again).
       el.toggleClass("is-selected", this.chatImageId === image.id);
-      el.addEventListener("focus", () => this.setChatImage(image.id));
+      el.addEventListener("focus", () => this.pickChatImage(image.id));
       // click, not pointerdown: a read-only picture (selection mode, AIM) takes no pointerdown of its own.
-      el.addEventListener("click", () => this.setChatImage(image.id));
+      el.addEventListener("click", () => this.pickChatImage(image.id));
       if (!editable) continue;
       const handle = el.createDiv("vam-canvas-image-handle");
       handle.setAttr("aria-hidden", "true");
@@ -22365,7 +22365,7 @@ export class VisualAgentMapView extends ItemView {
             this.selection.clickEmpty();
             this.syncRelationClasses();
           } else this.applySelectionChange(this.selection.clickEmpty());
-          if (pressedImage) this.setChatImage(pressedImage);
+          if (pressedImage) this.pickChatImage(pressedImage);
           else this.clearChatImage();
         }
       };
@@ -22793,6 +22793,7 @@ export class VisualAgentMapView extends ItemView {
       widths: setWidth => this.chatWidths(setWidth),
       stateChanged: () => this.refreshEmptyMap(),
       image: () => this.chatImage(),
+      imageNotice: () => this.chatImageNotice(),
       watchImage: changed => this.watchChatImage(changed),
       imageMode: () => this.chatImageMode(),
       setImageMode: mode => {
@@ -22932,6 +22933,25 @@ export class VisualAgentMapView extends ItemView {
   watchChatImage(listener: () => void): () => void {
     this.chatImageListeners.add(listener);
     return () => this.chatImageListeners.delete(listener);
+  }
+  /**
+   * A press or focus on a canvas picture. Only a picture the chat would really send (an annotated one) becomes the chat picture;
+   * an ordinary picture is never sent, so it takes any earlier choice off instead of showing a chip that says otherwise.
+   */
+  private pickChatImage(id: string): void {
+    const item = (this.map?.canvasItems ?? []).find(entry => entry.id === id);
+    if (item && isAnnotatedImage(item)) this.setChatImage(id);
+    else this.clearChatImage();
+  }
+  /**
+   * What to tell the user under the picture chip: the selected picture would be sent but the model cannot read pictures. Null when
+   * nothing is wrong. The send is refused while this is set, so nothing is sent and the model is not asked.
+   */
+  chatImageNotice(): string | null {
+    if (this.chatImage()?.kind !== "annotated") return null;
+    return this.plugin.aiCalls.capabilitiesFor(this.plugin.settings.cliModel).imageInput
+      ? null
+      : t("ui.map_chat_image_unsupported");
   }
   private setChatImage(id: string): void {
     if (this.chatImageId === id) return;
@@ -23261,6 +23281,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Sends the draft (see MapChatConversation). */
   private sendMapChat(again?: MapChatOrigin, restore?: string, retryOf?: ChatChainRun): Promise<void> {
+    // Send is off while the chip says the model cannot read the picture; nothing is read, sent or asked.
+    if (!again && this.chatImageNotice()) return Promise.resolve();
     return this.mapChatConversation.sendMapChat(again, restore, retryOf);
   }
   private steerMapChat(): void {

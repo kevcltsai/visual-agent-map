@@ -6556,7 +6556,7 @@ integrationTest('persona G12: moving a card with its own branch up under another
 });
 
 // ---- P4a: picture chip, "before AI edits the picture" switch, "AI looked at this picture", "Undo this reply" ---------------------
-const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }) => {
+const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }, extra = {}) => {
   const state = { image: start, mode: 'preview', listeners: [], sets: [], undo: new Map(), undone: [], later: 0 };
   const token = { label: 'reply' };
   const f = panelFixture({
@@ -6564,7 +6564,8 @@ const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts
     watchImage: changed => { state.listeners.push(changed); return () => { state.listeners.splice(state.listeners.indexOf(changed), 1); }; },
     setImageMode: mode => { state.sets.push(mode); state.mode = mode; },
     replyUndoState: t2 => state.undo.get(t2) ?? 'top',
-    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; }
+    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; },
+    ...extra
   });
   f.panel.setOpen(true);
   const set = image => { state.image = image; state.listeners.forEach(fn => fn()); };
@@ -6592,6 +6593,29 @@ test('P4a chip: an annotated picture reads "Selected: annotated image · words" 
   f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(chipTexts(), ['Selected: image · b.png']);
   f.set(null); assert.deepEqual(chipTexts(), []);
   f.panel.dispose(); assert.equal(f.state.listeners.length, 0, 'the panel stops listening when the view closes');
+});
+
+// V3.3 G05 / P5.4: the chip says the picture goes to the AI; a runtime that cannot read pictures is told at selection time, Send is off.
+test('G05 chip: an annotated picture chip says "This image goes to the AI" beside its label; an ordinary one does not', () => {
+  const f = imageHostFixture(); const sent = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-sent')).map(i => i.text);
+  f.panel.refreshSelection();
+  assert.deepEqual(sent(), ['This image goes to the AI']);
+  f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(sent(), [], 'an ordinary picture is never sent');
+});
+
+test('G05 no image input: the explanation shows under the chip at once, Send is disabled and pressing Send or Enter asks the host for nothing; with image input there is no explanation', () => {
+  const state = { notice: 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.' };
+  const f = imageHostFixture(undefined, { imageNotice: () => state.notice });
+  f.panel.refreshSelection();
+  const notice = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-image-notice')).map(i => i.text);
+  assert.deepEqual(notice(), [state.notice]);
+  assert.equal(f.parts.send().disabled, true);
+  f.panel.inputEl.value = 'hello'; f.panel.inputEl.fire('input');
+  f.parts.send().click(); pressEnter(f.panel);
+  assert.equal(f.calls.send, 0, 'nothing is sent');
+  state.notice = null; f.panel.refreshSelection();
+  assert.deepEqual(notice(), []); assert.equal(f.parts.send().disabled, false);
+  f.parts.send().click(); assert.equal(f.calls.send, 1);
 });
 
 test('P4a switch: a named group of two aria-pressed buttons, only while a picture is chosen; clicking switches, remembers through the host, and a second click on the same button changes nothing', () => {

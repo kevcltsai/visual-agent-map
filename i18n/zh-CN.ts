@@ -712,7 +712,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.annotated_image_edit_title": "编辑说明",
   "ui.annotated_image_note_label": "说明（选填）",
   "ui.annotated_image_note_hint":
-    "写这是什么图、要研究什么。研究和展开看不到图片，只读这行字和锚点说明；选中这张图时，地图 AI 对话会看图。",
+    "写这是什么图、要研究什么。研究和展开不看图，只读这行字和锚点说明；心智图对话可看你选的图。",
   "ui.annotated_image_convert_button": "转换",
   "ui.annotated_image_place_anchor": "放置锚点",
   "ui.image_explore": "图像探索",
@@ -758,7 +758,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.anchor_pick_plain_image": "这是普通图片。先在图片上右键“转成标注图”，才能放点。",
   "ui.anchor_place_hint": "← ↑ → ↓ 移动、Shift 移动较远、Enter 放下、Esc 取消、也可以直接用鼠标点",
   "ui.anchor_place_cancelled": "已取消放锚点",
-  "ui.anchor_no_note_notice": "这张标注图还没有说明。研究和展开看不到图片，建议补一句“这是什么图、要研究什么”。",
+  "ui.anchor_no_note_notice":
+    "这张标注图还没有说明。研究和展开不看图，建议补一句“这是什么图、要研究什么”；心智图对话可看你选的图。",
   "ui.anchor_limit": "这张图的锚点已达上限（{0} 个）。",
   "ui.canvas_boundaries_group": "外框",
   "ui.canvas_boundary_label": "外框：{0}",
@@ -1295,6 +1296,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_ref_selected_0": "已选取：{0}",
   "ui.map_chat_ref_image_annotated_0": "已选取：标注图・{0}",
   "ui.map_chat_ref_image_plain_0": "已选取：图片・{0}",
+  "ui.map_chat_image_sent": "这张图会送给 AI",
   "ui.map_chat_image_mode_label": "AI 改图前",
   "ui.map_chat_image_mode_preview": "先给我看",
   "ui.map_chat_image_mode_direct": "直接改",

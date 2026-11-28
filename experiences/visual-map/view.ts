@@ -249,6 +249,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
+import { collapseForEditorRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -2475,6 +2476,7 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("resize", () => {
         this.chat?.refreshNote();
         this.syncReaderToggle();
+        this.makeRoomForAiCard();
       })
     );
     // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
@@ -16647,6 +16649,7 @@ export class VisualAgentMapView extends ItemView {
       viewSession
     };
     win.mount(overlay);
+    this.makeRoomForAiCard();
     if (node)
       void livingReplacedSources(this.app, this.plugin.repo, this.map, node.id)
         .then(names => {
@@ -16806,6 +16809,13 @@ export class VisualAgentMapView extends ItemView {
       await this.refreshAfterSavedChange();
     }
     return saved;
+  }
+  /** A narrow window with both side panels open leaves the central editor a few dozen pixels: fold a side panel until it fits. */
+  private makeRoomForAiCard(): void {
+    if (!this.aiCardOpen) return;
+    const width = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay")?.clientWidth ?? 0;
+    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
+    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit]);
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {

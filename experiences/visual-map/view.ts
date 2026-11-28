@@ -795,7 +795,6 @@ function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
 }
 
-/** A copy of `node` without any AIM field: what an old AIM map shares. */
 /**
  * Puts what a reply's staged card changes did (`base` to `final`) on `target`, a map that others have changed since `base`:
  * new cards are added (a missing parent fails it), and a field a staged change moved is set where the card still has the
@@ -816,12 +815,13 @@ function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocu
       nodes.set(added.id, added);
       continue;
     }
-    if (!now) continue;
+    if (!now) throw new Error("changed-target");
     const fields = now as unknown as Record<string, unknown>;
     const from = was as unknown as Record<string, unknown>;
     const to = node as unknown as Record<string, unknown>;
     for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
-      if (same(from[key], to[key]) || !same(fields[key], from[key])) continue;
+      if (same(from[key], to[key])) continue;
+      if (!same(fields[key], from[key])) throw new Error("changed-target");
       if (key in to) fields[key] = clone(to[key]);
       else delete fields[key];
     }
@@ -830,11 +830,13 @@ function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocu
   const from = base as unknown as Record<string, unknown>;
   const to = final as unknown as Record<string, unknown>;
   for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
-    if (key === "nodes" || key === "viewport" || same(from[key], to[key]) || !same(fields[key], from[key])) continue;
+    if (key === "nodes" || key === "viewport" || same(from[key], to[key])) continue;
+    if (!same(fields[key], from[key])) throw new Error("changed-target");
     if (key in to) fields[key] = clone(to[key]);
     else delete fields[key];
   }
 }
+/** A copy of `node` without any AIM field: what an old AIM map shares. */
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
   delete copy.aimKind;

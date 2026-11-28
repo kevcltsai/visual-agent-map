@@ -620,4 +620,36 @@ test('E2-y: another write of Map.md during the batch is kept: the staged cards a
   assert.equal(h.view.map.nodes.length, saved.nodes.length);
 });
 
+const outsideEdit = (h, change) => async () => {
+  const doc = await h.repo.readMap(MAP);
+  change(doc);
+  await h.view.app.vault.process(h.view.app.vault.getAbstractFileByPath(MAP), () => support.core.serializeMap(doc));
+};
+
+test('E2-y: the parent card of the batch is deleted by another write during it: nothing of the batch is written and the lines say why', async () => {
+  const h = await harness(tree4);
+  const parent = h.named('B').id;
+  afterNthCard(h, 3, outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); }));
+  const actions = kidsOf(h, 6).map(a => ({ ...a, parentId: parent }));
+  const lines = await chatApply(h, actions);
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length - 1, 'only their change is on disk: no card of the batch');
+  assert.equal(saved.nodes.some(n => n.parentId === parent), false);
+  assert.equal(lines.filter(line => line.status === 'failed').length, 6, 'every card of the batch says it was not written');
+  assert.ok(lines.every(line => !line.text || line.status !== 'failed' || /changed-target/.test(line.text)), 'with the reason');
+});
+
+test('E2-y: another write changes a card field the batch also changes: theirs is not overwritten, the batch is not written', async () => {
+  const h = await harness(tree4);
+  const root = h.named('Root');
+  root.collapsed = true;
+  await h.repo.saveMap(MAP, h.view.map);
+  afterNthCard(h, 3, outsideEdit(h, doc => { doc.nodes.find(n => n.id === root.id).collapsed = false; doc.nodes.find(n => n.id === root.id).x += 7; }));
+  const lines = await chatApply(h, kidsOf(h, 6));
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length, 'no card of the batch is on disk');
+  assert.equal(saved.nodes.find(n => n.id === root.id).x, 1007, 'their edit is still there');
+  assert.equal(lines.filter(line => line.status === 'failed').length, 6);
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

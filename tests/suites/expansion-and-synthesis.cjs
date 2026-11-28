@@ -2108,6 +2108,21 @@ integrationTest('topic style chooser: choosing a style writes note-style only an
   assert.equal(h.nameOf(h.radios(second)[0]), 'Textbook', 'the new choice is the one in force, first, when the picker opens again'); assert.equal(h.radios(second)[0].attrs['aria-checked'], 'true');
   assert.ok(!h.radios(second).some(row => /^Old setting/.test(h.nameOf(row))), 'a topic with note-style no longer reads its old pair');
 });
+// B19c (decision #62): a note style is a style, not structure; under both picture-book locks it still writes note-style only.
+integrationTest('topic style chooser under the picture-book structure lock: choosing a style still writes note-style only, Map.md keeps its cards', async () => {
+  const h = await chooserHarness(OLD_PAIR);
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  const before = await h.read();
+  const nodes = async () => JSON.stringify((await h.repo.readMap(h.view.path)).nodes);
+  const cards = await nodes();
+  const modal = await h.open();
+  assert.ok(modal, 'the chooser opens');
+  await h.choose(modal, 'Textbook');
+  const after = await h.read();
+  assert.equal(withoutKeys(after, ['note-style']), before, 'nothing but the note-style line is new');
+  assert.match(after, /^note-style: "builtin:textbook"$/m);
+  assert.equal(await nodes(), cards, 'no card, parent, order or place changes');
+});
 integrationTest('topic style picker: choosing alone writes nothing; the row in force leaves Apply disabled; Cancel and Esc write nothing and add no history (counterexample 3)', async () => {
   const h = await chooserHarness({ noteStyle: 'builtin:evidence' });
   const modal = await h.open();

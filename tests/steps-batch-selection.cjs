@@ -386,3 +386,63 @@ test('B19c: no disabled reason on the selection bar, under it, or under a greyed
   assert.ok(calls.length >= 4, `the reason entries were found: ${calls.length}`);
   for (const call of calls) assert.match(call, /reasonArgs/, call);
 });
+
+// B19c (decision #62 extended): under the picture-book structure lock, the actions that add no card and change no parent or
+// order stay on and write only their own field. The registry rows (tests/steps-card-actions.cjs TABLE, last column) pin
+// add-frame, summary-add(-selected), tidy-branch and note-style as available under bookStructure; these drive the real writes.
+const mapNodes = async h => (await h.repo.readMap(MAP)).nodes;
+const structure = nodes => JSON.stringify(nodes.map(node => [node.id, node.parentId, node.path]));
+const notesOf = files => [...files].filter(([path]) => path !== MAP);
+
+test('B19c structure lock: the selection ⋯ keeps Add frame and Add summary on; a frame writes only Map.md canvasItems', async () => {
+  const h = await harness(SPEC);
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  h.select(['A', 'B']);
+  const entries = [];
+  h.view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(v) { it.text = v; return chain; }, setIcon() { return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, onClick() { return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  h.view.openSelectionMoreMenu({}, 2);
+  for (const text of ['Add frame', 'Add summary bracket']) {
+    const entry = entries.find(item => item.text === text);
+    assert.ok(entry, `${text} is listed: ${entries.map(item => item.text)}`); assert.equal(entry.disabled, false, text);
+  }
+  const before = h.files(), nodes = await mapNodes(h);
+  const id = await h.view.addBoundary([h.named('A').id, h.named('B').id], 'Frame');
+  assert.ok(id);
+  const map = await h.repo.readMap(MAP);
+  assert.deepEqual(map.nodes, nodes, 'no card, parent, order or place changes');
+  assert.deepEqual([...map.canvasItems.filter(item => item.kind === 'boundary').map(item => item.members.length)], [2]);
+  assert.deepEqual(notesOf(h.files()), notesOf(before), 'notes are not written');
+});
+
+test('B19c structure lock: a summary bracket is a canvas item, not a card: it writes only canvasItems', async () => {
+  const h = await harness(SPEC);
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  h.select(['A', 'B']);
+  const before = h.files(), nodes = await mapNodes(h);
+  h.view.addSummaryOver([h.named('A').id, h.named('B').id]);
+  const pending = h.view.pendingSummary;
+  assert.ok(pending, 'the bracket starts (no refusal under the lock)');
+  await h.view.saveSummaryItem(pending.id, 'Both', pending.members);
+  const map = await h.repo.readMap(MAP);
+  assert.deepEqual(map.nodes, nodes, 'no card is added and no parent, order or place changes');
+  assert.deepEqual([...map.canvasItems.filter(item => item.kind === 'summary').map(item => item.text)], ['Both']);
+  assert.deepEqual(notesOf(h.files()), notesOf(before), 'notes are not written');
+});
+
+test('B19c structure lock: Tidy this branch moves cards only: parents, paths and order stay, notes are not written', async () => {
+  const h = await harness(SPEC);
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  const before = h.files(), nodes = await mapNodes(h);
+  h.view.openTidyPreview(h.named('Root').id);
+  assert.ok(h.view.tidy?.positions.size > 0, 'the preview opens under the lock and moves cards');
+  const history = h.view.history.past.length;
+  h.view.applyTidy();
+  await h.settled();
+  assert.equal(h.view.history.past.length, history + 1, 'Apply writes, in one step');
+  const after = await mapNodes(h);
+  assert.notEqual(JSON.stringify(after), JSON.stringify(nodes), 'some card moved');
+  assert.equal(structure(after), structure(nodes), 'parents, paths and order unchanged');
+  const strip = list => list.map(({ x: _x, y: _y, ...rest }) => rest);
+  assert.deepEqual(strip(after), strip(nodes), 'only x and y may change');
+  assert.deepEqual(notesOf(h.files()), notesOf(before), 'notes are not written');
+});

@@ -226,6 +226,28 @@ test('card actions: the table covers every action, and every unavailable answer 
   assert.equal(zhTW[R.aiLock], '這張卡已鎖定，不讓 AI 修改；先在工具列解除鎖定');
 });
 
+// B19c: every greyed-out reason the registry gives, filled with its own reasonArgs, reads in all three languages with no raw {n}
+// (the table's contexts, plus one and two locked cards of a selection and the selection's own reasons).
+test('card actions: every disabled reason exists in en, zh-TW and zh-CN and fills every placeholder', () => {
+  const { translate } = S.load('i18n.ts');
+  const seen = new Map();
+  const add = result => { if (!result.ok) seen.set(JSON.stringify([result.reasonKey, result.reasonArgs ?? []]), result); };
+  for (const [id, surface, target, , extra] of TABLE)
+    for (const state of CONTEXTS) add(availability(id, surface, ctxFor(target, state, extra)));
+  const locked = (...ids) => ctxFor(['a', 'd', 'b'], 'normal', { note: id => (ids.includes(id) ? { prompt: '', aiLocked: true } : { prompt: '' }) });
+  for (const surface of ['toolbar', 'more', 'context'])
+    for (const ctx of [locked('d'), locked('a', 'd'), ctxFor(['a'], 'normal'), ctxFor(['a', 'd'], 'normal', { multiResearchRunning: () => true })])
+      for (const entry of actionsFor(surface, ctx)) add(entry.availability);
+  const keys = [...seen.values()].map(result => result.reasonKey);
+  assert.ok(keys.includes('ui.selection_locked_one_0') && keys.includes('ui.selection_locked_0_1'), keys.join());
+  for (const result of seen.values())
+    for (const [name, dictionary] of [['en', en], ['zh-TW', zhTW], ['zh-CN', zhCN]]) {
+      assert.ok(dictionary[result.reasonKey]?.trim(), `${result.reasonKey} in ${name}`);
+      const text = translate(name, result.reasonKey, ...(result.reasonArgs ?? []));
+      assert.doesNotMatch(text, /\{\d+\}/, `${result.reasonKey} in ${name}: ${text}`);
+    }
+});
+
 test('card actions: selection reasons that come from the selection itself', () => {
   // mergeCheck's own reason is the bar's tooltip; Synthesize is disabled under two topics; Research is disabled while its batch runs.
   eq(availability('merge', 'toolbar', ctxFor(['a', 'd'], 'normal', { mergeBlock: () => 'ui.select_at_least_two_topics' })), { ok: false, reasonKey: 'ui.select_at_least_two_topics' });

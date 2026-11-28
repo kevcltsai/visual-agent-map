@@ -1383,7 +1383,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const adapter = withAtomicReplace(this.app.vault.adapter, (path, error) =>
         this.logs.appendLog(
           "warn",
-          `${path}: atomic replace failed, used remove and rename: ${error instanceof Error ? error.message : String(error)}`
+          t("log.store_replace_fallback_0", `${path}: ${error instanceof Error ? error.message : String(error)}`)
         )
       );
       this.exchanges = new AiExchangeLog(adapter, normalizePath(`${this.manifest.dir}/ai-exchanges.json`), error =>

@@ -2432,6 +2432,8 @@ export const en = {
   "log.operation_failed_0": "Operation failed: {0}",
   "log.plugin_loaded_0": "Visual Agent Map {0} loaded",
   "log.exchange_log_save_failed_0": "Saving the AI exchange log failed: {0}",
+  "log.store_replace_fallback_0":
+    "Could not replace a data file in one step, so it was removed and renamed instead: {0}",
   "log.pending_suggestions_save_failed_0": "Saving pending suggestions failed: {0}",
   "log.initialization_incomplete_0": "Initialization incomplete: {0}",
   "log.codex_recheck_failed": "Codex App Server recheck failed",

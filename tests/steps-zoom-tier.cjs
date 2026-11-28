@@ -172,3 +172,56 @@ test('stylesheet: tiers show only what the ticket says, the old 60% rules stay',
   assert.ok(view.includes('vam-card-detail-line'), 'renderNode builds the detail line');
   assert.ok(view.includes('"vam-node-stop"') || view.includes('vam-node-stop'), 'the stop buttons carry vam-node-stop');
 });
+
+// ---- Layout and share ignore the tier's taller cards ----
+const layoutMod = load('map-layout.ts');
+const { VisualAgentMapView: RealView } = support.load('main.ts', { obsidian: support.obsidian });
+function tierView(tier) {
+  const nodes = [support.node('r', null), support.node('a', 'r'), support.node('b', 'r')];
+  const view = new RealView({ app: {} }, { settings: { ...support.DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} });
+  view.map = support.map(nodes);
+  view.map.id = 'm';
+  const normal = { r: 100, a: 120, b: 100 };
+  const tall = { r: 220, a: 260, b: 220 };
+  view.heightsSeen = new Map(Object.entries(normal));
+  view.heightsSeenMap = 'm';
+  view.zoomTier = tier;
+  const heights = tier === 'normal' ? normal : tall;
+  view.cardEls = new Map(Object.entries(heights).map(([id, h]) => [id, { offsetHeight: h }]));
+  return view;
+}
+
+test('B12 layout: cardHeightOf and the arranged y are the same in detail and overview as at normal zoom', () => {
+  const place = tier => {
+    const view = tierView(tier);
+    const placed = layoutMod.arrangeMap(view.map.nodes, undefined, view.cardHeightOf, 'right');
+    return { h: ['r', 'a', 'b'].map(id => view.cardHeightOf(id)), y: placed.map(n => [n.id, n.x, n.y]) };
+  };
+  const normal = place('normal');
+  assert.deepEqual(normal.h, [100, 120, 100], 'control: normal reads the drawn heights');
+  assert.deepEqual(place('detail'), normal, 'detail');
+  assert.deepEqual(place('overview'), normal, 'overview');
+  const fresh = tierView('detail');
+  fresh.heightsSeen = new Map();
+  assert.equal(fresh.cardHeightOf('a'), undefined, 'no record in a tier and no set height: never the enlarged offsetHeight');
+});
+
+test('B12 share: ringHeights in detail equal the normal ones, and none are written without a record', () => {
+  const ringOf = tier => {
+    const view = tierView(tier);
+    view.path = 'Map.md';
+    view.notesLoading = () => false;
+    view.notes = new Map();
+    const ids = ['a', 'b'];
+    view.map.nodes.forEach(n => { n.parentId = null; });
+    view.map.canvasItems = [{ id: 'img', kind: 'annotated-image', path: 'img.png', x: 0, y: 300, w: 400, h: 300,
+      anchors: ids.map((id, i) => ({ id: `an${id}`, at: { kind: 'image-2d', x: 0.2 + i * 0.4, y: 0.5 } })),
+      relations: ids.map(id => ({ kind: 'related', from: `an${id}`, to: id, ring: true })) }];
+    const snap = view.shareSnapshot();
+    return snap === 'none' || snap === 'empty' ? snap : snap.ringHeights;
+  };
+  const normal = ringOf('normal');
+  assert.equal(JSON.stringify([...normal]), JSON.stringify([['a', 120], ['b', 100]]), 'control: normal reads the drawn heights');
+  assert.equal(JSON.stringify([...ringOf('detail')]), JSON.stringify([['a', 120], ['b', 100]]));
+  assert.equal(JSON.stringify([...ringOf('overview')]), JSON.stringify([['a', 120], ['b', 100]]));
+});

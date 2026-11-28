@@ -1908,13 +1908,23 @@ export class VisualAgentMapView extends ItemView {
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
   private cardHeightOf = (id: string): number | undefined =>
-    this.cardEls.get(id)?.offsetHeight ||
+    this.layoutCardHeightOf(id) ||
     // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
     this.map?.nodes.find(node => node.id === id)?.height ||
     // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
     (this.isTextId(id)
       ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
-      : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+      : medianHeight(
+          this.inZoomTier() ? [...this.heightsSeen.values()] : [...this.cardEls.values()].map(card => card.offsetHeight)
+        ));
+  private inZoomTier(): boolean {
+    return this.zoomTier === "overview" || this.zoomTier === "detail";
+  }
+  /** A drawn card's height for layout and share: at overview / detail zoom the cards are taller on purpose, so the last normal-zoom height counts. */
+  private layoutCardHeightOf(id: string): number | undefined {
+    if (this.inZoomTier()) return this.heightsSeenMap === this.map?.id ? this.heightsSeen.get(id) : undefined;
+    return this.cardEls.get(id)?.offsetHeight;
+  }
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -16363,7 +16373,7 @@ export class VisualAgentMapView extends ItemView {
       const card = this.cardEls.get(id);
       const cover = card ? cardCovers.get(card) : undefined;
       if (cover && !cover.frame.classList.contains("is-sized")) ringMeasured = false;
-      const height = card?.offsetHeight;
+      const height = this.layoutCardHeightOf(id);
       if (height) ringHeights.set(id, height);
     }
     if (!ringMeasured) ringHeights.clear();

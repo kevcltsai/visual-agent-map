@@ -1932,9 +1932,10 @@ test('not_requested: changeRequested false turns any write into a plan; read-onl
     { kind: 'delete_topic', nodeId: 'a', branch: false }, { kind: 'set_appearance', nodeIds: ['a'] },
     { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'quick', images: false },
     { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: 'x', mode: '', images: false },
-    { kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' }
+    { kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' },
+    { kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' }, { kind: 'auto_layout' }
   ];
-  const reads = [{ kind: 'select_topics', nodeIds: ['a'], all: false }, { kind: 'focus_topic', nodeId: 'a' }, { kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' }, { kind: 'auto_layout' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'concept' }, { kind: 'read_md_file', path: 'Maps/Steak/a.md' }];
+  const reads = [{ kind: 'select_topics', nodeIds: ['a'], all: false }, { kind: 'focus_topic', nodeId: 'a' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'concept' }, { kind: 'read_md_file', path: 'Maps/Steak/a.md' }];
   for (const action of writes) {
     for (const extra of [{}, { autoApply: true, mapFolder: 'Maps/Steak' }]) {
       const result = planFor([action], ctx, { changeRequested: false, ...extra });

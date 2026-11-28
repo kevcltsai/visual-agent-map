@@ -102,13 +102,10 @@ export const isChainSafe = (action: MapChatAction): boolean =>
       ? false
       : CHAIN_SAFE.has(action.kind);
 
-/** Actions that write nothing (selection, view, the kind question, reading a file): a reply the user did not ask to change the map may still do them at once. */
+/** Actions that write nothing (selection, focus, the kind question, reading a file): a reply the user did not ask to change the map may still do them at once. Collapse, expand and layout write Map.md, so they are writes. */
 const READ_ONLY_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["kind"]>([
   "select_topics",
   "focus_topic",
-  "collapse_topic",
-  "expand_topic",
-  "auto_layout",
   "ask_topic_kind",
   "read_md_file"
 ]);

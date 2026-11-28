@@ -2635,7 +2635,7 @@ integrationTest('E4a question only: a reply with a write and changeRequested fal
     assert.notEqual(vaultState(h), before, 'Apply writes it');
   }
 });
-integrationTest('E4a question only: select, focus and layout go on at once; the same reply asked for (changeRequested true) is written at once as before', async () => {
+integrationTest('E4a question only: select and focus go on at once; the same reply asked for (changeRequested true) is written at once as before', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
   h.control.reply = async () => say('Here it is.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }, { kind: 'focus_topic', nodeId: h.ids.a }], '', false);
   h.type('where is it?'); await h.view.sendMapChat();
@@ -2644,6 +2644,17 @@ integrationTest('E4a question only: select, focus and layout go on at once; the 
   g.control.reply = async () => say('I will link them.', [contradiction(g)], '');
   g.type('mark them as contradicting'); await g.view.sendMapChat(); await until(() => !gchat.isBusy && !g.view.chatApplying);
   assert.equal(planCard(g).length, 0, 'asked for: no plan'); assert.equal(gchat.pendingPlan(), null);
+});
+integrationTest('E4a question only (counter-example): layout and collapse write Map.md, so with changeRequested false they wait as a plan labelled "You did not ask for changes"; the vault is byte for byte the same', async () => {
+  for (const action of [() => ({ kind: 'auto_layout' }), h => ({ kind: 'collapse_topic', nodeId: h.ids.a })]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h); h.control.mutates = 0;
+    h.control.reply = async () => say('It looks fine.', [action(h)], '', false);
+    h.type('does this look tidy?'); await h.view.sendMapChat();
+    const kind = action(h).kind;
+    assert.equal(planCard(h).length, 1, 'a plan card for ' + kind); assert.equal(chat.pendingPlan().state, 'pending');
+    assert.match(planReasons(h), new RegExp(NOT_ASKED));
+    assert.equal(h.control.mutates, 0, 'no write was queued for ' + kind); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was for ' + kind);
+  }
 });
 integrationTest('E4a auto-apply (counter-example, row 8): with the switch on, a reply whose changeRequested is false or missing still waits as a plan; the map is untouched', async () => {
   for (const reply of [h => say('Maybe add this.', [addRoot('x', 'Extra')], '', false), h => ({ reply: 'Maybe add this.', actions: [addRoot('x', 'Extra')], rejected: [], remaining: '', changeRequested: undefined })]) {

@@ -1423,6 +1423,89 @@ test('trial cancel: declining the usage confirmation or pressing Stop shows no f
   assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
 });
 
+// ---- P3.4 trial and adoption through the central editor ---------------------------------------------------------------
+const sha = text => require('node:crypto').createHash('sha256').update(String(text)).digest('hex');
+// A ready trial of A, which reads the note N. The vault raises `modify` for every write, as Obsidian's does.
+const trialHarness = async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  const listeners = new Set();
+  h.app.vault.on = (name, fn) => { const ref = { name, fn }; listeners.add(ref); return ref; };
+  h.app.vault.offref = ref => { listeners.delete(ref); };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    for (const ref of [...listeners]) if (ref.name === 'modify') ref.fn(file);
+    return result;
+  };
+  const reader = [];
+  h.host.showLivingTrial = async (file, _markdown, owner, isCurrent) => { reader.push(['trial', file?.path, owner]); return isCurrent(); };
+  h.host.invalidateLivingTrial = owner => { reader.push(['invalid', owner]); };
+  h.host.restoreLivingOfficial = async (file, owner, release) => { reader.push(['official', file?.path, owner, !!release]); };
+  h.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  const button = text => find(h.pop(), i => i.tag === 'button' && i.text === text);
+  const bytes = () => [sha(h.raw('A')), sha(h.raw('N'))];
+  const ready = async () => {
+    h.view.openAiCardPopover(h.node('A'));
+    button('Try prompt').click();
+    await until(() => h.view.aiCardOpen?.trial.state === 'ready' && reader.some(r => r[0] === 'trial'));
+    await dom.tick(); await dom.tick();
+    assert.equal(button('Adopt trial').disabled, false, 'the preview is ready to adopt');
+  };
+  return { ...h, listeners, reader, button, bytes, ready };
+};
+
+for (const [name, leave] of [
+  ['switching to another map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+  ['closing the view', h => h.view.onClose().catch(() => {})]
+]) test(`P3.4 ${name} discards a ready trial: the editor is gone, a retained adoption check writes nothing, the reader shows the formal note`, async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial, adoption, viewSession } = h.view.aiCardOpen;
+  const before = h.bytes();
+  const calls = h.calls.length;
+  const leaving = leave(h);
+  assert.equal(h.view.aiCardOpen, null, 'the editor closes before anything else');
+  await leaving;
+  assert.equal(trial.state, 'none');
+  assert.equal(trial.result, undefined);
+  assert.equal(await trial.adopt(h.repo, adoption), 'discarded');
+  eq(h.bytes(), before, 'Map notes byte for byte as before');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  const official = h.reader.filter(r => r[0] === 'official' && r[2] === viewSession);
+  assert.equal(official.length, 1, 'the reader is handed back once');
+  assert.equal(official[0][3], true, 'and released');
+  if (name.startsWith('switching')) assert.equal(official[0][1], h.node('A').path, 'it shows the formal note of the card again');
+});
+
+test('P3.4 trial, preview, stop or close: the card and its source keep their bytes; one AI call per trial; saving the configuration calls nothing', async () => {
+  const h = await trialHarness();
+  const before = h.bytes();
+  await h.ready();
+  assert.equal(h.calls.length, 1, 'one AI call for the trial');
+  eq(h.bytes(), before, 'a ready preview wrote nothing');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  eq(h.bytes(), before, 'closing wrote nothing');
+  // Stop while it runs.
+  h.plan.hang.add('A');
+  h.view.openAiCardPopover(h.node('A'));
+  h.button('Try prompt').click();
+  await until(() => h.calls.length === 2);
+  h.button('Stop').click();
+  await until(() => h.view.aiCardOpen?.trial.state !== 'running');
+  await dom.tick(); await dom.tick();
+  assert.equal(h.calls.length, 2, 'one more call for the second trial, none for stopping');
+  eq(h.bytes(), before, 'stopping wrote nothing');
+  h.view.closeAiCardPopover();
+  // Saving the configuration writes the card but never calls the AI.
+  h.view.openAiCardPopover(h.node('A'));
+  h.question().value = 'Why not?'; h.question().input();
+  h.saveButton().click();
+  await until(() => /Why not\?/.test(h.raw('A')));
+  assert.equal(h.calls.length, 2, 'saving made no AI call');
+  assert.equal(sha(h.raw('N')), before[1], 'the source is untouched');
+});
+
 test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note, and Note still opens the details', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');

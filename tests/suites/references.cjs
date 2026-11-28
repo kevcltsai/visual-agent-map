@@ -278,4 +278,7 @@ test('source identity: a self-written "[S1]: [[note]]" definition (no .md) leave
   assert.equal(api.resolveDetailReferences(out, groups, out), out, 'the same source and revision re-run is byte-identical');
   // An ordinary line that merely starts with the marker keeps its text.
   assert.ok(api.resolveDetailReferences('[S1]: says the lab note\n', groups).includes('says the lab note'));
+  // The same self-written definition with trailing words, in a list item or in a quote is dropped too.
+  for (const line of [`[S1]: [[${path}]] — the lab note`, `- [S1]: [[${path}]]`, `> [S1]: [[${path}]]`])
+    assert.equal(api.resolveDetailReferences(`Claim[S1]\n\n${line}\n`, groups), `Claim[^1]\n\n[^1]: ${identity}\n`, line);
 });

@@ -325,8 +325,8 @@ export function resolveDetailReferences(
   const dropped = new Set<string>();
   lines.forEach((line, index) => {
     if (!code[index]) {
-      // The reply's own definition line for a marker (`[S1]: [[note]]`): VAM writes that definition, so the line is dropped.
-      if (/^\[S\d+\]:[ \t]*\[\[[^\]]+\]\](?:%%vam-src:[A-Za-z0-9_-]+:[0-9a-f]{8}%%)?[ \t]*$/.test(line)) return;
+      // The reply's own definition line for a marker (`[S1]: [[note]] …`, also in a list item or quote): VAM writes that definition, so the line is dropped.
+      if (/^[ \t]*(?:>[ \t]*)*(?:[-*+][ \t]+)?\[S\d+\]:[ \t]*\[\[[^\]]+\]\]/.test(line)) return;
       const definition = sourceFootnoteDefinition(line);
       if (definition) {
         defined.set(definition.label, definition.target);

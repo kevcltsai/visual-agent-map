@@ -21673,16 +21673,12 @@ export class VisualAgentMapView extends ItemView {
     options: { origin?: boolean; language?: ContentLanguage } = {}
   ): Promise<ReferenceGroup> {
     const language = options.language ?? this.plugin.settings?.language ?? "zh-TW";
-    const notes = await Promise.all(
-      sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
+    // One read per note: the parsed note and the file as the other source paths read it, so a citation of this topic carries its node id and file revision, not those of the text below.
+    const snapshots = await Promise.all(
+      sources.map(source => this.plugin.repo.readNoteSnapshot(source.path, this.map ?? undefined))
     );
-    // The file as the other source paths read it, so a citation of this topic carries its node id and file revision, not those of the text below.
-    const files = await Promise.all(
-      sources.map(async source => {
-        const file = this.app.vault.getAbstractFileByPath(source.path);
-        return file instanceof TFile ? livingNoteForModel(await this.app.vault.read(file)) : undefined;
-      })
-    );
+    const notes = snapshots.map(snapshot => snapshot.note);
+    const files = snapshots.map(snapshot => livingNoteForModel(snapshot.content));
     const documents = sources.map((source, index) => {
       const note = notes[index];
       const finding = note.newFindings.trim();
@@ -21699,9 +21695,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(Boolean)
         .join("\n\n");
       const file = files[index];
-      return file === undefined
-        ? { path: source.path, content }
-        : { path: source.path, content, nodeId: sourceNodeId(file), rev: sourceRevision(file) };
+      return { path: source.path, content, nodeId: sourceNodeId(file), rev: sourceRevision(file) };
     });
     return {
       id: `mind-map:${this.map?.id ?? "selected"}`,

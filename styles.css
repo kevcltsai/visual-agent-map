@@ -716,7 +716,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-unread { position: absolute; top: 4px; right: 4px; box-sizing: border-box; width: 10px; height: 10px; border: 2px solid var(--background-secondary); border-radius: 50%; background: var(--interactive-accent); }
 .vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-send:focus-visible, .vam-map-chat-stop:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden, .vam-map-chat-hero-title.is-hidden, .vam-map-chat-resizer.is-hidden { display: none; }
-.vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; }
+.vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; overflow-y: auto; }
 /* The docked chat reaches the window's bottom edge, where Obsidian's status bar floats over its send button. */
 .vam-map-chat > .vam-map-chat-body { padding-bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-map-chat.is-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -2px; background: var(--background-modifier-hover); }
@@ -751,7 +751,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* The history keeps at least half of the panel body: the flow block, the switch row and the warning never squeeze it to a line. */
 .vam-map-chat-body > .vam-map-chat-log { min-height: 50%; }
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
-.vam-map-chat-form { display: flex; flex-direction: column; gap: 6px; }
+/* E2-stop: in a narrow pane the chips and a wrapped scope line can be taller than the pane; the body then scrolls and the form (message box, Send, Stop) stays at the bottom, in view. */
+.vam-map-chat-form { position: sticky; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 6px; background: var(--background-primary); }
 .vam-map-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; caret-color: var(--text-accent); }
 /* What this turn may change (P2.2a): one quiet line above the message box. */
 .vam-map-chat-scope { margin-bottom: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }

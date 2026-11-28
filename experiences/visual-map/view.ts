@@ -10692,7 +10692,14 @@ export class VisualAgentMapView extends ItemView {
   /** Registers the three entries on the canvas; AIM maps and topic selection mode get none (D11). */
   private setupCanvasImageInput(): void {
     const viewport = this.viewportEl;
-    if (!viewport || !this.canEditCanvasItems()) return;
+    if (!viewport) return;
+    // V3.3 G04-y: the right-click is bound in every state, or the image menu (rows greyed with a reason) never opens while
+    // several topics are picked or the notes load. Without edit rights only the image's own menu answers; the rest stays shut.
+    viewport.addEventListener("contextmenu", event => {
+      if (this.canEditCanvasItems() || (event.target as Element | null)?.closest?.(".vam-canvas-image"))
+        this.onCanvasContextMenu(event);
+    });
+    if (!this.canEditCanvasItems()) return;
     viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
     viewport.addEventListener("dragleave", event => this.onCanvasDragLeave(event));
     viewport.addEventListener("drop", event => this.onCanvasDrop(event));
@@ -10708,7 +10715,6 @@ export class VisualAgentMapView extends ItemView {
       viewport.addEventListener(name, () => {
         this.internalDrag = false;
       });
-    viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
   }
   private onCanvasPointerMove(event: { clientX: number; clientY: number }): void {

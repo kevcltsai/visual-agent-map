@@ -231,7 +231,8 @@ test('D11: topic selection mode registers no entry; a normal map registers all o
   for (const [name, options] of [['integration', { integration: true }]]) {
     const h = await harness(options);
     h.view.setupCanvasImageInput();
-    assert.deepEqual(Object.keys(h.view.viewportEl.listeners), [], name);
+    // V3.3 G04-y: the image's own menu (greyed rows) is the one entry still bound; drop, drag and paste stay unregistered.
+    assert.deepEqual(Object.keys(h.view.viewportEl.listeners), ['contextmenu'], name);
     const event = dropEvent([file(png())]);
     h.view.onCanvasDrop(event);
     await h.settle();

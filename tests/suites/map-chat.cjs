@@ -399,7 +399,14 @@ async function harness({ aim = false, document = false, empty = false, realRende
       control.mutates++; if (control.depth > 0) control.nested++;
       const result = queue.then(async () => {
         control.depth++;
-        try { await work(); const view = ctx.view; if (view) await (viaSync ? view.synchronize() : view.hydrate()); } finally { control.depth--; }
+        try {
+          await work(); const view = ctx.view;
+          // The real readBackViews -> view.synchronize() reads nothing while a chat batch holds the view (syncHold > 0): it only notes a read is owed (syncPending), and releaseChatBatch queues one empty write for it. A staged card has no note file until the batch flush, so reading every note here would fail on it.
+          for (const each of [view, ...(ctx.otherViews ?? [])]) {
+            if (each && each.syncHold > 0) each.syncPending = true;
+            else if (each) await (viaSync ? each.synchronize() : each.hydrate());
+          }
+        } finally { control.depth--; }
       });
       queue = result.catch(() => {});
       return result;
@@ -477,6 +484,8 @@ async function harness({ aim = false, document = false, empty = false, realRende
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     note: async key => repo.readNote(view.map.nodes.find(n => n.id === ids[key]).path),
     saved: async () => (await repo.readMap(MAP)).nodes,
+    // Other windows of the plugin (plugin.views()): held and read back with the chat view, like the real ones.
+    setOtherViews: views => { ctx.otherViews = views; },
     open: () => { repaint(); view.chat.setOpen(true); return view.chat; },
     type: text => { view.chat.inputEl.value = text; }
   };
@@ -4136,12 +4145,17 @@ integrationTest('B2-0 F4: 100 add_child into a 150-card map rebuild the derived 
   assert.equal(h.view.map.nodes.length, 250);
   assert.equal(counts.rebuild, 1, `rebuildDerivedData ${counts.rebuild}`); assert.ok(counts.scanMaps <= 1, `scanMaps ${counts.scanMaps}`);
 });
-integrationTest('B2-0 F4: a card that fails to be added still has the derived data rebuilt (once), and the other cards are made', async () => {
+integrationTest('B2-0 F4: a card that fails to be added fails the whole batch (E2-tx: all or nothing, no card or note left) and the derived data is still rebuilt (once)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); const counts = countCalls(h);
-  const createNote = h.repo.createNote.bind(h.repo); h.repo.createNote = async (title, ...rest) => { const made = await createNote(title, ...rest); if (title === 'Boom') throw new Error('disk full'); return made; };
+  const createNote = h.repo.createNote.bind(h.repo); const trashed = new Set(); const trash = h.app.fileManager.trashFile; h.app.fileManager.trashFile = async item => { trashed.add(item.path); return trash(item); };
+  // Like the real createNote (repository.ts), which throws before it creates the file; the notes made before it are taken back by the transaction.
+  h.repo.createNote = async (title, ...rest) => { if (title === 'Boom') throw new Error('disk full'); return createNote(title, ...rest); };
   const actions = [addRoot('r', 'Root'), addRoot('a', 'A', 'new:r'), addRoot('b', 'Boom', 'new:r'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))];
   const lines = await apply(h, actions);
-  eq(lines.filter(l => l.status === 'failed').length, 1); assert.ok(lines.filter(l => l.status === 'done').length >= 6);
+  // The cards are staged and written in one transaction; the one that throws takes the others back with it.
+  eq(lines.filter(l => l.status === 'failed').length, 7, JSON.stringify(lines)); eq(lines.filter(l => l.status === 'done').length, 0);
+  assert.equal((await h.saved()).length, 0, 'no card is kept');
+  eq([...h.files.keys()].filter(p => p.endsWith('.md') && p !== MAP && !p.includes('/Chats/') && p.startsWith('Agent Workspace/Topics/map-a/') && !trashed.has(p)), [], 'no note file is left (the two made before the throw were taken back)');
   assert.equal(counts.rebuild, 1, `rebuilt once: ${counts.rebuild}`);
 });
 integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops half way still rebuilds once for what it made', async () => {
@@ -4152,11 +4166,56 @@ integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops hal
 });
 integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch is kept (no conflict window: the staged cards are put on it) and the batch goes on', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
-  const createNote = h.repo.createNote.bind(h.repo);
-  h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
+  // The outside write lands while the 4th card is only staged (its note is not a file yet), before the batch's one transaction.
+  const noteFromContent = h.repo.noteFromContent.bind(h.repo);
+  h.repo.noteFromContent = async (...args) => { const made = await noteFromContent(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
   const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
   assert.equal((h.control.modals ?? []).length, 0, 'no conflict window: the staged cards are put on their version'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
   assert.equal((await h.repo.readMap(MAP)).title, 'Edited outside', 'their change is kept'); assert.equal((await h.repo.readMap(MAP)).nodes.length, 8);
+});
+
+
+// E2-tx B1: a second tab of the same map is held (syncHold, syncPending) while the first tab's batch flushes Map.md; a removal that runs on either tab in that window must not judge the flushed Map.md an outside edit.
+const twoTabs = async removeOn => {
+  const h = await harness({ realRender: true, viaSync: true }); await h.view.hydrate();
+  const B = new h.view.constructor({ app: h.app }, h.plugin);
+  Object.assign(B, { path: MAP, contentEl: h.rootEl, closed: false, render() {}, focusNode() {}, fit() {} });
+  B.map = await h.repo.readMap(MAP);
+  if (removeOn === 'travel') B.history.push({ label: 'x', undo: () => { throw new Error('undo must not run'); }, redo() {} });
+  B.hydrate = async () => { B.notes = new Map(await Promise.all(B.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)]))); };
+  await B.hydrate(); h.setOtherViews([B]);
+  const seen = []; let reached; const reachedP = new Promise(resolve => { reached = resolve; });
+  for (const [name, view] of [['A', h.view], ['B', B]]) {
+    const original = view.resolveMapConflict.bind(view);
+    view.resolveMapConflict = async () => { seen.push({ view: name, isChatView: view === h.view, syncHold: view.syncHold, syncPending: view.syncPending, batch: !!view.chatMapBatch }); reached(); return original(); };
+  }
+  let pending; const flush = h.view.flushChatMapBatch.bind(h.view);
+  h.view.flushChatMapBatch = async () => { await flush(); const target = removeOn === 'A' ? h.view : B; pending = removeOn === 'travel' ? B.travel(false) : target.removeToUnassigned(target.map.nodes.find(n => n.id === h.ids.c), false); };
+  // The reply stays applying (views held) until the removal has reached its conflict check.
+  const release = h.view.releaseChatBatch.bind(h.view);
+  h.view.releaseChatBatch = async () => { await withTimeout(reachedP); return release(); };
+  const lines = await apply(h, Array.from({ length: 8 }, (_, i) => addRoot(`k${i}`, `K${i}`, h.ids.root)));
+  await withTimeout(pending);
+  return { h, B, seen, lines };
+};
+for (const tab of ['A', 'B']) integrationTest(`E2-tx B1: the batch flushed Map.md while the other tab is held; removing a card on tab ${tab} opens no conflict window, hangs nothing and keeps the 8 new cards`, async () => {
+  const { h, seen, lines } = await twoTabs(tab);
+  eq(lines.filter(l => l.status === 'done').length, 8, JSON.stringify(lines));
+  assert.equal((h.control.modals ?? []).length, 0, `conflict window opened: ${JSON.stringify(seen)}`);
+  const saved = await h.repo.readMap(MAP);
+  assert.equal(saved.nodes.length, 11, `Map.md keeps the 8 new cards (4 + 8 - the removed one): ${saved.nodes.length}; ${JSON.stringify(seen)}`);
+  for (const node of saved.nodes) assert.ok(h.files.has(node.path), `a card has its note: ${node.path}`);
+  assert.ok(!saved.nodes.some(n => n.id === h.ids.c), 'the removed card is off the map');
+  if (tab === 'B') assert.ok(seen.some(e => e.view === 'B' && e.syncHold > 0 && e.syncPending && !e.batch), `B adopted while held: ${JSON.stringify(seen)}`);
+});
+integrationTest('E2-tx B1: undo on the held tab after the batch flush adopts the stored map and says so: a Notice, history buttons refreshed, the 8 new cards kept', async () => {
+  const { h, B, seen, lines } = await twoTabs('travel');
+  eq(lines.filter(l => l.status === 'done').length, 8, JSON.stringify(lines));
+  assert.ok(seen.some(e => e.view === 'B' && e.syncHold > 0 && e.syncPending && !e.batch), `B was held: ${JSON.stringify(seen)}`);
+  assert.equal((h.control.modals ?? []).length, 0, 'no conflict window');
+  assert.equal(h.notices.filter(n => /Another tab's reply changed this map/.test(n)).length, 1, `one Notice: ${JSON.stringify(h.notices)}`);
+  assert.equal(B.history.canUndo, false); assert.equal(B.map.nodes.length, 12, 'B shows the stored map (4 + 8)');
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 12, 'Map.md keeps the 8 new cards');
 });
 
 

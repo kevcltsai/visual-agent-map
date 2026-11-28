@@ -129,6 +129,7 @@ import {
   isTransactionError,
   withVerifiedNoteHistory,
   type AttachmentPath,
+  type NewCard,
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
@@ -396,6 +397,8 @@ import {
   normalizeMapChatOpen,
   normalizeMapChatImageMode,
   rebaseMapNotePaths,
+  type ModelSource,
+  type NewNoteInitial,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -779,6 +782,15 @@ const BRANCH_LABEL = {
 } as const;
 export const VIEW_TYPE = "visual-agent-map-view";
 /** What a cross-map cut adds to writeNewBranches: its own transaction, the source map's part of it, and the success step. */
+/** A card shown on the map before its note exists: the transaction that lists it makes the note (see `Transaction.createNote`). */
+interface PendingCard {
+  /** The card as shown; its path is only the one the note is expected to get. */
+  node: MapNode;
+  title: string;
+  model: string;
+  modelSource: ModelSource;
+  initial: NewNoteInitial;
+}
 interface CrossCut {
   /** Reads what must be put back byte for byte if the commit fails; runs before `begin`. */
   snapshot: () => Promise<void>;
@@ -910,6 +922,10 @@ const MERGE_DONE_NOTICE_MS = 15000;
 const CHAT_ADDED_HINT_MS = 8000;
 /** How long a located card flashes (Locate on a chat result, resume item or the corner hint). */
 const CHAT_LOCATE_FLASH_MS = 1200;
+/** How long a reply's card batch may wait for its write (the queue and the commit) before the reply gives up: the cards fail with a reason the user can retry. */
+const CHAT_BATCH_WRITE_TIMEOUT_MS = 60000;
+/** How long a reply waits for the queue after its writes (rebuild, re-read) before it stops waiting; that work still runs when the queue frees. */
+const CHAT_BATCH_TAIL_TIMEOUT_MS = 10000;
 /** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
 const MERGE_FINDINGS_NOTICE_LIMIT = 5;
 /** How long a new AI editor waits for the previous one to give the pane and side panels back before it takes them anyway. */
@@ -1527,8 +1543,21 @@ export class VisualAgentMapView extends ItemView {
     freshNotes: () => this.freshNotes(),
     freshNotesOf: ids => this.freshNotesOf(ids),
     topicState: (id, fresh) => this.chatTopicState(id, fresh),
-    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
-      this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart, summary) => {
+      const batch = this.chatMapBatch;
+      return this.addNode(
+        parentNode,
+        suggestedTitle,
+        rebuildDerivedData,
+        focus,
+        kind,
+        keyboardFocus,
+        hypothesisStart,
+        undefined,
+        undefined,
+        { summary, refused: () => !!batch?.abandoned }
+      );
+    },
     createLivingNode: (parent, action, rebuild, current, allowSource) =>
       this.createNode(
         parent,
@@ -1676,11 +1705,17 @@ export class VisualAgentMapView extends ItemView {
     on: boolean;
     base: MapDocument | null;
     created: string[];
+    /** Cards shown but not yet made: their notes are written by the flush's transaction (see {@link PendingCard}). */
+    cards: PendingCard[];
     /** Where the batch began: the map it belongs to, and the place in the reply's history group its one entry goes back to. */
     path: string;
     mapId: string;
     historyAt: number;
+    /** The reply stopped waiting for the write: a commit that is still running refuses to write on (see settleStaged). */
+    abandoned: boolean;
   } | null = null;
+  private chatBatchWriteTimeoutMs = CHAT_BATCH_WRITE_TIMEOUT_MS;
+  private chatBatchTailTimeoutMs = CHAT_BATCH_TAIL_TIMEOUT_MS;
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
@@ -7119,6 +7154,29 @@ export class VisualAgentMapView extends ItemView {
     });
     return button;
   }
+  private newCard(card: PendingCard, mapId: string, mapPath: string, parkFolder: string): NewCard {
+    return {
+      title: card.title,
+      model: card.model,
+      map: { id: mapId },
+      mapPath,
+      modelSource: card.modelSource,
+      initial: { ...card.initial, nodeId: card.node.id },
+      parkFolder
+    };
+  }
+  /** After a step made card notes: the cards' notes are read from the files they were written to (their path is final now). */
+  private async readMadeNotes(cards: PendingCard[]): Promise<void> {
+    for (const card of cards) {
+      const node = this.map?.nodes.find(item => item.id === card.node.id);
+      if (!node || !this.map) continue;
+      try {
+        this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map));
+      } catch {
+        // The preview stays until the next read of the map.
+      }
+    }
+  }
   /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
@@ -7132,13 +7190,21 @@ export class VisualAgentMapView extends ItemView {
   private async flushChatMapBatch(): Promise<void> {
     const batch = this.chatMapBatch;
     const base = batch?.base;
-    if (!batch || !base || !this.map) return;
+    if (!batch || !base) return;
     const created = batch.created;
+    const cards = batch.cards;
     batch.base = null;
     batch.created = [];
+    batch.cards = [];
+    const forget = (): void => {
+      for (const card of cards) this.notes.delete(card.node.id);
+    };
     // Another map is open now (or the view is gone): the staged cards belong to the one the reply began on, and the open map
     // is not touched, so the whole batch fails.
-    if (this.closed || this.path !== batch.path || this.map.id !== batch.mapId) throw new Error("changed-target");
+    if (!this.map || this.closed || this.path !== batch.path || this.map.id !== batch.mapId) {
+      forget();
+      throw new Error("changed-target");
+    }
     const final = clone(this.map);
     const viewport = clone(this.map.viewport);
     const mapPath = this.path;
@@ -7149,31 +7215,59 @@ export class VisualAgentMapView extends ItemView {
       const disk = await this.plugin.repo.readMap(mapPath);
       this.adoptSavedMap(disk);
       const tx = this.beginMapTransaction();
-      for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
+      const parkFolder = this.plugin.repo.topicFolder(mapPath, "Unassigned");
+      for (const path of created) tx.create(path, parkFolder, base.id);
+      for (const card of cards) tx.createNote(card.node.id, this.newCard(card, base.id, mapPath, parkFolder));
       const entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, _resolve, _attachment, made) => {
           if (structure(map) === structure(base)) {
             const target = map as unknown as Record<string, unknown>;
             for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
             Object.assign(target, final);
           } else applyStagedDelta(map, base, final);
           map.viewport = clone(viewport);
+          // Each staged card is on the final map with the path its note was given, and hangs on a card that is there too:
+          // a map that lost the parent meanwhile cannot be written (it would not read back).
+          for (const card of cards) {
+            const node = map.nodes.find(item => item.id === card.node.id);
+            if (!node || (node.parentId !== null && !map.nodes.some(item => item.id === node.parentId)))
+              throw new Error("changed-target");
+            node.path = made(card.node.id).path;
+          }
         })
-        .commit({ deferRebuild: true });
+        .commit({ deferRebuild: true, authorize: () => !batch.abandoned });
       this.history.pushAt(entry, batch.historyAt);
     } catch (error) {
+      forget();
       this.render();
       throw error;
     }
+    await this.readMadeNotes(cards);
     this.render();
   }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
   private async resolveMapConflict(): Promise<boolean> {
+    this.adoptedHeldMap = false;
     if (!this.map) return false;
     const disk = await this.plugin.repo.readMap(this.path);
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
-    if (structure(disk) === structure(this.map)) return false;
-    const local = clone(this.map);
+    // While a reply's cards are only staged, the map on screen is ahead of Map.md by design: what is on disk is compared with
+    // the map the batch began from (the flush merges another write in), not with the staged cards.
+    const staged = this.chatMapBatch?.base;
+    if (structure(disk) === structure(staged ?? this.map)) return false;
+    // A view whose re-read is held back by another view's reply batch (holdChatBatch) has not read the batch's own Map.md
+    // writes yet: the difference is that owed read, not an outside edit. It takes the stored map now, as its synchronize
+    // would at the end of the batch; a conflict window here would offer its stale map over the batch's cards.
+    if (!staged && this.syncHold > 0 && this.syncPending) {
+      this.adoptSavedMap(disk);
+      this.history.clear();
+      this.adoptedHeldMap = true;
+      this.updateHistoryButtons();
+      return false;
+    }
+    // The screen version offered is the map without the staged cards: they have no note file yet, and keeping the screen
+    // would write them to Map.md without one. The batch then fails at its flush (its cards are not on the map).
+    const local = staged ? { ...clone(staged), viewport: clone(this.map.viewport) } : clone(this.map);
     // A cross-map cut refuses to touch this map while its conflict window is still open.
     this.conflictOpen = true;
     try {
@@ -7190,7 +7284,8 @@ export class VisualAgentMapView extends ItemView {
     rebuildDerivedData = true,
     created: string[] = [],
     attachment?: { name: string; data: ArrayBuffer },
-    authorize?: () => boolean
+    authorize?: () => boolean,
+    cards: PendingCard[] = []
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     this.clearTidy(false);
@@ -7220,11 +7315,14 @@ export class VisualAgentMapView extends ItemView {
       }
       if (graph(snapshot) !== graph(map)) this.livingGraph = undefined;
       staging.created.push(...created);
+      staging.cards.push(...cards);
       this.render();
       return null;
     }
     const tx = this.beginMapTransaction();
-    for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    const parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
+    for (const path of created) tx.create(path, parkFolder, this.map.id);
+    for (const card of cards) tx.createNote(card.node.id, this.newCard(card, this.map.id, this.path, parkFolder));
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
     if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before!: MapDocument, after!: MapDocument;
@@ -7233,10 +7331,12 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     try {
       const entry = await tx
-        .editMap(mapPath, (map, _resolve, attachmentPath) => {
+        .editMap(mapPath, (map, _resolve, attachmentPath, made) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
+          // The card the change adds carries the path its note was given at commit.
+          for (const card of cards) card.node.path = made(card.node.id).path;
           change(map, attachmentPath);
           this.pruneSummariesIn(map);
           after = clone(map);
@@ -7249,9 +7349,11 @@ export class VisualAgentMapView extends ItemView {
       if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
         this.map.viewport = clone(after.viewport);
     } catch (error) {
+      for (const card of cards) this.notes.delete(card.node.id);
       this.render();
       throw error;
     }
+    await this.readMadeNotes(cards);
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
@@ -7261,7 +7363,7 @@ export class VisualAgentMapView extends ItemView {
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
     if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
-      if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
+      if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0 || cards.length > 0))
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
@@ -13549,8 +13651,12 @@ export class VisualAgentMapView extends ItemView {
       .openDetails(this.plugin.repo.file(node.path), undefined, intent, this.notes.get(node.id)?.aiCard)
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
+  /** Set by resolveMapConflict when a held view took the stored map and dropped its history (not an outside edit). */
+  private adoptedHeldMap = false;
   private async travel(redo: boolean): Promise<void> {
     // Undo and redo replace Map.md like any change: an outside edit goes through the same conflict window first.
+    // The flag only counts for this click: a value left by another path must not show the notice.
+    this.adoptedHeldMap = false;
     if (
       this.map &&
       this.path &&
@@ -13560,6 +13666,14 @@ export class VisualAgentMapView extends ItemView {
       await this.persist();
       await this.hydrate();
       this.render();
+      return;
+    }
+    if (this.adoptedHeldMap) {
+      // The step this click would have undone or redone is gone with the history: say so instead of doing nothing.
+      this.adoptedHeldMap = false;
+      await this.hydrate();
+      this.render();
+      new Notice(t("ui.map_chat_history_reset_by_other_tab"));
       return;
     }
     const action = redo ? this.history.redo() : this.history.undo();
@@ -19741,7 +19855,12 @@ export class VisualAgentMapView extends ItemView {
       current: () => boolean;
       allowSource?: (path: string) => boolean;
       onSaved: (saved: LivingConfigSave) => void;
-    }
+    },
+    /** A titled card's finished summary: it is part of the note when the note is made (never a second write). */
+    start: {
+      summary?: string;
+      /** True once the reply this card belongs to gave up: the write goes no further. */ refused?: () => boolean;
+    } = {}
   ): Promise<MapNode | undefined> {
     if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
     const creationMapPath = this.path;
@@ -19752,8 +19871,18 @@ export class VisualAgentMapView extends ItemView {
     // No name given (the "+", the toolbar, the keys): the card appears with a default name and its title opens for typing.
     const interactive = suggestedTitle === undefined;
     // One resolution: a manual ancestor's model is inherited, otherwise the current model.
-    const model = parent
-      ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+    // A card given its title has no note until the map transaction that lists it makes one; one named in its field (and a
+    // Living card, which is configured first) is a note at once.
+    const deferred = !livingConfig && !interactive;
+    // A card still waiting for its note has no file to resolve from: the model comes from its nearest card that has one.
+    const waiting = new Set(this.chatMapBatch?.cards.map(card => card.node.path));
+    let modelParent = parent;
+    while (modelParent && waiting.has(modelParent.path)) {
+      const above: string | null = modelParent.parentId;
+      modelParent = (above && this.map.nodes.find(item => item.id === above)) || null;
+    }
+    const model = modelParent
+      ? (await this.plugin.repo.resolveTopicModel(modelParent.path, this.map ?? undefined)).model
       : this.plugin.currentModelChoice().model;
     if (livingConfig && !livingConfig.current()) return undefined;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
@@ -19764,24 +19893,27 @@ export class VisualAgentMapView extends ItemView {
       t("ui.new_topic"),
       this.map.nodes.map(item => this.notes.get(item.id)?.title ?? "")
     );
-    const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName,
-      model,
-      this.map,
-      this.path,
-      parent ? "inherited" : "workspace",
-      // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      {
-        researchMode: "local",
-        ...(typed ? { topicKind: kind } : {}),
-        ...(typed && kind === "hypothesis"
-          ? {
-              ...(hypothesisStart.leaning ? { hypothesisLeaning: hypothesisStart.leaning } : {}),
-              ...(hypothesisStart.strength ? { hypothesisStrength: hypothesisStart.strength } : {})
-            }
-          : {})
-      }
-    );
+    const title = sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName;
+    const modelSource: ModelSource = parent ? "inherited" : "workspace";
+    // A new topic starts in Quick mode (a research of it may still be run in Standard).
+    const initial: NewNoteInitial = {
+      researchMode: "local",
+      ...(typed ? { topicKind: kind } : {}),
+      ...(typed && kind === "hypothesis"
+        ? {
+            ...(hypothesisStart.leaning ? { hypothesisLeaning: hypothesisStart.leaning } : {}),
+            ...(hypothesisStart.strength ? { hypothesisStrength: hypothesisStart.strength } : {})
+          }
+        : {}),
+      ...(deferred && start.summary ? { complete: { patch: { summary: start.summary } } } : {})
+    };
+    let node: MapNode;
+    let preview: string | undefined;
+    if (deferred) {
+      const shown = this.plugin.repo.previewNote(title, model, this.map, this.path, modelSource, initial, waiting);
+      node = shown.node;
+      preview = shown.content;
+    } else node = await this.plugin.repo.createNote(title, model, this.map, this.path, modelSource, initial);
     // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
@@ -19821,7 +19953,11 @@ export class VisualAgentMapView extends ItemView {
         if (!livingConfig.current()) throw new Error("changed-target");
       }
       if (!this.map) throw new Error("changed-target");
-      const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
+      const shownMap = { ...this.map, nodes: [...this.map.nodes, node] };
+      const preparedNote =
+        preview !== undefined
+          ? await repo.noteFromContent(node.path, preview, shownMap)
+          : await repo.readNote(node.path, shownMap);
       if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
       this.notes.set(node.id, preparedNote);
       // A batch card (focus false) leaves the selection to its caller.
@@ -19835,12 +19971,18 @@ export class VisualAgentMapView extends ItemView {
           fresh: true,
           created: true
         };
+      if (start.refused?.()) {
+        this.notes.delete(node.id);
+        throw new Error("batch-timeout");
+      }
       await this.mapChangeSnapshots(
         map => {
           if (livingConfig && (map.id !== creationMapId || graph(map) !== configurationGraph))
             throw new Error("changed-target-identity");
-          map.nodes.push(node);
           const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+          // The parent is gone from the map being written (another write took it): the card would not read back.
+          if (parent && !owner) throw new Error("changed-target");
+          map.nodes.push(node);
           // Only a block that hangs on this very topic can be followed; anything else adds an ordinary child.
           const follows =
             owner && afterTextId
@@ -19877,9 +20019,10 @@ export class VisualAgentMapView extends ItemView {
           }
         },
         livingConfig ? false : rebuildDerivedData,
-        [node.path],
+        deferred ? [] : [node.path],
         undefined,
-        livingConfig?.current
+        livingConfig?.current,
+        deferred ? [{ node, title, model, modelSource, initial }] : []
       );
       if (livingConfig && configured) {
         livingConfig.onSaved(configured);
@@ -19896,6 +20039,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
+      if (deferred) this.notes.delete(node.id);
       if (
         livingConfig &&
         provisionalFile &&
@@ -25543,6 +25687,18 @@ export class VisualAgentMapView extends ItemView {
     this.renderHold++;
     for (const view of this.heldViews) view.syncHold++;
   }
+  /** Waits for `work` at most `ms`; false when it is still running (it goes on, only this wait ends). */
+  private async waitAtMost(work: Promise<unknown>, ms: number): Promise<boolean> {
+    let timer: number | undefined;
+    const limit = new Promise<false>(resolve => {
+      timer = window.setTimeout(() => resolve(false), ms);
+    });
+    try {
+      return await Promise.race([work.then(() => true), limit]);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
   private async releaseChatBatch(): Promise<void> {
     const held = this.heldViews;
     if (!held.length) return;
@@ -25557,7 +25713,10 @@ export class VisualAgentMapView extends ItemView {
     for (const view of held) view.syncPending = false;
     try {
       // An empty write: its tail re-reads every view once.
-      await this.plugin.mutate(async () => {});
+      await this.waitAtMost(
+        this.plugin.mutate(async () => {}),
+        this.chatBatchTailTimeoutMs
+      );
     } catch {
       // mutate() has logged it; the views catch up at their next write.
     }
@@ -25568,9 +25727,12 @@ export class VisualAgentMapView extends ItemView {
       run.ownershipDirty = false;
       try {
         // plugin.rebuildDerivedData reports its own failure; the queue only keeps it from running between two writes.
-        await this.plugin.mutate(async () => {
-          await this.plugin.rebuildDerivedData();
-        });
+        await this.waitAtMost(
+          this.plugin.mutate(async () => {
+            await this.plugin.rebuildDerivedData();
+          }),
+          this.chatBatchTailTimeoutMs
+        );
       } catch {
         // mutate() has logged it.
       }
@@ -25685,13 +25847,54 @@ export class VisualAgentMapView extends ItemView {
     // A reply that adds many cards writes them to Map.md once: the card writes (and the layout after them) are staged in
     // memory and written as one transaction before anything else writes, or at the end.
     const stage =
-      adds > 0 && batched && !scope ? { on: false, base: null, created: [], path: "", mapId: "", historyAt: 0 } : null;
+      adds > 0 && batched && !scope
+        ? { on: false, base: null, created: [], cards: [], path: "", mapId: "", historyAt: 0, abandoned: false }
+        : null;
     const staged: { index: number; label: string; ids: string[] }[] = [];
     this.chatMapBatch = stage;
+    // One write of this reply. It waits for the queue at most the batch limit; past it the reply gives up (`gaveUp`): the write
+    // is dropped if it has not started, every later write of the reply fails at once, and the staged cards are taken back.
+    let gaveUp = false;
+    const queued = async (work: () => Promise<void>): Promise<void> => {
+      if (gaveUp) throw new Error("batch-timeout");
+      const done = this.plugin.mutate(async () => {
+        if (!gaveUp) await work();
+      });
+      done.catch(() => {});
+      if (!(await this.waitAtMost(done, this.chatBatchWriteTimeoutMs))) {
+        gaveUp = true;
+        // A card write already running goes on in the background: it must not write what its line says was not kept.
+        if (stage) stage.abandoned = true;
+        throw new Error("batch-timeout");
+      }
+    };
+    const dropStaged = (): void => {
+      if (!stage?.base) return;
+      this.adoptSavedMap(stage.base);
+      for (const card of stage.cards as PendingCard[]) this.notes.delete(card.node.id);
+      stage.base = null;
+      stage.created = [];
+      stage.cards = [];
+      this.render();
+    };
     const settleStaged = async (): Promise<void> => {
       if (!stage?.base) return;
       try {
-        await this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        if (gaveUp) {
+          dropStaged();
+          throw new Error("batch-timeout");
+        }
+        // The wait has a limit: a write queue that is stuck (another write waiting for the user) or a commit that never returns
+        // must not leave the reply at "applying". On the limit the cards fail (retry by asking again); a flush that has not
+        // started is dropped, one that has started is told to stop at its next check and takes its notes back.
+        const write = this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        write.catch(() => {});
+        if (!(await this.waitAtMost(write, this.chatBatchWriteTimeoutMs))) {
+          gaveUp = true;
+          stage.abandoned = true;
+          dropStaged();
+          throw new Error("batch-timeout");
+        }
         wrote = true;
       } catch (error) {
         // All or nothing: the cards of the batch were not written, so their lines say so and the run forgets them.
@@ -25755,6 +25958,13 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        if (gaveUp) {
+          lines[index] = this.chatLine(label, {
+            status: "failed",
+            reason: chatFailureReason(new Error("batch-timeout"))
+          });
+          continue;
+        }
         const staging = !!stage && action.kind === "add_child" && !action.livingPrompt;
         if (!staging) await settleStaged();
         if (action.kind === "rename_map") {
@@ -25807,7 +26017,7 @@ export class VisualAgentMapView extends ItemView {
             // The run's own write takes the mutation queue, so this one must not wait inside it.
             box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
           else
-            await this.plugin.mutate(async () => {
+            await queued(async () => {
               // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
             });
@@ -25850,7 +26060,7 @@ export class VisualAgentMapView extends ItemView {
       ) {
         try {
           if (stage) stage.on = true;
-          await this.plugin.mutate(() =>
+          await queued(() =>
             this.history.ownWrites(async () => {
               if (!same() || !this.map) return;
               // The layout measures the cards, so the held repaint comes first.
@@ -25877,7 +26087,7 @@ export class VisualAgentMapView extends ItemView {
         if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
             if (stage) stage.on = true;
-            await this.plugin.mutate(() =>
+            await queued(() =>
               this.history.ownWrites(async () => {
                 if (!same() || !this.map) return;
                 await this.mapChange(map => {
@@ -25913,7 +26123,7 @@ export class VisualAgentMapView extends ItemView {
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           if (stage) stage.on = true;
-          await this.plugin.mutate(() =>
+          await queued(() =>
             this.history.ownWrites(async () => {
               if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
               this.flushChatRender();

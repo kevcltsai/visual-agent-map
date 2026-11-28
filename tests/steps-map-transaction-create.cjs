@@ -253,3 +253,54 @@ test('Living Node creation: failed map publication must not trash a provisionall
   assert.equal(h.trashed.length, 0);
   assert.match(h.contents.get(h.notesIn('Notes').find(p => /Edited research/.test(p))), /User edit/);
 });
+
+// ---- tx.createNote (E2-tx): the transaction makes the note of a new card itself, once, with its final content ----
+const newCard = h => ({
+  title: 'Made', model: 'gpt-6-luna', map: h.view.map, mapPath: MAP, modelSource: 'workspace',
+  initial: { nodeId: 'made-1', researchMode: 'local', complete: { patch: { summary: 'S made' } } },
+  parkFolder: h.repo.topicFolder(MAP, 'Unassigned')
+});
+const listMade = h => (map, _resolve, _attachment, made) => { map.nodes.push({ ...made('k'), parentId: h.root.id }); };
+
+test('tx.createNote: one commit makes the note with its summary, lists it, and keeps the id given; Undo parks it in Unassigned, Redo puts it back', async () => {
+  const h = await harness();
+  const tx = h.view.beginMapTransaction().createNote('k', newCard(h)).editMap(MAP, listMade(h));
+  const entry = await tx.commit();
+  const listed = (await h.repo.readMap(MAP)).nodes.find(n => n.id === 'made-1');
+  assert.ok(listed, 'Map.md lists the card under the id it was given');
+  assert.match(h.contents.get(listed.path), /S made/, 'the note was written with its summary');
+  assert.equal(h.notesIn('Notes').filter(p => /Made/.test(p)).length, 1);
+  h.view.history.push(entry);
+  await h.view.travel(false);
+  assert.equal(h.contents.has(listed.path), false, 'undo moves the note away');
+  assert.equal(h.notesIn('Unassigned').length, 1, 'to Unassigned');
+  await h.view.travel(true);
+  assert.equal(h.contents.has(listed.path), true, 'redo puts it back');
+});
+
+test('tx.createNote: a failed step takes back the note it made', async () => {
+  const h = await harness();
+  const before = h.notesIn('Notes');
+  const error = await h.rejected(h.view.beginMapTransaction().createNote('k', newCard(h)).editMap(MAP, (map, _r, _a, made) => { made('k'); throw new Error('refused'); }).commit());
+  assert.match(error.message, /refused/);
+  assert.equal(h.trashed.filter(p => /Made/.test(p)).length, 1, 'the note was trashed');
+  assert.deepEqual(before, h.notesIn('Notes').filter(p => !h.trashed.includes(p)));
+  assert.equal((await h.repo.readMap(MAP)).nodes.some(n => n.id === 'made-1'), false);
+});
+
+test('tx.createNote: a rollback that fails to rebuild the derived data throws rollback-failed and keeps every created note', async () => {
+  const h = await harness();
+  const plugin = h.view.plugin;
+  const rebuild = plugin.rebuildDerivedData;
+  const spy = plugin.repo;
+  const save = spy.saveMap;
+  let calls = 0;
+  spy.saveMap = async (...args) => { calls += 1; const out = await save.apply(spy, args); if (calls === 1) throw new Error('injected saveMap 1'); return out; };
+  plugin.rebuildDerivedData = async () => { throw new Error('injected rebuild'); };
+  const error = await h.rejected(h.view.beginMapTransaction().createNote('k', newCard(h)).editMap(MAP, listMade(h)).commit());
+  plugin.rebuildDerivedData = rebuild;
+  spy.saveMap = save;
+  assert.equal(error.kind, 'rollback-failed');
+  assert.equal(h.notesIn('Notes').filter(p => /Made/.test(p)).length, 1, 'the created note file stays for the retry');
+  assert.equal(h.trashed.length, 0, 'nothing was trashed');
+});

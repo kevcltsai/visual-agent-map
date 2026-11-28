@@ -577,6 +577,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.keep_editor_contents": "保留畫面內容",
   "ui.save_merged_contents": "儲存合併內容",
   "ui.mind_map_changed_externally": "心智圖有外部修改",
+  "ui.map_chat_history_reset_by_other_tab": "另一個分頁的回覆已修改這張心智圖，已切換到最新版本。請重做這一步。",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "畫面與 Map.md 的結構都已改變。請選擇要保留哪一版。",
   "ui.invalid_merged_contents": "合併內容無效：結構不符合心智圖格式，請修正後再儲存。",
@@ -1491,6 +1492,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_attached_read_only": "檔案在這張心智圖的資料夾之外，對話只能讀、不能改",
   "ui.map_chat_skip_stale": "送出後檔案又被修改過",
   "ui.map_chat_fail_changed": "目標卡在送出後被改過，這一步沒有寫入",
+  "ui.map_chat_fail_batch_timeout": "這一步沒能及時寫入，沒有保留（標為完成的行已保留）；請再問一次",
   "ui.map_chat_fail_unknown": "這一步無法完成",
   "ui.map_chat_skip_topic_gone": "議題已不在心智圖上",
   "ui.map_chat_skip_find_failed": "要取代的文字沒有剛好出現一次",

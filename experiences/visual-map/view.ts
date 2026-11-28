@@ -2734,17 +2734,46 @@ export class VisualAgentMapView extends ItemView {
       if (start !== null && end !== null) input.setSelectionRange(start, end);
     };
   }
+  /** The last result: one keystroke asks for it several times (marks, count, announcement, step) but computes it once. */
+  private mapSearchMemo: { query: string; signature: string; notes: Note[]; result: MapSearchResult } | null = null;
+  /** Summary and Detail joined once per loaded note, so the same string is folded only once. */
+  private searchBodies = new WeakMap<Note, { summary: string; detail: string; body: string }>();
+  private searchBodyOf(note: Note | undefined): string {
+    if (!note) return "";
+    const kept = this.searchBodies.get(note);
+    if (kept && kept.summary === note.summary && kept.detail === note.detail) return kept.body;
+    const body = `${note.summary}\n${note.detail}`;
+    this.searchBodies.set(note, { summary: note.summary, detail: note.detail, body });
+    return body;
+  }
   private mapSearchResult(): MapSearchResult | null {
     if (!this.map || !this.mapSearch) return null;
     const direction = layoutOf(this.map).direction;
-    return searchMap(
+    const query = this.mapSearch.query;
+    const signature = `${direction}|${mapSignature(this.map)}`;
+    const notes = this.map.nodes.map(node => this.notes.get(node.id) as Note);
+    const memo = this.mapSearchMemo;
+    if (
+      memo &&
+      memo.query === query &&
+      memo.signature === signature &&
+      memo.notes.length === notes.length &&
+      memo.notes.every((note, i) => note === notes[i])
+    )
+      return memo.result;
+    const result = searchMap(
       this.map.nodes,
       supersededAimNodeIds(this.map),
-      id => this.notes.get(id)?.title ?? "",
-      this.mapSearch.query,
+      id => {
+        const note = this.notes.get(id);
+        return { title: note?.title ?? "", body: this.searchBodyOf(note) };
+      },
+      query,
       ["down", "up"].includes(direction) ? "x" : "y",
       direction === "balanced"
     );
+    this.mapSearchMemo = { query, signature, notes, result };
+    return result;
   }
   private mapSearchCountText(): string {
     const search = this.mapSearch;
@@ -2814,9 +2843,8 @@ export class VisualAgentMapView extends ItemView {
     // Keyboard-style move: the camera follows in memory and Map.md's viewport is not written.
     this.focusNode(target, false);
     this.applySearchMarks();
-    this.announcer?.setText(
-      t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "")
-    );
+    const spoken = t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "");
+    this.announcer?.setText(result?.bodyOnly.has(step.id) ? `${spoken}${t("ui.map_search_body_hit")}` : spoken);
   }
   /** Shows exactly `ancestors` open (the rest of an earlier jump folds back) and works out where the revealed cards stand, on a copy. */
   private openForSearch(ancestors: string[]): void {

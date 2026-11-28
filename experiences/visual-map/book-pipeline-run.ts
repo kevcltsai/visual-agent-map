@@ -389,6 +389,8 @@ export type BookRunRefusal =
   | "empty"
   | "not_stopped"
   | "instruction"
+  /** The note has `ai-locked: true`: nothing is asked of the model. */
+  | "ai_locked"
   /** Applying notes: a notes job already holds this map; a drive does; the job was cancelled; the map or card changed meanwhile; the backup failed; no note to apply. */
   | "notes_busy"
   | "drive_running"
@@ -427,6 +429,8 @@ export interface PipelineCard {
   prompt: string;
   detail: string;
   raw: string;
+  /** `ai-locked: true` in `raw`, read the way the write fence reads it: no AI call is made for this note. */
+  aiLocked?: boolean;
   fields: PipelineFields;
   /** The six `book-*` values the note holds (the root's are the owner's current values). */
   settings: BookSettings;
@@ -806,6 +810,7 @@ const internalCode = (error: unknown): string =>
 /** Failure reasons after which the card's proof-result section is not written (the write never reached the card, or the card is gone). */
 const NO_FAILURE_SECTION: ReadonlySet<string> = new Set([
   "discarded",
+  "ai_locked",
   "card_removed",
   "backup_failed",
   "missing",
@@ -2479,6 +2484,7 @@ export class BookPipelineRuns {
     } catch {
       throw new BookPipelineRunError("unreadable");
     }
+    if ((await this.ports.readCard(path).catch(() => undefined))?.aiLocked) throw new BookPipelineRunError("ai_locked");
     refuseIfGone();
     const items = snapshotNotes(raw);
     if (!items.length) throw new BookPipelineRunError("nothing");
@@ -3479,6 +3485,10 @@ export class BookPipelineRuns {
       );
     };
     if (!card) return giveUp();
+    if (card.aiLocked) {
+      this.log(drive, "ai_locked_skipped", nodeId, "proof", "ai_locked");
+      return giveUp();
+    }
     const body = aiProofBody(chapterBody(card.detail));
     const revision = cardRevision(drive.store.state, nodeId);
     const key = aiProofKey(revision, body);
@@ -4196,6 +4206,10 @@ export class BookPipelineRuns {
     const order = effectiveOrder(drive.store.state);
     if (!root || order.some(id => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
+    if (before.aiLocked) {
+      this.log(drive, "ai_locked_skipped", drive.rootId, "plan", "ai_locked");
+      return { kind: "failed", reason: "ai_locked", final: true };
+    }
     const structure = this.structureOf(drive, order);
     const locked = await this.lockedCards(drive, order);
     const request: GlobalPlanRequest = {
@@ -4296,7 +4310,7 @@ export class BookPipelineRuns {
       if (id === drive.rootId) continue;
       const info = drive.cards.get(id) as CardInfo;
       const raw = await this.ports.readCard(info.path).then(
-        card => card.raw,
+        card => (card.aiLocked ? undefined : card.raw),
         () => undefined
       );
       // The text's owner alone: a one-time permit or the card's own rerun opens only that rewrite, never a structure change (the same
@@ -4554,12 +4568,19 @@ export class BookPipelineRuns {
     });
   }
 
+  /** A chapter with `ai-locked: true` (ai-flows, AI lock): no call is made; it needs review with the locked reason, its text untouched. */
+  private aiLockedStep(drive: Drive, nodeId: string, step: PipelineStep): Outcome {
+    this.log(drive, "ai_locked_skipped", nodeId, step, "ai_locked");
+    return { kind: "failed", reason: "ai_locked", forceReview: true };
+  }
+
   private async execPlan(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    if (card.aiLocked) return this.aiLockedStep(drive, nodeId, "plan");
     // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text): the plan and the write keep it.
     if (readerSummaryRaw(card.raw)) drive.ownSummary.add(nodeId);
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
@@ -4707,6 +4728,7 @@ export class BookPipelineRuns {
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     drive.imagesDone.delete(nodeId);
     const card = await this.ports.readCard(info.path);
+    if (card.aiLocked) return this.aiLockedStep(drive, nodeId, "write");
     const root = await this.ports.readCard(rootInfo.path);
     // The reader's hand: a chapter whose text is not as the program left it (or whose state is not known) is rewritten only with the
     // reader's one-time permission for exactly this text. The same check runs again inside the write itself (see `authorizeWrite`).
@@ -6011,6 +6033,7 @@ export class BookPipelineRuns {
     const card = await this.ports.readCard(info.path);
     // "Keep my version" for this very text: the reader's answer is final, no proofread call; the chapter is done.
     if (isKeptRaw(card.raw)) return { kind: "ok", after: () => this.setStage(drive, nodeId, "checked", null) };
+    if (card.aiLocked) return this.aiLockedStep(drive, nodeId, "proof");
     const checklist = parseChecklist(card.prompt);
     const chapter = chapterBody(card.detail);
     const body = projectProofBody(stripImageLines(chapter));

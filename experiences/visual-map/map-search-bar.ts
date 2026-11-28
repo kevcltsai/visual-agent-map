@@ -1,11 +1,13 @@
-import { findMatches, nextMatch, type MapMatchStep } from "./map-search";
+import { nextMatch, searchMatches, type MapMatchStep, type SearchText } from "./map-search";
 import { readingOrder } from "./presentation-order";
 import type { MapNode } from "../../map-graph";
 
-/** Search over the map's titles: the reading order (collapsed branches included), the matches and the current one. */
+/** Search over the map's titles, summaries and details: the reading order (collapsed branches included) and the matches. */
 export interface MapSearchResult {
   order: string[];
   matches: string[];
+  /** Matches found only in the summary or Detail, not the title. */
+  bodyOnly: ReadonlySet<string>;
 }
 
 /**
@@ -15,7 +17,7 @@ export interface MapSearchResult {
 export function searchMap(
   nodes: readonly MapNode[],
   skip: ReadonlySet<string>,
-  titleOf: (id: string) => string,
+  textOf: (id: string) => SearchText,
   query: string,
   siblingAxis: "y" | "x",
   balanced = false
@@ -24,7 +26,7 @@ export function searchMap(
     nodes.filter(node => !skip.has(node.id)),
     { includeHidden: true, siblingAxis, balanced }
   );
-  return { order, matches: findMatches(order, titleOf, query) };
+  return { order, ...searchMatches(order, textOf, query) };
 }
 
 /** The match to jump to from `currentId`, cycling. Null when nothing matches. */

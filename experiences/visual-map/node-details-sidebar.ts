@@ -12,6 +12,8 @@ export class NodeDetailsSidebar {
   private trialOwner?: string;
   private revision = 0;
   private pending: Promise<void> = Promise.resolve();
+  private readonly revealListeners = new Set<() => void>();
+  private revealingCount = 0;
 
   /** Serialize transitions of the single shared right pane; the newest selection wins. */
   private enqueue<T>(run: () => Promise<T>): Promise<T> {
@@ -58,6 +60,27 @@ export class NodeDetailsSidebar {
     if (this.app().workspace.rightSplit.collapsed) return false;
     if (this.following && this.detailsLeaf && !this.attached(this.detailsLeaf)) return true;
     return this.paneLeaves().some(leaf => leaf.view.containerEl.isShown());
+  }
+
+  /** Called after this pane revealed its leaf (which can unfold the right side panel); returns the unsubscribe. */
+  onReveal(listener: () => void): () => void {
+    this.revealListeners.add(listener);
+    return () => this.revealListeners.delete(listener);
+  }
+
+  /** True while this pane is revealing its leaf: a side panel unfolding now is VAM's doing, not the user's. */
+  revealing(): boolean {
+    return this.revealingCount > 0;
+  }
+
+  private async reveal(leaf: WorkspaceLeaf): Promise<void> {
+    this.revealingCount++;
+    try {
+      await this.app().workspace.revealLeaf(leaf);
+    } finally {
+      this.revealingCount--;
+    }
+    for (const listener of [...this.revealListeners]) listener();
   }
 
   /** A plain selection: the native editor the user opened for this same card is kept. */
@@ -132,7 +155,7 @@ export class NodeDetailsSidebar {
     this.detailsPath = file.path;
     this.following = true;
     this.styleLeaf(leaf);
-    await this.app().workspace.revealLeaf(leaf);
+    await this.reveal(leaf);
   }
 
   showLivingTrial(
@@ -167,7 +190,7 @@ export class NodeDetailsSidebar {
       if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
       await leaf.view.show(file, markdown, owner, warnings, false, changes, draft);
       if (!current()) return false;
-      await this.app().workspace.revealLeaf(leaf);
+      await this.reveal(leaf);
       return current();
     });
   }

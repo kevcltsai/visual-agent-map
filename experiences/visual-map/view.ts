@@ -267,7 +267,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { collapseForEditorRoom, restoreEditorRoom, type SideDock } from "./living-editor-room";
+import { EditorRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -1766,10 +1766,10 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController;
     viewSession: string;
     adoption?: LivingAdoptionCheck;
-    /** Side panels this editor folded to make room; opened again when it closes. */
-    folded: Set<SideDock>;
-    /** Side panels the user had folded that the editor's reader unfolded; folded back when it closes. */
-    revealed: Set<SideDock>;
+    /** The room this editor makes among the side panels, given back when it closes. */
+    room: EditorRoom;
+    /** Ends the subscription to the reader's reveals. */
+    stopReveal?: () => void;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -17252,9 +17252,15 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      folded: new Set(),
-      revealed: new Set()
+      room: new EditorRoom(this.sideDocks())
     };
+    // The reader revealing its leaf can unfold the right panel: that is VAM's doing, not the user's, and it takes width.
+    const room = this.aiCardOpen.room;
+    this.aiCardOpen.stopReveal = this.plugin.onDetailsReveal?.(() => {
+      if (this.aiCardOpen?.room !== room) return;
+      room.accept(this.sideDock("right"));
+      this.makeRoomForAiCard();
+    });
     win.mount(overlay);
     this.makeRoomForAiCard();
     if (node)
@@ -17264,17 +17270,11 @@ export class VisualAgentMapView extends ItemView {
         })
         .catch(() => undefined);
     if (node) {
-      const right = (this.app.workspace as { rightSplit?: SideDock } | undefined)?.rightSplit;
-      const rightFolded = right?.collapsed === true;
       void this.plugin
         .openDetails(this.plugin.repo.file(node.path), viewSession)
         .then(() => {
-          // The reader opens in the right panel: a panel the user had folded is folded back on close, and the room is
-          // measured again now that the reader took its width.
-          const open = this.aiCardOpen;
-          if (!current() || !open) return;
-          if (right && rightFolded && !right.collapsed) open.revealed.add(right);
-          this.makeRoomForAiCard();
+          // The reader took width in the right panel: the room is measured again.
+          if (current() && this.aiCardOpen) this.makeRoomForAiCard();
         })
         .catch(error => {
           if (current()) new Notice(error instanceof Error ? error.message : String(error));
@@ -17288,7 +17288,8 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
-    restoreEditorRoom(open.folded, open.revealed);
+    open.stopReveal?.();
+    open.room.restore();
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
@@ -17437,8 +17438,17 @@ export class VisualAgentMapView extends ItemView {
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
     const width = overlay.clientWidth ?? 0;
-    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
-    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit], this.aiCardOpen.folded);
+    // A resize while the reader is revealing its leaf comes from VAM unfolding the right panel, not from the user.
+    if (this.plugin.detailsRevealing?.()) this.aiCardOpen.room.accept(this.sideDock("right"));
+    this.aiCardOpen.room.fit(width);
+  }
+  private sideDock(side: "left" | "right"): SideDock | undefined {
+    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock } | undefined;
+    return side === "left" ? workspace?.leftSplit : workspace?.rightSplit;
+  }
+  /** Obsidian's side panels, the left one first. */
+  private sideDocks(): SideDock[] {
+    return [this.sideDock("left"), this.sideDock("right")].filter((dock): dock is SideDock => !!dock);
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {
@@ -23082,10 +23092,12 @@ export class VisualAgentMapView extends ItemView {
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    // A continuous pan or zoom writes Map.md once, after it stops; closing, switching maps and unload flush it at once.
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
       this.queueViewportWrite();
-    }, 250);
+    }, 500);
+    this.plugin.viewportsPending?.add(this);
   }
   /** A viewport write skips the re-read of every note; saves that arrive while one waits in the queue join it. */
   private queueViewportWrite(): void {
@@ -23110,14 +23122,20 @@ export class VisualAgentMapView extends ItemView {
     this.viewportTimer = null;
     await this.persistViewport();
   }
+  /** Unload: a pan or zoom still in its debounce, or queued behind other work, is written now. */
+  flushViewportOnUnload(): void {
+    if (this.viewportTimer === null && !this.viewportQueued) return;
+    if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    void this.persistViewport().catch(() => undefined);
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
+    this.plugin.viewportsPending?.delete(this);
     if (!this.map || !this.path) return;
     const path = this.path;
     const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };
-    const written = await this.plugin.repo.updateMap(path, map => {
-      map.viewport = viewport;
-    });
+    const written = await this.plugin.repo.updateViewport(path, viewport);
     // A late write for the previous map must not stamp the newly opened map.
     if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.

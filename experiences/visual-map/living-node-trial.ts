@@ -128,7 +128,10 @@ export class LivingTrial {
       if (base.revision === "empty" && !next.records.length && !next.output.text)
         throw new Error("missing-formal-result");
       if (!(await request.stillCurrent()) || !current()) {
-        if (current()) this.status = "invalid";
+        if (current()) {
+          this.status = "invalid";
+          this.failureCode = "source-changed";
+        }
         return false;
       }
       this.preview = {

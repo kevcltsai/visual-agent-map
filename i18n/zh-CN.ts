@@ -1223,6 +1223,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial_reason_timeout": "AI 响应太久，已超时。",
   "ui.living_node_trial_reason_web": "这张卡需要联网搜索，但没有使用到搜索结果。",
   "ui.living_node_trial_reason_replaced": "试跑期间来源笔记被替换或改动。",
+  "ui.living_node_trial_reason_source_changed": "试跑期间来源变了，预览已失效，请重新试跑。",
   "ui.living_node_trial_reason_validation": "AI 的回答没有通过检查，已被拒绝。",
   "ui.living_node_trial_reason_code_0": "代码：{0}",
   "ui.living_node_trial_retry": "再试一次",

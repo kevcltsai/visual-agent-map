@@ -1293,6 +1293,8 @@ export const en = {
   "ui.living_node_trial_reason_timeout": "The AI took too long and timed out.",
   "ui.living_node_trial_reason_web": "This card needs a web search, but no search result was used.",
   "ui.living_node_trial_reason_replaced": "A source note was replaced or changed during the trial.",
+  "ui.living_node_trial_reason_source_changed":
+    "A source changed during the trial, so the preview is no longer valid. Run the trial again.",
   "ui.living_node_trial_reason_validation": "The AI answer was rejected by validation.",
   "ui.living_node_trial_reason_code_0": "Code: {0}",
   "ui.living_node_trial_retry": "Try again",

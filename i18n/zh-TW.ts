@@ -1224,6 +1224,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_trial_reason_timeout": "AI 回應太久，已逾時。",
   "ui.living_node_trial_reason_web": "這張卡需要網路搜尋，但沒有使用到搜尋結果。",
   "ui.living_node_trial_reason_replaced": "試跑期間來源筆記被替換或改動。",
+  "ui.living_node_trial_reason_source_changed": "試跑期間來源變了，預覽已失效，請重新試跑。",
   "ui.living_node_trial_reason_validation": "AI 的回答沒有通過檢查，已被拒絕。",
   "ui.living_node_trial_reason_code_0": "代碼：{0}",
   "ui.living_node_trial_retry": "再試一次",

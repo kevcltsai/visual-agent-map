@@ -390,7 +390,13 @@ export class AiCardPopover {
       this.preview = false;
     } finally {
       this.busy = false;
-      if (!this.destroyed) this.refresh();
+      if (!this.destroyed) {
+        this.refresh();
+        // The adopt button is now disabled and took the focus with it: keep the keyboard (and Escape) in this editor.
+        const doc = this.el.ownerDocument;
+        const active = doc?.activeElement ?? null;
+        if (!active || active === doc?.body || !this.el.contains(active)) this.trialEl.focus();
+      }
     }
   }
 

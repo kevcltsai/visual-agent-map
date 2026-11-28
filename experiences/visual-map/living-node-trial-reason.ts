@@ -17,6 +17,7 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
     if (/required-web|forbidden-web|web-check|web-excerpt|missing-search-decision/.test(code))
       return "ui.living_node_trial_reason_web";
     if (/too-large/.test(code)) return "ui.living_node_reason_range_too_large";
+    if (code === "source-changed") return "ui.living_node_trial_reason_source_changed";
     if (/^(stale-base|changed-knowledge)$/.test(code)) return "ui.living_node_trial_reason_replaced";
     if (/^(ambiguous-living-node-region|invalid-generation|invalid-receipts|unknown-ownership)$/.test(code))
       return "ui.living_node_reason_markers_damaged";

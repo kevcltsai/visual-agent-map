@@ -2188,6 +2188,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-living-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .vam-living-editor .vam-ai-card-pop-question { flex: 1; min-height: 180px; height: auto; resize: vertical; }
 .vam-living-editor .vam-ai-card-pop-foot { gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+.vam-living-editor .vam-ai-card-pop-foot button.mod-cta { background: color-mix(in srgb, var(--interactive-accent) 75%, black); color: var(--text-on-accent); }
+.vam-living-editor .vam-ai-card-pop-foot button.mod-cta:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 75%, black); color: var(--text-on-accent); }
 .vam-living-editor-status { font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-living-editor-close-choices { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .vam-living-editor-close-choices[hidden] { display: none; }

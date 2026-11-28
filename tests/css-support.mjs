@@ -177,3 +177,26 @@ test("is-notes-loading rules do not hide the card toolbar", () => {
   });
   assert.deepEqual(hiding, []);
 });
+
+// D1-x10: the Living Node editor's Save button was white on the stock accent: 3.43:1 (light), 4.26:1 (dark).
+const hslToRgb = (h, s, l) => { s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); return [0, 8, 4].map((n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))); };
+const luminance = (rgb) => { const [r, g, b] = rgb.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+
+test("Living Node editor Save button: white text on the accent mixed with black is at least 4.5:1 in both themes", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  for (const selector of [".vam-living-editor .vam-ai-card-pop-foot button.mod-cta", ".vam-living-editor .vam-ai-card-pop-foot button.mod-cta:hover"]) {
+    const rule = css.split("\n").find((line) => line.startsWith(selector + " {"));
+    assert.ok(rule, `${selector} is styled`);
+    const mix = /background:\s*color-mix\(in srgb,\s*var\(--interactive-accent(?:-hover)?(?:,\s*var\(--interactive-accent\))?\)\s*(\d+)%,\s*black\)/.exec(rule);
+    assert.ok(mix, `${selector} darkens the accent with black: ${rule}`);
+    assert.match(rule, /color:\s*var\(--text-on-accent\)/);
+    const keep = Number(mix[1]) / 100;
+    // Obsidian's stock accent as measured on the demo vault: hsl(258 88% 66%) dark (4.26:1 with white), hsl(258 88% 70.5%) light (3.43:1); hover is lighter still (+4%).
+    for (const [theme, lightness] of [["dark", 66], ["light", 70.5], ["dark hover", 70], ["light hover", 74.5]]) {
+      const accent = hslToRgb(258, 88, lightness);
+      const mixed = accent.map((c) => c * keep);
+      assert.ok(ratio(1, luminance(mixed)) >= 4.5, `${selector} ${theme}: ${ratio(1, luminance(mixed)).toFixed(2)}`);
+    }
+  }
+});

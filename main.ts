@@ -1418,19 +1418,23 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     this.repo = new Repository(this.app, this.settings, recovery);
     this.repo.onUnreadableMaps = failures => this.reportUnreadableMaps(failures);
-    // First, before any rebuildDerivedData (it strips the map id from notes no map lists) and before a view or chat
-    // batch exists: takes back card notes whose Map.md write a crash cut off. A failure is logged by mutate, not fatal.
-    const adoptOrphans = this.mutate(
-      async () => {
-        const adopted = await this.repo.adoptOrphanNodeNotes({
-          skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
-          failed: (mapPath, error) =>
-            this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
-        });
-        if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
-      },
-      { sync: false }
-    ).catch(() => undefined);
+    // First, before any rebuildDerivedData (it strips the map id from notes no map lists) and before a chat batch can
+    // start: takes back card notes whose Map.md write a crash cut off. It waits for the layout: until then Obsidian is
+    // still scanning the vault folder, so a note added while VAM was closed is not in the file list yet. Views that
+    // opened meanwhile re-read the map through mutate. A failure is logged by mutate, not fatal.
+    const layoutReady = new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve));
+    const adoptOrphans = layoutReady
+      .then(() =>
+        this.mutate(async () => {
+          const adopted = await this.repo.adoptOrphanNodeNotes({
+            skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
+            failed: (mapPath, error) =>
+              this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
+          });
+          if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
+        })
+      )
+      .catch(() => undefined);
     const initialize = (
       this.settings.migrated
         ? adoptOrphans

@@ -26,7 +26,10 @@ async function onloadWrites(saved, options = {}) {
   const plugin = new Proxy(bare, { get: (target, key, receiver) => key in target || typeof key !== 'string' || !/^(register|add)/.test(key) ? Reflect.get(target, key, receiver) : () => ({ setAttribute() {}, addClass() {}, addEventListener() {} }) });
   plugin.manifest = { id: 'visual-agent-map', version: '0.0.0-test', dir: '' };
   plugin.app = { vault, fileManager: { trashFile: record('trashFile'), renameFile: record('renameFile') }, metadataCache: { on: () => ({}), getFileCache: () => null },
-    workspace: { onLayoutReady: callback => { if (options.layoutReady === false) (options.callbacks ??= []).push(callback); else callback(); }, on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: true }, loadLocalStorage: () => null, saveLocalStorage() {} };
+    workspace: { onLayoutReady: callback => { if (options.layoutReady === false && plugin.ready !== initialReady) (options.callbacks ??= []).push(callback); else callback(); }, on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: true }, loadLocalStorage: () => null, saveLocalStorage() {} };
+  // Callbacks registered before onload assigns `ready` (the startup adoption gate waits on the layout) still run at once;
+  // only the style callbacks registered after it are held back.
+  const initialReady = plugin.ready;
   plugin.loadData = async () => saved;
   plugin.saveData = async data => { if (options.failSave?.()) throw new Error('disk full'); options.saves?.push(JSON.parse(JSON.stringify(data))); };
   plugin.addCommand = command => command;

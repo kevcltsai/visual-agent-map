@@ -398,6 +398,18 @@ integrationTest('adoption skips a copy whose node-id is already used and leaves 
   assert.equal(JSON.stringify(skipped), JSON.stringify([copyPath]));
   assert.equal(contents.get(mapPath), mapBefore);
 });
+integrationTest('adoption keeps the original of an id collision, not its "(1)" or conflict copy, whatever the path order', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('Order of copies'), doc = await repo.readMap(mapPath);
+  const original = await repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
+  const dir = original.path.replace(/\/[^/]+$/, ''), base = original.path.split('/').pop().replace(/\.md$/, '');
+  const copies = [`${dir}/${base} (1).md`, `${dir}/${base}.sync-conflict-20260101.md`];
+  for (const path of copies) await app.vault.create(path, contents.get(original.path));
+  const skipped = [];
+  assert.equal(await repo.adoptOrphanNodeNotes({ skipped: path => skipped.push(path) }), 1);
+  assert.equal(JSON.stringify((await repo.readMap(mapPath)).nodes.map(node => node.path)), JSON.stringify([original.path]));
+  assert.equal(JSON.stringify(skipped.sort()), JSON.stringify([...copies].sort()));
+});
 integrationTest('adoption of one map failing does not stop the later maps', async () => {
   const { repo } = fixture();
   const mapA = await repo.createMap('Aaa'), mapB = await repo.createMap('Bbb');

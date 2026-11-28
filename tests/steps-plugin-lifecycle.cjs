@@ -130,11 +130,13 @@ test('P3.9 load: a vault with a stale Living card makes no AI call and writes no
   assert.deepEqual(writes, [], 'unload writes nothing');
 });
 
-test('DX-orphan startup: onload adopts a crash-orphaned note once before ready, and a note staged afterwards is not adopted by vault events or a mutate', async () => {
+test('DX-orphan startup: adoption waits for the layout (the vault folder scan), adopts a crash-orphaned note once before ready, and a note staged afterwards is not adopted by vault events or a mutate', async () => {
   const f = S.fixture('en');
   const mapPath = await f.repo.createMap('Crashed batch'), doc = await f.repo.readMap(mapPath);
   const orphan = await f.repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
-  const handlers = [], adoptCalls = [];
+  const handlers = [], adoptCalls = [], layoutCallbacks = [];
+  // Cold start: Obsidian is still scanning the vault folder, so the note added while VAM was closed is not listed yet.
+  let scanned = false;
   const bare = new lifecycle.default();
   // The repository is built inside onload: wrap adoption the moment it is assigned, so the startup call is seen too.
   let repo;
@@ -148,8 +150,8 @@ test('DX-orphan startup: onload adopts a crash-orphaned note once before ready, 
   const on = (name, handler) => { handlers.push([name, handler]); return {}; };
   plugin.app = { ...f.app, fileManager: f.app.fileManager,
     metadataCache: { ...f.app.metadataCache, on: () => ({}) },
-    vault: { ...f.app.vault, on },
-    workspace: { onLayoutReady: () => {}, on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: false }, loadLocalStorage: () => null, saveLocalStorage() {} };
+    vault: { ...f.app.vault, on, getMarkdownFiles: () => f.app.vault.getMarkdownFiles().filter(file => scanned || file.path !== orphan.path) },
+    workspace: { onLayoutReady: callback => layoutCallbacks.push(callback), on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: false }, loadLocalStorage: () => null, saveLocalStorage() {} };
   // Not yet migrated: the startup rebuild runs too, and must find the orphan already listed.
   plugin.loadData = async () => ({ migrated: false, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
   plugin.saveData = async () => {};
@@ -157,8 +159,12 @@ test('DX-orphan startup: onload adopts a crash-orphaned note once before ready, 
   const logs = [];
   plugin.logs = { appendLog: (level, line) => logs.push([level, line]), dispose() {} };
   await plugin.onload();
+  await delay(20);
+  assert.equal(adoptCalls.length, 0, 'nothing is adopted while the layout is not ready');
+  scanned = true;
+  for (const callback of layoutCallbacks) callback();
   await plugin.ready;
-  assert.equal(adoptCalls.length, 1, 'adoption ran exactly once, at startup');
+  assert.equal(adoptCalls.length, 1, 'adoption ran exactly once, after the layout was ready');
   const map = await f.repo.readMap(mapPath);
   assert.ok(map.nodes.some(node => node.id === orphan.id), 'the orphan is listed in Map.md once ready resolves');
   assert.match(f.contents.get(orphan.path), /agent-map-id: /, 'its map id survived the startup rebuild');

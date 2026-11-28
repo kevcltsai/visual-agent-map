@@ -900,7 +900,19 @@ export const en = {
   "ui.merge_done_0": "Merged into “{0}”. You can undo.",
   "ui.move_links_dialog_notice_0":
     "{0} of your other notes link to this card. Obsidian may ask whether to update links; choose Update so they keep working.",
-  "ui.merge_check_warning_0": "{0} item(s) of source content may be missing or changed in the merge.",
+  "ui.merge_check_failed_0_1":
+    "Nothing was merged into “{0}”: {1} item(s) of source content are missing or changed in the AI draft. The original cards are unchanged.",
+  "ui.merge_check_failed_chat_0_1_2":
+    "Not merged: “{0}”, {1} item(s) of source content missing or changed ({2}). Retry or view the draft from the notice.",
+  "ui.merge_check_missing": "Missing from the draft:",
+  "ui.merge_check_added": "Not in any source:",
+  "ui.merge_retry": "Retry",
+  "ui.merge_view_draft": "View draft",
+  "ui.merge_draft_title_0": "AI merge draft, not applied: {0}",
+  "ui.merge_draft_copy": "Copy",
+  "ui.merge_draft_copied": "Draft copied",
+  "ui.merge_draft_copy_failed": "Unable to copy the draft.",
+  "ui.merge_draft_gone": "This draft is no longer kept. Merge the cards again.",
   "log.merge_check_warning": "AI merge check: source content not preserved",
   "ui.synthesis_written_0": "Synthesis written to “{0}”. You can undo.",
   "ui.synthesis_new_topic_0": "Created synthesis topic “{0}”. You can undo.",
@@ -1317,6 +1329,8 @@ export const en = {
   "ui.structure_review_stale_missing": "This suggestion is out of date: a card it refers to is no longer on the map.",
   "ui.structure_review_stale_changed":
     "This suggestion is out of date: the card was renamed or moved after the review.",
+  "ui.structure_review_stale_content":
+    "This suggestion is out of date: a card it refers to was changed after the review. Nothing was applied.",
   "ui.structure_review_stale_structure":
     "This suggestion no longer fits the map: applying it now would create a loop or change nothing.",
   "ui.structure_review_merge_title": "Merge “{0}” into “{1}”",
@@ -2258,6 +2272,7 @@ export const en = {
   "note.no_conclusion_yet": "No conclusion yet",
   "note.untitled_topic": "Untitled topic",
   "note.source_unconfirmed_0": "Source to confirm: {0}",
+  "note.source_unverified": "(source not verified)",
   "note.external_source_0": "External source: {0}",
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",

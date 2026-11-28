@@ -135,6 +135,8 @@ export interface QuickOutline {
       limits: OutlineLimits;
       /** The dialog's one-run model; absent: the topic's own. */
       runOnce?: RunOnceModel;
+      /** Sent beside the map's sources (what a map chat turn attached); absent: the map's sources only. */
+      chatSources?: ReferenceGroup[];
     },
     signal: AbortSignal,
     /** Takes user additions while the outline is generated (the topic chat window); absent: none. */

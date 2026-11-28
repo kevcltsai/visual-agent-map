@@ -6,6 +6,7 @@ import {
   buildStructureReviewNodes,
   isSuggestionStale,
   parseStructureReview,
+  structureContentVersion,
   STRUCTURE_REVIEW_MAX_SUGGESTIONS,
   STRUCTURE_REVIEW_SCHEMA,
   StructureReviewError,
@@ -22,6 +23,7 @@ export {
   buildStructureReviewNodes,
   isSuggestionStale,
   parseStructureReview,
+  structureContentVersion,
   STRUCTURE_REVIEW_MAX_SUGGESTIONS,
   STRUCTURE_REVIEW_SCHEMA,
   StructureReviewError

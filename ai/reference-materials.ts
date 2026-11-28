@@ -1,5 +1,6 @@
 import { App, TFile } from "obsidian";
 import { tNote } from "../i18n";
+import { contentHash } from "../core/content-hash";
 import { fencedLines, sourceFootnoteDefinition } from "./result-utils";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./detail-templates";
 
@@ -8,6 +9,10 @@ export interface ReferenceDocument {
   content: string;
   external?: boolean;
   key?: string;
+  /** The VAM note's `node-id`; read from the content's frontmatter when not given. A non-VAM note has none. */
+  nodeId?: string;
+  /** {@link sourceRevision} of the content; computed when not given. */
+  rev?: string;
 }
 export interface ReferenceGroup {
   id: string;
@@ -162,10 +167,64 @@ export function resolveSummaryReferences(summary: string, groups: ReferenceGroup
 }
 
 const FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
+const FRONTMATTER = /^---\n([\s\S]*?)\n---(?:\n|$)/;
+
+/**
+ * A source's revision: the last 8 hex digits of {@link contentHash} over its body, where the body is the content with
+ * CRLF and CR turned into LF, the leading `---` frontmatter block removed and trailing whitespace trimmed. Frontmatter
+ * edits and line-ending changes keep the revision; any other text change gives a new one.
+ */
+export function sourceRevision(content: string): string {
+  return contentHash(content.replace(/\r\n?/g, "\n").replace(FRONTMATTER, "").trimEnd()).slice(-8);
+}
+
+/** The `node-id` in a VAM note's frontmatter, when it is a plain id (letters, digits, `_`, `-`). */
+export function sourceNodeId(content: string): string | undefined {
+  const yaml = FRONTMATTER.exec(content.replace(/\r\n?/g, "\n"))?.[1];
+  return yaml ? /^node-id:[ \t]*(["']?)([A-Za-z0-9_][A-Za-z0-9_-]*)\1[ \t]*$/m.exec(yaml)?.[2] : undefined;
+}
+
+const revisions = new WeakMap<ReferenceDocument, string>();
+function documentRevision(document: ReferenceDocument): string {
+  if (document.rev) return document.rev;
+  let rev = revisions.get(document);
+  if (!rev) revisions.set(document, (rev = sourceRevision(document.content)));
+  return rev;
+}
+
+function documentNodeId(document: ReferenceDocument): string | undefined {
+  const id = document.nodeId ?? sourceNodeId(document.content);
+  return id && /^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(id) ? id : undefined;
+}
 
 function footnoteTarget(document: ReferenceDocument): string {
   const basename = (document.path.split("/").pop() ?? document.path).replace(/\.md$/i, "");
-  return document.external ? tNote("note.external_source_0", document.path) : `[[${document.path}|${basename}]]`;
+  if (document.external) return tNote("note.external_source_0", document.path);
+  // An Obsidian comment: older versions keep it as plain footnote text and the reading view hides it.
+  return `[[${document.path}|${basename}]]%%vam-src:${documentNodeId(document) ?? "-"}:${documentRevision(document)}%%`;
+}
+
+export type CitationStatus = "same" | "changed" | "missing" | "relocated";
+
+/**
+ * A source footnote's target against the current documents: `same` when the linked path is there with the cited
+ * revision (or the target names no revision), `changed` when its text changed since, `relocated` when the path is gone
+ * but a note with the cited node id is there (renamed or moved), `missing` otherwise. Only an exact path matches, so
+ * a namesake at another path is never taken for the source. Null when the target is not a source wikilink.
+ */
+export function compareCitation(
+  target: string,
+  documents: ReferenceDocument[]
+): { status: CitationStatus; document?: ReferenceDocument } | null {
+  const match = /^\[\[([^\]|#]+)[^\]]*\]\](?:%%vam-src:([A-Za-z0-9_-]+):([0-9a-f]{8})%%)?$/.exec(target.trim());
+  if (!match) return null;
+  const path = match[1].trim();
+  const [, , nodeId, rev] = match;
+  const vault = documents.filter(document => !document.external);
+  const atPath = vault.find(document => document.path === path || document.path === `${path}.md`);
+  if (atPath) return { status: rev && documentRevision(atPath) !== rev ? "changed" : "same", document: atPath };
+  const moved = nodeId && nodeId !== "-" ? vault.find(document => documentNodeId(document) === nodeId) : undefined;
+  return moved ? { status: "relocated", document: moved } : { status: "missing" };
 }
 
 /** Same note => same key, whether or not the wikilink carries a display name. */

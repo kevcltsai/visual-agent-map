@@ -127,7 +127,7 @@ test('34: Mod+F while the box is open selects the field text instead of reopenin
   assert.equal(h.doc.activeElement, h.bar().input);
 });
 
-test('34: titles match case-insensitively in Chinese and English, Traditional matches Simplified; body text is not searched', async () => {
+test('34: titles match case-insensitively in Chinese and English, Traditional matches Simplified; the title still matches without any body', async () => {
   const h = await harness();
   h.press(h.card('alpha'));
   h.type('ALPHA');
@@ -136,6 +136,88 @@ test('34: titles match case-insensitively in Chinese and English, Traditional ma
   h.type('市场'); // Simplified query against a Traditional-looking title
   assert.ok(h.card('beta').classes.has('is-search-match'), 'fold-insensitive');
   assert.ok(!h.card('alpha').classes.has('is-search-match'));
+});
+
+// C08: the summary and the Detail are searched too, from the notes the view already holds.
+const withBodies = h => {
+  h.view.notes.get(h.ids.beta).summary = '價格調查摘要';
+  h.view.notes.get(h.ids.alpha).detail = 'Long detail mentioning the zebra crossing.';
+  h.view.notes.get(h.ids.deep).detail = 'Hidden zebra inside two folded levels.';
+};
+
+test('C08: a word only in the Detail or summary finds the card; a word in neither finds nothing; Traditional and Simplified match in the body', async () => {
+  const h = await harness();
+  withBodies(h);
+  h.press(h.card('alpha')); h.type('zebra');
+  assert.ok(h.card('alpha').classes.has('is-search-match'), 'Detail hit');
+  assert.ok(!h.card('beta').classes.has('is-search-match'));
+  h.type('价格'); // Simplified query, Traditional summary
+  assert.ok(h.card('beta').classes.has('is-search-match'), 'summary hit, fold-insensitive');
+  h.type('nowhere-at-all');
+  for (const key of ['root', 'alpha', 'beta', 'branch']) assert.ok(!h.card(key).classes.has('is-search-match'));
+  assert.equal(h.bar().root.children.find(c => c.cls.includes('vam-map-search-count')).text, 'No matches');
+});
+
+test('C08: two cards with the same title in different files are both listed, not merged', async () => {
+  const h = await harness({ collapse: false });
+  h.view.notes.get(h.ids.deep2).title = 'Alpha plan';
+  assert.notEqual(h.view.map.nodes.find(n => n.id === h.ids.deep2).path, h.view.map.nodes.find(n => n.id === h.ids.alpha).path);
+  h.press(h.card('alpha')); h.type('alpha plan');
+  assert.ok(h.card('alpha').classes.has('is-search-match'));
+  assert.ok(h.card('deep2').classes.has('is-search-match'));
+  assert.equal(h.view.mapSearchResult().matches.length, 2);
+});
+
+test('C08: a body hit inside folded branches opens them for the search only; Map.md is byte-identical afterwards; Enter speaks (in text)', async () => {
+  const h = await harness();
+  withBodies(h);
+  const before = h.contents.get(MAP);
+  assert.equal(h.card('deep'), undefined);
+  h.press(h.card('alpha')); h.type('hidden zebra');
+  h.keydown('Enter'); await h.settle();
+  assert.ok(h.card('deep'), 'the card in the folded branch is drawn');
+  assert.ok(h.card('deep').classes.has('is-search-current'));
+  assert.equal(h.centred.at(-1).id, h.ids.deep);
+  assert.match(h.spoken(), /^1\/1: Deep Needle \(in text\)$/);
+  h.keydown('Escape'); await h.settle();
+  assert.equal(h.card('deep'), undefined, 'folded again');
+  assert.equal(h.contents.get(MAP), before, 'Map.md bytes unchanged');
+});
+
+test('C08: a title hit is spoken without (in text); a body-only hit is spoken with it', async () => {
+  const h = await harness({ collapse: false });
+  withBodies(h);
+  h.press(h.card('alpha')); h.type('alpha');
+  h.keydown('Enter'); await h.settle();
+  assert.ok(!/in text/.test(h.spoken()), h.spoken());
+  withBodies(h); // the harness reloads the notes after a jump; put the bodies back
+  h.type('zebra');
+  h.view.mapSearch.currentId = null;
+  h.keydown('Enter'); await h.settle();
+  assert.match(h.spoken(), /\(in text\)$/);
+});
+
+test('C08: a fresh view with the same notes gives the same result for the same query', async () => {
+  const a = await harness(); withBodies(a); a.press(a.card('alpha')); a.type('zebra');
+  const b = await harness(); withBodies(b); b.press(b.card('alpha')); b.type('zebra');
+  const titles = h => h.view.mapSearchResult().matches.map(id => h.view.notes.get(id).title);
+  assert.deepEqual([...titles(a)], [...titles(b)]);
+  assert.ok(titles(a).length >= 2);
+});
+
+test('C08: one keystroke computes the search result once for marks, count and announcement', async () => {
+  const h = await harness({ collapse: false });
+  withBodies(h);
+  const note = h.view.notes.get(h.ids.beta);
+  let reads = 0; const title = note.title;
+  Object.defineProperty(note, 'title', { get() { reads++; return title; }, configurable: true });
+  h.press(h.card('alpha'));
+  reads = 0; h.type('zebra');
+  assert.equal(reads, 1, 'beta title read once while one keystroke marks cards and sets the count');
+  h.flushTimers(); // the announcement reuses it
+  assert.equal(reads, 1, 'and the delayed announcement does not search again');
+  reads = 0; h.type('zebr');
+  assert.equal(reads, 1, 'a new query computes again, once');
 });
 
 test('34: a regex-looking query is literal and a blank query matches nothing and says so', async () => {

@@ -1,5 +1,5 @@
 // P1.12 performance baseline: measures interaction latency of the mind-map view in a harness-launched test Obsidian over CDP.
-//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--out=<file.json>]
+//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]
 // The vault must be harness-owned (made by `node scripts/test-harness.mjs --session=<name>`, already running and trusted).
 // For numbers to compare (P1.12 stage B against the stage A baseline), use a fresh session vault per run: fixture maps from
 // earlier runs stay in the vault and raise heap and batch times.
@@ -8,6 +8,7 @@
 // that paints the last DOM change it caused (a frame loop that ends after two frames with no mutation under the view):
 //   pan (background drag, per move), zoom (wheel, per notch), select (click a card), drag (card drag, per move),
 //   expand (Space on the focused branch card, fold/unfold alternating), summary (update_summary through applyMapChatActions, no provider),
+//   search (one keystroke in the in-map search box, matching titles, summaries and Details; query typed letter by letter),
 //   batch (10 add_child through applyMapChatActions on a fresh 40-card map, no provider).
 // Also reports performance.memory.usedJSHeapSize before/after and the total long-task time (PerformanceObserver "longtask")
 // while measuring. Nothing focuses or raises the window (focus emulation only; see obsidian-cdp.mjs).
@@ -25,34 +26,45 @@ const marker = ".vam-test-environment.json";
 export const PERF_CARD_COUNT = 40;
 const root = fileURLToPath(new URL("..", import.meta.url));
 
-// Root + 5 branches + 34 leaves (7,7,7,7,6): 40 cards, laid out left to right, no overlap.
-export function perfFixtureCards() {
+// Default (40): root + 5 branches + 34 leaves (7,7,7,7,6), laid out left to right, no overlap.
+// Other sizes (e.g. 300): root + ceil((n-1)/20) branches, the remaining cards spread over them as leaves.
+export function perfFixtureCards(count = PERF_CARD_COUNT) {
   const cards = [{ id: "perf-root", title: "Perf Root", parent: null, x: 0, y: 0 }];
-  const leaves = [7, 7, 7, 7, 6];
+  let leaves = [7, 7, 7, 7, 6];
+  let rowGap = 680;
+  if (count !== PERF_CARD_COUNT) {
+    const branches = Math.max(1, Math.ceil((count - 1) / 20));
+    const total = count - 1 - branches;
+    if (total < 0) throw new Error(`--cards=${count} is too small for a tree.`);
+    leaves = Array.from({ length: branches }, (_, b) => Math.floor(total / branches) + (b < total % branches ? 1 : 0));
+    rowGap = (Math.max(...leaves) + 1) * 96;
+  }
   leaves.forEach((count, b) => {
-    const branchY = (b - 2) * 680;
+    const branchY = (b - Math.floor(leaves.length / 2)) * rowGap;
     cards.push({ id: `perf-b${b}`, title: `Branch ${b}`, parent: "perf-root", x: 380, y: branchY });
     for (let j = 0; j < count; j++) cards.push({ id: `perf-b${b}-l${j}`, title: `Leaf ${b}.${j}`, parent: `perf-b${b}`, x: 760, y: branchY + (j - 3) * 96 });
   });
   return cards;
 }
 
-export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace") {
+export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count = PERF_CARD_COUNT) {
   const topicId = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const folder = `${workspaceRoot}/Topics/${topic}`;
-  const cards = perfFixtureCards();
+  const cards = perfFixtureCards(count);
+  // The default 40-card fixture keeps its one-line Detail; bigger maps carry about 1.5 KB of Detail per card, so search has text to read.
+  const filler = count === PERF_CARD_COUNT ? "" : " " + "Synthetic filler sentence for the search measurement. ".repeat(28);
   const nodes = cards.map(card => ({ id: card.id, path: `${folder}/Notes/${card.id}.md`, parentId: card.parent, x: card.x, y: card.y, collapsed: false }));
   const mapJson = { version: 1, id: topicId, title: topic, viewport: { x: 0, y: 0, zoom: 1 }, nodes };
   const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
   const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
   }));
   return { mapPath: `${folder}/Map.md`, files: [{ path: `${folder}/Map.md`, text: map }, ...notes] };
 }
 
-function seed(vault, topic) {
-  const { mapPath, files } = perfFixtureFiles(topic);
+function seed(vault, topic, count) {
+  const { mapPath, files } = perfFixtureFiles(topic, "Agent Workspace", count);
   if (files.some(file => existsSync(join(vault, file.path)))) throw new Error(`${topic} already exists in ${vault}; not overwriting.`);
   for (const file of files) { mkdirSync(join(vault, file.path, ".."), { recursive: true }); writeFileSync(join(vault, file.path), file.text); }
   return mapPath;
@@ -87,12 +99,12 @@ async call(fn){const s=watch();const t0=performance.now();const value=await fn()
 
 const view = `app.workspace.getLeavesOfType("visual-agent-map-view").map(l=>l.view).find(v=>v.containerEl.isShown())`;
 
-async function open(cdp, mapPath) {
+async function open(cdp, mapPath, expected = PERF_CARD_COUNT) {
   // Opens the map, then closes every other map tab, so only one view is alive while measuring.
   await cdp.evaluate(`(async()=>{const old=app.workspace.getLeavesOfType("visual-agent-map-view");const v=await app.plugins.plugins["visual-agent-map"].openMapInNewTab(${JSON.stringify(mapPath)});for(const l of old)if(l.view!==v)l.detach();return !!v})()`);
   for (let i = 0; i < 120; i++) {
     const count = await cdp.evaluate(`(()=>{const v=${view};return v&&v.map?v.containerEl.querySelectorAll(".vam-node").length:0})()`);
-    if (count >= PERF_CARD_COUNT) {
+    if (count >= expected) {
       // Same canvas every run: no side panels, map chat closed, "show all" (last zoom control) so every card is on screen.
       await cdp.evaluate(`(async()=>{app.workspace.leftSplit.collapse();app.workspace.rightSplit.collapse();const v=${view};v.containerEl.querySelector(".vam-map-chat-close")?.click();
 await new Promise(r=>setTimeout(r,300));[...v.containerEl.querySelectorAll(".vam-zoom-controls button")].pop()?.click();await new Promise(r=>setTimeout(r,500));return true})()`);
@@ -101,7 +113,20 @@ await new Promise(r=>setTimeout(r,300));[...v.containerEl.querySelectorAll(".vam
     }
     await delay(250);
   }
-  throw new Error(`Map ${mapPath} did not render ${PERF_CARD_COUNT} cards.`);
+  throw new Error(`Map ${mapPath} did not render ${expected} cards.`);
+}
+
+// Big maps: "show all" shrinks cards to a few pixels or leaves them off screen, so clicks miss. Bring the card into view first
+// (zoom back to 100% when its on-screen width is tiny, then centre the camera on it), judged by its real DOM rect.
+async function reveal(cdp, id) {
+  const probeExpr = `(()=>{const v=${view};const vr=v.containerEl.querySelector(".vam-viewport").getBoundingClientRect();const n=v.containerEl.querySelector('.vam-node[data-node-id="${id}"]');if(!n)return {ok:false,tiny:false};
+const r=n.getBoundingClientRect();return {ok:r.left>=vr.left+10&&r.right<=vr.right-10&&r.top>=vr.top+10&&r.bottom<=vr.bottom-10,tiny:r.width<60}})()`;
+  const state = await cdp.evaluate(probeExpr);
+  if (state.ok && !state.tiny) return;
+  if (state.tiny) { await cdp.evaluate(`(()=>{${view}.containerEl.querySelector(".vam-zoom-controls .vam-zoom")?.click()})()`); await delay(400); }
+  await cdp.evaluate(`(()=>{const v=${view};const n=v.map.nodes.find(x=>x.id==="${id}");if(n)v.focusNode(n,false)})()`);
+  await delay(600);
+  if (!(await cdp.evaluate(probeExpr)).ok) throw new Error(`Card ${id} could not be brought on screen.`);
 }
 
 // Points are viewport CSS pixels (what Input.dispatchMouseEvent takes).
@@ -124,7 +149,7 @@ async function measureInput(cdp, start, end, act) {
 }
 
 async function measureMap(cdp, samples) {
-  const out = { pan: [], zoom: [], select: [], drag: [], expand: [], summary: [] };
+  const out = { pan: [], zoom: [], select: [], drag: [], expand: [], summary: [], search: [] };
   // Pan: one background drag per 10 samples, alternating direction.
   for (let done = 0, dir = 1; done < samples; dir = -dir) {
     const p = await cdp.evaluate(emptyPointExpr);
@@ -143,6 +168,7 @@ async function measureMap(cdp, samples) {
   for (let i = 0; i < samples; i++)
     out.zoom.push(await measureInput(cdp, "wheel", "wheel", () => cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: centre.x, y: centre.y, deltaX: 0, deltaY: i % 2 ? 100 : -100 })));
   // Select: click visible cards in turn.
+  if ((await cdp.evaluate(cardPointsExpr)).length < 3) await reveal(cdp, "perf-b1");
   const points = await cdp.evaluate(cardPointsExpr);
   if (points.length < 3) throw new Error(`Only ${points.length} cards are visible to click.`);
   for (let i = 0; i < samples; i++) {
@@ -164,10 +190,13 @@ async function measureMap(cdp, samples) {
     await mouse(cdp, "mouseReleased", x, p.y);
   }
   // Expand: fold and unfold one branch with Space on the focused branch card (keydown arms, keyup toggles), alternating.
+  await reveal(cdp, "perf-b1");
   const branch = await cdp.evaluate(`(()=>{const n=${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]');if(!n)return null;const r=n.getBoundingClientRect();return {x:r.left+r.width*0.06,y:r.top+r.height/2}})()`);
   if (!branch) throw new Error("Branch card perf-b1 is not on screen.");
   await mouse(cdp, "mousePressed", branch.x, branch.y, 1);
   await mouse(cdp, "mouseReleased", branch.x, branch.y);
+  if (!(await cdp.evaluate(`document.activeElement?.closest?.('.vam-node')?.dataset.nodeId==="perf-b1"`)))
+    await cdp.evaluate(`${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')?.focus()`);
   const folded = `${view}.map.nodes.find(n=>n.id==="perf-b1").collapsed===true`;
   for (let i = 0; i < samples; i++) {
     const before = await cdp.evaluate(folded);
@@ -183,39 +212,47 @@ return __vamPerf.call(()=>v.applyMapChatActions({actions:[{kind:"update_summary"
     if (status !== "done") throw new Error(`update_summary did not apply: ${JSON.stringify(r.value).slice(0, 300)}`);
     out.summary.push(r.ms);
   }
+  // Search: open the in-map search box and type a query letter by letter (Detail text, so every key folds and scans the bodies).
+  const query = "synthetic card perf-b1-l2";
+  await cdp.evaluate(`(()=>{const v=${view};v.openMapSearch(null);return !!v.mapSearchBar})()`);
+  for (let i = 0; i < samples; i++) {
+    const text = query.slice(0, (i % query.length) + 1);
+    out.search.push(await measureInput(cdp, "input", "input", () => cdp.evaluate(`(()=>{const input=${view}.mapSearchBar.input;input.value=${JSON.stringify(text)};input.dispatchEvent(new Event("input",{bubbles:true}));return true})()`)));
+  }
+  await cdp.evaluate(`${view}.closeMapSearch(false)`);
   return out;
 }
 
-async function measureBatch(cdp, mapPath) {
-  await open(cdp, mapPath);
+async function measureBatch(cdp, mapPath, cards) {
+  await open(cdp, mapPath, cards);
   await cdp.evaluate(probe);
   const actions = Array.from({ length: 10 }, (_, i) => ({ kind: "add_child", parentId: "perf-b0", title: `Batch card ${i}`, summary: `Synthetic batch card ${i}.` }));
   const r = await cdp.evaluate(`(()=>{const v=${view};return __vamPerf.call(()=>v.applyMapChatActions({actions:${JSON.stringify(actions)},rejected:[]},{mdHashes:{},topicHashes:{},mapSourcePaths:[]}))})()`);
   const count = await cdp.evaluate(`${view}.map.nodes.length`);
-  if (count !== PERF_CARD_COUNT + 10) throw new Error(`Batch add left ${count} cards, expected ${PERF_CARD_COUNT + 10}: ${JSON.stringify(r.value).slice(0, 300)}`);
+  if (count !== cards + 10) throw new Error(`Batch add left ${count} cards, expected ${cards + 10}: ${JSON.stringify(r.value).slice(0, 300)}`);
   return r.ms;
 }
 
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
-export async function runPerfBaseline({ vault, samples = 30, batches = 10 }) {
+export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards: cardCount = PERF_CARD_COUNT }) {
   if (resolve(vault) === resolve(canonicalVault)) throw new Error(`Refusing ${vault}: it is the owner's testing vault.`);
   if (!existsSync(join(vault, marker))) throw new Error(`${vault} is not a harness-owned test vault (no ${marker}).`);
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "");
-  const main = seed(vault, `Perf Fixture ${stamp}`);
-  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`));
+  const main = seed(vault, `Perf Fixture ${stamp}`, cardCount);
+  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`, cardCount));
   const cdp = await connectCdp(vault);
   try {
     await cdp.evaluate(`app.vault.adapter.list("Agent Workspace/Topics")`); // let the vault index the new files
     const installed = join(vault, await cdp.evaluate("app.vault.configDir"), "plugins", "visual-agent-map", "main.js");
     await delay(1500);
-    const cards = await open(cdp, main);
+    const cards = await open(cdp, main, cardCount);
     await cdp.evaluate(probe);
     const heapBefore = await cdp.evaluate("performance.memory.usedJSHeapSize");
     const longBefore = await cdp.evaluate("__vamPerf.longTasks.length");
     const interactions = await measureMap(cdp, samples);
     const batch = [];
-    for (const mapPath of batchMaps) batch.push(await measureBatch(cdp, mapPath));
+    for (const mapPath of batchMaps) batch.push(await measureBatch(cdp, mapPath, cardCount));
     const heapAfter = await cdp.evaluate("performance.memory.usedJSHeapSize");
     const longTasks = await cdp.evaluate(`__vamPerf.longTasks.slice(${longBefore})`);
     const env = await cdp.evaluate(`({obsidian:navigator.userAgent.split("obsidian/")[1]?.split(" ")[0]??null,plugin:app.plugins.manifests["visual-agent-map"]?.version,window:{w:innerWidth,h:innerHeight,dpr:devicePixelRatio},ua:navigator.userAgent})`);
@@ -234,7 +271,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10 }) {
   } finally { cdp.close(); }
 }
 
-export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--out=<file.json>]";
+export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]";
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
@@ -243,7 +280,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!vault || args.includes("--help")) { process.stdout.write(`${usage}\n`); process.exitCode = vault ? 0 : 2; }
   else {
     try {
-      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10) });
+      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10), cards: Number(option("cards") ?? PERF_CARD_COUNT) });
       const out = resolve(option("out") ?? join(tmpdir(), `vam-perf-${Date.now()}.json`));
       writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
       const { raw, ...short } = report;

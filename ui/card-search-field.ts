@@ -1,5 +1,6 @@
 import { AbstractInputSuggest, setIcon, type App } from "obsidian";
 import { t } from "../i18n";
+import { foldSearchText } from "../i18n/han-fold";
 
 /** One row of the card search list. `none` is the "no match" message, `root` the fixed last row of the parent search. */
 export interface CardSearchItem {
@@ -71,10 +72,10 @@ export function ancestorTrail(
   return trail;
 }
 
-/** Title contains the typed text, ignoring case. An empty text matches everything. */
+/** Title contains the typed text, ignoring case and Traditional/Simplified. An empty text matches everything. */
 export function matchesTitle(title: string, query: string): boolean {
-  const needle = query.trim().toLowerCase();
-  return !needle || title.toLowerCase().includes(needle);
+  const needle = foldSearchText(query.trim());
+  return !needle || foldSearchText(title).includes(needle);
 }
 
 /** The rows for the typed text: matching cards, then the root row when asked, or the "no match" message. */

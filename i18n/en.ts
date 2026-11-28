@@ -1659,6 +1659,8 @@ export const en = {
   "ui.map_chat_book_field_previous": "Carried over",
   "ui.map_chat_book_field_checklist": "Checklist",
   "ui.book_editor_opening_fallback": "The plan is ready. Tell me anything you'd like to change.",
+  "ui.book_seam_unchecked":
+    "Neighbouring card's plan or text changed; not yet checked by a person (card {0}, revision {1})",
   "ui.map_chat_do_edit_md_0": "Edit {0}",
   "ui.map_chat_do_create_md_0": "Create {0}",
   "ui.map_chat_do_select_0": "Select {0} topics",

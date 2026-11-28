@@ -13112,6 +13112,7 @@ export class VisualAgentMapView extends ItemView {
       },
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
+      titles: ids => ids.map(id => this.notes.get(id)?.title ?? id).join(t("ui.list_separator")),
       isArgumentCard: id => this.isArgumentCard(id),
       stylesEditable: !!node && this.markersEditable(node),
       aiRunning: id => this.aiStatusOf(id) === "running",
@@ -20660,7 +20661,7 @@ export class VisualAgentMapView extends ItemView {
     for (const { action, availability } of entries) {
       if (action.id === "finish-selection") addMore();
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
-      const reasonText = availability.ok ? "" : t(availability.reasonKey);
+      const reasonText = availability.ok ? "" : t(availability.reasonKey, ...(availability.reasonArgs ?? []));
       const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
         if (reasonText) new Notice(reasonText);
         else action.run(context, {});

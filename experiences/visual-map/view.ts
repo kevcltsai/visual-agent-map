@@ -14842,6 +14842,8 @@ export class VisualAgentMapView extends ItemView {
       const rect = other.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) others.push(rect);
     }
+    // The edge entries (V3.3 A6/B28) sit outside the card on the side children grow toward; the row keeps off them.
+    const edge = card.querySelector<HTMLElement>(":scope > .vam-card-edge")?.getBoundingClientRect();
     const spot = chooseCardToolsSpot({
       card: cardRect,
       row: { left: rowLeft, right: rowLeft + width },
@@ -14849,7 +14851,8 @@ export class VisualAgentMapView extends ItemView {
       others,
       controls: this.floatingControlRects(),
       visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom },
-      rightGap: cardToolsSideGap("right", zoom) * zoom
+      rightGap: cardToolsSideGap("right", zoom) * zoom,
+      avoid: edge && edge.right > edge.left && edge.bottom > edge.top ? [edge] : []
     });
     // Panning moves every card alike, so the side and inset chosen here stay right. In memory only, like keyboard navigation.
     if (spot.side === "bottom") tools.toggleClass("is-below", true);
@@ -18947,7 +18950,7 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
     if (!focus) return this.map?.nodes.find(n => n.id === node.id) ?? node;
-    if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
+    // The camera pans to the new card and keeps the user's zoom (V3.3 B28 fix: a 0.7 floor here threw a zoomed-out map back to 70%).
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
     // The camera follows in memory only: a saved camera would be a second Map.md write about 300 ms after the card's
     // own (B30, one write per new card); the next pan or zoom saves it.

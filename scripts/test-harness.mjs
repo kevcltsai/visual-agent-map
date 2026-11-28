@@ -8,6 +8,7 @@ import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
 import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
+import { applyProviderGuard, parseLive } from "./provider-guard.mjs";
 import { assertOwnerIdle, ownerBusyReasons, waitOwnerIdle } from "./owner-idle.mjs";
 import { connectCdp } from "./obsidian-cdp.mjs";
 import { sourceFingerprint } from "./candidate-id.mjs";
@@ -86,7 +87,7 @@ export function verifyTestVault(vault, artifact = root, owner = canonicalVault) 
 }
 
 // Only a vault created by this checkout may be reset. Never follow a root symlink.
-export function prepareTestVault({ vault = canonicalVault, artifact = root, profile = "normal", workspaceRoot = "Agent Workspace", source = {} } = {}) {
+export function prepareTestVault({ vault = canonicalVault, artifact = root, profile = "normal", workspaceRoot = "Agent Workspace", source = {}, live = null, owner = canonicalVault } = {}) {
   if (existsSync(vault) || (() => { try { lstatSync(vault); return true; } catch { return false; } })()) {
     // The canonical vault is the owner's designated testing vault and holds their maps: it is created once and then
     // only updated in place (--update-current). A fresh profile needs a different vault path, never a reset of this one.
@@ -100,7 +101,8 @@ export function prepareTestVault({ vault = canonicalVault, artifact = root, prof
   const staging = mkdtempSync(join(dirname(vault), ".vam-fixture-"));
   try {
     const fresh = join(staging, "vault");
-    createTestVault({ vault: fresh, artifact, profile, workspaceRoot });
+    // The owner's testing vault is never guarded: the owner calls AI there for real. Only session vaults fail closed.
+    createTestVault({ vault: fresh, artifact, profile, workspaceRoot, live, stubProviders: !isOwnerVault(vault, owner) });
     const record = { kind: "vam-disposable-test-vault", owner: realpathSync(root), profile, workspaceRoot, version: json(join(artifact, "manifest.json")).version, hashes: hashes(artifact), source };
     writeFileSync(join(fresh, marker), JSON.stringify(record, null, 2));
     verifyTestVault(fresh, artifact);
@@ -471,10 +473,40 @@ export function prepareSessionCandidate({
   return { fingerprint: before, verification, artifacts: built };
 }
 
+/** Session vaults are fail-closed on every run (create, update in place, reload); the owner vault is never touched. */
+export function applySessionGuard(vault, live = null, owner = canonicalVault) {
+  return isOwnerVault(vault, owner) ? null : applyProviderGuard(vault, live);
+}
+
+/**
+ * Session vaults only. The onboarding profile cannot carry the provider guard: a data.json would count as saved settings and skip the
+ * first-install flow (main.ts initializeFirstInstall), and a bare "codex"/"claude" is resolved from ~/.local/bin, Homebrew, /usr/local/bin
+ * and nvm before PATH, so a guard folder on PATH would lose. So such a session is refused before Obsidian starts unless the tester says
+ * --unguarded. --unguarded means "this run is not guarded"; --live means "this model may be called". They are not mixed: --live alone on an
+ * onboarding vault is refused, and --live together with --unguarded is accepted only because the tester asked for both.
+ */
+export function assertOnboardingChoice(args) {
+  const unguarded = args.includes("--unguarded");
+  if (!args.includes("--profile=onboarding")) return;
+  if (unguarded) return;
+  throw new Error(`Refusing an onboarding vault with no provider guard${args.some(arg => arg.startsWith("--live=")) ? " (--live alone does not help: there is no data.json to carry it)" : ""}. The first-install flow needs a vault with no data.json (saved settings skip it), and a bare codex/claude is found in ~/.local/bin, Homebrew, /usr/local/bin and nvm before PATH, so the harness cannot make this vault fail closed. Add --unguarded if you know this run is unguarded (walk the first-install flow without calling any AI). After the first run has made data.json, the next --session run adds the guard.`);
+}
+
+/** An existing session vault the guard cannot be written into (no data.json yet) is refused before launch unless --unguarded. */
+export function assertSessionGuardable(vault, args, owner = canonicalVault) {
+  if (isOwnerVault(vault, owner) || args.includes("--unguarded")) return;
+  if (!existsSync(join(vault, ".ob" + "sidian/plugins/visual-agent-map/data.json"))) throw new Error(`Refusing ${vault}: it has no data.json yet (an onboarding vault before its first run), so the provider guard cannot be added and the vault would not fail closed. Add --unguarded if this run is meant to be unguarded.`);
+}
+
+// `--live=<model>` / `--live=claude:<model>`: the only provider call a harness vault may really make (see scripts/provider-guard.mjs).
+const liveOf = args => { const values = args.filter(arg => arg.startsWith("--live=")); if (values.length > 1) throw new Error("Give --live once."); return values.length ? parseLive(values[0].slice("--live=".length)) : null; };
+
 function sessionMain(args) {
-  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full", "--reload"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`--session cannot be combined with: ${arg}`);
+  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full", "--reload"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=") && arg !== "--unguarded") throw new Error(`--session cannot be combined with: ${arg}`);
   if (args.filter(arg => arg.startsWith("--session=")).length !== 1) throw new Error("Exactly one session name is required.");
-  if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg === "--reload" || arg.startsWith("--profile=")))) throw new Error("Conflicting session options.");
+  assertOnboardingChoice(args);
+  if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg === "--reload" || arg.startsWith("--profile=") || arg.startsWith("--live=")))) throw new Error("Conflicting session options.");
+  if (args.includes("--reload") && args.some(arg => arg.startsWith("--live="))) throw new Error("--live cannot be combined with --reload (a running Obsidian keeps the settings it loaded).");
   const mode = args.includes("--preview") ? "preview" : args.includes("--full") ? "full" : "affected";
   const vault = sessionVault(args.find(arg => arg.startsWith("--session=")).slice("--session=".length));
   return withSessionLock(vault, () => sessionMainLocked(args, vault, mode));
@@ -498,6 +530,7 @@ function sessionMainLocked(args, vault, mode) {
   const exists = existsSync(vault);
   if (exists && args.some(arg => arg.startsWith("--profile="))) throw new Error(`${vault} exists and is updated in place; --profile applies only when it is first created.`);
   if (exists) assertSessionOwner(vault);
+  if (exists) assertSessionGuardable(vault, args);
   if (reload) { assertSessionOwner(vault); assertSessionIdle(vault); }
   const { fingerprint, verification, artifacts } = timedSync("session-prepare", () => prepareSessionCandidate({ mode }));
   if (instanceRunning(appProfile) !== running) throw new Error("Session Obsidian changed state during preparation; refusing to replace loaded files.");
@@ -511,13 +544,17 @@ function sessionMainLocked(args, vault, mode) {
   checkCandidate();
   if (reload) {
     ensureSessionProfile(vault, runtime, { running: true });
+    applySessionGuard(vault); // an older session vault gets the guard on reload too (no --live on reload: it is reset to blocked)
     return timedAsync("session-reload", () => reloadSessionVault({ vault, source, checkCandidate })).then(record => {
       process.stdout.write(JSON.stringify({ vault, reloaded: true, version: record.version, hashes: record.hashes, verification, acceptance: "PENDING" }, null, 2) + "\n");
     });
   }
+  const live = liveOf(args);
   const record = timedSync("install", () => exists
     ? updateCurrentTestVault({ vault, source })
-    : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source }));
+    : prepareTestVault({ vault, profile: args.find(arg => arg.startsWith("--profile="))?.split("=")[1] || "normal", source, live }));
+  // Session vaults are always fail-closed: an older vault gets the guard too, and --live is re-decided on every run.
+  if (exists) applySessionGuard(vault, live);
   ensureSessionProfile(vault, runtime);
   launchObsidian(appProfile);
   const cdp = `node scripts/obsidian-cdp.mjs --vault=${vault}`;
@@ -568,7 +605,7 @@ function assertObsidianClosed() {
 // The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
 
-export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--reload] [--profile=...] | --which-installed | --help]
+export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--reload] [--profile=...] [--live=<model>] [--unguarded (onboarding vaults and vaults with no data.json yet)] | --which-installed | --help]
   (no option)        build + unit + integration tests only
   --session=<name>   isolated vault /private/tmp/vam-e2e-<name>, background Obsidian driven over CDP (see scripts/obsidian-cdp.mjs, scripts/run-scenario.mjs)
   --preview          session only: build and install for inspection; verification NOT RUN, not acceptance
@@ -585,7 +622,7 @@ export function main(args = process.argv.slice(2)) {
     if (args.length !== 1) throw new Error("--which-installed takes no other options.");
     return process.stdout.write(`${whichInstalled()}\n`);
   }
-  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed", "--wait-idle"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
+  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed", "--wait-idle"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=") && arg !== "--unguarded") throw new Error(`Unknown argument: ${arg}`);
   const ui = args.includes("--ui"), prepare = ui || args.includes("--prepare");
   const update = args.includes("--update-current");
   if (update && prepare) throw new Error("--update-current cannot be combined with reset/prepare options.");
@@ -593,6 +630,7 @@ export function main(args = process.argv.slice(2)) {
   if (ownerIdleConfirmed && !update) throw new Error("--owner-idle-confirmed applies only to --update-current.");
   const waitIdle = args.includes("--wait-idle");
   if (waitIdle && (!update || ownerIdleConfirmed)) throw new Error("--wait-idle applies only to --update-current without --owner-idle-confirmed.");
+  if (args.some(arg => arg.startsWith("--live=") || arg === "--unguarded")) throw new Error("--live and --unguarded apply only to --session: --prepare, --ui and --update-current handle the owner's testing vault, which is never guarded and never touched by the guard.");
   if (args.some(arg => arg.startsWith("--profile=")) && !prepare) throw new Error("Profile requires --prepare or --ui.");
   for (const name of ["VAM_TEST_TARGET_VERSION", "VAM_TEST_VAULT_PARENT", "VAM_TEST_ARTIFACT_DIR", "VAM_TEST_WORKSPACE_ROOT"]) if (process.env[name]) throw new Error(`${name} is retired in the current-branch harness; unset it to avoid testing a stale target.`);
   if (prepare) assertObsidianClosed();

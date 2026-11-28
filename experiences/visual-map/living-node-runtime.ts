@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { TFile, type App } from "obsidian";
 import { isPlaceholder } from "../../core/note-placeholder";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
-import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
+import { frontmatter, marker, setFrontmatterKeys } from "../../core/repository-frontmatter";
 import { livingConfigurationStamp } from "../../core/living-node-region";
 import { normalizeVaultPath } from "../../core/map-chat-guard";
 import { createNoteReadContext, readOnce, type NoteReadContext } from "../../core/note-read-context";
@@ -19,6 +19,7 @@ import {
   livingIdentityStore,
   reconcileLivingDraftReferences,
   sameLivingTarget,
+  type LivingAuthorizedNote,
   type LivingSourceRef,
   type resolveLivingSources
 } from "./living-node-sources";
@@ -176,9 +177,24 @@ function noteIdentity(app: App, file: TFile) {
   return { identity: entry.refId, resolved: entry.state === "resolved" };
 }
 
+/** A VAM map file: a `Map.md`, or any note marked `visual-agent-map` (legacy maps). It is VAM's own data, never a note source. */
+function isVamMapFile(app: App, file: TFile): boolean {
+  return file.name === "Map.md" || marker(app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"]);
+}
+
+/** The notes the "read notes first" picker offers: map files are left out. */
+export function livingNoteCandidates(app: App, files: readonly TFile[]): TFile[] {
+  return files.filter(file => !isVamMapFile(app, file));
+}
+
 export function sourceResolver(app: App) {
   return {
-    resolveAuthorized(link: string, fromPath: string, _role?: "explicit" | "map", exact?: true) {
+    resolveAuthorized(
+      link: string,
+      fromPath: string,
+      _role?: "explicit" | "map",
+      exact?: true
+    ): LivingAuthorizedNote | undefined {
       const file = exact
         ? app.vault.getAbstractFileByPath(link)
         : app.metadataCache.getFirstLinkpathDest(link, fromPath);
@@ -188,6 +204,8 @@ export function sourceResolver(app: App) {
         app.vault.getAbstractFileByPath(file.path) !== file
       )
         return undefined;
+      // Refused before an identity is bound, so a map file never enters the identity store.
+      if (isVamMapFile(app, file)) return { identity: file.path, path: file.path, mapFile: true };
       const { identity, resolved } = noteIdentity(app, file);
       return { identity, path: file.path, ...(resolved ? {} : { unresolved: true as const }) };
     }
@@ -573,12 +591,17 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
   // Why a card did not finish, as a short code kept with its outcome so the card can say so after a reopen.
   const reasons = new Map<string, string>();
   for (const [id, reason] of plan.blocked) {
-    const replaced = sources
-      .get(id)
-      ?.failures.some(failure => failure.required && failure.reason === "source-replaced");
+    const failed = (kind: string): boolean =>
+      !!sources.get(id)?.failures.some(failure => failure.required && failure.reason === kind);
     reasons.set(
       id,
-      replaced ? "source-replaced" : reason === "missing-source" || reason === "cycle" ? reason : "dependency-blocked"
+      failed("map-file")
+        ? "map-file-source"
+        : failed("source-replaced")
+          ? "source-replaced"
+          : reason === "missing-source" || reason === "cycle"
+            ? reason
+            : "dependency-blocked"
     );
   }
   for (const id of upstreamBlocked) reasons.set(id, "upstream-trial");
@@ -838,6 +861,7 @@ function resolveDraft(
     link => {
       const note = resolver.resolveAuthorized(link, target.path);
       if (!note) throw new Error("missing-source");
+      if (note.mapFile) throw new Error("map-file-source");
       // Choosing the link again is the user's explicit confirmation of an unresolved source.
       if (note.unresolved) {
         const file = app.vault.getAbstractFileByPath(note.path);
@@ -862,7 +886,10 @@ function resolveDraft(
     card.id === target.id ? { ...card, prompt, aiCard: true, explicitRefs: explicit, sourceUnavailable: false } : card
   );
   const next = planLivingMap(proposed, [], resolver);
-  if (next.sources.get(target.id)?.failures.some(failure => failure.required)) throw new Error("invalid-source");
+  const required = next.sources.get(target.id)?.failures.filter(failure => failure.required) ?? [];
+  // A saved reference to a map file stays in the note; it is refused with its own reason until the user removes it.
+  if (required.some(failure => failure.reason === "map-file")) throw new Error("map-file-source");
+  if (required.length) throw new Error("invalid-source");
   if (introducesLivingCycle(cards, proposed, resolver) || next.plan.blocked.get(target.id) === "cycle")
     throw new Error("living-node-cycle");
   const revisionOf = (planned: typeof next) =>

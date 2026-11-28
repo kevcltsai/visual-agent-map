@@ -17,6 +17,7 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
     if (/^(stale-base|changed-knowledge)$/.test(code)) return "ui.living_node_trial_reason_replaced";
     if (/^(ambiguous-living-node-region|invalid-generation|invalid-receipts|unknown-ownership)$/.test(code))
       return "ui.living_node_reason_markers_damaged";
+    if (code === "map-file-source") return "ui.living_node_reason_map_file";
     if (/^(unauthorized-source|missing-source|invalid-source)$/.test(code))
       return "ui.living_node_reason_missing_source";
     if (code) return "ui.living_node_trial_reason_validation";
@@ -39,6 +40,8 @@ export function livingSaveReason(error: unknown): TranslationKey | null {
       return "ui.living_node_save_reason_self";
     case "living-node-cycle":
       return "ui.living_node_reason_cycle";
+    case "map-file-source":
+      return "ui.living_node_reason_map_file";
     case "unauthorized-source":
     case "missing-source":
     case "invalid-source":

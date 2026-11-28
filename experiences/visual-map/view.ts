@@ -212,6 +212,7 @@ import {
   saveLivingConfig,
   validateLivingStructure,
   livingRemovalConsumers,
+  livingNoteCandidates,
   livingReplacedSources,
   livingCrossCut,
   type LivingConfigSave
@@ -15374,7 +15375,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
-    const files = this.app.vault.getMarkdownFiles();
+    const files = livingNoteCandidates(this.app, this.app.vault.getMarkdownFiles());
     const modal = new AiCardNotePicker(
       this.app,
       files,

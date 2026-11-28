@@ -833,7 +833,7 @@ test('P3.3 refusal reasons are localized in English, Traditional and Simplified 
 export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian });
-  const codes = ['empty-prompt', 'self-reference', 'living-node-cycle', 'unauthorized-source', 'missing-source', 'ambiguous-source', 'changed-configuration', 'changed-target'];
+  const codes = ['empty-prompt', 'self-reference', 'living-node-cycle', 'map-file-source', 'unauthorized-source', 'missing-source', 'ambiguous-source', 'changed-configuration', 'changed-target'];
   const seen = new Map();
   try {
     for (const language of ['en', 'zh-TW', 'zh-CN']) {
@@ -1278,6 +1278,58 @@ test('replaced sources: the card lists the links whose note was replaced; none f
   eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), []);
   store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stampRef(99);
   eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), ['Ref']);
+});
+
+// B23: a map file (Map.md, or any note marked `visual-agent-map`) is VAM's own data, not a note to read first.
+const OTHER_MAP = 'Agent Workspace/Topics/map-b/Map.md';
+const withOtherMap = async h => {
+  await h.app.vault.create(OTHER_MAP, core.serializeMap({ id: 'map-b', title: 'Secret map B', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }));
+  await h.app.vault.create('Maps/Old.md', '---\nvisual-agent-map: true\n---\n# Old map\n');
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+};
+const saveReason = require('./support-replay.cjs').loadSource('export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";', { obsidian });
+
+test('map files as sources: the note picker leaves out every map file and keeps ordinary notes', async () => {
+  const h = await harness([['solo', null]]);
+  await withOtherMap(h);
+  const paths = h.runtime.livingNoteCandidates(h.app, h.app.vault.getMarkdownFiles()).map(file => file.path);
+  assert.ok(paths.includes('Notes/Ref.md'), 'an ordinary note stays a candidate');
+  assert.ok(paths.includes(h.node('solo').path), 'a topic note stays a candidate');
+  for (const path of [MAP, OTHER_MAP, 'Maps/Old.md']) assert.ok(!paths.includes(path), path + ' is not offered');
+});
+
+test('map files as sources: saving one as a source writes nothing and is refused with a reason', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts' }]]);
+  await withOtherMap(h);
+  const before = h.raw('solo');
+  for (const link of ['Agent Workspace/Topics/map-b/Map', 'Maps/Old']) {
+    const error = await h.runtime
+      .saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[' + link + ']]')
+      .then(() => null, e => e);
+    assert.ok(error, link + ' is refused');
+    assert.equal(error.message, 'map-file-source');
+    assert.equal(saveReason.livingSaveReason(error), 'ui.living_node_reason_map_file');
+    assert.equal(h.raw('solo'), before, 'nothing written');
+  }
+  // An ordinary note still saves.
+  await h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[Ref]]');
+  assert.match(h.raw('solo'), /note-path:Notes\/Ref\.md/);
+});
+
+test('map files as sources: a saved reference to one stays in the file, is not read, and the card says why', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await withOtherMap(h);
+  await h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[Ref]]');
+  const file = h.app.vault.getAbstractFileByPath(h.node('solo').path);
+  await h.app.vault.process(file, text => text.replace('note-path:Notes/Ref.md', 'note-path:' + OTHER_MAP));
+  assert.ok(h.raw('solo').includes('note-path:' + OTHER_MAP));
+  await h.roundPort().run();
+  assert.ok(!h.calls.some(call => JSON.stringify(call.input).includes('Secret map B')), 'the map file is not sent');
+  assert.equal(h.calls.length, 0, 'the card does not run');
+  assert.ok(h.raw('solo').includes('note-path:' + OTHER_MAP), 'the reference stays');
+  assert.equal(h.raw('solo').match(/^living-node-reason: "(.*)"$/m)?.[1], 'map-file-source');
+  const living = S.load('experiences/visual-map/living-node-state.ts');
+  assert.equal(living.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'map-file-source' }), 'ui.living_node_reason_map_file');
 });
 
 test('reconfirm: the identity is confirmed only after the formal save succeeded, and only for the chosen link', async () => {

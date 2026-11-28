@@ -137,6 +137,8 @@ export interface MapChatConversationPorts {
   applyBlock(anchor: { path: string; id: string | undefined }): string | null;
   /** Why a change to these cards cannot be made now (one of them is merging); null = it can. */
   mergeBlock(ids: readonly string[]): string | null;
+  /** Why a relation between these cards or knowledge references cannot be made now (one is no longer on the map); null = it can. */
+  endBlock(ids: readonly string[]): string | null;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
   /** `selection`: the cards selected when the message was sent (what an action that names no card works on). */
   actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>, selection?: readonly string[]): string;
@@ -379,7 +381,10 @@ export class MapChatConversation {
           reason: suggestion.reason,
           source: suggestion.source,
           state: "pending",
-          blocked: () => this.ports.applyBlock(anchor) ?? this.ports.mergeBlock([suggestion.fromId, suggestion.toId]),
+          blocked: () => {
+            const ends = [suggestion.fromId, suggestion.toId];
+            return this.ports.applyBlock(anchor) ?? this.ports.endBlock(ends) ?? this.ports.mergeBlock(ends);
+          },
           adopt: () =>
             void this.adoptSuggestion(card, row, token, suggested[at], baseline, anchor, message, drawPreview)
         };

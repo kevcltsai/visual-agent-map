@@ -141,6 +141,7 @@ import {
 } from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { managedNodeIds } from "./core/argument-map/model";
+import { isNoteBackupPath } from "./core/blocks/block-files";
 import {
   bookSettingsFrontmatter,
   pipelineFrontmatter,
@@ -1841,7 +1842,9 @@ export class Repository {
   }
 
   async mapFiles(): Promise<TFile[]> {
-    return (await this.markedFiles("visual-agent-map")).sort((a, b) => a.path.localeCompare(b.path));
+    return (await this.markedFiles("visual-agent-map"))
+      .filter(file => !isNoteBackupPath(file.path))
+      .sort((a, b) => a.path.localeCompare(b.path));
   }
 
   /**

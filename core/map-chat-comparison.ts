@@ -86,13 +86,15 @@ export function buildComparisonTable(
   return { columns, rows };
 }
 
-/** The header text of one column: "Name (unit)", "Name (no unit)" for the unitless column of a split attribute, else the name. */
+/** The header text of one column: "Name (unit)" ("Name · unit" when the unit already holds parentheses), "Name (no unit)" for the unitless column of a split attribute, else the name. */
 export function comparisonColumnHeader(
   column: ComparisonColumn,
   words: { withUnit: (name: string, unit: string) => string; noUnit: (name: string) => string }
 ): string {
   return column.unit !== null
-    ? words.withUnit(column.name, column.unit)
+    ? /[(（]/.test(column.unit)
+      ? `${column.name} · ${column.unit}`
+      : words.withUnit(column.name, column.unit)
     : column.split
       ? words.noUnit(column.name)
       : column.name;

@@ -62,6 +62,24 @@ test('corpus: a map without the marker, an archived card, an unreadable note, a 
   assert.equal(io.reads.some(r => r.startsWith('note:') && /a3|d1|d2|e1/.test(r)), false, 'no body is read for a card that is not authorised');
 });
 
+test('corpus: a note backup of a map (same id, marker) is not a map: the original map stays searchable', async () => {
+  const spec = SPEC();
+  spec['Agent Workspace/Note styles/Backups/Notes/Map 2026-11-28 101500.md'] = { id: 'map-a', title: 'Alpha map', nodes: [{ id: 'a1', title: 'Pricing strategy', body: 'subscription tiers' }] };
+  spec['Agent Workspace/Note styles/備份/筆記/Map 2026-11-28 101500.md'] = { id: 'map-b', title: 'Beta map', nodes: [{ id: 'b1', title: 'Competitor prices', body: 'pricing table' }] };
+  const io = fakeIo(spec);
+  const cards = await corpus.loadAuthorizedCards(io, new AbortController().signal);
+  same(cards.map(c => c.nodeId).sort(), ['a1', 'a2', 'b1'], 'the originals are still in the corpus');
+  assert.ok(cards.every(c => c.mapPath.startsWith('Maps/')), 'no card comes from a backup');
+  assert.equal(io.reads.some(r => r.includes('Backups') || r.includes('備份')), false, 'a backup is never read');
+});
+
+test('corpus: two real maps sharing an id are still both skipped', async () => {
+  const spec = SPEC();
+  spec['Maps/Copy/Map.md'] = { id: 'map-a', title: 'Alpha copy', nodes: [{ id: 'k1', title: 'Copy card' }] };
+  const cards = await corpus.loadAuthorizedCards(fakeIo(spec), new AbortController().signal);
+  same(cards.map(c => c.nodeId).sort(), ['b1'], 'the shared id cannot tell the two maps apart');
+});
+
 test('corpus: aborting stops the reading at once and returns nothing', async () => {
   const io = fakeIo(SPEC());
   const ctl = new AbortController();

@@ -447,3 +447,32 @@ test('F08b wiring: the reply hands the chat the map the table is about, and the 
   assert.equal(host.comparisonSaveBlock(h.chat.attached[0], h.chat.anchors[0]), null);
   assert.equal((await host.saveComparison(h.chat.attached[0], h.chat.anchors[0])).ok, true);
 });
+
+// ---- F08a-x: narrow panel (table scrolls, never squeezed per character) and unit that already has parentheses ----
+test('F08a-x header: a unit that already holds parentheses is not wrapped in a second pair, on screen and in the Markdown', () => {
+  const words = { withUnit: (n, u) => `${n}（${u}）`, noUnit: n => `${n}（無單位）` };
+  for (const unit of ['US$（總價）', 'US$ (total)']) {
+    const col = { attribute: 0, name: '價格', unit, split: false };
+    assert.equal(comparisonColumnHeader(col, words), `價格 · ${unit}`);
+  }
+  assert.equal(comparisonColumnHeader({ attribute: 0, name: '價格', unit: 'US$', split: true }, words), '價格（US$）');
+  const md = comparisonMarkdown(
+    buildComparisonTable({ attributes: [{ name: '價格', unit: 'US$（總價）' }], rows: [row('a', '5')] }, { titleOf: () => 'A', unknown: 'U' }),
+    { header: c => comparisonColumnHeader(c, words), gone: 'g', notes: [] }
+  );
+  assert.ok(md.split('\n')[0].includes('價格 · US\\$（總價）'), md);
+});
+
+test('F08a-x css: the table is not forced to its container width, cells keep words whole, and the wrapper scrolls sideways', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  const rule = sel => (css.match(new RegExp(`^${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`, 'm')) || [])[1] || '';
+  assert.match(rule('.vam-map-chat-comparison-scroll'), /overflow-x:\s*auto/);
+  const table = rule('.vam-map-chat-comparison-table');
+  assert.match(table, /width:\s*max-content/);
+  assert.match(table, /min-width:\s*100%/);
+  const cells = rule('.vam-map-chat-comparison-table th, .vam-map-chat-comparison-table td');
+  assert.doesNotMatch(cells, /overflow-wrap:\s*anywhere/);
+  assert.match(cells, /overflow-wrap:\s*normal/);
+  assert.match(cells, /word-break:\s*keep-all/);
+  assert.match(cells, /min-width:\s*\d+(px|em|ch)/);
+});

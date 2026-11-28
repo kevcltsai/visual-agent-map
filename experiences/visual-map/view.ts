@@ -3258,6 +3258,8 @@ export class VisualAgentMapView extends ItemView {
     this.selection.restore(this.branchFocus.selection, branch);
     this.render();
     this.fitCards(branch);
+    // From the command palette the keyboard is left on the page body, where the map's Esc is not heard: give it to the map.
+    this.restoreMapFocusSoon(id);
     return true;
   }
   exitBranchFocus(): boolean {

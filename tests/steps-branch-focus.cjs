@@ -215,3 +215,15 @@ test('B13-9: adding a child while focused keeps the pre-focus viewport in Map.md
   assert.equal(onDisk.nodes.length, 6, 'the edit really reached disk (5 cards + the new child)');
   assert.deepEqual(vp(onDisk.viewport), { x: 12, y: 34, zoom: 0.9 });
 });
+
+test('B13-10: focusing from the command palette (keyboard left on the body) puts focus on the focused card, so Esc leaves', async () => {
+  const h = await harness();
+  h.view.selection.setSelected(h.ids.branch);
+  h.doc.activeElement = h.doc.body; // the palette closed: Obsidian leaves the keyboard on the body
+  assert.equal(h.view.mapCommand('focus-branch', false), true);
+  await timers(10);
+  assert.equal(h.active(), h.card('branch'), 'the focused card holds the keyboard');
+  h.view.onMapKeydown(keydown(h.active()));
+  assert.equal(h.view.branchFocus, null, 'Esc on it leaves the focus');
+});
+

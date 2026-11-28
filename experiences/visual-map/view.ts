@@ -1978,7 +1978,9 @@ export class VisualAgentMapView extends ItemView {
     parentId: string,
     newIds: Set<string>,
     minTop?: number,
-    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }
+    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf },
+    /** A batch (a chat reply's cards, made one by one) never pans the view for the selected card. */
+    keepView = false
   ): void {
     // The selected card may be pushed by the arrangement: the view pans (only) so it stays where the eye was.
     const selectedId = this.selection?.state.selected;
@@ -2000,7 +2002,7 @@ export class VisualAgentMapView extends ItemView {
     const after = from && selectedId ? map.nodes.find(node => node.id === selectedId) : undefined;
     // Only for added cards: a moved, sorted or re-parented card (already drawn) is no reason to pan.
     const addedOnly = [...newIds].every(id => !(this.cardEls as Map<string, HTMLElement> | undefined)?.has(id));
-    if (addedOnly && from && after && map.viewport) {
+    if (!keepView && addedOnly && from && after && map.viewport) {
       const dx = after.x - from.x,
         dy = after.y - from.y;
       const limit = this.cardHeightOf(after.id) ?? DEFAULT_CARD_HEIGHT;
@@ -18925,7 +18927,8 @@ export class VisualAgentMapView extends ItemView {
       const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
       if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
       this.notes.set(node.id, preparedNote);
-      this.selection.setSelected(node.id);
+      // A batch card (focus false) leaves the selection to its caller.
+      if (focus) this.selection.setSelected(node.id);
       // Set before the repaint that shows the card, so the card is drawn with its title field.
       if (interactive && focus && !this.inlineName)
         this.inlineName = {
@@ -18962,7 +18965,7 @@ export class VisualAgentMapView extends ItemView {
               ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
               : undefined;
             // Grown from the block itself, so the block and the topics already after it stay where they are.
-            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop);
+            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop, undefined, !focus);
           } else if (!parent) {
             const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
             if (roots.length)

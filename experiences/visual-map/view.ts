@@ -681,6 +681,7 @@ import {
 } from "./ai-mode";
 import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
 import { openStylePopover, type StylePopover, type StylePopoverState } from "./style-popover";
+import { openBatchColorPopover, type BatchColorPopover } from "./batch-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
@@ -1619,6 +1620,8 @@ export class VisualAgentMapView extends ItemView {
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
   /** The toolbar Style popover (B08) and the card it styles; a repaint takes it out and puts it back. */
   private styleOpen: { nodeId: string; mapId: string; pop: StylePopover } | null = null;
+  /** The selection bar's Color popover (B19b); a new bar (a repaint, a changed selection) closes it. */
+  private batchColorPop: BatchColorPopover | null = null;
   /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
   private aiCardOpen: {
     nodeId: string | null;
@@ -3534,6 +3537,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeTopicChatWindow();
     this.closeAiCardPopover();
     this.styleOpen?.pop.close();
+    this.batchColorPop?.close(false);
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
     else this.topicChatRecords?.close();
@@ -13001,6 +13005,7 @@ export class VisualAgentMapView extends ItemView {
       },
       search: () => this.openMapSearch(),
       shortcuts: () => this.openKeyboardShortcuts(),
+      openBatchColor: opener => this.openBatchColor(opener),
       merge: () => this.openMerge(),
       multiResearch: () => this.openMultiResearch(),
       chooseParent: copy => this.chooseSelectedParent(copy),
@@ -20549,12 +20554,82 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
+   * The selection bar's Color popover (batch-popover.ts) above its button: the selection's one colour is pressed, or none
+   * and "Mixed" when the cards differ. A click on the button again closes it; a swatch closes it and colours the selection.
+   */
+  private openBatchColor(opener?: HTMLElement): void {
+    const open = this.batchColorPop;
+    open?.close(false);
+    const host = opener?.parentElement;
+    if (open || !opener || !host) return;
+    const ids = [...this.selection.state.multiSelected];
+    const colors = new Set(
+      ids
+        .filter(id => this.notes.get(id))
+        .map(id => TOPIC_COLORS.find(color => color === this.notes.get(id)?.color) ?? null)
+    );
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (target && !pop.el.contains(target) && !opener.contains(target)) pop.close(false);
+    };
+    const pop = openBatchColorPopover(host, opener, colors.size > 1 ? "mixed" : ([...colors][0] ?? null), ids.length, {
+      onColor: color => {
+        pop.close();
+        this.enqueue(async () => {
+          await this.changeSelectionColor(ids, color);
+          // The write repainted the bar: the focus goes to its new Color button.
+          if (!opener.isConnected)
+            this.selectionBarEl?.querySelector<HTMLElement>('[data-card-action="batch-color"]')?.focus();
+        });
+      },
+      onClose: () => {
+        if (this.batchColorPop === pop) this.batchColorPop = null;
+        pop.el.ownerDocument?.removeEventListener("pointerdown", outside, true);
+      }
+    });
+    pop.el.style.left = `${opener.offsetLeft}px`;
+    pop.el.ownerDocument?.addEventListener("pointerdown", outside, true);
+    this.batchColorPop = pop;
+  }
+  /**
+   * Sets (or, with null, clears) the colour of every selected topic in one undoable step (P1.9). It rechecks the Color
+   * button's gates first (presentation, loading notes, the picture-book structure lock, an AI-locked or merging card): a
+   * refused write says why and writes nothing. Only the notes whose colour really changes are written; Map.md changes only
+   * its viewport. Not changeTopicColor: that one is for a single card outside selection mode (markersEditable).
+   */
+  private async changeSelectionColor(ids: readonly string[], color: TopicColor | null): Promise<void> {
+    if (!this.map) return;
+    const ctx = this.cardActionContext(ids);
+    const availability = actionsFor("toolbar", ctx).find(entry => entry.action.id === "batch-color")?.availability;
+    if (!availability?.ok) {
+      if (availability) new Notice(t(availability.reasonKey, ...(availability.reasonArgs ?? [])));
+      return;
+    }
+    const targets = ids
+      .map(id => this.map!.nodes.find(item => item.id === id))
+      .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
+      .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
+    if (!targets.length) return;
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeTopicColor(path, color));
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_color") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /**
    * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card
-   * action registry (Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
+   * action registry (Color, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
    * cannot run stays focusable (aria-disabled) and its reason is written on a line below the row. The canvas keeps its height
    * free (see `has-selection-bar`).
    */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
+    this.batchColorPop?.close(false);
     const selection = workspace.createDiv("vam-selection-bar");
     const count = this.selection.state.multiSelected.size;
     workspace.toggleClass?.("has-selection-bar", count > 0);
@@ -20588,8 +20663,12 @@ export class VisualAgentMapView extends ItemView {
       const reasonText = availability.ok ? "" : t(availability.reasonKey, ...(availability.reasonArgs ?? []));
       const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
         if (reasonText) new Notice(reasonText);
-        else action.run(context, {});
+        else action.run(context, { opener: button });
       });
+      if (action.id === "batch-color") {
+        button.setAttr("data-card-action", action.id);
+        button.setAttr("aria-haspopup", "dialog");
+      }
       if (reasonText) {
         button.setAttr("aria-disabled", "true");
         button.setAttr("title", reasonText);

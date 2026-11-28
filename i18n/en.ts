@@ -1059,6 +1059,9 @@ export const en = {
   "ui.card_action_off_no_lockable": "None of the selected cards can be locked",
   "ui.selection_locked_0_1":
     "△ {0} of them are locked or being merged ({1}), so this group cannot change color, size, position or merge. Take them out of the selection, or unlock them first.",
+  "ui.batch_color": "Color ▾",
+  "ui.batch_color_title_0": "Color for {0} cards",
+  "ui.batch_color_mixed": "Mixed",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "Workspace default",

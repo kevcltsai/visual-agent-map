@@ -998,6 +998,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_action_off_no_lockable": "选取的卡都不能锁定",
   "ui.selection_locked_0_1":
     "△ 其中 {0} 张已锁定或正在合并（{1}），这一组不能改颜色、尺寸、位置或合并。把它移出选取，或先解除锁定。",
+  "ui.batch_color": "颜色 ▾",
+  "ui.batch_color_title_0": "{0} 张卡的颜色",
+  "ui.batch_color_mixed": "未统一",
   "ui.model": "使用模型",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "工作区默认",

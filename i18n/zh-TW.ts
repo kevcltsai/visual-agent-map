@@ -999,6 +999,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_action_off_no_lockable": "選取的卡都不能鎖定",
   "ui.selection_locked_0_1":
     "△ 其中 {0} 張已鎖定或正在合併（{1}），這一組不能改顏色、尺寸、位置或合併。把它移出選取，或先解除鎖定。",
+  "ui.batch_color": "顏色 ▾",
+  "ui.batch_color_title_0": "{0} 張卡的顏色",
+  "ui.batch_color_mixed": "未統一",
   "ui.model": "使用模型",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "工作區預設",

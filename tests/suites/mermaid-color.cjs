@@ -10,7 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { test, root } = require('../support.cjs');
+const { test, root, reapIfOrphaned } = require('../support.cjs');
 
 const tokens = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/color/obsidian-default-tokens.json'), 'utf8'));
 const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -123,6 +123,7 @@ async function withChrome(chrome, directory, url, drive, timeoutMs = 90000) {
   const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--use-mock-keychain', '--password-store=basic', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,900', 'about:blank'], { stdio: 'ignore', detached: true });
   let timer; let stopped = false; let exitInfo = null;
   child.once('exit', (code, signal) => { exitInfo = { code, signal }; });
+  reapIfOrphaned(child, profile);
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Chrome run timed out after ${timeoutMs} ms`)), timeoutMs); });
   const work = async () => {
     let target;

@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
 import { allowedUrl } from "../../core/argument-map/source-proof";
+import { isPlaceholder } from "../../core/note-placeholder";
 import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatter";
+import {
+  CANONICAL_HEADINGS,
+  canonicalHeadings,
+  localizeHeadings,
+  noteHeadingSet,
+  replaceSummarySection,
+  section
+} from "../../core/repository-note-body";
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
@@ -673,6 +682,27 @@ export const livingWithoutFence = (content: string): string =>
 /** Replay-fence generation stored in the note (0 for a note written before the fence existed). */
 export const livingGeneration = (content: string): number => readLivingFence(frontmatter(content)).generation;
 
+/**
+ * The latest summary (frontmatter `summary` and `## Current Summary`) follows the knowledge output of a commit. A summary the
+ * user wrote (neither empty, the placeholder, nor the output this commit replaces) is theirs and stays as it is.
+ */
+function withLatestSummary(content: string, previous: string, latest: string): string {
+  const headings = noteHeadingSet(content) ?? CANONICAL_HEADINGS;
+  const canonical = canonicalHeadings(content, headings);
+  const hasSection = /^## Current Summary[ \t]*\r?$/m.test(canonical);
+  const owned = frontmatter(content).summary;
+  const current = (hasSection ? section(canonical, "Current Summary") : typeof owned === "string" ? owned : "").trim();
+  if (current && !isPlaceholder(current) && current !== previous.trim()) return content;
+  // A note without the section (not written by VAM) is not given one: its body stays as it is, only the frontmatter summary follows.
+  if (!hasSection) return setFrontmatterKeys(content, { summary: latest });
+  // The section helper leaves no blank line before the next heading when the section grew; the note keeps its spacing.
+  const body = replaceSummarySection(canonical, latest).replace(
+    /(\n## Current Summary\r?\n\r?\n[\s\S]*?[^\n])\n(## )/,
+    "$1\n\n$2"
+  );
+  return setFrontmatterKeys(localizeHeadings(body, headings), { summary: latest });
+}
+
 export interface LivingMarkdownPort {
   /** The existing Repository.updateNoteRawGuarded port; its transform runs inside vault.process. */
   updateNoteRawGuarded(
@@ -757,7 +787,11 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
           ? content.slice(0, region.start) + managed + content.slice(region.end)
           : content + (content.endsWith("\n") ? "\n" : "\n\n") + managed + "\n"
         : content;
-      committedContent = setFrontmatterKeys(replaced, {
+      const withSummary =
+        next.output.owner === "ai" && next.output.text.trim() && next.output.text !== stored.output.text
+          ? withLatestSummary(replaced, stored.output.text, next.output.text)
+          : replaced;
+      committedContent = setFrontmatterKeys(withSummary, {
         [HASH_KEY]: livingSnapshotRevision(managed),
         [OWNERSHIP_KEY]: ownership(nextKnowledge),
         [COMMIT_KEY]: candidate.executionId,

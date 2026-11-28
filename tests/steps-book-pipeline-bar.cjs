@@ -626,6 +626,27 @@ test('P8c bar: a finished book whose every chapter was locked and nothing checke
   assert.ok(one(someOpen, 'vam-book-open-issues'), 'one chapter not locked: the page is written, the button stays');
 });
 
+test('B33-z bar: the button follows the runner\'s saved decision (closingSkipped), whatever the bar could count itself; older saves keep the B33-x rule', () => {
+  setUiLanguage('zh-TW');
+  const done = { done: true, checked: 2 };
+  const proof = { a: slot(done), b: slot(done), c: slot(done), d: slot(done) };
+  const book = slot({ done: true, checked: 3, incomplete: true, locked: ['b'] });
+  const draw = data => { const bar = dom.element('div'); bundle.renderBookBar(bar, bundle.bookBarState(data, undefined, () => 'checked'), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return bar; };
+  assert.equal(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: true })), 'vam-book-open-issues'), undefined, 'saved as skipped: no button');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book, closingSkipped: false })), 'vam-book-open-issues'), 'saved as written (say, a cover item): the button');
+  const allLocked = slot({ done: true, incomplete: true, locked: ['a', 'b', 'c', 'd'] });
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: { a: slot({ done: true }), b: slot({ done: true }), c: slot({ done: true }), d: slot({ done: true }) }, bookProof: allLocked, closingSkipped: false })), 'vam-book-open-issues'), 'the saved decision wins over the older rule');
+  assert.ok(one(draw(aiData({ phase: 'done', aiProof: proof, bookProof: book })), 'vam-book-open-issues'), 'an older save, partly locked: the button as before');
+});
+test('B33-z: the notice for chapters skipped as locked names them, in each UI language', () => {
+  setUiLanguage('zh-TW');
+  assert.equal(bundle.lockedSkippedNotice(['甲', '乙']), 'AI 校對略過了已鎖定的章：甲、乙。其他章都沒有問題。');
+  setUiLanguage('zh-CN');
+  assert.equal(bundle.lockedSkippedNotice(['甲']), 'AI 校对略过了已锁定的章：甲。其他章都没有问题。');
+  setUiLanguage('en');
+  assert.equal(bundle.lockedSkippedNotice(['A', 'B']), 'The AI proofread skipped these locked chapters: A, B. Nothing else is open.');
+  setUiLanguage('zh-TW');
+});
 test('bar: with a book structure the fix line names the card by its place (preface / chapter / section) and counts cards', () => {
   const order = ['p', 'c1', 's1', 'c2'];
   const places = { p: { kind: 'preface' }, c1: { kind: 'chapter', chapter: 1 }, s1: { kind: 'section', chapterId: 'c1', sectionIndex: 1, sectionCount: 1 }, c2: { kind: 'chapter', chapter: 2 } };

@@ -1906,3 +1906,105 @@ test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers on
   assert.ok(buttons(ready).length > 1, 'editable again: the other tools are back');
   assert.ok(buttons(ready).some(b => hasCls(b, 'vam-card-tool-more')));
 });
+
+// ---- D1-x7: adopting a trial is the same commit as a formal Run Card; an unsaved draft can be tried ------------------------
+const sameNoteButTime = text => String(text)
+  // The save step the adopter needs writes the source refs, which also feed the input revision: the only two non-time differences.
+  .replace(/^living-node-refs:\n(  - .*\n)*/m, '')
+  .replace(/^(updated|living-node-input-revision|living-node-last-attempt|living-node-last-successful-check|living-node-last-content-change|living-node-commit|living-node-receipts|living-node-generation):.*\n?/gm, '')
+  .replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T')
+  .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'U');
+
+test('D1-x7 adopt = formal submit: the adopted note has the same frontmatter, summary, status and knowledge revision as a Run Card of the same settings', async () => {
+  const formal = await popoverHarness([['A', null, { prompt: 'Why?\nSources: [[N]]' }], ['N', null, { noAi: true }]]);
+  formal.view.readLivingMapSourceReport = async () => ({ groups: [], unavailable: 0 });
+  formal.view.startPromptRun([formal.node('A').id]); await formal.done();
+  assert.match(formal.raw('A'), /Result: A/, 'the formal run wrote the result');
+  const adopted = await trialHarness();
+  await adopted.ready();
+  adopted.saveButton().click(); // adoption needs the exact same configuration saved first
+  await until(() => adopted.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  adopted.button('Adopt trial').click();
+  await until(() => /Result: A/.test(adopted.raw('A')));
+  for (let i = 0; i < 20; i++) await dom.tick();
+  eq(sameNoteButTime(adopted.raw('A')), sameNoteButTime(formal.raw('A')), 'same bytes except time fields');
+  const a = await adopted.repo.readNote(adopted.node('A').path, adopted.mapDoc), f = await formal.repo.readNote(formal.node('A').path, formal.mapDoc);
+  assert.equal(a.summary, f.summary); assert.equal(a.livingNode.summary, f.livingNode.summary);
+  assert.equal(a.livingNode.knowledgeRevision, f.livingNode.knowledgeRevision);
+  assert.equal(a.status, f.status);
+  assert.equal(a.summary, 'Result: A', 'D1-x9: adopt updates the latest summary like a formal run');
+  assert.match(adopted.raw('A'), /## Current Summary\n\nResult: A\n/);
+  assert.ok(adopted.reader.some(r => r[0] === 'official'), 'the reader is handed back to the official note');
+});
+
+// ---- D1-x9: a successful commit updates the latest summary (frontmatter `summary` + `## Current Summary`) -------------------
+const summaryOf = raw => raw.match(/## Current Summary\n\n([\s\S]*?)\n\n## /)?.[1].split('\n\n')[0];
+const fmSummary = raw => require('./support.cjs').obsidian.parseYaml(raw.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1]).summary;
+
+test('D1-x9 formal Run Card: a new latest summary replaces the placeholder in frontmatter and Current Summary, in the same single write as the knowledge commit', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  assert.match(summaryOf(h.raw('A')), /\S/);
+  assert.equal(summaryOf(h.raw('A')), 'No conclusion yet', 'starts as the placeholder, which is not user content');
+  const file = h.app.vault.getAbstractFileByPath(h.node('A').path);
+  const states = [];
+  const process = h.app.vault.process;
+  h.app.vault.process = async (f, change) => { const r = await process(f, change); if (f === file) states.push(h.raw('A')); return r; };
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  assert.equal(fmSummary(h.raw('A')), 'Result: A');
+  assert.equal(summaryOf(h.raw('A')), 'Result: A');
+  const firstRegion = states.findIndex(t => /### Current output[\s\S]*Result: A/.test(t));
+  const firstSummary = states.findIndex(t => summaryOf(t) === 'Result: A' && fmSummary(t) === 'Result: A');
+  assert.ok(firstRegion >= 0);
+  assert.equal(firstSummary, firstRegion, 'summary and knowledge land in one write');
+  assert.equal((await h.repo.readNote(h.node('A').path, h.mapDoc)).summary, 'Result: A');
+});
+
+test('D1-x9 a later commit with a new summary updates it again; the same summary is not rewritten; a hand-edited summary is kept', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  const origRun = h.host.aiCalls.run;
+  let next = null;
+  h.host.aiCalls.run = (prepared, options, finish) => next === null ? origRun(prepared, options, finish)
+    : (h.calls.push({ key: 'A', input: prepared.input, options }), finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: next === '' ? [] : [{ kind: 'output', text: next, evidence: [] }] }), { signal: options.signal, parsed() {} }));
+  const run = async text => {
+    next = text; const count = h.calls.length;
+    h.view.promptBatch = null; h.view.startPromptRun([h.node('A').id]);
+    await until(() => h.view.promptBatch?.outcome && h.calls.length > count);
+    for (let i = 0; i < 15; i++) await dom.tick();
+  };
+  await run('Second');
+  assert.equal(fmSummary(h.raw('A')), 'Second');
+  assert.equal(summaryOf(h.raw('A')), 'Second');
+  // no effective change: the summary section and key stay byte for byte
+  const before = h.raw('A');
+  await run('Second');
+  assert.equal(summaryOf(h.raw('A')), summaryOf(before));
+  assert.equal(fmSummary(h.raw('A')), 'Second');
+  // the user edits the summary: protected; the AI result still lands in the Living region
+  await h.repo.updateNote(h.node('A').path, { summary: 'Mine' });
+  await run('Third');
+  assert.match(h.raw('A'), /### Current output[\s\S]*Third/, 'the AI result lands in the knowledge region');
+  assert.equal(summaryOf(h.raw('A')), 'Mine');
+  assert.equal(fmSummary(h.raw('A')), 'Mine');
+});
+
+test('D1-x7 an unsaved new Living card can be tried (A23): it runs the draft, writes nothing, creates no formal config; an empty Prompt is still refused', async () => {
+  const h = await trialHarness();
+  const vault = () => [...h.contents.entries()].map(([k, v]) => k + '\n' + v).join('\n--\n');
+  h.view.openAiCardPopover(null);
+  const button = h.button;
+  assert.equal(button('Try prompt').disabled, true, 'empty Prompt: refused');
+  const before = vault();
+  h.question().value = 'What is new?'; h.question().input();
+  assert.equal(button('Try prompt').disabled, false, 'a non-empty unsaved draft may be tried');
+  button('Try prompt').click();
+  await until(() => ['ready', 'error', 'invalid'].includes(h.view.aiCardOpen?.trial.state)).catch(() => {});
+  for (let i = 0; i < 10; i++) await dom.tick();
+  assert.equal(h.view.aiCardOpen.trial.state, 'ready', 'the source watcher does not drop a draft preview');
+  assert.equal(h.calls.length, 1, 'one AI call');
+  assert.ok(h.reader.some(r => r[0] === 'trial'), 'the preview is shown');
+  assert.equal(vault(), before, 'vault bytes unchanged: no note, no map write');
+  h.question().value = ''; h.question().input();
+  assert.equal(button('Try prompt').disabled, true, 'emptied again: refused');
+});

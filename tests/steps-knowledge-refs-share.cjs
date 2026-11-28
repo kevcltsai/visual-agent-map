@@ -19,6 +19,7 @@ const exportRun = load('experiences/visual-map/map-export-run.ts', { obsidian },
 const outline = load('experiences/visual-map/map-export.ts');
 const importer = load('experiences/visual-map/outline-import.ts', { obsidian });
 const mm = load('map-model.ts', { obsidian });
+const { buildMapChatContext } = load('core/map-chat-context.ts', { obsidian });
 const plain = value => JSON.parse(JSON.stringify(value));
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
@@ -174,9 +175,9 @@ test('14: the OPML/FreeMind file export tells about titles only first, only when
 
 // ---- 9 (handoff): references are not in nodes, so nothing that walks the nodes sees them --------------------------------
 
-test('references stay out of layout, in-map search, chat context, Living Node and Run All: none of them reads knowledgeRefs', () => {
-  const walkers = ['map-layout.ts', 'map-layout-text.ts', 'map-graph.ts', 'experiences/visual-map/map-search.ts', 'experiences/visual-map/living-node-coordinator.ts', 'experiences/visual-map/living-node-provider.ts', 'experiences/visual-map/map-chat-context.ts'];
-  for (const file of walkers.filter(name => fs.existsSync(path.join(root, name)))) assert.equal(/knowledgeRefs|knowledge-refs/.test(read(file)), false, file);
+test('references stay out of layout, in-map search, Living Node and Run All: none of them reads knowledgeRefs', () => {
+  const walkers = ['map-layout.ts', 'map-layout-text.ts', 'map-graph.ts', 'experiences/visual-map/map-search.ts', 'experiences/visual-map/living-node-coordinator.ts', 'experiences/visual-map/living-node-provider.ts'];
+  for (const file of walkers) assert.equal(/knowledgeRefs|knowledge-refs/.test(read(file)), false, file);
   const consumers = fs.readdirSync(path.join(root, 'experiences/visual-map')).filter(name => /^(map-chat|living-node|run-all|topic-run|argument-run)/.test(name) && name.endsWith('.ts'));
   assert.ok(consumers.length > 3);
   for (const file of consumers) assert.equal(/knowledgeRefs|knowledge-refs/.test(read(`experiences/visual-map/${file}`)), false, file);
@@ -184,4 +185,22 @@ test('references stay out of layout, in-map search, chat context, Living Node an
   const map = baseMap({ knowledgeRefs: [ref()] });
   assert.deepEqual(map.nodes.map(n => n.id), ['r', 'c']);
   assert.deepEqual(plain(mm.parseMap(mm.serializeMap(map), () => {}).nodes.map(n => n.id)), ['r', 'c']);
+});
+
+// ---- map chat context (V3.3 F07b, decision #64): only the id, and the title when already resolved ----------------------------
+
+test('chat context: each reference is exactly {id, title?}; unresolved has no title; AIM sends none; no refs means no key; no body or location strings', () => {
+  assert.ok(fs.existsSync(path.join(root, 'core/map-chat-context.ts')), 'the context builder must exist: a missing file is a failure, not a skip');
+  const base = { mapTitle: 'M', outline: [{ id: 'c', title: 'Kid', summary: '', parentId: null, depth: 0 }], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] };
+  const sent = [{ id: 'ref-1', title: 'Original card' }, { id: 'ref-2' }];
+  // The real ref entries carry the secrets; a leak would put them in the input, so the input here carries them on purpose.
+  const dirty = sent.map(entry => ({ ...entry, body: SECRET_BODY, mapId: 'other-map-id', nodeId: 'n1-secret', pathHint: 'Mind Maps/Other/Map.md', path: 'Topics/Secret.md' }));
+  const json = buildMapChatContext({ ...base, knowledgeRefs: dirty }).json;
+  const parsed = JSON.parse(json);
+  assert.deepEqual(plain(parsed.knowledgeRefs), [{ id: 'ref-1', title: 'Original card' }, { id: 'ref-2' }]);
+  assert.equal('title' in parsed.knowledgeRefs[1], false, 'unresolved: id only');
+  for (const leak of [SECRET_BODY, 'other-map-id', 'n1-secret', 'Mind Maps', 'Topics/Secret.md', 'pathHint', 'mapId', 'nodeId']) assert.equal(json.includes(leak), false, leak);
+  const aim = JSON.parse(buildMapChatContext({ ...base, aim: true, knowledgeRefs: dirty }).json);
+  assert.equal('knowledgeRefs' in aim, false, 'an AIM map sends none');
+  for (const input of [base, { ...base, knowledgeRefs: [] }]) assert.equal('knowledgeRefs' in JSON.parse(buildMapChatContext(input).json), false, 'no refs: no key');
 });

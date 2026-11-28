@@ -10,6 +10,7 @@ import {
   type CanvasItem
 } from "./experiences/visual-map/canvas-items";
 import { cleanBranchLayouts } from "./layouts/compose";
+import { readKnowledgeRefs } from "./experiences/visual-map/knowledge-refs";
 import { isLayoutKind, isStoredLayoutSpacing, type MapLayout } from "./map-layout";
 import { isContentLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
@@ -116,7 +117,7 @@ export function normalizeRelationDescription(text: string): string | undefined {
 
 /**
  * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
- * are not topics, self links and a second relation on a pair of topics already linked (any kind, either direction;
+ * are neither a topic nor a readable knowledge reference of this map (V3.3 P4.4), both ends references, self links and a second relation on a pair of topics already linked (any kind, either direction;
  * the first in list order stays, decision #37). A description that is not a string is
  * removed but its relation is kept; a string description is kept as written. Derivation and prerequisite cycles are
  * kept (a hand-written loop still opens). Logs warns with counts only; removes the key when nothing is left. Never throws.
@@ -133,6 +134,7 @@ export function sanitizeTopicRelations(
     return;
   }
   const ids = new Set(map.nodes.map(n => n?.id));
+  const refIds = new Set(readKnowledgeRefs(map).map(ref => ref.id));
   const seen = new Set<string>();
   const kept: TopicRelation[] = [];
   let dropped = 0;
@@ -146,8 +148,9 @@ export function sanitizeTopicRelations(
       !(TOPIC_RELATION_KINDS as readonly string[]).includes(r.kind) ||
       typeof r.from !== "string" ||
       typeof r.to !== "string" ||
-      !ids.has(r.from) ||
-      !ids.has(r.to) ||
+      !(ids.has(r.from) || refIds.has(r.from)) ||
+      !(ids.has(r.to) || refIds.has(r.to)) ||
+      (refIds.has(r.from) && refIds.has(r.to)) ||
       r.from === r.to
     ) {
       dropped++;
@@ -737,6 +740,19 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
       this.dropped++;
     }
     this.future = [];
+  }
+  /** How many entries the open group holds now (0 when none is open): a place to put a later entry back to with {@link pushAt}. */
+  get groupSize(): number {
+    return this.grouped?.length ?? 0;
+  }
+  /** Like {@link push}, but an entry that joins the open group goes at `index` (so undo, which runs the group backwards, reaches it later). */
+  pushAt(entry: T, index: number): void {
+    if (this.grouped && this.owning > 0) {
+      this.grouped.splice(Math.min(Math.max(index, 0), this.grouped.length), 0, entry);
+      this.future = [];
+      return;
+    }
+    this.push(entry);
   }
   /** Forgets the step redo would bring back (one cancelled for good, so redo must not replay it). */
   dropRedo(): void {

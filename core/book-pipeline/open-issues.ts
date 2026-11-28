@@ -85,6 +85,10 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
         zh: "這章已鎖定，AI 沒有再查也沒有修改",
         en: "This chapter is locked, so the AI did not check it again or change it"
       },
+      proof_locked_skipped: {
+        zh: "略過（已鎖定），AI 校對沒有查這章",
+        en: "Skipped (locked); the AI proofread did not check this chapter"
+      },
       proof_incomplete: {
         zh: "AI 校對沒有跑完，這章沒有完整查過",
         en: "The AI proofread did not finish, so this chapter was not fully checked"
@@ -164,6 +168,10 @@ const COVER_OPEN = (k: number): Words => ({
   zh: `另有 ${k} 張封面圖可能對不上。`,
   en: `${k} cover pictures may not fit.`
 });
+const SKIPPED_LOCKED = (k: number): Words => ({
+  zh: `另有 ${k} 章略過（已鎖定）。`,
+  en: `${k} more chapters skipped (locked).`
+});
 const NONE_CHECKED: Words = { zh: "沒有可列的項目。", en: "Nothing to list." };
 
 /** The file name the page is meant to have (no folder). */
@@ -201,20 +209,23 @@ export function composeOpenIssuesNote(input: OpenIssuesInput): string {
   const { language, issues } = input;
   const n = Math.max(0, Math.trunc(input.checked));
   const colon = instructionLanguageOf(language) === "zh" ? "：" : ": ";
-  const aiOpen = issues.filter(issue => issue.source === "ai-proof").length;
+  // A chapter skipped as locked is not an unsolved AI item: it has its own sentence.
+  const skipped = issues.filter(issue => issue.source === "ai-proof" && issue.reason === "proof_locked_skipped").length;
+  const aiOpen = issues.filter(issue => issue.source === "ai-proof").length - skipped;
   const coverOpen = issues.filter(issue => issue.source === "cover").length;
-  const otherOpen = issues.length - aiOpen - coverOpen;
+  const otherOpen = issues.length - aiOpen - skipped - coverOpen;
   const aiSummary = aiOpen
     ? pick(SOME_OPEN(n, aiOpen), language)
     : n > 0
       ? pick(ALL_SOLVED(n), language)
-      : otherOpen || coverOpen
+      : otherOpen || coverOpen || skipped
         ? ""
         : pick(NONE_CHECKED, language);
   const summary = [
     aiSummary,
     otherOpen ? pick(OTHER_OPEN(otherOpen), language) : "",
-    coverOpen ? pick(COVER_OPEN(coverOpen), language) : ""
+    coverOpen ? pick(COVER_OPEN(coverOpen), language) : "",
+    skipped ? pick(SKIPPED_LOCKED(skipped), language) : ""
   ]
     .filter(Boolean)
     .join(" ");

@@ -1,5 +1,6 @@
 import { errorMessage } from "../../core/error-message";
-import { livingEditorRefusal } from "../../core/living-node-region";
+import { isLivingNodeNote, livingEditorRefusal } from "../../core/living-node-region";
+import { frontmatter } from "../../core/repository-frontmatter";
 import {
   cardOutputLanguage,
   defaultOutputLanguage,
@@ -12492,6 +12493,9 @@ export class VisualAgentMapView extends ItemView {
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const { note: latest, content: expectedContent } = await this.plugin.repo.readNoteSnapshot(path, map);
         if (latest.aiLocked || latest.aiCard || this.chartSnapshot(latest) !== snapshot) return false;
+        // A Living Node note (a managed region kept after the flag was cleared, or its metadata) refuses this writer at
+        // commit; the write is guarded on these same bytes, so the refusal is a stale chart, not an error (living-node §5.4).
+        if (isLivingNodeNote(expectedContent, frontmatter(expectedContent))) return false;
         // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
         // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
         const top = job.updateMode === "top";

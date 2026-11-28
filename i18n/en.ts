@@ -713,6 +713,7 @@ export const en = {
   "ui.map_search_chat_full_0": "A message can carry up to {0} cards from other maps.",
   "ui.map_chat_found_0":
     "AI found {0} card(s) from your other maps and sent them with this message (read-only). Click one to go to it: ",
+  "ui.map_chat_found_cut": "Long cards were cut down to the parts that matched.",
   "ui.presentation_start": "Start presentation",
   "ui.presentation_exit": "Exit presentation (Esc)",
   "ui.presentation_position_0_1_2": "Presentation {0}/{1}: {2}",

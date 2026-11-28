@@ -95,7 +95,8 @@ import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from ".
 import { CrossMapSearch } from "./cross-map-search";
 import { renderCrossMapResults } from "./cross-map-results";
 import type { CorpusCard } from "./cross-map-corpus";
-import { findCards } from "./knowledge-retrieval";
+import { readAiLocked } from "../../note-values";
+import { excerptOf, findCards, raceAbort } from "./knowledge-retrieval";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -3080,7 +3081,7 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map || !this.plugin.knowledgeIndex) return [];
     try {
-      const cards = await this.plugin.knowledgeIndex.get();
+      const cards = await raceAbort(this.plugin.knowledgeIndex.get(), signal, []);
       if (signal.aborted) return [];
       return findCards(cards, message, {
         mapId: map.id,
@@ -3096,7 +3097,8 @@ export class VisualAgentMapView extends ItemView {
    * notice that can locate each.
    */
   async takeOtherMapCards(
-    found: readonly CorpusCard[] = []
+    found: readonly CorpusCard[] = [],
+    message = ""
   ): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
     const added = [...this.chatOtherCards.values()].map(card => ({
       ...card,
@@ -3119,32 +3121,50 @@ export class VisualAgentMapView extends ItemView {
       { withBody: true }
     );
     const sentFound: CorpusCard[] = [];
-    const cards = picked.flatMap((pick, index) => {
+    let cut = false;
+    const cards: NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]> = [];
+    for (const [index, pick] of picked.entries()) {
       const card = resolved.get(String(index));
-      if (!card?.ok) return [];
-      if (pick.foundBy) sentFound.push(pick.foundBy);
-      return [
-        {
-          mapTitle: card.mapTitle,
-          title: card.title,
-          summary: card.summary ?? "",
-          detail: card.detail ?? "",
-          notePath: card.notePath,
-          ...(pick.foundBy ? { foundByAi: true } : {})
-        }
-      ];
-    });
-    if (sentFound.length) this.noticeFoundCards(sentFound);
+      if (!card?.ok) continue;
+      let summary = card.summary ?? "";
+      let detail = card.detail ?? "";
+      if (pick.foundBy) {
+        // An automatic find is held to more than a card the user added: a note locked for the AI since it was indexed stays out, and only
+        // an excerpt (never the whole text) is sent.
+        const fm = await Promise.resolve(this.plugin.repo.knowledgeRefIO().noteFrontmatter(card.notePath)).catch(
+          () => null
+        );
+        if (!fm || readAiLocked(fm)) continue;
+        const part = excerptOf(summary, detail, message);
+        ({ summary, detail } = part);
+        cut ||= part.cut;
+        sentFound.push(pick.foundBy);
+      }
+      cards.push({
+        mapTitle: card.mapTitle,
+        title: card.title,
+        summary,
+        detail,
+        notePath: card.notePath,
+        ...(pick.foundBy ? { foundByAi: true } : {})
+      });
+    }
+    this.foundSent = { cards: sentFound, cut };
     return cards;
   }
+  /** What the last `takeOtherMapCards` found by itself and sent; read at once by the request builder. */
+  private foundSent: { cards: CorpusCard[]; cut: boolean } = { cards: [], cut: false };
+  /** The found cards of a built request, told to the user once its turn went through (and written to the record when it was sent). */
+  private chatFound = new WeakMap<object, { cards: CorpusCard[]; cut: boolean }>();
   /** "AI found N past cards", each a link that locates it, so a reply that names a card can be followed. */
-  private noticeFoundCards(cards: readonly CorpusCard[]): void {
+  private noticeFoundCards(found: { cards: readonly CorpusCard[]; cut: boolean }): void {
     const make = (window as { createFragment?: typeof createFragment }).createFragment;
+    const text = `${t("ui.map_chat_found_0", found.cards.length)}${found.cut ? ` ${t("ui.map_chat_found_cut")}` : ""}`;
     new Notice(
       make
         ? make(frag => {
-            frag.createSpan({ text: t("ui.map_chat_found_0", cards.length) });
-            for (const card of cards)
+            frag.createSpan({ text });
+            for (const card of found.cards)
               frag
                 .createEl("a", { text: `${card.mapTitle}: ${card.title}`, href: "#" })
                 .addEventListener("click", event => {
@@ -3152,7 +3172,7 @@ export class VisualAgentMapView extends ItemView {
                   void this.locateCrossMapCard(card);
                 });
           })
-        : t("ui.map_chat_found_0", cards.length),
+        : text,
       8000
     );
   }
@@ -23915,7 +23935,17 @@ export class VisualAgentMapView extends ItemView {
     return undone ? "undone" : later();
   }
   /** What the finished turn tells the panel: the picture it sent ("AI looked at this picture") and, when applied directly, the undo step. */
-  private markChatTurn(origin: MapChatOrigin, request: { imageDataUrl?: string }, written?: TransactionEntry): void {
+  private markChatTurn(
+    origin: MapChatOrigin,
+    request: { imageDataUrl?: string; context?: object },
+    written?: TransactionEntry
+  ): void {
+    // The cards VAM found are named only now that the request went through (a failed or stopped one tells nothing).
+    const found = request.context ? this.chatFound.get(request.context) : undefined;
+    if (found && request.context) {
+      this.chatFound.delete(request.context);
+      this.noticeFoundCards(found);
+    }
     if (!request.imageDataUrl) return;
     const picture = this.chatSelectedImage(origin.imageId);
     const note = picture?.selected.kind === "annotated" ? (picture.selected.note ?? "").trim() : "";
@@ -24119,7 +24149,8 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
-    const otherMapCards = await this.takeOtherMapCards(await this.findPastCards(message, signal));
+    const otherMapCards = await this.takeOtherMapCards(await this.findPastCards(message, signal), message);
+    const foundNow = this.foundSent;
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();
@@ -24175,6 +24206,7 @@ export class VisualAgentMapView extends ItemView {
     // From this turn on the conversation holds source text (and what the model made of it): its writes need the user's yes.
     if (context.mapSourcesSent) this.chatReadsSources = true;
     this.chatChipPaths.set(context, chipPaths);
+    if (foundNow.cards.length) this.chatFound.set(context, foundNow);
     return {
       message,
       context,
@@ -24442,12 +24474,22 @@ export class VisualAgentMapView extends ItemView {
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
       this.markSourcesRecorded(record);
+      this.markFoundRecorded(record, request);
       this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes a `cards_found` line: the cards (title and map) VAM found and sent with this message, and that they were shortened. */
+  private markFoundRecorded(record: MapChatTurnRecord | null, request: { context: object }): void {
+    const found = this.chatFound.get(request.context);
+    if (!record || !found) return;
+    record.event("cards_found", {
+      topics: found.cards.map(card => ({ id: card.mapTitle, title: card.title })),
+      ...(found.cut ? { reason: "cut" } : {})
+    });
   }
   /** Writes the `sources_read` mark once per record conversation (the sources were sent: a reopened conversation keeps its writes behind the plan). */
   private markSourcesRecorded(record: MapChatTurnRecord | null): void {

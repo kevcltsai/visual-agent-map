@@ -6,6 +6,7 @@
  * search then only compares strings. Pure: the vault is reached only through the `KnowledgeRefIO` the caller passes.
  */
 import { foldSearchText } from "../../i18n/han-fold";
+import { readAiLocked } from "../../note-values";
 import { isArchivedVamNote } from "./archived-note";
 import type { KnowledgeRefIO } from "./knowledge-refs";
 
@@ -20,6 +21,8 @@ export interface CorpusCard {
   title: string;
   foldedTitle: string;
   foldedBody: string;
+  /** The note carries `ai-locked`: the cross-map search still lists it, an automatic find does not bring it to the AI. */
+  aiLocked: boolean;
 }
 
 /** Hits shown at once; the total is still counted and said. */
@@ -49,7 +52,8 @@ export async function loadAuthorizedCards(io: KnowledgeRefIO, signal: AbortSigna
     if ((holders.get(map.id) ?? 0) !== 1) continue;
     for (const node of map.nodes) {
       if (signal.aborted) return [];
-      if (isArchivedVamNote(node.path, await io.noteFrontmatter(node.path).catch(() => null))) continue;
+      const fm = await io.noteFrontmatter(node.path).catch(() => null);
+      if (isArchivedVamNote(node.path, fm)) continue;
       if (signal.aborted) return [];
       const note = await io.readNote(node.path).catch(() => null);
       if (!note) continue;
@@ -61,7 +65,8 @@ export async function loadAuthorizedCards(io: KnowledgeRefIO, signal: AbortSigna
         notePath: node.path,
         title: note.title,
         foldedTitle: foldSearchText(note.title),
-        foldedBody: foldSearchText(`${note.summary}\n${note.detail}`)
+        foldedBody: foldSearchText(`${note.summary}\n${note.detail}`),
+        aiLocked: fm ? readAiLocked(fm) : false
       });
     }
   }

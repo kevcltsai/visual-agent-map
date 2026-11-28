@@ -1789,10 +1789,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       );
     }
   }
+  private dropKnowledgeIndex(file: unknown, oldPath?: string): void {
+    if (file instanceof TFile)
+      this.knowledgeIndex.changed(oldPath ? [file.path, oldPath] : [file.path], this.isMap(file));
+  }
   registerVaultEvents(): void {
-    // A rename, a delete, a new or changed note or map can change which cards exist or are authorised: the next message reads them again.
-    for (const event of ["modify", "create", "delete", "rename"] as const)
-      this.registerEvent(this.app.vault.on(event as "modify", () => this.knowledgeIndex.invalidate()));
+    // Only a map file or a card's note (a rename also reports the old path) can change which cards exist or are authorised: the next
+    // message reads them again. Any other note leaves the index alone.
+    this.registerEvent(this.app.vault.on("modify", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("create", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("delete", file => this.dropKnowledgeIndex(file)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.dropKnowledgeIndex(file, oldPath)));
     this.registerEvent(
       this.app.vault.on("modify", file => {
         if (file instanceof TFile) this.collectUnsynced(file.path);

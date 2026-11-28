@@ -669,6 +669,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_search_chat_already": "这张卡片已在等你的下一条消息。",
   "ui.map_search_chat_full_0": "一条消息最多带 {0} 张其他图的卡片。",
   "ui.map_chat_found_0": "AI 从你的其他图找到 {0} 张卡片，已随这条消息发送（只读）。点选可前往：",
+  "ui.map_chat_found_cut": "较长的卡片已截断，只发送相符的片段。",
   "ui.presentation_start": "开始演示",
   "ui.presentation_exit": "退出演示（Esc）",
   "ui.presentation_position_0_1_2": "演示 {0}／{1}：{2}",

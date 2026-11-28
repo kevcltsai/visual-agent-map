@@ -669,6 +669,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_search_chat_already": "這張卡片已在等你的下一則訊息。",
   "ui.map_search_chat_full_0": "一則訊息最多帶 {0} 張其他圖的卡片。",
   "ui.map_chat_found_0": "AI 從你的其他圖找到 {0} 張卡片，已隨這則訊息送出（唯讀）。點選可前往：",
+  "ui.map_chat_found_cut": "較長的卡片已截斷，只送出相符的片段。",
   "ui.presentation_start": "開始簡報",
   "ui.presentation_exit": "離開簡報（Esc）",
   "ui.presentation_position_0_1_2": "簡報 {0}／{1}：{2}",

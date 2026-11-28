@@ -76,7 +76,7 @@ function world(options = {}) {
       map.nodes.push(node('n1', args[0]?.id ?? null));
       notes.set('n1', { title: args[1], summary: '', detail: '' });
     },
-    noteChange: async (found, patch) => { log('noteChange', found.id, patch); Object.assign(notes.get(found.id), patch); },
+    noteChange: async (found, patch) => { log('noteChange', found.id, patch); Object.assign(notes.get(found.id), patch); return 'written'; },
     moveTopic: async (found, parent) => { log('moveTopic', found.id, parent.id); found.parentId = parent.id; },
     removeToUnassignedEntry: async (found, branch) => { log('removeToUnassignedEntry', found.id, branch); return { parkedPaths: () => [`Unassigned/${found.path}`] }; },
     chatMoveBefore: async () => true, chatReorderChildren: async () => {}, arrangeAll: () => {}, focusNode: () => {}, flushChatRender: () => {},
@@ -124,6 +124,19 @@ test('chat action writer: rename_topic writes the title and moves the baseline; 
   const result = await apply(stale, { kind: 'rename_topic', nodeId: 'a', title: 'A2' }, changed);
   assert.deepEqual(result.outcome, skippedOutcome('ui.map_chat_skip_topic_changed'));
   assert.deepEqual(stale.only('noteChange'), []);
+});
+
+test('chat action writer: D1-x2 - a note write the guarded commit discarded is skipped as stale, and the baseline does not move', async () => {
+  for (const action of [{ kind: 'rename_topic', nodeId: 'a', title: 'A2' }, { kind: 'update_summary', nodeId: 'a', summary: 'S2' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 'D2' }]) {
+    const w = world();
+    w.ports.noteChange = async (found, patch) => { w.calls.push(['noteChange', found.id, plain(patch)]); return 'discarded'; };
+    const baseline = w.baseline();
+    baseline.topicHashes.a.detailHash = contentHash('');
+    const before = JSON.stringify(baseline.topicHashes);
+    const { outcome } = await apply(w, action, baseline);
+    assert.deepEqual(outcome, skippedOutcome('ui.map_chat_skip_stale'), action.kind);
+    assert.equal(JSON.stringify(baseline.topicHashes), before, action.kind);
+  }
 });
 
 test('chat action writer: move_topic moves the card and follows it in the baseline; a move under its own descendant is a cycle', async () => {

@@ -4,13 +4,16 @@ import { frontmatter, setFrontmatterKeys } from "../../core/repository-frontmatt
 import { readAiCard, readAiLocked } from "../../note-values";
 import {
   applyLivingChanges,
+  LIVING_LAST_CHANGE_KEY,
   livingEventTombstone,
+  livingLastChangeValue,
   livingDeletedTextHash,
   livingSuppressionV2,
   livingSuppressionV2Entry,
   livingSuppressionV2Forms,
   parseLivingEventTombstone,
   parseLivingSuppressionV2,
+  summarizeLivingChanges,
   type LivingAiLatest,
   type LivingChangeContext,
   type LivingEvidence,
@@ -715,6 +718,7 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
   };
   const managed = renderRegion(nextKnowledge);
   const changed = !region || region.text !== managed;
+  const changes = summarizeLivingChanges(stored, nextKnowledge);
   const checked = await request.inspect();
   if (signal.aborted || !request.isCurrent() || !canCommitLivingCandidate(candidate, checked)) return "discarded";
   let committedContent: string | undefined;
@@ -745,7 +749,11 @@ export async function commitLivingMarkdown(port: LivingMarkdownPort, request: Li
         "living-node-checked": context.checked?.length
           ? context.checked.map(item => item.at + " " + (item.url ?? "search: " + item.query))
           : null,
-        ...(changed ? { "living-node-last-content-change": context.at } : {})
+        ...(changed ? { "living-node-last-content-change": context.at } : {}),
+        // Record ids and change kinds only, and only when there was a baseline to compare with; unchanged runs leave it alone.
+        ...(changed && !changes.firstRun
+          ? { [LIVING_LAST_CHANGE_KEY]: livingLastChangeValue(changes, context.at) }
+          : {})
       });
       return committedContent;
     },

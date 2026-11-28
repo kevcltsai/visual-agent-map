@@ -236,6 +236,7 @@ import {
   livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
+import { livingHighlight, type LivingDependencyGraph } from "./living-node-map";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import {
   livingNoteForModel,
@@ -374,7 +375,8 @@ import {
   type NotePatch,
   type TopicInfo,
   isPlaceholder,
-  type TopicAppearanceChange
+  type TopicAppearanceChange,
+  AiWriterRefusal
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
@@ -684,6 +686,7 @@ import {
 } from "./ai-mode";
 import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
 import { openStylePopover, type StylePopover, type StylePopoverState } from "./style-popover";
+import { openBatchColorPopover, type BatchColorPopover } from "./batch-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
@@ -1355,6 +1358,7 @@ export class VisualAgentMapView extends ItemView {
     anchors: { imageId: string; x: number; y: number; note: string }[];
     cards?: PlanGhostSpec[];
     relations?: PlanGhostRelation[];
+    moves?: { imageId: string; anchorId: string; x: number; y: number; imageRef?: string }[];
   } | null = null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
@@ -1646,6 +1650,8 @@ export class VisualAgentMapView extends ItemView {
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
   /** The toolbar Style popover (B08) and the card it styles; a repaint takes it out and puts it back. */
   private styleOpen: { nodeId: string; mapId: string; pop: StylePopover } | null = null;
+  /** The selection bar's Color popover (B19b); a new bar (a repaint, a changed selection) closes it. */
+  private batchColorPop: BatchColorPopover | null = null;
   /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
   private aiCardOpen: {
     nodeId: string | null;
@@ -2587,6 +2593,13 @@ export class VisualAgentMapView extends ItemView {
       event.stopPropagation();
       return;
     }
+    // A branch an outline reveal opened for the view (no search box) folds back first; with a search box Esc is the box's.
+    if (event.key === "Escape" && !this.mapSearch && this.searchOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeMapSearch(false);
+      return;
+    }
     if (event.key === "Escape" && this.branchFocus) {
       event.preventDefault();
       event.stopPropagation();
@@ -3410,7 +3423,10 @@ export class VisualAgentMapView extends ItemView {
       }
       const name = (value ?? "").trim();
       if (!name || name === note.title) this.render();
-      else this.enqueue(() => this.noteChange(node, { title: name }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { title: name });
+        });
     });
     this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
     return input;
@@ -3495,7 +3511,10 @@ export class VisualAgentMapView extends ItemView {
         this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
       }
       if (!save || value === state.original.trim()) this.render();
-      else this.enqueue(() => this.noteChange(node, { summary: value }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { summary: value });
+        });
     };
     area.addEventListener("input", () => {
       state.draft = area.value;
@@ -3570,6 +3589,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeTopicChatWindow();
     this.closeAiCardPopover();
     this.styleOpen?.pop.close();
+    this.batchColorPop?.close(false);
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
     else this.topicChatRecords?.close();
@@ -3976,8 +3996,10 @@ export class VisualAgentMapView extends ItemView {
     this.notes = loaded;
     this.mapSourcesControl?.loadForMap(sources);
     this.livingValidity.clear();
+    this.livingGraph = undefined;
     if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
       try {
+        let graph: LivingDependencyGraph | undefined;
         const validity = await inspectLivingValidity({
           app: this.app,
           repo: this.plugin.repo,
@@ -3988,9 +4010,13 @@ export class VisualAgentMapView extends ItemView {
           current: alive,
           noteReads: ctx,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readLivingMapSourceReport(signal)
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onDependencies: dependencies => (graph = dependencies)
         });
-        if (alive()) this.livingValidity = validity;
+        if (alive()) {
+          this.livingValidity = validity;
+          this.livingGraph = graph;
+        }
       } catch {
         // Unknown validity never pretends to be a fresh result.
       }
@@ -6679,6 +6705,11 @@ export class VisualAgentMapView extends ItemView {
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    // The dependency graph comes from the cards, paths and parents (not their order or place); after a change to those it is
+    // stale and highlights nothing until the next hydrate brings it back.
+    const planned = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+    if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
       if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
         await this.plugin.rebuildDerivedData();
@@ -8092,9 +8123,9 @@ export class VisualAgentMapView extends ItemView {
       // The outline is the chip's twin: it follows the picture selection of the chat, not the keyboard focus (a picture that kept
       // focus after Esc has no chip, so it has no outline; a press or focus on it selects it again).
       el.toggleClass("is-selected", this.chatImageId === image.id);
-      el.addEventListener("focus", () => this.setChatImage(image.id));
+      el.addEventListener("focus", () => this.pickChatImage(image.id));
       // click, not pointerdown: a read-only picture (selection mode, AIM) takes no pointerdown of its own.
-      el.addEventListener("click", () => this.setChatImage(image.id));
+      el.addEventListener("click", () => this.pickChatImage(image.id));
       if (!editable) continue;
       const handle = el.createDiv("vam-canvas-image-handle");
       handle.setAttr("aria-hidden", "true");
@@ -8330,10 +8361,29 @@ export class VisualAgentMapView extends ItemView {
     if (!preview || preview.token !== this.chatPlanToken) return [];
     return preview.anchors.filter(a => a.imageId === imageId && Number.isFinite(a.x) && Number.isFinite(a.y));
   }
+  /**
+   * The anchors the pending plan would move on this image: only those still on the picture with a 2D position (an anchor deleted
+   * since is not drawn), each with where it is now.
+   */
+  private previewMovesOf(image: AnnotatedImageItem): { x: number; y: number; from: { x: number; y: number } }[] {
+    const preview = this.chatPreview;
+    if (!preview?.moves || preview.token !== this.chatPlanToken) return [];
+    return preview.moves.flatMap(move => {
+      if (move.imageId !== image.id || !Number.isFinite(move.x) || !Number.isFinite(move.y)) return [];
+      // The same check Apply makes: another file under the same id is stale, so nothing is drawn.
+      if (move.imageRef !== undefined && move.imageRef !== image.path) return [];
+      const anchor = image.anchors.find(entry => entry.id === move.anchorId);
+      return anchor && isImage2dAnchor(anchor)
+        ? [{ x: move.x, y: move.y, from: { x: anchor.at.x, y: anchor.at.y } }]
+        : [];
+    });
+  }
   private annotatedLabel(image: AnnotatedImageItem, name: string): string {
     const previewed = this.previewAnchorsOf(image.id).length;
-    const base = t("ui.annotated_image_label", image.note || name);
-    return previewed ? t("ui.annotated_image_label_preview_0_1", base, previewed) : base;
+    const moved = this.previewMovesOf(image).length;
+    let label = t("ui.annotated_image_label", image.note || name);
+    if (previewed) label = t("ui.annotated_image_label_preview_0_1", label, previewed);
+    return moved ? t("ui.annotated_image_label_move_0_1", label, moved) : label;
   }
   private annotatedCountText(image: AnnotatedImageItem): string {
     const previewed = this.previewAnchorsOf(image.id).length;
@@ -8348,19 +8398,49 @@ export class VisualAgentMapView extends ItemView {
   private paintAnchorPreview(el: HTMLElement, image: AnnotatedImageItem, name: string): void {
     for (const old of Array.from(el.querySelectorAll(".is-preview"))) old.remove();
     for (const old of Array.from(el.querySelectorAll(".vam-anchor-preview-note"))) old.remove();
+    for (const old of Array.from(el.querySelectorAll(".vam-anchor-move-link"))) old.remove();
     const preview = this.previewAnchorsOf(image.id);
+    const moves = this.previewMovesOf(image);
     el.querySelector(".vam-annotated-count")?.setText(this.annotatedCountText(image));
     el.setAttr("aria-label", this.annotatedLabel(image, name));
-    if (!preview.length) return;
+    if (!preview.length && !moves.length) return;
+    // Numbers only, clamped to the picture.
+    const pct = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 1e6) / 1e4;
     for (const point of preview) {
       const dot = el.createSpan("vam-anchor is-preview");
       dot.setAttr("aria-hidden", "true");
-      dot.style.left = `${Math.round(Math.min(1, Math.max(0, point.x)) * 1e6) / 1e4}%`;
-      dot.style.top = `${Math.round(Math.min(1, Math.max(0, point.y)) * 1e6) / 1e4}%`;
+      dot.style.left = `${pct(point.x)}%`;
+      dot.style.top = `${pct(point.y)}%`;
+    }
+    for (const move of moves) {
+      // A light line from where the anchor is (it stays there) to the dashed dot; the picture's own box is its 0-100 space.
+      const link = el.createSpan("vam-anchor-move-link");
+      link.setAttr("aria-hidden", "true");
+      const svg = createSvg("svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      const line = createSvg("line");
+      line.setAttribute("x1", String(pct(move.from.x)));
+      line.setAttribute("y1", String(pct(move.from.y)));
+      line.setAttribute("x2", String(pct(move.x)));
+      line.setAttribute("y2", String(pct(move.y)));
+      svg.appendChild(line);
+      link.appendChild(svg);
+      const dot = el.createSpan("vam-anchor is-preview is-move-target");
+      dot.setAttr("aria-hidden", "true");
+      dot.style.left = `${pct(move.x)}%`;
+      dot.style.top = `${pct(move.y)}%`;
     }
     const note = el.createDiv("vam-anchor-preview-note");
     note.setAttr("aria-hidden", "true");
-    note.setText(t("ui.annotated_image_preview_note"));
+    note.setText(
+      [
+        preview.length ? t("ui.annotated_image_preview_note") : "",
+        moves.length ? t("ui.annotated_image_move_note") : ""
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
   }
   /** Brings the dashed dots on the canvas in line with the pending plan, without a full render (so the focus stays put). */
   private syncAnchorPreview(): void {
@@ -10486,6 +10566,7 @@ export class VisualAgentMapView extends ItemView {
         el.style.width = `${from.w}px`;
         el.style.height = `${from.h}px`;
         ring?.update(0, 0);
+        if (ring) this.syncDependencyHighlight();
       };
       const up = (): void => {
         if (done) return;
@@ -11666,7 +11747,26 @@ export class VisualAgentMapView extends ItemView {
       if (target) {
         map.nodes.find(node => node.id === target.id)!.collapsed = false;
         // One layout for the moved branches under the target, in the same history entry as the move.
-        this.arrangeBranch(map, target.id, moved, undefined);
+        if (roots.length > 1 && !before && this.placesLocally(map)) {
+          // A batch move keeps the branches' distances to each other: the top branch is laid out, the rest shift by the same offset, then only overlaps are pushed apart.
+          const lead = roots
+            .map(root => map.nodes.find(item => item.id === root.id)!)
+            .reduce((a, b) => (b.y < a.y ? b : a));
+          const start = new Map(
+            map.nodes.filter(node => moved.has(node.id)).map(node => [node.id, { x: node.x, y: node.y }])
+          );
+          const first = start.get(lead.id)!;
+          this.arrangeBranch(map, target.id, branchOf.get(lead.id)!, undefined);
+          const placed = map.nodes.find(node => node.id === lead.id)!;
+          const dx = placed.x - first.x,
+            dy = placed.y - first.y;
+          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          for (const node of map.nodes) {
+            const was = rest.has(node.id) ? start.get(node.id) : undefined;
+            if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });
+          }
+          this.pushFrom(map, rest);
+        } else this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }
@@ -12666,7 +12766,7 @@ export class VisualAgentMapView extends ItemView {
     sink: (entry: Action) => void = entry => this.history.push(entry),
     /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
     rejectAiCard = false
-  ): Promise<void> {
+  ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
@@ -12680,8 +12780,10 @@ export class VisualAgentMapView extends ItemView {
       before.previewInitialized = current.previewInitialized;
       before.previewAutoHash = current.previewAutoHash;
     }
-    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
-    await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard });
+    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
+    // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
+    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+      return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
       this.plugin.topicRuns.dropPending(node.path);
@@ -12722,6 +12824,7 @@ export class VisualAgentMapView extends ItemView {
     });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
     this.render();
+    return "written";
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
   private chartSnapshot(note: Note): string {
@@ -13134,6 +13237,7 @@ export class VisualAgentMapView extends ItemView {
       },
       search: () => this.openMapSearch(),
       shortcuts: () => this.openKeyboardShortcuts(),
+      openBatchColor: opener => this.openBatchColor(opener),
       merge: () => this.openMerge(),
       multiResearch: () => this.openMultiResearch(),
       chooseParent: copy => this.chooseSelectedParent(copy),
@@ -15056,6 +15160,7 @@ export class VisualAgentMapView extends ItemView {
     this.syncToolsVisibility();
     this.chat?.refreshSelection();
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
   }
   /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
   private syncToolsVisibility(): void {
@@ -15718,8 +15823,24 @@ export class VisualAgentMapView extends ItemView {
     this.openForSearch(collapsedAncestors(this.map.nodes, node.id));
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
-    this.focusNode(node, false);
+    this.focusNode(node, false, true);
     return true;
+  }
+  /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
+  private foldRevealUnless(node: MapNode): void {
+    const open = this.searchOpen;
+    if (this.mapSearch || !open || !this.map) return;
+    const byId = new Map(this.map.nodes.map(item => [item.id, item] as const));
+    const seen = new Set<string>();
+    for (
+      let at: MapNode | undefined = node;
+      at && !seen.has(at.id);
+      at = at.parentId ? byId.get(at.parentId) : undefined
+    ) {
+      if (open.expanded.has(at.id)) return;
+      seen.add(at.id);
+    }
+    this.closeMapSearch(false);
   }
   private selectMapNode(node: MapNode): void {
     // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
@@ -16217,6 +16338,7 @@ export class VisualAgentMapView extends ItemView {
     if ((event.target as Element).closest("button")) return;
     // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
     if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+    this.foldRevealUnless(node);
     if (this.selection.state.multiSelectMode) {
       this.applySelectionChange(this.selection.toggleByClick(node.id));
       return;
@@ -18612,7 +18734,14 @@ export class VisualAgentMapView extends ItemView {
    */
   private async changeTopicColor(node: MapNode, color: TopicColor | null, branch = false): Promise<void> {
     if (!this.map || !this.markersEditable(node)) return;
-    const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
+    await this.recolorTopics(branch ? branchNoteIds(this.map.nodes, node.id) : [node.id], color);
+  }
+  /**
+   * The one colour write of changeTopicColor and changeSelectionColor (their callers check the gates): only the notes whose
+   * colour really changes get topic-color, in one undoable map transaction; Map.md changes only its viewport.
+   */
+  private async recolorTopics(ids: readonly string[], color: TopicColor | null): Promise<void> {
+    if (!this.map) return;
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
       .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
@@ -20698,12 +20827,67 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
+   * The selection bar's Color popover (batch-popover.ts) above its button: the selection's one colour is pressed, or none
+   * and "Mixed" when the cards differ. A click on the button again closes it; a swatch closes it and colours the selection.
+   */
+  private openBatchColor(opener?: HTMLElement): void {
+    const open = this.batchColorPop;
+    open?.close(false);
+    const host = opener?.parentElement;
+    if (open || !opener || !host) return;
+    const ids = [...this.selection.state.multiSelected];
+    const colors = new Set(
+      ids
+        .filter(id => this.notes.get(id))
+        .map(id => TOPIC_COLORS.find(color => color === this.notes.get(id)?.color) ?? null)
+    );
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (target && !pop.el.contains(target) && !opener.contains(target)) pop.close(false);
+    };
+    const pop = openBatchColorPopover(host, opener, colors.size > 1 ? "mixed" : ([...colors][0] ?? null), ids.length, {
+      onColor: color => {
+        pop.close();
+        this.enqueue(async () => {
+          await this.changeSelectionColor(ids, color);
+          // The write repainted the bar: the focus goes to its new Color button.
+          if (!opener.isConnected)
+            this.selectionBarEl?.querySelector<HTMLElement>('[data-card-action="batch-color"]')?.focus();
+        });
+      },
+      onClose: () => {
+        if (this.batchColorPop === pop) this.batchColorPop = null;
+        pop.el.ownerDocument?.removeEventListener("pointerdown", outside, true);
+      }
+    });
+    pop.el.style.left = `${opener.offsetLeft}px`;
+    pop.el.ownerDocument?.addEventListener("pointerdown", outside, true);
+    this.batchColorPop = pop;
+  }
+  /**
+   * Sets (or, with null, clears) the colour of every selected topic in one undoable step (P1.9). It rechecks the Color
+   * button's gates first (presentation, loading notes, an AI-locked or merging card; not the picture-book locks, a colour
+   * is neither card AI nor structure): a refused write says why and writes nothing. Only the notes whose colour really changes are written; Map.md changes only
+   * its viewport. Not changeTopicColor: that one is for a single card outside selection mode (markersEditable).
+   */
+  private async changeSelectionColor(ids: readonly string[], color: TopicColor | null): Promise<void> {
+    if (!this.map) return;
+    const ctx = this.cardActionContext(ids);
+    const availability = actionsFor("toolbar", ctx).find(entry => entry.action.id === "batch-color")?.availability;
+    if (!availability?.ok) {
+      if (availability) new Notice(t(availability.reasonKey, ...(availability.reasonArgs ?? [])));
+      return;
+    }
+    await this.recolorTopics(ids, color);
+  }
+  /**
    * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card
-   * action registry (Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
+   * action registry (Color, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
    * cannot run stays focusable (aria-disabled) and its reason is written on a line below the row. The canvas keeps its height
    * free (see `has-selection-bar`).
    */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
+    this.batchColorPop?.close(false);
     const selection = workspace.createDiv("vam-selection-bar");
     const count = this.selection.state.multiSelected.size;
     workspace.toggleClass?.("has-selection-bar", count > 0);
@@ -20737,8 +20921,12 @@ export class VisualAgentMapView extends ItemView {
       const reasonText = availability.ok ? "" : t(availability.reasonKey, ...(availability.reasonArgs ?? []));
       const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
         if (reasonText) new Notice(reasonText);
-        else action.run(context, {});
+        else action.run(context, { opener: button });
       });
+      if (action.id === "batch-color") {
+        button.setAttr("data-card-action", action.id);
+        button.setAttr("aria-haspopup", "dialog");
+      }
       if (reasonText) {
         button.setAttr("aria-disabled", "true");
         button.setAttr("title", reasonText);
@@ -21391,6 +21579,11 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private livingValidity = new Map<string, "none" | "valid" | "stale">();
+  /** What each runnable AI card depends on, from the same validity pass; absent while unknown. */
+  private livingGraph: LivingDependencyGraph | undefined;
+  /** The tree lines this view marked and the overlay lines it added for the selected card's dependencies. */
+  private depMarks: SVGPathElement[] = [];
+  private depOverlays: SVGPathElement[] = [];
 
   /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
   private aiStatusOf(id: string): AiCardStatus | undefined {
@@ -22377,19 +22570,24 @@ export class VisualAgentMapView extends ItemView {
     return tops;
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
-  private focusNode(target: MapNode, persist = true): void {
+  private focusNode(target: MapNode, persist = true, measured = false): void {
     if (!this.map || !this.viewportEl) return;
     const id = target.id;
     if (
       this.holdCamera(() => {
         const node = this.map?.nodes.find(item => item.id === id);
-        if (node) this.focusNode(node, persist);
+        if (node) this.focusNode(node, persist, measured);
       })
     )
       return;
+    // `measured` (outline reveal): centre on the card's laid-out box; other callers keep the fixed +80 estimate.
+    const card = measured ? this.cardEls.get(id) : undefined;
+    const centre = card?.offsetHeight
+      ? { x: target.x + (card.offsetWidth || (target.width ?? CARD_WIDTH)) / 2, y: target.y + card.offsetHeight / 2 }
+      : { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 };
     this.map.viewport = focusViewport(
       this.map.viewport,
-      { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 },
+      centre,
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
       this.canvasInsets()
     );
@@ -22547,7 +22745,7 @@ export class VisualAgentMapView extends ItemView {
             this.selection.clickEmpty();
             this.syncRelationClasses();
           } else this.applySelectionChange(this.selection.clickEmpty());
-          if (pressedImage) this.setChatImage(pressedImage);
+          if (pressedImage) this.pickChatImage(pressedImage);
           else this.clearChatImage();
         }
       };
@@ -22975,6 +23173,7 @@ export class VisualAgentMapView extends ItemView {
       widths: setWidth => this.chatWidths(setWidth),
       stateChanged: () => this.refreshEmptyMap(),
       image: () => this.chatImage(),
+      imageNotice: () => this.chatImageNotice(),
       watchImage: changed => this.watchChatImage(changed),
       imageMode: () => this.chatImageMode(),
       setImageMode: mode => {
@@ -23115,6 +23314,25 @@ export class VisualAgentMapView extends ItemView {
     this.chatImageListeners.add(listener);
     return () => this.chatImageListeners.delete(listener);
   }
+  /**
+   * A press or focus on a canvas picture. Only a picture the chat would really send (an annotated one) becomes the chat picture;
+   * an ordinary picture is never sent, so it takes any earlier choice off instead of showing a chip that says otherwise.
+   */
+  private pickChatImage(id: string): void {
+    const item = (this.map?.canvasItems ?? []).find(entry => entry.id === id);
+    if (item && isAnnotatedImage(item)) this.setChatImage(id);
+    else this.clearChatImage();
+  }
+  /**
+   * What to tell the user under the picture chip: the selected picture would be sent but the model cannot read pictures. Null when
+   * nothing is wrong. The send is refused while this is set, so nothing is sent and the model is not asked.
+   */
+  chatImageNotice(): string | null {
+    if (this.chatImage()?.kind !== "annotated") return null;
+    return this.plugin.aiCalls.capabilitiesFor(this.plugin.settings.cliModel).imageInput
+      ? null
+      : t("ui.map_chat_image_unsupported");
+  }
   private setChatImage(id: string): void {
     if (this.chatImageId === id) return;
     this.chatImageId = id;
@@ -23202,7 +23420,8 @@ export class VisualAgentMapView extends ItemView {
           to: link.to,
           ...(link.description ? { description: link.description } : {})
         })),
-        imageAttached: false
+        imageAttached: false,
+        path: image.path
       },
       path: image.path
     };
@@ -23443,6 +23662,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Sends the draft (see MapChatConversation). */
   private sendMapChat(again?: MapChatOrigin, restore?: string, retryOf?: ChatChainRun): Promise<void> {
+    // Send is off while the chip says the model cannot read the picture; nothing is read, sent or asked.
+    if (!again && this.chatImageNotice()) return Promise.resolve();
     return this.mapChatConversation.sendMapChat(again, restore, retryOf);
   }
   private steerMapChat(): void {
@@ -23508,10 +23729,16 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       chain: () => this.chatChainRunner,
       plans: () => this.chatRecordSession.plans,
-      showPreview: (token, anchors, cards, relations = []) => {
+      showPreview: (token, anchors, cards, relations = [], moves = []) => {
         this.chatPreview =
-          anchors.length || cards.length || relations.length
-            ? { token, anchors, ...(cards.length ? { cards } : {}), ...(relations.length ? { relations } : {}) }
+          anchors.length || cards.length || relations.length || moves.length
+            ? {
+                token,
+                anchors,
+                ...(cards.length ? { cards } : {}),
+                ...(relations.length ? { relations } : {}),
+                ...(moves.length ? { moves } : {})
+              }
             : null;
         this.syncAnchorPreview();
         this.paintPlanGhosts();
@@ -24000,6 +24227,13 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
       case "add_anchor":
         return action.note ? t("ui.map_chat_do_add_anchor_0", action.note) : t("ui.map_chat_do_add_anchor_empty");
+      case "move_anchor":
+        return t(
+          "ui.map_chat_do_move_anchor_0",
+          findAnnotatedImage(this.map?.canvasItems ?? [], action.imageId)?.anchors.find(
+            anchor => anchor.id === action.anchorId
+          )?.note || t("ui.map_chat_anchor_unnamed")
+        );
       case "link_anchor": {
         const anchorNote =
           refTitles?.get(action.anchorId) ||
@@ -24980,6 +25214,8 @@ export class VisualAgentMapView extends ItemView {
       return await this.chatWriter.write(action, baseline, same, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      // The guarded commit refused the bytes (a Living Node or damaged markers appeared after the gate): skipped, nothing written.
+      if (error instanceof AiWriterRefusal) return { status: "skipped", reason: error.message };
       throw error;
     } finally {
       this.chatReadOnlyPaths = previous;
@@ -25041,6 +25277,7 @@ export class VisualAgentMapView extends ItemView {
       case "remove_relation":
       case "add_anchor":
       case "link_anchor":
+      case "move_anchor":
       case "auto_layout":
         paths.push(this.path);
         break;
@@ -26869,6 +27106,7 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          this.syncDependencyHighlight();
         }
       };
       const settle = (): void => {
@@ -26899,6 +27137,8 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          // A drop that puts the card back redraws no edges: the overlays come back here.
+          this.syncDependencyHighlight();
         }
       };
       const drop = (e: PointerEvent, landed: { node: MapNode; invalid: boolean } | null): void => {
@@ -27084,6 +27324,8 @@ export class VisualAgentMapView extends ItemView {
     });
     return {
       update: (dx, dy) => {
+        // Dependency overlays do not follow a drag; the next highlight pass draws them again.
+        this.clearDependencyOverlays();
         for (const { id, boxes } of spines) {
           const move = (item: string, box: CardBox): CardBox =>
             group.has(item) ? (shifted(item, dx, dy) ?? box) : box;
@@ -27208,6 +27450,7 @@ export class VisualAgentMapView extends ItemView {
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
+        this.clearDependencyOverlays();
         if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
@@ -27438,6 +27681,50 @@ export class VisualAgentMapView extends ItemView {
     for (const line of lines) this.edgesEl.appendChild(line);
     this.drawRelations(boxFor);
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
+  }
+  /**
+   * The selected AI card's dependencies, as the planner resolves them: an AI dependency gets the run style, an ordinary
+   * card it reads the read style, on the tree line between them. A pair with no tree line drawn (an explicit reference,
+   * or a tree line left out for a relation) gets an overlay line while selected. Semantic lines are never marked.
+   * Only the previous marks are undone, so a selection change costs the size of the highlight, not the map.
+   */
+  private syncDependencyHighlight(): void {
+    for (const path of this.depMarks) path.removeClass("is-dep-run", "is-dep-read");
+    this.depMarks = [];
+    this.clearDependencyOverlays();
+    const selected = this.selection.state.selected;
+    if (!this.edgesEl || !this.map || this.map.aim || !this.livingGraph || !selected) return;
+    if (this.selection.state.multiSelected.size > 1) return;
+    const { run, read } = livingHighlight(this.livingGraph, selected);
+    const mark = (pairs: [string, string][], cls: string): void => {
+      for (const [consumer, dep] of pairs) {
+        const key = `${consumer}\u0000${dep}`;
+        // A child that reads its parent shares the parent's tree line (keyed parent first).
+        const path = this.edgeEls.get(key) ?? this.edgeEls.get(`${dep}\u0000${consumer}`);
+        if (path) {
+          path.addClass(cls);
+          this.depMarks.push(path);
+          continue;
+        }
+        // Collapsed away: with one end hidden there is nothing to join.
+        const from = this.cardEls.get(consumer);
+        const to = this.cardEls.get(dep);
+        if (!from || !to) continue;
+        const overlay = createSvg("path");
+        overlay.setAttribute("d", relationPathData(boxOf(from), boxOf(to)));
+        overlay.setAttribute("data-dep", key);
+        overlay.addClass("vam-edge-dep-overlay", cls);
+        this.edgesEl?.appendChild(overlay);
+        this.depOverlays.push(overlay);
+      }
+    };
+    mark(run, "is-dep-run");
+    mark(read, "is-dep-read");
+  }
+  private clearDependencyOverlays(): void {
+    for (const overlay of this.depOverlays) overlay.remove();
+    this.depOverlays = [];
   }
   /**
    * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving

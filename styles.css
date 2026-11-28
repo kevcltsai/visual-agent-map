@@ -2135,6 +2135,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-run-all-track { stroke: color-mix(in srgb, var(--interactive-accent) 25%, transparent); }
 .vam-view .vam-run-all-arc { stroke: var(--interactive-accent); stroke-linecap: round; }
 .vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
+/* D2-4: a selected AI card shows what it depends on. Run = an AI dependency (accent, heavier); read = an ordinary card it reads (dashed, muted). An overlay joins a pair that has no tree line drawn; semantic lines are never marked. */
+.vam-edges .vam-edge-dep-overlay { fill: none; pointer-events: none; }
+.vam-edges .vam-edge.is-dep-run, .vam-edges .vam-edge-dep-overlay.is-dep-run { stroke: var(--interactive-accent); stroke-width: 3; opacity: 1; }
+.vam-edges .vam-edge.is-dep-read, .vam-edges .vam-edge-dep-overlay.is-dep-read { stroke: var(--text-muted); stroke-width: 2; stroke-dasharray: 4 4; opacity: 1; }
 .vam-prompt-arrow { fill: var(--text-faint); stroke: none; }
 .vam-menu-hint { margin-inline-start: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 

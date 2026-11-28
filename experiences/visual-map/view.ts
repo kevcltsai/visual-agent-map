@@ -236,6 +236,7 @@ import {
   livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
+import { livingHighlight, type LivingDependencyGraph } from "./living-node-map";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import {
   livingNoteForModel,
@@ -3940,8 +3941,10 @@ export class VisualAgentMapView extends ItemView {
     this.notes = loaded;
     this.mapSourcesControl?.loadForMap(sources);
     this.livingValidity.clear();
+    this.livingGraph = undefined;
     if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
       try {
+        let graph: LivingDependencyGraph | undefined;
         const validity = await inspectLivingValidity({
           app: this.app,
           repo: this.plugin.repo,
@@ -3952,9 +3955,13 @@ export class VisualAgentMapView extends ItemView {
           current: alive,
           noteReads: ctx,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readLivingMapSourceReport(signal)
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onDependencies: dependencies => (graph = dependencies)
         });
-        if (alive()) this.livingValidity = validity;
+        if (alive()) {
+          this.livingValidity = validity;
+          this.livingGraph = graph;
+        }
       } catch {
         // Unknown validity never pretends to be a fresh result.
       }
@@ -10353,6 +10360,7 @@ export class VisualAgentMapView extends ItemView {
         el.style.width = `${from.w}px`;
         el.style.height = `${from.h}px`;
         ring?.update(0, 0);
+        if (ring) this.syncDependencyHighlight();
       };
       const up = (): void => {
         if (done) return;
@@ -14915,6 +14923,7 @@ export class VisualAgentMapView extends ItemView {
     this.syncToolsVisibility();
     this.chat?.refreshSelection();
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
   }
   /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
   private syncToolsVisibility(): void {
@@ -21225,6 +21234,11 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private livingValidity = new Map<string, "none" | "valid" | "stale">();
+  /** What each runnable AI card depends on, from the same validity pass; absent while unknown. */
+  private livingGraph: LivingDependencyGraph | undefined;
+  /** The tree lines this view marked and the overlay lines it added for the selected card's dependencies. */
+  private depMarks: SVGPathElement[] = [];
+  private depOverlays: SVGPathElement[] = [];
 
   /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
   private aiStatusOf(id: string): AiCardStatus | undefined {
@@ -26589,6 +26603,7 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          this.syncDependencyHighlight();
         }
       };
       const settle = (): void => {
@@ -26619,6 +26634,8 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          // A drop that puts the card back redraws no edges: the overlays come back here.
+          this.syncDependencyHighlight();
         }
       };
       const drop = (e: PointerEvent, landed: { node: MapNode; invalid: boolean } | null): void => {
@@ -26804,6 +26821,8 @@ export class VisualAgentMapView extends ItemView {
     });
     return {
       update: (dx, dy) => {
+        // Dependency overlays do not follow a drag; the next highlight pass draws them again.
+        this.clearDependencyOverlays();
         for (const { id, boxes } of spines) {
           const move = (item: string, box: CardBox): CardBox =>
             group.has(item) ? (shifted(item, dx, dy) ?? box) : box;
@@ -26928,6 +26947,7 @@ export class VisualAgentMapView extends ItemView {
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
+        this.clearDependencyOverlays();
         if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
@@ -27158,6 +27178,49 @@ export class VisualAgentMapView extends ItemView {
     for (const line of lines) this.edgesEl.appendChild(line);
     this.drawRelations(boxFor);
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
+  }
+  /**
+   * The selected AI card's dependencies, as the planner resolves them: an AI dependency gets the run style, an ordinary
+   * card it reads the read style, on the tree line between them. A pair with no tree line drawn (an explicit reference,
+   * or a tree line left out for a relation) gets an overlay line while selected. Semantic lines are never marked.
+   * Only the previous marks are undone, so a selection change costs the size of the highlight, not the map.
+   */
+  private syncDependencyHighlight(): void {
+    for (const path of this.depMarks) path.removeClass("is-dep-run", "is-dep-read");
+    this.depMarks = [];
+    this.clearDependencyOverlays();
+    const selected = this.selection.state.selected;
+    if (!this.edgesEl || !this.map || this.map.aim || !this.livingGraph || !selected) return;
+    if (this.selection.state.multiSelected.size > 1) return;
+    const { run, read } = livingHighlight(this.livingGraph, selected);
+    const mark = (pairs: [string, string][], cls: string): void => {
+      for (const [consumer, dep] of pairs) {
+        const key = `${consumer}\u0000${dep}`;
+        const path = this.edgeEls.get(key);
+        if (path) {
+          path.addClass(cls);
+          this.depMarks.push(path);
+          continue;
+        }
+        // Collapsed away: with one end hidden there is nothing to join.
+        const from = this.cardEls.get(consumer);
+        const to = this.cardEls.get(dep);
+        if (!from || !to) continue;
+        const overlay = createSvg("path");
+        overlay.setAttribute("d", relationPathData(boxOf(from), boxOf(to)));
+        overlay.setAttribute("data-dep", key);
+        overlay.addClass("vam-edge-dep-overlay", cls);
+        this.edgesEl?.appendChild(overlay);
+        this.depOverlays.push(overlay);
+      }
+    };
+    mark(run, "is-dep-run");
+    mark(read, "is-dep-read");
+  }
+  private clearDependencyOverlays(): void {
+    for (const overlay of this.depOverlays) overlay.remove();
+    this.depOverlays = [];
   }
   /**
    * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving

@@ -243,7 +243,8 @@ async function harness(spec, { confirm = true } = {}) {
     view.livingValidity = await inspectLivingValidity({
       app, repo, calls: host.aiCalls, mapPath: MAP, viewSession: 'test-validity',
       signal: new AbortController().signal, current: () => true,
-      language: () => 'English', mapSources: async () => []
+      language: () => 'English', mapSources: async () => [],
+      onDependencies: graph => { view.livingGraph = graph; }
     });
   };
   // A second view of the same map on the same plugin (another pane or window).
@@ -568,6 +569,55 @@ test('arrows: a line whose parent is an AI card gets a marker-start arrow and a 
   g.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
   g.view.drawEdges();
   assert.equal(g.view.edgesEl.children.some(c => c.tag === 'defs' && c.children.length), false);
+});
+
+test('D2-4 dependency highlight: selecting an AI card marks the planner edges in place; semantic lines never; no selection leaves the DOM as without a graph', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['C', 'A'], ['O', 'A', { noAi: true }], ['D', 'C'], ['E', null], ['F', null, { noAi: true }]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  const refs = async (key, ...targets) => {
+    const file = h.app.vault.getAbstractFileByPath(h.node(key).path);
+    await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + targets.map(t => `  - "card:${id(t)}"\n`).join('')));
+  };
+  await refs('B', 'D');
+  await refs('A', 'E');
+  // A-F is a semantic line; A-C is a parent and child that also hold a relation, so only the relation line is drawn.
+  h.mapDoc.topicRelations = [{ kind: 'supports', from: id('A'), to: id('F') }, { kind: 'related', from: id('A'), to: id('C') }];
+  await view.hydrate();
+  assert.ok(view.livingGraph, 'the graph comes with the validity pass');
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  const snap = () => JSON.stringify(view.edgesEl.children);
+  const graph = view.livingGraph;
+  view.livingGraph = undefined;
+  view.drawEdges();
+  const noGraph = snap();
+  view.livingGraph = graph;
+  view.drawEdges();
+  const before = snap();
+  assert.equal(before, noGraph, 'a graph with no selection changes nothing');
+  let draws = 0;
+  const draw = view.drawEdges;
+  view.drawEdges = function () { draws++; return draw.call(this); };
+  const marked = cls => view.edgesEl.children.filter(c => c.classes?.includes(cls));
+  const pair = c => c.getAttribute('data-dep') ?? [...view.edgeEls].find(([, p]) => p === c)?.[0];
+  const keyName = new Map(h.mapDoc.nodes.map(n => [n.id, [...h.byKey].find(([, v]) => v.id === n.id)[0]]));
+  const label = list => list.map(c => pair(c).split('\u0000').map(x => keyName.get(x)).join('>')).sort();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.deepEqual(label(marked('is-dep-run')), ['A>B', 'A>C', 'A>E', 'B>D', 'C>D']);
+  assert.deepEqual(label(marked('is-dep-read')), ['A>O']);
+  const overlays = marked('vam-edge-dep-overlay');
+  assert.deepEqual(label(overlays), ['A>C', 'A>E', 'B>D'], 'pairs without a drawn tree line get an overlay');
+  assert.ok(overlays.every(o => o.getAttribute('d')), 'each overlay has a path');
+  assert.equal(view.edgesEl.children.at(-1), overlays.at(-1), 'overlays sit on top');
+  for (const path of view.relationEls.values()) assert.equal(path.classes.some(c => c.startsWith('is-dep')), false, 'semantic lines never');
+  view.applySelectionChange(view.selection.click(id('O')));
+  assert.equal(marked('is-dep-run').length + marked('is-dep-read').length, 0, 'an ordinary card highlights nothing');
+  view.applySelectionChange(view.selection.click(id('A')));
+  view.applySelectionChange(view.selection.clickEmpty());
+  assert.equal(snap(), before, 'clearing the selection restores the DOM');
+  assert.equal(draws, 0, 'selection never redraws the edges');
 });
 
 test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {

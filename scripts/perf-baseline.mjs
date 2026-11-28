@@ -1,5 +1,6 @@
 // P1.12 performance baseline: measures interaction latency of the mind-map view in a harness-launched test Obsidian over CDP.
-//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]
+//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]
+//   --ai marks every fixture card an AI card (ai-card: true), so selection exercises the dependency highlight.
 // The vault must be harness-owned (made by `node scripts/test-harness.mjs --session=<name>`, already running and trusted).
 // For numbers to compare (P1.12 stage B against the stage A baseline), use a fresh session vault per run: fixture maps from
 // earlier runs stay in the vault and raise heap and batch times.
@@ -47,7 +48,7 @@ export function perfFixtureCards(count = PERF_CARD_COUNT) {
   return cards;
 }
 
-export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count = PERF_CARD_COUNT) {
+export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count = PERF_CARD_COUNT, { ai = false } = {}) {
   const topicId = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const folder = `${workspaceRoot}/Topics/${topic}`;
   const cards = perfFixtureCards(count);
@@ -58,13 +59,13 @@ export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count
   const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
   const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
   }));
   return { mapPath: `${folder}/Map.md`, files: [{ path: `${folder}/Map.md`, text: map }, ...notes] };
 }
 
-function seed(vault, topic, count) {
-  const { mapPath, files } = perfFixtureFiles(topic, "Agent Workspace", count);
+function seed(vault, topic, count, ai) {
+  const { mapPath, files } = perfFixtureFiles(topic, "Agent Workspace", count, { ai });
   if (files.some(file => existsSync(join(vault, file.path)))) throw new Error(`${topic} already exists in ${vault}; not overwriting.`);
   for (const file of files) { mkdirSync(join(vault, file.path, ".."), { recursive: true }); writeFileSync(join(vault, file.path), file.text); }
   return mapPath;
@@ -235,12 +236,12 @@ async function measureBatch(cdp, mapPath, cards) {
 
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
-export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards: cardCount = PERF_CARD_COUNT }) {
+export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards: cardCount = PERF_CARD_COUNT, ai = false }) {
   if (resolve(vault) === resolve(canonicalVault)) throw new Error(`Refusing ${vault}: it is the owner's testing vault.`);
   if (!existsSync(join(vault, marker))) throw new Error(`${vault} is not a harness-owned test vault (no ${marker}).`);
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "");
-  const main = seed(vault, `Perf Fixture ${stamp}`, cardCount);
-  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`, cardCount));
+  const main = seed(vault, `Perf Fixture ${stamp}`, cardCount, ai);
+  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`, cardCount, ai));
   const cdp = await connectCdp(vault);
   try {
     await cdp.evaluate(`app.vault.adapter.list("Agent Workspace/Topics")`); // let the vault index the new files
@@ -271,7 +272,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
   } finally { cdp.close(); }
 }
 
-export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]";
+export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]";
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
@@ -280,7 +281,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!vault || args.includes("--help")) { process.stdout.write(`${usage}\n`); process.exitCode = vault ? 0 : 2; }
   else {
     try {
-      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10), cards: Number(option("cards") ?? PERF_CARD_COUNT) });
+      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10), cards: Number(option("cards") ?? PERF_CARD_COUNT), ai: args.includes("--ai") });
       const out = resolve(option("out") ?? join(tmpdir(), `vam-perf-${Date.now()}.json`));
       writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
       const { raw, ...short } = report;

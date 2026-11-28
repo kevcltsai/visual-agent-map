@@ -459,6 +459,7 @@ for (const [name, becomeAi] of [
   await until(() => failed.length === 1);
   assert.equal(h.raw(a), before, 'the note keeps its bytes');
   assert.equal(failed[0][0], 'chart-x', 'the chart exchange is marked failed');
+  assert.equal(failed[0][1], t('log.chart_stale_not_applied'), 'with the stale-chart reason');
   assert.deepEqual(applied, [false], 'apply refuses the late chart with a false outcome (§5.4: a refused writer reports its outcome to the caller)');
   assert.equal(h.calls.length, 0, 'no research call');
 });

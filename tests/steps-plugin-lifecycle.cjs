@@ -135,9 +135,13 @@ test('P3.9 unload: a Living result that arrives after unload, and unload itself,
   const mapDoc = S.map([S.node('card')]);
   await f.app.vault.create('card.md', STALE_CARD.replace('Research card again', 'Research card'));
   f.repo.readMap = async () => mapDoc;
-  const plugin = newPlugin();
+  // The plugin and the round come from the same bundle, so `plugin.onunload()` closes the round's own coordinator.
+  const plugin = new lifecycle.default();
   plugin.app = f.app;
+  plugin.logs = { appendLog() {} };
   plugin.repo = f.repo;
+  const coordinator = lifecycle.livingCoordinator(plugin);
+  const run = coordinator.beginRun('Map.md');
   const writes = [];
   let recording = false;
   for (const name of ['create', 'createFolder', 'createBinary', 'modify', 'modifyBinary', 'append', 'process', 'rename', 'delete', 'trash']) {
@@ -150,8 +154,9 @@ test('P3.9 unload: a Living result that arrives after unload, and unload itself,
   const reply = S.deferred(), dispatched = S.deferred();
   let late;
   const port = {
-    app: f.app, repo: f.repo, mapPath: 'Map.md', viewSession: 'view', signal: new AbortController().signal,
-    coordinator: lifecycle.livingCoordinator(plugin), current: () => !f.repo.isDisposed(), busy: () => false, language: () => 'English',
+    // The view's shape (view.ts runPrompts) minus its repo-disposed check: only the coordinator can stop this round.
+    app: f.app, repo: f.repo, mapPath: 'Map.md', viewSession: 'view', signal: run.signal,
+    coordinator, current: () => !run.signal.aborted, busy: () => false, language: () => 'English',
     mapSources: async () => [], confirm: async (_model, run) => { await run(); return true; },
     onStart() {}, onRunning() {}, onSettled() {}, onFailure() {},
     calls: { run: async (prepared, options, finish) => {
@@ -166,9 +171,13 @@ test('P3.9 unload: a Living result that arrives after unload, and unload itself,
   recording = true;
   plugin.onunload();
   assert.deepEqual(writes, [], 'unload itself writes nothing');
+  assert.ok(run.signal.aborted, 'unload cancels the formal run');
+  assert.equal(coordinator.beginRun('Other.md'), undefined, 'the coordinator is closed');
+  assert.equal(coordinator.acquire('other', 'view', ['Other.md'], false), undefined, 'no lease after unload');
   reply.resolve();
   const results = await round;
-  assert.ok(typeof results?.get === 'function' && !['changed', 'no-change', 'reused'].includes(results.get('card')), 'the late result is rejected, not committed');
+  assert.equal(typeof results?.get, 'function', `the round settles: ${results}`);
+  assert.equal(results.get('card'), 'cancelled', 'a round stopped by unload reports cancelled (§5.2), not a failure');
   await late?.catch?.(() => {});
   await delay(20);
   assert.deepEqual(writes, [], 'the late result writes nothing');

@@ -85,6 +85,10 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
         zh: "這章已鎖定，AI 沒有再查也沒有修改",
         en: "This chapter is locked, so the AI did not check it again or change it"
       },
+      proof_locked_skipped: {
+        zh: "略過（已鎖定），AI 校對沒有查這章",
+        en: "Skipped (locked); the AI proofread did not check this chapter"
+      },
       proof_incomplete: {
         zh: "AI 校對沒有跑完，這章沒有完整查過",
         en: "The AI proofread did not finish, so this chapter was not fully checked"

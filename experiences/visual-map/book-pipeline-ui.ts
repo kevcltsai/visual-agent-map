@@ -240,7 +240,7 @@ export function bookBarState(
     ...(rerunning ? { rerun: true as const } : {}),
     ...(again ? { again: { ...again } } : {}),
     ...(fixAgain?.items ? { fixAgain } : {}),
-    ...(mode === "done" && closingPageSkipped(data) ? { noClosingPage: true as const } : {}),
+    ...(mode === "done" && closingPageSkipped(data, counts["needs-review"]) ? { noClosingPage: true as const } : {}),
     ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
@@ -905,6 +905,11 @@ export function bookErrorReason(error: unknown): string {
 export function bookRefusalText(error: unknown): string {
   if (error instanceof BookPipelineRunError && error.code in REFUSAL_KEY) return t(REFUSAL_KEY[error.code]);
   return t("ui.book_failed_0", bookErrorReason(error));
+}
+
+/** The notice for a book whose closing page was not written because its only gap is chapters the AI proofread skipped as locked. */
+export function lockedSkippedNotice(titles: readonly string[]): string {
+  return t("ui.book_locked_skipped_0", titles.join(t("ui.list_separator")));
 }
 
 /** Runs one runner entry; a refusal (or any error) is shown through `notify` instead of being thrown. */

@@ -6,7 +6,7 @@ const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
 const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe, expansionUnsafeRule } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
-const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
+const { readBookPipeline, closingPageSkipped } = S.load('core/book-pipeline/model.ts');
 const { cardRevision, fixAgainPlan } = S.load('core/book-pipeline/machine.ts');
 const review = S.load('experiences/visual-map/book-pipeline-review.ts');
 /** The sentences the review box of chapter `i` lists after the run (gate 2's own rules): the box must say what really happened. */
@@ -6295,6 +6295,41 @@ test('AI lock, whole book: a chapter never checked because it was locked leaves 
   assert.equal(slot.incomplete, true, 'the book is not marked as fully checked');
   same(slot.locked, [r.nodes[1].id], 'the chapter left out is named');
 });
+// B33-z: a chapter the whole-book check left out because it was locked is "skipped (locked)", never "did not finish"; with nothing else
+// open the book gets no page, only a notice naming the skipped chapters (and the bar no button to a page).
+const lockedSkipRig = async (aiProof = async () => ({ checks: [], prior: [], dropped: {} })) => {
+  const holder = { v: pageVault(), skipped: [] };
+  const r = await aiRig({
+    aiProof: async request => {
+      if (request.title === 'SecretTitleA') await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true);
+      return aiProof(request);
+    }
+  }, { ports: { writeOpenIssues: holder.v.port, lockedSkipped: titles => holder.skipped.push(titles) } });
+  holder.r = r;
+  await finishAi(r);
+  return { r, holder };
+};
+test('AI lock, whole book (B33-z): one chapter locked, the rest solved: no closing page, a notice names the skipped chapter, the bar has no button', async () => {
+  const { r, holder } = await lockedSkipRig();
+  const state = await r.state();
+  same(state.bookProof.locked, [r.nodes[1].id], 'the book still records the skipped chapter (so "fix again" can take it back once unlocked)');
+  assert.equal(state.bookProof.incomplete, true);
+  assert.equal(state.phase, 'done');
+  same(pageFiles(holder.v), [], 'no "still open" page for a book whose only gap is a locked chapter');
+  same(holder.skipped, [['SecretTitleA']], 'one notice, naming the locked chapter');
+  assert.equal(closingPageSkipped(state, 0), true, 'the bar reads the same: no page, no button');
+});
+test('AI lock, whole book (B33-z): one chapter locked and another whose check failed: the page is written; the locked one is "skipped (locked)", only the failed one "did not finish"', async () => {
+  const { r, holder } = await lockedSkipRig(async request => { if (request.title === 'SecretTitleB') throw new Error('boom'); return { checks: [], prior: [], dropped: {} }; });
+  const state = await r.state();
+  assert.equal(state.aiProof[r.nodes[2].id].incomplete, true, 'chapter B did not finish');
+  const page = pageFiles(holder.v).map(([, text]) => text).join('\n');
+  assert.match(page, /^- SecretTitleA：略過（已鎖定）/m, `the locked chapter is marked as skipped: ${page}`);
+  assert.doesNotMatch(page, /SecretTitleA：AI 校對沒有跑完/, 'the locked chapter is not listed as unfinished');
+  assert.match(page, /^- SecretTitleB：AI 校對沒有跑完/m, 'the failed chapter keeps the unfinished line');
+  same(holder.skipped, [], 'no notice: the page says it');
+  assert.equal(closingPageSkipped(state, 0), false);
+});
 // The finding in chapter A (book chapter 2) is found by the first check; A is locked during that check, so it is never fixed or re-checked.
 const lockedFindingRig = async (aiFix = async request => request.targets.map(t => ({ id: t.id, chapter: t.chapter, quote: request.chapters.find(c => c.number === t.chapter).text, replacement: `Book corrected ${t.chapter}` }))) => {
   const holder = { checks: 0, v: pageVault() };
@@ -6325,7 +6360,8 @@ test('AI lock, whole book: a known finding in a chapter locked after the check s
   assert.equal(r.raw(1), holder.locked, 'the locked file is byte for byte as locked');
   const page = pageFiles(holder.v).map(([, text]) => text).join('\n');
   assert.match(page, /SecretTitleA：chapters disagree：這章已鎖定/, `the closing page lists the kept finding as locked: ${page}`);
-  assert.match(page, /SecretTitleA：AI 校對沒有跑完/, 'and names the locked chapter as not fully checked');
+  assert.match(page, /SecretTitleA：略過（已鎖定）/, 'and names the locked chapter as skipped (B33-z: not as unfinished)');
+  assert.doesNotMatch(page, /SecretTitleA：AI 校對沒有跑完/);
 });
 test('AI lock, whole book: once the chapter is unlocked, "fix again" sends its kept finding and the re-check covers it; the book is complete again', async () => {
   const { r } = await lockedFindingRig();

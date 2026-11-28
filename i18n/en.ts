@@ -3326,6 +3326,8 @@ export const en = {
     "{0} more are chapter statuses (proofread not passed, pictures that do not match); this round does not touch them.",
   "ui.book_fix_again_go": "Start fixing",
   "ui.book_bar_open_issues": "See what is still open",
+  "ui.book_locked_skipped_0":
+    'The AI proofread skipped these locked chapters: {0}. Nothing else is open, so no "Still open" page was made.',
   "ui.book_bar_open_issues_missing": 'The "Still open" page was not found; it may have been renamed or moved.',
   "ui.book_step_self_check": "Author self-check",
   "ui.book_plan_title_book": 'Book plan: edit freely, then press "{0}"',

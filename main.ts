@@ -30,7 +30,7 @@ import {
   type RefindResult
 } from "./experiences/visual-map/book-pipeline-run";
 import type { StructureNode, StructureOp } from "./core/book-pipeline/structure-edit";
-import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+import { bookErrorReason, bookRefusalText, lockedSkippedNotice } from "./experiences/visual-map/book-pipeline-ui";
 import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import { writeOpenIssuesFile } from "./experiences/visual-map/book-open-issues-file";
 import {
@@ -943,6 +943,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         language,
         content
       ),
+    lockedSkipped: titles => void new Notice(lockedSkippedNotice(titles)),
     notes: {
       readText: async path => {
         const open = this.openMarkdownViews(path)[0];

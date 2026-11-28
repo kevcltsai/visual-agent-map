@@ -530,15 +530,22 @@ export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">
   return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
 }
 /**
- * ai-flows AI lock: the run has no closing page to write (and the bar no button to it) when the whole-book check left every card out as
- * locked and nothing was checked or is open. Read from the saved state only, so the runner and the bar agree.
+ * ai-flows AI lock: the run has no closing page to write (and the bar no button to it) when the only gap the whole-book check left is
+ * chapters it skipped as locked: every card locked and nothing checked or open, or some cards locked and nothing open, no other chapter's
+ * check unfinished and no chapter (`needsReview`, the needs-review stage count) to look at. Read from the saved state and the stage count
+ * only, so the runner and the bar agree. The book keeps `incomplete` and `locked`, so "fix again" takes the chapters back once unlocked.
  */
-export function closingPageSkipped(data: BookPipelineData): boolean {
+export function closingPageSkipped(data: BookPipelineData, needsReview: number): boolean {
   const order = effectiveOrder(data);
   const locked = data.bookProof?.locked;
-  if (!order.length || !locked || !order.every(id => locked.includes(id))) return false;
+  if (!order.length || !locked?.length) return false;
   const slots = [data.bookProof, ...order.map(id => data.aiProof?.[id])];
-  return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
+  if (order.every(id => locked.includes(id))) return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
+  return (
+    !needsReview &&
+    slots.every(slot => !slot?.open.length) &&
+    order.every(id => locked.includes(id) || !data.aiProof?.[id]?.incomplete)
+  );
 }
 /** How the map's cards (`mapIds`) differ from what the run accepted: new cards, and cards of the run that are gone. */
 export function mapDifference(

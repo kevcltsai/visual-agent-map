@@ -601,6 +601,8 @@ export interface BookPipelinePorts {
     language: ContentLanguage,
     content: string
   ): Promise<{ ok: true; path: string } | { ok: false }>;
+  /** The closing page was not written because its only gap is these chapters (titles), skipped as locked: production shows a notice. */
+  lockedSkipped?(titles: string[]): void;
   /**
    * Production: `runAiProof(aiCalls, request, run)`: the independent proofread of one chapter (a different model from the author's).
    * The AI proofread runs only when `aiProof`, `aiFix` and `aiBookProof` are all given.
@@ -4266,9 +4268,17 @@ export class BookPipelineRuns {
           reason: open.reason
         });
       }
-      // Left out because AI-locked: each such chapter is named (it was not checked), not the book as a whole.
-      if (state.bookProof.incomplete)
-        for (const id of state.bookProof.locked?.length ? state.bookProof.locked : [""]) incomplete(id && title(id));
+      // Left out because AI-locked: each such chapter is named as skipped (locked), not as unfinished; `locked` is the only reason then.
+      const locked = state.bookProof.locked ?? [];
+      for (const id of locked)
+        issues.push({
+          source: "ai-proof",
+          chapterId: id,
+          chapterTitle: title(id),
+          problem: "",
+          reason: "proof_locked_skipped"
+        });
+      if (state.bookProof.incomplete && !locked.length) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);
@@ -4326,8 +4336,13 @@ export class BookPipelineRuns {
     if (!this.ports.writeOpenIssues || !root) return !this.ports.writeOpenIssues;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.dead(drive)) return false;
-      // ai-flows AI lock: a book whose every chapter is locked and that nothing checked gets no page (no file is added for it).
-      if (closingPageSkipped(drive.store.state)) return true;
+      // ai-flows AI lock: a book whose only gap is chapters skipped as locked gets no page (no file is added), only a notice naming them.
+      const state = drive.store.state;
+      const needsReview = effectiveOrder(state).filter(id => drive.stages.get(id) === "needs-review").length;
+      if (closingPageSkipped(state, needsReview)) {
+        this.ports.lockedSkipped?.((state.bookProof?.locked ?? []).map(id => drive.cards.get(id)?.title ?? ""));
+        return true;
+      }
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
         const content = composeOpenIssuesNote({

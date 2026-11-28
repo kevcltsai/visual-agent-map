@@ -3125,6 +3125,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_fix_again_note_status_0": "另外 {0} 項是章節狀態（校對沒過、圖片對不上），這一輪不處理。",
   "ui.book_fix_again_go": "開始修",
   "ui.book_bar_open_issues": "看仍有問題",
+  "ui.book_locked_skipped_0": "AI 校對略過了已鎖定的章：{0}。其他章都沒有問題，所以沒有建立「仍有問題」頁。",
   "ui.book_bar_open_issues_missing": "找不到「仍有問題」那一頁，可能被改名或移走了。",
   "ui.book_step_self_check": "作者自查",
   "ui.book_plan_title_book": "全書企劃　可以直接改，改完按「{0}」",

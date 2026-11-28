@@ -151,10 +151,10 @@ test('B15: outline click and canvas selection, five times each, leave Map.md unc
   assert.ok(calls.active.includes('leaf.md') && calls.active.includes('root.md'), 'the outline is told which topic is active');
 });
 
-test('B15: an outline click on a card inside a collapsed branch selects it and centers on its nearest visible ancestor', async () => {
+test('B15: an outline click on a card inside a collapsed branch selects it and centers on the topic, opened for the view only', async () => {
   const { view, ids } = await viewWithMap();
   const [root, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; root.x = 200; root.y = 100;
   await view.revealPath('leaf.md');
   assert.equal(view.selection.state.selected, ids.leaf);
-  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (200 + 140), y: 300 - 180, zoom: 1 }, 'camera is on the collapsed root, the topmost visible ancestor');
+  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 80), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
 });

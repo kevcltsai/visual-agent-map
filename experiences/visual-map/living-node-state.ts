@@ -13,6 +13,7 @@ const REASON_KEYS: Record<string, TranslationKey> = {
   "range-too-large": "ui.living_node_reason_range_too_large",
   failed: "ui.living_node_reason_failed",
   "provider-failed": "ui.living_node_trial_reason_provider",
+  "network-failed": "ui.living_node_trial_reason_network",
   timeout: "ui.living_node_trial_reason_timeout",
   "web-required": "ui.living_node_trial_reason_web",
   "source-changed": "ui.living_node_trial_reason_replaced",
@@ -22,6 +23,22 @@ const REASON_KEYS: Record<string, TranslationKey> = {
 
 /** A bare error code such as "required-web-unavailable"; anything longer or free-form may carry private text. */
 const CODE = /^[a-z][a-z0-9-]{1,63}$/;
+
+const NETWORK =
+  /fetch failed|ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ENETDOWN|socket hang up/i;
+
+/** A connection-level failure, read from the error, its code and its cause. Only classifies; the text is never shown. */
+export function isNetworkFailure(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  for (let current = error; current && typeof current === "object" && !seen.has(current);) {
+    seen.add(current);
+    const { message, code, cause } = current as { message?: unknown; code?: unknown; cause?: unknown };
+    if (NETWORK.test(typeof message === "string" ? message : "") || NETWORK.test(typeof code === "string" ? code : ""))
+      return true;
+    current = cause;
+  }
+  return typeof error === "string" && NETWORK.test(error);
+}
 
 /**
  * The short code stored with a failed card. Never raw error text, which can carry prompt text or paths: only the
@@ -43,6 +60,7 @@ export function livingFailureCode(error: unknown): string {
   if (code) return "validation-rejected";
   if ((error as { name?: unknown } | null)?.name === "SyntaxError" || /JSON/i.test(message))
     return "validation-rejected";
+  if (isNetworkFailure(error)) return "network-failed";
   if (/time.?out|timed out/i.test(message)) return "timeout";
   return "provider-failed";
 }

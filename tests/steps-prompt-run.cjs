@@ -1460,7 +1460,10 @@ test('reason: a failed card and the cards blocked by it keep a short reason in t
 
 test('reason: each error class is stored as a short code and shows its own line on the card; raw error text is never stored', async () => {
   const cases = [
-    ['provider', { errors: new Error('connect ECONNRESET /Users/me/secret') }, 'provider-failed', 'ui.living_node_trial_reason_provider'],
+    ['provider', { errors: new Error('connect EPROTO /Users/me/secret') }, 'provider-failed', 'ui.living_node_trial_reason_provider'],
+    ['network-reset', { errors: new Error('connect ECONNRESET /Users/me/secret') }, 'network-failed', 'ui.living_node_trial_reason_network'],
+    ['network-fetch', { errors: Object.assign(new Error('fetch failed'), { cause: new Error('getaddrinfo ENOTFOUND /Users/me/secret') }) }, 'network-failed', 'ui.living_node_trial_reason_network'],
+    ['network-etimedout', { errors: new Error('connect ETIMEDOUT /Users/me/secret') }, 'network-failed', 'ui.living_node_trial_reason_network'],
     ['timeout', { errors: new Error('Request timed out') }, 'timeout', 'ui.living_node_trial_reason_timeout'],
     ['not-json', { reply: 'this is not json {' }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
     ['bad-answer', { reply: JSON.stringify({ baseRevision: 'x', requiresWeb: false, operations: 'nope' }) }, 'validation-rejected', 'ui.living_node_trial_reason_validation'],
@@ -1471,7 +1474,7 @@ test('reason: each error class is stored as a short code and shows its own line 
     for (const [kind, value] of Object.entries(how)) h.plan[kind].set('solo', value);
     await h.runAll(); await h.done();
     assert.equal(reasonOf(h, 'solo'), code, name);
-    assert.doesNotMatch(h.raw('solo'), /Unexpected token|ECONNRESET|secret|not valid JSON/, name + ' raw text not stored');
+    assert.doesNotMatch(h.raw('solo'), /Unexpected token|ECONNRESET|ENOTFOUND|fetch failed|EPROTO|secret|not valid JSON/, name + ' raw text not stored');
     assert.equal(livingState.livingReasonKey(await livingOf(h, 'solo')), key, name);
   }
 });
@@ -1492,6 +1495,8 @@ test('reason codes map to lines: unknown code gets the generic line, trial-reaso
   assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
   assert.equal(code(new Error('cancelled')), 'failed');
   assert.equal(code('plain text'), 'provider-failed');
+  assert.equal(code(new Error('read ECONNRESET')), 'network-failed');
+  assert.equal(mapped('network-failed'), 'ui.living_node_trial_reason_network');
   // D1-x5: a search that did not happen is stamped as a web failure, so the card shows the web line.
   const notSearched = S.load('ai/search-not-performed.ts').searchNotPerformedError();
   assert.equal(code(notSearched), 'web-required');
@@ -2005,6 +2010,25 @@ test('D1-x9 a later commit with a new summary updates it again; the same summary
   assert.match(h.raw('A'), /### Current output[\s\S]*Third/, 'the AI result lands in the knowledge region');
   assert.equal(summaryOf(h.raw('A')), 'Mine');
   assert.equal(fmSummary(h.raw('A')), 'Mine');
+});
+
+test('D1-x11 a hand edit of the output (made in the native editor) is kept by the next AI commit; the AI result goes to AI latest', async () => {
+  const h = await popoverHarness([['A', null, {}]]);
+  h.view.startPromptRun([h.node('A').id]); await h.done();
+  const origRun = h.host.aiCalls.run;
+  let next = null;
+  h.host.aiCalls.run = (prepared, options, finish) => next === null ? origRun(prepared, options, finish)
+    : (h.calls.push({ key: 'A', input: prepared.input, options }), finish(JSON.stringify({ baseRevision: prepared.input.base.revision, requiresWeb: false, operations: [{ kind: 'output', text: next, evidence: [] }] }), { signal: options.signal, parsed() {} }));
+  const path = h.node('A').path;
+  assert.match(h.raw('A'), /> Result: A/);
+  h.contents.set(path, h.raw('A').replace('> Result: A', '> My own words'));
+  next = 'Machine second';
+  const count = h.calls.length;
+  h.view.promptBatch = null; h.view.startPromptRun([h.node('A').id]);
+  await until(() => h.view.promptBatch?.outcome && h.calls.length > count);
+  for (let i = 0; i < 15; i++) await dom.tick();
+  assert.match(h.raw('A'), /> My own words/, 'the human edit survives');
+  assert.match(h.raw('A'), /### AI latest[\s\S]*> Machine second/, 'the AI result lands in the AI latest area');
 });
 
 test('D1-x7 an unsaved new Living card can be tried (A23): it runs the draft, writes nothing, creates no formal config; an empty Prompt is still refused', async () => {

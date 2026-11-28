@@ -1220,6 +1220,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_trial_failed_title": "试跑没有完成",
   "ui.living_node_trial_failed_note": "当前显示的预览不是这次试跑的结果。",
   "ui.living_node_trial_reason_provider": "AI 服务失败或没有响应。",
+  "ui.living_node_trial_reason_network": "网络连接失败，请检查网络后重试。",
+  "ui.living_node_open_in_editor": "在编辑器打开",
   "ui.living_node_trial_reason_timeout": "AI 响应太久，已超时。",
   "ui.living_node_trial_reason_web": "这张卡需要联网搜索，但没有使用到搜索结果。",
   "ui.living_node_trial_reason_replaced": "试跑期间来源笔记被替换或改动。",

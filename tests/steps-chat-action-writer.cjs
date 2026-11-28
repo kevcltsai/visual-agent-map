@@ -754,3 +754,17 @@ test('AI write gate (chat): an injected or invalid action cannot change a topic 
   assert.deepEqual(w.only('noteChange'), []);
   assert.equal(w.history.length, 0);
 });
+
+// ai-flows §AI 鎖定: the book plan chat leaves a note with `ai-locked: true` as it is and says why (the locked reason, not "changed").
+test('book plan chat, AI lock: a locked card is left as it is and named locked; a locked book card refuses the thread edit; nothing written there', async () => {
+  const w = planWorld();
+  w.cards.get('b.md').aiLocked = true;
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'new entry' }, { id: 'c', entry: 'other entry' }]), { bookPlan: w.baselineOf(['b', 'c']) }));
+  assert.equal(outcome.status, 'done', JSON.stringify(outcome));
+  assert.match(outcome.note, /\(1 cards left as they are\): B \(locked\)$/);
+  assert.ok(!w.writes.includes('b.md'));
+  const root = planWorld({ rootRaw: threadRoot('old thread'), thread: 'old thread' });
+  root.cards.get('r.md').aiLocked = true;
+  assert.deepEqual(plain(await applyBookThreadEdit(root.deps, threadAction('x'), { bookPlan: root.baselineOf([]) })), skippedOutcome('ui.ai_locked_notice'));
+  assert.deepEqual(root.writes, []);
+});

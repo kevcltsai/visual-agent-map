@@ -14160,7 +14160,7 @@ export class VisualAgentMapView extends ItemView {
     this.lockWhileLoading();
     this.settleCardHeights();
     // A waiting suggestion's Adopt follows the cards and references on the map (a card merged or deleted greys it at once).
-    this.chat?.refreshPlan();
+    this.chat?.refreshPlan?.();
   }
   private paint(): void {
     // A hidden tab paints like any other (outline, title, canvas), so its other consumers stay live; its measures are 0, so it paints again when shown.

@@ -2587,10 +2587,7 @@ export class VisualAgentMapView extends ItemView {
   private onMapKeydown(event: KeyboardEvent): void {
     // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
     const target = event.target as HTMLElement | null;
-    if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
-    // A button in the chat window (its toggle) keeps Esc for an outline reveal's opening, which folds back; the rest of the window is the chat's.
-    const revealOpen = event.key === "Escape" && !this.mapSearch && !!this.searchOpen;
-    if (target?.closest(".vam-map-chat") && !(revealOpen && target.closest("button"))) return;
+    if (target?.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     // Something that already took this Esc (a menu, a dialog), or a menu still open, closes alone; only a bare Esc clears the selection.
     // A menu that this very key just closed is already gone from the page, so its hide is remembered for the rest of the key event.
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
@@ -15852,6 +15849,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
     this.focusNode(node, false, true);
+    // Focus goes back to the map (no scroll), so Esc after a reveal reaches the map's key handler, not a chat control.
+    this.contentEl.focus({ preventScroll: true });
     return true;
   }
   /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */

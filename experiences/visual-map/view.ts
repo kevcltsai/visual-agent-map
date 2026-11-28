@@ -15845,8 +15845,12 @@ export class VisualAgentMapView extends ItemView {
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
     this.focusNode(node, false, true);
+    // The reader the outline opens beside the map slides in after this: the canvas narrows for a while, so re-centre on resize.
+    this.revealResize = { id: node.id, until: Date.now() + 500 };
     return true;
   }
+  /** The card an outline reveal just centred, re-centred while the canvas or its insets change until `until` (ms). */
+  private revealResize: { id: string; until: number } | null = null;
   /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
   private foldRevealUnless(node: MapNode): void {
     const open = this.searchOpen;
@@ -23089,6 +23093,15 @@ export class VisualAgentMapView extends ItemView {
     }
     // The suggestion card's room ends above the zoom bar and hint, which this clearance moves.
     this.placeMapTools();
+    // Last: a resize and the status bar (it grows when the reader makes a note active) both move the visible centre.
+    this.recentreReveal();
+  }
+  /** Centres an outline reveal's card again on the visible area, while the reveal's window lasts. */
+  private recentreReveal(): void {
+    const reveal = this.revealResize;
+    const revealed = reveal && Date.now() < reveal.until ? this.mapNodeById(reveal.id) : undefined;
+    if (revealed) this.focusNode(revealed, false, true);
+    else this.revealResize = null;
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

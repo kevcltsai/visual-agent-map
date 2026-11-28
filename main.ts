@@ -1449,20 +1449,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       leaf =>
         new OutlineView(
           leaf,
-          async path => {
-            try {
-              // The outline moves the map to the topic and opens its note beside it.
-              const view = this.views().find(item => item.hasPath(path));
-              if (view) {
-                // Bring the map tab forward first: a background tab has no size to center in.
-                await this.app.workspace.revealLeaf(view.leaf);
-                await view.revealPath(path);
-              }
-              await this.openDetails(this.repo.file(path));
-            } catch (error) {
-              new Notice(error instanceof Error ? error.message : String(error));
-            }
-          },
+          path => this.revealFromOutline(path),
           // Drag and Alt+arrow in the outline move topics of the map it shows, through that view.
           async (id, to) => (await this.outlineSourceView?.outlineMove(id, to)) ?? null
         )
@@ -2830,6 +2817,28 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   restoreLivingOfficial(file: TFile | undefined, owner: string, release = false): Promise<void> {
     return this.nodeDetailsSidebar.restoreLivingOfficial(file, owner, release);
+  }
+  /** An outline row click: moves the map to the topic and opens its note beside it. */
+  async revealFromOutline(path: string): Promise<void> {
+    // The reader opens first: it takes width from the map, and the card is centred on the width that is left.
+    let failed: string | null = null;
+    const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+    try {
+      await this.openDetails(this.repo.file(path));
+    } catch (error) {
+      failed = message(error);
+    }
+    try {
+      const view = this.views().find(item => item.hasPath(path));
+      if (view) {
+        // Bring the map tab forward first: a background tab has no size to center in.
+        await this.app.workspace.revealLeaf(view.leaf);
+        await view.revealPath(path);
+      }
+    } catch (error) {
+      failed ??= message(error);
+    }
+    if (failed) new Notice(failed);
   }
   openDetails(file: TFile, owner?: string): Promise<void> {
     return this.nodeDetailsSidebar.openDetails(file, owner);

@@ -61,7 +61,7 @@ import {
   swapFigureStamped,
   type FigureSwap
 } from "../../core/book-pipeline/refind-slot";
-import { composeOpenIssuesNote, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
+import { composeOpenIssuesNote, openIssuePictures, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
 import {
   PipelineStore,
   addBudget,
@@ -125,6 +125,7 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  bookProofUnfinished,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -246,7 +247,7 @@ import {
 } from "../../core/book-pipeline/cover-block";
 import { isBadRequest } from "../../ai/bad-request";
 import type { ReasoningLevel } from "../../ai/types";
-import { instructionLanguageOf, translate, type ContentLanguage } from "../../i18n";
+import { translate, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -4277,7 +4278,7 @@ export class BookPipelineRuns {
           problem: "",
           reason: "proof_locked_skipped"
         });
-      if (state.bookProof.incomplete && !locked.length) incomplete("");
+      if (bookProofUnfinished(state.bookProof)) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
       const info = drive.cards.get(id);
@@ -4304,10 +4305,7 @@ export class BookPipelineRuns {
                   : "";
       // What the status line itself says, once none of the six older causes is: the reason a person can act on (the old fallback was one vague sentence).
       const off = splitPictureIssue(issue).off ?? [...issue.matchAll(/image_(\d+)_mismatch/g)].map(m => Number(m[1]));
-      const zh = instructionLanguageOf(drive.config.language) === "zh";
-      const pictures = zh
-        ? `第 ${off.join("、")} 張圖`
-        : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const pictures = openIssuePictures(drive.config.language, off);
       const found =
         reason ||
         (/fix interrupted/.test(issue)

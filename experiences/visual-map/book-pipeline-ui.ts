@@ -18,6 +18,7 @@ import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { fixAgainPlan } from "../../core/book-pipeline/machine";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
+  bookProofUnfinished,
   closingPageSkipped,
   effectiveOrder,
   mapDifference,
@@ -359,6 +360,9 @@ export function itemText(
   return from === to ? t("ui.book_struct_move_same_0", title) : t("ui.book_struct_move_0_1_2", title, from, to);
 }
 
+/** A count in its singular form for 1 (`…_one`) and plural otherwise (`…_0`); en needs it, zh reads the same either way. */
+const counted = (k: number, one: TranslationKey, many: TranslationKey): string => (k === 1 ? t(one) : t(many, k));
+
 /** The bar's AI numbers; "open" counts the same items the closing page lists (see the runner's `openIssuesOf`). */
 function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview: number): BookBarState["ai"] {
   let fixing = 0;
@@ -372,7 +376,7 @@ function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview
     fixed += slot.fixed;
   }
   if (data.bookProof) {
-    open += data.bookProof.open.length + (data.bookProof.incomplete ? 1 : 0);
+    open += data.bookProof.open.length + (bookProofUnfinished(data.bookProof) ? 1 : 0);
     fixed += data.bookProof.fixed;
   }
   return { fixing, open, fixed };
@@ -530,7 +534,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       cls: "vam-book-bar-counts vam-book-done-counts",
       text: state.again
         ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open)
-        : t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
+        : t(
+            "ui.book_bar_done_0_1_2",
+            counted(state.structure?.chapters ?? total, "ui.book_bar_chapters_one", "ui.book_bar_chapters_0"),
+            counted(state.ai.fixed, "ui.book_bar_places_one", "ui.book_bar_places_0"),
+            state.ai.open
+          )
     });
     if (state.again) makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
     else {

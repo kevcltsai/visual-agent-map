@@ -18965,7 +18965,14 @@ export class VisualAgentMapView extends ItemView {
               ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
               : undefined;
             // Grown from the block itself, so the block and the topics already after it stay where they are.
-            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop, undefined, !focus);
+            this.arrangeBranch(
+              map,
+              node.afterTextId ? node.afterTextId : owner.id,
+              new Set([node.id]),
+              minTop,
+              undefined,
+              !focus
+            );
           } else if (!parent) {
             const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
             if (roots.length)

@@ -300,10 +300,11 @@ import {
   type LayoutSpacing,
   type PushHints
 } from "../../map-layout";
-import type { PushBox, PushDecoration } from "../../layouts/push";
+import { pushAffected, type PushBox, type PushDecoration } from "../../layouts/push";
 import {
   arrangeMapWithRings,
   arrangeNewBranchWithRings,
+  ringTreeIds,
   arrangeNewTreeWithText,
   directionWithRings,
   ringImagesInTheWay,
@@ -1826,6 +1827,24 @@ export class VisualAgentMapView extends ItemView {
     if (!map.canvasItems?.some(item => item.kind === "summary")) return;
     map.canvasItems = pruneSummaries(map.canvasItems, map.nodes);
     if (!map.canvasItems.length) delete map.canvasItems;
+  }
+  /** Pushes apart what the cards `moving` (grown or just unfolded, at their stored places) cover, with the siblings after it; every other card keeps its x and y. */
+  private pushFrom(map: MapDocument, moving: ReadonlySet<string>): void {
+    const items = map.canvasItems ?? [];
+    const hints = pushHintsFor(map, this.cardEls, this.summaryEls);
+    map.nodes = pushAffected(map.nodes, moving, {
+      fixed: new Set([...(hints.fixed ?? []), ...ringTreeIds(map.nodes, items)]),
+      boxOf: hints.boxOf,
+      heightOf: this.cardHeightOf,
+      decorations: hints.decorations ?? [],
+      layout: { direction: layoutOf(map).direction }
+    }).nodes;
+  }
+  /** True when new, unfolded or grown cards are placed locally (right, left, balanced, down, up); radial, timeline, fishbone and argument maps lay the whole map out (decision #18). */
+  private placesLocally(map: MapDocument): boolean {
+    if (readArgumentMap(map).kind === "usable") return false;
+    const kind = layoutOf(map).direction;
+    return kind !== "radial" && kind !== "timeline" && kind !== "fishbone";
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
@@ -4683,7 +4702,10 @@ export class VisualAgentMapView extends ItemView {
     const members = ringMemberIds(map.nodes, items);
     const plain = members.size ? new Set([...resized].filter(id => !members.has(id))) : resized;
     if (plain.size && cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) {
-      this.arrangeAll(map);
+      // Where cards are placed locally, only what a grown card covers (and the siblings after it) is pushed.
+      if (this.placesLocally(map)) this.pushFrom(map, plain);
+      // A card that still covers another (a card under its own parent, a push that found no sibling to move) falls back to the whole layout.
+      if (!this.placesLocally(map) || cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) this.arrangeAll(map);
       return true;
     }
     if (!members.size) return false;
@@ -10165,7 +10187,20 @@ export class VisualAgentMapView extends ItemView {
         const n = map.nodes.find(item => item.id === node.id);
         if (!n) return;
         n.collapsed = !n.collapsed;
-        this.arrangeAll(map);
+        // Folding moves nothing; unfolding keeps the revealed cards where they were stored and pushes only what they cover.
+        if (!this.placesLocally(map)) this.arrangeAll(map);
+        else if (!n.collapsed) {
+          const revealed = new Set<string>();
+          const reveal = (id: string): void => {
+            for (const child of map.nodes) {
+              if (child.parentId !== id || revealed.has(child.id)) continue;
+              revealed.add(child.id);
+              if (!child.collapsed) reveal(child.id);
+            }
+          };
+          reveal(n.id);
+          if (revealed.size) this.pushFrom(map, revealed);
+        }
       })
     );
   }
@@ -23095,6 +23130,8 @@ export class VisualAgentMapView extends ItemView {
         run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
         !noNewMap &&
         same() &&
+        // Where cards are placed locally the batch is placed like a few cards: every other branch stays where it is.
+        !(this.map && this.placesLocally(this.map)) &&
         // A reply that made a ring places the ring and the other new cards below, never the whole map again.
         !run.ringImages?.size &&
         !result.actions.some(action => action.kind === "auto_layout")
@@ -23144,8 +23181,17 @@ export class VisualAgentMapView extends ItemView {
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
       // A reply that made a ring did not lay the whole map out either, so its other new cards are placed the same way.
       const ringed = run.ringImages?.size ? new Set(run.ringImages) : null;
+      const local =
+        batched &&
+        !arranged &&
+        !!this.map &&
+        this.placesLocally(this.map) &&
+        run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
+        !noNewMap;
       const rough =
-        batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
+        batched && !arranged && (stopped || layoutDone || !!ringed || !!scope || local)
+          ? run.created.slice(laidOutCount)
+          : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           await this.plugin.mutate(() =>
@@ -23190,6 +23236,9 @@ export class VisualAgentMapView extends ItemView {
                 }
                 this.fitCards(members);
               }
+              // Show all, as after a whole layout, when only the batch was placed.
+              if (local && !stopped && !ringed && !result.actions.some(action => action.kind === "focus_topic"))
+                this.fit();
             })
           );
         } catch {

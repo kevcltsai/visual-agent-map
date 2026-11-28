@@ -4,11 +4,6 @@
   ],
   "allow": [
     {
-      "file": "experiences/visual-map/book-pipeline-run.ts",
-      "text": "Neighbouring card's plan or text changed",
-      "reason": "owner-facing notice stored in the neighbour card's frontmatter field (data the owner reads and clears, English counterpart of the zh line next to it), never sent to a model"
-    },
-    {
       "file": "experiences/visual-map/subtree-plan.ts",
       "text": "unresearched topics are deeper down and are not listed.",
       "reason": "data line of the outline block (counts and titles of the subtree, like a table row); the rule that says what to do with it lives in the synthesize step template"

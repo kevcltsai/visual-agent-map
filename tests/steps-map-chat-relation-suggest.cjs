@@ -256,3 +256,69 @@ test('F07b-y adopt: a suggestion from a never-touched card to a knowledge refere
   const after = await snap();
   assert.deepEqual([...after.keys()].filter(path => after.get(path) !== before.get(path)), [], 'no note of either end changed');
 });
+
+// ---- F07a-y: an end of a suggestion left the map ----
+const GONE = 'This card is no longer on the map.';
+/** The view's real render (its tail refreshes the waiting plan, as after any map change) with the canvas painting left out. */
+function useRealRender(h) {
+  delete h.view.render;
+  h.view.paint = () => {}; h.view.lockWhileLoading = () => {}; h.view.settleCardHeights = () => {};
+}
+/** Takes the card out of the map the way a finished merge or a delete does (Map.md and memory), and lets the view repaint. */
+async function removeCard(h, key) {
+  const doc = await h.repo.readMap(MAP);
+  doc.nodes = doc.nodes.filter(n => n.id !== h.ids[key]);
+  await h.repo.saveMap(MAP, doc);
+  h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids[key]);
+}
+
+test('F07a-y card gone: the row is greyed with the card-gone reason the moment the map changes; the other rows stay adoptable', async () => {
+  const { h, card } = await suggested();
+  h.chat.painted = null;
+  await removeCard(h, 'a');
+  useRealRender(h);
+  h.view.render();
+  assert.deepEqual(plain(h.chat.painted?.[0]), [GONE, null, null], 'painted without a click');
+  assert.equal(card.suggestions[0].blocked(), GONE);
+  assert.equal(card.suggestions[1].blocked(), null);
+});
+
+test('F07a-y card gone (counter-example): clicking Adopt writes nothing, never a relation to a missing id, and says why', async () => {
+  const { h, card } = await suggested();
+  const before = await (async () => { await removeCard(h, 'a'); return h.hash(); })();
+  card.suggestions[0].adopt(); await tick();
+  assert.equal(await h.hash(), before, 'Map.md byte-identical');
+  assert.deepEqual(plain((await h.saved()).topicRelations ?? []), []);
+  assert.equal(card.suggestions[0].state, 'pending', 'a refused click is not a failed write; the row stays greyed');
+  assert.equal(h.view.history.undoEntry, undefined, 'no undo step');
+  // Even if the gate were skipped, the write re-checks the ends on the map being edited.
+  const row = card.suggestions[0];
+  const blocked = row.blocked; row.blocked = () => null;
+  row.adopt(); await tick();
+  assert.equal(await h.hash(), before, 'write-time check: nothing written');
+  assert.match(row.note ?? '', /no longer on the map/);
+  row.blocked = blocked;
+});
+
+test('F07a-y knowledge reference removed: a row ending on it greys; an existing reference stays adoptable', async () => {
+  const h = await harness();
+  const doc = await h.repo.readMap(MAP);
+  doc.knowledgeRefs = [{ id: 'ref-1', mapId: 'other', nodeId: 'n1', parentId: h.ids.a, x: 300, y: 0, pathHint: 'Mind Maps/Other/Map.md' }];
+  await h.repo.saveMap(MAP, doc);
+  await h.repo.rebuildDerivedData();
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.hydrate();
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [], remaining: '', suggestions: [{ fromId: h.ids.root, toId: 'ref-1', relationKind: 'supports', reason: 'why', source: '[S1]' }] });
+  await h.send('link to the reference');
+  const card = h.chat.plans[0];
+  assert.equal(card.suggestions[0].blocked(), null, 'the reference is on the map');
+  useRealRender(h);
+  const saved = await h.repo.readMap(MAP); saved.knowledgeRefs = []; await h.repo.saveMap(MAP, saved);
+  h.view.map.knowledgeRefs = [];
+  h.chat.painted = null;
+  h.view.render();
+  assert.deepEqual(plain(h.chat.painted?.[0]), [GONE], 'greyed when the reference is removed');
+  const before = await h.hash();
+  card.suggestions[0].adopt(); await tick();
+  assert.equal(await h.hash(), before, 'nothing written');
+});

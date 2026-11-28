@@ -14167,6 +14167,8 @@ export class VisualAgentMapView extends ItemView {
     // Outside paint(): the paint tail is pinned by the view.ts wiring tests (34, 42).
     this.lockWhileLoading();
     this.settleCardHeights();
+    // A waiting suggestion's Adopt follows the cards and references on the map (a card merged or deleted greys it at once).
+    this.chat?.refreshPlan?.();
   }
   private paint(): void {
     // A hidden tab paints like any other (outline, title, canvas), so its other consumers stay live; its measures are 0, so it paints again when shown.
@@ -24613,6 +24615,14 @@ export class VisualAgentMapView extends ItemView {
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
       mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
+      endBlock: ids =>
+        this.map &&
+        ids.some(
+          id =>
+            !this.map!.nodes.some(node => node.id === id) && !readKnowledgeRefs(this.map!).some(ref => ref.id === id)
+        )
+          ? t("ui.map_chat_impact_missing")
+          : null,
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).

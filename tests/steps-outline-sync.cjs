@@ -129,11 +129,12 @@ async function viewWithMap() {
   const calls = { mutate: 0, mapChange: 0, saved: 0, active: [] };
   const plugin = { mutate: () => { calls.mutate++; return Promise.resolve(); }, expansionBatches: new Map(), setOutlineActive: path => calls.active.push(path) };
   const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600 };
+  view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {} };
   view.render = () => {}; view.transform = () => {}; view.saveViewport = () => { calls.saved++; };
   view.mapChange = async () => { calls.mapChange++; };
   return { view, app, calls, text, ids: { root: root.id, child: child.id, leaf: leaf.id } };
 }
+const fakeCard = (offsetWidth, offsetHeight) => ({ offsetWidth, offsetHeight, toggleClass() {}, addClass() {}, removeClass() {}, setAttr() {}, setAttribute() {}, querySelector: () => null, querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }), style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false } });
 const read = async app => app.vault.adapter ? app.vault.adapter.read(MAP) : app.vault.read(app.vault.getAbstractFileByPath(MAP));
 
 test('B15: outline click and canvas selection, five times each, leave Map.md unchanged and write nothing', async () => {
@@ -154,10 +155,32 @@ test('B15: outline click and canvas selection, five times each, leave Map.md unc
 test('B15: an outline click on a card inside a collapsed branch selects it and centers on the topic, opened for the view only', async () => {
   const { view, ids } = await viewWithMap();
   const [root, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; root.x = 200; root.y = 100;
+  view.cardEls = new Map([[leaf.id, fakeCard(280, 79)]]);
   await view.revealPath('leaf.md');
   assert.equal(view.selection.state.selected, ids.leaf);
-  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 80), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
+  // B15-x: the centre is the card's measured box (280 x 79), not a fixed +80 down from its top.
+  assert.deepEqual({ ...view.map.viewport }, { x: 400 - (1000 + 140), y: 300 - (400 + 39.5), zoom: 1 }, 'camera is on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
 });
+
+// B15-x: after an outline reveal the card's DOM centre sits at the centre of the canvas minus its insets, at any zoom.
+for (const zoom of [1, 0.25]) for (const [w, h] of [[280, 79], [280, 99], [360, 180]]) {
+  test(`B15-x: outline reveal centres the card's DOM box within 4px of the inset-free canvas centre (zoom ${zoom}, card ${w}x${h})`, async () => {
+    const { view } = await viewWithMap();
+    const [, , leaf] = view.map.nodes; leaf.x = 1000; leaf.y = 400; leaf.width = w;
+    const canvas = { left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 };
+    view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {}, getBoundingClientRect: () => canvas };
+    const rects = { '.vam-map-tools': { left: 100, right: 700, top: 20, bottom: 64 }, '.vam-zoom-controls': { left: 300, right: 500, top: 560, bottom: 610 }, '.vam-map-chat.is-overlay': { left: 10, right: 130, top: 20, bottom: 620 } };
+    view.contentEl = { querySelector: selector => rects[selector] && { getBoundingClientRect: () => rects[selector] } };
+    view.cardEls = new Map([[leaf.id, fakeCard(w, h)]]);
+    view.map.viewport = { x: 0, y: 0, zoom };
+    await view.revealPath('leaf.md');
+    const vp = view.map.viewport, ins = view.canvasInsets();
+    const cx = canvas.left + vp.x + (leaf.x + w / 2) * zoom, cy = canvas.top + vp.y + (leaf.y + h / 2) * zoom;
+    const tx = canvas.left + ins.left + (canvas.width - ins.left - ins.right) / 2, ty = canvas.top + ins.top + (canvas.height - ins.top - ins.bottom) / 2;
+    assert.ok(Math.abs(cx - tx) <= 4, `dx ${cx - tx}`);
+    assert.ok(Math.abs(cy - ty) <= 4, `dy ${cy - ty}`);
+  });
+}
 
 test('C08: outline search also reads summaries and Details; a row matched only by its body says so, a title match does not', () => {
   const OutlineView = loadOutline();

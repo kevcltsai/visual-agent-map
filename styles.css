@@ -71,6 +71,10 @@
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
+/* After a chat reply added many cards the view keeps its frame; this hint sits above the zoom controls and goes to them on request. */
+.vam-chat-added-hint { position: absolute; right: 12px; bottom: calc(56px + var(--vam-status-clearance, 0px)); display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); color: var(--text-muted); }
+.vam-chat-added-hint .vam-chat-added-locate { height: auto; padding: 2px 6px; background: transparent; box-shadow: none; color: var(--text-accent); }
+.vam-canvas.has-selection-bar .vam-chat-added-hint { margin-bottom: 44px; }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 /* Token usage: the button at the left end of the zoom controls and the popover above them. */
 .vam-zoom-controls > .vam-usage-button { width: auto; gap: 4px; padding: 0 6px; font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -498,7 +502,6 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-lock-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; margin-right: auto; padding: 1px 4px 1px 10px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-card-lock-pill[hidden] { display: none; }
 .vam-card-lock-pill button.vam-card-lock-unlock { height: auto; padding: 0 8px; border-radius: 999px; font-size: var(--font-ui-smaller); }
-.vam-topic-modal .vam-branch-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .vam-inspector-topic { margin: -8px 0 14px; color: var(--text-muted); }
 /* Card settings (ticket 41): the add-relation sentence, the folded groups and the AI lock state. Classes below are not collected by the share viewer. */
 .vam-topic-modal .vam-relation-list { max-height: 9em; overflow-y: auto; }
@@ -743,6 +746,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
 .vam-map-chat-form { display: flex; flex-direction: column; gap: 6px; }
 .vam-map-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; caret-color: var(--text-accent); }
+/* What this turn may change (P2.2a): one quiet line above the message box. */
+.vam-map-chat-scope { margin-bottom: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-map-chat-composer { position: relative; padding-bottom: 36px; border: 1px solid var(--background-modifier-border); border-radius: var(--input-radius); background: var(--background-modifier-form-field); cursor: text; }
 .vam-map-chat-composer:focus-within { border-color: var(--interactive-accent); box-shadow: 0 0 0 2px var(--background-modifier-border-focus); }
 .vam-map-chat-composer .vam-map-chat-input { padding-bottom: 4px; border: 0; background: transparent; box-shadow: none; }
@@ -768,6 +773,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-line.is-failed { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-weight: var(--font-semibold); }
 .vam-map-chat-line.is-skipped { font-style: italic; }
 .vam-map-chat-line.is-note { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--background-modifier-border); }
+/* "Locate ›" after a result line goes to the card it is about; the card flashes once (no motion when reduced motion is asked for). */
+.vam-map-chat-line-locate { margin-left: 6px; height: auto; padding: 0 6px; background: transparent; box-shadow: none; font-size: var(--font-ui-smaller); color: var(--text-accent); cursor: pointer; }
+.vam-map-chat-line-locate:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.is-chat-located { animation: vam-chat-located 1.2s ease-out; }
+@keyframes vam-chat-located { 0%, 60% { box-shadow: 0 0 0 4px var(--interactive-accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .is-chat-located { animation: none; outline: 3px solid var(--interactive-accent); outline-offset: 2px; } }
 .vam-map-chat-lines-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--text-normal); font-weight: var(--font-semibold); }
 .vam-map-chat-lines-counts { min-width: 0; overflow-wrap: anywhere; }
 .vam-map-chat-plan-buttons button.vam-map-chat-lines-toggle { margin-inline-start: auto; }
@@ -978,7 +989,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 /* The first-line indent is an empty inline box: the `text-indent` property is outside the CSS lint's supported set. */
 .vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(.vam-picture-paragraph)::before { content: ""; display: inline-block; width: 2em; }
 @media (max-width: 900px) { .vam-inspector { width: 260px; } }
-@media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); } .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; } }
+@media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); } .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; } .vam-workspace.has-inspector .vam-chat-added-hint { right: auto; left: 12px; } }
 
 .vam-hover-markdown { font-size: var(--vam-hover-body-size, 13px); line-height: var(--vam-hover-line-height, 1.45); }
 .vam-hover-markdown img { display: block; max-width: 100%; max-height: var(--vam-hover-image-max, 150px); object-fit: contain; margin: 10px auto; }
@@ -1537,11 +1548,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="blue"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="blue"] { background: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="purple"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="purple"] { background: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch, .vam-style-popover .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
-.vam-topic-modal .vam-color-section > button { margin-top: 8px; }
-.vam-topic-modal .vam-topic-colors button[aria-checked="true"], .vam-topic-modal .vam-topic-colors button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
-.vam-topic-modal .vam-style-section > button { margin-top: 8px; }
-.vam-topic-modal .vam-topic-style-size-label { margin: 8px 0 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-topic-modal .vam-topic-style-sizes button[aria-checked="true"], .vam-topic-modal .vam-topic-style-sizes button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
 .vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
 .vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }
 /* Topic style (card-style): bold, text size and thick border on the card, thick line on the edge into it. Every rule starts with .vam-view so the share viewer does not collect it. Only the type, colour and status rules above set shape, fill and dashes; these set weight, size and width, and a selected or relation-end card adds 1px on top. */
@@ -1846,6 +1852,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-action { padding: 3px 10px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-primary); color: var(--text-normal); font-size: var(--font-ui-small); cursor: pointer; }
 .vam-topic-chat-action.is-active { border-color: var(--interactive-accent); background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-topic-chat-action:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
+/* What a reply of the topic chat may change: the card and its subtree. */
+.vam-topic-chat-writable { margin-bottom: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-topic-chat-composer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 6px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); }
 .vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
 /* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. The class order (.has-topic-chat first) keeps scripts/viewer-css.mjs from pulling this rule into the share viewer. */

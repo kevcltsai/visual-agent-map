@@ -915,6 +915,24 @@ test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its q
   assert.equal(h.question().value, '');
 });
 
+test('popover room (D1-x10): a pane squeezed under 320px by Obsidian side panels folds them, left first, until the editor fits; a wide pane folds nothing', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; } });
+  const narrow = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  narrow.view.app.workspace = { ...narrow.view.app.workspace, leftSplit: left, rightSplit: right };
+  narrow.overlay.clientWidth = 42;
+  narrow.view.openAiCardPopover(narrow.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'opening folds the left panel first');
+  narrow.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'still narrow after the layout settled: the right panel folds too');
+  const wide = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const l2 = dock(), r2 = dock();
+  wide.view.app.workspace = { ...wide.view.app.workspace, leftSplit: l2, rightSplit: r2 };
+  wide.overlay.clientWidth = 504;
+  wide.view.openAiCardPopover(wide.node('A'));
+  assert.deepEqual([l2.collapsed, r2.collapsed], [false, false], 'a pane with room keeps both panels');
+});
+
 test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
   const restored = [];

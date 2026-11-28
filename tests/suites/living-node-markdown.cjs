@@ -338,6 +338,14 @@ S.integrationTest('Living Node trial: stale source, lock or draft invalidation c
   assert.equal(f.contents.get(path), initial);
 });
 
+S.integrationTest('Living Node trial: a source that changed during the run fails with the source-changed code, not a provider error', async () => {
+  const f = await setup();
+  const trial = new LivingTrial(new LivingCoordinator());
+  assert.equal(await trial.run(trialRequest(f, async () => proposal, { stillCurrent: async () => false })), false);
+  assert.equal(trial.state, 'invalid');
+  assert.equal(trial.failureCode, 'source-changed');
+});
+
 S.integrationTest('Living Node trial: late provider result cannot revive a closed editor', async () => {
   const f = await setup();
   const trial = new LivingTrial(new LivingCoordinator());

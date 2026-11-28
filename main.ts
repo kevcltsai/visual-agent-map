@@ -316,9 +316,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const note = await this.repo.readNote(path);
       return { title: note.title, summary: note.summary };
     },
-    updateNote: async (path, patch) => {
-      await this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true });
-    },
+    updateNote: (path, patch) => this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true }),
     askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
     runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
     // requestUrl has no abort: verifySource races its own 15 s timeout and the runner's fence drops a late result.

@@ -31,7 +31,8 @@ function rig(options = {}) {
     settlePlan(card, st, lines) { log.push(['settlePlan', st, lines]); card.state = st; if (panel.pending === card) panel.pending = null; return panel.settleReturn; },
     showPlan(card) { log.push(['showPlan']); panel.pending = card; },
     setApplying(on) { log.push(['setApplying', on]); },
-    hasQueuedSteers() { return state.queued; }
+    hasQueuedSteers() { return state.queued; },
+    refreshPlan() { log.push(['refreshPlan']); }
   };
   state.panel = panel;
   const applyCalls = [];
@@ -46,6 +47,7 @@ function rig(options = {}) {
     plans: () => plans,
     showPreview: (token, anchors) => log.push(['showPreview', token, anchors]),
     clearPreview: () => log.push(['clearPreview']),
+    applyBlock: () => state.block ?? null,
     refTitles: actions => new Map(),
     actionLabel: action => `L:${action.kind}`,
     applyActions: (...args) => { applyCalls.push(args); return state.apply ? state.apply(...args) : Promise.resolve([{ status: 'done', text: 'ok' }]); }
@@ -449,7 +451,7 @@ function turnRig(options = {}) {
     panel: () => state.panel, closed: () => state.closed, path: () => state.path, map: () => state.map,
     notesLoading: () => state.notesLoading, selectionIds: () => state.selection, imageId: () => state.imageId,
     chain: () => chain, plans: () => plans,
-    showPreview: () => {}, clearPreview: () => log.push(['clearPreview']), refTitles: () => new Map(), actionLabel: a => a.kind,
+    showPreview: () => {}, clearPreview: () => log.push(['clearPreview']), applyBlock: () => null, refTitles: () => new Map(), actionLabel: a => a.kind,
     applyActions: (...args) => { log.push(['apply']); return Promise.resolve(state.applyLines); },
     buildRequest: (message, origin, signal) => { log.push(['build', message]); state.buildSignal = signal; return state.build(message, origin, signal); },
     confirmAiUsage: async (model, run, hooks) => {
@@ -1085,4 +1087,20 @@ test('offer: a structure card where every item is refused offers no apply; one w
   assert.equal(shown([fine]).noApply, undefined);
   assert.equal(shown([refused, fine]).noApply, undefined);
   assert.equal(shown([refused, act.del]).noApply, undefined, 'another action of the reply is still applicable');
+});
+
+test('E3 apply gate: a read-only map at Apply writes nothing, keeps the card waiting and draws it again; once writable it applies once', async () => {
+  const r = rig();
+  const { card } = offer(r);
+  assert.equal(typeof card.blocked, 'function');
+  r.state.block = 'read-only';
+  assert.equal(card.blocked(), 'read-only');
+  r.log.length = 0;
+  card.apply(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(r.applyCalls.length, 0, 'nothing written');
+  assert.equal(card.state, 'pending');
+  assert.deepEqual(names(r.log), ['refreshPlan']);
+  r.state.block = null;
+  card.apply(); card.apply(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(r.applyCalls.length, 1, 'written once');
 });

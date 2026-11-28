@@ -583,7 +583,7 @@ test('first anchor on an image without a note: a Notice, once per image', async 
     h.view.render();
   };
   await place();
-  assert.deepEqual(h.notices, ['This image has no note yet. Research and expansion cannot see pictures; add one sentence on what it is and what to research.']);
+  assert.deepEqual(h.notices, ['This image has no note yet. Research and expansion don\'t look at images; add one sentence on what it is and what to research. Mind map chat can see the image you select.']);
   await place();
   assert.equal(h.notices.length, 1, 'only once');
   const withNote = await harness([annotated({ note: 'has note' })]);
@@ -1397,6 +1397,21 @@ test('the click that ends an anchor drag does not toggle the anchor', async () =
   find(h.imageEl(), i => i.hasClass('vam-anchor')).click();
   assert.equal(h.view.canvasNodes().length, 1);
   assert.equal(h.view.anchorClickSuppressed, false);
+});
+
+// V3.3 G05 / P5.4: only a picture that would really be sent (an annotated one) becomes the chat picture by focus or click.
+test('focus and click: an annotated image becomes the chat picture; an ordinary image does not (and drops an earlier choice)', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  h.imageEl().fire('focus');
+  assert.equal(h.view.chatImageId, 'img1');
+  const g = await harness([image()]);
+  g.view.render();
+  g.imageEl().fire('focus'); g.imageEl().click();
+  assert.equal(g.view.chatImageId, null, 'a plain image is not sent, so it is not the chat picture');
+  assert.equal(g.view.chatImage(), null);
+  g.view.chatImageId = 'other'; g.imageEl().fire('focus');
+  assert.equal(g.view.chatImageId, null, 'focusing an ordinary image takes the earlier choice off');
 });
 
 // V3.3 G04 / P5.3: "Image exploration" is the image right-click's first row, drawn from the card action list (image-explore).

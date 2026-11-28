@@ -101,7 +101,7 @@ test('runPromptItems: post-order calls, statuses, outcome counts; a failing chil
   assert.equal(statuses.get('a').status, 'blocked'); assert.equal(statuses.get('a').reason, 'below: A1');
   assert.equal(statuses.get('root').status, 'blocked', 'the grandparent is stuck too');
   assert.match(statuses.get('a1').reason, /boom/);
-  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false });
+  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 });
 
 test('runPromptItems: Stop returns the running card to idle and starts nothing new', async () => {
@@ -243,7 +243,8 @@ async function harness(spec, { confirm = true } = {}) {
     view.livingValidity = await inspectLivingValidity({
       app, repo, calls: host.aiCalls, mapPath: MAP, viewSession: 'test-validity',
       signal: new AbortController().signal, current: () => true,
-      language: () => 'English', mapSources: async () => []
+      language: () => 'English', mapSources: async () => [],
+      onDependencies: graph => { view.livingGraph = graph; }
     });
   };
   // A second view of the same map on the same plugin (another pane or window).
@@ -345,7 +346,7 @@ test('Run All: one call per unlocked AI card, dependency order, optional web on 
     assert.equal(call.options.task.webSearchOnly, true);
     assert.equal(call.options.task.optionalWebSearch, true);
   }
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   for (const [key] of TREE) assert.equal(stamp(h, key).result, 'ok');
   assert.match(h.raw('root'), /> Result: root/);
 });
@@ -501,6 +502,72 @@ test('toolbar Run all: disabled with a hint without an AI card; progress "n / N"
   assert.equal(h.view.promptBatch.outcome.stopped, true);
 });
 
+// ---- V3.3 P3.6: n / N only once the round is planned, and the last count (D2-2) ---------------------------------------
+const MISSING = { prompt: 'Find facts\nSources: [[Missing]]' };
+const countOf = h => {
+  const bar = element('div');
+  h.view.renderRunAllButton(bar);
+  const button = find(bar, i => i.tag === 'button' && i.cls?.includes('is-running'));
+  return { button, count: button && find(button, i => i.cls?.includes('vam-run-all-count'))?.text };
+};
+
+test('D2-2 progress: no "n / N" before the round is planned; N leaves out cards blocked before the start and locked cards', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING], ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  const early = countOf(h);
+  assert.ok(early.button, 'the stop button shows at once');
+  assert.equal(early.count, undefined, 'no "0 / 0" before the total is known');
+  await until(() => h.calls.length === 1);
+  assert.equal(countOf(h).count, '1 / 5', 'the blocked "solo" and the locked "lk" are not in N, nor counted as finished');
+  h.view.stopPromptBatch(); await h.done();
+  const g = await harness([['solo', null, MISSING]]);
+  await g.runAll(); await g.done();
+  assert.equal(g.view.promptBatch.total, 0, 'nothing to process: N is 0, so no "0 / 0" either');
+  assert.equal(g.view.promptBatch.outcome.blocked, 1);
+});
+
+test('D2-2 last count: the end notice lists each class that happened; "done" is changed + no-change only, reused is not done', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.fail.add('leaf1');
+  await h.runAll(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 2, failed: 1, blocked: 3, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 2 done, 1 failed, 3 blocked');
+  h.plan.fail.delete('leaf1');
+  h.view.promptBatch = undefined;
+  await h.runAll(); await h.done();
+  // Run All forces every card: the two that were already done run again and write nothing new.
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 1, stopped: false, noChange: 2, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 5 done (2 with no change), 1 blocked');
+  // Run Card on root: its valid dependencies are reused, and reused is not done.
+  h.view.promptBatch = undefined;
+  h.view.startPromptRun([h.node('root').id]); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: false, noChange: 1, cancelled: 0, skipped: 0, reused: 4 });
+  assert.equal(h.notices.at(-1), 'Run finished: 1 done (1 with no change), 4 already up to date');
+  const s = await harness(TREE);
+  s.plan.hang.add('leaf1');
+  await s.runAll();
+  await until(() => s.calls.length === 1);
+  s.view.stopPromptBatch(); await s.done();
+  eq(s.view.promptBatch.outcome, { done: 0, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 5, skipped: 0, reused: 0 });
+  assert.equal(s.notices.at(-1), 'Run stopped: 5 cancelled');
+});
+
+test('D2-2 chat: a run_living_* round where every card was already current says so, not "done"', async () => {
+  const h = await harness(TREE);
+  const first = await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] });
+  eq(first, { status: 'done' });
+  // The planner forces its targets today, so a whole reused round comes from the round's count, stubbed here.
+  const counts = { done: 0, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0 };
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 5 });
+  for (const [action, nodeIds] of [['run_living_all', []], ['run_living_card', [h.node('side').id]]]) {
+    const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action, nodeIds });
+    eq(outcome, { status: 'skipped', reason: 'already up to date, nothing was run' }, action);
+  }
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 0 });
+  eq(await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }), { status: 'skipped', reason: 'There are no Prompt topics to run.' });
+});
+
 // ---- menus ------------------------------------------------------------------------------------------------------------
 const canvasEvent = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
 const titles = menu => menu.items.map(i => i.title ?? '|');
@@ -570,6 +637,103 @@ test('arrows: a line whose parent is an AI card gets a marker-start arrow and a 
   assert.equal(g.view.edgesEl.children.some(c => c.tag === 'defs' && c.children.length), false);
 });
 
+test('D2-4 dependency highlight: selecting an AI card marks the planner edges in place; semantic lines never; no selection leaves the DOM as without a graph', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['C', 'A'], ['O', 'A', { noAi: true }], ['D', 'C'], ['E', null], ['F', null, { noAi: true }]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  const refs = async (key, ...targets) => {
+    const file = h.app.vault.getAbstractFileByPath(h.node(key).path);
+    await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + targets.map(t => `  - "card:${id(t)}"\n`).join('')));
+  };
+  await refs('B', 'D');
+  await refs('A', 'E');
+  // A-F is a semantic line; A-C is a parent and child that also hold a relation, so only the relation line is drawn.
+  h.mapDoc.topicRelations = [{ kind: 'supports', from: id('A'), to: id('F') }, { kind: 'related', from: id('A'), to: id('C') }];
+  await view.hydrate();
+  assert.ok(view.livingGraph, 'the graph comes with the validity pass');
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  const snap = () => JSON.stringify(view.edgesEl.children);
+  const graph = view.livingGraph;
+  view.livingGraph = undefined;
+  view.drawEdges();
+  const noGraph = snap();
+  view.livingGraph = graph;
+  view.drawEdges();
+  const before = snap();
+  assert.equal(before, noGraph, 'a graph with no selection changes nothing');
+  let draws = 0;
+  const draw = view.drawEdges;
+  view.drawEdges = function () { draws++; return draw.call(this); };
+  const marked = cls => view.edgesEl.children.filter(c => c.classes?.includes(cls));
+  const pair = c => c.getAttribute('data-dep') ?? [...view.edgeEls].find(([, p]) => p === c)?.[0];
+  const keyName = new Map(h.mapDoc.nodes.map(n => [n.id, [...h.byKey].find(([, v]) => v.id === n.id)[0]]));
+  const label = list => list.map(c => pair(c).split('\u0000').map(x => keyName.get(x)).join('>')).sort();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.deepEqual(label(marked('is-dep-run')), ['A>B', 'A>C', 'A>E', 'B>D', 'C>D']);
+  assert.deepEqual(label(marked('is-dep-read')), ['A>O']);
+  const overlays = marked('vam-edge-dep-overlay');
+  assert.deepEqual(label(overlays), ['A>C', 'A>E', 'B>D'], 'pairs without a drawn tree line get an overlay');
+  assert.ok(overlays.every(o => o.getAttribute('d')), 'each overlay has a path');
+  assert.equal(view.edgesEl.children.at(-1), overlays.at(-1), 'overlays sit on top');
+  for (const path of view.relationEls.values()) assert.equal(path.classes.some(c => c.startsWith('is-dep')), false, 'semantic lines never');
+  view.applySelectionChange(view.selection.click(id('O')));
+  assert.equal(marked('is-dep-run').length + marked('is-dep-read').length, 0, 'an ordinary card highlights nothing');
+  view.applySelectionChange(view.selection.click(id('A')));
+  view.applySelectionChange(view.selection.clickEmpty());
+  assert.equal(snap(), before, 'clearing the selection restores the DOM');
+  assert.equal(draws, 0, 'selection never redraws the edges');
+});
+
+test('D2-4 dependency highlight: a structural change drops the stale graph (no highlight until the next hydrate); a position-only change keeps it', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['X', null]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  await view.hydrate();
+  assert.ok(view.livingGraph);
+  view.render = () => {};
+  const setup = () => {
+    view.cardEls = new Map(view.map.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+    view.edgesEl = dom.createSvg('svg');
+    view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+    view.drawEdges();
+  };
+  const marks = () => view.edgesEl.children.filter(c => c.classes?.some(cls => cls.startsWith('is-dep') || cls === 'vam-edge-dep-overlay'));
+  // Position only (and the sibling order, as a drop among siblings rewrites it): the planner sees the same cards.
+  await view.mapChange(map => {
+    map.nodes.find(n => n.id === id('B')).x += 40;
+    map.nodes.reverse();
+  });
+  assert.ok(view.livingGraph, 'a position-only write keeps the graph');
+  await view.mapChange(map => { map.nodes.find(n => n.id === id('B')).parentId = id('X'); });
+  setup();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.equal(marks().length, 0, 'the old parent shows no A>B line or overlay');
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().length, 0, 'the new parent waits for the next hydrate');
+  await view.hydrate();
+  setup();
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().filter(c => c.classes.includes('is-dep-run')).length, 1, 'after hydrate X marks X>B');
+});
+
+test('D2-4 dependency highlight: an AI child reading its ordinary parent marks the tree line, no overlay', async () => {
+  const h = await harness([['P', null, { noAi: true }], ['C', 'P']]);
+  const { view } = h;
+  const file = h.app.vault.getAbstractFileByPath(h.node('C').path);
+  await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + `  - "card:${h.node('P').id}"\n`));
+  await view.hydrate();
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  view.drawEdges();
+  view.applySelectionChange(view.selection.click(h.node('C').id));
+  const tree = view.edgeEls.get(`${h.node('P').id}\u0000${h.node('C').id}`);
+  assert.ok(tree.classes.includes('is-dep-read'));
+  assert.equal(view.edgesEl.children.filter(c => c.classes?.includes('vam-edge-dep-overlay')).length, 0);
+});
+
 test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {
   const h = await harness([['a', null, { prompt: 'Why is the sky blue?\nsecond line' }]]);
   const node = h.node('a');
@@ -596,7 +760,7 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
-test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+test('V3.3 P1.2 / D2-3: running, waiting, failed, blocked, stopped and stale AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
   const face = () => {
@@ -610,7 +774,7 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
     return f;
   };
   const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
-  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['waiting', 'vam-status-waiting', 'Waiting'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Failed'], ['blocked', 'vam-status-blocked', 'Blocked'], ['stopped', 'vam-status-stopped', 'Stopped']]) {
     const f = paint(status);
     const [chip, ...rest] = chips(f.header);
     assert.equal(rest.length, 0, `${status}: one label`);
@@ -622,6 +786,68 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
   }
   for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
   assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+  assert.equal(find(paint('pending').title, i => i.cls?.includes('vam-ai-glyph-pending'))?.attrs.title.split('\n')[0], 'Not run yet', 'pending: its glyph has words too');
+});
+
+test('D2-3 card face: a failed, blocked or stopped card whose knowledge is out of date shows both labels; repainting keeps two', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  h.view.livingValidity.set(node.id, 'stale');
+  for (const [status, text] of [['failed', 'Failed'], ['blocked', 'Blocked'], ['stopped', 'Stopped']]) {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+    card.createEl('h3', { cls: 'vam-card-title' });
+    const texts = () => findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text);
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], `${status}: repainting does not stack labels`);
+  }
+  h.view.livingValidity.set(node.id, 'valid');
+  const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+  card.createEl('h3', { cls: 'vam-card-title' });
+  h.view.aiStatusMemo.set(node.id, 'failed');
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  eq(findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text), ['Failed'], 'old knowledge still valid: no rerun label');
+});
+
+test('D2-3 real round: queued cards wait, the running one runs, a blocked one says blocked; Stop leaves the unreached ones stopped', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  const state = key => { h.view.aiStatusMemo.clear(); return h.view.aiStatusOf(h.node(key).id); };
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['running', 'waiting', 'waiting', 'blocked']);
+  h.view.stopPromptBatch(); await h.done();
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['stopped', 'stopped', 'stopped', 'blocked'], 'after the round');
+  const f = await harness(TREE);
+  f.plan.fail.add('leaf1');
+  await f.runAll(); await f.done();
+  f.view.aiStatusMemo.clear();
+  eq(['leaf1', 'mid', 'root'].map(key => f.view.aiStatusOf(f.node(key).id)), ['failed', 'blocked', 'blocked'], 'a failure is "failed", the cards that needed it "blocked"');
+});
+
+test('D2-3 Stop: a locked card was never part of the round, so it is skipped in the count and not stopped on its face', async () => {
+  const h = await harness([...TREE, ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  // The toolbar refuses a locked target; a caller that does not (chat tools) puts it in the round as excluded.
+  void h.view.runLivingBatch([h.node('root').id, h.node('lk').id]);
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  h.view.stopPromptBatch(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 4, skipped: 1, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run stopped: 1 done, 4 cancelled, 1 skipped');
+  h.view.aiStatusMemo.clear();
+  assert.notEqual(h.view.aiStatusOf(h.node('lk').id), 'stopped');
+  assert.equal(h.view.aiStatusOf(h.node('leaf1').id), 'stopped');
+});
+
+test('D2-3 Stop before the round is planned still says the run stopped', async () => {
+  const h = await harness(TREE);
+  await h.runAll();
+  h.view.stopPromptBatch(); await h.done();
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
+  assert.equal(h.notices.at(-1), 'Run stopped: no card ran');
 });
 
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
@@ -651,7 +877,7 @@ test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown 
 });
 
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
-test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
+test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (waiting, its knowledge stale after a Prompt edit)', async () => {
   const h = await harness([['Y', null], ['X', null]]);
   await h.runAll(); await h.done();
   assert.equal(h.status('X'), 'done');
@@ -662,9 +888,10 @@ test('two batches: a card not yet reached by batch 2 is not shown done from batc
   h.plan.hang.add('Y');
   await h.runAll();
   await until(() => h.calls.filter(c => c.key === 'Y').length === 2);
-  assert.equal(h.status('X'), undefined, 'batch 1 left nothing for X');
+  assert.equal(h.status('X'), 'waiting', 'batch 2 queued X; batch 1 left nothing for it');
   h.view.aiStatusMemo.clear();
-  assert.equal(h.view.aiStatusOf(h.node('X').id), 'stale');
+  assert.equal(h.view.aiStatusOf(h.node('X').id), 'waiting', 'not reached yet: waiting, never done');
+  assert.equal(h.view.livingValidity.get(h.node('X').id), 'stale', 'its knowledge is still out of date');
   h.view.stopPromptBatch(); await h.done();
 });
 
@@ -1001,8 +1228,8 @@ test('two views: a second view joins the running progress instead of starting or
   assert.ok(second.promptRunning());
   h.plan.go();
   await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.equal(h.calls.length, 5);
   assert.equal(second.promptBatch.finished, second.promptBatch.total);
   assert.equal(h.status('root'), 'done');
@@ -1051,7 +1278,7 @@ test('closing a view only unsubscribes; the last view closing cancels the run', 
   assert.equal(second.promptBatch.outcome, undefined, 'the run goes on for the remaining view');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 
   const g = await harness(TREE);
   const other = await g.otherView();
@@ -1151,7 +1378,7 @@ test('a view that switches maps leaves the run; the round it started keeps readi
   const before = h.raw('side');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
   eq([...new Set(reads)], [MAP], 'sources come from the original map');
   eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');
@@ -1247,6 +1474,10 @@ test('reason codes map to lines: unknown code gets the generic line, trial-reaso
   assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
   assert.equal(code(new Error('cancelled')), 'failed');
   assert.equal(code('plain text'), 'provider-failed');
+  // D1-x5: a search that did not happen is stamped as a web failure, so the card shows the web line.
+  const notSearched = S.load('ai/search-not-performed.ts').searchNotPerformedError();
+  assert.equal(code(notSearched), 'web-required');
+  assert.equal(mapped(code(notSearched)), 'ui.living_node_trial_reason_web');
 });
 
 test('reason: a missing required source is reported as missing-source', async () => {

@@ -13,7 +13,7 @@ import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readV
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
 import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
-import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
+import { policyAction, applyPolicy, policyExpression, parseFrontApp } from '../scripts/keep-background.mjs';
 
 function environment(t) {
   const folder = mkdtempSync(join(tmpdir(), 'vam-harness-test-'));
@@ -946,4 +946,11 @@ test('session reload CDP guard really executes: only an idle correct instance is
     assert.notEqual((await execute(state)).status, 'disabled');
     assert.deepEqual(state.calls, []);
   }
+});
+
+test('front app is read from both lsappinfo formats', () => {
+  assert.deepEqual(parseFrontApp('"pid"=828\n"LSBundlePath"="/Applications/LINE.app"\n'), { pid: 828, path: '/Applications/LINE.app' });
+  const macos27 = '[ NULL ]  ASN:0x0-0x15015: (in front) \n    bundleID=[ NULL ] \n    bundle path="/Applications/LINE.app"\n    executable path=[ NULL ] \n    pid = 828 !cgsConnection !signalled type=[ NULL ]\n';
+  assert.deepEqual(parseFrontApp(macos27), { pid: 828, path: '/Applications/LINE.app' });
+  assert.ok(Number.isNaN(parseFrontApp('').pid));
 });

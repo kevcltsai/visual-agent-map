@@ -165,3 +165,77 @@ test('remove reference (Delete key and the menu) removes only this map\'s refere
   assert.deepEqual(await h.repo.readMap(OTHER), before, 'the original map is untouched');
   assert.equal(h.view.history.past.length >= 1, true, 'one undo step');
 });
+
+// Real pointer sequences (F01 UI FAIL 1, 2): the press goes to the reference card first, then bubbles to the canvas
+// viewport, whose pan handler is wired by setupPan; the last setPointerCapture takes the moves and the up, and a click
+// lands on the element that holds the capture (the viewport when it panned).
+function pointerRig(h) {
+  const viewport = dom.element('div', 'vam-viewport');
+  let captor = null;
+  viewport.setPointerCapture = () => { captor = viewport; };
+  viewport.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600 });
+  viewport.stageAncestor = true;
+  h.view.viewportEl = viewport;
+  h.view.transform = () => {}; h.view.saveViewport = () => {}; h.view.markCanvasHintSeen = () => {};
+  h.view.setupPan();
+  const el = refEls(h)[0];
+  el.setPointerCapture = () => { captor = el; };
+  // Class selectors only (the pan guard's list); the card and its ancestors are checked like Element.closest.
+  el.closest = sel => sel.split(',').map(x => x.trim()).some(x => { if (!x.startsWith('.')) return false; for (let up = el; up; up = up.parent) if (dom.hasCls(up, x.slice(1))) return true; return false; }) ? el : null;
+  const send = (target, name, event) => {
+    let stopped = false;
+    const e = { button: 0, pointerId: 1, altKey: false, shiftKey: false, target: el, preventDefault() {}, stopPropagation() { stopped = true; }, stopImmediatePropagation() { stopped = true; }, ...event };
+    for (const fn of [...(target.listeners[name] ?? [])]) fn(e);
+    if (target === el && !stopped) for (const fn of [...(viewport.listeners[name] ?? [])]) fn(e);
+  };
+  const sequence = points => {
+    captor = null;
+    const [first, ...rest] = points;
+    send(el, 'pointerdown', { clientX: first[0], clientY: first[1] });
+    const panned = viewport.hasClass('is-panning');
+    for (const [x, y] of rest) send(captor ?? el, 'pointermove', { clientX: x, clientY: y });
+    const last = points.at(-1);
+    send(captor ?? el, 'pointerup', { clientX: last[0], clientY: last[1] });
+    send(captor ?? el, 'click', { clientX: last[0], clientY: last[1], target: captor ?? el });
+    return { panned };
+  };
+  return { el, viewport, sequence };
+}
+
+test('F01 FAIL 1: a real mouse click on a reference card opens it and does not pan the canvas', async () => {
+  const h = await harness();
+  await h.settle(); h.view.paintKnowledgeRefs();
+  const opened = [];
+  h.view.openKnowledgeRef = ref => { opened.push(ref.id); return Promise.resolve(); };
+  const rig = pointerRig(h);
+  const { panned } = rig.sequence([[100, 100]]);
+  assert.equal(panned, false, 'the press on the reference card must not start a canvas pan');
+  assert.deepEqual(opened, ['ref-a'], 'the click opens the reference');
+});
+
+test('F01 FAIL 2: a real mouse drag on a reference card moves the reference, not the canvas', async () => {
+  const h = await harness();
+  await h.settle(); h.view.paintKnowledgeRefs();
+  const rig = pointerRig(h);
+  const before = { ...h.view.map.viewport };
+  const { panned } = rig.sequence([[100, 100], [130, 110], [160, 120]]);
+  await h.settle(); await h.settle();
+  assert.equal(panned, false, 'no canvas pan');
+  assert.deepEqual({ x: h.view.map.viewport.x, y: h.view.map.viewport.y }, { x: before.x, y: before.y }, 'the canvas stays put');
+  const ref = (await h.saved()).knowledgeRefs.find(r => r.id === 'ref-a');
+  assert.deepEqual({ x: ref.x, y: ref.y }, { x: 360, y: 20 }, 'the reference moved by the drag');
+});
+
+test('F01 FAIL 3: a pasted reference sits clear of the parent card\'s existing child cards', async () => {
+  const h = await harness();
+  (await h.viewOf(OTHER)).copyAsKnowledgeRef({ id: h.ids.original });
+  h.view.pasteKnowledgeRef(h.ids.root); await h.settle(); await h.settle();
+  const saved = await h.saved();
+  const root = saved.nodes.find(n => n.id === h.ids.root), kid = saved.nodes.find(n => n.id === h.ids.kid);
+  const ref = saved.knowledgeRefs.find(r => r.parentId === h.ids.root);
+  // The widest a reference card is drawn (styles.css max-width 260px) and a two-line height.
+  const refBox = { x: root.x + ref.x, y: root.y + ref.y, w: 260, h: 60 };
+  const kidBox = { x: kid.x, y: kid.y, w: kid.width ?? 280, h: kid.height ?? 180 };
+  const overlap = refBox.x < kidBox.x + kidBox.w && kidBox.x < refBox.x + refBox.w && refBox.y < kidBox.y + kidBox.h && kidBox.y < refBox.y + refBox.h;
+  assert.equal(overlap, false, `reference at ${JSON.stringify(refBox)} overlaps the child card at ${JSON.stringify(kidBox)}`);
+});

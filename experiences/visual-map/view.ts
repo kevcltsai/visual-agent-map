@@ -7922,15 +7922,24 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t(probe?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
       return;
     }
-    const parent = this.canvasNodes().find(node => node.id === parentId);
+    const shown = this.canvasNodes();
+    const parent = shown.find(node => node.id === parentId);
     const siblings = visibleKnowledgeRefs(map).filter(ref => ref.parentId === parentId).length;
+    // Right of the parent card; when it already has child cards, in their column just below the lowest one.
+    const kids = parent ? shown.filter(node => node.parentId === parentId) : [];
+    const below = kids.length
+      ? {
+          x: Math.min(...kids.map(kid => kid.x)) - parent!.x,
+          y: Math.max(...kids.map(kid => kid.y + (this.cardHeightOf(kid.id) ?? DEFAULT_CARD_HEIGHT))) - parent!.y + 24
+        }
+      : null;
     const ref: KnowledgeRef = {
       id: `ref-${crypto.randomUUID()}`,
       mapId: target.mapId,
       nodeId: target.nodeId,
       parentId,
-      x: (parent?.width ?? CARD_WIDTH) + 40,
-      y: siblings * 90,
+      x: below?.x ?? (parent?.width ?? CARD_WIDTH) + 40,
+      y: (below?.y ?? 0) + siblings * 90,
       pathHint: probe.mapPath
     };
     const paths = this.knownRefPaths();
@@ -22241,6 +22250,7 @@ export class VisualAgentMapView extends ItemView {
         target.closest(".vam-boundary-label") ||
         target.closest(".vam-summary") ||
         target.closest(".vam-summary-text") ||
+        target.closest(".vam-knowledge-ref") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
       )

@@ -1,4 +1,5 @@
 import { abortError as aborted } from "../../core/abort";
+import { isArchivedVamNote } from "./archived-note";
 import { TFile, TFolder, parseYaml, type App } from "obsidian";
 import {
   dedupeReferenceGroups,
@@ -62,20 +63,6 @@ export function serializeMapSources(sources: readonly MapSource[]): string[] {
     if (KINDS.includes(source.kind) && validVaultPath(source.path) && !clean.some(item => sameMapSource(item, source)))
       clean.push(source);
   return clean.map(source => `${source.kind}:${source.path}`);
-}
-
-/**
- * True for a VAM-managed note (`agent-map-node`) that is archived: `topic-state: archived`, or no `topic-state` and the
- * note sits directly in a folder named `Archive`. Ordinary notes (also in an `Archive` folder) are never archived.
- */
-export function isArchivedVamNote(path: string, fm: Record<string, unknown> | null | undefined): boolean {
-  if (!fm || typeof fm !== "object") return false;
-  const managed = fm["agent-map-node"] === true || fm["agent-map-node"] === "true";
-  if (!managed) return false;
-  return (
-    fm["topic-state"] === "archived" ||
-    (fm["topic-state"] === undefined && path.replace(/\\/g, "/").split("/").at(-2) === "Archive")
-  );
 }
 
 /** Frontmatter of note text; a block that does not parse throws only when it names `agent-map-node`. */
@@ -238,3 +225,5 @@ export function mapSourceStatus(app: App, source: MapSource): { exists: boolean;
   }
   return { exists: item instanceof TFile };
 }
+
+export { isArchivedVamNote };

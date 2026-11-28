@@ -331,10 +331,19 @@ test('03 bulk: a mixed selection says how many are locked and the click locks th
   assert.equal((await h.repo.readNote(b.path)).aiLocked, undefined);
 });
 
-test('03 bulk: no selection disables it; the bar wires it in', async () => {
+test('03 bulk: nothing selected has no menu row; a selection with no lockable card shows it off with the reason (B09); the bar wires it in', async () => {
   const h = await harness(['A']);
-  assert.equal(selectionButton(h).disabled, true);
-  assert.match(read('experiences/visual-map/view.ts'), /openSelectionMoreMenu\(event: MouseEvent, count: number\)[\s\S]*?ui\.ai_lock_toggle/, 'the bar\'s More menu wires it in');
+  assert.equal(selectionButton(h), undefined, 'no card picked: the More menu has no rows');
+  h.view.selection.replaceMulti([h.nodes[0].id]);
+  h.view.isArgumentCard = () => true;
+  const reasons = [];
+  h.view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.text = t; return chain; }, setIcon() { return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, onClick() { return chain; } }; chain.dom = { setAttr() {}, createDiv(v) { reasons.push(v.text); return {}; } }; build(chain); if (it.disabled) it.reason = reasons.at(-1); (m.entries ??= []).push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  const menu = h.view.newMenu(); h.view.newMenu = () => menu;
+  h.view.openSelectionMoreMenu({}, 1);
+  const lock = menu.entries.find(i => i.text === 'Lock from AI');
+  assert.ok(lock, 'still listed'); assert.equal(lock.disabled, true); assert.equal(lock.reason, 'None of the selected cards can be locked');
+  assert.equal(menu.entries.at(-1).text, 'Selection help', 'the help is the last row');
+  assert.match(read('experiences/visual-map/view.ts'), /openSelectionMoreMenu\(event: MouseEvent, count: number\)[\s\S]*?actionsFor\("more", context\)/, 'the bar\'s More menu is made from the card action list');
 });
 
 // ---- ticket 04: integrate, charts, integrate selection -------------------------------------------------------------

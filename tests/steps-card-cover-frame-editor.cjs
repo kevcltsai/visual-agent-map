@@ -517,22 +517,12 @@ test('open: no dialog when the topic has no cover picture or the cover is off', 
 });
 
 // ---- the panel button
-test('panel: "Crop and size…" appears with the cover switch only when the topic has a cover picture, and opens the dialog', async () => {
+test('panel (V3.3 B11): card settings keep only the cover switch; "Crop and size…" is gone, the card cover itself opens the dialog', async () => {
   const withPicture = await harness(TEXT);
-  const calls = [];
-  Object.assign(withPicture.view, { enqueue: fn => fn(), openCoverFrameEditor: node => { calls.push(node.id); return null; } });
+  Object.assign(withPicture.view, { enqueue: fn => fn(), openCoverFrameEditor: () => { throw new Error('not from the panel'); } });
   const panel = dom.element('div');
   withPicture.view.renderCoverSection(panel, { id: 'm', path: NOTE });
-  const adjust = dom.find(panel, i => i.tag === 'button' && i.text === 'Crop and size…');
-  assert.ok(adjust, 'the button is there');
-  adjust.click();
-  assert.deepEqual(calls, ['m']);
-  for (const cache of [{ frontmatter: {}, embeds: [] }, { frontmatter: { 'topic-cover': 'none' }, embeds: [{ link: 'img/a.png' }] }]) {
-    const none = await harness(TEXT, { cache });
-    const p = dom.element('div');
-    none.view.renderCoverSection(p, { id: 'm', path: NOTE });
-    assert.equal(dom.find(p, i => i.tag === 'button' && i.text === 'Crop and size…'), undefined, 'no picture or cover off: no button');
-  }
+  assert.deepEqual(dom.findAll(panel, i => i.tag === 'button').map(b => b.text), ['Turn card cover off'], 'the switch only');
   const locked = await harness(TEXT);
   locked.view.selection.toggleMultiSelect();
   const p = dom.element('div');
@@ -543,7 +533,7 @@ test('panel: "Crop and size…" appears with the cover switch only when the topi
 test('i18n: every language has the new strings; the stylesheet uses no CSS variable for the frame editor', () => {
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = read(`i18n/${lang}.ts`);
-    for (const key of ['ui.card_settings_cover_frame', 'ui.topic_cover_frame_title', 'ui.topic_cover_frame_reset', 'ui.topic_cover_frame_apply', 'ui.topic_cover_frame_box', 'ui.topic_cover_frame_status', 'ui.topic_cover_frame_load_failed', 'ui.topic_cover_frame_handle_nw', 'ui.topic_cover_frame_handle_se'])
+    for (const key of ['ui.topic_cover_frame_title', 'ui.topic_cover_frame_reset', 'ui.topic_cover_frame_apply', 'ui.topic_cover_frame_box', 'ui.topic_cover_frame_status', 'ui.topic_cover_frame_load_failed', 'ui.topic_cover_frame_handle_nw', 'ui.topic_cover_frame_handle_se'])
       assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
     assert.ok(!text.includes('"ui.topic_cover_frame_adjust"'), `${lang}: the old button key is gone`);
   }
@@ -603,7 +593,7 @@ test('card: when the dialog cannot open (cover off, not editable) a double-click
 test('card: the right-click menu no longer has "Edit card" in any state (the picture double-click and the panel button open it)', async () => {
   const items = h => {
     const titles = [];
-    const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
+    const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, setDisabled() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
     h.view.notes = new Map([['m', { title: 'M', summary: 's' }]]);
     h.view.map = { nodes: [{ id: 'm', path: NOTE }], viewport: { x: 0, y: 0, zoom: 1 } };
     h.view.canEditText = () => false;

@@ -549,7 +549,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 32);
+  assert.equal(mapChatStep.version, 33);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1487,27 +1487,27 @@ test('chat 07: the schema has beforeId as a required string, and both prompts ex
 const look = (nodeIds, fields = {}) => item('set_appearance', { nodeIds, color: '', markers: [], removeMarkers: [], formats: [], removeFormats: [], ...fields });
 test('chat 08: set_appearance keeps its cards and only the changes it names; a new card can be named by its ref', () => {
   const got = parse(reply(
-    look(['a', 'b'], { color: 'red', markers: ['flag-red', 'priority-1'], formats: ['bold', 'text-large'] }),
+    look(['a', 'b'], { color: 'red', markers: ['done', 'warning'], formats: ['bold', 'text-large'] }),
     look(['a1'], { color: 'none', removeMarkers: ['all'], removeFormats: ['border-thick'] }),
     child('n1', 'a'),
     look(['new:n1'], { markers: ['star'] })
   ));
   assert.deepEqual(got.actions, [
-    { kind: 'set_appearance', nodeIds: ['a', 'b'], color: 'red', markers: ['flag-red', 'priority-1'], formats: ['bold', 'text-large'] },
+    { kind: 'set_appearance', nodeIds: ['a', 'b'], color: 'red', markers: ['done', 'warning'], formats: ['bold', 'text-large'] },
     { kind: 'set_appearance', nodeIds: ['a1'], color: 'none', removeMarkers: ['all'], removeFormats: ['border-thick'] },
     { kind: 'add_child', parentId: 'a', title: 'n1', summary: '', ref: 'n1' },
     { kind: 'set_appearance', nodeIds: ['new:n1'], markers: ['star'] }
   ]);
   assert.deepEqual(got.rejected, []);
 });
-test('chat 08: an unknown colour, marker or format, two values of one single-choice group, both text sizes, a value both on and off, nothing to change or no cards drops it', () => {
+test('chat 08: an unknown colour, marker or format, only removed marker ids, both text sizes, a value both on and off, nothing to change or no cards drops it', () => {
   const got = parse(reply(
     look(['a'], { color: 'pink' }),
     look(['a'], { markers: ['flag-purple'] }),
     look(['a'], { formats: ['italic'] }),
     look(['a'], { removeMarkers: ['everything'] }),
-    look(['a'], { markers: ['priority-1', 'priority-2'] }),
-    look(['a'], { markers: ['progress-0', 'progress-50'] }),
+    look(['a'], { markers: ['priority-1', 'flag-red'] }),
+    look(['a'], { removeMarkers: ['progress-50', 'smile'] }),
     look(['a'], { formats: ['text-small', 'text-large'] }),
     look(['a'], { markers: ['star'], removeMarkers: ['star'] }),
     look(['a']),
@@ -1516,9 +1516,11 @@ test('chat 08: an unknown colour, marker or format, two values of one single-cho
     look(['a'], { markers: 'star' })
   ));
   assert.deepEqual(got.actions, []);
-  assert.deepEqual(codes(got), ['0:bad_value', '1:bad_value', '2:bad_value', '3:bad_value', '4:bad_value', '5:bad_value', '6:bad_value', '7:bad_value', '8:missing_field', '9:missing_field', '10:unknown_node', '11:bad_value']);
-  // Several values of a group that holds several (flags, status, faces) are fine.
-  assert.deepEqual(parse(reply(look(['a'], { markers: ['flag-red', 'flag-blue', 'done', 'star'] }))).rejected, []);
+  assert.deepEqual(codes(got), ['0:bad_value', '1:bad_value', '2:bad_value', '3:bad_value', '4:missing_field', '5:missing_field', '6:bad_value', '7:bad_value', '8:missing_field', '9:missing_field', '10:unknown_node', '11:bad_value']);
+  // Several status markers are fine; a removed id (priority, progress, flag, face) beside them is left out silently (v3.3 P1.10b).
+  const mixed = parse(reply(look(['a'], { markers: ['flag-red', 'priority-2', 'done', 'star', 'question'], removeMarkers: ['progress-100', 'warning'] })));
+  assert.deepEqual(mixed.rejected, []);
+  assert.deepEqual(plain(mixed.actions), [{ kind: 'set_appearance', nodeIds: ['a'], markers: ['done', 'star'], removeMarkers: ['warning'] }]);
 });
 test('chat 08: on an AIM map set_appearance is dropped and counted', () => {
   const got = parse(reply(look(['a'], { color: 'red' })), context({ aim: true }));
@@ -1527,12 +1529,12 @@ test('chat 08: on an AIM map set_appearance is dropped and counted', () => {
 test('chat 08: the context sends each card\'s appearance and leaves out the default; nothing on AIM', () => {
   const dressed = [
     { ...outline[0] },
-    { ...outline[1], color: 'red', markers: ['flag-red', 'priority-2'], styles: ['bold'] },
+    { ...outline[1], color: 'red', markers: ['done', 'star'], styles: ['bold'] },
     { ...outline[2], color: undefined, markers: [], styles: [] },
     { ...outline[3] }
   ];
   const data = JSON.parse(context({ outline: dressed }).json);
-  assert.deepEqual(data.outline[1], { id: 'a', title: 'A', summary: 'A summary', parentId: 'r', depth: 1, color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold'] });
+  assert.deepEqual(data.outline[1], { id: 'a', title: 'A', summary: 'A summary', parentId: 'r', depth: 1, color: 'red', markers: ['done', 'star'], formats: ['bold'] });
   for (const index of [0, 2, 3]) for (const key of ['color', 'markers', 'formats']) assert.equal(key in data.outline[index], false, `${index} ${key}`);
   const aim = JSON.parse(context({ outline: dressed, aim: true }).json);
   assert.equal(aim.outline.some(node => 'color' in node || 'markers' in node || 'formats' in node), false);
@@ -1541,12 +1543,13 @@ test('chat 08: the schema lists the colours, markers and formats as enums, and b
   const items = MAP_CHAT_SCHEMA.properties.actions.items;
   for (const key of ['color', 'markers', 'removeMarkers', 'formats', 'removeFormats']) assert.ok(items.required.includes(key), key);
   assert.deepEqual(plain(items.properties.color.enum), ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'none', '']);
-  assert.ok(items.properties.removeMarkers.items.enum.includes('all'));
+  assert.deepEqual(plain(items.properties.markers.items.enum), ['done', 'warning', 'star']);
+  assert.deepEqual(plain(items.properties.removeMarkers.items.enum), ['done', 'warning', 'star', 'all']);
   assert.deepEqual(plain(items.properties.formats.items.enum), ['bold', 'text-small', 'text-large', 'border-thick', 'line-thick']);
   const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
   const en = render('en'), zh = render('zh-TW');
-  assert.match(en, /- set_appearance: nodeIds/); assert.match(en, /Priority and progress hold one value each/); assert.match(en, /do not send set_appearance/);
-  assert.match(zh, /- set_appearance：nodeIds/); assert.match(zh, /優先度與進度各只能有一個值/); assert.match(zh, /不要送 set_appearance/);
+  assert.match(en, /- set_appearance: nodeIds/); assert.match(en, /Markers: done, warning, star\./); assert.doesNotMatch(en, /priority|progress-|flag-/); assert.match(en, /do not send set_appearance/);
+  assert.match(zh, /- set_appearance：nodeIds/); assert.match(zh, /標記：done（完成）、warning（警告）、star（星號）。/); assert.doesNotMatch(zh, /priority|progress-|flag-/); assert.match(zh, /不要送 set_appearance/);
 });
 
 // ---- result lines: notes are shown but not counted ----
@@ -1723,7 +1726,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 32);
+  assert.equal(mapChatStep.version, 33);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

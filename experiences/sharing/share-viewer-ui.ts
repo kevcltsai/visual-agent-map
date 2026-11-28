@@ -26,11 +26,6 @@ export interface ShareViewerUi {
   zoomReset: string;
   showAll: string;
   toResearch: string;
-  tierCore: string;
-  tierSupport: string;
-  tierSide: string;
-  /** Reason shown for a tier the author set by hand (no `reason`). */
-  manualReason: string;
   topicDetails: string;
   detailsButton: string;
   close: string;
@@ -46,6 +41,10 @@ export interface ShareViewerUi {
   attachmentDownload: string;
   /** Shown on a file card whose file is not in the shared file (too big, images off, or not found). */
   attachmentNotIncluded: string;
+  /** Mark on a card that points at a card of another map (the card shows its title only). */
+  refLabel: string;
+  /** Shown in place of a reference whose original card could not be used. */
+  refUnavailable: string;
   resizePanel: string;
   /** Label of the outline (the topic tree on the left) and of its toggle button. */
   outline: string;
@@ -129,10 +128,6 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   zoomReset: "Zoom {0}, reset to 100%",
   showAll: "Show all",
   toResearch: "To research",
-  tierCore: "Must learn",
-  tierSupport: "Learn when needed",
-  tierSide: "Skippable",
-  manualReason: "You set this",
   topicDetails: "Topic details",
   detailsButton: "Details",
   close: "Close",
@@ -144,6 +139,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   imageSource: "Source: {0}",
   attachmentDownload: "Download ({0})",
   attachmentNotIncluded: "Not included",
+  refLabel: "Reference",
+  refUnavailable: "Unavailable reference",
   resizePanel: "Resize the side panel",
   outline: "Outline",
   untitledMap: "Untitled map",
@@ -162,25 +159,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   markerNames: {
     done: "Done",
     warning: "Warning",
-    star: "Star",
-    "priority-1": "Priority 1",
-    "priority-2": "Priority 2",
-    "priority-3": "Priority 3",
-    "priority-4": "Priority 4",
-    "priority-5": "Priority 5",
-    "progress-0": "Progress 0%",
-    "progress-25": "Progress 25%",
-    "progress-50": "Progress 50%",
-    "progress-75": "Progress 75%",
-    "progress-100": "Progress 100%",
-    "flag-red": "Red flag",
-    "flag-yellow": "Yellow flag",
-    "flag-green": "Green flag",
-    "flag-blue": "Blue flag",
-    smile: "Smile",
-    neutral: "Neutral",
-    sad: "Sad",
-    question: "Question"
+    star: "Star"
   },
   colorLabel: "Color: {0}",
   colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" },

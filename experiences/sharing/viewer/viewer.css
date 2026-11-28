@@ -135,10 +135,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }
 @media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }
-/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */
-.vam-node.vam-node[data-relevance="side"] { opacity: 1; }
-.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
-.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }
 /* Topic style (card-style): the same attributes and rules as the map view; every value comes from the viewer's own whitelist, never from the payload text. */
 .vam-node[data-topic-style-bold] .vam-card-title { font-weight: 800; }
 .vam-node[data-topic-style-size="small"] .vam-card-title, .vam-node[data-topic-style-size="small"] .vam-card-summary { font-size: var(--font-ui-small); }
@@ -149,10 +145,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 /* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */
 .vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }
 .vam-outline-item .vam-markers { margin-left: 6px; }
-.vam-marker[data-marker="flag-red"] { color: #d9534f; }
-.vam-marker[data-marker="flag-yellow"] { color: #b8860b; }
-.vam-marker[data-marker="flag-green"] { color: #2e8b57; }
-.vam-marker[data-marker="flag-blue"] { color: #3b82c4; }
 .vam-status-idea.vam-status-idea { color: var(--text-muted); }
 .vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }
 /* Reading styles for the note HTML that Obsidian rendered at export time. */
@@ -212,6 +204,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 /* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */
 @media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }
 .vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vam-ref-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-muted); font-size: 0.9em; line-height: 1.45; overflow-wrap: anywhere; }
+.vam-ref-node .vam-ref-mark { margin-right: 6px; padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: 999px; font-size: 0.8em; }
+.vam-ref-node.is-unavailable { font-style: italic; }
 .vam-text-edge { opacity: 0.8; }
 .vam-text-link { stroke-dasharray: 5 4; opacity: 0.8; }
 .vam-summaries, .vam-summary { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; }
@@ -241,7 +236,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-share-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
 .vam-node[data-share-kind="action"] { --vam-kind-hue: var(--color-orange); }
 .vam-node[data-share-kind] { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--text-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
-.vam-node[data-share-kind][data-relevance="side"] { --vam-kind-dash: 6 4; }
 .vam-node[data-share-kind].is-selected { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
 .vam-node[data-share-kind="action"] { border-radius: 3px; border-color: var(--vam-kind-line); background: var(--vam-kind-fill); }
 .vam-node[data-share-shape="rect"]:not([data-share-kind]) { border-radius: 3px; }

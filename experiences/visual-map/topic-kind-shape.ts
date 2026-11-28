@@ -153,12 +153,7 @@ export function shapeInsets(kind: TopicKind, content: { width: number; height: n
 
 /**
  * A conclusion is written, not researched: its card never says "To research" (the type label already says what it is).
- * A card the user marked 100% progress is not waiting for research either (`progressDone`).
  */
-export function showsToResearch(
-  kind: TopicKind,
-  status: "idea" | "running" | "completed" | "error",
-  progressDone = false
-): boolean {
-  return !(status === "idea" && (kind === "conclusion" || progressDone));
+export function showsToResearch(kind: TopicKind, status: "idea" | "running" | "completed" | "error"): boolean {
+  return !(status === "idea" && kind === "conclusion");
 }

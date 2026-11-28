@@ -54,7 +54,8 @@ const cases = direction => {
 const GOLDEN = {
   sampleFull: [['explore', 80, 641], ['constraints', 440, 182], ['budget', 800, 80], ['companions', 800, 284], ['transport', 440, 488], ['rail-car', 800, 488], ['food', 440, 692], ['nature', 440, 896], ['weather', 800, 896], ['lodging', 440, 1100], ['journey', 80, 1304], ['next', 440, 1304]],
   sampleHeights: [['explore', 80, 509.875], ['constraints', 440, 131.25], ['budget', 800, 80], ['companions', 800, 201], ['transport', 440, 285], ['rail-car', 800, 303.5], ['food', 440, 517], ['nature', 440, 767.5], ['weather', 800, 749], ['lodging', 440, 907], ['journey', 80, 1102], ['next', 440, 1065]],
-  sampleBranch: [['explore', 20, 300], ['constraints', 350, 0], ['budget', 690, 0], ['companions', 690, 170], ['transport', 380, 1204], ['rail-car', 740, 1204], ['food', 350, 500], ['nature', 350, 750], ['weather', 690, 750], ['lodging', 350, 1000], ['journey', 1050, 350], ['next', 1390, 500]],
+  // A9：P1.4 新規則，中段插入推開後續兄弟（sampleBranch: transport/rail-car 1204→374，food 500→670，nature/weather 750→920，lodging 1000→1170）
+  sampleBranch: [['explore', 20, 300], ['constraints', 350, 0], ['budget', 690, 0], ['companions', 690, 170], ['transport', 380, 374], ['rail-car', 740, 374], ['food', 350, 670], ['nature', 350, 920], ['weather', 690, 920], ['lodging', 350, 1170], ['journey', 1050, 350], ['next', 1390, 500]],
   sampleBranchHeights: [['explore', 20, 300], ['constraints', 350, 0], ['budget', 710, 100], ['companions', 710, 221], ['transport', 350, 250], ['rail-car', 690, 340], ['food', 350, 500], ['nature', 350, 750], ['weather', 690, 750], ['lodging', 350, 1000], ['journey', 1050, 350], ['next', 1390, 500]],
   sampleTree: [['explore', 20, 300], ['constraints', 350, 0], ['budget', 690, 0], ['companions', 690, 170], ['transport', 350, 250], ['rail-car', 690, 340], ['food', 350, 500], ['nature', 350, 750], ['weather', 690, 750], ['lodging', 350, 1000], ['journey', 20, 1204], ['next', 380, 1204]],
   sampleTreeHeights: [['explore', 20, 300], ['constraints', 350, 0], ['budget', 690, 0], ['companions', 690, 170], ['transport', 350, 250], ['rail-car', 690, 340], ['food', 350, 500], ['nature', 350, 750], ['weather', 690, 750], ['lodging', 350, 1000], ['journey', 20, 1195], ['next', 380, 1158]],
@@ -395,14 +396,15 @@ test('V4d: in a down map moved and copied topics go below their parent, not to i
 });
 
 test('V5: an AIM map offers no direction in the Layout menu', async () => {
-  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
+  // A10: P1.4 "Tidy map" replaces the "Auto layout" menu item (same action), so the last title changed.
+  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Tidy map'];
   const h = await harness(tree4);
   h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   h.view.openLayoutMenu({});
   assert.deepEqual(h.menuTitles(), original);
   h.view.map.aim = undefined;
   h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Tidy map']);
 });
 
 // ---- P3: the map chat's new cards follow the map's direction. ----

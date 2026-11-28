@@ -13,6 +13,8 @@ import { relocateFile } from "./core/repository-relocation";
 import { managedMapContainers, isManagedMapPath, type Settings } from "./core/repository-settings";
 import {
   DETAIL_START,
+  REFERENCE_START,
+  REFERENCE_END,
   splitOpenItems,
   noteContentLanguage,
   placeholder,
@@ -102,6 +104,7 @@ import {
   type TranslationKey
 } from "./i18n";
 import type { CanvasItem } from "./experiences/visual-map/canvas-items";
+import { duplicatedKnowledgeRefs, type KnowledgeRefIO } from "./experiences/visual-map/knowledge-refs";
 import { MapDocument, MapNode, serializeMap, parseMap } from "./map-model";
 import type { ReasoningLevel } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
@@ -116,7 +119,6 @@ import { linkSpans, RenameRepairWatch } from "./core/rename-repair";
 import { chainRebase, mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
-  readRelevance,
   readAiLocked,
   readAiCard,
   readAiRun,
@@ -128,8 +130,7 @@ import {
   resolveHypothesisWrite,
   type HypothesisStrength,
   type HypothesisLeaning,
-  type TopicKind,
-  type NoteRelevance
+  type TopicKind
 } from "./note-values";
 import {
   MAP_SOURCES_KEY,
@@ -794,7 +795,6 @@ export class Repository {
     );
     const preview = previewSection(content),
       contentLanguage = noteContentLanguage(fm),
-      relevance = readRelevance(fm),
       bookSettings = readBookSettings(fm),
       topicKind = readTopicKind(fm),
       markers = readTopicMarkers(fm),
@@ -876,7 +876,6 @@ export class Repository {
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(contentLanguage ? { contentLanguage } : {}),
-      ...(relevance ? { relevance } : {}),
       ...(readAiLocked(fm) || managedNodeIds(map).has(this.nodeAtPath(path, map, ctx)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
@@ -1360,6 +1359,37 @@ export class Repository {
     return parseMap(await this.app.vault.read(this.file(path)));
   }
 
+  /**
+   * The vault as the knowledge-reference resolver reads it (P4.3): only maps that carry the marker, each read fresh, a
+   * failure reported as null. Nothing here writes.
+   */
+  knowledgeRefIO(): KnowledgeRefIO {
+    return {
+      mapPaths: async () => (await this.mapFiles()).map(file => file.path),
+      readMap: async path => {
+        try {
+          return await this.readMap(path);
+        } catch {
+          return null;
+        }
+      },
+      noteFrontmatter: async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) return null;
+        const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        return cached ?? frontmatter(await this.app.vault.cachedRead(file));
+      },
+      readNote: async path => {
+        try {
+          const note = await this.readNote(path);
+          return { title: note.title, summary: note.summary, detail: note.detail };
+        } catch {
+          return null;
+        }
+      }
+    };
+  }
+
   /** Map.md read once: the map plus its sources (what hydrate and synchronize need). */
   async readMapMeta(path: string): Promise<MapMeta> {
     const content = await this.app.vault.read(this.file(path));
@@ -1655,23 +1685,6 @@ export class Repository {
         ...(next.strength !== current.strength ? { "hypothesis-strength": next.strength } : {})
       });
     });
-  }
-
-  /**
-   * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
-   * `relevance-reason` that older versions wrote). An AI grade writes the tier and removes the manual flag; a tier set by
-   * hand (`manual`) writes the tier and `relevance-manual: true`; null removes the keys. Every write removes
-   * `relevance-reason`. The body
-   * and every other key stay as they were, and `updated` is not bumped: grading is not an edit of the note.
-   */
-  async writeRelevance(path: string, value: NoteRelevance | null): Promise<void> {
-    await this.app.vault.process(this.file(path), content =>
-      setFrontmatterKeys(content, {
-        "relevance-tier": value ? value.tier : null,
-        "relevance-reason": null,
-        "relevance-manual": value?.manual ? true : null
-      })
-    );
   }
 
   async saveMap(
@@ -2402,8 +2415,15 @@ export class Repository {
     const textLanguage = owner?.map.aim
       ? noteLanguageOf(resolveMapOutputLanguage(owner.map, language))
       : (noteContentLanguage(fm) ?? language);
+    // User paragraphs written after the references block are kept byte-identical in place: the rebuild only sees the
+    // text up to the block, so they cannot fall into the Preview section once the block is taken out (B26).
+    const raw = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+    const referenceStart = raw.indexOf(REFERENCE_START);
+    const referenceEnd = referenceStart >= 0 ? raw.indexOf(REFERENCE_END, referenceStart) : -1;
+    const trailing = referenceEnd >= 0 ? raw.slice(referenceEnd + REFERENCE_END.length) : "";
+    const kept = trailing.trim() ? trailing : "";
     let body = ensurePreview(
-      decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")),
+      decodeCalloutSections(kept ? raw.slice(0, referenceEnd + REFERENCE_END.length) : raw),
       language,
       textLanguage
     );
@@ -2446,7 +2466,11 @@ export class Repository {
       textLanguage,
       isBookCardFrontmatter(fm)
     );
-    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
+    const derived = localizeHeadings(
+      withReferenceLinks(body, fm, language),
+      writtenHeadingSet(content, this.headingsFor(textLanguage))
+    );
+    return `---\n${stringifyYaml(fm)}---\n${kept ? `${derived.trimEnd()}${kept}` : derived}`;
   }
 
   async ensureNodePresentation(): Promise<void> {
@@ -2515,6 +2539,9 @@ export class Repository {
       map.viewport = { ...source.viewport };
       for (const key of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"] as const)
         if (source[key] !== undefined) (map as unknown as Record<string, unknown>)[key] = cloneJson(source[key]);
+      // Cross-map references point at other maps and stay as they are; the ones hanging on a copied card hang on its copy.
+      const refs = duplicatedKnowledgeRefs(source, new Map([...copies].map(([id, copy]) => [id, copy.id])));
+      if (refs) map.knowledgeRefs = refs;
       if (source.topicRelations)
         map.topicRelations = source.topicRelations.map(relation => ({
           ...relation,

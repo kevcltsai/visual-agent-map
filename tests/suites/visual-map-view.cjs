@@ -515,10 +515,12 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0;
   const view = {
-    renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderBranchToggle() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderBranchToggle() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources,
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
     // The on-screen sibling order is covered by the move tests in steps-after-text-view.cjs; here the stored order is kept.
     onScreenSiblingOrder: map => map.nodes, moveLastAmongSiblings: VisualAgentMapView.prototype.moveLastAmongSiblings,
+    // B11: the parent pick is the same move as a drag (moveBranches), which keeps the selection and repaints.
+    moveBranches: VisualAgentMapView.prototype.moveBranches, selection: { state: {}, afterMove() {} }, render() {},
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -866,7 +868,7 @@ integrationTest('persona 11: Alt+arrow on a focused card reorders it among its s
   press('b', { key: 'ArrowDown', altKey: true });
   assert.equal(calls.length, 3, 'select mode: no reordering');
 });
-integrationTest('select mode: the narrow bar names Merge / Research by count, keeps More for the rest and announces the topic count to screen readers', () => {
+integrationTest('select mode: the narrow bar names Merge / Research by count, keeps More for the rest (ending with the help) and announces the topic count to screen readers', () => {
   const fixture = selectionView(load); const { view } = fixture;
   view.selection.toggleMultiSelect(); fixture.build();
   const labels = ids => {
@@ -875,15 +877,19 @@ integrationTest('select mode: the narrow bar names Merge / Research by count, ke
     return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled, button.attrs['aria-label']]);
   };
   assert.deepEqual(labels([]), [], 'no card picked: the bar is empty');
-  assert.deepEqual(labels(['a']).slice(0, 2), [['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
-  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 2), [['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
+  // B09: Move to…, Merge, Research, ⋯, Done selecting (the "?" is the last row of ⋯).
+  assert.deepEqual(labels(['a']).slice(0, 3), [['Move to…', false, undefined], ['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 3), [['Move to…', false, undefined], ['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).map(([text]) => text), ['Move to…', 'Merge', 'Research', '⋯', 'Done selecting']);
+  const countBar = view.renderSelectionBar(selectionDom()('div'));
+  assert.equal(countBar.children[0].text, '3 selected'); assert.match(countBar.children[0].attrs['aria-label'], /^Selected 3: /, 'the names moved to the aria-label');
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.synthesize_0_topics', 3), '整合 3 個議題'); assert.equal(translate('zh-TW', 'ui.research_0_topics', 3), '研究 3 個議題');
   // Everything the old panel had that the bar does not show is in More.
   view.applySelectionChange(view.selection.replaceMulti(['a', 'b', 'c']));
   const bar = view.renderSelectionBar(selectionDom()('div'));
   const entries = recordMenus(view)(bar.children.find(child => child.classes.has('vam-selection-more')));
-  assert.deepEqual(entries.map(entry => entry.title), ['Synthesize 3 topics', 'Copy to…', 'Add frame', 'Add summary bracket', 'Lock from AI', 'Clear', 'Remove']);
+  assert.deepEqual(entries.map(entry => entry.title), ['Synthesize 3 topics', 'Copy to…', 'Add frame', 'Add summary bracket', 'Lock from AI', 'Clear', 'Remove', 'Selection help']);
   view.applySelectionChange(view.selection.replaceMulti(['a']));
   const single = recordMenus(view)(view.renderSelectionBar(selectionDom()('div')).children.find(child => child.classes.has('vam-selection-more')));
   assert.equal(single.find(entry => entry.title === 'Synthesize').disabled, true, 'integration needs two topics');
@@ -1463,10 +1469,13 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   // Auto layout from the Layout menu re-arranges every topic in one write.
   for (const nodes of [doc.nodes, view.map.nodes]) { nodes.find(item => item.id === 'b').x = 9999; nodes.find(item => item.id === 'c').y = -9999; }
   const writes = saved;
-  view.autoLayout(); await view.pending;
+  // A10：P1.4 整理全圖取代 Auto layout（先預覽）: the menu action only previews; Apply writes.
+  view.contentEl = { addEventListener() {}, removeEventListener() {} };
+  view.autoLayout(); view.applyTidy(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*(?:map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\)|this\.arrangeAll\(map\));/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
+  // A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：收合鈕在同一次變更 arrangeAll；新：局部 layout 下收合不動卡、展開只推開被覆蓋者，只有整圖 layout（radial／timeline／fishbone／argument）才 arrangeAll。
+  assert.match(source, /n\.collapsed = !n\.collapsed;(?:\s*\/\/[^\n]*)*\s*if \(!this\.placesLocally\(map\)\) this\.arrangeAll\(map\);/, 'the card collapse button re-arranges whole only where the layout is whole-map; otherwise it places locally');
 });
 integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the eight arrangements, a separator, the three spacings and Auto layout', () => {
   const menus = [];
@@ -1474,7 +1483,7 @@ integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a s
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
   const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayout = patch => calls.push(patch.direction ?? patch.spacing);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Tidy map']); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, false, false, false, false, false, false, false, true, false, undefined], 'the current direction and spacing are checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
   assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
@@ -1624,7 +1633,7 @@ integrationTest('Select subtopics: shown in the More list only for an unfolded c
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
     const more = tools.children.find(child => child.tag === 'button' && child.classes.has('vam-card-tool-more'));
     const items = [];
-    fixture.view.newMenu = () => { const menu = { addItem(cb) { const entry = { setTitle(title) { entry.title = title; return entry; }, setIcon() { return entry; }, onClick(fn) { entry.click = fn; return entry; } }; cb(entry); items.push(entry); return menu; }, addSeparator() { return menu; }, showAtPosition() {} }; return menu; };
+    fixture.view.newMenu = () => { const menu = { addItem(cb) { const entry = { setTitle(title) { entry.title = title; return entry; }, setIcon() { return entry; }, setWarning() { return entry; }, onClick(fn) { entry.click = fn; return entry; } }; cb(entry); items.push(entry); return menu; }, addSeparator() { return menu; }, showAtPosition() {} }; return menu; };
     if (more) { more.getBoundingClientRect = () => ({ left: 0, bottom: 0 }); more.handlers.get('click')({ stopPropagation() {} }); }
     return { fixture, items, hasMore: !!more };
   };
@@ -1858,7 +1867,7 @@ function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [], opened = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
   const Notice = class { constructor(message) { notices.push(message); } };
-  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; } };
+  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, setWarning: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('experiences/visual-map/view.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
@@ -1903,16 +1912,10 @@ integrationTest('hypothesis-evidence: the add menu for a new top-level topic (em
   menus[0].clicks.slice(0, heKindNames.length).forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => [null, undefined, true, true, kind]));
 });
-integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-type menu and creates the chosen type under this topic', () => {
-  const { view, menus } = heFixture();
-  const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
+integrationTest('hypothesis-evidence: the panel body has no "Add sub-hypothesis" or "Add subtopic…" (V3.3 B11: card settings no longer adds cards)', () => {
+  const { view } = heFixture();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
-  assert.equal(dom.buttons(panel).includes('Add sub-hypothesis'), false); assert.equal(dom.buttons(panel).includes('Add subtopic…'), false, 'the entry moved out of the body into the footer (C3)');
-  const footer = dom.element('actions'); view.renderAddSubtopic(footer, view.map.nodes[2]);
-  dom.button(footer, 'Add subtopic…').click();
-  assert.equal(menus.length, 1); assert.deepEqual(menus[0].titles, heKindNames);
-  menus[0].clicks.forEach(click => click());
-  assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
+  assert.equal(dom.buttons(panel).includes('Add sub-hypothesis'), false); assert.equal(dom.buttons(panel).includes('Add subtopic…'), false);
 });
 integrationTest('hypothesis-evidence: the card More list offers Add another type with the six types for its card (no name dialog, nothing is added before a pick)', () => {
   const { view, menus } = heFixture();
@@ -2192,7 +2195,7 @@ integrationTest('hypothesis-evidence: the chat-guard message names the type and 
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = read(lang);
     assert.doesNotMatch(text, /"ui\.(add_hypothesis|new_hypothesis|add_subhypothesis|new_subhypothesis)"/, lang);
-    for (const key of [...heKindIds.map(k => `ui.topic_kind_${k}`), 'ui.topic_type', 'ui.add_subtopic_menu']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+    for (const key of [...heKindIds.map(k => `ui.topic_kind_${k}`), 'ui.topic_type']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
   }
   assert.match(read('zh-TW'), /類型或強度欄位/); assert.match(read('zh-CN'), /类型或强度字段/); assert.match(read('en'), /type or hypothesis fields/);
 });
@@ -2700,12 +2703,12 @@ integrationTest('hypothesis-evidence: every type rule starts with the data-topic
   const viewer = extractViewerRules(css).map(item => item.text).join('\n');
   assert.doesNotMatch(viewer, /data-topic-kind|vam-kind-/, 'the viewer stylesheet carries no type rule');
 });
-integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines, dash only a skippable topic, and mark running, error and selected on the outline', () => {
+integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines (no relevance-tier dash), and mark running, error and selected on the outline', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const frame = css.split('\n').find(line => line.includes('isolation: isolate; padding: 28px 40px'));
   assert.match(frame, /border-color: transparent; background: transparent; box-shadow: none;/);
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(frame.includes(`[data-topic-kind="${kind}"]`), `${kind} is in the hidden-frame rule`); assert.ok(!frame.includes('"action"') && !frame.includes('"topic"'), 'action and topic keep their card frame');
-  assert.match(css, /--vam-kind-dash: none;/); assert.match(css, /\[data-relevance="side"\][^{]*\{ --vam-kind-dash: 6 4; \}/);
+  assert.match(css, /--vam-kind-dash: none;/); assert.doesNotMatch(css, /data-relevance/, 'P1.10b: no card or line is styled by the relevance tier');
   assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)/);
   assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
   assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--vam-accent\)[^}]*--vam-kind-width: 3px; \}/);
@@ -3151,15 +3154,13 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });
 // ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
-integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM and a skippable branch keep the plain accent edge (A1)', () => {
+integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM keeps the plain accent edge, and a legacy side-tier branch now gets the ordinary parent line (A1, P1.10b)', () => {
   const topics = [node('root'), node('kid', 'root'), node('skip', 'root')];
   const notes = heNotes([['root', {}], ['kid', {}], ['skip', { relevance: { tier: 'side' } }]]);
   const edges = options => { const fx = heFixture({ topics, notes, ...options }); return heDrawn(fx.view, { root: [0, 0], kid: [400, 0], skip: [400, 200] }); };
   const plain = edges({});
   assert.equal(plain.length, 2);
-  const kid = plain.find(p => !p.classes.includes('vam-edge-side')), skip = plain.find(p => p.classes.includes('vam-edge-side'));
-  assert.ok(kid.classes.includes('vam-edge') && 'data-parent-line' in kid.attrs, 'an ordinary parent line is marked');
-  assert.equal('data-parent-line' in skip.attrs, false, 'a skippable branch keeps its own muted edge');
+  for (const p of plain) { assert.ok(p.classes.includes('vam-edge') && 'data-parent-line' in p.attrs, 'every parent line is marked, the legacy side branch included'); assert.equal(p.classes.includes('vam-edge-side'), false, 'no muted side edge any more'); }
   for (const options of [{ aim: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
@@ -3228,14 +3229,15 @@ const heDialog = (options = {}, index = 1) => {
 };
 const heCss = () => fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line => line.startsWith(`${selector} {`)); assert.ok(hit, `rule ${selector}`); return hit.slice(hit.indexOf('{') + 1, hit.lastIndexOf('}')); };
-integrationTest('hypothesis-evidence: the dialog reads leaning and strength (hypothesis only), colour, style, cover, then the folded More (type, relations, parent topic search, markers, links, AI lock), with the same heading class on each (C1, C2)', () => {
+integrationTest('hypothesis-evidence: the dialog reads, flat (V3.3 P1.8), leaning and strength (hypothesis only), cover, type, parent topic search, markers, links, relations (folded), AI lock, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Leaning', 'Strength', 'Color', 'Style', 'Cover picture', 'Topic type', 'Relations', 'Parent topic', 'Markers', 'Links', 'AI lock'], 'card settings: the look comes first (a hypothesis starts with leaning and strength), then everything else under More');
+  // Colour and style stay last until the toolbar Style popover replaces them (B08).
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Leaning', 'Strength', 'Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock', 'Color', 'Style'], 'card settings: one flat list in the P1.8 order (a hypothesis starts with leaning and strength)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Color', 'Style', 'Cover picture', 'Topic type', 'Relations', 'Parent topic', 'Markers', 'Links', 'AI lock'], 'no leaning or strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'Relations', 'AI lock', 'Color', 'Style'], 'no leaning or strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-leanings') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-card-search' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
-  assert.deepEqual(order.slice(0, 6), ['vam-hypothesis-leanings', 'vam-hypothesis-strengths', 'vam-topic-kinds', 'vam-card-search', 'vam-card-search', 'vam-hint'], 'leaning, strength, then under More the type, the relation search, the parent search and its hint (the relations note is a different class)');
+  assert.deepEqual(order.slice(0, 6), ['vam-hypothesis-leanings', 'vam-hypothesis-strengths', 'vam-topic-kinds', 'vam-card-search', 'vam-hint', 'vam-card-search'], 'leaning, strength, the type, the parent search and its hint, then the relation search (the relations note is a different class)');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-section-heading'), /margin: 16px 0 8px;[^}]*font-size: var\(--font-ui-small\); font-weight: 600;/);
 });
@@ -3247,24 +3249,22 @@ const heBranchDialog = () => {
   fx.view.renderInspector(content, fx.view.map.nodes[0], 'structure', () => {}, host);
   return { ...fx, content, host };
 };
-integrationTest('card settings: titled "Card settings" with the card name as subtitle; the first view holds colour, style, cover and the branch checkbox, and one folded More holds type, parent, markers, links and the AI lock', () => {
+integrationTest('card settings: titled "Card settings" with the card name as subtitle; no "More" fold (V3.3 P1.8): every field is in one flat list and only the relations fold, closed, behind "Relations (N)"', () => {
   const hyp = heDialog({}, 1);
   assert.equal(dom.find(hyp.content, c => c.tag === 'strong' && !(c.cls ?? '').includes('section-heading')).text, 'Card settings');
   assert.equal(dom.find(hyp.content, c => (c.cls ?? '').includes('vam-inspector-topic')).text, 'HYP', 'the subtitle is the card name');
   const toggles = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-disclosure-toggle'));
-  assert.deepEqual(toggles.map(b => b.text), ['More: type, parent, markers and link'], 'one fold only: no Appearance or Layout');
+  assert.deepEqual(toggles.map(b => b.text), ['Relations (0)'], 'no More fold; the relations fold says how many there are');
   const bodyOf = toggle => toggle.parent.children.find(c => (c.cls ?? '').includes('vam-disclosure-body'));
   const more = toggles[0], body = bodyOf(more);
-  assert.equal(more.attrs['aria-expanded'], 'false', 'More is folded at first'); assert.equal(body.hidden, true); assert.equal(more.attrs['aria-controls'], body.id); assert.equal(more.tag, 'button', 'a real button: Enter and Space work');
-  const inMore = text => dom.findAll(body, c => c.text === text).length > 0;
-  for (const heading of ['Leaning', 'Strength', 'Color', 'Style', 'Cover picture']) { assert.ok(dom.find(hyp.content, c => c.text === heading), heading); assert.equal(inMore(heading), false, `${heading} is in the first view, not in More`); }
-  for (const heading of ['Topic type', 'Relations', 'Parent topic', 'Markers', 'Links', 'AI lock']) assert.ok(inMore(heading), `${heading} is inside More`);
-  const all = dom.findAll(hyp.content, () => true);
-  assert.ok(all.indexOf(dom.find(hyp.content, c => c.text === 'Cover picture')) < all.indexOf(more), 'the first view comes before the fold');
+  assert.equal(more.attrs['aria-expanded'], 'false', 'relations are folded at first'); assert.equal(body.hidden, true); assert.equal(more.attrs['aria-controls'], body.id); assert.equal(more.tag, 'button', 'a real button: Enter and Space work');
+  const inFold = text => dom.findAll(body, c => c.text === text).length > 0;
+  for (const heading of ['Leaning', 'Strength', 'Cover picture', 'Topic type', 'Parent topic', 'Markers', 'Links', 'AI lock']) { assert.ok(dom.find(hyp.content, c => c.text === heading), heading); assert.equal(inFold(heading), false, `${heading} is not folded`); }
+  assert.ok(inFold('Relations'), 'the relation list is inside the fold');
   const branchy = heBranchDialog();
   const box = dom.find(branchy.content, c => (c.cls ?? '').includes('vam-branch-toggle-box'));
   const branchBody = dom.find(branchy.content, c => (c.cls ?? '').includes('vam-disclosure-body'));
-  assert.equal(box.type, 'checkbox'); assert.equal(box.checked, false); assert.equal(dom.findAll(branchBody, c => c === box).length, 0, 'the checkbox is outside More');
+  assert.equal(box.type, 'checkbox'); assert.equal(box.checked, false); assert.equal(dom.findAll(branchBody, c => c === box).length, 0, 'the checkbox is outside the fold');
   assert.ok(dom.texts(dom.find(branchy.content, c => (c.cls ?? '').includes('vam-branch-toggle'))).includes('Change the whole branch too'));
   assert.equal(dom.find(hyp.content, c => (c.cls ?? '').includes('vam-branch-toggle-box')), undefined, 'a card without subtopics has no checkbox');
   more.click(); assert.equal(more.attrs['aria-expanded'], 'true'); assert.equal(body.hidden, false);
@@ -3331,18 +3331,18 @@ integrationTest('card settings: through the real dialog the ticked checkbox writ
   dom.find(content, c => c.tag === 'button' && c.text === 'Thick border').click(); await dom.tick(); await new Promise(r => setTimeout(r, 20));
   assert.deepEqual([root, child, grand].map(styleOf), [['bold', 'border-thick'], ['bold'], ['bold']], 'unticked again: only the card');
 });
-integrationTest('card dialog search: a card with a parent keeps the branch layout inside More and the parent search is in More too, never beside the first view', () => {
+integrationTest('card dialog search: a card with a parent shows the branch layout and the parent search directly in the flat list (V3.3 P1.8: no More fold)', () => {
   const fx = heFixture();
   fx.view.map.nodes.forEach(n => { n.parentId = null; }); fx.view.map.nodes[1].parentId = 'fact';
   fx.view.referenceSourcePaths = () => []; fx.view.enqueue = work => work();
   const content = dom.element('content'), host = dom.element('modal');
   fx.view.renderInspector(content, fx.view.map.nodes[1], 'structure', () => {}, host);
   const toggles = dom.findAll(content, c => (c.cls ?? '').includes('vam-disclosure-toggle'));
-  assert.deepEqual(toggles.map(b => b.text), ['More: type, parent, markers and link']);
-  const body = toggles[0].parent.children.find(c => (c.cls ?? '').includes('vam-disclosure-body'));
-  assert.ok(dom.find(body, c => (c.cls ?? '').includes('vam-branch-layout')), 'More holds the branch arrangement');
-  assert.equal(dom.findAll(body, c => c.text === 'Parent topic').length, 1, 'and the parent search');
-  assert.equal(dom.findAll(content, c => (c.cls ?? '').includes('vam-branch-layout')).length, dom.findAll(body, c => (c.cls ?? '').includes('vam-branch-layout')).length, 'none outside More');
+  assert.deepEqual(toggles.map(b => b.text), ['Relations (0)'], 'only the relations fold');
+  const panel = content.children[0];
+  assert.ok(panel.children.find(c => (c.cls ?? '').includes('vam-branch-layout-section')), 'the branch arrangement is a field of the list');
+  assert.ok(panel.children.find(c => (c.cls ?? '').includes('vam-parent-section')), 'and the parent search');
+  assert.equal(dom.findAll(content, c => c.text === 'Parent topic').length, 1);
 });
 // ---- card dialog search (2026-11-08): the relation target and the parent topic are search fields ----
 const csParentDialog = ({ parents = {}, locked = false } = {}) => {
@@ -3351,7 +3351,8 @@ const csParentDialog = ({ parents = {}, locked = false } = {}) => {
   const { view } = fx;
   view.map.nodes.forEach(n => { n.parentId = parents[n.id] ?? null; });
   view.referenceSourcePaths = () => []; view.enqueue = work => work(); view.mergeUnlocked = () => !locked;
-  const moves = []; view.mapChange = async () => { moves.push(1); };
+  // The parent pick goes through moveBranches, which repaints the map after the write.
+  const moves = []; view.mapChange = async () => { moves.push(1); }; view.render = () => {};
   const content = dom.element('content'), host = dom.element('modal');
   view.renderInspector(content, view.map.nodes.find(n => n.id === 'c'), 'structure', () => {}, host);
   const input = dom.byLabel(content, 'Parent topic'); const suggest = heSuggests.find(s => s.inputEl === input);
@@ -3509,16 +3510,13 @@ integrationTest('card settings: the AI lock is a Lock from AI button in More; on
   assert.equal(pill.hidden, true); assert.equal(section.hidden, false);
   assert.equal(load('i18n.ts').translate('zh-TW', 'ui.card_settings_locked'), '已鎖定，AI 不會改');
 });
-integrationTest('card settings: the footer is the status line and one Done button; "Add subtopic…" now lives in More and still opens the six-type menu; Remove is not in this dialog', () => {
-  const { footer, content, menus } = heDialog({}, 1);
+integrationTest('card settings: the footer is the status line and one Done button; there is no "Add subtopic…" (V3.3 B11) and no Remove in this dialog', () => {
+  const { footer, content } = heDialog({}, 1);
   const buttons = footer.children.filter(c => c.tag === 'button');
   assert.deepEqual(buttons.map(b => b.text), ['Done']);
   assert.ok(buttons[0].cls.includes('mod-cta'));
   assert.equal(dom.buttons(content).includes('Remove from map'), false);
-  const more = dom.find(content, c => (c.cls ?? '').includes('vam-disclosure-body'));
-  const add = dom.find(more, c => c.tag === 'button' && c.text === 'Add subtopic…');
-  assert.ok(add && add.cls.includes('vam-add-subtopic'), 'inside More');
-  add.click(); assert.deepEqual(menus.at(-1).titles, heKindNames, 'it still opens the six-type menu');
+  assert.equal(dom.buttons(content).includes('Add subtopic…'), false);
 });
 integrationTest('hypothesis-evidence: the type and strength options are quiet segmented buttons: no mod-cta, aria-pressed on the current one, a swatch of the type shape on each type, three columns (C4, C5)', () => {
   const { content } = heDialog({}, 1);
@@ -3537,9 +3535,8 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker'), /font-size: 16px/);
+  assert.doesNotMatch(css, /is-segmented/, 'P1.10b: the one-of marker groups (priority, progress) are gone');
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3661,17 +3658,17 @@ const tmRender = (options, id) => {
 integrationTest('topic-markers: a card shows whitelisted markers as aria-hidden symbols in a fixed order and names them in its accessible name; a topic without any shows none', () => {
   const notes = heNotes([['fact', { markers: ['star', 'done', 'priority-2'] }], ['hyp', heHyp('weak')], ['other', {}]]);
   const shown = tmRender({ notes }, 'fact');
-  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★', 'P2'], 'whitelist order, plain Unicode');
+  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★'], 'whitelist order, plain Unicode; a legacy priority value is not shown (P1.10b)');
   const row = dom.find(shown.card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-markers'));
   assert.equal(row.attrs['aria-hidden'], 'true');
-  assert.match(shown.label.text, /Markers: Done, Star, Priority 2/); assert.match(shown.label.text, /^FACT, /);
+  assert.match(shown.label.text, /Markers: Done, Star$/); assert.doesNotMatch(shown.label.text, /Priority/); assert.match(shown.label.text, /^FACT, /);
   assert.equal(shown.card.attrs['aria-labelledby'], shown.label.id);
   const kindToo = tmRender({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) }, 'fact');
   assert.match(kindToo.label.text, /Evidence/); assert.match(kindToo.label.text, /Markers: Done/);
   const none = tmRender({ notes }, 'other');
   assert.deepEqual(none.marks, []); assert.doesNotMatch(none.label.text, /Markers/);
   const aim = tmRender({ aim: true, notes }, 'fact');
-  assert.equal(aim.marks.length, 3, 'a read-only map still shows the markers');
+  assert.equal(aim.marks.length, 2, 'a read-only map still shows the markers');
 });
 integrationTest('topic-markers: a value outside the whitelist is not shown, not drawn and not read out', () => {
   const notes = heNotes([['fact', { markers: ['<img src=x onerror=alert(1)>', 'DONE', 3, 'star', 'star'] }], ['hyp', {}], ['other', {}]]);
@@ -3687,9 +3684,9 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.drawEdges = () => {};
   f.view.notes.get('fact').markers = ['warning', 'priority-3'];
   f.view.refreshCard(node, false);
-  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠', 'P3']);
+  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠']);
   const label = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
-  assert.match(label.text, /Markers: Warning, Priority 3/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
+  assert.match(label.text, /Markers: Warning$/); assert.doesNotMatch(label.text, /Priority/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
   f.view.notes.get('fact').markers = [];
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
@@ -3750,7 +3747,7 @@ integrationTest('topic-markers, topic-color and topic-style: select mode has no 
     assert.deepEqual(writes, [], `${name} ${JSON.stringify(options)}`);
   }
 });
-integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
+integrationTest('topic-markers: the panel has one aria-pressed toggle per status marker in a single many-of box, with no group titles (P1.10b)', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
   const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
@@ -3762,39 +3759,27 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   };
   view.refreshAfterSavedChange = async () => {};
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
-  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
+  const group = () => dom.find(panel, c => (c.cls ?? '').split(/\s+/).includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
-  // Priority and progress buttons are symbol-only; their name is the aria-label.
-  const name = c => c.attrs['aria-label'] ?? c.text;
-  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(name);
-  const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
-  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
-  const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
-  assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
-  sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  const { TOPIC_MARKERS } = load('topic-markers.ts', { obsidian });
+  const boxes = () => dom.findAll(group(), c => (c.cls ?? '').split(/\s+/).includes('vam-topic-marker-group'));
+  assert.equal(boxes().length, 1, 'one box'); assert.match(boxes()[0].cls, /\bis-multi\b/); assert.doesNotMatch(boxes()[0].cls, /is-segmented/);
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length); assert.equal(TOPIC_MARKERS.length, 3);
+  assert.deepEqual(dom.findAll(panel, c => /vam-topic-marker-group-title/.test(c.cls ?? '')), [], 'no group titles');
   assert.deepEqual(pressed(), []);
-  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => (c.attrs['aria-label'] ?? c.text).includes(name)).click();
-  click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
-  assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
-  assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  click('Done'); await dom.tick(); click('Star'); await dom.tick();
+  assert.deepEqual(toggled, ['done', 'star']);
+  assert.equal(pressed().length, 2, 'status markers can coexist');
   click('Done'); await dom.tick();
-  assert.equal(pressed().length, 1);
-  click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
-  assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
-  assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
-  sub.forEach((box, i) => {
-    const single = TOPIC_MARKER_GROUPS[i].single;
-    assert.equal((box.cls ?? '').includes('is-segmented'), !!single, 'only one-of groups are segmented');
-    for (const b of dom.findAll(box, c => c.tag === 'button')) {
-      if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
-      else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
-      assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
-      // The stylesheet's progress size rule is `button[data-marker^="progress-"] > .vam-marker`: the attribute is on the button, the symbol is its child.
-      assert.ok(b.dataset.marker, 'the marker id is on the button');
-      assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
-    }
-  });
-  assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
+  assert.equal(pressed().length, 1); assert.ok(pressed()[0].includes('Star'));
+  for (const b of dom.findAll(group(), c => c.tag === 'button')) {
+    assert.ok(b.text && b.attrs['aria-label'] === undefined, 'buttons keep their text');
+    assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+    assert.ok(TOPIC_MARKERS.includes(b.dataset.marker), 'the marker id is on the button');
+    assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
+  }
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -3823,15 +3808,14 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
   await pushed[0].redo(); assert.ok(text());
   await pushed[0].undo();
   await view.refreshAfterSavedChange();
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
-  await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-25'); const mid = contents.get(topic.path);
-  await view.changeTopicMarker(view.map.nodes[0], 'progress-50');
-  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2', 'progress-50']);
-  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of a same-group switch restores the previous choice');
+  await view.changeTopicMarker(view.map.nodes[0], 'done');
+  await view.changeTopicMarker(view.map.nodes[0], 'warning'); const mid = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'star');
+  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done', 'warning', 'star']);
+  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of the last toggle restores the previous note text');
   await pushed.at(-1).redo(); await view.refreshAfterSavedChange();
   await pushed.at(-1).undo(); await pushed.at(-2).undo(); await view.refreshAfterSavedChange();
-  assert.equal(pushed.length, 5); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
+  assert.equal(pushed.length, 4); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['done']);
 });
 // ---- topic colour (ticket 37, P2b) ----
 const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
@@ -4520,9 +4504,28 @@ test('bug bash #12: a tool row wider than the whole visible canvas wraps and eve
 });
 integrationTest('C5: the map commands apply only to an active map view (topic ones only with a selected card, editing ones never in a presentation) and run the same actions as the card tools', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const tuples = [...source.matchAll(/\["(map-[a-z-]+)", "(ui\.command_map_[a-z_]+)", "([a-z-]+)"\]/g)].map(m => [m[1], m[2], m[3]]);
-  assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
-  assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(action, checking\) \?\? false/, 'no map view: the command does not apply');
+  // main.ts registers the card action list's palette commands (B05): [id, name key, mapCommand action].
+  const { CARD_COMMANDS, commandTitleKey } = load('experiences/visual-map/card-actions.ts', { obsidian });
+  const tuples = CARD_COMMANDS.map(entry => [entry.commandId, commandTitleKey(entry.action), entry.mapAction]);
+  assert.ok(tuples.every(([id]) => /^map-[a-z-]+$/.test(id)), 'ids as before');
+  // The names are the card action list's (ticket 05): the same as the card ⋯ and right-click.
+  assert.deepEqual(JSON.parse(JSON.stringify(tuples.map(([id, key]) => [id, key]))), [
+    ['map-add-topic', 'ui.command_map_add_topic'],
+    ['map-add-subtopic', 'ui.card_menu_add_child'],
+    ['map-add-sibling', 'ui.card_menu_add_sibling'],
+    ['map-ai-explore-selected', 'ui.ai_explore'],
+    ['map-rename-selected', 'ui.shortcut_rename'],
+    ['map-open-selected-details', 'ui.card_menu_open_note'],
+    ['map-toggle-collapse-selected', 'ui.card_menu_collapse'],
+    ['map-focus-branch', 'ui.focus_branch'],
+    ['map-zoom-to-fit', 'ui.command_map_zoom_fit'],
+    ['map-zoom-reset', 'ui.command_map_zoom_reset'],
+    ['map-search', 'ui.command_map_search'],
+    ['map-keyboard-shortcuts', 'ui.command_map_shortcuts']
+  ]);
+  assert.ok(tuples.length >= 6 && tuples.length <= 12, `${tuples.length} map commands`);
+  assert.match(source, /for \(const \{ commandId, mapAction, action \} of CARD_COMMANDS\)/, 'main.ts registers the list');
+  assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(mapAction, checking\) \?\? false/, 'no map view: the command does not apply');
   const { translate } = load('i18n.ts');
   for (const [, key] of tuples) for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(translate(language, key) && translate(language, key) !== key, `${language} ${key}`);
   const { view } = selectionView(load, {}, { ...obsidian, Modal: class { open() { this.opened = true; } close() {} } });
@@ -4537,23 +4540,55 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.zoomBy = factor => calls.push(['zoom', factor]);
   view.openMapSearch = () => calls.push(['search']);
   view.openKeyboardShortcuts = () => calls.push(['keys']);
+  view.enterBranchFocus = id => calls.push(['focus', id]);
   view.viewportEl = view.viewportEl ?? dom.element('div');
   const actions = tuples.map(t => t[2]);
   view.selection.setSelected(null);
   const none = Object.fromEntries(actions.map(action => [action, view.mapCommand(action, true)]));
-  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
+  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'focus-branch': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
   assert.deepEqual(calls, [], 'checking runs nothing');
   view.selection.setSelected('c'); assert.equal(view.mapCommand('toggle-collapse', true), false, 'a card with no subtopics');
-  const target = view.map.nodes.find(node => node.parentId);
+  assert.equal(view.mapCommand('focus-branch', true), false, 'B13: a card with no subtopics has no branch to focus');
+  const target = view.map.nodes.find(node => node.parentId && view.map.nodes.some(child => child.parentId === node.id));
+  assert.ok(target, 'the fixture has a subtopic with subtopics');
   view.selection.setSelected(target.id);
   for (const action of actions) assert.equal(view.mapCommand(action, false), true, action);
-  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
+  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['focus', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
   view.presentation = { order: [], currentId: 'x' };
   for (const action of ['add-topic', 'rename', 'search', 'toggle-collapse']) assert.equal(view.mapCommand(action, true), false, `presentation: ${action}`);
   view.presentation = null;
   view.selection.toggleMultiSelect(); assert.equal(view.mapCommand('toggle-collapse', true), false, 'selection mode: toggle-collapse'); view.selection.toggleMultiSelect();
   view.map = null;
   for (const action of actions) assert.equal(view.mapCommand(action, true), false, `no map: ${action}`);
+});
+integrationTest('C5: the map commands write nothing while the notes load or the picture book locks the card (decision #35); reading and zoom stay', () => {
+  const { view } = selectionView(load, {}, { ...obsidian, Modal: class { open() { this.opened = true; } close() {} } });
+  const calls = [];
+  view.enqueue = work => work();
+  view.addNode = parent => { calls.push(['add', parent?.id ?? null]); };
+  view.openTopicChat = node => calls.push(['ai', node.id]);
+  view.startCardTitleEdit = node => calls.push(['rename', node.id]);
+  view.toggleCollapsed = node => calls.push(['collapse', node.id]);
+  view.openDetails = node => calls.push(['details', node.id]);
+  view.viewportEl = view.viewportEl ?? dom.element('div');
+  const target = view.map.nodes.find(node => node.parentId);
+  view.selection.setSelected(target.id);
+  const writes = ['add-topic', 'add-subtopic', 'add-sibling', 'ai-explore', 'rename', 'toggle-collapse'];
+  for (const action of writes) assert.equal(view.mapCommand(action, true), true, `before: ${action}`);
+  view.noteLoad = {};
+  for (const action of writes) {
+    assert.equal(view.mapCommand(action, true), false, `notes loading: ${action} is not offered`);
+    assert.equal(view.mapCommand(action, false), false, `notes loading: ${action} does not run`);
+  }
+  assert.deepEqual(calls, [], 'nothing ran while the notes load');
+  for (const action of ['open-details', 'zoom-fit', 'shortcuts']) assert.equal(view.mapCommand(action, true), true, `notes loading: ${action} stays`);
+  view.noteLoad = null;
+  view.bookLock = () => ({ ai: true, structure: false });
+  assert.equal(view.mapCommand('ai-explore', true), false, 'book AI lock: no AI explore');
+  assert.equal(view.mapCommand('add-subtopic', true), true, 'book AI lock: adding stays');
+  view.bookLock = () => ({ ai: false, structure: true });
+  for (const action of ['add-topic', 'add-subtopic', 'add-sibling']) assert.equal(view.mapCommand(action, true), false, `book structure lock: ${action}`);
+  assert.equal(view.mapCommand('ai-explore', true), true, 'book structure lock: AI explore stays');
 });
 integrationTest('C5: Keyboard shortcuts lists the map keys (Mod reads ⌘ on macOS, Ctrl elsewhere) and is in the More mind map actions menu', () => {
   const { MAP_KEYBOARD_SHORTCUTS, shortcutLabel } = load('ui/modals/keyboard-shortcuts-modal.ts', { obsidian: { ...obsidian, Platform: { isMacOS: false } } });
@@ -5103,6 +5138,13 @@ test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat 
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const pinned = css.match(/\.vam-view\.is-header-narrow \.vam-multi-research-statusbar \{([^}]*)\}/);
+  assert.ok(pinned, 'narrow research bar rule');
+  assert.match(pinned[1], /position: sticky;/); assert.match(pinned[1], /top: 0;/);
+  const zOf = re => Number(css.match(re)[1]);
+  const barZ = Number(pinned[1].match(/z-index: (\d+);/)[1]);
+  assert.ok(barZ > zOf(/\.vam-selection-bar \{[^}]*z-index: (\d+)/), 'above the selection bar');
+  assert.ok(!/\.vam-zoom-controls \{[^}]*z-index: (\d+)/.test(css) || barZ > zOf(/\.vam-zoom-controls \{[^}]*z-index: (\d+)/), 'above the zoom bar');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });

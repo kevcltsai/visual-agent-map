@@ -1,5 +1,4 @@
 import type { MapDocument } from "../../map-model";
-import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, readTopicStyle, type TopicColor, type TopicStyle } from "../../topic-colors";
 import { CARD_WIDTH, clampCardHeight, clampCardWidth } from "../../map-graph";
@@ -7,6 +6,7 @@ import { branchDirectionOf, layoutDirectionFor, type BranchDirection } from "../
 import { layoutOf, type MapLayout } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 import { readTopicLinks } from "../../topic-links";
+import { visibleKnowledgeRefs } from "../visual-map/knowledge-refs";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
 export const SHARE_FORMAT = "vam-share";
@@ -120,9 +120,6 @@ export interface ShareNodePayload {
   status: "idea" | "completed";
   title: string;
   summary: string;
-  tier?: RelevanceTier;
-  reason?: string;
-  manual?: true;
   /** Optional (ticket 33): whitelisted topic marker ids in fixed order. Absent means none; `version` stays 1. */
   markers?: TopicMarker[];
   /** Optional (ticket 37): a whitelisted topic colour id. Absent means none; `version` stays 1. */
@@ -230,6 +227,19 @@ export interface ShareAttachmentPayload {
   asset?: string;
 }
 
+/**
+ * Optional (knowledge-reference): a reference to a card of another map. `x`/`y` are absolute like a text node's. Only the
+ * title the original had at share time travels (never a path, an id of the other map or its text); no `title` means the
+ * original could not be used.
+ */
+export interface ShareRefPayload {
+  id: string;
+  parentId: string;
+  x: number;
+  y: number;
+  title?: string;
+}
+
 export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
@@ -241,6 +251,8 @@ export interface SharePayload {
   nodes: ShareNodePayload[];
   /** Optional (tree-text-node): present only when the map has text nodes; absent keeps older files byte-identical. `version` stays 1. */
   textNodes?: ShareTextNodePayload[];
+  /** Optional (knowledge-reference): references hung under cards of this map; absent when there are none. `version` stays 1. */
+  refs?: ShareRefPayload[];
   /** Optional (summary-bracket): present only when the map has a drawable bracket; absent keeps older files byte-identical. `version` stays 1. */
   summaries?: ShareSummaryPayload[];
   /** Optional (share-match-map): the map's layout when it is not the default (right, standard spacing). `version` stays 1. */
@@ -269,9 +281,6 @@ export interface ShareNoteInput {
   title: string;
   summary: string;
   status: string;
-  relevance?: { tier: RelevanceTier; manual?: true };
-  /** Legacy `relevance-reason`, still shown when an older note has one. */
-  reason?: string;
   /** Topic type from the note; anything not on the whitelist is dropped when the payload is built. */
   kind?: unknown;
   /** The card's shape (computed by the exporter, argument-map cards are rect); anything not on the whitelist is dropped when the payload is built. */
@@ -309,6 +318,8 @@ export interface ShareOptions {
   ringHeights?: Readonly<Record<string, number>>;
   /** annotated or free image id -> asset name. Same rule as `covers`. */
   imageAssets?: Readonly<Record<string, string>>;
+  /** reference id -> the original's title read at share time, or null when it could not be used. A reference not listed counts as unavailable. */
+  refTitles?: Readonly<Record<string, string | null>>;
   /** Turns free text into plain text (the exporter passes `plainWikilinks`); identity when absent. */
   plainText?: (text: string) => string;
 }
@@ -332,6 +343,29 @@ const optionalText = (value: string | undefined): string | undefined => {
 const SHARE_TEXT_LIMIT = 2000;
 
 /** The map's text nodes for the payload: a parent that is missing or the node itself makes it an orphan (parentId null), never dropped. */
+function shareRefs(
+  map: MapDocument,
+  titles: Readonly<Record<string, string | null>>,
+  plain: (text: string) => string
+): ShareRefPayload[] {
+  const parents = new Map(map.nodes.map(node => [node.id, node]));
+  const out: ShareRefPayload[] = [];
+  for (const ref of visibleKnowledgeRefs(map)) {
+    const parent = parents.get(ref.parentId);
+    if (!parent) continue;
+    const raw = titles[ref.id];
+    const title = typeof raw === "string" ? plain(raw).replace(/\s+/g, " ").trim().slice(0, SHARE_TEXT_LIMIT) : "";
+    out.push({
+      id: ref.id,
+      parentId: parent.id,
+      x: parent.x + ref.x,
+      y: parent.y + ref.y,
+      ...(title ? { title } : {})
+    });
+  }
+  return out;
+}
+
 function shareTextNodes(map: MapDocument): ShareTextNodePayload[] {
   const ids = new Set(map.nodes.map(node => node.id));
   const seen = new Set<string>();
@@ -593,12 +627,6 @@ export function buildSharePayload(
     const ringHeight = options.ringHeights?.[node.id];
     if (typeof ringHeight === "number" && Number.isFinite(ringHeight) && ringHeight >= 1 && ringHeight <= 20000)
       out.ringHeight = Math.round(ringHeight);
-    if (note?.relevance) {
-      out.tier = note.relevance.tier;
-      if (note.relevance.manual) out.manual = true;
-      const reason = optionalText(note.reason);
-      if (reason) out.reason = reason;
-    }
     if (isOneOf(SHARE_NODE_KINDS, note?.kind)) out.kind = note.kind;
     if (isOneOf(SHARE_NODE_SHAPES, note?.shape)) out.shape = note.shape;
     const markers = readTopicMarkers({ "topic-markers": note?.markers });
@@ -628,6 +656,7 @@ export function buildSharePayload(
       out.afterTextId = textId;
   }
   const summaries = shareSummaries(map);
+  const refs = shareRefs(map, options.refTitles ?? {}, options.plainText ?? (text => text));
   const stored = layoutOf(map);
   const images = shareImages(
     map,
@@ -656,6 +685,7 @@ export function buildSharePayload(
     nodes,
     ...(textNodes.length ? { textNodes } : {}),
     ...(summaries.length ? { summaries } : {}),
+    ...(refs.length ? { refs } : {}),
     ...(stored.direction !== "right" || stored.spacing ? { layout: stored } : {}),
     ...(images.length ? { images } : {}),
     ...(relations.length ? { relations } : {}),

@@ -693,6 +693,163 @@ test('popover close: Esc, Close or discard returns focus to the card it was open
   h.pop().keydown({ key: 'Escape' });
   assert.equal(h.view.aiCardOpen, null);
   eq(restored, [h.node('A').id]);
+  // P3.3: back on the canvas, the viewport and the selection are what they were before the editor opened, also after "discard".
+  const g = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const back = [];
+  g.view.restoreMapFocusSoon = id => back.push(id);
+  g.view.map.viewport = { x: -120, y: 45, zoom: 1.5 };
+  g.view.selection.replaceMulti([g.node('A').id]);
+  const before = canvasState(g);
+  g.view.openAiCardPopover(g.node('A'));
+  g.pop().keydown({ key: 'Escape' });
+  eq(canvasState(g), before);
+  assert.equal(g.view.aiCardOpen, null);
+  g.view.openAiCardPopover(g.node('A'));
+  g.question().value = 'Changed?'; g.question().input();
+  g.pop().keydown({ key: 'Escape' });
+  assert.ok(g.view.aiCardOpen, 'unsaved changes: the choices come first');
+  find(g.pop(), i => i.tag === 'button' && i.text === 'Discard').click();
+  assert.equal(g.view.aiCardOpen, null);
+  eq(canvasState(g), before);
+  eq(back, [g.node('A').id, g.node('A').id]);
+});
+
+// P3.3: the central editor's close choices, draft guard and refusals.
+const canvasState = h => {
+  const s = h.view.selection.state;
+  return { viewport: h.view.map.viewport, selected: s.selected, multi: [...s.multiSelected].sort(), mode: s.multiSelectMode };
+};
+const choices = h => find(h.pop(), i => i.cls?.includes('vam-living-editor-close-choices'));
+const choice = (h, text) => find(choices(h), i => i.tag === 'button' && i.text === text);
+const type = (h, text) => { h.question().value = text; h.question().input(); };
+
+test('P3.3 save and close: one history step, the viewport stays, the editor closes', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  h.view.map.viewport = { x: -120, y: 45, zoom: 1.5 };
+  const before = canvasState(h);
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'New question');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(choices(h).hidden, false);
+  choice(h, 'Save').click();
+  await until(() => h.view.aiCardOpen === null);
+  assert.equal(h.view.history.past.length, past + 1);
+  assert.match(h.raw('A'), /New question/);
+  eq(canvasState(h), before);
+});
+
+test('P3.3 return: the editor stays open, the draft is kept and the focus is on the Prompt field', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Draft');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(choices(h).hidden, false);
+  choice(h, 'Return').click();
+  assert.equal(choices(h).hidden, true);
+  assert.ok(h.view.aiCardOpen);
+  assert.equal(h.question().value, 'Draft');
+  assert.equal(dom.focusedNow(), h.question());
+  assert.match(h.raw('A'), /Old/);
+});
+
+test('P3.3 another card with unsaved changes: the editor stays on the original card and shows the close choices', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['B', null, { prompt: 'Other' }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Draft');
+  const win = h.view.aiCardOpen.win;
+  h.view.openAiCardPopover(h.node('B'));
+  assert.equal(h.view.aiCardOpen.win, win);
+  assert.equal(h.view.aiCardOpen.nodeId, h.node('A').id);
+  assert.equal(choices(h).hidden, false);
+  assert.equal(h.question().value, 'Draft');
+});
+
+test('P3.3 a [[link]] in the Prompt body (not on the sources line) is not saved as a source', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }], ['N', null, { noAi: true }]]);
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Compare with [[N]] in the text');
+  h.saveButton().click();
+  await until(() => /Compare with/.test(h.raw('A')));
+  assert.match(h.raw('A'), /\[\[N\]\]/, 'the text is kept as written');
+  assert.match(h.raw('A'), /^living-node-refs: \[\]$/m, 'no source recorded');
+  assert.equal(h.raw('A').includes('card:' + h.node('N').id), false);
+});
+
+for (const [name, change] of [
+  ['its Prompt', h => h.repo.updateNote(h.node('A').path, { prompt: 'Changed elsewhere' })],
+  ['only its configuration (revision)', h => h.repo.writeAiCard(h.node('A').path, false)]
+]) test(`P3.3 ${name} changed elsewhere while the editor is open: the save is refused, the draft and the editor stay`, async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error); // as the plugin does
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'My draft');
+  await change(h);
+  const outside = h.raw('A');
+  const past = h.view.history.past.length;
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  await dom.tick(); await dom.tick();
+  assert.match(h.notices.join('\n'), /changed elsewhere/i, 'says why: changed elsewhere, draft kept');
+  assert.ok(h.view.aiCardOpen, 'the editor stays open');
+  assert.equal(h.question().value, 'My draft');
+  assert.equal(h.raw('A'), outside, 'nothing was written');
+  assert.equal(h.view.history.past.length, past);
+});
+
+test('P3.3 a refused save says why in plain words, not a raw code', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error); // as the plugin does
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'Why?\nSources: [[A]]');
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  assert.equal(/self-reference/.test(h.notices.join('\n')), false, h.notices.join('\n'));
+  assert.match(h.notices.join('\n'), /itself/i);
+  assert.ok(h.view.aiCardOpen);
+});
+
+test('P3.3 batch UI: a refused save shows one notice, not a raw code first and the plain reason second', async () => {
+  const h = await popoverHarness([['A', null, { prompt: 'Old' }]]);
+  const { plainFailure } = S.load('ai/plain-error.ts', { obsidian });
+  h.host.recordFailure = (context, error) => plainFailure(context, error);
+  // As main.ts mutate(): every error that leaves the queued work also raises its own notice.
+  h.host.mutate = work => { const result = Promise.resolve().then(work); result.catch(error => h.notices.push(String(error?.message ?? error))); return result; };
+  h.view.openAiCardPopover(h.node('A'));
+  type(h, 'My draft');
+  await h.repo.updateNote(h.node('A').path, { prompt: 'Changed elsewhere' });
+  h.saveButton().click();
+  await until(() => h.notices.length > 0);
+  await dom.tick(); await dom.tick();
+  const shown = h.notices.map(n => String(n.message ?? n));
+  assert.equal(shown.length, 1, shown.join(' | '));
+  assert.equal(/changed-configuration/.test(shown[0]), false, shown[0]);
+});
+
+test('P3.3 refusal reasons are localized in English, Traditional and Simplified Chinese; an unknown code gives none', () => {
+  const ui = require('./support-replay.cjs').loadSource(`
+export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";
+export { setUiLanguage, t } from "./i18n";
+`, { obsidian });
+  const codes = ['empty-prompt', 'self-reference', 'living-node-cycle', 'map-file-source', 'unauthorized-source', 'missing-source', 'ambiguous-source', 'changed-configuration', 'changed-target'];
+  const seen = new Map();
+  try {
+    for (const language of ['en', 'zh-TW', 'zh-CN']) {
+      ui.setUiLanguage(language);
+      for (const code of codes) {
+        const key = ui.livingSaveReason(new Error(code));
+        assert.ok(key, code);
+        const text = ui.t(key);
+        assert.ok(text && text !== key && !text.includes(code), `${language} ${code}: ${text}`);
+        if (!seen.has(code)) seen.set(code, new Set());
+        seen.get(code).add(text);
+      }
+    }
+  } finally { ui.setUiLanguage('en'); }
+  for (const [code, texts] of seen) assert.equal(texts.size, 3, `${code}: three languages`);
+  assert.equal(ui.livingSaveReason(new Error('some free text')), null);
 });
 
 test('save path: existing AI card is one undoable configuration edit; source IDs and manual content are preserved', async () => {
@@ -1121,6 +1278,58 @@ test('replaced sources: the card lists the links whose note was replaced; none f
   eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), []);
   store.created('Notes/Ref.md', { ctime: 99, size: 5 }); stampRef(99);
   eq(await h.runtime.livingReplacedSources(h.app, h.repo, h.mapDoc, h.node('solo').id), ['Ref']);
+});
+
+// B23: a map file (Map.md, or any note marked `visual-agent-map`) is VAM's own data, not a note to read first.
+const OTHER_MAP = 'Agent Workspace/Topics/map-b/Map.md';
+const withOtherMap = async h => {
+  await h.app.vault.create(OTHER_MAP, core.serializeMap({ id: 'map-b', title: 'Secret map B', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }));
+  await h.app.vault.create('Maps/Old.md', '---\nvisual-agent-map: true\n---\n# Old map\n');
+  await h.app.vault.create('Notes/Ref.md', 'reference body');
+};
+const saveReason = require('./support-replay.cjs').loadSource('export { livingSaveReason } from "./experiences/visual-map/living-node-trial-reason";', { obsidian });
+
+test('map files as sources: the note picker leaves out every map file and keeps ordinary notes', async () => {
+  const h = await harness([['solo', null]]);
+  await withOtherMap(h);
+  const paths = h.runtime.livingNoteCandidates(h.app, h.app.vault.getMarkdownFiles()).map(file => file.path);
+  assert.ok(paths.includes('Notes/Ref.md'), 'an ordinary note stays a candidate');
+  assert.ok(paths.includes(h.node('solo').path), 'a topic note stays a candidate');
+  for (const path of [MAP, OTHER_MAP, 'Maps/Old.md']) assert.ok(!paths.includes(path), path + ' is not offered');
+});
+
+test('map files as sources: saving one as a source writes nothing and is refused with a reason', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts' }]]);
+  await withOtherMap(h);
+  const before = h.raw('solo');
+  for (const link of ['Agent Workspace/Topics/map-b/Map', 'Maps/Old']) {
+    const error = await h.runtime
+      .saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[' + link + ']]')
+      .then(() => null, e => e);
+    assert.ok(error, link + ' is refused');
+    assert.equal(error.message, 'map-file-source');
+    assert.equal(saveReason.livingSaveReason(error), 'ui.living_node_reason_map_file');
+    assert.equal(h.raw('solo'), before, 'nothing written');
+  }
+  // An ordinary note still saves.
+  await h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[Ref]]');
+  assert.match(h.raw('solo'), /note-path:Notes\/Ref\.md/);
+});
+
+test('map files as sources: a saved reference to one stays in the file, is not read, and the card says why', async () => {
+  const h = await harness([['solo', null, { prompt: 'Find facts\nSources: [[Ref]]' }]]);
+  await withOtherMap(h);
+  await h.runtime.saveLivingConfig(h.app, h.repo, h.mapDoc, h.node('solo').id, 'Find facts\nSources: [[Ref]]');
+  const file = h.app.vault.getAbstractFileByPath(h.node('solo').path);
+  await h.app.vault.process(file, text => text.replace('note-path:Notes/Ref.md', 'note-path:' + OTHER_MAP));
+  assert.ok(h.raw('solo').includes('note-path:' + OTHER_MAP));
+  await h.roundPort().run();
+  assert.ok(!h.calls.some(call => JSON.stringify(call.input).includes('Secret map B')), 'the map file is not sent');
+  assert.equal(h.calls.length, 0, 'the card does not run');
+  assert.ok(h.raw('solo').includes('note-path:' + OTHER_MAP), 'the reference stays');
+  assert.equal(h.raw('solo').match(/^living-node-reason: "(.*)"$/m)?.[1], 'map-file-source');
+  const living = S.load('experiences/visual-map/living-node-state.ts');
+  assert.equal(living.livingReasonKey({ damaged: false, outcome: 'blocked', reason: 'map-file-source' }), 'ui.living_node_reason_map_file');
 });
 
 test('reconfirm: the identity is confirmed only after the formal save succeeded, and only for the chosen link', async () => {

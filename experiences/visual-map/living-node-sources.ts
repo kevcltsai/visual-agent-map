@@ -68,11 +68,13 @@ export interface LivingAuthorizedNote {
   path: string;
   /** The file at this path is not provably the note that was bound: replaced, deleted-and-recreated or unverifiable. */
   unresolved?: true;
+  /** A VAM map file (Map.md): VAM's own data, never read as a source. */
+  mapFile?: true;
 }
 
 export interface LivingSourceFailure {
   ref: LivingSourceRef;
-  reason: "missing-or-unauthorized" | "self-reference" | "ambiguous" | "source-replaced";
+  reason: "missing-or-unauthorized" | "self-reference" | "ambiguous" | "source-replaced" | "map-file";
   required: boolean;
 }
 
@@ -147,6 +149,10 @@ export function createLivingSourceResolver(nodes: readonly LivingSourceNode[], p
       }
       if (!note?.identity || !note.path) {
         fail(ref, "missing-or-unauthorized", role);
+        return;
+      }
+      if (note.mapFile) {
+        fail(ref, "map-file", role);
         return;
       }
       if (note.path === target.path) {

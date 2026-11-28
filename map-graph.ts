@@ -137,11 +137,24 @@ export function descendants(nodes: MapNode[], id: string): Set<string> {
   walkDescendants(childIndex(nodes), id, found);
   return found;
 }
-export function visibleNodes(nodes: MapNode[]): MapNode[] {
+/**
+ * The nodes the canvas draws: everything not under a collapsed branch. `rootId` narrows the result to that node and its
+ * branch (a view-only focus; the branch is drawn by its own collapsed flags, whatever its ancestors say), and `expand`
+ * names collapsed branches to draw open for now. Both are optional; without them the result is what it always was.
+ */
+export function visibleNodes(nodes: MapNode[], options?: { rootId?: string; expand?: ReadonlySet<string> }): MapNode[] {
   const index = childIndex(nodes);
+  let pool = nodes;
+  if (options?.rootId && nodes.some(node => node.id === options.rootId)) {
+    const branch = new Set([options.rootId]);
+    walkDescendants(index, options.rootId, branch);
+    pool = nodes.filter(node => branch.has(node.id));
+  }
   const hidden = new Set<string>();
-  for (const node of nodes) if (node.collapsed && !hidden.has(node.id)) walkDescendants(index, node.id, hidden);
-  return nodes.filter(node => !hidden.has(node.id));
+  for (const node of pool)
+    if (node.collapsed && !options?.expand?.has(node.id) && !hidden.has(node.id))
+      walkDescendants(index, node.id, hidden);
+  return pool.filter(node => !hidden.has(node.id));
 }
 /**
  * Sets every branch's collapsed flag at once. `shownLevels` is how many levels below the roots stay visible:

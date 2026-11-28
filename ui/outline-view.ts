@@ -28,10 +28,14 @@ export class OutlineView extends ItemView {
   private tempOpen = new Set<string>();
   private query = "";
   private activePath = "";
+  /** What the outline last drew from (see setMap), so an unchanged repaint does not rebuild it. */
+  private content = "";
   private dragId: string | null = null;
   private dropRow: HTMLElement | null = null;
   /** A row that took focus before a move rebuilds the tree: focus returns to the same topic. */
   private refocusId: string | null = null;
+  /** Set by render() for the renderTree() it runs: the focused row read before the pane was emptied. */
+  private keepFocusPath: string | undefined;
   private reasonEl: HTMLElement | null = null;
   constructor(
     leaf: WorkspaceLeaf,
@@ -61,10 +65,24 @@ export class OutlineView extends ItemView {
     const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
     const restoreFocus = !!search && search === document.activeElement;
     const selection = restoreFocus ? ([search.selectionStart, search.selectionEnd] as const) : null;
+    // Every full map repaint hands the outline its content again; when nothing the outline shows changed, keep the tree
+    // (rows, active row, temporary opens) instead of rebuilding it. The label text is included so a language change redraws.
+    const content = JSON.stringify([
+      t("ui.topic_outline"),
+      map?.title,
+      !!map?.aim,
+      map?.nodes.map(node => [node.id, node.parentId, node.path]),
+      [...titles],
+      [...markers],
+      [...links]
+    ]);
+    const same = content === this.content && !!this.contentEl.querySelector(".vam-outline-tree");
+    this.content = content;
     this.map = map;
     this.titles = titles;
     this.markers = markers;
     this.links = links;
+    if (same) return;
     if (map) {
       this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
       this.tempOpen = new Set([...this.tempOpen].filter(id => this.collapsed.has(id)));
@@ -96,10 +114,13 @@ export class OutlineView extends ItemView {
       .filter(id => !open.has(id))
       .concat([...open].filter(id => !this.tempOpen.has(id)));
     this.tempOpen = open;
+    // A lazy fill draws the new active row already marked and points activeEl at it; keep the previous row so it is cleared.
+    const previous = this.activeEl;
     for (const id of [...open].filter(id => changed.includes(id))) {
       const branch = this.branches.get(id);
       if (branch && !branch.filled) branch.fill();
     }
+    this.activeEl = previous;
     for (const id of changed) {
       const closed = this.collapsed.has(id) && !open.has(id);
       const branch = this.branches.get(id);
@@ -140,7 +161,14 @@ export class OutlineView extends ItemView {
     }
     activeRow?.scrollIntoView?.({ block: "nearest" });
   }
+  /** The path of the outline row that has the keyboard focus, read before a rebuild takes it out of the document. */
+  private focusedRowPath(): string | undefined {
+    const focused = (this.contentEl.ownerDocument as Document | undefined)?.activeElement;
+    return [...this.noteEls].find(([, el]) => el === focused)?.[0];
+  }
   private render(): void {
+    // Emptying the pane drops the focus to the body at once, so the focused row is read here, before it.
+    this.keepFocusPath ??= this.focusedRowPath();
     this.contentEl.empty();
     this.contentEl.addClass("vam-outline");
     const heading = this.contentEl.createDiv("vam-outline-heading");
@@ -152,6 +180,7 @@ export class OutlineView extends ItemView {
         cls: "vam-outline-empty",
         text: t("ui.open_a_mind_map_to_see_its_topic_hierarchy_here")
       });
+      this.keepFocusPath = undefined;
       return;
     }
     const input = this.contentEl.createEl("input", {
@@ -263,6 +292,9 @@ export class OutlineView extends ItemView {
     row.addClass(`is-drop-${place}`);
   }
   private renderTree(): void {
+    // A full render (a map change: a move can bring two in a row) gives the row that had the keyboard focus its focus back.
+    const focusedPath = this.keepFocusPath;
+    this.keepFocusPath = undefined;
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
     this.branches.clear();
@@ -383,7 +415,7 @@ export class OutlineView extends ItemView {
       const path = this.map.nodes.find(node => node.id === this.refocusId)?.path;
       this.refocusId = null;
       if (path) this.noteEls.get(path)?.focus();
-    }
+    } else if (focusedPath) this.noteEls.get(focusedPath)?.focus();
     if (!tree.childElementCount) {
       tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
       if (query)

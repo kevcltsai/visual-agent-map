@@ -2553,10 +2553,11 @@ const addRoot = (ref, title, parentId = '') => ({ kind: 'add_child', parentId, t
 const children = (h, id) => h.view.map.nodes.filter(n => n.parentId === id);
 const titleOf = async (h, node) => (await h.repo.readNote(node.path)).title;
 
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
 integrationTest('B1 core: a root card plus three levels, tied together with new:<ref>, are built on an empty map with the same parent/child shape as the reply', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); assert.equal(h.view.map.nodes.length, 0);
   const lines = await apply(h, [addRoot('r', 'Coffee'), addRoot('o', 'Origins', 'new:r'), addRoot('p', 'Processing', 'new:r'), addRoot('e', 'Ethiopia', 'new:o'), addRoot('w', 'Washed', 'new:p'), addRoot('x', 'Anaerobic', 'new:p')]);
-  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 7, 'six cards: the sixth line is the automatic layout');
+  eq(lines.slice(0, 6).map(l => l.status), Array(6).fill('done'), JSON.stringify(lines)); assert.equal(lines.length, 6, 'six cards: one line each, no whole-map layout line (A9)');
   const saved = await h.saved(); assert.equal(saved.length, 6);
   const byTitle = {}; for (const n of saved) byTitle[await titleOf(h, n)] = n;
   assert.equal(byTitle.Coffee.parentId, null); assert.equal(byTitle.Origins.parentId, byTitle.Coffee.id); assert.equal(byTitle.Processing.parentId, byTitle.Coffee.id);
@@ -2782,14 +2783,15 @@ integrationTest('B1 view operations: collapse, expand, auto layout and focus eac
   assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
   await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
 });
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
 integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view shows the whole map and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
   const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
   const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   const four = await counted(); const fourLines = await apply(four, tree(4));
   assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); eq(four.fits, []); eq([four.view.selection.state.selected], [four.view.map.nodes.find(n => !n.parentId).id]); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
   const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
-  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
-  assert.equal(fiveLines.at(-1).text, 'Arranged the map automatically after adding many topics', 'it comes after every card line');
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(!fiveLines.some(l => /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines)); // A9: the batch is placed locally, no whole-map layout line
+  assert.equal(fiveLines.length, 5, 'one line per card, nothing after the last card line'); // A9: no whole-map layout line any more
   const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
   assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
   const skipped = await counted(); const skippedLines = await apply(skipped, [...tree(5).slice(0, 4), { kind: 'add_child', parentId: 'ghost', title: 'Lost', summary: '', ref: '' }, { kind: 'add_child', parentId: 'ghost', title: 'Lost 2', summary: '', ref: '' }]);
@@ -3209,7 +3211,7 @@ integrationTest('UX B10: "Create an empty mind map" clears the draft typed on th
   const box = element('div'); h.view.fillEmptyMap(box);
   assert.match(visibleText(box), /This mind map has no topics yet\./); assert.doesNotMatch(visibleText(box), /＋ Topic|\+ Topic/, 'no pointer to the removed toolbar button');
   const addButtons = findAll(box, i => i.tag === 'button');
-  assert.equal(addButtons.length, 1, 'the empty canvas has exactly one add button'); assert.equal(addButtons[0].text, '+ Add first topic');
+  assert.deepEqual(addButtons.map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the empty canvas has the one "Add first topic" button and, since V3.3 A7, the secondary "✦ AI root" after it');
   const opened = []; h.view.openAddMenu = (event, parent) => opened.push([event, parent]);
   addButtons[0].click(); assert.equal(opened.length, 1); assert.equal(opened[0][1], null, 'the button adds a top-level topic');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -3349,8 +3351,8 @@ integrationTest('B1 ui: Escape on any control of the window folds it; the view\'
 integrationTest('B1 ui: Tab order follows the document: the reference chips, then the message field, then Send', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
   const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
-  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : i.text === 'Off' || i.text === 'On' ? 'switch' : 'other');
-  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'switch', 'switch', 'input', 'model', 'send'], 'the auto-apply Off/On row sits above the field; the model menu is in the composer, between the field and Send');
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : hasClass(i, 'vam-map-chat-resume-open') ? 'resume' : i.tag === 'select' ? 'model' : i.text === 'Off' || i.text === 'On' ? 'switch' : 'other');
+  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'switch', 'switch', 'resume', 'input', 'model', 'send'], 'the auto-apply Off/On row sits above the field; the resume-summary button (P4.8) is just above the field; the model menu is in the composer, between the field and Send');
   assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
 });
 
@@ -3623,7 +3625,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 1, 'the idle empty canvas has the one "Add first topic" button');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.deepEqual(findAll(box, i => i.tag === 'button').map(b => b.text), ['+ Add first topic', '✦ AI root'], 'the idle empty canvas has "Add first topic" and the V3.3 A7 "✦ AI root"');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');
@@ -3967,10 +3969,12 @@ integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions
   assert.equal(lines.filter(l => l.status === 'done').length, 11); assert.equal(h.view.map.nodes.length, 10);
   eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
 });
-integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once)', async () => {
+// A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
+integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once) (A9: local placement)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
   let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
-  const lines = await apply(h, spread()); assert.ok(lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one layout, no extra local step'); eq(overlaps(h.view.map.nodes), []);
+  const lines = await apply(h, spread()); assert.ok(!lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one placement, no extra local step');
+  eq(overlaps(h.view.map.nodes), []);
 });
 
 // ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------
@@ -6020,10 +6024,12 @@ const looksOf = async (h, key) => { const note = await h.note(key); return { col
 integrationTest('chat 08: set_appearance sets colour, markers and styles on every card it names, with the panel\'s writes; the note text stays', async () => {
   const h = await harness(); await h.view.hydrate();
   const before = { a: h.contents.get(h.node('a').path), b: h.contents.get(h.node('b').path) };
-  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold', 'text-large'] })]);
+  // P1.10b: a removed marker id the model still sends is dropped without an error; the status marker is set.
+  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'star', 'priority-2'], formats: ['bold', 'text-large'] })]);
   eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Done: Set the appearance of 2 topics');
   for (const key of ['a', 'b']) {
-    eq(await looksOf(h, key), { color: 'red', markers: ['priority-2', 'flag-red'], style: ['bold', 'text-large'] });
+    eq(await looksOf(h, key), { color: 'red', markers: ['star'], style: ['bold', 'text-large'] });
+    assert.doesNotMatch(h.contents.get(h.node(key).path), /flag-red|priority-2/, 'a removed id is not written');
     assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
   }
   eq(await looksOf(h, 'c'), { color: null, markers: [], style: [] }, 'other cards are untouched');
@@ -6038,12 +6044,12 @@ integrationTest('chat 08 / L1: set_appearance counts the cards it could not touc
   const clean = await apply(h, [lookAct([h.ids.b], { color: 'red' })]);
   assert.doesNotMatch(clean[0].text, /skipped/, 'no filtered card, nothing to count');
 });
-integrationTest('chat 08: a single-choice marker group keeps one value and the text size one choice, as in the panel', async () => {
+integrationTest('chat 08: the text size keeps one choice, as in the panel (P1.10b: the single-choice marker groups are gone)', async () => {
   const h = await harness();
   const path = h.node('a').path;
-  await h.repo.writeTopicMarkers(path, 'priority-1'); await h.repo.writeTopicMarkers(path, 'progress-25'); await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
-  await apply(h, [lookAct([h.ids.a], { markers: ['priority-4', 'progress-100'], formats: ['text-large'] })]);
-  eq(await looksOf(h, 'a'), { color: null, markers: ['priority-4', 'progress-100'], style: ['text-large'] });
+  await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
+  await apply(h, [lookAct([h.ids.a], { formats: ['text-large'] })]);
+  eq(await looksOf(h, 'a'), { color: null, markers: [], style: ['text-large'] });
 });
 integrationTest('chat 08: set_appearance clears a colour, every marker and every style; unknown frontmatter values stay', async () => {
   const h = await harness(); const path = h.node('a').path;
@@ -6063,14 +6069,14 @@ integrationTest('chat 08: a card that already looks like that is not written, an
 });
 integrationTest('chat 08: a real send carries each card\'s appearance (default left out); an unknown value is counted as skipped and writes nothing', async () => {
   const h = await harness(); const path = h.node('a').path;
-  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'flag-blue'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
+  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'star'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
   const before = h.contents.get(h.node('b').path);
   h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.b], color: 'pink' }] }), request.context);
   h.open(); h.type('make it pink'); await h.view.sendMapChat();
   await until(() => !h.view.chat.isBusy);
   const outline = JSON.parse(h.control.requests[0].context.json).outline;
   const card = id => outline.find(n => n.id === id);
-  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['flag-blue']); eq(card(h.ids.a).formats, ['bold']);
+  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['star']); eq(card(h.ids.a).formats, ['bold']);
   assert.equal(['color', 'markers', 'formats'].some(key => key in card(h.ids.b)), false);
   assert.equal(h.contents.get(h.node('b').path), before);
   assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
@@ -6748,7 +6754,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 32 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 33 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -10335,4 +10341,46 @@ integrationTest('map chat: configure_ai_card on an existing AI card applies when
   const unseen = await apply(h3, [{ kind: 'configure_ai_card', nodeId: h3.ids.a, content: 'New prompt' }], {}, undefined, topicBaseline(h3, { full: false }));
   eq(unseen.map(l => l.status), ['skipped']); assert.match(unseen[0].text, /was not shown/);
   assert.equal(h3.contents.get(path3), before3);
+});
+
+// ---- P4.8 resume summary: the panel's local, read-only block (no message, no turn, no record) ------------------------------------
+const summaryItem = (extra = {}) => ({ kind: 'research', subject: 'Competitor prices', nodeId: 'a', recordId: '20261126-100000-bbbbbb', turn: 1, at: '2026-11-26T10:00:00.000Z', ...extra });
+const summaryBlock = f => find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume'));
+const summaryButtons = f => findAll(summaryBlock(f), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-resume-locate'));
+function summaryFixture(summary, extra = {}) {
+  const located = []; const calls = { summary: 0 };
+  const f = panelFixture({ resumeSummary: async () => { calls.summary++; return summary; }, locateTopic: id => { located.push(id); return id !== 'gone'; }, ...extra });
+  f.panel.setOpen(true);
+  return { f, located, calls, open: async () => { find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')).click(); await tick(); } };
+}
+test('P4.8 resume: the entry shows each item with a Locate button; Locate centres the card and adds no message', async () => {
+  const { f, located, open } = summaryFixture({ state: 'items', items: [summaryItem(), summaryItem({ kind: 'unfinished', subject: 'Company C', nodeId: 'b' })] });
+  await open();
+  assert.equal(summaryBlock(f).hidden, false);
+  assert.match(visibleText(summaryBlock(f)), /Resume summary \(read only\)/); assert.match(visibleText(summaryBlock(f)), /Researched “Competitor prices”/); assert.match(visibleText(summaryBlock(f)), /Not finished: “Company C”/);
+  summaryButtons(f)[1].click(); eq(located, ['b']);
+  assert.equal(f.panel.hasMessages, false, 'the summary is not a message'); eq(f.panel.completedTurns(), []);
+});
+test('P4.8 resume: a deleted card says it cannot be located and has no button; an item with no card shows its record under it', async () => {
+  const { f, open } = summaryFixture({ state: 'items', items: [summaryItem({ nodeId: 'deleted-card' }), summaryItem({ kind: 'recent', subject: 'Summarise', nodeId: undefined })] }, {});
+  await open();
+  const text = visibleText(summaryBlock(f));
+  assert.match(text, /Cannot locate/); assert.equal(summaryButtons(f).length, 1, 'only the item that can be located has a button');
+  const record = find(findAll(summaryBlock(f), i => i.tag === 'li')[1], i => hasClass(i, 'vam-map-chat-resume-record')); assert.match(record.text, /20261126-100000-bbbbbb/);
+  assert.equal(record.hidden, true); summaryButtons(f)[0].click(); assert.equal(record.hidden, false);
+});
+test('P4.8 resume: no records says there is not enough data; closing, a new conversation and a late answer leave nothing behind', async () => {
+  const { f, open, calls } = summaryFixture({ state: 'empty', items: [] });
+  await open(); assert.match(visibleText(summaryBlock(f)), /Not enough data/); assert.equal(summaryButtons(f).length, 0);
+  findAll(summaryBlock(f), i => hasClass(i, 'vam-map-chat-resume-close'))[0].click(); assert.equal(summaryBlock(f).hidden, true);
+  await open(); assert.equal(summaryBlock(f).hidden, false); f.panel.reset(); assert.equal(summaryBlock(f).hidden, true);
+  let release; const slow = summaryFixture({ state: 'empty', items: [] }, { resumeSummary: () => new Promise(resolve => { release = () => resolve({ state: 'empty', items: [] }); }) });
+  find(slow.f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')).click(); slow.f.panel.reset(); release(); await tick();
+  assert.equal(summaryBlock(slow.f).hidden, true, 'a summary that arrives after the reset is not shown'); assert.equal(calls.summary, 2);
+});
+test('P4.8 resume: a host without the summary has no entry; the words follow the interface language', async () => {
+  const bare = panelFixture(); assert.equal(find(bare.panel.el, i => hasClass(i, 'vam-map-chat-resume-open')), undefined);
+  const { f, open } = summaryFixture({ state: 'empty', items: [] });
+  f.setLanguage('zh-TW'); f.panel.relabel(); await open(); assert.match(visibleText(summaryBlock(f)), /資料不足，沒有可恢復的紀錄/); assert.match(visibleText(find(f.panel.el, i => hasClass(i, 'vam-map-chat-resume-open'))), /恢復摘要/);
+  f.setLanguage('en');
 });

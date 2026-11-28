@@ -28,6 +28,7 @@ import {
 } from "../../core/map-chat-layout";
 import { MapChatPaintScope } from "./map-chat-paint-scope";
 import type { ResumeItem, ResumeSummary } from "../../core/map-chat-resume";
+import type { ImpactItem, ImpactResult } from "../../core/map-impact";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -702,6 +703,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private resumeSummaryShown: ResumeSummary | null = null;
   /** Counts the presses and resets, so an answer that comes late is not shown after the panel moved on. */
   private resumeSummarySeq = 0;
+  private impactEl: HTMLElement | null = null;
+  /** The impact analysis shown now (F09; rebuilt in place after a language change); null while it is closed. */
+  private impactShown: ImpactResult | null = null;
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
@@ -1856,6 +1860,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
     this.closeResume();
+    this.closeImpact();
     this.paintScope.reset();
     this.rows = new WeakMap();
     this.messages = [];
@@ -2136,6 +2141,85 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
   }
 
+  // ---- impact analysis (F09): local, read only; never a message, never recorded -------------------------------------------------
+
+  /** Shows the impact of one card in the window (opened if it was folded). Built by the view from this map only. */
+  showImpact(result: ImpactResult): void {
+    this.impactShown = result;
+    this.setOpen(true);
+    this.renderImpact();
+  }
+  private closeImpact(): void {
+    this.impactShown = null;
+    if (this.impactEl) {
+      this.impactEl.empty();
+      this.impactEl.hidden = true;
+    }
+  }
+  private impactRows(box: HTMLElement, heading: string, items: readonly ImpactItem[], hidden: number): void {
+    box.createDiv({ cls: "vam-map-chat-impact-heading", text: `${heading} (${items.length + hidden})` });
+    if (!items.length) {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_none") });
+      return;
+    }
+    const list = box.createEl("ul", { cls: "vam-map-chat-resume-list" });
+    for (const item of items) {
+      const row = list.createEl("li", { cls: `vam-map-chat-resume-item is-${item.section}` });
+      const label = item.refId ? item.title || t("ui.map_chat_impact_reference_card") : item.title;
+      row.createSpan({ cls: "vam-map-chat-resume-text", text: `“${label}”` });
+      if (item.section === "direct")
+        row.createSpan({
+          cls: "vam-map-chat-resume-record",
+          text: item.kinds.map(kind => t(`ui.map_chat_impact_kind_${kind}`)).join(" · ")
+        });
+      else
+        row.createSpan({
+          cls: "vam-map-chat-resume-record",
+          text: t("ui.map_chat_impact_guess_0", item.matched ?? "")
+        });
+      if (this.host.topicTitle(item.nodeId) === null) {
+        row.createSpan({ cls: "vam-map-chat-resume-gone", text: t("ui.map_chat_resume_unlocatable") });
+        continue;
+      }
+      const locate = row.createEl("button", {
+        cls: "vam-map-chat-resume-locate vam-map-chat-impact-locate",
+        text: t("ui.map_chat_resume_locate"),
+        attr: { type: "button" }
+      });
+      locate.addEventListener("click", () => void this.host.locateTopic?.(item.nodeId));
+    }
+    if (hidden)
+      box.createDiv({ cls: "vam-map-chat-resume-note", text: t("ui.map_chat_impact_more_0", String(hidden)) });
+  }
+  private renderImpact(): void {
+    const box = this.impactEl;
+    const result = this.impactShown;
+    if (!box || !result) return;
+    box.empty();
+    box.hidden = false;
+    const title = t("ui.map_chat_impact_title_0", result.targetTitle);
+    box.setAttr("aria-label", title);
+    const head = box.createDiv("vam-map-chat-resume-head");
+    head.createSpan({ cls: "vam-map-chat-resume-title", text: title });
+    const close = head.createEl("button", {
+      cls: "vam-map-chat-resume-close clickable-icon",
+      attr: { type: "button", "aria-label": t("ui.map_chat_impact_close") }
+    });
+    setIcon(close, "x");
+    close.addEventListener("click", () => this.closeImpact());
+    if (result.state === "missing") {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_missing") });
+      return;
+    }
+    box.createDiv({ cls: "vam-map-chat-resume-note", text: t("ui.map_chat_impact_note") });
+    if (result.state === "empty") {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_impact_empty") });
+      return;
+    }
+    this.impactRows(box, t("ui.map_chat_impact_direct"), result.direct, result.hidden.direct);
+    this.impactRows(box, t("ui.map_chat_impact_speculative"), result.speculative, result.hidden.speculative);
+  }
+
   private startNewConversation(): void {
     if (this.working) return;
     this.reset();
@@ -2288,6 +2372,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
+    this.impactEl = form.createDiv({ cls: "vam-map-chat-impact", attr: { role: "region" } });
+    this.impactEl.hidden = true;
     if (this.host.resumeSummary) {
       this.resumeEl = form.createDiv({ cls: "vam-map-chat-resume", attr: { role: "region" } });
       this.resumeEl.hidden = true;
@@ -2453,6 +2539,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.renderResumeButton();
     this.renderResume();
+    this.renderImpact();
     this.renderPlaceholder();
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));

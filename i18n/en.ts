@@ -1288,6 +1288,7 @@ export const en = {
   "ui.living_node_save_reason_ambiguous": "More than one card matches a source note",
   "ui.living_node_source_line_0_1": "Source: {0} ({1})",
   "ui.living_node_generated_0": "Generated: {0}",
+  "ui.living_node_trial_waiting_consent": "Press Agree in the usage dialog to start the trial.",
   "ui.living_node_source_replaced": "The source note was replaced and needs to be confirmed again.",
   "ui.living_node_suppressed_dropped_0": "Skipped {0} proposed observation(s) you deleted earlier.",
   "ui.living_node_optional_source_unavailable":

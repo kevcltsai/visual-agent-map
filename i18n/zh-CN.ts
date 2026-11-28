@@ -1217,6 +1217,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.living_node_save_reason_ambiguous": "有多张卡片对应同一个来源笔记",
   "ui.living_node_source_line_0_1": "来源：{0}（{1}）",
   "ui.living_node_generated_0": "生成时间：{0}",
+  "ui.living_node_trial_waiting_consent": "请在用量对话框按同意后才会开始试跑。",
   "ui.living_node_source_replaced": "来源已被取代，需重新确认",
   "ui.living_node_suppressed_dropped_0": "已略过 {0} 条你先前删除过的观察。",
   "ui.living_node_optional_source_unavailable": "部分地图级可选来源无法读取；本次结果仅使用可取得的资料。",

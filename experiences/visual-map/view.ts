@@ -17365,6 +17365,7 @@ export class VisualAgentMapView extends ItemView {
     const node = (): MapNode | undefined => this.map?.nodes.find(item => item.id === entry.nodeId);
     return {
       topicTitle: () => this.notes.get(entry.nodeId)?.title ?? node()?.path ?? "",
+      mapSourceCount: () => this.mapSourcesControl?.sourceCount ?? 0,
       anchor: () => {
         const card = this.cardEls.get(entry.nodeId);
         const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");

@@ -10,7 +10,7 @@ const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts', { obsid
 const { t } = load('i18n.ts');
 const hasClass = (item, name) => dom.hasCls(item, name);
 
-function fixture({ anchor, submit, steer, stoppable } = {}) {
+function fixture({ anchor, submit, steer, stoppable, sources } = {}) {
   const docListeners = {};
   const doc = { activeElement: null, listeners: docListeners,
     addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); },
@@ -21,6 +21,7 @@ function fixture({ anchor, submit, steer, stoppable } = {}) {
   const calls = { submit: [], steer: [], stop: 0, close: 0, modes: [], opener: 0 };
   const host = {
     topicTitle: () => 'Premise',
+    mapSourceCount: () => (sources ? sources() : 0),
     anchor: anchor ?? (() => null),
     session: () => session,
     subscribe: fn => { watchers.push(fn); return () => { watchers.splice(watchers.indexOf(fn), 1); }; },
@@ -38,6 +39,8 @@ function fixture({ anchor, submit, steer, stoppable } = {}) {
   const win = new TopicChatWindow(host, opener, root);
   win.mount(root);
   const input = find(win.el, i => i.tag === 'textarea');
+  calls.selectAll = 0;
+  input.select = () => { calls.selectAll++; };
   const action = kind => find(win.el, i => i.tag === 'button' && i.text === t(`ui.topic_chat_${kind}`));
   const send = () => byLabel(win.el, t('ui.topic_chat_send'));
   const type = text => { input.value = text; input.input(); };
@@ -62,34 +65,36 @@ test('topic chat is a labelled dialog and the focus goes to the input', () => {
   assert.equal(f.doc.activeElement, f.input);
 });
 
-test('topic chat counterexample 2: grey text that was not adopted cannot be sent, Tab adopts it, typing overwrites it', async () => {
+test('E1a topic chat: a shortcut fills the box with its prompt and selects it all; it sends without Tab; an emptied box cannot be sent', async () => {
   const f = fixture();
   assert.equal(f.send().disabled, true, 'nothing chosen yet');
   f.action('expand').click();
-  assert.equal(f.input.value, '');
-  assert.equal(ghost(f), t('ui.topic_chat_suggest_expand'));
-  assert.equal(f.send().disabled, true);
+  assert.equal(f.input.value, t('ui.topic_chat_suggest_expand'), 'the prompt is in the box itself');
+  assert.equal(f.session.draftText, t('ui.topic_chat_suggest_expand'), 'and kept as the draft');
+  assert.equal(f.calls.selectAll, 1, 'all of it selected, so typing replaces it');
+  assert.equal(f.doc.activeElement, f.input);
+  assert.equal(f.input.attrs.placeholder, t('ui.topic_chat_placeholder'), 'no grey suggestion in the placeholder');
+  assert.equal(f.send().disabled, false, 'sendable without Tab');
   assert.equal(f.press('Enter'), true);
-  f.send().click();
-  await dom.tick();
-  assert.deepEqual(f.calls.submit, [], 'the runner was not called');
-  assert.equal(f.press('Tab'), true, 'Tab is taken over while a grey suggestion shows');
-  assert.equal(f.input.value, t('ui.topic_chat_suggest_expand'));
-  assert.equal(f.send().disabled, false);
-  f.send().click();
   await dom.tick();
   assert.deepEqual(f.calls.submit, [['expand', t('ui.topic_chat_suggest_expand')]]);
   assert.equal(f.input.value, '', 'a started run clears the input');
-  // Typing over the grey text: the typed text is what is sent.
+  // Typing over the selected prompt: the typed text is what is sent.
   f.action('research').click();
   f.type('only the risks');
-  assert.equal(f.send().disabled, false);
-  assert.equal(f.press('Enter'), true);
+  f.press('Enter');
   await dom.tick();
   assert.deepEqual(f.calls.submit[1], ['research', 'only the risks']);
+  // An emptied box keeps the button but has nothing to send.
+  f.action('synthesize').click();
+  f.type('');
+  assert.equal(f.send().disabled, true);
+  f.press('Enter'); f.send().click();
+  await dom.tick();
+  assert.equal(f.calls.submit.length, 2, 'the runner was not called');
 });
 
-test('topic chat Tab is native when there is no grey text; typing without a button is an ask, empty text is never sent', async () => {
+test('topic chat Tab is always native; typing without a button is an ask, empty text is never sent', async () => {
   const f = fixture();
   assert.equal(f.press('Tab'), false);
   f.type('   ');
@@ -104,8 +109,36 @@ test('topic chat Tab is native when there is no grey text; typing without a butt
   assert.deepEqual(f.calls.submit, [['ask', 'a free question']]);
   assert.equal(f.input.value, '', 'a started ask clears the input');
   f.action('research').click();
-  f.type('typed');
-  assert.equal(f.press('Tab'), false, 'with typed text Tab stays native');
+  assert.equal(f.press('Tab'), false, 'with the filled prompt Tab stays native');
+  f.type('');
+  assert.equal(f.press('Tab'), false, 'an emptied box does not bring the prompt back');
+  assert.equal(f.input.value, '');
+});
+
+test('E1a topic chat meta line under the input: scope, sources (this note + N data sources from the host), mode; three languages', () => {
+  let count = 0;
+  const f = fixture({ sources: () => count });
+  const meta = () => find(f.win.el, i => hasClass(i, 'vam-topic-chat-meta'));
+  const parts = () => meta().children.map(c => c.text);
+  const composer = find(f.win.el, i => hasClass(i, 'vam-topic-chat-composer'));
+  const kids = composer.children;
+  assert.ok(kids.indexOf(meta()) > kids.indexOf(f.input) && kids.indexOf(meta()) < kids.findIndex(c => hasClass(c, 'vam-topic-chat-foot')), 'between the input and the web box row');
+  assert.deepEqual(parts(), ['Scope: this card', "Sources: this card's note", 'Mode: no web']);
+  count = 1; f.refresh();
+  assert.equal(parts()[1], "Sources: this card's note + 1 data source");
+  count = 2; f.action('synthesize').click();
+  assert.deepEqual(parts(), ['Scope: this branch', "Sources: this card's note + 2 data sources", 'Mode: no web']);
+  f.web().checked = true; f.web().change();
+  assert.equal(parts()[2], 'Mode: web search', 'follows the web box');
+  const zhTW = load('i18n/zh-TW.ts').zhTW; const zhCN = load('i18n/zh-CN.ts').zhCN;
+  assert.equal(zhTW['ui.topic_chat_sources_note'], '來源：本卡筆記');
+  assert.equal(zhTW['ui.topic_chat_sources_note_map_0'], '來源：本卡筆記＋{0} 份資料來源');
+  assert.equal(zhTW['ui.topic_chat_meta_mode_quick'], '模式：不上網');
+  assert.equal(zhTW['ui.topic_chat_meta_mode_standard'], '模式：上網');
+  assert.equal(zhCN['ui.topic_chat_sources_note'], '来源：本卡笔记');
+  assert.equal(zhCN['ui.topic_chat_sources_note_map_0'], '来源：本卡笔记＋{0} 份数据源');
+  assert.equal(zhCN['ui.topic_chat_meta_mode_quick'], '模式：不上网');
+  assert.equal(zhCN['ui.topic_chat_meta_mode_standard'], '模式：上网');
 });
 
 test('topic chat shows an AI answer to a question through the markdown whitelist and the question as plain text', () => {
@@ -150,7 +183,7 @@ test('topic chat web search box: a checkbox that is checked exactly in the stand
 test('topic chat scope pill: this card by default, this branch when the draft is an integration', () => {
   const f = fixture();
   assert.equal(f.scope().text, t('ui.topic_chat_scope_card'));
-  assert.ok(hasClass(f.win.el.children.find(c => hasClass(c, 'vam-topic-chat-actions')).children[0], 'vam-topic-chat-scope'), 'first in the actions row');
+  assert.ok(hasClass(find(f.win.el, i => hasClass(i, 'vam-topic-chat-meta')).children[0], 'vam-topic-chat-scope'), 'first in the meta line');
   f.action('synthesize').click();
   assert.equal(f.scope().text, t('ui.topic_chat_scope_branch'));
   f.action('research').click();
@@ -203,7 +236,6 @@ test('topic chat Escape closes and gives the focus back to the opener', () => {
 test('topic chat keeps the input when the send is declined', async () => {
   const f = fixture({ submit: () => false });
   f.action('research').click();
-  f.press('Tab');
   f.send().click();
   await dom.tick();
   assert.equal(f.calls.submit.length, 1);
@@ -215,7 +247,6 @@ test('topic chat keeps the input when the send is declined', async () => {
 test('topic chat while running: shows the running line and disables the buttons and send', () => {
   const f = fixture();
   f.action('research').click();
-  f.press('Tab');
   f.session.running = true;
   f.refresh();
   assert.ok(findAll(f.win.el, i => i.text === t('ui.topic_chat_running')).length === 1);
@@ -405,19 +436,14 @@ test('topic chat send key is accent-filled when it can send, with a selector tha
   assert.doesNotMatch(base, /background|[; ]color:/, 'a disabled key keeps the grey fill');
 });
 
-test('topic chat counterexample 5: the grey text shows with no Tab label on screen, and Tab still adopts it', () => {
+test('topic chat counterexample 5 (E1a): no grey overlay and no Tab label; the prompt is plain text in the box', () => {
   const f = fixture();
   f.action('expand').click();
   assert.equal(findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-tab')).length, 0);
   assert.equal(findAll(f.win.el, i => /Tab/.test(i.text)).length, 0, 'no Tab label anywhere');
-  const ghostEl = find(f.win.el, i => hasClass(i, 'vam-topic-chat-ghost'));
-  const text = find(ghostEl, i => hasClass(i, 'vam-topic-chat-ph'));
-  assert.equal(text.text, t('ui.topic_chat_suggest_expand'));
-  assert.equal(ghostEl.hidden, false);
-  assert.ok(find(f.win.el, i => hasClass(i, 'vam-topic-chat-composer')).children.includes(ghostEl));
-  assert.equal(f.press('Tab'), true);
+  assert.equal(findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-ghost') || hasClass(i, 'vam-topic-chat-ph')).length, 0, 'the grey overlay is gone');
+  assert.equal(hasClass(f.input, 'is-ghost'), false);
   assert.equal(f.input.value, t('ui.topic_chat_suggest_expand'));
-  assert.equal(ghostEl.hidden, true, 'adopted: the grey line goes away');
 });
 
 test('topic chat destroy releases every listener and the host subscription', () => {
@@ -550,6 +576,17 @@ integrationTest('topic chat counterexample 7: the card menu (AI explore) and the
   h.view.selection.setSelected(h.ids.b);
   assert.equal(h.view.mapCommand('ai-explore', false), true);
   assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.b, 'the command opens the topic chat');
+});
+
+integrationTest('E1a topic chat meta line counts the map sources (saved and outside the vault) the data sources button counts', async () => {
+  const h = await harness();
+  const sources = () => find(h.win().el, i => hasClass(i, 'vam-topic-chat-sources'))?.text;
+  h.view.openTopicChat(h.node('a'));
+  assert.equal(sources(), t('ui.topic_chat_sources_note'), 'no map sources');
+  h.view.mapSourcesControl.mapSources = [{ kind: 'file', path: 'Ref/one.md' }, { kind: 'folder', path: 'Ref' }];
+  h.view.mapSourcesControl.externalSources = [{ label: 'Papers' }];
+  h.view.closeTopicChatWindow(); h.view.openTopicChat(h.node('a'));
+  assert.equal(sources(), t('ui.topic_chat_sources_note_map_0', 3));
 });
 
 integrationTest('topic chat entries: the empty suggestion panel, the card toolbar Research and the right-click entry open the topic chat; no entry opens the old dialog', async () => {

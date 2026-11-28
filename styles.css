@@ -1883,7 +1883,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-steer.is-queued { border-left-style: dashed; border-left-color: var(--text-muted); }
 .vam-topic-chat-steer.is-queued .vam-topic-chat-steer-tag { color: var(--text-muted); }
 .vam-topic-chat-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.vam-topic-chat-scope { align-self: center; padding: 1px 8px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
 .vam-topic-chat-other-ways { align-self: flex-start; font-size: var(--font-ui-smaller); }
 .vam-topic-chat-action { padding: 3px 10px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-primary); color: var(--text-normal); font-size: var(--font-ui-small); cursor: pointer; }
 .vam-topic-chat-action.is-active { border-color: var(--interactive-accent); background: var(--interactive-accent); color: var(--text-on-accent); }
@@ -1894,11 +1893,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
 /* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. The class order (.has-topic-chat first) keeps scripts/viewer-css.mjs from pulling this rule into the share viewer. */
 .has-topic-chat.vam-canvas-overlay { z-index: 5; }
-.vam-topic-chat-input, .vam-topic-chat-ghost { padding: 0; font: inherit; line-height: var(--line-height-normal); }
-.vam-topic-chat-input.is-ghost::placeholder { color: transparent; }
+.vam-topic-chat-input { padding: 0; font: inherit; line-height: var(--line-height-normal); }
 .vam-topic-chat-input::placeholder { color: var(--text-faint); }
-.vam-topic-chat-ghost { position: absolute; top: 8px; left: 8px; right: 8px; color: var(--text-faint); overflow-wrap: anywhere; pointer-events: none; }
-.vam-topic-chat-ghost[hidden] { display: none; }
+.vam-topic-chat-meta { display: flex; flex-wrap: wrap; gap: 2px 10px; min-width: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-chat-meta > span { min-width: 0; overflow-wrap: anywhere; }
 .vam-topic-chat-foot { display: flex; align-items: center; gap: 6px; }
 .vam-topic-chat-web { display: inline-flex; align-items: center; gap: 4px; margin-right: auto; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
 .vam-topic-chat-send svg { width: 13px; height: 13px; }

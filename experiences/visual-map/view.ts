@@ -5296,6 +5296,8 @@ export class VisualAgentMapView extends ItemView {
   private tidy: (TidyPreview & { branchId?: string; mapId: string; signature: string }) | null = null;
   private tidyBarEl: HTMLElement | null = null;
   private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
+  /** Where focus was when the preview opened; given back when it closes. */
+  private tidyReturnFocus: HTMLElement | null = null;
   private tidyArrange(map: MapDocument, branchId?: string): void {
     if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
     else this.arrangeAll(map);
@@ -5303,6 +5305,8 @@ export class VisualAgentMapView extends ItemView {
   private openTidyPreview(branchId?: string): void {
     if (!this.map || this.presentation || this.notesLoading()) return;
     this.clearTidy(false);
+    const active = activeDocument.activeElement as HTMLElement | null;
+    this.tidyReturnFocus = active && this.contentEl.contains(active) ? active : null;
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
@@ -5332,6 +5336,9 @@ export class VisualAgentMapView extends ItemView {
     const had = this.tidy !== null;
     this.tidy = null;
     if (had && repaint && !this.closed) this.render();
+    const back = this.tidyReturnFocus;
+    this.tidyReturnFocus = null;
+    if (had && !this.closed) (back?.isConnected ? back : this.viewportEl)?.focus?.({ preventScroll: true });
   }
   /** One undo step. A map that changed since the preview is previewed again instead of written. */
   private applyTidy(): void {

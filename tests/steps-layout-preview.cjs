@@ -79,15 +79,16 @@ test('A10: a card the preview does not know keeps its own position; shown() over
 // A10 review: the view clears the preview on any map change, leaves Esc inside inputs alone, and ignores Enter with nothing to move.
 const S = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+const doc = { activeElement: null };
 const { VisualAgentMapView } = load(
   'experiences/visual-map/view.ts',
   { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } },
-  { window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o) }
+  { activeDocument: doc, window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o) }
 );
 function tidyView(moves) {
   const view = Object.create(VisualAgentMapView.prototype);
   const listeners = [];
-  view.contentEl = { addEventListener: (_t, fn) => listeners.push(fn), removeEventListener: (_t, fn) => listeners.splice(listeners.indexOf(fn), 1) };
+  view.contentEl = { contains: () => true, addEventListener: (_t, fn) => listeners.push(fn), removeEventListener: (_t, fn) => listeners.splice(listeners.indexOf(fn), 1) };
   view.map = mapOf('right');
   view.presentation = false;
   view.notesLoading = () => false;
@@ -144,4 +145,24 @@ test('A10 review: Enter with an empty preview does not apply', () => {
   const moving = tidyView(true);
   moving.listeners[0](key('Enter', plain));
   assert.equal(moving.view.applied, 1);
+});
+
+test('A10 focus: closing the preview gives focus back to what had it; a removed element falls back to the viewport', () => {
+  const focusable = () => { const el = { isConnected: true, calls: 0, focus() { this.calls++; } }; return el; };
+  const card = focusable();
+  doc.activeElement = card;
+  const a = tidyView(true);
+  a.view.viewportEl = focusable();
+  a.listeners[0](key('Escape', plain));
+  assert.equal(card.calls, 1);
+  assert.equal(a.view.viewportEl.calls, 0);
+  const gone = focusable();
+  doc.activeElement = gone;
+  const b = tidyView(true);
+  b.view.viewportEl = focusable();
+  gone.isConnected = false;
+  b.listeners[0](key('Escape', plain));
+  assert.equal(gone.calls, 0);
+  assert.equal(b.view.viewportEl.calls, 1);
+  doc.activeElement = null;
 });

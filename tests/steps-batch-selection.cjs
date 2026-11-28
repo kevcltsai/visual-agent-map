@@ -55,7 +55,7 @@ test('B19a: a selection with an AI-locked card refuses Move to and Merge as a wh
   h.select(['A', 'B', 'C']);
   const before = h.files(), history = h.view.history.past.length;
   const bar = h.bar();
-  const reason = translate('en', 'ui.selection_locked_0_1', 1, 'B');
+  const reason = translate('en', 'ui.selection_locked_one_0', 'B');
   for (const text of ['Move to…', 'Merge']) {
     const button = buttonOf(bar, text);
     assert.equal(button.attrs['aria-disabled'], 'true', text); assert.equal(button.disabled, false, `${text} stays focusable`);
@@ -77,6 +77,7 @@ test('B19a: a selection with an AI-locked card refuses Move to and Merge as a wh
   assert.equal(buttonOf(free, 'Move to…').attrs['aria-disabled'], undefined); assert.equal(buttonOf(free, 'Merge').attrs['aria-disabled'], undefined);
   assert.equal(free.children.some(child => child.cls.includes('vam-selection-why')), false);
   assert.equal(translate('zh-TW', 'ui.selection_locked_0_1', 1, '研究摘要'), '△ 其中 1 張已鎖定或正在合併（研究摘要），這一組不能改顏色、尺寸、位置或合併。把它移出選取，或先解除鎖定。', 'the ticket wording');
+  assert.equal(translate('zh-TW', 'ui.selection_locked_one_0', '研究摘要'), '△ 其中 1 張已鎖定或正在合併（研究摘要），這一組不能改顏色、尺寸、位置或合併。把它移出選取，或先解除鎖定。', 'the ticket wording for the one card shown');
 });
 
 test('B19a: a merging card in the selection refuses the same way and the reason lists every refused card', async () => {
@@ -165,7 +166,7 @@ test('B19b: an AI-locked or merging card in the selection turns Color off with t
   h.select(['A', 'B', 'C']);
   const ids = ['A', 'B', 'C'].map(title => h.named(title).id);
   const before = h.files(), history = h.view.history.past.length;
-  const reason = translate('en', 'ui.selection_locked_0_1', 1, 'B');
+  const reason = translate('en', 'ui.selection_locked_one_0', 'B');
   const { bar, button, pop } = openColor(h);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.disabled, false); assert.equal(button.attrs.title, reason);
   assert.equal(bar.children.filter(child => child.cls.includes('vam-selection-why')).map(child => child.text).join(), reason, 'one reason line for Color, Move to and Merge');
@@ -295,7 +296,7 @@ test('B19c: an AI-locked or merging card in the selection turns Size off with th
   h.select(['A', 'B', 'C']);
   const ids = ['A', 'B', 'C'].map(title => h.named(title).id);
   const before = h.files(), history = h.view.history.past.length;
-  const reason = translate('en', 'ui.selection_locked_0_1', 1, 'B');
+  const reason = translate('en', 'ui.selection_locked_one_0', 'B');
   const { button, pop } = openSize(h);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.disabled, false); assert.equal(button.attrs.title, reason);
   assert.equal(pop, null, 'no popover');
@@ -327,4 +328,61 @@ test('B19c: an old AIM map has no Size button and its write entry writes nothing
   popButton(pop, 'Apply to 2 cards')[0].fire('click');
   await h.settled();
   assert.deepEqual(await sizes(h, ['A', 'B', 'C']), [['A', 320, undefined], ['B', undefined, undefined], ['C', 320, undefined]]);
+});
+
+// B19c follow-ups: the English reason picks its singular for one card, and no reason on the bar, under it or in its ⋯ menu
+// keeps a raw {0}.
+test('B19c: one locked card reads "1 of them is locked", two read "2 of them are locked", in all three languages', async () => {
+  const h = await harness(SPEC);
+  await h.repo.writeAiLocked(h.named('B').path, true);
+  await h.view.hydrate();
+  h.select(['A', 'B', 'C']);
+  const why = bar => bar.children.find(child => child.cls.includes('vam-selection-why'))?.text;
+  const one = why(h.bar());
+  assert.match(one, /^△ 1 of them is locked or being merged \(B\), so this group/); assert.match(one, /Take it out of the selection, or unlock it first\.$/);
+  await h.repo.writeAiLocked(h.named('C').path, true);
+  await h.view.hydrate();
+  const two = why(h.bar());
+  assert.match(two, /^△ 2 of them are locked or being merged \(B, C\), so this group/); assert.match(two, /Take them out of the selection, or unlock them first\.$/);
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    assert.doesNotMatch(translate(language, 'ui.selection_locked_one_0', 'B'), /\{\d+\}/, language);
+    assert.doesNotMatch(translate(language, 'ui.selection_locked_0_1', 2, 'B, C'), /\{\d+\}/, language);
+  }
+  assert.match(translate('zh-CN', 'ui.selection_locked_one_0', 'B'), /^△ 其中 1 张已锁定或正在合并（B）/);
+});
+
+test('B19c: no disabled reason on the selection bar, under it, or under a greyed row of its ⋯ menu keeps a raw {0}', async () => {
+  const h = await harness(SPEC);
+  const texts = [];
+  const collect = () => {
+    const bar = h.bar();
+    for (const child of bar.children) {
+      if (child.attrs?.title) texts.push(child.attrs.title);
+      if (child.cls.includes('vam-selection-why')) texts.push(child.text);
+    }
+    const reasons = [];
+    h.view.newMenu = () => { const m = { addItem(build) { const chain = { setTitle() { return chain; }, setIcon() { return chain; }, setDisabled() { return chain; }, onClick() { return chain; } }; chain.dom = { setAttr(name, value) { if (name === 'title') reasons.push(value); }, addClass() {}, createDiv(v) { reasons.push(v.text); return {}; } }; build(chain); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+    h.view.openSelectionMoreMenu({}, h.view.selection.state.multiSelected.size);
+    texts.push(...reasons);
+  };
+  h.select(['A', 'A1', 'B']);
+  collect(); // the ancestor merge reason
+  await h.repo.writeAiLocked(h.named('B').path, true);
+  await h.view.hydrate();
+  collect();
+  h.view.isMerging = id => id === h.named('C').id;
+  h.select(['A', 'B', 'C']);
+  collect();
+  h.view.notesLoading = () => true;
+  collect();
+  h.view.notesLoading = () => false;
+  h.select(['Root']);
+  collect(); // one topic: Synthesize and Merge need two
+  assert.ok(texts.length >= 6, `reasons were collected: ${texts.length}`);
+  for (const text of texts) assert.doesNotMatch(text, /\{\d+\}/, text);
+  // Every view entry that turns an action's reason into text fills its {0}, {1}… from reasonArgs.
+  const view = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const calls = view.match(/\bt\((availability|state)\.reasonKey[^)]*\)/g) ?? [];
+  assert.ok(calls.length >= 4, `the reason entries were found: ${calls.length}`);
+  for (const call of calls) assert.match(call, /reasonArgs/, call);
 });

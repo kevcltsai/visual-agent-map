@@ -234,7 +234,7 @@ test('card actions: selection reasons that come from the selection itself', () =
   // B19a: one locked card of three names only that card; the lock is said before mergeCheck's reason; a merging card
   // below a selected one (not itself selected) still gives Move to the old merging reason.
   const oneLocked = ctxFor(['a', 'd', 'b'], 'normal', { note: id => (id === 'd' ? { prompt: '', aiLocked: true } : { prompt: '' }), mergeBlock: () => 'ui.merge_ancestor_selected' });
-  const lockOne = { ok: false, reasonKey: 'ui.selection_locked_0_1', reasonArgs: [1, 'D'] };
+  const lockOne = { ok: false, reasonKey: 'ui.selection_locked_one_0', reasonArgs: ['D'] };
   eq(availability('merge', 'toolbar', oneLocked), lockOne);
   eq(availability('move-to', 'toolbar', oneLocked), lockOne);
   eq(availability('batch-color', 'toolbar', oneLocked), lockOne);

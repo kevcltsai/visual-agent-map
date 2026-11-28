@@ -1060,6 +1060,8 @@ export const en = {
   "ui.card_action_off_presentation": "Not available during a presentation",
   "ui.card_action_off_multi_select": "Not available while selecting several topics",
   "ui.card_action_off_no_lockable": "None of the selected cards can be locked",
+  "ui.selection_locked_one_0":
+    "△ 1 of them is locked or being merged ({0}), so this group cannot change color, size, position or merge. Take it out of the selection, or unlock it first.",
   "ui.selection_locked_0_1":
     "△ {0} of them are locked or being merged ({1}), so this group cannot change color, size, position or merge. Take them out of the selection, or unlock them first.",
   "ui.batch_color": "Color ▾",

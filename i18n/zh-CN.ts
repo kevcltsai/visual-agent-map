@@ -999,6 +999,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_action_off_presentation": "演示中无法使用",
   "ui.card_action_off_multi_select": "选择多个议题时无法使用",
   "ui.card_action_off_no_lockable": "选取的卡都不能锁定",
+  "ui.selection_locked_one_0":
+    "△ 其中 1 张已锁定或正在合并（{0}），这一组不能改颜色、尺寸、位置或合并。把它移出选取，或先解除锁定。",
   "ui.selection_locked_0_1":
     "△ 其中 {0} 张已锁定或正在合并（{1}），这一组不能改颜色、尺寸、位置或合并。把它移出选取，或先解除锁定。",
   "ui.batch_color": "颜色 ▾",

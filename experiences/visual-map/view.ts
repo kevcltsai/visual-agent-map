@@ -10917,7 +10917,7 @@ export class VisualAgentMapView extends ItemView {
     const run = (event: MouseEvent): void => {
       const now = { ...this.cardActionContext(node), surface: "toolbar" as const };
       const state = action.available(now);
-      if (!state.ok) new Notice(t(state.reasonKey));
+      if (!state.ok) new Notice(t(state.reasonKey, ...(state.reasonArgs ?? [])));
       else action.run(now, { opener: button, newTab: event.metaKey || event.ctrlKey });
     };
     button.addEventListener("click", event => (plain ? run(event) : this.whenEditing(() => run(event))));
@@ -11141,7 +11141,7 @@ export class VisualAgentMapView extends ItemView {
         if (!availability.ok) {
           item.setDisabled(true);
           (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
-          this.menuHint(item, t(availability.reasonKey), "vam-menu-reason");
+          this.menuHint(item, t(availability.reasonKey, ...(availability.reasonArgs ?? [])), "vam-menu-reason");
           return;
         }
         if (action.id === "add-other") {
@@ -21064,9 +21064,10 @@ export class VisualAgentMapView extends ItemView {
         if (!availability.ok) {
           // The reason goes under the greyed row (a menu item has no subtitle of its own).
           const dom = (item as unknown as { dom?: HTMLElement }).dom;
-          dom?.setAttr?.("title", t(availability.reasonKey));
+          const why = t(availability.reasonKey, ...(availability.reasonArgs ?? []));
+          dom?.setAttr?.("title", why);
           dom?.addClass?.("vam-menu-item-has-why");
-          dom?.createDiv?.({ cls: "vam-menu-item-why", text: t(availability.reasonKey) });
+          dom?.createDiv?.({ cls: "vam-menu-item-why", text: why });
         }
       });
     });

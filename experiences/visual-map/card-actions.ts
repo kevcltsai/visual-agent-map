@@ -254,9 +254,11 @@ const merging = (ctx: CardActionContext, ids: Iterable<string | null>): CardAvai
  */
 const selectionLock = (ctx: CardActionContext): CardAvailability => {
   const locked = ctx.ids.filter(id => ctx.note(id)?.aiLocked === true || ctx.isMerging(id));
-  return locked.length
-    ? { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] }
-    : OK;
+  if (!locked.length) return OK;
+  // English needs its singular for one card.
+  return locked.length === 1
+    ? { ok: false, reasonKey: "ui.selection_locked_one_0", reasonArgs: [ctx.titles(locked)] }
+    : { ok: false, reasonKey: "ui.selection_locked_0_1", reasonArgs: [locked.length, ctx.titles(locked)] };
 };
 const branch = (ctx: CardActionContext, id: string): string[] => {
   const out = [id];

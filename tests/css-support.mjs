@@ -131,3 +131,20 @@ test('A5: a locked card is not dimmed; it says "locked" in words instead (V3.3 P
   for (const line of css.split('\n').filter(l => /data-ai-locked/.test(l))) assert.ok(!/opacity/.test(line), `no dimming: ${line.slice(0, 80)}`);
   assert.match(css, /\.vam-card-ai-lock-label\b/);
 });
+
+test("B28: the card edge entries keep a 22px screen height when zoomed out (same counter-scale as the card toolbar, origin on the anchored corner)", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  const COUNTER = "max(1, calc(1 / var(--vam-zoom, 1)))";
+  const rules = {};
+  postcss.parse(css).walkRules((rule) => {
+    rule.walkDecls("scale", (d) => { rules[rule.selector] = { scale: d.value, origin: rule.nodes.find((n) => n.prop === "transform-origin")?.value }; });
+  });
+  const tools = rules[".vam-node > .vam-node-tools"];
+  assert.equal(tools?.scale, COUNTER, "the toolbar counter-scale this mirrors");
+  const origins = { right: "0 0", down: "0 0", left: "100% 0", up: "0 100%" };
+  for (const [side, origin] of Object.entries(origins)) {
+    const entry = rules[`.vam-node > .vam-card-edge.is-edge-${side}`];
+    assert.equal(entry?.scale, COUNTER, `${side}: counter-scale`);
+    assert.equal(entry?.origin, origin, `${side}: origin on the corner that touches the card`);
+  }
+});

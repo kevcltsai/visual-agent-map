@@ -4263,10 +4263,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-edge.vam-edge-prompt { stroke: var(--text-faint); stroke-width: 1.2; }
 .vam-node.is-layout-preview { border-style: solid; box-shadow: 0 0 0 2px var(--interactive-accent), var(--shadow-s); }
 .vam-node > .vam-card-edge { position: absolute; display: flex; gap: var(--vam-space-2); z-index: 2; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.12s ease; }
-.vam-node > .vam-card-edge.is-edge-right { left: 100%; top: 50%; flex-direction: column; align-items: flex-start; transform: translate(var(--vam-space-1), -50%); }
-.vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%); }
-.vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1)); }
-.vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1))); }
+.vam-node > .vam-card-edge.is-edge-right { left: 100%; top: 50%; flex-direction: column; align-items: flex-start; transform: translate(var(--vam-space-1), -50%);; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 0; }
+.vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%);; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 100% 0; }
+.vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1));; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 0; }
+.vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1)));; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 100%; }
 .vam-card-edge .vam-card-edge-button { height: 22px /* A2 mockup */; padding: 0 var(--vam-space-2); border-radius: 999px /* pill, A2 */; border: 1px solid var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
 .vam-card-edge .vam-card-edge-button:hover { background: var(--vam-accent); color: var(--vam-surface); }
 .vam-card-edge .vam-card-edge-button:focus-visible { outline: 2px solid var(--vam-focus); outline-offset: 2px; }

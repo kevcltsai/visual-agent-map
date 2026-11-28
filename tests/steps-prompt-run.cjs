@@ -620,6 +620,54 @@ test('D2-4 dependency highlight: selecting an AI card marks the planner edges in
   assert.equal(draws, 0, 'selection never redraws the edges');
 });
 
+test('D2-4 dependency highlight: a structural change drops the stale graph (no highlight until the next hydrate); a position-only change keeps it', async () => {
+  const h = await harness([['A', null], ['B', 'A'], ['X', null]]);
+  const { view } = h;
+  const id = key => h.node(key).id;
+  await view.hydrate();
+  assert.ok(view.livingGraph);
+  view.render = () => {};
+  const setup = () => {
+    view.cardEls = new Map(view.map.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+    view.edgesEl = dom.createSvg('svg');
+    view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+    view.drawEdges();
+  };
+  const marks = () => view.edgesEl.children.filter(c => c.classes?.some(cls => cls.startsWith('is-dep') || cls === 'vam-edge-dep-overlay'));
+  // Position only (and the sibling order, as a drop among siblings rewrites it): the planner sees the same cards.
+  await view.mapChange(map => {
+    map.nodes.find(n => n.id === id('B')).x += 40;
+    map.nodes.reverse();
+  });
+  assert.ok(view.livingGraph, 'a position-only write keeps the graph');
+  await view.mapChange(map => { map.nodes.find(n => n.id === id('B')).parentId = id('X'); });
+  setup();
+  view.applySelectionChange(view.selection.click(id('A')));
+  assert.equal(marks().length, 0, 'the old parent shows no A>B line or overlay');
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().length, 0, 'the new parent waits for the next hydrate');
+  await view.hydrate();
+  setup();
+  view.applySelectionChange(view.selection.click(id('X')));
+  assert.equal(marks().filter(c => c.classes.includes('is-dep-run')).length, 1, 'after hydrate X marks X>B');
+});
+
+test('D2-4 dependency highlight: an AI child reading its ordinary parent marks the tree line, no overlay', async () => {
+  const h = await harness([['P', null, { noAi: true }], ['C', 'P']]);
+  const { view } = h;
+  const file = h.app.vault.getAbstractFileByPath(h.node('C').path);
+  await h.app.vault.process(file, text => text.replace(/^---\n/, '---\nliving-node-refs:\n' + `  - "card:${h.node('P').id}"\n`));
+  await view.hydrate();
+  view.cardEls = new Map(h.mapDoc.nodes.map((n, i) => [n.id, Object.assign(element('div'), { offsetLeft: i * 400, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 })]));
+  view.edgesEl = dom.createSvg('svg');
+  view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  view.drawEdges();
+  view.applySelectionChange(view.selection.click(h.node('C').id));
+  const tree = view.edgeEls.get(`${h.node('P').id}\u0000${h.node('C').id}`);
+  assert.ok(tree.classes.includes('is-dep-read'));
+  assert.equal(view.edgesEl.children.filter(c => c.classes?.includes('vam-edge-dep-overlay')).length, 0);
+});
+
 test('card face: a star and one state glyph by the name, the question line under it; done has no glyph, locked has none', async () => {
   const h = await harness([['a', null, { prompt: 'Why is the sky blue?\nsecond line' }]]);
   const node = h.node('a');

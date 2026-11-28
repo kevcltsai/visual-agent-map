@@ -6648,6 +6648,11 @@ export class VisualAgentMapView extends ItemView {
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    // The dependency graph comes from the cards, paths and parents (not their order or place); after a change to those it is
+    // stale and highlights nothing until the next hydrate brings it back.
+    const planned = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+    if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
       if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
         await this.plugin.rebuildDerivedData();
@@ -27198,7 +27203,8 @@ export class VisualAgentMapView extends ItemView {
     const mark = (pairs: [string, string][], cls: string): void => {
       for (const [consumer, dep] of pairs) {
         const key = `${consumer}\u0000${dep}`;
-        const path = this.edgeEls.get(key);
+        // A child that reads its parent shares the parent's tree line (keyed parent first).
+        const path = this.edgeEls.get(key) ?? this.edgeEls.get(`${dep}\u0000${consumer}`);
         if (path) {
           path.addClass(cls);
           this.depMarks.push(path);

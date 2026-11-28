@@ -1,7 +1,6 @@
 // P1.12 performance baseline: measures interaction latency of the mind-map view in a harness-launched test Obsidian over CDP.
 //   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]
-//   --ai marks every fixture card but perf-b1 an AI card (ai-card: true), so selection exercises the dependency highlight;
-//   perf-b1 stays ordinary because the expand measurement folds it with Space, which does not fold an AI card.
+//   --ai marks every fixture card an AI card (ai-card: true), so selection exercises the dependency highlight.
 // The vault must be harness-owned (made by `node scripts/test-harness.mjs --session=<name>`, already running and trusted).
 // For numbers to compare (P1.12 stage B against the stage A baseline), use a fresh session vault per run: fixture maps from
 // earlier runs stay in the vault and raise heap and batch times.
@@ -60,7 +59,7 @@ export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count
   const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
   const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai && card.id !== "perf-b1" ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
   }));
   return { mapPath: `${folder}/Map.md`, files: [{ path: `${folder}/Map.md`, text: map }, ...notes] };
 }
@@ -197,13 +196,20 @@ async function measureMap(cdp, samples) {
   if (!branch) throw new Error("Branch card perf-b1 is not on screen.");
   await mouse(cdp, "mousePressed", branch.x, branch.y, 1);
   await mouse(cdp, "mouseReleased", branch.x, branch.y);
-  if (!(await cdp.evaluate(`document.activeElement?.closest?.('.vam-node')?.dataset.nodeId==="perf-b1"`)))
-    await cdp.evaluate(`${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')?.focus()`);
+  // Space folds only when the card itself has focus (not a button inside it).
+  const branchCard = `${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')`;
+  if (!(await cdp.evaluate(`document.activeElement===${branchCard}`))) await cdp.evaluate(`${branchCard}?.focus()`);
   const folded = `${view}.map.nodes.find(n=>n.id==="perf-b1").collapsed===true`;
   for (let i = 0; i < samples; i++) {
     const before = await cdp.evaluate(folded);
     out.expand.push(await measureInput(cdp, "keydown", "keyup", () => cdp.press("Space")));
-    if ((await cdp.evaluate(folded)) === before) throw new Error("Space on the branch card did not fold or unfold it.");
+    // The fold is queued and may land after the measured frames on a busy machine: poll for it (20 ms, up to about 2 s).
+    let flipped = false;
+    for (let wait = 0; wait < 100 && !flipped; wait++) {
+      flipped = (await cdp.evaluate(folded)) !== before;
+      if (!flipped) await delay(20);
+    }
+    if (!flipped) throw new Error("Space on the branch card did not fold or unfold it.");
   }
   // Summary: update_summary through the map-chat apply path with a fixture action (no provider).
   for (let i = 0; i < samples; i++) {

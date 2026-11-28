@@ -22,15 +22,11 @@ test("perf fixture files are one map plus one note per card under the topic fold
   assert.ok(files.slice(1).every(file => file.text.includes("agent-map-node: true") && file.text.includes("## Current Summary")));
 });
 
-test("perf fixture --ai marks every card but the folded branch an AI card; the default fixture has none", () => {
+test("perf fixture --ai marks every card an AI card; the default fixture has none", () => {
   const plain = perfFixtureFiles("Perf Fixture T").files.slice(1);
   assert.ok(plain.every(file => !file.text.includes("ai-card:")));
-  const files = perfFixtureFiles("Perf Fixture T", "Agent Workspace", PERF_CARD_COUNT, { ai: true }).files.slice(1);
-  const branch = files.filter(file => file.path.endsWith("/perf-b1.md"));
-  assert.equal(branch.length, 1);
-  assert.ok(!branch[0].text.includes("ai-card:"), "the expand measurement folds perf-b1 with Space");
-  const ai = files.filter(file => !branch.includes(file));
-  assert.equal(ai.length, PERF_CARD_COUNT - 1);
+  const ai = perfFixtureFiles("Perf Fixture T", "Agent Workspace", PERF_CARD_COUNT, { ai: true }).files.slice(1);
+  assert.equal(ai.length, PERF_CARD_COUNT);
   assert.ok(ai.every(file => /^---\n[\s\S]*\nai-card: true\n---\n/.test(file.text) && file.text.includes("## Prompt")));
 });
 

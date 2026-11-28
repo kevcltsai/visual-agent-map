@@ -6,6 +6,7 @@ import { markPictureParagraphs } from "./experiences/markdown-context/picture-pa
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
 import { registerBookFigures } from "./experiences/book-figures/register";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
+import { KnowledgeIndex } from "./experiences/visual-map/knowledge-retrieval";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
@@ -245,6 +246,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   mermaidZoom: MermaidZoomHandle | null = null;
   settings: Settings = { ...DEFAULT_SETTINGS };
   repo!: Repository;
+  /** Past cards a chat message can find (P4.1), in memory only; any vault change drops it. */
+  readonly knowledgeIndex = new KnowledgeIndex(() => this.repo.knowledgeRefIO());
   /** Reads the note style files once per run and resolves a topic's style; writes files only on a user action. */
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
@@ -1787,6 +1790,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
   }
   registerVaultEvents(): void {
+    // A rename, a delete, a new or changed note or map can change which cards exist or are authorised: the next message reads them again.
+    for (const event of ["modify", "create", "delete", "rename"] as const)
+      this.registerEvent(this.app.vault.on(event as "modify", () => this.knowledgeIndex.invalidate()));
     this.registerEvent(
       this.app.vault.on("modify", file => {
         if (file instanceof TFile) this.collectUnsynced(file.path);

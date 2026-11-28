@@ -95,6 +95,7 @@ import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from ".
 import { CrossMapSearch } from "./cross-map-search";
 import { renderCrossMapResults } from "./cross-map-results";
 import type { CorpusCard } from "./cross-map-corpus";
+import { findCards } from "./knowledge-retrieval";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -3052,12 +3053,43 @@ export class VisualAgentMapView extends ItemView {
     this.chatOtherCards.set(key, { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath });
     new Notice(t("ui.map_search_chat_added_0", card.title));
   }
-  /** The waiting cards for this message, read again now under the reference rules (a card that is gone, archived or unreadable is dropped), then forgotten. */
-  async takeOtherMapCards(): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
-    const picked = [...this.chatOtherCards.values()];
+  /**
+   * Past cards of other maps whose words match the message (P4.1): the in-memory index, never this map's own cards and never one the
+   * user already added. A failure to read leaves the message as it was.
+   */
+  private async findPastCards(message: string, signal: AbortSignal): Promise<CorpusCard[]> {
+    const map = this.map;
+    if (!map || !this.plugin.knowledgeIndex) return [];
+    try {
+      const cards = await this.plugin.knowledgeIndex.get();
+      if (signal.aborted) return [];
+      return findCards(cards, message, {
+        mapId: map.id,
+        keys: new Set([...this.chatOtherCards.values()].map(card => `${card.mapId}\u0000${card.nodeId}`))
+      });
+    } catch {
+      return [];
+    }
+  }
+  /**
+   * The waiting cards for this message (the ones the user added first, then `found` ones), read again now under the reference rules
+   * (a card that is gone, archived or unreadable is dropped), then forgotten. The found ones carry `foundByAi` and are named in a
+   * notice that can locate each.
+   */
+  async takeOtherMapCards(
+    found: readonly CorpusCard[] = []
+  ): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
+    const added = [...this.chatOtherCards.values()].map(card => ({
+      ...card,
+      foundBy: undefined as CorpusCard | undefined
+    }));
     this.chatOtherCards.clear();
+    const picked = [
+      ...added,
+      ...found.map(card => ({ mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath, foundBy: card }))
+    ].slice(0, MAP_CHAT_OTHER_CARDS_LIMIT);
     if (!picked.length) return [];
-    const found = await resolveKnowledgeRefs(
+    const resolved = await resolveKnowledgeRefs(
       picked.map((card, index) => ({
         id: String(index),
         mapId: card.mapId,
@@ -3067,20 +3099,43 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.repo.knowledgeRefIO(),
       { withBody: true }
     );
-    return picked.flatMap((_, index) => {
-      const card = found.get(String(index));
-      return card?.ok
-        ? [
-            {
-              mapTitle: card.mapTitle,
-              title: card.title,
-              summary: card.summary ?? "",
-              detail: card.detail ?? "",
-              notePath: card.notePath
-            }
-          ]
-        : [];
+    const sentFound: CorpusCard[] = [];
+    const cards = picked.flatMap((pick, index) => {
+      const card = resolved.get(String(index));
+      if (!card?.ok) return [];
+      if (pick.foundBy) sentFound.push(pick.foundBy);
+      return [
+        {
+          mapTitle: card.mapTitle,
+          title: card.title,
+          summary: card.summary ?? "",
+          detail: card.detail ?? "",
+          notePath: card.notePath,
+          ...(pick.foundBy ? { foundByAi: true } : {})
+        }
+      ];
     });
+    if (sentFound.length) this.noticeFoundCards(sentFound);
+    return cards;
+  }
+  /** "AI found N past cards", each a link that locates it, so a reply that names a card can be followed. */
+  private noticeFoundCards(cards: readonly CorpusCard[]): void {
+    const make = (window as { createFragment?: typeof createFragment }).createFragment;
+    new Notice(
+      make
+        ? make(frag => {
+            frag.createSpan({ text: t("ui.map_chat_found_0", cards.length) });
+            for (const card of cards)
+              frag
+                .createEl("a", { text: `${card.mapTitle}: ${card.title}`, href: "#" })
+                .addEventListener("click", event => {
+                  event.preventDefault();
+                  void this.locateCrossMapCard(card);
+                });
+          })
+        : t("ui.map_chat_found_0", cards.length),
+      8000
+    );
   }
   /** The small "opened for search" labels; kept outside renderNode and removed whenever the marks are redone or the search ends. */
   private searchBadges: HTMLElement[] = [];
@@ -23970,7 +24025,7 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
-    const otherMapCards = await this.takeOtherMapCards();
+    const otherMapCards = await this.takeOtherMapCards(await this.findPastCards(message, signal));
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();

@@ -6666,6 +6666,10 @@ export class VisualAgentMapView extends ItemView {
         started();
         this.render();
       });
+      if (!this.mergeDrafts.failedDraft) {
+        this.mergeFailureNotice?.hide();
+        this.mergeFailureNotice = undefined;
+      }
     });
     if (accepted && !began && !signal.aborted) new Notice(t("ui.merge_draft_stale"));
     return began;
@@ -6720,20 +6724,30 @@ export class VisualAgentMapView extends ItemView {
     // Where the focus was when the merge ended: View draft puts it back there when its window closes.
     const back = this.contentEl?.ownerDocument?.activeElement;
     const found = String(check.missing.length + check.added.length);
-    this.mergeFailureNotice?.hide();
-    this.mergeFailureNotice = backgroundResultNotice(
-      `${t("ui.merge_check_failed_0_1", task.title, found)}\n${this.mergeFindings(check, MERGE_FINDINGS_NOTICE_LIMIT)}`,
-      [
-        { label: t("ui.merge_retry"), open: () => this.retryFailedMerge(task) },
-        { label: t("ui.merge_view_draft"), open: () => this.viewFailedMergeDraft(task, back) }
-      ],
-      0
-    );
+    this.showMergeFailure(task, back);
     const items = [...check.missing, ...check.added];
     const shown =
       items.slice(0, MERGE_FINDINGS_NOTICE_LIMIT).join(t("ui.list_separator")) +
       (items.length > MERGE_FINDINGS_NOTICE_LIMIT ? "…" : "");
     task.failedLine?.(t("ui.merge_check_failed_chat_0_1_2", task.title, found, shown));
+  }
+  /**
+   * The failure Notice of the kept draft (it stays until dismissed). Pressing either button hides it, so it is shown again
+   * when View draft closes or a Retry ends without starting, while that draft is still kept.
+   */
+  private showMergeFailure(task: MergeTask, back: Element | null | undefined): void {
+    const check = task.check;
+    if (!check || this.closed || this.mergeDrafts.failedDraft !== task) return;
+    const found = String(check.missing.length + check.added.length);
+    this.mergeFailureNotice?.hide();
+    this.mergeFailureNotice = backgroundResultNotice(
+      `${t("ui.merge_check_failed_0_1", task.title, found)}\n${this.mergeFindings(check, MERGE_FINDINGS_NOTICE_LIMIT)}`,
+      [
+        { label: t("ui.merge_retry"), open: () => this.retryFailedMerge(task, back) },
+        { label: t("ui.merge_view_draft"), open: () => this.viewFailedMergeDraft(task, back) }
+      ],
+      0
+    );
   }
   /** The kept draft of a failed merge goes (the map is switched); its Notice goes with it. */
   private dropFailedMergeDraft(): void {
@@ -6742,15 +6756,19 @@ export class VisualAgentMapView extends ItemView {
     this.mergeFailureNotice = undefined;
   }
   /** Retry of a failed merge: the user's press only; it starts the merge again through the usage notice, as the dialog does. */
-  private retryFailedMerge(task: MergeTask): void {
+  private retryFailedMerge(task: MergeTask, back: Element | null | undefined): void {
     if (this.closed || this.mergeDrafts.failedDraft !== task || this.path !== task.mapPath) {
       new Notice(t("ui.merge_draft_gone"));
       return;
     }
     if (this.mergeOpen || this.mergeDrafts.has(this.path)) {
       new Notice(t("ui.merge_locked"));
+      this.showMergeFailure(task, back);
       return;
     }
+    // A retry that did not start (usage declined, refused) leaves the draft kept: its Notice comes back. One that started
+    // dropped the draft (same cards), so nothing stale is shown.
+    const again = (): void => this.showMergeFailure(task, back);
     this.startMergeDraft(
       task.title,
       {
@@ -6766,7 +6784,15 @@ export class VisualAgentMapView extends ItemView {
         ...(task.keepTitle ? { keepTitle: true } : {}),
         ...(task.appearance ? { appearance: task.appearance } : {})
       }
-    ).catch(error => new Notice(this.plugin.recordFailure(t("log.merge_failed"), error)));
+    ).then(
+      began => {
+        if (!began) again();
+      },
+      error => {
+        new Notice(this.plugin.recordFailure(t("log.merge_failed"), error));
+        again();
+      }
+    );
   }
   /** The draft of a failed merge, read only and copyable; nothing can be applied from it. */
   private viewFailedMergeDraft(task: MergeTask, back: Element | null | undefined): void {
@@ -6787,6 +6813,7 @@ export class VisualAgentMapView extends ItemView {
         const earlier = back as HTMLElement | null | undefined;
         const target = earlier?.isConnected && earlier !== earlier.ownerDocument.body ? earlier : this.contentEl;
         target.focus();
+        this.showMergeFailure(task, back);
       }
     ).open();
   }

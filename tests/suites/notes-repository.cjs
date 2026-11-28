@@ -1390,6 +1390,57 @@ integrationTest('AI merge check: Retry declined at the usage notice keeps the dr
   assert.equal(h.usage.length, 2, 'the usage notice is asked'); assert.equal(h.asks.length, 2, 'nothing more is asked');
   assert.equal(h.view.mergeDrafts.failedDraft, task, 'the draft is kept'); assert.equal(h.view.mergeDrafts.tasks.size, 0);
 });
+// The failure Notice as the user sees it: pressing an action hides that Notice (backgroundResultNotice), so only a shown one can be pressed.
+const shownFailures = h => h.shim.Notice.all.filter(n => !n.hidden && String(n.message).startsWith('Nothing was merged into'));
+const pressFailure = (h, text) => {
+  const shown = shownFailures(h); assert.equal(shown.length, 1, `${text}: one failure Notice is on screen`);
+  shown[0].actions.find(a => a.text === text).click(); assert.equal(shown[0].hidden, true, `${text}: the press hides it`);
+  return shown[0];
+};
+const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve)); };
+const assertFailureShownAgain = (h, pressed, label) => {
+  const shown = shownFailures(h); assert.equal(shown.length, 1, `${label}: the failure Notice is shown again`);
+  assert.notEqual(shown[0], pressed); assert.equal(String(shown[0].message), String(pressed.message), `${label}: the same findings`);
+  assert.deepEqual(shown[0].actions.map(a => a.text), ['Retry', 'View draft'], label); assert.equal(shown[0].timeout, 0, `${label}: it stays until dismissed`);
+};
+integrationTest('AI merge check: closing View draft shows the failure Notice again with Retry and View draft', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy; h.view.contentEl = require('../support-dom.cjs').element('div');
+  const opened = []; const open = h.shim.Modal.prototype.open; h.shim.Modal.prototype.open = function () { opened.push(this); return open.call(this); };
+  const { task } = await h.begin(); await h.untilSettled(task);
+  const pressed = pressFailure(h, 'View draft'); assert.equal(opened.length, 1);
+  assert.equal(shownFailures(h).length, 0, 'not shown while the draft window is open');
+  opened[0].close(); assertFailureShownAgain(h, pressed, 'after close');
+  pressFailure(h, 'View draft'); assert.equal(opened.length, 2, 'the draft opens again from the shown Notice');
+});
+integrationTest('AI merge check: a Retry that does not start (usage declined, or another merge running) shows the failure Notice again and keeps the draft', async () => {
+  for (const scenario of ['declined', 'merging']) {
+    const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+    const { task } = await h.begin(); await h.untilSettled(task);
+    if (scenario === 'declined') h.decline = true; else h.view.mergeOpen = true;
+    const pressed = pressFailure(h, 'Retry'); await settle();
+    assert.equal(h.asks.length, 2, `${scenario}: nothing more is asked`); assert.equal(h.view.mergeDrafts.failedDraft, task, `${scenario}: the draft is kept`);
+    assertFailureShownAgain(h, pressed, scenario);
+  }
+});
+integrationTest('AI merge check: a Retry that starts shows no stale failure Notice, while running or after it merged', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); let calls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  h.answer = async () => (++calls <= 2 ? lossy : (await gate, good));
+  const { task } = await h.begin(); await h.untilSettled(task);
+  pressFailure(h, 'Retry'); await settle();
+  const retry = h.view.mergeDrafts.tasks.get(h.path); assert.ok(retry && retry !== task, 'the retry runs');
+  assert.equal(shownFailures(h).length, 0, 'no failure Notice while the retry runs');
+  release(); await h.untilSettled(retry); await settle();
+  assert.ok(await h.mergedNode('AI merged')); assert.equal(shownFailures(h).length, 0, 'none after it merged');
+});
+integrationTest('AI merge check: merging the same cards again drops the draft and hides its failure Notice', async () => {
+  const h = await aiMergeHarness({ details: checkedDetails }); h.answer = async () => lossy;
+  const { task } = await h.begin(); await h.untilSettled(task);
+  const [first] = shownFailures(h); assert.ok(first);
+  h.answer = async () => good; const { task: again } = await h.begin();
+  assert.equal(h.view.mergeDrafts.failedDraft, undefined, 'the draft is dropped'); assert.equal(first.hidden, true, 'its Notice goes with it');
+  await h.untilSettled(again); assert.equal(shownFailures(h).length, 0);
+});
 integrationTest('AI merge: a source edit after the source comparison and before the commit abandons the merge (plain and parent mode)', async () => {
   for (const mode of ['plain', 'parent']) {
     const h = await aiMergeHarness({ details: checkedDetails }); if (mode === 'parent') await parentOf(h);

@@ -22,6 +22,20 @@ export const toSimplifiedFold = (text: string): string => {
 export const foldSearchText = (text: string): string =>
   toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
 
+// Folding walks every character, so the folded text of an unchanged string (a long Detail) is kept between keystrokes.
+const foldedKept = new Map<string, string>();
+/** foldSearchText for text that is searched again and again; the kept results are cleared when they grow large. */
+export const foldSearchTextCached = (text: string): string => {
+  if (!text) return "";
+  let folded = foldedKept.get(text);
+  if (folded === undefined) {
+    if (foldedKept.size > 4000) foldedKept.clear();
+    folded = foldSearchText(text);
+    foldedKept.set(text, folded);
+  }
+  return folded;
+};
+
 /**
  * Counts script evidence in text.
  * traditional: characters that have a different Simplified form (keys of the table, e.g. 圖 發 髮 後 灣).

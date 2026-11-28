@@ -1141,8 +1141,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
     const links = new Map<string, string[]>();
     for (const [id, note] of notes) if (note.links?.length) links.set(id, note.links);
+    const bodies = new Map<string, string>();
+    for (const [id, note] of notes) if (note.summary || note.detail) bodies.set(id, `${note.summary}\n${note.detail}`);
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
-      if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles, markers, links);
+      if (leaf.view instanceof OutlineView) leaf.view.setMap(map, titles, markers, links, bodies);
   }
   /** Marks the active outline row without rebuilding the outline. */
   setOutlineActive(path: string): void {

@@ -645,6 +645,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_search_none": "没有符合",
   "ui.search_temp_open": "暂时展开",
   "ui.map_search_position_0_1_2": "{0}／{1}：{2}",
+  "ui.map_search_body_hit": "（内文）",
+  "ui.outline_body_match": "内文",
   "ui.map_search_close": "关闭搜索",
   "ui.presentation_start": "开始演示",
   "ui.presentation_exit": "退出演示（Esc）",

@@ -645,6 +645,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_search_none": "沒有符合",
   "ui.search_temp_open": "暫時展開",
   "ui.map_search_position_0_1_2": "{0}／{1}：{2}",
+  "ui.map_search_body_hit": "（內文）",
+  "ui.outline_body_match": "內文",
   "ui.map_search_close": "關閉搜尋",
   "ui.presentation_start": "開始簡報",
   "ui.presentation_exit": "離開簡報（Esc）",

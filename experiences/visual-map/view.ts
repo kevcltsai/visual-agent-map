@@ -1601,7 +1601,11 @@ export class VisualAgentMapView extends ItemView {
   private mergeDrafts = new MergeDrafts({
     path: () => this.path,
     closed: () => this.closed,
-    changed: () => this.render(),
+    changed: () => {
+      this.render();
+      // A waiting card's Adopt follows the merge lock (greyed with the reason while merging, back when it ends).
+      this.chat?.refreshPlan();
+    },
     language: () => this.plugin.settings.language,
     detailTemplate: language => this.mapStyleCached(language, { notify: true }).template,
     progress: task => {
@@ -6983,6 +6987,7 @@ export class VisualAgentMapView extends ItemView {
         this.mergeOpen = false;
         started();
         this.render();
+        this.chat?.refreshPlan();
       });
       if (!this.mergeDrafts.failedDraft) {
         this.mergeFailureNotice?.hide();

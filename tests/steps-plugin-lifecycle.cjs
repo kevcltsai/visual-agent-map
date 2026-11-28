@@ -28,6 +28,40 @@ test('unload clears the pending external reconciliation so no repo work runs aft
   assert.equal(mutated, 0, 'the 500 ms reconcile timer never fired after unload');
 });
 
+test('B viewport debounce: unload sends a pending viewport and keeps the vault open until that write lands', async () => {
+  const plugin = newPlugin();
+  let disposed = false, release;
+  const order = [];
+  plugin.repo = { dispose() { disposed = true; order.push('dispose'); } };
+  const gate = new Promise(resolve => { release = resolve; });
+  const view = {
+    async flushPendingViewport() {
+      order.push('flush');
+      const write = gate.then(() => { order.push('written'); });
+      plugin.viewportWrites.add(write);
+      await write;
+      plugin.viewportWrites.delete(write);
+    }
+  };
+  plugin.viewportsPending.add(view);
+  plugin.onunload();
+  assert.equal(disposed, false, 'the vault stays open while the viewport write is on its way');
+  release();
+  await delay(20);
+  assert.deepEqual(order, ['flush', 'written', 'dispose']);
+});
+
+test('B viewport debounce: a viewport write that never settles does not keep the vault open past 2 s', async () => {
+  const plugin = newPlugin();
+  let disposed = false;
+  plugin.repo = { dispose() { disposed = true; } };
+  plugin.viewportWrites.add(new Promise(() => {}));
+  plugin.onunload();
+  assert.equal(disposed, false);
+  await delay(2100);
+  assert.equal(disposed, true);
+});
+
 test('one external delete batch scans the maps once, however many notes were deleted', async () => {
   const plugin = newPlugin();
   const checked = [];

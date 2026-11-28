@@ -272,6 +272,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
   private unloaded = false;
   /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
+  /** Map views with a pan or zoom still waiting to be written; unload sends them at once. */
+  readonly viewportsPending = new Set<{ flushPendingViewport(): Promise<void> }>();
+  /** Viewport writes on their way to Map.md; unload releases the vault only after they land (at most 2 s). */
+  readonly viewportWrites = new Set<Promise<void>>();
   readonly researchProgress = new ResearchProgressStore();
   /** Owns the background chart queue. Every port is read on use: tests and onload replace these objects after construction. */
   readonly topicRuns = new TopicRuns({
@@ -2426,8 +2430,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookHighlights.dispose();
     this.readingHighlight.release();
     this.bookNotes.dispose();
+    // The last pan or zoom is not lost: a pending one is sent now, and the vault is released once those writes land (≤ 2 s).
+    for (const view of [...this.viewportsPending]) void view.flushPendingViewport().catch(() => undefined);
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
-    this.repo?.dispose();
+    const repo = this.repo;
+    if (this.viewportWrites.size === 0) repo?.dispose();
+    else
+      void Promise.race([
+        Promise.allSettled([...this.viewportWrites]),
+        new Promise(resolve => window.setTimeout(resolve, 2000))
+      ]).then(() => repo?.dispose());
     // A pending external-delete reconcile must not touch the disposed repo after unload.
     if (this.externalReconcileTimer !== null) window.clearTimeout(this.externalReconcileTimer);
     this.externalReconcileTimer = null;

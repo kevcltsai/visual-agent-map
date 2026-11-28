@@ -67,8 +67,8 @@ test('a card at the origin sits below the toolbar after the initial viewport, fo
 
 const notices = [];
 const shown = [];
-function makeView() {
-  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class { constructor(message) { notices.push(message); shown.push(this); } hide() { this.hidden = true; } } } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+function makeView(timers = { setTimeout, clearTimeout }) {
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class { constructor(message) { notices.push(message); shown.push(this); } hide() { this.hidden = true; } } } }, { window: timers, ...timers, CSS: { escape: s => s } });
   const writes = [];
   const view = Object.create(VisualAgentMapView.prototype);
   view.selection = new (load('experiences/visual-map/topic-selection.ts').TopicSelection)();
@@ -93,7 +93,7 @@ function makeView() {
   return { view, writes, nodes };
 }
 
-const flush = () => new Promise(resolve => setTimeout(resolve, 400));
+const flush = () => new Promise(resolve => setTimeout(resolve, 700));
 
 test('arrow-key navigation moves the camera in memory and writes nothing to Map.md', async () => {
   const { view, writes, nodes } = makeView();
@@ -152,6 +152,54 @@ test('pending viewport flush propagates a write failure without leaving the time
   } finally {
     if (view.viewportTimer !== null) clearTimeout(view.viewportTimer);
   }
+});
+
+// A hand-driven clock: the debounce is checked by moving time, not by waiting for it.
+function manualClock() {
+  let now = 0, next = 1;
+  const due = new Map();
+  return {
+    setTimeout(fn, ms) { const id = next++; due.set(id, { at: now + ms, fn }); return id; },
+    clearTimeout(id) { due.delete(id); },
+    advance(ms) {
+      now += ms;
+      for (const [id, timer] of [...due].sort((a, b) => a[1].at - b[1].at)) {
+        if (timer.at > now) continue;
+        due.delete(id);
+        timer.fn();
+      }
+    }
+  };
+}
+
+test('B viewport debounce: 20 zoom steps 300 ms apart write Map.md once, about 500 ms after the last one', async () => {
+  const clock = manualClock();
+  const { view, writes } = makeView(clock);
+  for (let i = 0; i < 20; i++) {
+    view.map.viewport = { x: 40, y: 40, zoom: 1 + i / 20 };
+    view.saveViewport();
+    clock.advance(300);
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(writes.length, 0, 'nothing written while the zoom continues');
+  clock.advance(200);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(writes.length, 1, 'one write once the zoom stops');
+});
+
+test('B viewport debounce: closing the view writes the last pending viewport at once', async () => {
+  const clock = manualClock();
+  const { view, writes } = makeView(clock);
+  const stored = {};
+  view.plugin.repo.updateMap = async (path, change) => { writes.push(path); change(stored); };
+  view.map.viewport = { x: 7, y: 8, zoom: 1.5 };
+  view.saveViewport();
+  await view.flushPendingViewport();
+  assert.equal(writes.length, 1);
+  assert.deepEqual({ ...stored.viewport }, { x: 7, y: 8, zoom: 1.5 }, 'the last viewport is not lost');
+  clock.advance(1000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(writes.length, 1, 'the cancelled timer writes nothing more');
 });
 
 test('viewport persistence stamps only the map whose path was written', async () => {

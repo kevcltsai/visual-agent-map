@@ -23027,10 +23027,13 @@ export class VisualAgentMapView extends ItemView {
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    // A continuous pan or zoom writes Map.md once, after it stops; closing, switching maps and unload flush it at once.
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
+      this.plugin.viewportsPending?.delete(this);
       this.queueViewportWrite();
-    }, 250);
+    }, 500);
+    this.plugin.viewportsPending?.add(this);
   }
   /** A viewport write skips the re-read of every note; saves that arrive while one waits in the queue join it. */
   private queueViewportWrite(): void {
@@ -23049,14 +23052,25 @@ export class VisualAgentMapView extends ItemView {
       });
   }
   /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
-  private async flushPendingViewport(): Promise<void> {
+  async flushPendingViewport(): Promise<void> {
     if (this.viewportTimer === null) return;
     window.clearTimeout(this.viewportTimer);
     this.viewportTimer = null;
+    this.plugin.viewportsPending?.delete(this);
     await this.persistViewport();
   }
-  /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
+  /** Unload keeps the vault open until a viewport write on its way has landed. */
   private async persistViewport(): Promise<void> {
+    const write = this.writeViewport();
+    this.plugin.viewportWrites?.add(write);
+    try {
+      await write;
+    } finally {
+      this.plugin.viewportWrites?.delete(write);
+    }
+  }
+  /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
+  private async writeViewport(): Promise<void> {
     if (!this.map || !this.path) return;
     const path = this.path;
     const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };

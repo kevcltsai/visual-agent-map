@@ -355,6 +355,10 @@ function readableSource(raw: string, labels: LivingReaderLabels): string | undef
   return labels.source(link, day ? (labels.date?.(retrievedAt, false) ?? retrievedAt.slice(0, 10)) : retrievedAt);
 }
 
+/** An Observation header as written (Ownership is dropped first): the internal fields are not for the reader. */
+const OBSERVATION_HEAD =
+  /^### Observation\r?\n- ID: ".*"\r?\n- Subject: (".*")\r?\n- Scope: ".*"\r?\n- Granularity: ".*"\r?\n- Event time: (".*"|null)\r?\n- Validity: ".*"(?:\r?\n|$)/gm;
+
 /**
  * What the reader shows: the AI latest heading and its generated time in the interface language, and each evidence source
  * as "title (date)" (a link when it is a public web page). The note file itself is not changed. Inside a note only the
@@ -367,6 +371,25 @@ export function localizeLivingReader(markdown: string, labels: LivingReaderLabel
   const [from, to] = whole ? [0, markdown.length] : [start, end];
   const region = relabel(markdown.slice(from, to), labels.aiLatest)
     .replace(/^- Ownership: ".*"\r?\n/gm, "")
+    .replace(OBSERVATION_HEAD, (line, subject: string, eventTime: string) => {
+      try {
+        const name: unknown = JSON.parse(subject);
+        const at: unknown = JSON.parse(eventTime);
+        if (typeof name !== "string" || (at !== null && typeof at !== "string")) return line;
+        return `### ${escapeMarkdown(name)}\n` + (at ? `- ${labels.date?.(at, false) ?? at}\n` : "");
+      } catch {
+        return line;
+      }
+    })
+    .replace(/^- (Time|Reason): (".*")$/gm, (line, name: string, raw: string) => {
+      try {
+        const text: unknown = JSON.parse(raw);
+        if (typeof text !== "string") return line;
+        return "- " + (name === "Time" ? (labels.date?.(text, true) ?? text) : escapeMarkdown(text));
+      } catch {
+        return line;
+      }
+    })
     .replace(/(^|\n)### Suppression\r?\n(?:- (?:ID|Suppression v2): ".*"(?:\r?\n|$))*/g, "$1")
     .replace(/^- Source: (\[.*\])$/gm, (line, raw: string) => "- " + (readableSource(raw, labels) ?? line.slice(2)))
     .replace(/^- Generated: (".*")$/gm, (line, raw: string) => {

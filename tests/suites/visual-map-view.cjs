@@ -520,7 +520,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
     // The on-screen sibling order is covered by the move tests in steps-after-text-view.cjs; here the stored order is kept.
     onScreenSiblingOrder: map => map.nodes, moveLastAmongSiblings: VisualAgentMapView.prototype.moveLastAmongSiblings,
     // B11: the parent pick is the same move as a drag (moveBranches), which keeps the selection and repaints.
-    moveBranches: VisualAgentMapView.prototype.moveBranches, selection: { afterMove() {} }, render() {},
+    moveBranches: VisualAgentMapView.prototype.moveBranches, selection: { state: {}, afterMove() {} }, render() {},
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },

@@ -6362,3 +6362,79 @@ test('AI lock, whole book: "fix again" whose problems are all in a locked chapte
   assert.equal(JSON.stringify(await r.state()), saved, 'the saved state is not touched');
   for (let i = 0; i < 3; i++) assert.equal(r.raw(i), raws[i]);
 });
+
+// ai-flows §AI 鎖定 ("AI 不會修改"): after the whole-book proofread the callouts writer (BookCallouts, as main.ts wires it over the note
+// writer) leaves a locked chapter's bytes alone: no "AI 校對：查了 0 項" box is put in, an old box is neither rewritten nor taken off. Only
+// the pipeline's own frontmatter keys may change on a locked chapter; the run writes none of them after the lock here, so the list is
+// what the program could write (writePipelineFields / writePipelineRole), not what it did.
+const { BookCallouts } = S.load('experiences/visual-map/book-pipeline-callouts.ts');
+const PIPELINE_KEYS = ['pipeline-stage', 'pipeline-issue', 'pipeline-seam', 'pipeline-role', 'book-role'];
+const withoutPipelineKeys = raw => raw.split('\n').filter(line => !PIPELINE_KEYS.some(key => line.startsWith(`${key}:`))).join('\n');
+const calloutsOf = r => new BookCallouts({
+  readMap: p => r.repo.readMap(p),
+  readCard: p => r.ports.readCard(p),
+  readText: async p => r.contents.get(p),
+  write: createNoteWriter({ openViews: () => [], rawGuarded: (p, transform, options) => r.repo.updateNoteRawGuarded(p, transform, options) }),
+  log: () => {}
+});
+const AI_BOX = /AI 校對|vam-review/;
+test('AI lock, whole book: the callouts writer leaves a chapter locked during the run as locked: no AI box, every byte but the pipeline keys kept; the open chapter gets its box', async () => {
+  const holder = {};
+  const r = await aiRig({
+    aiProof: async request => {
+      if (request.title === 'SecretTitleA') { await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true); holder.locked = holder.r.raw(1); }
+      return { checks: [], prior: [], dropped: {} };
+    }
+  });
+  holder.r = r;
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.ok(AI_BOX.test(r.raw(2)), 'the open chapter has its AI box (the writer ran)');
+  assert.ok(!AI_BOX.test(r.raw(1)), 'no AI box in the locked chapter');
+  assert.equal(withoutPipelineKeys(r.raw(1)), withoutPipelineKeys(holder.locked), 'the locked chapter is byte for byte as locked, the pipeline keys aside');
+});
+test('AI lock, whole book: a box written before the lock stays as it was through the next align, a clear and an align with no run', async () => {
+  const r = await aiRig({});
+  await finishAi(r);
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.ok(AI_BOX.test(r.raw(1)), 'chapter A got its box while open');
+  await r.repo.writeAiLocked(r.nodes[1].path, true);
+  const locked = r.raw(1);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; });
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.equal(r.raw(1), locked, 'an align that wants no box leaves the locked box');
+  assert.ok(!AI_BOX.test(r.raw(2)), 'the open chapter\'s box goes (the writer ran)');
+  await callouts.clear(r.mapPath);
+  assert.equal(r.raw(1), locked, 'a clear leaves the locked box');
+  await r.repo.updateMap(r.mapPath, d => { delete d.bookPipeline; });
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  assert.equal(r.raw(1), locked, 'an align with no run leaves the locked box');
+});
+test('AI lock, whole book: every chapter locked and nothing checked: no new file in the vault (no "still open" page), every chapter as locked', async () => {
+  const holder = { raws: {} };
+  const files = { get: p => holder.r.contents.get(p), set: (p, text) => holder.r.contents.set(p, text) };
+  const v = pageVault(files);
+  const r = await aiRig({
+    aiProof: async request => {
+      const at = TITLES.indexOf(request.title);
+      await holder.r.repo.writeAiLocked(holder.r.nodes[at].path, true);
+      holder.raws[at] = holder.r.raw(at);
+      holder.files = [...holder.r.contents.keys()].sort();
+      return { checks: [], prior: [], dropped: {} };
+    }
+  }, { ports: { writeOpenIssues: v.port } });
+  holder.r = r;
+  await finishAi(r);
+  same(Object.keys(holder.raws).sort(), ['0', '1', '2'], 'every chapter was locked');
+  assert.equal((await r.state()).phase, 'done', 'the book is done without the page');
+  const callouts = calloutsOf(r);
+  await callouts.reconcile(r.mapPath); await callouts.idle();
+  same([...r.contents.keys()].sort(), holder.files, 'no file added after the last lock');
+  for (let i = 0; i < 3; i++) {
+    assert.ok(!AI_BOX.test(r.raw(i)), `no AI box in chapter ${i}`);
+    assert.equal(withoutPipelineKeys(r.raw(i)), withoutPipelineKeys(holder.raws[i]), `chapter ${i} is byte for byte as locked, the pipeline keys aside`);
+  }
+});

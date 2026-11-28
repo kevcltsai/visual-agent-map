@@ -396,7 +396,8 @@ export class BookCallouts {
     let clean = true;
     for (const { id, card } of await this.cardsOf(map, read.data)) {
       if (this.disposed) return false;
-      if (!hasProgramCallouts(card.raw)) continue;
+      // ai-flows AI lock: a locked chapter is not written, not even to take a program callout off ("AI will not change it").
+      if (card.aiLocked || !hasProgramCallouts(card.raw)) continue;
       if (!(await this.put(read.data.runId, id, card.path, text => alignCallouts(text, undefined)))) clean = false;
     }
     return clean;
@@ -469,6 +470,8 @@ export class BookCallouts {
     // Any other phase wants none: a callout left from an earlier phase or run goes now.
     for (const { id, card } of cards) {
       if (this.disposed) return;
+      // ai-flows AI lock: a locked chapter gets no box and keeps the one it has (no "checked 0" box for a chapter nobody checked).
+      if (card.aiLocked) continue;
       const want = wanted.get(id) ?? {
         runId: data.runId,
         nodeId: id
@@ -502,6 +505,7 @@ export class BookCallouts {
         continue;
       }
       if (!hasProgramCallouts(raw)) continue;
+      if ((await this.ports.readCard(node.path).catch(() => undefined))?.aiLocked) continue;
       await this.put(runId ?? "none", node.id, node.path, text =>
         removeProgramCalloutsWhere(text, callout => callout.runId !== current)
       );

@@ -89,3 +89,4 @@ export const labelOldFindings = (language: ContentLanguage): string => inLanguag
 export const thinkingOriginBlock = (origin: string): string => renderTemplate(ThinkingOriginSourceTemplate, { origin });
 export const thinkingOriginDocumentBlock = (origin: string): string =>
   renderTemplate(ThinkingOriginLabelTemplate, { origin });
+export { default as livingNodeRepairTemplate } from "./living-node-repair.md";

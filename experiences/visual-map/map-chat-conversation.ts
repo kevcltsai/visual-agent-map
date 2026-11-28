@@ -33,6 +33,7 @@ import type {
 } from "./map-chat";
 import { newChatWork, type ChatChainRun, type ChatRoundWork, type MapChatChainRunner } from "./map-chat-chain-run";
 import { bookPlanDiff, bookStructureCard, bookThreadDiff } from "./book-plan-diff";
+import { planGhostRelations, planGhostSpecs, type PlanGhostRelation, type PlanGhostSpec } from "./chat-plan-preview";
 import type { TransactionEntry } from "./map-transaction";
 import type { MapChatTurnRecord, TurnEndFields } from "./map-chat-turn-record";
 import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
@@ -40,7 +41,7 @@ import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
 /** The part of the chat window the plan flow uses. */
 export type ChatPlanPanel = Pick<
   MapChatPanel,
-  "isBusy" | "pendingPlan" | "settlePlan" | "showPlan" | "setApplying" | "hasQueuedSteers"
+  "isBusy" | "pendingPlan" | "settlePlan" | "showPlan" | "setApplying" | "hasQueuedSteers" | "refreshPlan"
 >;
 /** The part of the chat window the turn driver uses (the plan flow's part included). */
 export type ChatTurnPanel = ChatPlanPanel &
@@ -77,6 +78,15 @@ export interface ChatPreviewAnchor {
   y: number;
   note: string;
 }
+/** One anchor a pending plan would move: the dashed dot is drawn at `x`, `y`, a light link to where the anchor is now. */
+export interface ChatPreviewMove {
+  imageId: string;
+  anchorId: string;
+  x: number;
+  y: number;
+  /** The picture file the position was meant for; a picture replaced by another file is no longer drawn on. */
+  imageRef?: string;
+}
 /** What applying a plan is given beyond the reply: the context the basis is judged by and where the started work is collected. */
 export interface ChatPlanApplyOptions {
   context: Pick<MapChatContext, "basis" | "parents">;
@@ -106,9 +116,20 @@ export interface MapChatConversationPorts {
     | "advanceChain"
   >;
   plans(): WeakMap<MapChatPlanCard, MapChatTurnRecord>;
-  /** Draws the plan's anchors as dashed dots (an empty list clears them), only while `token` is the plan's current one. */
-  showPreview(token: number, anchors: ChatPreviewAnchor[]): void;
+  /**
+   * Draws the plan's anchors as dashed dots, the cards it would make as dashed cards and the relations it would add as dashed lines
+   * and the anchors it would move as a dashed dot with a link to where they are now (empty lists clear them), only while `token` is the plan's current one. Drawn only: never a node or a relation of the map.
+   */
+  showPreview(
+    token: number,
+    anchors: ChatPreviewAnchor[],
+    cards: PlanGhostSpec[],
+    relations: PlanGhostRelation[],
+    moves: ChatPreviewMove[]
+  ): void;
   clearPreview(): void;
+  /** Why the plan made for `anchor` cannot be applied now (its map is not the open one, or the map is read-only here); null = it can. */
+  applyBlock(anchor: { path: string; id: string | undefined }): string | null;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
   /** `selection`: the cards selected when the message was sent (what an action that names no card works on). */
   actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>, selection?: readonly string[]): string;
@@ -228,6 +249,8 @@ export class MapChatConversation {
         return t("ui.map_chat_plan_reason_auto_apply_confirm");
       case "book_plan_edit":
         return t("ui.map_chat_plan_reason_book_plan_edit");
+      case "move_anchor_confirm":
+        return t("ui.map_chat_plan_reason_move_anchor_confirm");
       case "living_node_confirm":
         return t("ui.living_node_chat_plan_confirm");
     }
@@ -251,7 +274,22 @@ export class MapChatConversation {
     const anchorsToPlace = result.actions.flatMap(action =>
       action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
     );
-    this.ports.showPreview(token, anchorsToPlace);
+    // The cards and relations the plan would make are drawn as a dashed preview (V3.3 E3); the text list below stays the full account.
+    const ghosts = planGhostSpecs(result.actions);
+    const movesToShow = result.actions.flatMap(action =>
+      action.kind === "move_anchor"
+        ? [
+            {
+              imageId: action.imageId,
+              anchorId: action.anchorId,
+              x: action.x,
+              y: action.y,
+              ...(action.imageRef !== undefined ? { imageRef: action.imageRef } : {})
+            }
+          ]
+        : []
+    );
+    this.ports.showPreview(token, anchorsToPlace, ghosts, planGhostRelations(result.actions), movesToShow);
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
@@ -322,6 +360,8 @@ export class MapChatConversation {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
+      ...(ghosts.length ? { previewNote: t("ui.map_chat_plan_preview_note") } : {}),
+      blocked: () => this.ports.applyBlock(anchor),
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         if (token !== this.planToken) return;
@@ -356,6 +396,12 @@ export class MapChatConversation {
       const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       this.ports.plans().get(card)?.plan("cancelled", skip);
+      return;
+    }
+    // The map is checked again just before the write: read-only here now (a presentation, notes still loading) writes nothing and
+    // the card keeps waiting and is drawn again, with the reason under its greyed Apply.
+    if (this.ports.applyBlock(anchor) !== null) {
+      chat.refreshPlan();
       return;
     }
     this.applying = true;

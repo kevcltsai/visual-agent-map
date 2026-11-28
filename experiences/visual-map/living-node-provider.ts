@@ -43,6 +43,7 @@ interface LivingRepair {
 type LivingStepInput = LivingProviderInput & { repair?: LivingRepair };
 
 const repairNote = (repair: LivingRepair): string =>
+  "\n\n" +
   renderTemplate(livingNodeRepairTemplate, {
     code: repair.code,
     operation: repair.operation ? " at operation " + repair.operation : "",

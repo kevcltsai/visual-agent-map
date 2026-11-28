@@ -323,7 +323,7 @@ test('applied notice: bottom-right box removed by its own 10 s timer; undo click
   const timers = { set: c.set, clear: c.clear };
   let undone = 0;
   const n = b.showAppliedNotice(host, timers, 'm', 'u', () => undone++, 10000);
-  assert.equal(made[0].o.cls, 'vam-book-applied-notice');
+  assert.equal(made[0].o.cls, 'vam-book-applied-notice vam-tokens');
   made[0].clicks[0]({ preventDefault() {} });
   assert.equal(undone, 1);
   c.advance(9999);

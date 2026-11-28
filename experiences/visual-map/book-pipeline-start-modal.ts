@@ -247,6 +247,7 @@ export class BookSettingsViewModal extends Modal {
   }
   onOpen(): void {
     const { contentEl } = this;
+    contentEl.addClass("vam-tokens");
     this.titleEl.setText(t("ui.book_settings_view"));
     const list = contentEl.createEl("dl", { cls: "vam-book-settings-list" });
     for (const field of BOOK_SETTING_FIELDS) {
@@ -451,6 +452,7 @@ export class BookStartModal extends Modal {
   onOpen(): void {
     this.opened = true;
     const { contentEl } = this;
+    contentEl.addClass("vam-tokens");
     this.titleEl.setText(t("ui.book_start_title"));
     contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_start_intro") });
     this.estimateEl = contentEl.createEl("p", { cls: "vam-book-start-estimate" });

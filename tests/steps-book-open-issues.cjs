@@ -161,3 +161,9 @@ test('B33-v: a zh-CN book\'s page text is Simplified (like the seam line); its f
   // zh-TW is unchanged Traditional
   assert.match(note([]), /AI 校對查了 12 項，全部解決。/);
 });
+test('B33-v: the "which pictures" problem line follows the page language: zh-CN Simplified, zh-TW Traditional, en Picture/Pictures', () => {
+  assert.equal(oi.openIssuePictures('zh-CN', [1, 3]), '第 1、3 张图');
+  assert.equal(oi.openIssuePictures('zh-TW', [2]), '第 2 張圖');
+  assert.equal(oi.openIssuePictures('en', [2]), 'Picture 2');
+  assert.equal(oi.openIssuePictures('en', [1, 3]), 'Pictures 1, 3');
+});

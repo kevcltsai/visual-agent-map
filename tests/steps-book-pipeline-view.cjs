@@ -1466,7 +1466,8 @@ test('toolbar words: the plan review and done sentences and buttons read in Engl
     assert.equal(tr('ui.book_bar_plan_hint'), want[0]);
     assert.equal(tr('ui.book_bar_plan_go'), want[1]);
     assert.equal(tr('ui.book_bar_ai_0_1', 1, 2), want[2]);
-    assert.equal(tr('ui.book_bar_done_0_1_2', 3, 5, 2), want[3]);
+    // B33-v: the counts come in as counted words ("3 chapters", "5 places"), so en can say "1 chapter"
+    assert.equal(tr('ui.book_bar_done_0_1_2', tr('ui.book_bar_chapters_0', 3), tr('ui.book_bar_places_0', 5), 2), want[3]);
     assert.equal(tr('ui.book_bar_open_issues'), want[4]);
   }
   lang('zh-TW');

@@ -109,6 +109,14 @@ export interface OpenIssuesInput {
 const counted = (language: ContentLanguage, k: number, one: TranslationKey, many: TranslationKey): string =>
   k === 1 ? translate(language, one) : translate(language, many, k);
 
+/** Which pictures of a chapter may not fit (1-based), as the item's problem line in the page language ("第 1、3 张图" for zh-CN). */
+export const openIssuePictures = (language: ContentLanguage, off: readonly number[]): string =>
+  translate(
+    language,
+    off.length > 1 ? "ui.book_open_pictures_0" : "ui.book_open_picture_0",
+    off.join(instructionLanguageOf(language) === "zh" ? "、" : ", ")
+  );
+
 /**
  * The file name the page is meant to have (no folder). A name the program finds the page by, so it is spelled in the note language
  * (zh-CN keeps the Traditional name, the one older pages have and the bar looks up), while the text inside follows the page language.

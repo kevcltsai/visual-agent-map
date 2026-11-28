@@ -1984,7 +1984,9 @@ export class VisualAgentMapView extends ItemView {
     parentId: string,
     newIds: Set<string>,
     minTop?: number,
-    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }
+    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf },
+    /** A batch (a chat reply's cards, made one by one) never pans the view for the selected card. */
+    keepView = false
   ): void {
     // The selected card may be pushed by the arrangement: the view pans (only) so it stays where the eye was.
     const selectedId = this.selection?.state.selected;
@@ -2006,7 +2008,7 @@ export class VisualAgentMapView extends ItemView {
     const after = from && selectedId ? map.nodes.find(node => node.id === selectedId) : undefined;
     // Only for added cards: a moved, sorted or re-parented card (already drawn) is no reason to pan.
     const addedOnly = [...newIds].every(id => !(this.cardEls as Map<string, HTMLElement> | undefined)?.has(id));
-    if (addedOnly && from && after && map.viewport) {
+    if (!keepView && addedOnly && from && after && map.viewport) {
       const dx = after.x - from.x,
         dy = after.y - from.y;
       const limit = this.cardHeightOf(after.id) ?? DEFAULT_CARD_HEIGHT;
@@ -2186,6 +2188,8 @@ export class VisualAgentMapView extends ItemView {
   private restoringFocus = false;
   /** True only while a repaint opens a card title/summary field or hands focus back from one: the tool row must not pan the canvas then. */
   private keepCanvasOnFieldRestore = false;
+  /** True only while a chat reply selects its new branch root: the tool row must not pan the canvas then. */
+  private keepCanvasOnSelect = false;
   private onMapWindowFocus(): void {
     if (!this.focusRestorePending) return;
     this.focusRestorePending = false;
@@ -15125,7 +15129,13 @@ export class VisualAgentMapView extends ItemView {
     // A framing action (Show all) is mid-way: its viewport is the answer, so the row stays where it fits instead of moving the canvas.
     // Likewise a repaint putting focus back (opening or closing a card's title/summary field redraws the card, which is taller
     // or shorter by the field and its hint): the user did not navigate, so the canvas must stay where it is.
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.keepCanvasOnFieldRestore) {
+    if (
+      (spot.pan.dx || spot.pan.dy) &&
+      this.map &&
+      !this.framingViewport &&
+      !this.keepCanvasOnFieldRestore &&
+      !this.keepCanvasOnSelect
+    ) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -15813,7 +15823,7 @@ export class VisualAgentMapView extends ItemView {
     this.openForSearch(collapsedAncestors(this.map.nodes, node.id));
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
-    this.focusNode(node, false);
+    this.focusNode(node, false, true);
     return true;
   }
   /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
@@ -19054,7 +19064,8 @@ export class VisualAgentMapView extends ItemView {
       const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
       if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
       this.notes.set(node.id, preparedNote);
-      this.selection.setSelected(node.id);
+      // A batch card (focus false) leaves the selection to its caller.
+      if (focus) this.selection.setSelected(node.id);
       // Set before the repaint that shows the card, so the card is drawn with its title field.
       if (interactive && focus && !this.inlineName)
         this.inlineName = {
@@ -19091,7 +19102,14 @@ export class VisualAgentMapView extends ItemView {
               ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
               : undefined;
             // Grown from the block itself, so the block and the topics already after it stay where they are.
-            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop);
+            this.arrangeBranch(
+              map,
+              node.afterTextId ? node.afterTextId : owner.id,
+              new Set([node.id]),
+              minTop,
+              undefined,
+              !focus
+            );
           } else if (!parent) {
             const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
             if (roots.length)
@@ -22191,8 +22209,6 @@ export class VisualAgentMapView extends ItemView {
         { detailTemplate, newVisualReferences: true }
       );
       integrated.parentId = null;
-      integrated.x = Math.max(...sources.map(node => node.x)) + 340;
-      integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
       const previousEntry = this.history.undoEntry;
       try {
         await this.mapChangeSnapshots(
@@ -22205,6 +22221,14 @@ export class VisualAgentMapView extends ItemView {
                 if (relationAllowed(map.topicRelations ?? [], link))
                   setTopicRelations(map, [...(map.topicRelations ?? []), link]);
               }
+            // Placed like any new top-level card (P1.4): clear of every card, and no existing card moves.
+            map.nodes = arrangeNewTree(
+              map.nodes,
+              integrated.id,
+              new Set([integrated.id]),
+              this.cardHeightOf,
+              layoutOf(map)
+            );
           },
           true,
           [integrated.path]
@@ -22216,6 +22240,11 @@ export class VisualAgentMapView extends ItemView {
       }
       this.plugin.topicRuns.clearSelection(this);
       this.selection.afterSynthesis(integrated.id);
+      // The layout replaced the card object, so the camera is aimed at the placed one.
+      Object.assign(
+        integrated,
+        this.map.nodes.find(node => node.id === integrated.id)
+      );
       await this.hydrate();
       this.render();
       this.focusNode(integrated);
@@ -22247,6 +22276,10 @@ export class VisualAgentMapView extends ItemView {
       } else {
         this.plugin.topicRuns.clearSelection(this);
         this.map = disk;
+        Object.assign(
+          integrated,
+          disk.nodes.find(node => node.id === integrated.id)
+        );
         this.selection.afterSynthesis(integrated.id);
         try {
           await this.plugin.rebuildDerivedData();
@@ -22552,19 +22585,24 @@ export class VisualAgentMapView extends ItemView {
     return tops;
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
-  private focusNode(target: MapNode, persist = true): void {
+  private focusNode(target: MapNode, persist = true, measured = false): void {
     if (!this.map || !this.viewportEl) return;
     const id = target.id;
     if (
       this.holdCamera(() => {
         const node = this.map?.nodes.find(item => item.id === id);
-        if (node) this.focusNode(node, persist);
+        if (node) this.focusNode(node, persist, measured);
       })
     )
       return;
+    // `measured` (outline reveal): centre on the card's laid-out box; other callers keep the fixed +80 estimate.
+    const card = measured ? this.cardEls.get(id) : undefined;
+    const centre = card?.offsetHeight
+      ? { x: target.x + (card.offsetWidth || (target.width ?? CARD_WIDTH)) / 2, y: target.y + card.offsetHeight / 2 }
+      : { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 };
     this.map.viewport = focusViewport(
       this.map.viewport,
-      { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 },
+      centre,
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
       this.canvasInsets()
     );
@@ -24793,8 +24831,15 @@ export class VisualAgentMapView extends ItemView {
       // A topic chat does not move the user's selection.
     } else if (run.ringImages?.size) {
       if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
-    } else if (branchRoot && same() && !this.closed)
-      this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+    } else if (branchRoot && same() && !this.closed) {
+      // Selecting the reply's branch root must not pan the view to fit its tool row (#56: a finished reply never moves the picture).
+      this.keepCanvasOnSelect = true;
+      try {
+        this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+      } finally {
+        this.keepCanvasOnSelect = false;
+      }
+    }
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles, selection.ids);

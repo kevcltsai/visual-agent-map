@@ -2813,6 +2813,14 @@ export default class VisualAgentMapPlugin extends Plugin {
       }).catch(error => console.error("Visual Agent Map external rename reconciliation", error));
     }, 500);
   }
+  /** Called after the node-details pane revealed its leaf; returns the unsubscribe. */
+  onDetailsReveal(listener: () => void): () => void {
+    return this.nodeDetailsSidebar.onReveal(listener);
+  }
+  /** True while the node-details pane is revealing its leaf. */
+  detailsRevealing(): boolean {
+    return this.nodeDetailsSidebar.revealing();
+  }
   /** The node-details sidebar counts as open only while its pane is actually visible. */
   detailsShown(): boolean {
     return this.nodeDetailsSidebar.detailsShown();

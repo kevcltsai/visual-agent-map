@@ -7230,7 +7230,9 @@ export class VisualAgentMapView extends ItemView {
       this.history.clear();
       return false;
     }
-    const local = clone(this.map);
+    // The screen version offered is the map without the staged cards: they have no note file yet, and keeping the screen
+    // would write them to Map.md without one. The batch then fails at its flush (its cards are not on the map).
+    const local = staged ? { ...clone(staged), viewport: clone(this.map.viewport) } : clone(this.map);
     // A cross-map cut refuses to touch this map while its conflict window is still open.
     this.conflictOpen = true;
     try {

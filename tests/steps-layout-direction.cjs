@@ -269,7 +269,9 @@ async function harness(spec, extra = {}) {
     showAtMouseEvent() { return this; }
   }
   const Base = dom.makeModal();
-  class Modal extends Base { open() { super.open(); this.close(); } }
+  // A conflict window is recorded; with `conflict.keep` the button "Keep editor contents" is pressed (otherwise closing it takes the file's version).
+  const modals = [], conflict = { keep: false };
+  class Modal extends Base { open() { super.open(); modals.push(this); if (conflict.keep) dom.findAll(this.contentEl, item => item.tag === 'button' && item.text === 'Keep editor contents')[0]?.click(); this.close(); } }
   const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
   let pending = Promise.resolve();
@@ -287,7 +289,7 @@ async function harness(spec, extra = {}) {
   const named = title => view.map.nodes.find(n => view.notes.get(n.id)?.title === title);
   const menuTitles = () => menus.at(-1).items.map(item => (item.separator ? '---' : item.title));
   const choose = async title => { view.openLayoutMenu({}); menus.at(-1).items.find(item => item.title === title).click(); await pending; await pending; };
-  return { repo, view, named, menus, menuTitles, choose, settled: () => pending, fits: () => fits, saved: () => repo.readMap(MAP), createSvg };
+  return { modals, conflict, repo, view, named, menus, menuTitles, choose, settled: () => pending, fits: () => fits, saved: () => repo.readMap(MAP), createSvg };
 }
 // A card-sized DOM stand-in (as in tests/steps-map-keyboard.cjs): one handler per event name, writable text.
 const stub = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, isConnected: true,
@@ -989,6 +991,25 @@ test('E2-tx M1: the write limit of a reply that stages no card says only that th
   assert.equal(failedLines(mixed).length, 1);
   assert.doesNotMatch(failedLines(mixed)[0].text, /nothing was kept/, 'the cards of the flush are kept');
   assert.equal((await b.saved()).nodes.filter(n => /Kid/.test(n.path)).length, 6);
+});
+
+test('E2-tx M2: an outside edit of Map.md while cards are staged opens the conflict window; "keep editor contents" never writes a card that has no note file', async () => {
+  const h = await harness(tree4);
+  serialQueue(h);
+  h.conflict.keep = true;
+  let answered;
+  const orphans = [];
+  afterNthCard(h, 3, async () => {
+    await outsideEdit(h, doc => { doc.title = 'Edited outside'; })();
+    answered = await h.view.resolveMapConflict();
+    if (answered) await h.view.persist();
+    for (const node of (await h.saved()).nodes) if (!h.view.app.vault.getAbstractFileByPath(node.path)) orphans.push(node.path);
+  });
+  const lines = await within(chatApply(h, kidsOf(h, 6)), 3000, 'the reply ends');
+  assert.equal(h.modals.length, 1, `the outside edit is a real conflict: ${JSON.stringify(lines.map(l => l.status))}`);
+  assert.equal(answered, true);
+  assert.deepEqual(orphans, [], 'right after the choice Map.md lists no card without a note file');
+  for (const node of (await h.saved()).nodes) assert.ok(h.view.app.vault.getAbstractFileByPath(node.path), `Map.md lists a card without a note file: ${node.path}`);
 });
 
 test('E2-tx: a card made with the name field (no title given) is a note file at once, as before', async () => {

@@ -4135,12 +4135,15 @@ integrationTest('B2-0 F4: 100 add_child into a 150-card map rebuild the derived 
 });
 integrationTest('B2-0 F4: a card that fails to be added fails the whole batch (E2-tx: all or nothing, no card or note left) and the derived data is still rebuilt (once)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); const counts = countCalls(h);
-  const createNote = h.repo.createNote.bind(h.repo); h.repo.createNote = async (title, ...rest) => { const made = await createNote(title, ...rest); if (title === 'Boom') throw new Error('disk full'); return made; };
+  const createNote = h.repo.createNote.bind(h.repo); const trashed = new Set(); const trash = h.app.fileManager.trashFile; h.app.fileManager.trashFile = async item => { trashed.add(item.path); return trash(item); };
+  // Like the real createNote (repository.ts), which throws before it creates the file; the notes made before it are taken back by the transaction.
+  h.repo.createNote = async (title, ...rest) => { if (title === 'Boom') throw new Error('disk full'); return createNote(title, ...rest); };
   const actions = [addRoot('r', 'Root'), addRoot('a', 'A', 'new:r'), addRoot('b', 'Boom', 'new:r'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))];
   const lines = await apply(h, actions);
   // The cards are staged and written in one transaction; the one that throws takes the others back with it.
   eq(lines.filter(l => l.status === 'failed').length, 7, JSON.stringify(lines)); eq(lines.filter(l => l.status === 'done').length, 0);
   assert.equal((await h.saved()).length, 0, 'no card is kept');
+  eq([...h.files.keys()].filter(p => p.endsWith('.md') && p !== MAP && !p.includes('/Chats/') && p.startsWith('Agent Workspace/Topics/map-a/') && !trashed.has(p)), [], 'no note file is left (the two made before the throw were taken back)');
   assert.equal(counts.rebuild, 1, `rebuilt once: ${counts.rebuild}`);
 });
 integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops half way still rebuilds once for what it made', async () => {

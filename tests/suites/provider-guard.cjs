@@ -84,28 +84,32 @@ test('session vaults get the guard on every run, including reload; an onboarding
   } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
 });
 
-test('onboarding without --unguarded or --live is refused before Obsidian starts; --unguarded passes and the vault still has no data.json', async () => {
-  const { assertOnboardingChoice } = await import(pathToFileURL(path.join(root, 'scripts', 'test-harness.mjs')).href);
-  assert.throws(() => assertOnboardingChoice(['--prepare', '--profile=onboarding']), /no provider guard[\s\S]*data\.json[\s\S]*before PATH[\s\S]*--unguarded[\s\S]*--live/);
-  assert.throws(() => assertOnboardingChoice(['--session=x', '--profile=onboarding']), /Refusing an onboarding vault/);
-  assert.doesNotThrow(() => assertOnboardingChoice(['--prepare', '--profile=onboarding', '--unguarded']));
-  assert.doesNotThrow(() => assertOnboardingChoice(['--session=x', '--profile=onboarding', '--live=sonnet']));
-  assert.doesNotThrow(() => assertOnboardingChoice(['--prepare', '--profile=normal']));
-  assert.doesNotThrow(() => assertOnboardingChoice(['--session=x']));
-  assert.throws(() => assertOnboardingChoice(['--prepare', '--unguarded']), /only to --profile=onboarding/);
-  // Through the real CLI: refused at once (before the build, the lock or any launch), exit non-zero.
+test('onboarding session without --unguarded is refused before launch (--live alone too); a session vault with no data.json is refused; the owner vault is never guarded', async () => {
+  const lib = await import(pathToFileURL(path.join(root, 'scripts', 'test-harness.mjs')).href);
+  assert.throws(() => lib.assertOnboardingChoice(['--session=x', '--profile=onboarding']), /Refusing an onboarding vault[\s\S]*data\.json[\s\S]*before PATH[\s\S]*--unguarded/);
+  assert.throws(() => lib.assertOnboardingChoice(['--session=x', '--profile=onboarding', '--live=sonnet']), /--live alone does not help/);
+  assert.doesNotThrow(() => lib.assertOnboardingChoice(['--session=x', '--profile=onboarding', '--unguarded']));
+  assert.doesNotThrow(() => lib.assertOnboardingChoice(['--session=x', '--profile=normal']));
   const run = args => spawnSync(process.execPath, [path.join(root, 'scripts/test-harness.mjs'), ...args], { encoding: 'utf8', timeout: 20000 });
-  for (const args of [['--prepare', '--profile=onboarding'], ['--ui', '--profile=onboarding'], ['--session=hx-onb', '--profile=onboarding']]) {
-    const result = run(args);
-    assert.notEqual(result.status, 0, args.join(' '));
-    assert.match(result.stderr, /Refusing an onboarding vault with no provider guard/, args.join(' '));
-    assert.equal(fs.existsSync('/private/tmp/vam-e2e-hx-onb'), false);
-  }
+  const refused = run(['--session=hx-onb', '--profile=onboarding']);
+  assert.notEqual(refused.status, 0); assert.match(refused.stderr, /Refusing an onboarding vault/);
+  assert.equal(fs.existsSync('/private/tmp/vam-e2e-hx-onb'), false);
+  for (const args of [['--prepare', '--live=sonnet'], ['--ui', '--unguarded'], ['--update-current', '--unguarded']]) assert.match(run(args).stderr, /apply only to --session/, args.join(' '));
   const { createTestVault } = await vaultLib();
   const box = sandbox();
   try {
     createTestVault({ vault: box.vault, profile: 'onboarding' });
     assert.equal(fs.existsSync(path.join(box.vault, '.obsidian/plugins/visual-agent-map/data.json')), false);
+    assert.throws(() => lib.assertSessionGuardable(box.vault, ['--session=x']), /no data\.json yet/);
+    assert.doesNotThrow(() => lib.assertSessionGuardable(box.vault, ['--session=x', '--unguarded']));
+    assert.doesNotThrow(() => lib.assertSessionGuardable(box.vault, ['--session=x'], box.vault), 'the owner vault is exempt');
+    // The owner (canonical) vault is created without the guard; a session vault with the same call is guarded.
+    const owner = path.join(box.dir, 'owner'), session = path.join(box.dir, 'session');
+    lib.prepareTestVault({ vault: owner, owner });
+    lib.prepareTestVault({ vault: session, owner });
+    assert.equal(settingsOf(owner).codexPath, undefined); assert.equal(settingsOf(owner).claudePath, undefined);
+    assert.equal(fs.existsSync(path.join(owner, '.obsidian/vam-provider-guard')), false);
+    assert.ok(settingsOf(session).codexPath);
   } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
 });
 
@@ -118,8 +122,8 @@ test('--live parsing: a model alone means claude, claude:<model> is the same, an
 
 test('the harness accepts --live only where it applies, and --update-current never takes it', async () => {
   const run = args => spawnSync(process.execPath, [path.join(root, 'scripts/test-harness.mjs'), ...args], { encoding: 'utf8' });
-  assert.match(run(['--update-current', '--live=sonnet']).stderr, /--live applies only to --prepare/);
-  assert.match(run(['--live=codex:gpt']).stderr, /only claude can be let through/);
+  assert.match(run(['--update-current', '--live=sonnet']).stderr, /apply only to --session/);
+  assert.match(run(['--live=codex:gpt']).stderr, /apply only to --session/);
   assert.match(run(['--session=x', '--stop', '--live=sonnet']).stderr, /Conflicting session options/);
   assert.match(run(['--session=x', '--reload', '--live=sonnet']).stderr, /--live cannot be combined with --reload/);
   assert.match(run(['--bogus']).stderr, /Unknown argument/);

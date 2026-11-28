@@ -620,6 +620,8 @@ export const en = {
   "ui.keep_editor_contents": "Keep editor contents",
   "ui.save_merged_contents": "Save merged contents",
   "ui.mind_map_changed_externally": "Mind map changed externally",
+  "ui.map_chat_history_reset_by_other_tab":
+    "Another tab's reply changed this map; switched to the latest version. Please redo the step.",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "Both the map and Map.md have changed. Choose which version to keep.",
   "ui.invalid_merged_contents": "The merged contents do not match the map format. Fix them, then save again.",

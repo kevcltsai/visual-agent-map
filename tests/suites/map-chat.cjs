@@ -4169,6 +4169,7 @@ const twoTabs = async removeOn => {
   const B = new h.view.constructor({ app: h.app }, h.plugin);
   Object.assign(B, { path: MAP, contentEl: h.rootEl, closed: false, render() {}, focusNode() {}, fit() {} });
   B.map = await h.repo.readMap(MAP);
+  if (removeOn === 'travel') B.history.push({ label: 'x', undo: () => { throw new Error('undo must not run'); }, redo() {} });
   B.hydrate = async () => { B.notes = new Map(await Promise.all(B.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)]))); };
   await B.hydrate(); h.setOtherViews([B]);
   const seen = []; let reached; const reachedP = new Promise(resolve => { reached = resolve; });
@@ -4177,7 +4178,7 @@ const twoTabs = async removeOn => {
     view.resolveMapConflict = async () => { seen.push({ view: name, isChatView: view === h.view, syncHold: view.syncHold, syncPending: view.syncPending, batch: !!view.chatMapBatch }); reached(); return original(); };
   }
   let pending; const flush = h.view.flushChatMapBatch.bind(h.view);
-  h.view.flushChatMapBatch = async () => { await flush(); const target = removeOn === 'A' ? h.view : B; pending = target.removeToUnassigned(target.map.nodes.find(n => n.id === h.ids.c), false); };
+  h.view.flushChatMapBatch = async () => { await flush(); const target = removeOn === 'A' ? h.view : B; pending = removeOn === 'travel' ? B.travel(false) : target.removeToUnassigned(target.map.nodes.find(n => n.id === h.ids.c), false); };
   // The reply stays applying (views held) until the removal has reached its conflict check.
   const release = h.view.releaseChatBatch.bind(h.view);
   h.view.releaseChatBatch = async () => { await withTimeout(reachedP); return release(); };
@@ -4193,6 +4194,16 @@ for (const tab of ['A', 'B']) integrationTest(`E2-tx B1: the batch flushed Map.m
   assert.equal(saved.nodes.length, 11, `Map.md keeps the 8 new cards (4 + 8 - the removed one): ${saved.nodes.length}; ${JSON.stringify(seen)}`);
   for (const node of saved.nodes) assert.ok(h.files.has(node.path), `a card has its note: ${node.path}`);
   assert.ok(!saved.nodes.some(n => n.id === h.ids.c), 'the removed card is off the map');
+  if (tab === 'B') assert.ok(seen.some(e => e.view === 'B' && e.syncHold > 0 && e.syncPending && !e.batch), `B adopted while held: ${JSON.stringify(seen)}`);
+});
+integrationTest('E2-tx B1: undo on the held tab after the batch flush adopts the stored map and says so: a Notice, history buttons refreshed, the 8 new cards kept', async () => {
+  const { h, B, seen, lines } = await twoTabs('travel');
+  eq(lines.filter(l => l.status === 'done').length, 8, JSON.stringify(lines));
+  assert.ok(seen.some(e => e.view === 'B' && e.syncHold > 0 && e.syncPending && !e.batch), `B was held: ${JSON.stringify(seen)}`);
+  assert.equal((h.control.modals ?? []).length, 0, 'no conflict window');
+  assert.equal(h.notices.filter(n => /Another tab's reply changed this map/.test(n)).length, 1, `one Notice: ${JSON.stringify(h.notices)}`);
+  assert.equal(B.history.canUndo, false); assert.equal(B.map.nodes.length, 12, 'B shows the stored map (4 + 8)');
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 12, 'Map.md keeps the 8 new cards');
 });
 
 

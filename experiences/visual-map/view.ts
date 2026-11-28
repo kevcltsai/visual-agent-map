@@ -7215,6 +7215,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
   private async resolveMapConflict(): Promise<boolean> {
+    this.adoptedHeldMap = false;
     if (!this.map) return false;
     const disk = await this.plugin.repo.readMap(this.path);
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
@@ -7228,6 +7229,8 @@ export class VisualAgentMapView extends ItemView {
     if (!staged && this.syncHold > 0 && this.syncPending) {
       this.adoptSavedMap(disk);
       this.history.clear();
+      this.adoptedHeldMap = true;
+      this.updateHistoryButtons();
       return false;
     }
     // The screen version offered is the map without the staged cards: they have no note file yet, and keeping the screen
@@ -13586,6 +13589,8 @@ export class VisualAgentMapView extends ItemView {
       .openDetails(this.plugin.repo.file(node.path))
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
+  /** Set by resolveMapConflict when a held view took the stored map and dropped its history (not an outside edit). */
+  private adoptedHeldMap = false;
   private async travel(redo: boolean): Promise<void> {
     // Undo and redo replace Map.md like any change: an outside edit goes through the same conflict window first.
     if (
@@ -13597,6 +13602,14 @@ export class VisualAgentMapView extends ItemView {
       await this.persist();
       await this.hydrate();
       this.render();
+      return;
+    }
+    if (this.adoptedHeldMap) {
+      // The step this click would have undone or redone is gone with the history: say so instead of doing nothing.
+      this.adoptedHeldMap = false;
+      await this.hydrate();
+      this.render();
+      new Notice(t("ui.map_chat_history_reset_by_other_tab"));
       return;
     }
     const action = redo ? this.history.redo() : this.history.undo();

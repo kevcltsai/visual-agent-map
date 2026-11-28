@@ -577,6 +577,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.keep_editor_contents": "保留畫面內容",
   "ui.save_merged_contents": "儲存合併內容",
   "ui.mind_map_changed_externally": "心智圖有外部修改",
+  "ui.map_chat_history_reset_by_other_tab": "另一個分頁的回覆已修改這張心智圖，已切換到最新版本。請重做這一步。",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "畫面與 Map.md 的結構都已改變。請選擇要保留哪一版。",
   "ui.invalid_merged_contents": "合併內容無效：結構不符合心智圖格式，請修正後再儲存。",

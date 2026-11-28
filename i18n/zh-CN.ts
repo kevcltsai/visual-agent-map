@@ -577,6 +577,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.keep_editor_contents": "保留画面内容",
   "ui.save_merged_contents": "保存合并内容",
   "ui.mind_map_changed_externally": "心智图有外部修改",
+  "ui.map_chat_history_reset_by_other_tab": "另一个标签页的回复已修改这张心智图，已切换到最新版本。请重做这一步。",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "画面与 Map.md 的结构都已改变。请选择要保留哪一版。",
   "ui.invalid_merged_contents": "合并内容无效：结构不符合地图格式，请修正后再保存。",

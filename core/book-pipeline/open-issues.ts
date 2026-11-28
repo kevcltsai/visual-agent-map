@@ -168,6 +168,10 @@ const COVER_OPEN = (k: number): Words => ({
   zh: `另有 ${k} 張封面圖可能對不上。`,
   en: `${k} cover pictures may not fit.`
 });
+const SKIPPED_LOCKED = (k: number): Words => ({
+  zh: `另有 ${k} 章略過（已鎖定）。`,
+  en: `${k} more chapters skipped (locked).`
+});
 const NONE_CHECKED: Words = { zh: "沒有可列的項目。", en: "Nothing to list." };
 
 /** The file name the page is meant to have (no folder). */
@@ -205,20 +209,23 @@ export function composeOpenIssuesNote(input: OpenIssuesInput): string {
   const { language, issues } = input;
   const n = Math.max(0, Math.trunc(input.checked));
   const colon = instructionLanguageOf(language) === "zh" ? "：" : ": ";
-  const aiOpen = issues.filter(issue => issue.source === "ai-proof").length;
+  // A chapter skipped as locked is not an unsolved AI item: it has its own sentence.
+  const skipped = issues.filter(issue => issue.source === "ai-proof" && issue.reason === "proof_locked_skipped").length;
+  const aiOpen = issues.filter(issue => issue.source === "ai-proof").length - skipped;
   const coverOpen = issues.filter(issue => issue.source === "cover").length;
-  const otherOpen = issues.length - aiOpen - coverOpen;
+  const otherOpen = issues.length - aiOpen - skipped - coverOpen;
   const aiSummary = aiOpen
     ? pick(SOME_OPEN(n, aiOpen), language)
     : n > 0
       ? pick(ALL_SOLVED(n), language)
-      : otherOpen || coverOpen
+      : otherOpen || coverOpen || skipped
         ? ""
         : pick(NONE_CHECKED, language);
   const summary = [
     aiSummary,
     otherOpen ? pick(OTHER_OPEN(otherOpen), language) : "",
-    coverOpen ? pick(COVER_OPEN(coverOpen), language) : ""
+    coverOpen ? pick(COVER_OPEN(coverOpen), language) : "",
+    skipped ? pick(SKIPPED_LOCKED(skipped), language) : ""
   ]
     .filter(Boolean)
     .join(" ");

@@ -6330,6 +6330,7 @@ test('AI lock, whole book (B33-z): one chapter locked and another whose check fa
   assert.match(page, /^- SecretTitleA：略過（已鎖定）/m, `the locked chapter is marked as skipped: ${page}`);
   assert.doesNotMatch(page, /SecretTitleA：AI 校對沒有跑完/, 'the locked chapter is not listed as unfinished');
   assert.match(page, /^- SecretTitleB：AI 校對沒有跑完/m, 'the failed chapter keeps the unfinished line');
+  assert.match(page, /仍有 1 項沒解決。 另有 1 章略過（已鎖定）。/, `N counts the failed chapter only; the skipped one has its own sentence: ${page}`);
   same(holder.skipped, [], 'no notice: the page says it');
   assert.equal(state.closingSkipped, false);
   assert.equal(closingPageSkipped(state), false);
@@ -6359,6 +6360,8 @@ test('AI lock, whole book (B33-z): an earlier page of ours is rewritten (not lef
   same(pages.map(([path]) => path), [`${dir}/仍有問題.md`], 'the same file, no new one');
   assert.match(pages[0][1], /^- SecretTitleA：略過（已鎖定）/m, `rewritten with the skipped chapter: ${pages[0][1]}`);
   assert.doesNotMatch(pages[0][1], /沒有跑完/, 'nothing stale stays');
+  assert.doesNotMatch(pages[0][1], /仍有 \d+ 項沒解決/, 'the skipped chapter is not counted as unsolved');
+  assert.match(pages[0][1], /另有 1 章略過（已鎖定）。/);
   same(holder.skipped, [['SecretTitleA']]);
   assert.equal(closingPageSkipped(await r.state()), true);
 });

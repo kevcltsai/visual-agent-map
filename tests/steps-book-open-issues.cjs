@@ -87,6 +87,18 @@ test('the summary counts AI items only; chapter status items get their own line;
   assert.match(oi.composeOpenIssuesNote({ bookTitle: 'Art', language: 'en', checked: 3, issues: [issues[2]] }), /all solved\. 1 more chapter status issues\./);
 });
 
+// B33-z: a chapter skipped as locked is not an unsolved AI item: its own sentence, counted apart; none, no sentence.
+test('B33-z summary: chapters skipped as locked are counted in their own sentence, never in "N still open"; zh and en', () => {
+  const skipped = title => ({ source: 'ai-proof', chapterId: title, chapterTitle: title, problem: '', reason: 'proof_locked_skipped' });
+  const only = note([skipped('甲')], { checked: 0 });
+  assert.match(only, /另有 1 章略過（已鎖定）。/); assert.doesNotMatch(only, /仍有 \d+ 項沒解決|沒有可列的項目/);
+  assert.match(note([skipped('甲'), skipped('乙')], { checked: 4 }), /AI 校對查了 4 項，全部解決。 另有 2 章略過（已鎖定）。/);
+  const mixed = note([issue(), skipped('甲')]);
+  assert.match(mixed, /AI 校對查了 12 項，仍有 1 項沒解決。 另有 1 章略過（已鎖定）。/); assert.doesNotMatch(mixed, /章節狀態/);
+  assert.match(oi.composeOpenIssuesNote({ bookTitle: 'Art', language: 'en', checked: 3, issues: [skipped('A')] }), /all solved\. 1 more chapters skipped \(locked\)\./);
+  assert.doesNotMatch(note([issue()]), /略過/, 'none skipped: no sentence');
+});
+
 // ---- Cover image B4: the cover source ----
 test('cover source: a placed cover that may not fit is one item with its own label and sentence; it is not counted as AI or chapter status; zh and en', () => {
   assert.equal(oi.sourceLabel('cover', 'zh-TW'), '封面圖'); assert.equal(oi.sourceLabel('cover', 'en'), 'Cover picture');

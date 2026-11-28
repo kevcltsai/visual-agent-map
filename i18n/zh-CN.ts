@@ -2653,6 +2653,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_failed_subtree": "没有子议题整合成功。",
   "ui.topic_chat_record_failed": "议题对话记录没有存成功。",
   "ui.exchange_reason_invalid_line_0": "不是有效的 OPML 或 FreeMind 大纲，第 {0} 行附近格式有误",
+  "ui.exchange_import_safety": "只导入了标题和注解；图标、连线、样式不会带进来。",
   "ui.invalid_merged_json": "合并内容不是有效的 JSON：请检查引号、逗号与大括号是否成对，修正后再保存。",
   "ui.note_style_folder_open_failed":
     "无法打开笔记风格文件夹：同名文件可能占住了这个位置，或文件夹无法写入。请改名或移走该文件，再试一次。",

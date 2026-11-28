@@ -2824,6 +2824,7 @@ export const en = {
   "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.exchange_import_safety": "Only titles and notes were imported; icons, links and styles are not brought in.",
   "ui.invalid_merged_json":
     "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
   "ui.note_style_folder_open_failed":

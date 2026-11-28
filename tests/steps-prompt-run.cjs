@@ -1247,6 +1247,10 @@ test('reason codes map to lines: unknown code gets the generic line, trial-reaso
   assert.equal(code(new Error('living-node-context-too-large')), 'range-too-large');
   assert.equal(code(new Error('cancelled')), 'failed');
   assert.equal(code('plain text'), 'provider-failed');
+  // D1-x5: a search that did not happen is stamped as a web failure, so the card shows the web line.
+  const notSearched = S.load('ai/search-not-performed.ts').searchNotPerformedError();
+  assert.equal(code(notSearched), 'web-required');
+  assert.equal(mapped(code(notSearched)), 'ui.living_node_trial_reason_web');
 });
 
 test('reason: a missing required source is reported as missing-source', async () => {

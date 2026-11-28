@@ -224,3 +224,23 @@ test('B15-y: with the reader already open an outline click centres once, as befo
   const { centred, visibleCentre } = await outlineClick(true);
   assert.deepEqual(centred, [visibleCentre]);
 });
+
+test('B15-y: while the reader slides in after an outline reveal, each canvas resize re-centres the card; later resizes leave the camera', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  for (const name of ['drawWhenShown', 'syncHeaderNarrow', 'syncReaderToggle', 'syncChatNarrow', 'fitKindShapes', 'syncStatusBarClearance']) view[name] = () => {};
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500; // the reader took 300px
+  view.onResize();
+  const after = { ...view.map.viewport };
+  view.viewportEl.clientWidth = 800;
+  view.map.viewport = { x: 0, y: 0, zoom: 1 };
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500;
+  const expected = { ...view.map.viewport, x: view.map.viewport.x - 150 };
+  assert.ok(Math.abs(after.x - expected.x) <= 1 && Math.abs(after.y - expected.y) <= 1, `after resize ${JSON.stringify(after)} vs ${JSON.stringify(expected)}`);
+  view.revealResize.until = Date.now() - 1; // the reveal is over
+  view.map.viewport = { x: 7, y: 9, zoom: 1 };
+  view.onResize();
+  assert.deepEqual({ ...view.map.viewport }, { x: 7, y: 9, zoom: 1 }, 'a resize after the reveal does not move the camera');
+});

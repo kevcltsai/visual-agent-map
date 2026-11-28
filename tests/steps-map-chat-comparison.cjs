@@ -448,6 +448,40 @@ test('F08b wiring: the reply hands the chat the map the table is about, and the 
   assert.equal((await host.saveComparison(h.chat.attached[0], h.chat.anchors[0])).ok, true);
 });
 
+// F06-z: the process dies right after a generated card's note is created; every later vault write fails (the process is gone).
+function crashAfterNoteCreate(app, mapPath) {
+  const vault = app.vault, state = { dead: false, created: [] };
+  for (const name of ['process', 'modify', 'delete', 'trash', 'rename']) {
+    if (typeof vault[name] !== 'function') continue;
+    const real = vault[name].bind(vault);
+    vault[name] = (...args) => (state.dead ? Promise.reject(new Error('process crashed')) : real(...args));
+  }
+  const create = vault.create.bind(vault);
+  vault.create = async (path, content) => {
+    if (state.dead) throw new Error('process crashed');
+    const file = await create(path, content);
+    if (path.endsWith('.md') && path !== mapPath && !/\/Map\.md$/.test(path)) { state.created.push(path); state.dead = true; throw new Error('process crashed'); }
+    return file;
+  };
+  return state;
+}
+
+test('F06-z a crash right after the comparison note is created leaves a complete card, never an empty shell', async () => {
+  const h = await harness();
+  await h.view.hydrate();
+  const crash = crashAfterNoteCreate(h.app, MAP);
+  await h.view.saveComparison(cmpFor(h), anchorOf(h)).catch(() => undefined);
+  assert.equal(crash.created.length, 1);
+  crash.dead = false;
+  assert.equal(await h.repo.adoptOrphanNodeNotes(), 1);
+  const map = await h.saved();
+  const made = map.nodes.find(n => ![h.ids.root, h.ids.a, h.ids.b, h.ids.c].includes(n.id));
+  const note = await h.repo.readNote(made.path, map);
+  assert.equal(note.status, 'completed');
+  assert.equal(note.sourcePaths.length, 2, 'the source links were written with the note');
+  assert.match(note.detail, /Fee/);
+});
+
 // ---- F08a-x: narrow panel (table scrolls, never squeezed per character) and unit that already has parentheses ----
 test('F08a-x header: a unit that already holds parentheses is not wrapped in a second pair, on screen and in the Markdown', () => {
   const words = { withUnit: (n, u) => `${n}（${u}）`, noUnit: n => `${n}（無單位）` };

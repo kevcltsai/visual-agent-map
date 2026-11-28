@@ -1226,6 +1226,14 @@ export class Repository {
       /** A hypothesis's starting leaning and strength (default undecided and none); ignored for other kinds. */
       hypothesisLeaning?: HypothesisLeaning;
       hypothesisStrength?: HypothesisStrength;
+      /**
+       * A generated card's finished content (summary, body, source notes, status), applied to the new note's text before
+       * its single write: a crash can never leave an empty shell that startup adoption would list as a half card.
+       */
+      complete?: {
+        patch: NotePatch;
+        options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean };
+      };
     } = {},
     onCreate?: (path: string) => void
   ): Promise<MapNode> {
@@ -1261,10 +1269,12 @@ export class Repository {
       cssclasses: [NOTE_CSS_CLASS]
     };
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
+    const shell = `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(this.noteLanguage))}`;
+    const { complete } = initial;
     const created = await this.createUniqueNote(
       folder,
       title,
-      `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(this.noteLanguage))}`,
+      complete ? path => this.patchedNote(path, shell, complete.patch, complete.options ?? {}) : shell,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -1277,7 +1287,7 @@ export class Repository {
   private async createUniqueNote(
     folder: string,
     title: string,
-    content: string,
+    content: string | ((path: string) => string),
     onCreate?: (path: string) => void
   ): Promise<TFile> {
     const failed = new Set<string>();
@@ -1285,7 +1295,7 @@ export class Repository {
       const path = this.unique(folder, title, failed);
       onCreate?.(path);
       try {
-        return await this.app.vault.create(path, content);
+        return await this.app.vault.create(path, typeof content === "function" ? content(path) : content);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (attempt >= 5 || !/already exists/i.test(message)) throw error;

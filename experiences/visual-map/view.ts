@@ -398,6 +398,7 @@ import {
   rebaseMapNotePaths,
   type Note,
   type NotePatch,
+  type Repository,
   type TopicInfo,
   isPlaceholder,
   type TopicAppearanceChange,
@@ -5758,10 +5759,10 @@ export class VisualAgentMapView extends ItemView {
     const off = this.topicCoverOff(node);
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, async path => {
+      .rewriteNote(node.path, async (path, _attachment, scoped) => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.plugin.repo.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
+        await scoped.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -5786,16 +5787,15 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.markersEditable(node)) return null;
     const write: CoverLook = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
-    const repo = this.plugin.repo;
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, async path => {
+      .rewriteNote(node.path, async (path, _attachment, scoped) => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await repo.app.vault.process(file, content => withCoverLook(content, write));
+        await scoped.app.vault.process(file, content => withCoverLook(content, write));
         if (Object.keys(text).length) {
-          const current = await repo.readNote(path, this.map ?? undefined);
+          const current = await scoped.readNote(path, this.map ?? undefined);
           if (Object.keys(text).some(key => current[key as "title" | "summary"] !== text[key as "title" | "summary"])) {
-            await repo.updateNote(path, text);
+            await scoped.updateNote(path, text);
             this.plugin.topicRuns.stopTask(path);
           }
         }
@@ -8048,17 +8048,17 @@ export class VisualAgentMapView extends ItemView {
     try {
       const tx = this.beginMapTransaction().rewriteNote(
         target.path,
-        async path => {
-          await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
-          if (book) await this.plugin.repo.app.vault.process(repo.file(path), bookMergeStampRaw);
-          if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
-          if (asked) await repo.writeTopicAppearance(path, asked);
+        async (path, _attachment, scoped) => {
+          await scoped.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
+          if (book) await scoped.app.vault.process(scoped.file(path), bookMergeStampRaw);
+          if (mergedAiLocked(sourceNotes)) await scoped.writeAiLocked(path, true);
+          if (asked) await scoped.writeTopicAppearance(path, asked);
         },
         // Parking the children rewrites the links to them in the merged text: the program's fingerprint is taken again from the
         // text as committed (before the step records it, so undo still recognises it; redo does it again).
         book
-          ? async path => {
-              await this.plugin.repo.app.vault.process(repo.file(path), bookMergeStampRaw);
+          ? async (path, scoped) => {
+              await scoped.app.vault.process(scoped.file(path), bookMergeStampRaw);
             }
           : undefined
       );
@@ -8143,14 +8143,16 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One history step for a merge: the commit's entry, plus the selection clean-up and the merge's own error messages. */
   private mergeEntry(entry: TransactionEntry): TransactionEntry {
-    const travel = (work: () => Promise<void>) => async (): Promise<void> => {
-      try {
-        await work();
-      } catch (error) {
-        throw this.mergeError(error);
-      }
-      this.selection.pruneSelectedOnly(new Set((this.map?.nodes ?? []).map(item => item.id)));
-    };
+    const travel =
+      (work: (scope?: Repository) => Promise<void>) =>
+      async (scope?: Repository): Promise<void> => {
+        try {
+          await work(scope);
+        } catch (error) {
+          throw this.mergeError(error);
+        }
+        this.selection.pruneSelectedOnly(new Set((this.map?.nodes ?? []).map(item => item.id)));
+      };
     return { ...entry, undo: travel(entry.undo), redo: travel(entry.redo) };
   }
   private selectedRoots(): MapNode[] {
@@ -11392,11 +11394,11 @@ export class VisualAgentMapView extends ItemView {
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction()
           .createAttachment("image", { name, data, sourcePath: node.path })
-          .rewriteNote(node.path, async (target, attachment) => {
+          .rewriteNote(node.path, async (target, attachment, scoped) => {
             const note = this.app.vault.getAbstractFileByPath(target);
             if (!(note instanceof TFile)) throw new Error(target);
             const link = attachment("image");
-            await this.plugin.repo.app.vault.process(note, content => {
+            await scoped.app.vault.process(note, content => {
               const withEmbed = appendImageEmbed(content, link);
               return setCover ? withCover(withEmbed, link) : withEmbed;
             });
@@ -13129,8 +13131,8 @@ export class VisualAgentMapView extends ItemView {
     const plugin = this.plugin;
     return beginTransaction({
       repo: plugin.repo,
-      rebuildDerivedData: () => plugin.rebuildDerivedData(),
-      refreshNotes: paths => plugin.rebuildDerivedData(paths),
+      rebuildDerivedData: scoped => plugin.rebuildDerivedData(undefined, scoped),
+      refreshNotes: (paths, scoped) => plugin.rebuildDerivedData(paths, scoped),
       validateStructure: (before, after) => validateLivingStructure(plugin.repo.app, plugin.repo, before, after),
       onApplied: () => {},
       checkConflict: async mapPath => {
@@ -13185,9 +13187,9 @@ export class VisualAgentMapView extends ItemView {
   private copyEntry(entry: TransactionEntry): TransactionEntry {
     return {
       ...entry,
-      undo: async () => {
+      undo: async scope => {
         try {
-          await entry.undo();
+          await entry.undo(scope);
         } catch (error) {
           if (isTransactionError(error, "rollback-failed"))
             throw Object.assign(
@@ -13206,8 +13208,8 @@ export class VisualAgentMapView extends ItemView {
   private beginMapTransaction(scope?: { roots: string[] }): Transaction {
     return beginTransaction({
       repo: this.plugin.repo,
-      rebuildDerivedData: () => this.plugin.rebuildDerivedData(scope),
-      refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
+      rebuildDerivedData: scoped => this.plugin.rebuildDerivedData(scope, scoped),
+      refreshNotes: (paths, scoped) => this.plugin.rebuildDerivedData(paths, scoped),
       guardPath: path => this.assertChatWritable(path),
       validateStructure: (before, after) => validateLivingStructure(this.app, this.plugin.repo, before, after),
       onApplied: (mapPath, map) => {
@@ -17246,7 +17248,7 @@ export class VisualAgentMapView extends ItemView {
                   await this.plugin.mutate(async () => {
                     if (!current()) return;
                     const entry = await this.beginMapTransaction()
-                      .rewriteNote(node.path, path => this.plugin.repo.writeAiCard(path, false))
+                      .rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeAiCard(path, false))
                       .commit({ deferRebuild: true, label: t("ui.living_node_convert") });
                     this.history.push(entry);
                     await this.refreshAfterSavedChange();
@@ -17437,7 +17439,6 @@ export class VisualAgentMapView extends ItemView {
     current: () => boolean
   ): Promise<LivingConfigSave | undefined> {
     if (!this.map || !current()) return undefined;
-    const repo = this.plugin.repo;
     const viewport = clone(this.map.viewport);
     const mapPath = this.path;
     const mapId = this.map.id;
@@ -17458,15 +17459,15 @@ export class VisualAgentMapView extends ItemView {
     };
     let saved: LivingConfigSave | undefined;
     const entry = await this.beginMapTransaction()
-      .rewriteNote(nodePath, async path => {
+      .rewriteNote(nodePath, async (path, _attachment, scoped) => {
         if (!stillCurrent()) throw new Error("changed-target");
-        const liveMap = await repo.readMap(mapPath);
+        const liveMap = await scoped.readMap(mapPath);
         const live = liveMap.nodes.find(item => item.id === nodeId);
         if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
           throw new Error("changed-target-identity");
         saved = await saveLivingConfig(
           this.app,
-          repo,
+          scoped,
           liveMap,
           nodeId,
           joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
@@ -18768,7 +18769,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisStrength(path, strength))
+      .rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeHypothesisStrength(path, strength))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
       })
@@ -18781,7 +18782,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
+      .rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeHypothesisLeaning(path, leaning))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
         // On an argument map the same step records the user's verdict; `aiVerdict` stays the runner's.
@@ -18798,7 +18799,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.relationsEnabled() || this.topicKindOf(node.id) === kind) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, path => this.plugin.repo.writeTopicKind(path, kind))
+      .rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeTopicKind(path, kind))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
       })
@@ -19191,8 +19192,8 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     let result: AddTopicLinkResult = { ok: true, next: [] };
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, async path => {
-        result = await this.plugin.repo.writeTopicLinks(path, change);
+      .rewriteNote(node.path, async (path, _attachment, scoped) => {
+        result = await scoped.writeTopicLinks(path, change);
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -19289,7 +19290,9 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     let transaction = this.beginMapTransaction();
     for (const target of targets)
-      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeAiLocked(path, locked));
+      transaction = transaction.rewriteNote(target.path, (path, _attachment, scoped) =>
+        scoped.writeAiLocked(path, locked)
+      );
     const entry = await transaction
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -19394,7 +19397,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.markersEditable(node)) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .rewriteNote(node.path, path => this.plugin.repo.writeTopicMarkers(path, id))
+      .rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeTopicMarkers(path, id))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
       })
@@ -19452,7 +19455,9 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     let transaction = this.beginMapTransaction();
     for (const target of targets)
-      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeTopicColor(path, color));
+      transaction = transaction.rewriteNote(target.path, (path, _attachment, scoped) =>
+        scoped.writeTopicColor(path, color)
+      );
     const entry = await transaction
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -19482,8 +19487,8 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     let transaction = this.beginMapTransaction();
     for (const target of targets)
-      transaction = transaction.rewriteNote(target.path, path =>
-        this.plugin.repo.writeTopicStyle(path, { set: wanted })
+      transaction = transaction.rewriteNote(target.path, (path, _attachment, scoped) =>
+        scoped.writeTopicStyle(path, { set: wanted })
       );
     const entry = await transaction
       .editMap(this.path, map => {
@@ -26496,16 +26501,16 @@ export class VisualAgentMapView extends ItemView {
         throw this.chatUndoRefusal();
       }
       const list = redo ? entries : [...entries].reverse();
-      await withVerifiedNoteHistory(this.plugin.repo, snapshots, async () => {
+      await withVerifiedNoteHistory(this.plugin.repo, snapshots, async scoped => {
         const done: TransactionEntry[] = [];
         try {
           for (const entry of list) {
-            await (redo ? entry.redo() : entry.undo());
+            await (redo ? entry.redo(scoped) : entry.undo(scoped));
             done.push(entry);
           }
         } catch (error) {
           try {
-            for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+            for (const entry of done.reverse()) await (redo ? entry.undo(scoped) : entry.redo(scoped));
           } catch {
             // best effort; the original error is what the user sees
           }
@@ -27361,11 +27366,11 @@ export class VisualAgentMapView extends ItemView {
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path })
-      .rewriteNote(node.path, async (path, attachment) => {
+      .rewriteNote(node.path, async (path, attachment, scoped) => {
         const note = this.app.vault.getAbstractFileByPath(path);
         if (!(note instanceof TFile)) throw new Error(path);
         const link = attachment("image");
-        await this.plugin.repo.app.vault.process(note, content => {
+        await scoped.app.vault.process(note, content => {
           if (livingEditorRefusal(content, parseYaml)) throw new Error(t("ui.living_node_use_run_card"));
           return withCover(appendImageEmbed(content, link), link);
         });
@@ -29407,7 +29412,7 @@ export class VisualAgentMapView extends ItemView {
           if (!this.map) return;
           const viewport = clone(this.map.viewport);
           const entry = await this.beginMapTransaction()
-            .rewriteNote(path, target => this.plugin.repo.writeNoteStyle(target, ref))
+            .rewriteNote(path, (target, _attachment, scoped) => scoped.writeNoteStyle(target, ref))
             .editMap(this.path, map => {
               map.viewport = clone(viewport);
             })

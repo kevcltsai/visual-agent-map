@@ -412,15 +412,15 @@ export class ChatActionWriter {
         };
         const entry = await this.ports
           .beginMapTransaction()
-          .rewriteNote(nodePath, async path => {
+          .rewriteNote(nodePath, async (path, _attachment, scoped) => {
             if (!stillCurrent()) throw new Error("changed-target");
-            const liveMap = await repo.readMap(mapPath);
+            const liveMap = await scoped.readMap(mapPath);
             const live = liveMap.nodes.find(item => item.id === nodeId);
             if (liveMap.id !== mapId || live?.path !== path || live.parentId !== parentId)
               throw new Error("changed-target-identity");
             configured = await saveLivingConfig(
               this.app,
-              repo,
+              scoped,
               liveMap,
               nodeId,
               action.content,
@@ -767,7 +767,7 @@ export class ChatActionWriter {
       if (!Object.keys(topicAppearanceValues(shown, change)).length) continue;
       changes++;
       run?.notes?.add(node.id);
-      transaction.rewriteNote(node.path, path => this.plugin.repo.writeTopicAppearance(path, change));
+      transaction.rewriteNote(node.path, (path, _attachment, scoped) => scoped.writeTopicAppearance(path, change));
     }
     if (!changes) return done();
     const viewport = clone(this.map.viewport);
@@ -1022,10 +1022,10 @@ export class ChatActionWriter {
       if (!kindChanges && !leaningWrite && !strengthWrite) continue;
       changes++;
       run?.notes?.add(node.id);
-      transaction.rewriteNote(node.path, async path => {
-        if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
-        if (leaningWrite) await this.plugin.repo.writeHypothesisLeaning(path, target.leaning);
-        if (strengthWrite) await this.plugin.repo.writeHypothesisStrength(path, target.strength);
+      transaction.rewriteNote(node.path, async (path, _attachment, scoped) => {
+        if (kindChanges) await scoped.writeTopicKind(path, kind);
+        if (leaningWrite) await scoped.writeHypothesisLeaning(path, target.leaning);
+        if (strengthWrite) await scoped.writeHypothesisStrength(path, target.strength);
       });
     }
     if (!changes) return { status: "done" };

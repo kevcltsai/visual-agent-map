@@ -22,7 +22,7 @@ export type StructureResult = { ok: true } | { ok: false; code: string; rollback
 
 export interface StructurePortDeps {
   repo: TransactionDeps["repo"] & Pick<Repository, "createNote" | "resolveTopicModel" | "topicFolder" | "updateNote">;
-  rebuildDerivedData: () => Promise<void>;
+  rebuildDerivedData: (scope?: Repository) => Promise<void>;
 }
 
 export function createBookStructurePort(
@@ -58,7 +58,9 @@ export function createBookStructurePort(
       for (const card of work.archive) tx.park(card.path, repo.topicFolder(mapPath, "Archive"), map.id, "archived");
       for (const card of work.restore) tx.unpark(card.path, repo.topicFolder(mapPath, "Notes"), map.id, map.id);
       for (const card of work.rename) {
-        tx.rewriteNote(card.path, path => repo.updateNote(path, { title: card.title }).then(() => undefined));
+        tx.rewriteNote(card.path, (path, _attachment, scoped) =>
+          scoped.updateNote(path, { title: card.title }).then(() => undefined)
+        );
         tx.rename(card.path, card.title);
       }
       tx.editMap(mapPath, (doc, resolve) => {

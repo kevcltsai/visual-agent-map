@@ -841,7 +841,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     updateNoteRawGuarded: (path, transform, options) =>
       this.repo.updateNoteRawGuarded(path, transform, { ...options, rejectAiCard: true }),
     editBookStructure: (mapPath, work) =>
-      createBookStructurePort({ repo: this.repo, rebuildDerivedData: () => this.rebuildDerivedData() })(mapPath, work),
+      createBookStructurePort({
+        repo: this.repo,
+        rebuildDerivedData: scoped => this.rebuildDerivedData(undefined, scoped)
+      })(mapPath, work),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
     aiProof: (request, run) => runAiProof(this.aiCalls, request, run),
@@ -2823,9 +2826,13 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation), `roots` to
    * the notes under those folders (a paste rebuilds only the target map, B27).
    */
-  async rebuildDerivedData(scope?: string[] | { roots: string[]; paths?: string[] }): Promise<void> {
+  async rebuildDerivedData(
+    scope?: string[] | { roots: string[]; paths?: string[] },
+    /** The scoped repository of a running transaction: its derived-data writes must go through it. */
+    repo: Repository = this.repo
+  ): Promise<void> {
     try {
-      await this.repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope);
+      await repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
       new Notice(

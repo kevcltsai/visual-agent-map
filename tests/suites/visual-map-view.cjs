@@ -2096,7 +2096,7 @@ integrationTest('hypothesis-leaning: changeHypothesisLeaning is one history entr
 integrationTest('hypothesis-leaning: the panel shows a Leaning group (Supported, Undecided, Refuted) with aria-pressed only for a hypothesis, and the focus stays on the pressed leaning', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
-  const tx = { rewriteNote(p, write) { tx.write = write; return tx; }, editMap() { return tx; }, async commit() { await tx.write('hyp.md'); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { tx.write = write; return tx; }, editMap() { return tx; }, async commit() { await tx.write('hyp.md', undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   const written = [];
   view.beginMapTransaction = () => tx; view.history = { push() {} };
   view.plugin.repo.writeHypothesisLeaning = async (path, leaning) => written.push([path, leaning]);
@@ -2185,7 +2185,7 @@ integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind 
 integrationTest('hypothesis-evidence: the panel type control is a labelled group with aria-pressed, shows strength only for a hypothesis, and keeps focus on the pressed type after a switch', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
-  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path, undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   view.beginMapTransaction = () => tx; view.history = { push() {} };
   view.refreshAfterSavedChange = async () => { for (const [id, kind] of view.pendingKinds) { const note = view.notes.get(id); if (kind === 'topic') delete note.topicKind; else note.topicKind = kind; } };
   view.pendingKinds = new Map();
@@ -2437,7 +2437,7 @@ integrationTest('hypothesis-evidence: adding from the sentence repaints the open
 integrationTest('hypothesis-evidence: after a strength change the focus returns to the pressed strength button', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
-  const tx = { rewriteNote(p, write) { tx.write = write; return tx; }, editMap() { return tx; }, async commit() { await tx.write('hyp.md'); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { tx.write = write; return tx; }, editMap() { return tx; }, async commit() { await tx.write('hyp.md', undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
   view.history = { push() {} };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
@@ -2449,7 +2449,7 @@ integrationTest('hypothesis-evidence: after a strength change the focus returns 
 integrationTest('hypothesis-evidence: a strength change rewrites the note and Map.md in one history entry, and the buttons report the current strength', async () => {
   const { view, writes } = heFixture();
   const steps = []; view.enqueue = work => work();
-  const tx = { rewriteNote(p, write) { steps.push(['rewrite', p]); steps.write = write; return tx; }, editMap() { steps.push(['editMap']); return tx; }, async commit(options) { steps.push(['commit', options]); await steps.write('hyp.md'); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { steps.push(['rewrite', p]); steps.write = write; return tx; }, editMap() { steps.push(['editMap']); return tx; }, async commit(options) { steps.push(['commit', options]); await steps.write('hyp.md', undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
   const pushed = []; view.history = { push: entry => pushed.push(entry) };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
@@ -3718,7 +3718,7 @@ integrationTest('topic-markers, topic-color and topic-style: select mode has no 
 integrationTest('topic-markers: the panel has one aria-pressed toggle per status marker in a single many-of box, with no group titles (P1.10b)', async () => {
   const { view } = heFixture();
   view.enqueue = work => work();
-  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path, undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   view.beginMapTransaction = () => tx; view.history = { push() {} };
   const toggled = [];
   view.plugin.repo.writeTopicMarkers = async (path, id) => {
@@ -3887,8 +3887,8 @@ integrationTest('topic-color: applying to a branch is one transaction that write
   view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
   const pushed = []; view.history = { push: entry => pushed.push(entry) };
   await view.refreshAfterSavedChange();
-  const writes = []; const original = repo.writeTopicColor.bind(repo);
-  repo.writeTopicColor = async (p, id) => { writes.push(p); return original(p, id); };
+  const writes = []; const original = repo.writeTopicColor;
+  repo.writeTopicColor = async function (p, id) { writes.push(p); return original.call(this, p, id); };
   const snapshot = () => Object.fromEntries([root, child, grand, same, sibling].map(n => [n.path, contents.get(n.path)]));
   const before = snapshot(), mapBefore = contents.get(MAP);
   const rootNode = view.map.nodes.find(n => n.id === root.id);
@@ -3972,8 +3972,8 @@ integrationTest('topic-style: a branch change is one transaction writing only th
   view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
   const pushed = []; view.history = { push: entry => pushed.push(entry) };
   await view.refreshAfterSavedChange();
-  const writes = []; const original = repo.writeTopicStyle.bind(repo);
-  repo.writeTopicStyle = async (p, c) => { writes.push(p); return original(p, c); };
+  const writes = []; const original = repo.writeTopicStyle;
+  repo.writeTopicStyle = async function (p, c) { writes.push(p); return original.call(this, p, c); };
   const snapshot = () => Object.fromEntries([root, child, same, sibling].map(n => [n.path, contents.get(n.path)]));
   const before = snapshot(), mapBefore = contents.get(MAP);
   const rootNode = () => view.map.nodes.find(n => n.id === root.id);
@@ -4047,7 +4047,7 @@ integrationTest('topic-links: the panel section lists and opens links in read-on
     }
     const f = heFixture({ notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
     const { view } = f; view.enqueue = work => work();
-    const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+    const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path, undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
     view.beginMapTransaction = () => tx; view.history = { push() {} }; view.refreshAfterSavedChange = async () => {};
     const calls = [];
     view.plugin.repo.writeTopicLinks = async (path, change) => { calls.push(change); const note = view.notes.get('fact'); if ('add' in change) { if (change.add === 'dup') return { ok: false, reason: 'duplicate' }; if (change.add === 'bad') return { ok: false, reason: 'invalid' }; note.links = [...note.links, change.add]; } else note.links = note.links.filter(h => h !== change.remove.href); return { ok: true, next: note.links }; };
@@ -4068,7 +4068,7 @@ integrationTest('topic-links: the panel section lists and opens links in read-on
 integrationTest('topic-links: a refused write leaves no undo step; the link menu takes focus again after the pointer click that opened it blurred it', async () => {
   const f = heFixture({ notes: heNotes([['fact', { links: [] }], ['hyp', {}], ['other', {}]]) });
   const { view } = f; const pushed = [];
-  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path, undefined, view.plugin.repo); return { undo() {}, redo() {} }; } };
   view.beginMapTransaction = () => tx; view.history = { push: e => pushed.push(e) }; view.refreshAfterSavedChange = async () => {};
   for (const reason of ['invalid', 'duplicate', 'too-many']) {
     view.plugin.repo.writeTopicLinks = async () => ({ ok: false, reason });

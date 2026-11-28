@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { parentPath, baseName } from "./core/repository-paths";
 import {
   moveTopicsWithRollback,
@@ -388,9 +387,14 @@ const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 export class Repository {
   readonly app: App;
+  /** The guarded App for one note-write guard (none: the plain one). */
+  private readonly guardedApp: (noteGuard?: NoteWriteGuard) => App;
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
   private disposed = false;
-  private readonly noteWriteScope = new AsyncLocalStorage<NoteWriteGuard>();
+  /** Set only on a scoped view (see {@link withNoteWriteGuard}); the original Repository has none, so it never guards. */
+  private readonly noteScope?: NoteWriteGuard;
+  /** The original Repository, also from a scoped view: state that must not fork per view is written through it. */
+  private readonly root: Repository = this;
   /** The Map.md transforms of viewport writes: one started before unload still lands after dispose (that call only). */
   private readonly viewportChanges = new WeakSet<object>();
   /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
@@ -419,45 +423,59 @@ export class Repository {
         }
       }
     };
-    const noteGuard = (): NoteWriteGuard | undefined => this.noteWriteScope.getStore();
     const damagedMarkers = (): Error => new Error(this.message("error.living_node_markers_damaged"));
-    this.app = new Proxy(app, {
-      get(object, property) {
-        const value = Reflect.get(object, property, object) as unknown;
-        if (property === "vault")
-          return guardWrites(
-            value as object,
-            VAULT_WRITES,
-            stopped,
-            message,
-            recovery,
-            recoveryErrors,
-            noteGuard,
-            damagedMarkers,
-            spared
-          );
-        if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
-        return value;
-      }
-    });
+    this.guardedApp = (noteGuard?: NoteWriteGuard): App =>
+      new Proxy(app, {
+        get(object, property) {
+          const value = Reflect.get(object, property, object) as unknown;
+          if (property === "vault")
+            return guardWrites(
+              value as object,
+              VAULT_WRITES,
+              stopped,
+              message,
+              recovery,
+              recoveryErrors,
+              noteGuard ? () => noteGuard : undefined,
+              damagedMarkers,
+              spared
+            );
+          if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
+          return value;
+        }
+      });
+    this.app = this.guardedApp();
   }
 
-  /** Restrict the guard to this async operation; unrelated concurrent writers do not inherit it. */
-  withNoteWriteGuard<T>(guard: NoteWriteGuard, action: () => Promise<T>): Promise<T> {
-    const outer = this.noteWriteScope.getStore();
-    if (!outer) return this.noteWriteScope.run(guard, action);
-    const combined: NoteWriteGuard = (file, current, change) => outer(file, current, text => guard(file, text, change));
-    combined.acceptsHistory = outer.acceptsHistory;
-    combined.aroundHostMove = (origin, target, move) => {
-      const inner = (): Promise<void> => (guard.aroundHostMove ? guard.aroundHostMove(origin, target, move) : move());
-      return outer.aroundHostMove ? outer.aroundHostMove(origin, target, inner) : inner();
-    };
-    return this.noteWriteScope.run(combined, action);
+  /**
+   * Runs `action` with a view of this Repository whose vault writes go through `guard`. The scope is the view itself, passed
+   * explicitly (not async-local state): a write through any other Repository value, including this one, is not guarded.
+   * Inside a view the guard combines with the one already there.
+   */
+  withNoteWriteGuard<T>(guard: NoteWriteGuard, action: (scoped: Repository) => Promise<T>): Promise<T> {
+    const outer = this.noteScope;
+    let scope = guard;
+    if (outer) {
+      const combined: NoteWriteGuard = (file, current, change) =>
+        outer(file, current, text => guard(file, text, change));
+      combined.acceptsHistory = outer.acceptsHistory;
+      combined.aroundHostMove = (origin, target, move) => {
+        const inner = (): Promise<void> => (guard.aroundHostMove ? guard.aroundHostMove(origin, target, move) : move());
+        return outer.aroundHostMove ? outer.aroundHostMove(origin, target, inner) : inner();
+      };
+      scope = combined;
+    }
+    const view: Repository = Object.create(this) as Repository;
+    Object.defineProperties(view, {
+      app: { value: this.guardedApp(scope), enumerable: true },
+      noteScope: { value: scope }
+    });
+    return action(view);
   }
 
   /** Only a verified grouped-history scope may authorize a newer preimage from an earlier child entry. */
   acceptsNoteHistory(file: TFile, current: string): boolean {
-    return this.noteWriteScope.getStore()?.acceptsHistory?.(file, current) ?? false;
+    return this.noteScope?.acceptsHistory?.(file, current) ?? false;
   }
 
   /**
@@ -2236,7 +2254,7 @@ export class Repository {
         language: () => this.settings.language,
         message: key => this.message(key),
         markedNotes: () => this.markedFiles("agent-map-node"),
-        aroundHostMove: this.noteWriteScope.getStore()?.aroundHostMove
+        aroundHostMove: this.noteScope?.aroundHostMove
       },
       item,
       target
@@ -2886,11 +2904,11 @@ export class Repository {
     alsoManaged: string[] = [],
     onProgress?: MoveProgress
   ): Promise<Map<string, string>> {
-    this.pendingContainers = alsoManaged;
+    this.root.pendingContainers = alsoManaged;
     try {
       return await this.moveTopicsWithRollback(moves, onProgress);
     } finally {
-      this.pendingContainers = [];
+      this.root.pendingContainers = [];
     }
   }
 

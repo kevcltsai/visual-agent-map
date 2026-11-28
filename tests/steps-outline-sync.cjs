@@ -228,7 +228,8 @@ test('B15-y: with the reader already open an outline click centres once, as befo
 test('B15-y: while the reader slides in after an outline reveal, each canvas resize re-centres the card; later resizes leave the camera', async () => {
   const { view } = await viewWithMap();
   const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
-  for (const name of ['drawWhenShown', 'syncHeaderNarrow', 'syncReaderToggle', 'syncChatNarrow', 'fitKindShapes', 'syncStatusBarClearance']) view[name] = () => {};
+  for (const name of ['drawWhenShown', 'syncHeaderNarrow', 'syncReaderToggle', 'syncChatNarrow', 'fitKindShapes']) view[name] = () => {};
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
   await view.revealPath('leaf.md');
   view.viewportEl.clientWidth = 500; // the reader took 300px
   view.onResize();
@@ -243,4 +244,17 @@ test('B15-y: while the reader slides in after an outline reveal, each canvas res
   view.map.viewport = { x: 7, y: 9, zoom: 1 };
   view.onResize();
   assert.deepEqual({ ...view.map.viewport }, { x: 7, y: 9, zoom: 1 }, 'a resize after the reveal does not move the camera');
+});
+
+test('B15-y: the status bar growing during an outline reveal (the reader made a note active) re-centres the card on the new bottom inset', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  let bottomInset = 0;
+  view.canvasInsets = () => ({ top: 0, right: 0, bottom: bottomInset, left: 0 });
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
+  await view.revealPath('leaf.md');
+  const before = view.map.viewport.y;
+  bottomInset = 26; // the zoom bar rose above the taller status bar
+  view.syncStatusBarClearance();
+  assert.ok(Math.abs(view.map.viewport.y - (before - 13)) <= 1, `y ${view.map.viewport.y}, expected ${before - 13}`);
 });

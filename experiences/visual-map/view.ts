@@ -555,6 +555,7 @@ import {
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { buildResumeSummary, type ResumeSummary } from "../../core/map-chat-resume";
+import { buildImpact } from "../../core/map-impact";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
@@ -13386,6 +13387,7 @@ export class VisualAgentMapView extends ItemView {
       exitBranchFocus: () => void this.exitBranchFocus(),
       copyKnowledgeRef: card => this.copyAsKnowledgeRef(card),
       pasteKnowledgeRef: card => this.pasteKnowledgeRef(card.id),
+      impactAnalysis: card => void this.showCardImpact(card.id),
       zoomFit: () => this.fit(),
       zoomReset: () => {
         if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
@@ -24252,6 +24254,36 @@ export class VisualAgentMapView extends ItemView {
       window.setTimeout(() => card.removeClass("is-chat-located"), CHAT_LOCATE_FLASH_MS);
     }
     return true;
+  }
+  /**
+   * "Impact analysis" (F09): what this card touches in THIS map, shown read-only in the chat window. Nothing is written, no
+   * provider is called, no other map is read (a reference card shows only the title this view already resolved).
+   */
+  private async showCardImpact(id: string): Promise<void> {
+    const map = this.map;
+    const chat = this.chat;
+    if (!map || !chat) return;
+    let livingConsumerIds: string[] = [];
+    try {
+      livingConsumerIds = await livingRemovalConsumers(this.app, this.plugin.repo, clone(map), new Set([id]));
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Impact analysis: ${errorMessage(error)}`);
+    }
+    if (this.map !== map || this.chat !== chat) return;
+    const cards = map.nodes.map(node => {
+      const note = this.notes.get(node.id);
+      return {
+        id: node.id,
+        parentId: node.parentId ?? null,
+        title: note?.title ?? "",
+        summary: note?.livingNode?.summary || note?.summary || ""
+      };
+    });
+    const refs = visibleKnowledgeRefs(map).map(ref => {
+      const found = this.refResolved.get(ref.id);
+      return { id: ref.id, parentId: ref.parentId, ...(found?.ok ? { title: found.title } : {}) };
+    });
+    chat.showImpact(buildImpact({ targetId: id, cards, relations: map.topicRelations ?? [], livingConsumerIds, refs }));
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {

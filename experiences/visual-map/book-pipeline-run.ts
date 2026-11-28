@@ -246,7 +246,7 @@ import {
 } from "../../core/book-pipeline/cover-block";
 import { isBadRequest } from "../../ai/bad-request";
 import type { ReasoningLevel } from "../../ai/types";
-import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
+import { instructionLanguageOf, translate, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -1269,11 +1269,9 @@ export function replaceBodyImages(content: string, replacements: ReadonlyMap<str
   return rebuildBody(content, href => replacements.get(href));
 }
 
-/** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). */
-function seamText(language: string, at: number, revision: number | string): string {
-  return /^zh/i.test(language)
-    ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
-    : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`;
+/** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). Shown to the reader, so it follows the map language itself (zh-CN stays Simplified), not the Traditional-only note.* text. */
+function seamText(language: ContentLanguage, at: number, revision: number | string): string {
+  return translate(language, "ui.book_seam_unchecked", at + 1, String(revision));
 }
 
 /** What one apply-notes job did. `edits` carry the before/after of each replaced paragraph (the undo's input). */
@@ -2883,7 +2881,7 @@ export class BookPipelineRuns {
     mapPath: string,
     state: BookPipelineData,
     nodeId: string,
-    language: string,
+    language: ContentLanguage,
     map: MapDocument
   ): Promise<void> {
     const stateOrder = effectiveOrder(state);

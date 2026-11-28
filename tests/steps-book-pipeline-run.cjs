@@ -2441,6 +2441,16 @@ test('seams: a whole-book redo writes every chapter beside its neighbours again,
   assert.deepEqual([0, 1, 2].map(seam), [undefined, undefined, undefined], 'all stale join marks are gone');
 });
 
+test('B33-w seam text: the join mark written into the neighbour chapter is in the note language (zh-TW Traditional, zh-CN Simplified, en English)', async () => {
+  const want = { 'zh-TW': /鄰卡企劃或正文已變更，尚未人工核對（第 2 張/, 'zh-CN': /邻卡企划或正文已变更，尚未人工核对（第 2 张/, en: /^Neighbouring card's plan or text changed; not yet checked by a person \(card 2, revision/ };
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const r = await rig({ ports: { config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language }) } });
+    await finish(r);
+    await rerun(r, 1);
+    for (const i of [0, 2]) assert.match(/^pipeline-seam: "?(.*?)"?$/m.exec(r.raw(i))?.[1] ?? '', want[language], `${language} chapter ${i}`);
+  }
+});
+
 test('review-b S3: a redo of the whole book makes no plan call for a hand-edited or kept chapter, and a kept chapter gets no proof the second time and no auto-fix', async () => {
   const r = await rig();
   await finish(r);

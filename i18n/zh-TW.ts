@@ -1563,6 +1563,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_book_field_previous": "承接",
   "ui.map_chat_book_field_checklist": "驗收清單",
   "ui.book_editor_opening_fallback": "企劃排好了，哪裡想調整直接跟我說。",
+  "ui.book_seam_unchecked": "鄰卡企劃或正文已變更，尚未人工核對（第 {0} 張，版本 {1}）",
   "ui.map_chat_do_edit_md_0": "修改 {0}",
   "ui.map_chat_do_create_md_0": "建立 {0}",
   "ui.map_chat_do_select_0": "選取 {0} 個議題",

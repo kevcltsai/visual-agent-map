@@ -1562,6 +1562,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_book_field_previous": "承接",
   "ui.map_chat_book_field_checklist": "验收清单",
   "ui.book_editor_opening_fallback": "企划排好了，哪里想调整直接跟我说。",
+  "ui.book_seam_unchecked": "邻卡企划或正文已变更，尚未人工核对（第 {0} 张，版本 {1}）",
   "ui.map_chat_do_edit_md_0": "修改 {0}",
   "ui.map_chat_do_create_md_0": "创建 {0}",
   "ui.map_chat_do_select_0": "选取 {0} 个议题",

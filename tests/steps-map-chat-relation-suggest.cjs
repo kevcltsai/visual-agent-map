@@ -232,3 +232,27 @@ test('F07a-x merge gate: Adopt greys (with the reason) the moment a merge starts
   assert.deepEqual(plain(h.chat.painted?.[0]), [null, null, null], 'wakes when the merge ends');
   assert.equal(card.state, 'pending');
 });
+
+test('F07b-y adopt: a suggestion from a never-touched card to a knowledge reference writes Map.md only, no note changes', async () => {
+  const h = await harness();
+  const doc = await h.repo.readMap(MAP);
+  doc.knowledgeRefs = [{ id: 'ref-1', mapId: 'other', nodeId: 'n1', parentId: h.ids.a, x: 300, y: 0, pathHint: 'Mind Maps/Other/Map.md' }];
+  await h.repo.saveMap(MAP, doc);
+  await h.repo.rebuildDerivedData();
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.hydrate();
+  const notes = h.app.vault.getMarkdownFiles().filter(f => f.path !== MAP);
+  for (const f of notes) await h.app.vault.process(f, text => text.replace(/\n## Reference Links\n[\s\S]*?<!-- visual-agent-map:references:end -->\n?/, '\n'));
+  const snap = async () => { const m = new Map(); for (const f of notes) m.set(f.path, await h.app.vault.read(f)); return m; };
+  const before = await snap();
+  assert.ok([...before.values()].every(text => !/Reference Links/.test(text)), 'precondition: no derived block in any note');
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [], remaining: '', suggestions: [{ fromId: h.ids.root, toId: 'ref-1', relationKind: 'supports', reason: 'why', source: '[S1]' }] });
+  await h.send('link to the reference');
+  const card = h.chat.plans[0];
+  assert.equal(card.suggestions.length, 1, 'the reference suggestion is offered');
+  card.suggestions[0].adopt();
+  await until(async () => ((await h.saved()).topicRelations ?? []).length === 1);
+  await tick();
+  const after = await snap();
+  assert.deepEqual([...after.keys()].filter(path => after.get(path) !== before.get(path)), [], 'no note of either end changed');
+});

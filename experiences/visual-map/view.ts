@@ -2081,6 +2081,17 @@ export class VisualAgentMapView extends ItemView {
       settleMoving: true
     }).nodes;
   }
+  /** True when the branch root leaves a parent that grows in the way `target` grows (balanced: on the same side), so a batch move can carry that branch whole. */
+  private growsLikeTarget(map: MapDocument, root: MapNode, target: MapNode): boolean {
+    const way = branchDirectionResolver(map.nodes, layoutOf(map).direction, undefined, this.ringDirections(map));
+    const byId = new Map(map.nodes.map(node => [node.id, node]));
+    const side = (child: MapNode, parent: MapNode | undefined) => (parent ? Math.sign(child.x - parent.x) : 0);
+    const balanced = layoutOf(map).direction === "balanced";
+    const targetSide = side(target, target.parentId ? byId.get(target.parentId) : undefined);
+    const from = root.parentId ? byId.get(root.parentId) : undefined;
+    if (!from || way(from.id) !== way(target.id)) return false;
+    return !balanced || (targetSide !== 0 && side(root, from) === targetSide);
+  }
   /** True when new, unfolded or grown cards are placed locally (right, left, balanced, down, up); radial, timeline, fishbone and argument maps lay the whole map out (decision #18). */
   private placesLocally(map: MapDocument): boolean {
     if (readArgumentMap(map).kind === "usable") return false;
@@ -12310,6 +12321,10 @@ export class VisualAgentMapView extends ItemView {
       const branchOf = new Map<string, Set<string>>();
       // The siblings take the order on screen first; each moved topic then comes last among the new parent's children (before the layout).
       if (target) map.nodes = this.onScreenSiblingOrder(map);
+      // Decided per branch before the move: it leaves a parent that grows the way the target grows (and on the same side in a balanced map).
+      const carried = new Set(
+        target && roots.length > 1 ? roots.filter(root => this.growsLikeTarget(map, root, target)).map(r => r.id) : []
+      );
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
@@ -12334,16 +12349,41 @@ export class VisualAgentMapView extends ItemView {
             map.nodes.filter(node => moved.has(node.id)).map(node => [node.id, { x: node.x, y: node.y }])
           );
           const first = start.get(lead.id)!;
+          const leadCarried = carried.has(lead.id);
+          const everyone = leadCarried
+            ? new Map(map.nodes.map(node => [node.id, { x: node.x, y: node.y }]))
+            : undefined;
+          const items = leadCarried && map.canvasItems ? clone(map.canvasItems) : undefined;
           this.arrangeBranch(map, target.id, branchOf.get(lead.id)!, undefined);
           const placed = map.nodes.find(node => node.id === lead.id)!;
           const dx = placed.x - first.x,
             dy = placed.y - first.y;
-          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          // A lead that grows like the target is carried whole (its hand-placed inner offsets stay): the layout only gave the offset, so what it pushed is put back and only real overlaps are pushed below.
+          if (everyone) {
+            for (const node of map.nodes) {
+              const home = everyone.get(node.id);
+              if (home) Object.assign(node, home);
+            }
+            if (items) map.canvasItems = items;
+          }
+          // Only branches that are carried (or the lead, already arranged) shift and push; a branch of another way is left for the arrangement below.
+          const left = new Set(
+            roots
+              .filter(root => !carried.has(root.id) && root.id !== lead.id)
+              .flatMap(root => [...branchOf.get(root.id)!])
+          );
+          const rest = new Set(
+            [...moved].filter(id => !left.has(id) && (leadCarried || !branchOf.get(lead.id)!.has(id)))
+          );
           for (const node of map.nodes) {
             const was = rest.has(node.id) ? start.get(node.id) : undefined;
             if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });
           }
           this.pushFrom(map, rest);
+          // A branch that grows another way than the target is arranged under it (it may be re-arranged).
+          for (const root of roots)
+            if (root.id !== lead.id && !carried.has(root.id))
+              this.arrangeBranch(map, target.id, branchOf.get(root.id)!, undefined);
         } else this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);

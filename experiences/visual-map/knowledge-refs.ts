@@ -89,13 +89,21 @@ export function appendKnowledgeRef(map: { knowledgeRefs?: unknown }, ref: Knowle
   map.knowledgeRefs = [...rawKnowledgeRefs(map), { ...ref }];
 }
 
-/** Takes one entry out by id; the key goes when the list is left empty. Returns whether an entry was removed. */
-export function removeKnowledgeRef(map: { knowledgeRefs?: unknown }, id: string): boolean {
+/** Takes one entry out by id (and the relations that end at it, V3.3 P4.4); the key goes when the list is left empty. Returns whether an entry was removed. */
+export function removeKnowledgeRef(
+  map: { knowledgeRefs?: unknown; topicRelations?: { from: string; to: string }[] },
+  id: string
+): boolean {
   const list = rawKnowledgeRefs(map);
   const next = list.filter(entry => !(isRecord(entry) && entry.id === id));
   if (next.length === list.length) return false;
   if (next.length) map.knowledgeRefs = next;
   else delete map.knowledgeRefs;
+  if (Array.isArray(map.topicRelations)) {
+    const left = map.topicRelations.filter(link => link.from !== id && link.to !== id);
+    if (left.length) map.topicRelations = left;
+    else delete map.topicRelations;
+  }
   return true;
 }
 

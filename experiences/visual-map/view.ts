@@ -21832,7 +21832,8 @@ export class VisualAgentMapView extends ItemView {
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
       // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
-      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      // dialog names exactly the ones the run sends (an unnamed one is not sent). An original with an empty title is still
+      // listed, by its note name, so the set sent matches what the save check reads again.
       const refs = this.recombinedRefs(nodes);
       const found = refs.length
         ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
@@ -21842,8 +21843,8 @@ export class VisualAgentMapView extends ItemView {
       const listed = new Map<string, RefResolution>();
       const refNames = refs.flatMap(ref => {
         const resolution = found.get(ref.id);
-        const title = referenceTitle(resolution);
-        if (!title || !resolution) return [];
+        if (!resolution?.ok) return [];
+        const title = referenceTitle(resolution) ?? resolution.notePath.split("/").at(-1)?.replace(/\.md$/, "");
         listed.set(ref.id, resolution);
         return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
       });

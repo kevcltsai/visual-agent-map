@@ -281,3 +281,41 @@ for (const kind of ['plain', 'living']) {
     assert.equal(refs.compareCitation(target, asModelSees()).status, 'changed', 'edited source is stale');
   });
 }
+
+// F06-z: the process dies right after a generated card's note is created; every later vault write fails (the process is gone).
+function crashAfterNoteCreate(app, mapPath) {
+  const vault = app.vault, state = { dead: false, created: [] };
+  for (const name of ['process', 'modify', 'delete', 'trash', 'rename']) {
+    if (typeof vault[name] !== 'function') continue;
+    const real = vault[name].bind(vault);
+    vault[name] = (...args) => (state.dead ? Promise.reject(new Error('process crashed')) : real(...args));
+  }
+  const create = vault.create.bind(vault);
+  vault.create = async (path, content) => {
+    if (state.dead) throw new Error('process crashed');
+    const file = await create(path, content);
+    if (path.endsWith('.md') && path !== mapPath && !/\/Map\.md$/.test(path)) { state.created.push(path); state.dead = true; throw new Error('process crashed'); }
+    return file;
+  };
+  return state;
+}
+
+test('F06-z a crash right after the new card note is created leaves no half card: startup adoption lists a complete card or nothing', async () => {
+  const h = await harness();
+  const crash = crashAfterNoteCreate(h.app, HOST);
+  await run(h, []);
+  assert.equal(crash.created.length, 1, 'the crash hit the recombined card note');
+  crash.dead = false;
+  const adopted = await h.repo.adoptOrphanNodeNotes();
+  const map = await h.repo.readMap(HOST);
+  const extra = map.nodes.filter(n => !h.nodes.some(item => item.id === n.id));
+  assert.equal(extra.length, adopted);
+  for (const node of extra) {
+    const note = await h.repo.readNote(node.path, map);
+    assert.equal(note.summary, 'Combined', 'the adopted card carries its final summary, not the placeholder');
+    assert.equal(note.status, 'completed');
+    assert.match(note.detail, /One/);
+    assert.ok(note.sourcePaths.includes(h.original.path));
+  }
+  assert.equal(extra.length, 1, 'the one complete note is the card');
+});

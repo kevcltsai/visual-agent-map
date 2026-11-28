@@ -7851,6 +7851,8 @@ export class VisualAgentMapView extends ItemView {
     const firstNote = this.notes.get(sources[0].id),
       firstKind = firstNote?.topicKind,
       firstHypothesis = firstNote?.topicKind === "hypothesis" ? firstNote : undefined;
+    const mergeTemplate = content ? (await this.mapStyle(language)).template : undefined;
+    // One write with the finished content (F06-z): a crash can never leave an empty shell for startup adoption to list.
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
@@ -7862,7 +7864,32 @@ export class VisualAgentMapView extends ItemView {
         ...(firstKind ? { topicKind: firstKind } : {}),
         // A leaning on a non-hypothesis is not carried over.
         ...(firstHypothesis?.hypothesisLeaning ? { hypothesisLeaning: firstHypothesis.hypothesisLeaning } : {}),
-        ...(firstHypothesis?.hypothesisStrength ? { hypothesisStrength: firstHypothesis.hypothesisStrength } : {})
+        ...(firstHypothesis?.hypothesisStrength ? { hypothesisStrength: firstHypothesis.hypothesisStrength } : {}),
+        complete:
+          content && mergeTemplate
+            ? {
+                patch: {
+                  summary: content.summary,
+                  // A new note: only an image repeated inside the merged Detail is dropped.
+                  detail: dedupeImageEmbeds(
+                    withSourceSupplement(
+                      canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language), mergeTemplate),
+                      content.supplement,
+                      mergeTemplate,
+                      noteLanguageOf(language)
+                    )
+                  ),
+                  visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
+                  prompt: mergeGoalTask(language),
+                  sourcePaths: sources.map(source => source.path),
+                  status: "completed",
+                  ...formatIssuesPatch(content.formatIssues, language)
+                },
+                options: { detailTemplate: mergeTemplate, newVisualReferences: true }
+              }
+            : {
+                patch: { sourcePaths: sources.map(source => source.path), status: mergedStatus(detail) }
+              }
       }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"),
@@ -7872,34 +7899,6 @@ export class VisualAgentMapView extends ItemView {
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
       if (asked) await repo.writeTopicAppearance(created.path, asked);
       if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
-      if (content) {
-        const detailTemplate = (await this.mapStyle(language)).template;
-        await repo.updateNote(
-          created.path,
-          {
-            summary: content.summary,
-            // A new note: only an image repeated inside the merged Detail is dropped.
-            detail: dedupeImageEmbeds(
-              withSourceSupplement(
-                canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language), detailTemplate),
-                content.supplement,
-                detailTemplate,
-                noteLanguageOf(language)
-              )
-            ),
-            visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
-            prompt: mergeGoalTask(language),
-            sourcePaths: sources.map(source => source.path),
-            status: "completed",
-            ...formatIssuesPatch(content.formatIssues, language)
-          },
-          { detailTemplate, newVisualReferences: true }
-        );
-      } else
-        await repo.updateNote(created.path, {
-          sourcePaths: sources.map(source => source.path),
-          status: mergedStatus(detail)
-        });
       if (this.hasBookPipeline()) await this.plugin.repo.app.vault.process(repo.file(created.path), bookMergeStampRaw);
       // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
       const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
@@ -22925,33 +22924,35 @@ export class VisualAgentMapView extends ItemView {
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const concluded = this.relationsEnabled();
+    const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
+    // One write with the finished content: a crash can never leave an empty shell for startup adoption to list (F06-z).
     const integrated = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       this.map,
       this.path,
       "workspace",
-      // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
-      concluded ? { topicKind: "conclusion" } : {}
+      {
+        // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
+        ...(concluded ? { topicKind: "conclusion" as const } : {}),
+        complete: {
+          patch: {
+            summary: result.summary,
+            detail: dedupeImageEmbeds(
+              canonicalDetail(guardInlineHtmlLinks(result.detail), noteLanguageOf(language), detailTemplate)
+            ),
+            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
+            prompt: goal,
+            // Every note it was read from, the references' originals included.
+            sourcePaths: latest.documents.map(document => document.path),
+            status: "completed",
+            ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
+          },
+          options: { detailTemplate, newVisualReferences: true }
+        }
+      }
     );
-    const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
-      await this.plugin.repo.updateNote(
-        integrated.path,
-        {
-          summary: result.summary,
-          detail: dedupeImageEmbeds(
-            canonicalDetail(guardInlineHtmlLinks(result.detail), noteLanguageOf(language), detailTemplate)
-          ),
-          visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
-          prompt: goal,
-          // Every note it was read from, the references' originals included.
-          sourcePaths: latest.documents.map(document => document.path),
-          status: "completed",
-          ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
-        },
-        { detailTemplate, newVisualReferences: true }
-      );
       integrated.parentId = null;
       const previousEntry = this.history.undoEntry;
       try {
@@ -25127,10 +25128,12 @@ export class VisualAgentMapView extends ItemView {
       : this.plugin.currentModelChoice().model;
     const previous = this.history.undoEntry;
     const made = await this.writeNewBranches(clone(map), null, async copies => {
-      const node = await repo.createNote(title, model, map, this.path, parent ? "inherited" : "workspace", { detail });
+      const node = await repo.createNote(title, model, map, this.path, parent ? "inherited" : "workspace", {
+        detail,
+        complete: { patch: { sourcePaths, status: "completed" } }
+      });
       node.parentId = null;
       copies.push(node);
-      await repo.updateNote(node.path, { sourcePaths, status: "completed" });
     });
     const pushed = this.history.undoEntry;
     if (pushed && pushed !== previous) pushed.label = t("ui.map_chat_comparison_undo");

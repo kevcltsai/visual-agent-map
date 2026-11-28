@@ -3117,3 +3117,21 @@ integrationTest('AI write gate: an AI writer (rejectAiCard) is refused on a note
   assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'Mine' }, { expectedContent: contents.get(note.path) }), 'written');
   assert.equal((await repo.readNote(note.path)).summary, 'Mine');
 });
+
+integrationTest('F06-z createNote with `complete` writes the finished note in one vault write (no empty shell, merge and comparison paths)', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('One write'), doc = await repo.readMap(mapPath);
+  let writes = 0;
+  const create = app.vault.create.bind(app.vault);
+  app.vault.create = (...args) => { writes++; return create(...args); };
+  const before = new Set(contents.keys());
+  const node = await repo.createNote('Merged', 'a', doc, mapPath, 'workspace', { complete: { patch: { summary: 'Final summary', detail: 'Final body', sourcePaths: ['A.md'], status: 'completed' } } });
+  assert.equal(writes, 1);
+  assert.deepEqual([...contents.keys()].filter(path => !before.has(path)), [node.path]);
+  const note = await repo.readNote(node.path, doc);
+  assert.equal(note.summary, 'Final summary');
+  assert.match(note.detail, /Final body/);
+  assert.deepEqual(note.sourcePaths, ['A.md']);
+  assert.equal(note.status, 'completed');
+  assert.equal(await repo.adoptOrphanNodeNotes(), 1, 'a crash right after this write adopts a complete card');
+});

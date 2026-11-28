@@ -1,0 +1,456 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reply": {
+      "type": "string"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "x-vam-ignore-extra-fields": true,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add_child",
+              "rename_topic",
+              "update_summary",
+              "edit_topic_note",
+              "move_topic",
+              "delete_topic",
+              "edit_md_file",
+              "create_md_file",
+              "select_topics",
+              "run_map_action",
+              "create_map",
+              "open_map",
+              "collapse_topic",
+              "expand_topic",
+              "auto_layout",
+              "focus_topic",
+              "set_topic_kind",
+              "ask_topic_kind",
+              "add_relation",
+              "remove_relation",
+              "set_appearance",
+              "rename_map",
+              "reorder_topics",
+              "add_anchor",
+              "link_anchor",
+              "read_md_file",
+              "edit_book_plan",
+              "edit_book_thread",
+              "place_image",
+              "configure_ai_card",
+              "move_anchor"
+            ]
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "newParentId": {
+            "type": "string"
+          },
+          "beforeId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "find": {
+            "type": "string"
+          },
+          "replace": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "all": {
+            "type": "boolean"
+          },
+          "branch": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "research_standard",
+              "expand",
+              "synthesize",
+              "merge",
+              "find_images",
+              "run_living_card",
+              "run_living_all",
+              ""
+            ]
+          },
+          "direction": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              ""
+            ]
+          },
+          "images": {
+            "type": "boolean"
+          },
+          "needsWeb": {
+            "type": "boolean"
+          },
+          "otherProvider": {
+            "type": "boolean"
+          },
+          "rewrite": {
+            "type": "boolean"
+          },
+          "topicKind": {
+            "type": "string",
+            "enum": [
+              "topic",
+              "action",
+              "atomic",
+              "hypothesis",
+              "evidence",
+              "conclusion",
+              ""
+            ]
+          },
+          "leaning": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "undecided",
+              "refuted",
+              ""
+            ]
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "none",
+              "weak",
+              "medium",
+              "strong",
+              ""
+            ]
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationKind": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "verifies",
+              "derives_from",
+              "related",
+              "prerequisite",
+              ""
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "red",
+              "orange",
+              "yellow",
+              "green",
+              "blue",
+              "purple",
+              "none",
+              ""
+            ]
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "done",
+                "warning",
+                "star"
+              ]
+            }
+          },
+          "removeMarkers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "done",
+                "warning",
+                "star",
+                "all"
+              ]
+            }
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bold",
+                "text-small",
+                "text-large",
+                "border-thick",
+                "line-thick"
+              ]
+            }
+          },
+          "removeFormats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bold",
+                "text-small",
+                "text-large",
+                "border-thick",
+                "line-thick",
+                "all"
+              ]
+            }
+          },
+          "imageId": {
+            "type": "string"
+          },
+          "anchorId": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "covers": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "entry": {
+                  "type": "string"
+                },
+                "handoff": {
+                  "type": "string"
+                },
+                "previous": {
+                  "type": "string"
+                },
+                "checklist": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "structure",
+                          "fact"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "text"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "covers",
+                "points",
+                "entry",
+                "handoff",
+                "previous",
+                "checklist"
+              ]
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "nodeId",
+          "ref",
+          "parentId",
+          "newParentId",
+          "beforeId",
+          "title",
+          "summary",
+          "detail",
+          "path",
+          "find",
+          "replace",
+          "content",
+          "nodeIds",
+          "all",
+          "branch",
+          "action",
+          "direction",
+          "mode",
+          "images",
+          "needsWeb",
+          "otherProvider",
+          "topicKind",
+          "leaning",
+          "strength",
+          "fromId",
+          "toId",
+          "relationKind",
+          "description",
+          "color",
+          "markers",
+          "removeMarkers",
+          "formats",
+          "removeFormats",
+          "imageId",
+          "anchorId",
+          "x",
+          "y",
+          "note",
+          "changes"
+        ]
+      }
+    },
+    "remaining": {
+      "type": "string"
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "current",
+                  "todo"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "status"
+            ]
+          }
+        },
+        "current": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "steps"
+      ]
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationKind": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "verifies",
+              "derives_from",
+              "related",
+              "prerequisite"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fromId",
+          "toId",
+          "relationKind",
+          "reason",
+          "source"
+        ]
+      }
+    }
+  },
+  "required": [
+    "reply",
+    "actions",
+    "remaining"
+  ]
+}

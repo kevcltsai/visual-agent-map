@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { foldSearchText } from "../i18n/han-fold";
+import { foldSearchText, foldSearchTextCached } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
 import { readTopicLinks } from "../topic-links";
 import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
@@ -16,6 +16,8 @@ export class OutlineView extends ItemView {
   private titles = new Map<string, string>();
   private markers = new Map<string, TopicMarker[]>();
   private links = new Map<string, string[]>();
+  /** Summary and Detail per topic, searched along with the title (see setMap). */
+  private bodies = new Map<string, string>();
   private collapsed = new Set<string>();
   /** The fold button of each row in the tree as last drawn, so focus can follow a rebuild. */
   private toggleEls = new Map<string, HTMLElement>();
@@ -60,7 +62,8 @@ export class OutlineView extends ItemView {
     map: MapDocument | null,
     titles: Map<string, string>,
     markers: Map<string, TopicMarker[]> = new Map(),
-    links: Map<string, string[]> = new Map()
+    links: Map<string, string[]> = new Map(),
+    bodies: Map<string, string> = new Map()
   ): void {
     const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
     const restoreFocus = !!search && search === document.activeElement;
@@ -74,7 +77,8 @@ export class OutlineView extends ItemView {
       map?.nodes.map(node => [node.id, node.parentId, node.path]),
       [...titles],
       [...markers],
-      [...links]
+      [...links],
+      this.query.trim() ? [...bodies] : null
     ]);
     const same = content === this.content && !!this.contentEl.querySelector(".vam-outline-tree");
     this.content = content;
@@ -82,6 +86,7 @@ export class OutlineView extends ItemView {
     this.titles = titles;
     this.markers = markers;
     this.links = links;
+    this.bodies = bodies;
     if (same) return;
     if (map) {
       this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
@@ -204,7 +209,22 @@ export class OutlineView extends ItemView {
     });
     this.renderTree();
   }
-  /** The first topic, in outline order, whose own title contains the search text (not one that only has a matching child). */
+  /** The topic's own title, summary or Detail contains the (folded) search text. */
+  private ownMatch(node: MapNode, query: string): boolean {
+    return (
+      foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query) ||
+      foldSearchTextCached(this.bodies.get(node.id) ?? "").includes(query)
+    );
+  }
+  /** Only the summary or Detail matches, not the title: the row says so. */
+  private bodyOnlyMatch(node: MapNode, query: string): boolean {
+    return (
+      !!query &&
+      !foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query) &&
+      foldSearchTextCached(this.bodies.get(node.id) ?? "").includes(query)
+    );
+  }
+  /** The first topic, in outline order, whose own title, summary or Detail contains the search text (not one that only has a matching child). */
   private firstMatchPath(): string | null {
     if (!this.map) return null;
     const query = foldOutlineSearch(this.query.trim());
@@ -212,7 +232,7 @@ export class OutlineView extends ItemView {
     const children = new Map<string | null, MapNode[]>();
     for (const node of this.map.nodes) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
     const find = (node: MapNode): string | null => {
-      if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return node.path;
+      if (this.ownMatch(node, query)) return node.path;
       for (const child of children.get(node.id) ?? []) {
         const found = find(child);
         if (found) return found;
@@ -315,7 +335,7 @@ export class OutlineView extends ItemView {
     const query = foldOutlineSearch(this.query.trim());
     const matches = (node: MapNode): boolean => {
       if (!query) return true;
-      if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return true;
+      if (this.ownMatch(node, query)) return true;
       return (children.get(node.id) ?? []).some(matches);
     };
     const closed = (id: string): boolean => this.collapsed.has(id) && !this.tempOpen.has(id);
@@ -349,6 +369,11 @@ export class OutlineView extends ItemView {
       button.title = title;
       button.setAttr("dir", "auto");
       button.setAttr("data-path", node.path);
+      if (this.bodyOnlyMatch(node, query)) {
+        const label = t("ui.outline_body_match");
+        button.setAttr("aria-label", `${title}${t("ui.list_separator") === "、" ? "，" : ", "}${label}`);
+        button.createSpan({ cls: "vam-outline-body-hit", text: label });
+      }
       // Only whitelisted ids, in the fixed order. The symbols are decoration; the names reach assistive technology.
       const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
       if (marks.length) {
@@ -356,7 +381,7 @@ export class OutlineView extends ItemView {
         const names = marks.map(id => t(markerLabelKey(id))).join(listSeparator);
         button.setAttr(
           "aria-label",
-          `${title}${listSeparator === "、" ? "，" : ", "}${t("share.viewer_markers_0", names)}`
+          `${button.getAttr("aria-label") ?? title}${listSeparator === "、" ? "，" : ", "}${t("share.viewer_markers_0", names)}`
         );
         const row = button.createSpan("vam-markers");
         for (const id of marks) {

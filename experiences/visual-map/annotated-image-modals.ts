@@ -8,7 +8,8 @@ export class ImageNoteModal extends Modal {
   private done = false;
   constructor(
     app: App,
-    private readonly mode: "convert" | "edit",
+    /** "explore": P5.3's convert that also gives the picture to the map chat, so the title asks first. */
+    private readonly mode: "convert" | "edit" | "explore",
     private readonly value: string,
     /** Gets the raw text; the data layer cleans it (one line, 200 characters). */
     private readonly submit: (note: string) => void,
@@ -18,7 +19,13 @@ export class ImageNoteModal extends Modal {
   }
   onOpen(): void {
     this.titleEl.setText(
-      t(this.mode === "convert" ? "ui.annotated_image_convert_title" : "ui.annotated_image_edit_title")
+      t(
+        this.mode === "convert"
+          ? "ui.annotated_image_convert_title"
+          : this.mode === "explore"
+            ? "ui.image_explore_title"
+            : "ui.annotated_image_edit_title"
+      )
     );
     const input = this.contentEl.createEl("input", {
       type: "text",
@@ -32,7 +39,13 @@ export class ImageNoteModal extends Modal {
     actionStatus(actions);
     actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
     const ok = actions.createEl("button", {
-      text: t(this.mode === "convert" ? "ui.annotated_image_convert_button" : "ui.save"),
+      text: t(
+        this.mode === "convert"
+          ? "ui.annotated_image_convert_button"
+          : this.mode === "explore"
+            ? "ui.image_explore_button"
+            : "ui.save"
+      ),
       cls: "mod-cta"
     });
     const send = (): void => {

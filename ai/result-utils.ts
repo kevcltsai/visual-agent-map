@@ -59,9 +59,15 @@ export function truncateSummary(value: string, limit = 80): string {
   return `${(gap >= 0 ? window.slice(0, gap) : window).join("").trimEnd()}…`;
 }
 
+/** A source wikilink without the `%%vam-src:<node-id|->:<rev8>%%` comment VAM writes after it: two targets name the same source when these match. */
+export function withoutSourceIdentity(target: string): string {
+  return target.replace(/[ \t]*%%vam-src:[^%\n]*%%/g, "").trim();
+}
+
 /**
- * A footnote definition VAM writes for a note source: an old `src-` label, a single wikilink, or an external-source
- * note. Other footnotes belong to the writer and are left alone.
+ * A footnote definition VAM writes for a note source: an old `src-` label, a single wikilink (with or without the
+ * `%%vam-src:<node-id|->:<rev8>%%` comment), or an external-source note. Other footnotes belong to the writer and are
+ * left alone.
  */
 export function sourceFootnoteDefinition(line: string): { label: string; target: string } | null {
   const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line);
@@ -70,7 +76,9 @@ export function sourceFootnoteDefinition(line: string): { label: string; target:
   const external = NOTE_LANGUAGES.some(locale =>
     target.startsWith(translate(locale, "note.external_source_0", "").trim())
   );
-  return match[1].startsWith("src-") || /^\[\[[^\]]+\]\]$/.test(target) || external
+  return match[1].startsWith("src-") ||
+    /^\[\[[^\]]+\]\](?:%%vam-src:[A-Za-z0-9_-]+:[0-9a-f]{8}%%)?$/.test(target) ||
+    external
     ? { label: match[1], target }
     : null;
 }

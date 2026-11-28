@@ -54,19 +54,20 @@ export type CardActionId =
   | "clear-selection"
   | "remove-selected"
   | "selection-help"
-  | "finish-selection";
+  | "finish-selection"
+  | "image-explore";
 /**
  * Where an action is offered: the card toolbar or the selection bar, their ⋯ lists, the right-click menu, the command palette, a
  * key, the selected card's edge entries (V3.3 A6, card-edge-entry.ts), or the empty canvas's buttons (fillEmptyMap, V3.3 A7).
  */
 export type CardSurface = "toolbar" | "more" | "context" | "command" | "key" | "edge" | "canvas";
-/** What an action acts on: an ordinary card, an AI card, a topic selection, or the map itself. */
-export type CardScope = "card" | "ai-card" | "multi" | "map";
+/** What an action acts on: an ordinary card, an AI card, a topic selection, the map itself, or one canvas image (P5.3). */
+export type CardScope = "card" | "ai-card" | "multi" | "map" | "image";
 export type CardAvailability = { ok: true } | { ok: false; reasonKey: TranslationKey };
 
 /** The six plain reasons an action cannot run now (more specific ones come from the selection, such as mergeCheck's). */
 export const CARD_ACTION_REASONS = {
-  readOnly: "ui.card_action_off_read_only",
+  readOnly: "ui.card_action_off_notes_loading",
   merging: "ui.card_action_off_merging",
   aiLock: "ui.card_action_off_ai_lock",
   bookLock: "ui.card_action_off_book_lock",
@@ -122,6 +123,8 @@ export interface CardActionHost {
   removeSelected(): void;
   selectionHelp(): void;
   finishSelection(): void;
+  /** P5.3 Image exploration (exploreImage): an annotated image goes to the map chat; a plain one is converted first, if the user agrees. */
+  exploreImage(id: string): void;
 }
 
 /** What an action reads about the moment: plain state plus a few cheap lookups (VisualAgentMapView.cardActionContext). */
@@ -130,6 +133,8 @@ export interface CardActionContext {
   surface?: CardSurface;
   /** The one card acted on; null for a selection or the map. */
   node: MapNode | null;
+  /** The canvas image acted on (its right-click menu, openImageMenu); a card, selection or map context has none. */
+  image?: { id: string; annotated: boolean } | null;
   /** The cards acted on: the card, or the selection (or the right-clicked cards). */
   ids: readonly string[];
   nodes: readonly MapNode[];
@@ -333,7 +338,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 2,
     // The command opens the details whenever a card is selected, presenting or picking topics included. The toolbar's Note
     // only reads, so it works while loading and presenting (V3.3 A5); the toolbar is not drawn while picking topics.
-    // B05: while the notes load the toolbar hides Research, Add, Add summary and ⋯ (not drawn) instead of refusing a click.
+    // B05: while the notes load the toolbar hides Research, Add and Add summary; ⋯ still opens, its rows greyed with the reason.
     available: ctx =>
       ctx.surface === "command" ? OK : ctx.surface === "toolbar" ? gate(ctx, ["multiSelect"]) : gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openNote(card(ctx), options?.newTab ?? false)
@@ -796,6 +801,21 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 2,
     available: () => OK,
     run: ctx => ctx.host.finishSelection()
+  },
+  {
+    // P5.3: the image right-click's first row. A plain image asks first (the dialog's "…"); nothing goes to the AI unasked.
+    id: "image-explore",
+    titleKey: "ui.image_explore",
+    titleFor: ctx => (ctx.image?.annotated ? "ui.image_explore" : "ui.image_explore_ask"),
+    icon: "scan-search",
+    scope: ["image"],
+    surfaces: ["context"],
+    order: 420,
+    group: 3,
+    available: ctx => gate(ctx, CARD),
+    run: ctx => {
+      if (ctx.image) ctx.host.exploreImage(ctx.image.id);
+    }
   }
 ];
 
@@ -826,8 +846,9 @@ export const CARD_COMMANDS: readonly { commandId: string; mapAction: MapCommandA
   { commandId: "map-keyboard-shortcuts", mapAction: "shortcuts", action: "shortcuts" }
 ];
 
-/** What the context is about: one card (ordinary or AI), a selection, or the map. */
+/** What the context is about: one canvas image, one card (ordinary or AI), a selection, or the map. */
 export function cardActionKind(ctx: CardActionContext): CardScope {
+  if (ctx.image) return "image";
   if (ctx.node) return isAiCard(ctx.note(ctx.node.id)) ? "ai-card" : "card";
   return ctx.ids.length ? "multi" : "map";
 }
@@ -839,7 +860,7 @@ export function actionsFor(
 ): { action: CardAction; availability: CardAvailability }[] {
   const ctx = { ...context, surface };
   const kind = cardActionKind(ctx);
-  const toolbar = surface === "toolbar" && kind !== "map" ? CARD_TOOLBAR[kind] : null;
+  const toolbar = surface === "toolbar" && kind !== "map" && kind !== "image" ? CARD_TOOLBAR[kind] : null;
   // A card's ⋯ and right-click follow the rules below (B06, B07); everything else reads the action's own surfaces.
   const rule =
     kind === "card" || kind === "ai-card"
@@ -855,7 +876,8 @@ export function actionsFor(
       : CARD_ACTIONS.filter(
           action =>
             action.surfaces.includes(surface) &&
-            (action.scope.includes(kind) || action.scope.includes("map")) &&
+            // An image's menu has its own actions only, not the map's.
+            (action.scope.includes(kind) || (kind !== "image" && action.scope.includes("map"))) &&
             (!toolbar || toolbar.includes(action.id))
         )
   ).filter(action => action.applies?.(ctx) ?? true);

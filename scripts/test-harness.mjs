@@ -476,12 +476,28 @@ export function applySessionGuard(vault, live = null, owner = canonicalVault) {
   return isOwnerVault(vault, owner) ? null : applyProviderGuard(vault, live);
 }
 
+/**
+ * The onboarding profile cannot carry the provider guard: a data.json would count as saved settings and skip the first-install flow
+ * (main.ts initializeFirstInstall), and a bare "codex"/"claude" is resolved from ~/.local/bin, Homebrew, /usr/local/bin and nvm before PATH,
+ * so a guard folder on PATH would lose. So an onboarding vault is refused before Obsidian starts unless the tester says so.
+ */
+export function assertOnboardingChoice(args) {
+  const onboarding = args.some(arg => arg === "--profile=onboarding");
+  if (!onboarding) {
+    if (args.includes("--unguarded")) throw new Error("--unguarded applies only to --profile=onboarding.");
+    return;
+  }
+  if (args.includes("--unguarded") || args.some(arg => arg.startsWith("--live="))) return;
+  throw new Error("Refusing an onboarding vault with no provider guard. The first-install flow needs a vault with no data.json (saved settings skip it), and a bare codex/claude is found in ~/.local/bin, Homebrew, /usr/local/bin and nvm before PATH, so the harness cannot make this vault fail closed. Choose one: --unguarded (you know this run is unguarded and only walks the first-install flow without calling any AI) or --live=<model> (also unguarded here, because there is no data.json to carry the guard; the provider is not blocked). After the first run has made data.json, the next --session run adds the guard (--live is then honoured).");
+}
+
 // `--live=<model>` / `--live=claude:<model>`: the only provider call a harness vault may really make (see scripts/provider-guard.mjs).
 const liveOf = args => { const values = args.filter(arg => arg.startsWith("--live=")); if (values.length > 1) throw new Error("Give --live once."); return values.length ? parseLive(values[0].slice("--live=".length)) : null; };
 
 function sessionMain(args) {
-  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full", "--reload"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=")) throw new Error(`--session cannot be combined with: ${arg}`);
+  for (const arg of args) if (!/^--session=/.test(arg) && !["--stop", "--preview", "--full", "--reload"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=") && arg !== "--unguarded") throw new Error(`--session cannot be combined with: ${arg}`);
   if (args.filter(arg => arg.startsWith("--session=")).length !== 1) throw new Error("Exactly one session name is required.");
+  assertOnboardingChoice(args);
   if ((args.includes("--preview") && args.includes("--full")) || (args.includes("--stop") && args.some(arg => arg === "--preview" || arg === "--full" || arg === "--reload" || arg.startsWith("--profile=") || arg.startsWith("--live=")))) throw new Error("Conflicting session options.");
   if (args.includes("--reload") && args.some(arg => arg.startsWith("--live="))) throw new Error("--live cannot be combined with --reload (a running Obsidian keeps the settings it loaded).");
   const mode = args.includes("--preview") ? "preview" : args.includes("--full") ? "full" : "affected";
@@ -581,7 +597,7 @@ function assertObsidianClosed() {
 // The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
 
-export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] [--live=<model>|claude:<model>] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--reload] [--profile=...] [--live=<model>] | --which-installed | --help]
+export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] [--live=<model>|claude:<model>] [--unguarded (onboarding only)] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop | --preview | --full] [--reload] [--profile=...] [--live=<model>] [--unguarded] | --which-installed | --help]
   (no option)        build + unit + integration tests only
   --session=<name>   isolated vault /private/tmp/vam-e2e-<name>, background Obsidian driven over CDP (see scripts/obsidian-cdp.mjs, scripts/run-scenario.mjs)
   --preview          session only: build and install for inspection; verification NOT RUN, not acceptance
@@ -598,7 +614,7 @@ export function main(args = process.argv.slice(2)) {
     if (args.length !== 1) throw new Error("--which-installed takes no other options.");
     return process.stdout.write(`${whichInstalled()}\n`);
   }
-  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed", "--wait-idle"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=")) throw new Error(`Unknown argument: ${arg}`);
+  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed", "--wait-idle"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg) && !arg.startsWith("--live=") && arg !== "--unguarded") throw new Error(`Unknown argument: ${arg}`);
   const ui = args.includes("--ui"), prepare = ui || args.includes("--prepare");
   const update = args.includes("--update-current");
   if (update && prepare) throw new Error("--update-current cannot be combined with reset/prepare options.");
@@ -606,6 +622,7 @@ export function main(args = process.argv.slice(2)) {
   if (ownerIdleConfirmed && !update) throw new Error("--owner-idle-confirmed applies only to --update-current.");
   const waitIdle = args.includes("--wait-idle");
   if (waitIdle && (!update || ownerIdleConfirmed)) throw new Error("--wait-idle applies only to --update-current without --owner-idle-confirmed.");
+  assertOnboardingChoice(args);
   const live = liveOf(args);
   if (live && !prepare) throw new Error("--live applies only to --prepare, --ui or --session (--update-current never touches provider settings).");
   if (args.some(arg => arg.startsWith("--profile=")) && !prepare) throw new Error("Profile requires --prepare or --ui.");

@@ -84,6 +84,31 @@ test('session vaults get the guard on every run, including reload; an onboarding
   } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
 });
 
+test('onboarding without --unguarded or --live is refused before Obsidian starts; --unguarded passes and the vault still has no data.json', async () => {
+  const { assertOnboardingChoice } = await import(pathToFileURL(path.join(root, 'scripts', 'test-harness.mjs')).href);
+  assert.throws(() => assertOnboardingChoice(['--prepare', '--profile=onboarding']), /no provider guard[\s\S]*data\.json[\s\S]*before PATH[\s\S]*--unguarded[\s\S]*--live/);
+  assert.throws(() => assertOnboardingChoice(['--session=x', '--profile=onboarding']), /Refusing an onboarding vault/);
+  assert.doesNotThrow(() => assertOnboardingChoice(['--prepare', '--profile=onboarding', '--unguarded']));
+  assert.doesNotThrow(() => assertOnboardingChoice(['--session=x', '--profile=onboarding', '--live=sonnet']));
+  assert.doesNotThrow(() => assertOnboardingChoice(['--prepare', '--profile=normal']));
+  assert.doesNotThrow(() => assertOnboardingChoice(['--session=x']));
+  assert.throws(() => assertOnboardingChoice(['--prepare', '--unguarded']), /only to --profile=onboarding/);
+  // Through the real CLI: refused at once (before the build, the lock or any launch), exit non-zero.
+  const run = args => spawnSync(process.execPath, [path.join(root, 'scripts/test-harness.mjs'), ...args], { encoding: 'utf8', timeout: 20000 });
+  for (const args of [['--prepare', '--profile=onboarding'], ['--ui', '--profile=onboarding'], ['--session=hx-onb', '--profile=onboarding']]) {
+    const result = run(args);
+    assert.notEqual(result.status, 0, args.join(' '));
+    assert.match(result.stderr, /Refusing an onboarding vault with no provider guard/, args.join(' '));
+    assert.equal(fs.existsSync('/private/tmp/vam-e2e-hx-onb'), false);
+  }
+  const { createTestVault } = await vaultLib();
+  const box = sandbox();
+  try {
+    createTestVault({ vault: box.vault, profile: 'onboarding' });
+    assert.equal(fs.existsSync(path.join(box.vault, '.obsidian/plugins/visual-agent-map/data.json')), false);
+  } finally { fs.rmSync(box.dir, { recursive: true, force: true }); }
+});
+
 test('--live parsing: a model alone means claude, claude:<model> is the same, anything else is refused', async () => {
   const { parseLive } = await import(pathToFileURL(path.join(root, 'scripts', 'provider-guard.mjs')).href);
   assert.deepEqual({ ...parseLive('sonnet') }, { provider: 'claude', model: 'sonnet' });

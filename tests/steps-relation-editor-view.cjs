@@ -8,6 +8,7 @@ const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 const { element, find, findAll } = dom;
 const { load: loadMain, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator } = support;
+let setUiLanguage = () => {};
 const canvas = support.load('experiences/visual-map/canvas-items.ts');
 
 const TOPICS = 'Agent Workspace/Topics';
@@ -62,7 +63,9 @@ async function real({ relations = () => [], items = () => [], titles = {} } = {}
     addButton(cb) { const b = this.el.createEl('button'); cb({ setButtonText(t) { b.text = t; return this; }, onClick(fn) { b.addEventListener('click', fn); return this; } }); return this; }
   }
   class InputSuggest { constructor(a, input) { this.inputEl = input; suggests.push(this); } open() {} close() {} }
-  const { VisualAgentMapView } = loadMain('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: InputSuggest, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg });
+  const loaded = loadMain('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: InputSuggest, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg }, { entryPoints: undefined, stdin: { contents: 'export * from "./main"; export { setUiLanguage } from "./i18n";', resolveDir: support.root, loader: 'ts', sourcefile: 'entry.ts' } });
+  const { VisualAgentMapView } = loaded;
+  setUiLanguage = loaded.setUiLanguage;
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -357,4 +360,29 @@ test('12. hostile text (note, topic title, anchor note) is plain text in the pan
   find(host, i => i.hasClass('vam-relation-add-anchor')).click();
   noImg(h.modals[2].modalEl);
   assert.ok(find(h.modals[2].modalEl, i => i.tag === 'button' && i.text.includes(EVIL)));
+});
+
+test('F07b-x. a relation to a knowledge reference names the card and its source map (or the unavailable text), never the internal ref id', async () => {
+  try {
+  for (const [language, from, gone] of [['en', 'Reference from “Other map”', 'Original card unavailable'], ['zh-TW', '引用自〈Other map〉', '原卡無法取用']]) {
+    for (const ok of [true, false]) {
+      const h = await real({ relations: ids => [{ kind: 'supports', from: ids.root, to: 'ref-1' }] });
+      setUiLanguage(language);
+      h.view.map.knowledgeRefs = [{ id: 'ref-1', mapId: 'other', nodeId: 'n1', parentId: h.ids.child, x: 300, y: 0, pathHint: 'Other/Map.md' }];
+      h.view.map.topicRelations = [{ kind: 'supports', from: h.ids.root, to: 'ref-1' }];
+      h.view.refResolved = new Map([['ref-1', ok ? { ok: true, mapPath: 'Other/Map.md', mapTitle: 'Other map', notePath: 'Other/n1.md', title: 'Ref card' } : { ok: false, reason: 'missing' }]]);
+      const host = h.panel();
+      const row = topicRow(host);
+      assert.ok(row, `${language} ok=${ok}: the panel lists the reference relation`);
+      const texts = [row.attrs['aria-label'], ...findAll(row, () => true).map(i => i.text ?? '')].join('\n');
+      assert.ok(!texts.includes('ref-'), `${language} ok=${ok}: no internal id in the row: ${texts}`);
+      assert.ok(ok ? texts.includes('Ref card') && texts.includes(from) : texts.includes(gone), `${language} ok=${ok}: ${texts}`);
+      findAll(row, n => n.tag === 'button')[0].click();
+      const modal = h.modals.at(-1);
+      const sentence = find(modal.modalEl, i => i.hasClass('vam-relation-sentence')).text;
+      assert.ok(!sentence.includes('ref-'), sentence);
+      assert.ok(ok ? sentence.includes('Ref card') && sentence.includes(from) : sentence.includes(gone), sentence);
+    }
+  }
+  } finally { setUiLanguage('en'); }
 });

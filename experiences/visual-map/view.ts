@@ -24309,12 +24309,21 @@ export class VisualAgentMapView extends ItemView {
       mapId: this.map?.id ?? ""
     };
   }
+  /** The relation text of a reference end: "<card title> · ↗ Reference from “<map>”", or the unavailable text. Resolved data only. */
+  private knowledgeRefLabel(id: string): string | null {
+    if (!this.map || !visibleKnowledgeRefs(this.map).some(ref => ref.id === id)) return null;
+    const found = this.refResolved.get(id);
+    return found?.ok
+      ? `${found.title} · ${t("ui.knowledge_ref_from_0", found.mapTitle)}`
+      : t("ui.knowledge_ref_unavailable");
+  }
   /** What the relation editor reads from this view (all lazily: a test may replace a member after the view is built). */
   private relationEditorPorts(): RelationEditorPorts {
     return {
       app: () => this.app,
       map: () => this.map,
       notes: () => this.notes,
+      refLabel: id => this.knowledgeRefLabel(id),
       selection: () => this.selection,
       relationsEnabled: () => this.relationsEnabled(),
       anchorEditable: () => this.anchorRelationsEditable(),

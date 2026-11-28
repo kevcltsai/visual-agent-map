@@ -288,6 +288,7 @@ import {
   arrangeNewTree,
   cardsChangedHeight,
   cardsOverlapAny,
+  resolveLayout,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutOf,
@@ -1837,7 +1838,8 @@ export class VisualAgentMapView extends ItemView {
       boxOf: hints.boxOf,
       heightOf: this.cardHeightOf,
       decorations: hints.decorations ?? [],
-      layout: { direction: layoutOf(map).direction }
+      layout: { direction: layoutOf(map).direction, gap: resolveLayout(layoutOf(map)).gap },
+      settleMoving: true
     }).nodes;
   }
   /** True when new, unfolded or grown cards are placed locally (right, left, balanced, down, up); radial, timeline, fishbone and argument maps lay the whole map out (decision #18). */
@@ -10199,7 +10201,11 @@ export class VisualAgentMapView extends ItemView {
             }
           };
           reveal(n.id);
-          if (revealed.size) this.pushFrom(map, revealed);
+          if (revealed.size) {
+            this.pushFrom(map, revealed);
+            // A card still covered after the push (a revealed card over its own neighbour) falls back to the whole layout.
+            if (cardsOverlapAny(map.nodes, revealed, this.cardHeightOf)) this.arrangeAll(map);
+          }
         }
       })
     );

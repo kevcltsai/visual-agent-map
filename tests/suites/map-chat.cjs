@@ -3970,10 +3970,11 @@ integrationTest('B2-0 L4: an auto_layout that comes before the add_child actions
   eq(overlaps(h.view.map.nodes), [], 'no two cards overlap');
 });
 // A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：第六行是自動整圖排版；新：卡片局部放置，沒有整圖排版行。
-integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once)', async () => {
+integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid out as before (the whole map, once) (A9: local placement)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); measuredHeights(h);
   let layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { if (rebuild === false) layouts++; return original(change, rebuild); };
-  const lines = await apply(h, spread()); assert.ok(!lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one placement, no extra local step'); // A9: the batch is placed locally, no whole-map layout line eq(overlaps(h.view.map.nodes), []);
+  const lines = await apply(h, spread()); assert.ok(!lines.some(l => /Arranged/.test(l.text))); assert.equal(layouts, 1, 'one placement, no extra local step');
+  eq(overlaps(h.view.map.nodes), []);
 });
 
 // ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------

@@ -24,6 +24,11 @@ export interface PushOptions {
   /** Cards (text blocks, ring members) that are obstacles only: they and what hangs under them are never moved. */
   fixed?: ReadonlySet<string>;
   layout: { direction: string; gap?: number };
+  /**
+   * The moving cards grew or were revealed where they stand (not freshly placed): two of them that overlap are pushed apart in
+   * sibling order (the later one with its later siblings), and one that grew over its own child pushes that child's subtree on.
+   */
+  settleMoving?: boolean;
 }
 
 export interface PushResult {
@@ -193,7 +198,7 @@ export function pushAffected(nodes: MapNode[], movingIds: Iterable<string>, opts
           const pair = `${a.key}|${b.key}`;
           if (ignored.has(pair)) continue;
           if (!hasAny(a, original) && !hasAny(b, original) && cross(a.rect(none), b.rect(none))) continue;
-          if (hasAny(a, original) && hasAny(b, original)) continue;
+          if (!opts.settleMoving && hasAny(a, original) && hasAny(b, original)) continue;
           const ma = a.members.find(id => moving.has(id)) ?? a.members[0];
           const mb = b.members[0];
           const chainA = chain(ma);
@@ -202,6 +207,48 @@ export function pushAffected(nodes: MapNode[], movingIds: Iterable<string>, opts
           const lca = common && common !== ma && common !== mb ? common : undefined;
           const ca = lca ? chainA[chainA.indexOf(lca) - 1] : chainA[chainA.length - 1];
           const cb = lca ? chainB[chainB.indexOf(lca) - 1] : chainB[chainB.length - 1];
+          if (common && !lca && opts.settleMoving) {
+            // A moving card over its own descendant: the child's sibling row goes on along the depth of the parent's layout.
+            const ancIsA = common === ma;
+            const down = ancIsA ? chainB : chainA;
+            const child = down[down.indexOf(common) - 1];
+            const way = layoutDirectionFor(nodes, common, mapDirection);
+            const ancRect = ancIsA ? ra : rb;
+            const descRect = ancIsA ? rb : ra;
+            const along = way === "right" || way === "left";
+            const delta =
+              way === "down"
+                ? ancRect.b - descRect.t + gap
+                : way === "up"
+                  ? -(descRect.b - ancRect.t + gap)
+                  : way === "right"
+                    ? ancRect.r - descRect.l + gap
+                    : way === "left"
+                      ? -(descRect.r - ancRect.l + gap)
+                      : 0;
+            const axis = (id: string) => (along ? boxRect(id, offsets).t : boxRect(id, offsets).l);
+            const row = new Set<string>();
+            blocked = false;
+            for (const sibling of kids.get(common) ?? []) {
+              if (sibling.id !== child) {
+                const x = axis(sibling.id);
+                const y = axis(child);
+                if (x < y || (x === y && (order.get(sibling.id) ?? 0) < (order.get(child) ?? 0))) continue;
+              }
+              subtree(sibling.id, row);
+            }
+            if (!delta || blocked || !child) {
+              ignored.add(pair);
+              continue;
+            }
+            shove(row, delta, along);
+            for (const id of row) {
+              pushed.add(id);
+              moving.add(id);
+            }
+            rescan = true;
+            break;
+          }
           if ((common && !lca) || ca === cb) {
             ignored.add(pair);
             continue;
@@ -234,7 +281,7 @@ export function pushAffected(nodes: MapNode[], movingIds: Iterable<string>, opts
             for (const sibling of lca ? (kids.get(lca) ?? []) : (kids.get("") ?? [])) {
               if (sibling.id !== first && !before(first, sibling.id)) continue;
               if (balanced && sideOf(sibling.id) !== sideOf(first)) continue;
-              if (sibling.id !== first && original.has(sibling.id)) continue;
+              if (!opts.settleMoving && sibling.id !== first && original.has(sibling.id)) continue;
               subtree(sibling.id, out);
             }
             return out;

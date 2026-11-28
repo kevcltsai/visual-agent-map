@@ -63,6 +63,12 @@ export interface MapDocument {
    * whether it is usable. Absent on every other map.
    */
   bookPipeline?: unknown;
+  /**
+   * Cross-map read-only references (P4.3). Carried through parse and serialize untouched, like `argumentMap`: an entry this
+   * version cannot read is saved back exactly as it was; experiences/visual-map/knowledge-refs.ts `readKnowledgeRefs` decides
+   * which entries are usable. Absent on every map that has none (the key is removed with the last entry).
+   */
+  knowledgeRefs?: unknown;
 }
 /**
  * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind

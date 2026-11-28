@@ -587,7 +587,8 @@ const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
 const shown = el => { for (let n = el; n; n = n.parent) if (n.hidden || (n.tag === 'details' && !n.open)) return false; return true; };
 const field = (modal, label) => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
 
-test('start card: opens with the estimate (every step counted, about minutes), the six settings open (no <details>), the four model dropdowns always shown below the estimate (no summary, no change link); nothing starts yet', async () => {
+test('start card without editSettings (the fallback; the folded card with the request box is tests/steps-book-pipeline-start-nl.cjs): opens with the estimate (every step counted, about minutes), the six settings open (no <details>), the four model dropdowns always shown below the estimate (no summary, no change link); nothing starts yet', async () => {
+  // This harness gives the plugin no editBookSettings, so the card has no request box and nothing is folded (V3.3 P5.1a).
   const h = await harness({ book: false });
   const modal = await openCard(h);
   assert.ok(modal.isOpen);
@@ -596,7 +597,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(all.includes('3 張卡 · 約 40 分鐘 · 約 67 次 AI 呼叫'), all.join('|'));
   assert.ok(all.includes('AI 會企劃、寫作、找圖、校對每一章；企劃好後停下來讓你看方向。'), 'one intro sentence holds the old promise lines');
   assert.ok(!all.some(x => /只會停一次|重跑那一章|前言 \+|會先停下/.test(x)), 'no promise lines, no breakdown, no pause note');
-  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
+  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block without editSettings: the settings are always open');
   const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
   assert.equal(areas.length, 6);
   for (const area of areas) assert.ok(shown(area), 'each field is on screen');
@@ -2248,16 +2249,18 @@ test('chat: a failed call (rejected) leaves every field as it was and adds one f
   modal.close();
 });
 
-test('chat: a card without editSettings has no chat column (and the fields are not wrapped)', async () => {
+test('chat: a card without editSettings has no request box (and the fields are not folded)', async () => {
   const h = await harness({ book: false });
   h.ctl.impl = async () => SUGGEST;
   const modal = new bundleStart.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, modelChoice: { options: () => ['a'], label: x => x, onChange() {} }, settings: {}, onStart() {} });
   modal.open();
   assert.equal(chatInput(modal), undefined);
-  assert.equal(byCls(modal, 'vam-book-start-split').length, 0);
+  assert.equal(byCls(modal, 'vam-book-start-ask').length, 0);
+  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined);
   modal.close();
-  assert.match(css, /\.vam-book-start-split \{[^}]*grid-template-columns/);
-  assert.match(css, /@media \(max-width: 640px\) \{ \.vam-book-start-split \{ grid-template-columns: 1fr; \} \}/);
+  // V3.3 P5.1a: the side-by-side chat column is gone; the request box is one column at every width.
+  assert.match(css, /\.vam-book-start-ask \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /\.vam-book-start-split/);
 });
 
 test('chat: the plugin calls the step on the plan model the card passes, with the owner\'s text only', () => {

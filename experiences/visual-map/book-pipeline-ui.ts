@@ -116,6 +116,7 @@ const FAILURE_KEY: Record<string, TranslationKey> = {
   invalid_reply: "ui.book_fail_invalid_reply",
   backup_failed: "ui.book_fail_backup",
   discarded: "ui.book_fail_discarded",
+  ai_locked: "ui.ai_locked_notice",
   card_removed: "ui.book_fail_card_removed",
   missing: "ui.book_fail_card_removed"
 };
@@ -878,6 +879,7 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   empty: "ui.book_refused_empty",
   not_stopped: "ui.book_refused_not_stopped",
   instruction: "ui.book_refused_instruction",
+  ai_locked: "ui.ai_locked_notice",
   notes_busy: "ui.book_refused_notes_busy",
   drive_running: "ui.book_refused_drive_running",
   cancelled: "ui.book_refused_cancelled",
@@ -949,6 +951,9 @@ const REASON_KEY: Record<string, TranslationKey> = {
 
 /** A step failure with a plain sentence (cause and next step) instead of "step failed: reason"; keyed `step:code`. */
 const PLAIN_KEY: Record<string, TranslationKey> = {
+  "plan:ai_locked": "ui.ai_locked_notice",
+  "write:ai_locked": "ui.ai_locked_notice",
+  "proof:ai_locked": "ui.ai_locked_notice",
   "write:no_body": "ui.book_plain_write_no_body",
   "write:author_failed": "ui.book_plain_write_author_failed",
   "write:hand_edited": "ui.book_plain_write_hand_edited",

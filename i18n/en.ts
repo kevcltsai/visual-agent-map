@@ -688,6 +688,8 @@ export const en = {
   "ui.map_search_none": "No matches",
   "ui.search_temp_open": "Opened for search",
   "ui.map_search_position_0_1_2": "{0}/{1}: {2}",
+  "ui.map_search_body_hit": " (in text)",
+  "ui.outline_body_match": "In text",
   "ui.map_search_close": "Close search",
   "ui.presentation_start": "Start presentation",
   "ui.presentation_exit": "Exit presentation (Esc)",
@@ -2822,6 +2824,7 @@ export const en = {
   "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.exchange_import_safety": "Only titles and notes were imported; icons, links and styles are not brought in.",
   "ui.invalid_merged_json":
     "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
   "ui.note_style_folder_open_failed":
@@ -3086,6 +3089,9 @@ export const en = {
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro":
     "The AI plans, writes, finds pictures for and proofreads every chapter; after planning it stops so you can check the direction.",
+  "ui.book_start_intro_ask":
+    "The AI fills in the whole-book settings from what you say here; after planning it stops so you can check the direction.",
+  "ui.book_start_advanced": "Advanced settings (models, reader, tone… six in all)",
   "ui.book_start_estimate_0_1_2": "{0} cards · about {1} · about {2} AI calls",
   "ui.book_start_tip_plan":
     "Reads the whole map and decides the book's structure, what each chapter covers and how chapters connect. It needs deep thinking: the strongest model is best.",
@@ -3101,6 +3107,7 @@ export const en = {
   "ui.book_start_proof_same_as_author": "Best a different model from the author",
   "ui.book_start_suggesting":
     "The AI is thinking up suggestions from the subject; they fill the fields below when ready",
+  "ui.book_start_suggesting_ask": "The AI is thinking up suggestions; you can send once they are ready",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
   "ui.book_progress_step_images": "Pictures",
@@ -3138,14 +3145,16 @@ export const en = {
   "ui.book_counts_0_1_2_3_4": "Proofread {0}/{1} · Written {2} · Planned {3} · Needs a look {4}",
   "ui.book_progress_text_0_1_2_3": "Proofread {0}, written {1}, planned {2}, needs a look {3}",
   "ui.book_stop": "Stop",
-  "ui.book_chat_label": "Tell the chief editor what to adjust",
-  "ui.book_chat_placeholder": 'For example: "make the reader high-school students"',
+  "ui.book_chat_label": "What kind of book do you want? Say it in a sentence or two",
+  "ui.book_chat_placeholder": 'For example: "for middle-school readers, light, one picture per chapter"',
   "ui.book_chat_send": "Send",
   "ui.book_chat_thinking": "The chief editor is thinking…",
   "ui.book_chat_editor": "Chief editor",
   "ui.book_chat_undo": "Undo this turn",
   "ui.book_chat_failed": "The chief editor did not answer, so nothing changed.",
   "ui.book_chat_edited": "Chief editor changed this",
+  "ui.book_chat_kept_0": "Kept what you filled in: {0}. To change them, open Advanced settings",
+  "ui.book_chat_kept_turn_0": "(filled in by the owner, not changed: {0})",
   "ui.book_settings_view": "Book settings",
   "ui.book_settings_view_failed": "Could not read the book settings.",
   "ui.book_settings_view_hint": "To change them, press Stop first, then tell the chief editor.",

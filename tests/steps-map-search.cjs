@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const S = require('./support.cjs');
 
-const { foldSearchText, findMatches, nextMatch, collapsedAncestors } = load('experiences/visual-map/map-search.ts');
+const { foldSearchText, findMatches, searchMatches, nextMatch, collapsedAncestors } = load('experiences/visual-map/map-search.ts');
 const { foldOutlineSearch } = load('ui/outline-view.ts', { obsidian: S.obsidian });
 
 // The bundle runs in its own realm; compare plain host-realm copies.
@@ -15,7 +15,8 @@ const titles = {
   n7: '圖表設計', n8: 'Pricing Strategy', n9: 'İstanbul 市場', n10: '風險清單', n11: '下一步', n12: '待辦事項',
 };
 const order = Object.keys(titles);
-const titleOf = id => titles[id];
+const bodies = { n4: '抽樣調查顯示價格敏感', n12: 'Needle in the haystack' };
+const titleOf = id => ({ title: titles[id], body: bodies[id] ?? '' });
 const node = (id, parentId, collapsed = false) => ({ id, path: `${id}.md`, parentId, x: 0, y: 0, collapsed });
 
 test('findMatches matches Chinese titles as substrings in order', () => {
@@ -41,14 +42,25 @@ test('findMatches trims the query', () => {
 });
 test('findMatches treats regex characters literally', () => {
   const t = { a: 'a.*(b', b: 'axxb', c: 'plain' };
-  assert.deepEqual(plain(findMatches(['a', 'b', 'c'], id => t[id], '.*(')), ['a']);
-  assert.deepEqual(plain(findMatches(['a', 'b', 'c'], id => t[id], '(')), ['a']);
+  assert.deepEqual(plain(findMatches(['a', 'b', 'c'], id => ({ title: t[id], body: '' }), '.*(')), ['a']);
+  assert.deepEqual(plain(findMatches(['a', 'b', 'c'], id => ({ title: t[id], body: '' }), '(')), ['a']);
 });
 test('findMatches follows `order`, not insertion of titles', () => {
   assert.deepEqual(plain(findMatches(['n9', 'n4'], titleOf, '市場')), ['n9', 'n4']);
 });
-test('findMatches searches titles only', () => {
+test('findMatches finds a word that only the body has, and returns [] when neither title nor body has it', () => {
+  assert.deepEqual(plain(findMatches(order, titleOf, 'haystack')), ['n12']);
   assert.deepEqual(plain(findMatches(order, titleOf, 'n4')), []);
+});
+test('findMatches: Traditional/Simplified fold applies to the body too', () => {
+  assert.deepEqual(plain(findMatches(order, titleOf, '价格')), ['n4']);
+  assert.deepEqual(plain(findMatches(order, titleOf, '抽样')), ['n4']);
+});
+test('searchMatches tells body-only hits from title hits; two cards with the same title are both listed', () => {
+  const t = { a: { title: '市場', body: '' }, b: { title: '其他', body: '市場規模' }, c: { title: '市場', body: '市場' } };
+  const r = searchMatches(['a', 'b', 'c'], id => t[id], '市場');
+  assert.deepEqual(plain(r.matches), ['a', 'b', 'c']);
+  assert.deepEqual([...r.bodyOnly], ['b']);
 });
 test('foldSearchText equals foldOutlineSearch on fixed samples', () => {
   for (const s of ['圖表 Chart', 'İstanbul', 'ABC def', '產品地圖', '', '  mixed 繁體 ÇA  ', ...Object.values(titles)]) {

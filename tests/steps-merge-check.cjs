@@ -121,3 +121,16 @@ test('source supplement task: both languages name the data sources as untrusted 
   assert.match(zh, /不可信/); assert.match(zh, /維持原樣/); assert.match(zh, /與合併後文字衝突：/); assert.match(zh, /suggestions 只回傳一筆/);
   for (const text of [en, zh]) assert.doesNotMatch(text, /\{\{/);
 });
+
+test('V3.3 #05: the %%vam-src%% comment after a source wikilink carries no quantity; old and new citation formats are one link and remap to each other', () => {
+  const ok = { ok: true, missing: [], added: [] };
+  assert.deepEqual(check(['Fact 42[^1]\n\n[^1]: [[Notes/a.md|a]]%%vam-src:0b12-34cd:12345678%%'], ['Fact 42[^1]\n\n[^1]: [[Notes/a.md|a]]%%vam-src:0b12-34cd:98765432%%']), ok, 'a new revision is not a new number');
+  assert.deepEqual(check(['Fact 42[^1]\n\n[^1]: [[Notes/a.md|a]]'], ['Fact 42[^1]\n\n[^1]: [[Notes/a.md|a]]%%vam-src:-:98765432%%']), ok, 'old format source, new format merge');
+  const { keepDroppedContent } = load('core/steps/task/merge-check.ts');
+  const { standardTemplate } = load('ai/detail-templates.ts');
+  const template = standardTemplate('en');
+  const first = template.sections[0].name, sources = template.sections.find(section => section.role === 'sources').name;
+  const old = `### ${first}\nSpeed 42 km[^2]\n\n### ${sources}\n[^2]: [[Notes/b.md|b]]\n`;
+  const out = keepDroppedContent({ summary: '', references: '', language: 'en', template, oldDetail: old, newDetail: `### ${first}\nSpeed 40 km[^1] other[^2]\n\n### ${sources}\n[^1]: [[Notes/b.md|b]]%%vam-src:-:1aee8d83%%\n[^2]: [[Notes/a.md|a]]%%vam-src:n-1:1aee8d83%%\n` });
+  assert.ok(out.detail.includes('> Speed 42 km[^1]'), out.detail);
+});

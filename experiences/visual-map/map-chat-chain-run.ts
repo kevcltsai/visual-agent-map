@@ -139,6 +139,11 @@ export interface ChatChainRun {
   retriedRound: number | null;
   /** Auto-apply chain: what the last applied round did directly ("research 12, ..."), shown on the next round's separator. */
   appliedText: string;
+  /**
+   * The user asked for changes (decision 2026-11-28-vam-v3-3#33): the verdict of the user's own round, or true once the user applied a
+   * plan card. Automatic rounds read it; a question's chain never writes on its own.
+   */
+  changeRequested: boolean;
 }
 /** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
 export const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
@@ -241,7 +246,8 @@ export class MapChatChainRunner {
       backedUp: new Set(),
       createdFiles: new Set(),
       retriedRound: null,
-      appliedText: ""
+      appliedText: "",
+      changeRequested: origin?.changeRequested === true
     };
     this.current = run;
     return run;
@@ -304,6 +310,8 @@ export class MapChatChainRunner {
       chain: {
         seq: 0,
         resumed: true,
+        // A point restored from the file has no verdict: its writes wait as a plan.
+        ...(point.changeRequested ? { changeRequested: true as const } : {}),
         ...(selected.length ? { aiSelection: selected } : {}),
         // The toggle of the moment (never the saved one) decides the segment: a reload leaves it off.
         state: resumedChain({ ...point, maxRounds: this.resumeSegmentEnd(point.round) }, this.ports.autoApply()),
@@ -385,6 +393,7 @@ export class MapChatChainRunner {
           stoppedRound: run.state.round,
           reason,
           message: run.message,
+          ...(run.changeRequested ? { changeRequested: true as const } : {}),
           selectedIds: run.aiSelection ? [...run.aiSelection] : [],
           lastResults: run.lastResults.map(line => ({ text: line.text, status: line.status }))
         });
@@ -650,6 +659,7 @@ export class MapChatChainRunner {
       selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.ports.selectionIds(),
       chain: {
         seq: run.seq,
+        ...(run.changeRequested ? { changeRequested: true as const } : {}),
         ...(run.aiSelection ? { aiSelection: [...run.aiSelection] } : {}),
         state: run.state,
         createdIds: [...run.createdIds],

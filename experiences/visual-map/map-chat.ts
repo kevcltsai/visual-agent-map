@@ -164,9 +164,17 @@ export interface MapChatChainOrigin {
   resumed?: true;
   /** The cards the AI selected in an earlier round: later rounds read these, not the selection of the moment. */
   aiSelection?: string[];
+  /** The user asked for changes in this chain (their round said so, or they applied a plan); absent: writes wait as a plan. */
+  changeRequested?: true;
 }
-/** Where an interrupted chain goes on: kept on the last reply of the panel until a new message, a resume or a restore replaces it. */
-export type MapChatResumePoint = Omit<RestoredChainResume, "turn"> & { conversationId: string | null };
+/**
+ * Where an interrupted chain goes on: kept on the last reply of the panel until a new message, a resume or a restore replaces it.
+ * `changeRequested` lives only in memory (a point restored from the file has none).
+ */
+export type MapChatResumePoint = Omit<RestoredChainResume, "turn"> & {
+  conversationId: string | null;
+  changeRequested?: true;
+};
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */
 export interface MapChatPlanCard {

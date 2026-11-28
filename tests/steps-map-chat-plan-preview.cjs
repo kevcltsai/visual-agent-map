@@ -59,7 +59,8 @@ async function harness() {
     writing: 0,
     mutate(work) { queue = queue.then(async () => { plugin.writing++; try { await work(); } finally { plugin.writing--; } }); return queue; },
     confirmAiUsage: async (model, run) => { await run(); return true; },
-    mapChat: { chat: async request => control.reply(request) }
+    // A reply here is one the user asked for (decision 2026-11-28-vam-v3-3#33); a reply that says otherwise keeps its own flag.
+    mapChat: { chat: async request => ({ changeRequested: true, ...(await control.reply(request)) }) }
   });
   const view = new VisualAgentMapView({ app }, plugin);
   view.changed = () => {};
@@ -311,6 +312,18 @@ test('E3 small actions (counter-example): a reply that needs no confirming is wr
   assert.equal(ghostLayer(h), undefined, 'no preview');
   await until(async () => (await h.saved()).nodes.length === 4);
   assert.equal(h.view.chatPreview, null);
+});
+
+test('E4a question only: the same one card the user did not ask for waits as a plan labelled "You did not ask for changes", drawn dashed; Map.md untouched until Apply', async () => {
+  const h = await harness();
+  const before = await h.file();
+  h.control.reply = async () => ({ reply: 'One card is missing.', actions: [child(h.ids.a, 'Small one')], rejected: [], changeRequested: false });
+  await h.send('what is missing here?');
+  assert.equal(h.chat.plans.length, 1, 'a plan card');
+  assert.deepEqual([...h.chat.plans[0].reasons], ['You did not ask for changes']);
+  assert.ok(ghostLayer(h), 'the dashed preview is drawn');
+  assert.equal(await h.file(), before, 'Map.md byte for byte');
+  assert.equal((await h.saved()).nodes.length, 3);
 });
 
 test('E3-x layout (counter-example): two parents previewed at once at 25% zoom: no dashed card crosses another or a card on the canvas, and nothing is written', async () => {

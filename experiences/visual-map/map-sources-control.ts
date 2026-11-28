@@ -77,6 +77,10 @@ export class MapSourcesControl {
     this.mapSourcesToolsEl = null;
     this.clearExternalSources();
   }
+  /** Saved and outside-the-vault sources together: the count on the data sources button. */
+  get sourceCount(): number {
+    return this.mapSources.length + this.externalSources.length;
+  }
   /** A map was opened: its saved sources, then its external list. */
   loadForMap(sources: MapSource[]): void {
     this.mapSources = sources;

@@ -549,7 +549,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 35);
+  assert.equal(mapChatStep.version, 36);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1726,7 +1726,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 35);
+  assert.equal(mapChatStep.version, 36);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [
@@ -1892,7 +1892,7 @@ test('read_md_file: parsed with its path only', () => {
 });
 
 // ---- auto-apply conversation: plan rules (a)-(d) ----
-const AUTO = { autoApply: true, mapFolder: 'Maps/Steak' };
+const AUTO = { autoApply: true, mapFolder: 'Maps/Steak', changeRequested: true };
 const autoRun = (action, nodeIds = ['a'], extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', mode: '', images: false, ...extra });
 const autoCtx = { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0 };
 const autoPlan = (actions, options = {}) => planFor(actions, autoCtx, { ...AUTO, ...options });
@@ -1907,6 +1907,56 @@ const ALLOWED = [
   { kind: 'edit_md_file', path: 'Maps/Steak/Notes/a.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Maps/Steak/Notes/new.md', content: 'c' }
 ];
 const READS = [{ chain: { round: 3, researchSoFar: 0 } }, { chatStartedResearch: true }, { chatReadSources: true }];
+// ---- P2.8 (decision 2026-11-28-vam-v3-3#33): a change the user did not ask for waits as a plan ----
+test('changeRequested: only a boolean true counts; missing, the string "true" or a number is false; the schema names it', () => {
+  const raw = extra => JSON.stringify({ reply: 'ok', actions: [item('rename_topic', { nodeId: 'a', title: 'T' })], remaining: '', ...extra });
+  assert.equal(parse(raw({ changeRequested: true })).changeRequested, true);
+  for (const extra of [{}, { changeRequested: false }, { changeRequested: 'true' }, { changeRequested: 1 }, { changeRequested: null }])
+    assert.equal(parse(raw(extra)).changeRequested, false, JSON.stringify(extra));
+  assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.changeRequested), { type: 'boolean' });
+  assert.ok(!MAP_CHAT_SCHEMA.required.includes('changeRequested'), 'a reply without it is not sent back; it reads as not asked');
+  assert.throws(() => parseMapChat('{not json', context()), /not valid/, 'an unreadable reply applies nothing at all');
+});
+test('changeRequested prompt (zh and en): true only for an explicit change, false for a question, in the JSON template', () => {
+  const en = mapChatStep.render(request({ language: 'en' })), zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  assert.match(en, /Set "changeRequested" to true only when the user's message explicitly asks you to change the map/);
+  assert.match(en, /"changeRequested":false,"remaining":""\}/);
+  assert.match(zh, /"changeRequested" 才填 true/);
+  assert.match(zh, /"changeRequested":false,"remaining":""\}/);
+});
+test('not_requested: changeRequested false turns any write into a plan; read-only replies go on; absent is not judged', () => {
+  const ctx = { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0 };
+  const writes = [
+    { kind: 'add_child', parentId: 'a', title: 'T', summary: '' }, { kind: 'rename_topic', nodeId: 'a', title: 'T' }, { kind: 'update_summary', nodeId: 'a', summary: 's' },
+    { kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'contradicts' }, { kind: 'set_topic_kind', nodeIds: ['a'], topicKind: 'concept' },
+    { kind: 'delete_topic', nodeId: 'a', branch: false }, { kind: 'set_appearance', nodeIds: ['a'] },
+    { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'quick', images: false },
+    { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: 'x', mode: '', images: false },
+    { kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' },
+    { kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' }, { kind: 'auto_layout' }
+  ];
+  const reads = [{ kind: 'select_topics', nodeIds: ['a'], all: false }, { kind: 'focus_topic', nodeId: 'a' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'concept' }, { kind: 'read_md_file', path: 'Maps/Steak/a.md' }];
+  for (const action of writes) {
+    for (const extra of [{}, { autoApply: true, mapFolder: 'Maps/Steak' }]) {
+      const result = planFor([action], ctx, { changeRequested: false, ...extra });
+      assert.equal(result?.reasons[0], 'not_requested', action.kind + ' ' + JSON.stringify(extra));
+      assert.ok(!result.reasons.includes('auto_apply_confirm'), 'auto-apply is off for it, so its own reason does not show');
+      assert.equal(planFor([action], ctx, { changeRequested: true, ...extra })?.reasons.includes('not_requested') ?? false, false);
+    }
+    assert.equal(planFor([...reads, action], ctx, { changeRequested: false })?.reasons[0], 'not_requested', 'a write among read-only actions still waits');
+  }
+  assert.equal(planFor(reads, ctx, { changeRequested: false }), null, 'read-only actions go on');
+  assert.equal(planFor([{ kind: 'rename_topic', nodeId: 'a', title: 'T' }], ctx, {}), null, 'absent: not judged (old callers)');
+  assert.deepEqual(plain(planFor(renameRows(16), ctx, { changeRequested: false }).reasons), ['not_requested', 'many_actions'], 'the other reasons still hold');
+});
+test('not_requested (counter-example, row 8): autoApply true with changeRequested false is still a plan; the same reply asked for goes on', () => {
+  const asked = autoPlan(ALLOWED);
+  assert.equal(asked, null, 'asked for: auto-apply as before');
+  const notAsked = planFor(ALLOWED, autoCtx, { autoApply: true, mapFolder: 'Maps/Steak', changeRequested: false });
+  assert.deepEqual(plain(notAsked.reasons), ['not_requested', 'many_actions']);
+  assert.deepEqual(plain(planFor([autoAdd(1)], autoCtx, { autoApply: true, mapFolder: 'Maps/Steak', changeRequested: false }).reasons), ['not_requested']);
+});
+
 test('auto-apply plan (a): off or absent changes nothing, every old reason stays', () => {
   for (const options of [undefined, {}, { autoApply: false, mapFolder: 'Maps/Steak', callsSoFar: 999 }]) {
     assert.deepEqual(plain(plan(renameRows(16), {}, options)), { reasons: ['many_actions'], estimatedCalls: 0 });
@@ -2135,7 +2185,7 @@ test('book plan: the schema lists changes and the prompts say the plan is untrus
 test('book plan: edit_book_plan, edit_book_structure and edit_book_thread are always a plan (also under autoApply) and cost no call', () => {
   const ctx = context({ bookPlan: bookPlan() });
   for (const action of [{ kind: 'edit_book_plan', changes: [{ id: 'c1', entry: 'e' }] }, { kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: 'c1' }] }, { kind: 'edit_book_thread', content: 'T' }])
-  for (const options of [undefined, { autoApply: true }]) {
+  for (const options of [undefined, { autoApply: true }, { changeRequested: true }, { autoApply: true, changeRequested: true }]) {
     const result = planFor([action], ctx, options);
     assert.deepEqual(plain(result.reasons), ['book_plan_edit']);
     assert.equal(result.estimatedCalls, 0);
@@ -2175,17 +2225,18 @@ test('Living Node chat: direct creation carries the complete prompt, not a secon
 
 test('Living Node chat: configuration and formal execution need a plan even under auto apply', () => {
   const ctx = { parents: { a: null, b: 'a', c: 'b' }, selectedCount: 1 };
-  for (const autoApply of [false, true]) {
-    const creation = planFor([{ kind: 'add_child', parentId: 'a', title: 'Tracker', summary: '', livingPrompt: 'Track news' }], ctx, { autoApply });
+  for (const [autoApply, changeRequested] of [[false, undefined], [true, undefined], [false, true], [true, true]]) {
+    const opts = { autoApply, ...(changeRequested === undefined ? {} : { changeRequested }) };
+    const creation = planFor([{ kind: 'add_child', parentId: 'a', title: 'Tracker', summary: '', livingPrompt: 'Track news' }], ctx, opts);
     assert.ok(creation.reasons.includes('living_node_confirm'));
     assert.equal(creation.estimatedCalls, 0);
-    const config = planFor([{ kind: 'configure_ai_card', nodeId: 'a', content: 'Track news' }], ctx, { autoApply });
+    const config = planFor([{ kind: 'configure_ai_card', nodeId: 'a', content: 'Track news' }], ctx, opts);
     assert.ok(config.reasons.includes('living_node_confirm'));
     assert.equal(config.estimatedCalls, 0);
-    const run = planFor([{ kind: 'run_map_action', action: 'run_living_card', nodeIds: ['a'] }], ctx, { autoApply });
+    const run = planFor([{ kind: 'run_map_action', action: 'run_living_card', nodeIds: ['a'] }], ctx, opts);
     assert.ok(run.reasons.includes('living_node_confirm'));
     assert.equal(run.estimatedCalls, 3, 'upper bound includes dependencies');
-    const all = planFor([{ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }], ctx, { autoApply });
+    const all = planFor([{ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }], ctx, opts);
     assert.ok(all.reasons.includes('living_node_confirm'));
     assert.equal(all.estimatedCalls, 3);
   }

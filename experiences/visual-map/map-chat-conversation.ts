@@ -227,6 +227,8 @@ export class MapChatConversation {
     researchSoFar = 0
   ): string {
     switch (reason) {
+      case "not_requested":
+        return t("ui.map_chat_plan_reason_not_requested");
       case "many_actions":
         return t(
           "ui.map_chat_plan_reason_many_actions_0",
@@ -493,6 +495,8 @@ export class MapChatConversation {
     }
     this.applying = true;
     this.planStopped = false;
+    // The user's yes: the chain's later rounds are asked for.
+    if (run) run.changeRequested = true;
     // The dashed dots give way to the real anchors the writes make.
     this.ports.clearPreview();
     chat.settlePlan(card, "applied");
@@ -794,9 +798,12 @@ export class MapChatConversation {
             run.replyRemaining = result.remaining;
             // The switch of the moment decides this round's plan (and the limits of the chain from here on).
             run.state = syncAutoApply(run.state, this.ports.autoApply());
+            // Only a reply the user asked for writes at once (decision 2026-11-28-vam-v3-3#33). The user's round gives the verdict; an
+            // automatic round reads the chain's (its question is the plugin's text, not the user's): a question's chain never writes.
+            if (!autoOrigin) run.changeRequested = result.changeRequested === true;
             // Suggested relations (P4.4) always wait on a card: nothing is written until the user adopts one of them (the reply's
             // other actions then wait for Apply with them).
-            const planOptions = this.ports.planOptions(run, request);
+            const planOptions = { ...this.ports.planOptions(run, request), changeRequested: run.changeRequested };
             const plan =
               (result.actions.length ? planFor(result.actions, request.context, planOptions) : null) ??
               (result.suggestions?.length

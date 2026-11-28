@@ -422,7 +422,8 @@ async function harness({ aim = false, document = false, empty = false, realRende
     // Like the real service: the raw output goes to `onRaw` right before the reply is used, and never after a stop (unless a test asks for it).
     mapChat: { chat: async (request, signal, onReply, onProgress, onSteer, onRaw) => { control.calls.push('chat'); control.requests.push(request); if (control.invalidRaw !== undefined) { // Like the real runner: it hands the output to onRaw, then its parse throws before the service returns.
         if (!signal.aborted) onRaw?.(control.invalidRaw); throw Object.assign(new Error('Map chat reply is not valid'), { name: 'MapChatError', code: 'invalid' }); }
-      const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return result; } },
+      // A reply here is one the user asked for (decision 2026-11-28-vam-v3-3#33) unless it carries its own changeRequested (false, or undefined = missing).
+      const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return { changeRequested: true, ...result }; } },
     manifest: { version: '9.9.9' },
     // The switch reaches the writers a view registered (main.ts keeps the set; this stand-in keeps a list).
     registerMapChatRecordWriter: writer => { control.writers.push(writer); plugin.mapChatRecordWriters.add(writer); writer.setEnabled(settings.mapChatRecords); return () => { control.writers.splice(control.writers.indexOf(writer), 1); plugin.mapChatRecordWriters.delete(writer); }; },
@@ -2635,6 +2636,82 @@ integrationTest('B1 core: a new root card on a map that has cards goes in beside
   const lines = await apply(h, [addRoot('r', 'Second root'), addRoot('k', 'Its child', 'new:r')]);
   eq(lines.map(l => l.status), ['done', 'done']);
   const roots = (await h.saved()).filter(n => !n.parentId); assert.equal(roots.length, 2);
+});
+
+// ---- E4a P2.8 (decision 2026-11-28-vam-v3-3#33): a question that comes back with changes waits as a plan ----
+const NOT_ASKED = 'You did not ask for changes';
+const savedTitles = async h => Promise.all((await h.saved()).map(n => titleOf(h, n)));
+const contradiction = h => ({ kind: 'add_relation', fromId: h.ids.a, toId: h.ids.b, relationKind: 'contradicts', description: '' });
+integrationTest('E4a question only: a reply with a write and changeRequested false or missing waits as a plan labelled "You did not ask for changes"; the vault is byte for byte the same until Apply', async () => {
+  for (const flag of [{ changeRequested: false }, { changeRequested: undefined }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open();
+    const before = vaultState(h); h.control.mutates = 0;
+    h.control.reply = async () => ({ reply: 'These two may contradict each other.', actions: [contradiction(h)], rejected: [], remaining: '', ...flag });
+    h.type('do these two contradict?'); await h.view.sendMapChat();
+    assert.equal(planCard(h).length, 1, 'a plan card ' + JSON.stringify(flag)); assert.equal(chat.pendingPlan().state, 'pending');
+    assert.match(planReasons(h), new RegExp(NOT_ASKED));
+    assert.equal(h.control.mutates, 0, 'no write was queued'); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was');
+    assert.equal(h.view.map.relations?.length ?? 0, 0, 'no relation on the map');
+    planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+    assert.notEqual(vaultState(h), before, 'Apply writes it');
+  }
+});
+integrationTest('E4a question only: select and focus go on at once; the same reply asked for (changeRequested true) is written at once as before', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+  h.control.reply = async () => say('Here it is.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }, { kind: 'focus_topic', nodeId: h.ids.a }], '', false);
+  h.type('where is it?'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 0, 'read-only actions need no plan'); assert.equal(vaultState(h), before);
+  const g = await harness(); await g.view.hydrate(); const gchat = g.open();
+  g.control.reply = async () => say('I will link them.', [contradiction(g)], '');
+  g.type('mark them as contradicting'); await g.view.sendMapChat(); await until(() => !gchat.isBusy && !g.view.chatApplying);
+  assert.equal(planCard(g).length, 0, 'asked for: no plan'); assert.equal(gchat.pendingPlan(), null);
+});
+integrationTest('E4a question only (counter-example): layout and collapse write Map.md, so with changeRequested false they wait as a plan labelled "You did not ask for changes"; the vault is byte for byte the same', async () => {
+  for (const action of [() => ({ kind: 'auto_layout' }), h => ({ kind: 'collapse_topic', nodeId: h.ids.a })]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h); h.control.mutates = 0;
+    h.control.reply = async () => say('It looks fine.', [action(h)], '', false);
+    h.type('does this look tidy?'); await h.view.sendMapChat();
+    const kind = action(h).kind;
+    assert.equal(planCard(h).length, 1, 'a plan card for ' + kind); assert.equal(chat.pendingPlan().state, 'pending');
+    assert.match(planReasons(h), new RegExp(NOT_ASKED));
+    assert.equal(h.control.mutates, 0, 'no write was queued for ' + kind); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was for ' + kind);
+  }
+});
+integrationTest('E4a auto-apply (counter-example, row 8): with the switch on, a reply whose changeRequested is false or missing still waits as a plan; the map is untouched', async () => {
+  for (const reply of [h => say('Maybe add this.', [addRoot('x', 'Extra')], '', false), h => ({ reply: 'Maybe add this.', actions: [addRoot('x', 'Extra')], rejected: [], remaining: '', changeRequested: undefined })]) {
+    const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const before = vaultState(h);
+    h.control.reply = async () => reply(h);
+    h.type('what is missing?'); await h.view.sendMapChat();
+    assert.equal(planCard(h).length, 1); assert.equal(chat.pendingPlan().state, 'pending'); assert.match(planReasons(h), new RegExp(NOT_ASKED));
+    assert.equal(vaultState(h), before, 'the vault is byte for byte as it was');
+  }
+});
+integrationTest('E4a chain: an automatic round goes on from the round the user asked for, even when its own reply says changeRequested false', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'Then more'), say('Two.', [addRoot('y', 'Y')], '', false));
+  h.type('build two roots'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && !chat.isBusy && !h.view.chatApplying);
+  await tick(); await tick();
+  assert.equal(planCard(h).length, 0, 'no plan in the automatic round');
+  assert.ok(await savedTitles(h).then(t => t.includes('Y')), 'the second round wrote its card');
+});
+integrationTest('E4a chain (counter-example): a question whose first round only selects goes on, and the automatic round\'s write waits as a plan; its own changeRequested true does not count', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chainReplies(h, say('Looking.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }], 'Then check more', false), say('Two.', [addRoot('y', 'Y')], ''));
+  const before = JSON.stringify(h.view.map.nodes.map(n => n.id));
+  h.type('which cards contradict?'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && chat.pendingPlan() !== null);
+  assert.equal(chat.pendingPlan().state, 'pending'); assert.match(planReasons(h), new RegExp(NOT_ASKED));
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => n.id)), before, 'the map is unchanged');
+  assert.ok(await savedTitles(h).then(t => !t.includes('Y')), 'the automatic round wrote nothing');
+});
+integrationTest('E4a chain: once the user applies a "not asked" plan, the later automatic rounds write at once', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chainReplies(h, say('Maybe this.', [addRoot('x', 'X')], 'Then more', false), say('Two.', [addRoot('y', 'Y')], '', false));
+  h.type('what is missing?'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending'); assert.match(planReasons(h), new RegExp(NOT_ASKED));
+  planButton(h, 'apply').click();
+  await until(() => h.control.requests.length === 2 && !chat.isBusy && !h.view.chatApplying); await tick(); await tick();
+  assert.equal(chat.pendingPlan(), null, 'no plan in the automatic round');
+  assert.ok(await savedTitles(h).then(t => t.includes('Y')), 'the second round wrote its card');
 });
 
 integrationTest('B1 plan: 16 actions wait for Apply; until then the map, the notes and Map.md are untouched', async () => {
@@ -6983,7 +7060,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 35 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 36 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -7650,7 +7727,8 @@ const researchStub = h => { const runs = []; h.view.startMultiResearch = async (
 const workOutcome = (ids, status = 'succeeded', error) => ({ kind: 'settled', succeeded: status === 'succeeded' ? ids.length : 0, failed: status === 'failed' ? ids.length : 0, stopped: status === 'stopped' ? ids.length : 0, topics: ids.map(id => ({ id, title: `Card ${id.slice(0, 4)}`, status, ...(error ? { error } : {}) })) });
 const settleRun = (run, status, error) => run.onOutcome(workOutcome(run.ids, status, error));
 const chainReplies = (h, ...replies) => { h.control.reply = async (request, ...rest) => { const next = replies.shift(); if (!next) throw new Error('unexpected request'); return typeof next === 'function' ? next(request, ...rest) : next; }; };
-const say = (reply, actions = [], remaining = '') => ({ reply, actions, rejected: [], remaining });
+// The user asked for these changes (decision 2026-11-28-vam-v3-3#33); pass false for a question that came back with actions.
+const say = (reply, actions = [], remaining = '', changeRequested = true) => ({ reply, actions, rejected: [], remaining, changeRequested });
 const contextOf = request => JSON.parse(request.context.json);
 const chainEnded = (spy, count = 1) => until(() => spy.ends().length >= count);
 /** Round 1 of a chain that builds a root card and researches it (stubbed), then waits for the research. */

@@ -36,6 +36,9 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * `auto_apply_confirm` (auto-apply only): an action outside the allow-list (delete, maps, a file outside the map folder)
  * that no other reason already holds back.
  *
+ * `not_requested` (decision 2026-11-28-vam-v3-3#33): the user did not ask for a change (the reply's `changeRequested` is not true), yet the
+ * reply would write: every write waits as a plan, auto-apply or not. Replies of only {@link READ_ONLY_KINDS} go on at once.
+ *
  * `book_plan_edit`: the reply changes a book plan under review (cards, structure or thread); it writes the author's cards, so it is always a plan, auto-apply or not.
  *
  * `move_anchor_confirm`: the reply suggests moving an existing anchor; it is always a plan (never in {@link IMAGE_SAFE_KINDS}), auto-apply or not.
@@ -45,6 +48,7 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * a plan in either mode.
  */
 export type MapChatPlanReason =
+  | "not_requested"
   | "many_actions"
   | "many_research"
   | "new_map"
@@ -100,6 +104,14 @@ export const isChainSafe = (action: MapChatAction): boolean =>
     : action.kind === "add_child" && action.livingPrompt
       ? false
       : CHAIN_SAFE.has(action.kind);
+
+/** Actions that write nothing (selection, focus, the kind question, reading a file): a reply the user did not ask to change the map may still do them at once. Collapse, expand and layout write Map.md, so they are writes. */
+const READ_ONLY_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["kind"]>([
+  "select_topics",
+  "focus_topic",
+  "ask_topic_kind",
+  "read_md_file"
+]);
 
 /** The cards a reply that read web research text may rewrite or research without a plan (decision #14). */
 export interface MapChatTrusted {
@@ -326,10 +338,18 @@ export function planFor(
     readablePaths?: readonly string[];
     /** AI calls this segment of the chain already made (the call budget under `autoApply`). */
     callsSoFar?: number;
+    /**
+     * The user explicitly asked for a change (the reply's `changeRequested`, decision 2026-11-28-vam-v3-3#33). `false`: every write is a
+     * plan and `autoApply` does not apply. Absent: not judged (callers that apply a model reply always pass it).
+     */
+    changeRequested?: boolean;
   } = {}
 ): MapChatPlan | null {
   const reasons: MapChatPlanReason[] = [];
-  const auto = options.autoApply === true;
+  const notRequested = options.changeRequested === false;
+  // Auto-apply is only for what the user asked to change: a question does not turn into writes with the switch on.
+  const auto = options.autoApply === true && !notRequested;
+  if (notRequested && actions.some(action => !READ_ONLY_KINDS.has(action.kind))) reasons.push("not_requested");
   // A picture turn applied directly may place many anchors, links and topics at once (decision #14): they only add, and one undo takes them all back.
   const imageAddsOnly =
     options.imageMode === "direct" &&

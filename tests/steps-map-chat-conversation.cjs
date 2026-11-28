@@ -485,7 +485,7 @@ function turnRig(options = {}) {
 }
 const first = (r, kind) => r.log.find(entry => entry[0] === kind);
 const all = (r, kind) => r.log.filter(entry => entry[0] === kind);
-const REPLY = (actions = [], extra = {}) => ({ reply: 'ans', actions, remaining: 'none', rejected: [], ...extra });
+const REPLY = (actions = [], extra = {}) => ({ reply: 'ans', actions, remaining: 'none', rejected: [], changeRequested: true, ...extra });
 // The send promise stays open while the request runs; tests settle the fakes and await it only when they end the request.
 async function start(r, ...args) { r.sending = r.conv.sendMapChat(...args); await settle(); }
 

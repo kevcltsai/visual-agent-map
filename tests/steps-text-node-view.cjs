@@ -208,6 +208,7 @@ test('layout: text nodes follow auto layout, a map without text keeps no canvasI
   assert.equal(h.view.cardHeightOf('t1'), 28);
   assert.equal(h.view.cardHeightOf('txt-new'), 28);
   h.view.autoLayout();
+  h.view.applyTidy(); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   await h.settle();
   const [item] = await h.onDisk();
   assert.notEqual(item.x, 9999);
@@ -536,6 +537,7 @@ test('canvas-text-node: no layout direction moves a free block', async () => {
     h.view.setLayout({ direction });
     await h.settle();
     h.view.autoLayout();
+    h.view.applyTidy(); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
     await h.settle();
     const item = (await h.onDisk()).find(i => i.id === 'f1');
     assert.deepEqual([item.x, item.y, item.links], [600, 40, [h.root.id]], direction);

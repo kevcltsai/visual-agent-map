@@ -1463,7 +1463,9 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   // Auto layout from the Layout menu re-arranges every topic in one write.
   for (const nodes of [doc.nodes, view.map.nodes]) { nodes.find(item => item.id === 'b').x = 9999; nodes.find(item => item.id === 'c').y = -9999; }
   const writes = saved;
-  view.autoLayout(); await view.pending;
+  // A10：P1.4 整理全圖取代 Auto layout（先預覽）: the menu action only previews; Apply writes.
+  view.contentEl = { addEventListener() {}, removeEventListener() {} };
+  view.autoLayout(); view.applyTidy(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /n\.collapsed = !n\.collapsed;\s*(?:map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\)|this\.arrangeAll\(map\));/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
@@ -1474,7 +1476,7 @@ integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a s
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
   const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayout = patch => calls.push(patch.direction ?? patch.spacing);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Tidy map']); // A10：P1.4 整理全圖取代 Auto layout（先預覽）
   assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, false, false, false, false, false, false, false, true, false, undefined], 'the current direction and spacing are checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
   assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
@@ -5087,6 +5089,13 @@ test('B17 styles: the narrow header hides all but title, undo and ⋯; the chat 
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar, \.vam-view\.is-header-narrow \.vam-integration-progress \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > span, \.vam-view\.is-header-narrow \.vam-integration-progress > span \{[^}]*text-overflow: ellipsis;/);
   assert.match(css, /\.vam-view\.is-header-narrow \.vam-aim-statusbar > button, \.vam-view\.is-header-narrow \.vam-integration-progress > button \{[^}]*flex: none;/);
+  const pinned = css.match(/\.vam-view\.is-header-narrow \.vam-multi-research-statusbar \{([^}]*)\}/);
+  assert.ok(pinned, 'narrow research bar rule');
+  assert.match(pinned[1], /position: sticky;/); assert.match(pinned[1], /top: 0;/);
+  const zOf = re => Number(css.match(re)[1]);
+  const barZ = Number(pinned[1].match(/z-index: (\d+);/)[1]);
+  assert.ok(barZ > zOf(/\.vam-selection-bar \{[^}]*z-index: (\d+)/), 'above the selection bar');
+  assert.ok(!/\.vam-zoom-controls \{[^}]*z-index: (\d+)/.test(css) || barZ > zOf(/\.vam-zoom-controls \{[^}]*z-index: (\d+)/), 'above the zoom bar');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /const CHAT_RAIL_WIDTH = 28;/);
 });

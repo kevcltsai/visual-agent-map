@@ -1007,7 +1007,7 @@ const viewportFixture = () => {
   const a = node('a'), b = node('b', 'a');
   const doc = map([a, b]);
   const note = { title: 'T', summary: '', status: 'completed' };
-  const repo = { isDisposed: () => false, coordinatesChangedOutside: async () => false, updateMap: async (_path, change) => { counts.updateMap++; change(doc); }, updateViewport(path, viewport) { return this.updateMap(path, m => { m.viewport = viewport; }); }, readMap: async () => { counts.readMap++; return JSON.parse(JSON.stringify(doc)); }, readMapMeta: async () => { counts.readMap++; return { map: JSON.parse(JSON.stringify(doc)), sources: [] }; }, readNote: async () => { counts.readNote++; return { ...note }; } };
+  const repo = { isDisposed: () => false, topicFolder: (mapPath, collection) => `${mapPath.slice(0, mapPath.lastIndexOf('/'))}/${collection}`, coordinatesChangedOutside: async () => false, updateMap: async (_path, change) => { counts.updateMap++; change(doc); }, updateViewport(path, viewport) { return this.updateMap(path, m => { m.viewport = viewport; }); }, readMap: async () => { counts.readMap++; return JSON.parse(JSON.stringify(doc)); }, readMapMeta: async () => { counts.readMap++; return { map: JSON.parse(JSON.stringify(doc)), sources: [] }; }, readNote: async () => { counts.readNote++; return { ...note }; } };
   const plugin = Object.create(Plugin.prototype);
   Object.assign(plugin, { queue: Promise.resolve(), writing: 0, syncSeq: 0, logs: { appendLog() {} }, repo, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), pendingSuggestions: new Map(), syncOutline() {}, releaseOutline() {}, detailsShown: () => false, setOutlineActive() {} });
   const app = { vault: { getAbstractFileByPath: () => new obsidian.TFile('m/Map.md') } };
@@ -1954,7 +1954,9 @@ integrationTest('hypothesis-evidence: addNode hands createNote a topicKind only 
   for (const [kind, options] of [['topic', {}], ['hypothesis', {}], ['conclusion', {}]]) {
     const f = heFixture(options);
     f.view.path = 'Agent Workspace/Topics/map-a/Map.md';
+    // addNode previews the card (previewNote) for a non-interactive add and writes it at commit; either way the initial options are the last createNote/previewNote-before-avoid argument.
     f.view.plugin.repo.createNote = async (...args) => { seen.push([kind, args[args.length - 1]]); throw new Error('stop'); };
+    f.view.plugin.repo.previewNote = (...args) => { seen.push([kind, args[args.length - 2]]); throw new Error('stop'); };
     await f.view.addNode(null, 'Title', true, false, kind).catch(error => assert.equal(error.message, 'stop'));
   }
   assert.deepEqual(plain(seen), [['topic', { researchMode: 'local' }], ['hypothesis', { researchMode: 'local', topicKind: 'hypothesis' }], ['conclusion', { researchMode: 'local', topicKind: 'conclusion' }]]);

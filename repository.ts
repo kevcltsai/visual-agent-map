@@ -386,6 +386,26 @@ function guardWrites<T extends object>(
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+/** What a new card's note starts with (see `Repository.createNote`). */
+export type NewNoteInitial = Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> & {
+  topicKind?: TopicKind;
+  /** Deprecated alias of `topicKind: "hypothesis"`, kept per decision #30. */
+  hypothesis?: true;
+  /** A hypothesis's starting leaning and strength (default undecided and none); ignored for other kinds. */
+  hypothesisLeaning?: HypothesisLeaning;
+  hypothesisStrength?: HypothesisStrength;
+  /** The id of the card (the node id written into the note); default a new one. A card shown before its note is written keeps it. */
+  nodeId?: string;
+  /**
+   * A generated card's finished content (summary, body, source notes, status), applied to the new note's text before
+   * its single write: a crash can never leave an empty shell that startup adoption would list as a half card.
+   */
+  complete?: {
+    patch: NotePatch;
+    options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean };
+  };
+};
+
 export class Repository {
   readonly app: App;
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
@@ -783,7 +803,8 @@ export class Repository {
 
   /** Parses already-read note content; `readNote` reads the file once and calls this. */
   private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
-    const file = this.file(path),
+    // From the path, not the file: a card shown before its note is written has none (see `noteFromContent`).
+    const basename = path.slice(path.lastIndexOf("/") + 1).replace(/\.[^.]*$/, ""),
       decoded = decodeCalloutSections(upgradeLegacyAimText(raw)),
       fm = frontmatter(decoded),
       // A torn or duplicated region is cut out before sections are read, so it cannot leak into Detail or Prompt; a paired region already ends its section.
@@ -863,7 +884,7 @@ export class Repository {
     }
     return {
       ...(livingNode ? { livingNode } : {}),
-      title: noteTitle(content, fm, file.basename),
+      title: noteTitle(content, fm, basename),
       summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
@@ -1219,27 +1240,59 @@ export class Repository {
     map: MapDocument,
     mapPath: string,
     modelSource: ModelSource,
-    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> & {
-      topicKind?: TopicKind;
-      /** Deprecated alias of `topicKind: "hypothesis"`, kept per decision #30. */
-      hypothesis?: true;
-      /** A hypothesis's starting leaning and strength (default undecided and none); ignored for other kinds. */
-      hypothesisLeaning?: HypothesisLeaning;
-      hypothesisStrength?: HypothesisStrength;
-      /**
-       * A generated card's finished content (summary, body, source notes, status), applied to the new note's text before
-       * its single write: a crash can never leave an empty shell that startup adoption would list as a half card.
-       */
-      complete?: {
-        patch: NotePatch;
-        options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean };
-      };
-    } = {},
-    onCreate?: (path: string) => void
+    initial: NewNoteInitial = {},
+    /** Called with the path and text of each attempt to create the file, just before it is written. */
+    onCreate?: (path: string, text: string) => void
   ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
-    const id = crypto.randomUUID();
+    const { id, shell } = this.newNoteShell(title, model, map, modelSource, initial);
+    const { complete } = initial;
+    const created = await this.createUniqueNote(
+      folder,
+      title,
+      complete ? path => this.patchedNote(path, shell, complete.patch, complete.options ?? {}) : shell,
+      onCreate
+    );
+    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  /**
+   * What `createNote` would write, without writing: the card (at the free path it would take now, not one in `avoid`) and
+   * the note text. Nothing is created, so a card shown from it leaves no file if it is never written. The node carries the
+   * id `createNote` must be given as `initial.nodeId`.
+   */
+  previewNote(
+    title: string,
+    model: string,
+    map: MapDocument,
+    mapPath: string,
+    modelSource: ModelSource,
+    initial: NewNoteInitial,
+    avoid: ReadonlySet<string>
+  ): { node: MapNode; content: string } {
+    const { id, shell } = this.newNoteShell(title, model, map, modelSource, initial);
+    const path = this.unique(this.topicFolder(mapPath, "Notes"), title, avoid);
+    const { complete } = initial;
+    return {
+      node: { id, path, parentId: null, x: 80, y: 80, collapsed: false },
+      content: complete ? this.patchedNote(path, shell, complete.patch, complete.options ?? {}) : shell
+    };
+  }
+
+  /** The note a text at `path` reads as, for a card whose file is not written yet (see `previewNote`). */
+  noteFromContent(path: string, content: string, map?: MapDocument): Promise<Note> {
+    return this.parseNote(path, content, map);
+  }
+
+  private newNoteShell(
+    title: string,
+    model: string,
+    map: MapDocument,
+    modelSource: ModelSource,
+    initial: NewNoteInitial
+  ): { id: string; shell: string } {
+    const id = initial.nodeId ?? crypto.randomUUID();
     const kind: TopicKind = initial.topicKind ?? (initial.hypothesis ? "hypothesis" : "topic");
     const hypothesisValues =
       kind === "hypothesis"
@@ -1270,14 +1323,7 @@ export class Repository {
     };
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
     const shell = `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(this.noteLanguage))}`;
-    const { complete } = initial;
-    const created = await this.createUniqueNote(
-      folder,
-      title,
-      complete ? path => this.patchedNote(path, shell, complete.patch, complete.options ?? {}) : shell,
-      onCreate
-    );
-    return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+    return { id, shell };
   }
 
   /**
@@ -1288,14 +1334,15 @@ export class Repository {
     folder: string,
     title: string,
     content: string | ((path: string) => string),
-    onCreate?: (path: string) => void
+    onCreate?: (path: string, text: string) => void
   ): Promise<TFile> {
     const failed = new Set<string>();
     for (let attempt = 1; ; attempt++) {
       const path = this.unique(folder, title, failed);
-      onCreate?.(path);
+      const text = typeof content === "function" ? content(path) : content;
+      onCreate?.(path, text);
       try {
-        return await this.app.vault.create(path, typeof content === "function" ? content(path) : content);
+        return await this.app.vault.create(path, text);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (attempt >= 5 || !/already exists/i.test(message)) throw error;

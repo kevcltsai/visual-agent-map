@@ -620,6 +620,8 @@ export const en = {
   "ui.keep_editor_contents": "Keep editor contents",
   "ui.save_merged_contents": "Save merged contents",
   "ui.mind_map_changed_externally": "Mind map changed externally",
+  "ui.map_chat_history_reset_by_other_tab":
+    "Another tab's reply changed this map; switched to the latest version. Please redo the step.",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "Both the map and Map.md have changed. Choose which version to keep.",
   "ui.invalid_merged_contents": "The merged contents do not match the map format. Fix them, then save again.",
@@ -1580,6 +1582,8 @@ export const en = {
   "ui.map_chat_skip_attached_read_only": "the file is outside this map\u2019s folder, so the chat only reads it",
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_fail_changed": "the card was changed after you sent the message, so this step wrote nothing",
+  "ui.map_chat_fail_batch_timeout":
+    "this was not written in time and was not kept (lines marked done were kept); ask again",
   "ui.map_chat_fail_unknown": "this step could not be completed",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",

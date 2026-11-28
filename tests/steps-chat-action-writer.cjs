@@ -100,15 +100,15 @@ function world(options = {}) {
 }
 const apply = (w, action, baseline = w.baseline(), run = w.run()) => w.writer.write(action, baseline, () => true, run).then(outcome => ({ outcome: plain(outcome), run }));
 
-test('chat action writer: add_child passes the type, leaning and strength to addNode, records the new card and writes the summary', async () => {
+test('chat action writer: add_child passes the type, leaning and strength to addNode, records the new card and hands the summary to addNode (written with the note, not after it)', async () => {
   const w = world();
   const { outcome, run } = await apply(w, { kind: 'add_child', parentId: 'a', title: 'X1', ref: 'r1', summary: 'S1', topicKind: 'hypothesis', leaning: 'supported', strength: 'weak' });
   assert.deepEqual(outcome, { status: 'done' });
-  assert.deepEqual(w.only('addNode'), [['addNode', 'a', 'X1', true, false, 'hypothesis', false, { leaning: 'supported', strength: 'weak' }]]);
+  assert.deepEqual(w.only('addNode'), [['addNode', 'a', 'X1', true, false, 'hypothesis', false, { leaning: 'supported', strength: 'weak' }, 'S1']]);
   assert.deepEqual(run.created, ['n1']);
   assert.equal(run.refs.get('r1'), 'n1');
   assert.deepEqual([...run.notes], ['n1']);
-  assert.deepEqual(w.only('noteChange'), [['noteChange', 'n1', { summary: 'S1' }]]);
+  assert.deepEqual(w.only('noteChange'), [], 'no second write of the note for the summary');
 });
 
 test('chat action writer: rename_topic writes the title and moves the baseline; a card the user changed is skipped and not written', async () => {

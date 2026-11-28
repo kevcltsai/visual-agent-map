@@ -69,7 +69,7 @@ async function harness({ bHasSameTitle = false } = {}) {
   const Notice = dom.makeNotice(notices);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
-    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: scope => repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); }
   });
   const open = async path => {
@@ -187,4 +187,22 @@ test('P6 fallback: when the source map no longer has the copied topics, B builds
   assert.ok(pCopy);
   assert.ok(!h.contents.get(pCopy.path).includes('Next: [['), 'only whitelisted fields: no link text from the source file');
   assert.deepEqual(under(h, `${TOPICS}/map-a/`), aBefore);
+});
+
+test('B27: a paste into B leaves every source note of A byte for byte, hand-written ones included; the copies exist', async () => {
+  const h = await harness();
+  const { createHash } = require('node:crypto');
+  const sha = text => createHash('sha256').update(text).digest('hex');
+  const notes = [...under(h, `${TOPICS}/map-a/Notes/`).keys()];
+  assert.equal(notes.length, 3);
+  // Hand-written, not as VAM writes them: single-quoted references and a user paragraph after the references block.
+  for (const path of notes)
+    h.contents.set(path, `${h.contents.get(path).replace(/^  - "(.*)"$/gm, "  - '$1'")}\nA line the user wrote last.\n`);
+  const hashes = new Map(notes.map(path => [path, sha(h.contents.get(path))]));
+  pasteIntoB(h, copyBranch(h, ['p']));
+  await until(() => h.viewB.map.nodes.length === 3); await tick(); await tick();
+  const copies = h.viewB.map.nodes.filter(n => n.id !== h.ids.anchor);
+  assert.equal(copies.map(n => titleOf(h, n)).sort().join(), 'P,Q');
+  for (const copy of copies) assert.ok(h.contents.has(copy.path) && copy.path.startsWith(`${TOPICS}/map-b/`), copy.path);
+  for (const path of notes) assert.equal(sha(h.contents.get(path)), hashes.get(path), `${path} is not rewritten`);
 });

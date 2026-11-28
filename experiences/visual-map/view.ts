@@ -11252,7 +11252,8 @@ export class VisualAgentMapView extends ItemView {
       await create(copies, pairs, newRelations);
       // Only the new copies are written, before the transaction; a failure parks them like any other.
       if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = cross ? cross.begin() : this.beginMapTransaction();
+      // The rebuild after the paste covers this map only: notes elsewhere (the copied source, for one) stay as written (B27).
+      const tx = cross ? cross.begin() : this.beginMapTransaction({ roots: [repo.topicRoot(this.path)] });
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       cross?.join(tx);
       entry = await tx
@@ -11987,10 +11988,10 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Builds the transaction file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
-  private beginMapTransaction(): Transaction {
+  private beginMapTransaction(scope?: { roots: string[] }): Transaction {
     return beginTransaction({
       repo: this.plugin.repo,
-      rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      rebuildDerivedData: () => this.plugin.rebuildDerivedData(scope),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
       guardPath: path => this.assertChatWritable(path),
       validateStructure: (before, after) => validateLivingStructure(this.app, this.plugin.repo, before, after),

@@ -1772,9 +1772,11 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController;
     viewSession: string;
     adoption?: LivingAdoptionCheck;
-    /** The room this editor makes among the side panels, given back when it closes. */
-    room: SidePanelRoom;
+    /** The room this editor makes among the side panels, given back when it closes (null until the previous editor's close finished). */
+    room: SidePanelRoom | null;
   } | null = null;
+  /** The closing editor's pane and side panels, still being given back: the next editor starts on the state after it. */
+  private aiCardClosing: Promise<void> | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   private backgroundEpoch = 0;
@@ -17268,29 +17270,37 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      room: new SidePanelRoom(this.sideDocks())
+      room: null
     };
-    // While the editor is open its room is the only part of VAM that folds or unfolds a side panel (the trial preview too).
-    this.plugin.useSidePanelRoom?.(this.aiCardOpen.room);
+    const open = this.aiCardOpen;
     win.mount(overlay);
-    this.makeRoomForAiCard();
+    // The room and the pane start from the side panels and pane as the previous editor left them, once it gave them back.
+    const start = (): void => {
+      if (this.aiCardOpen !== open || !current()) return;
+      open.room = new SidePanelRoom(this.sideDocks());
+      // While the editor is open its room is the only part of VAM that folds or unfolds a side panel (the trial preview too).
+      this.plugin.useSidePanelRoom?.(open.room);
+      this.makeRoomForAiCard();
+      if (node) {
+        void this.plugin
+          .openDetails(this.plugin.repo.file(node.path), viewSession, "editor", note?.aiCard)
+          .then(() => {
+            // The reader took width in the right panel: the room is measured again.
+            if (current() && this.aiCardOpen) this.makeRoomForAiCard();
+          })
+          .catch(error => {
+            if (current()) new Notice(error instanceof Error ? error.message : String(error));
+          });
+      }
+    };
+    if (this.aiCardClosing) void this.aiCardClosing.then(start);
+    else start();
     if (node)
       void livingReplacedSources(this.app, this.plugin.repo, this.map, node.id)
         .then(names => {
           if (current() && names.length) win.markReplaced(names);
         })
         .catch(() => undefined);
-    if (node) {
-      void this.plugin
-        .openDetails(this.plugin.repo.file(node.path), viewSession, "editor", note?.aiCard)
-        .then(() => {
-          // The reader took width in the right panel: the room is measured again.
-          if (current() && this.aiCardOpen) this.makeRoomForAiCard();
-        })
-        .catch(error => {
-          if (current()) new Notice(error instanceof Error ? error.message : String(error));
-        });
-    }
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
@@ -17307,14 +17317,18 @@ export class VisualAgentMapView extends ItemView {
         : undefined;
     const aiCard = node ? this.notes.get(node.id)?.aiCard : undefined;
     // The pane is given back first (it never unfolds a side panel), then the side panels.
-    void Promise.resolve(
+    const released = Promise.resolve(
       this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true, aiCard)
-    )
-      .catch(() => {})
-      .finally(() => {
-        open.room.restore();
-        this.plugin.useSidePanelRoom?.(null, open.room);
-      });
+    ).catch(() => {});
+    const room = open.room;
+    // Closed before its room started: the previous editor's close, still running, gives the side panels back.
+    if (!room) return;
+    const closing = released.then(() => {
+      room.restore();
+      this.plugin.useSidePanelRoom?.(null, room);
+      if (this.aiCardClosing === closing) this.aiCardClosing = null;
+    });
+    this.aiCardClosing = closing;
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
@@ -17454,7 +17468,7 @@ export class VisualAgentMapView extends ItemView {
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
     const width = overlay.clientWidth ?? 0;
-    this.aiCardOpen.room.fit(width);
+    this.aiCardOpen.room?.fit(width);
   }
   private sideDock(side: "left" | "right"): SideDock | undefined {
     const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock } | undefined;

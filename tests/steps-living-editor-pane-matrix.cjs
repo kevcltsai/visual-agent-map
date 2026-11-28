@@ -334,6 +334,56 @@ for (const width of WIDTHS)
             assert.deepEqual(failures, []);
           });
 
+// D1 §23 B1: editor A open, the user presses edit on card B. A closes first (its pane given back, a leaf its trial made
+// removed, its side panels given back), then B opens on that state: B keeps its room and reads B; closing B gives the
+// panels back as they were before A opened.
+for (const width of [600, 700, 1024])
+  for (const leftStart of ['open', 'folded'])
+    for (const rightStart of ['open', 'folded', 'pane closed'])
+      for (const route of ['none', 'trial', 'trial+adopt'])
+        test(`D1 §23 B1: ${width}px, left ${leftStart}, right ${rightStart}, A ${route} → open B directly`, async () => {
+          const w = await world({ width });
+          const { leftSplit: left, rightSplit: right } = w.ws;
+          const failures = [];
+          await w.host.openDetails(w.file('A'));
+          await w.click('A');
+          if (rightStart === 'folded') right.collapse();
+          if (rightStart === 'pane closed') w.ws.closeActive();
+          if (leftStart === 'folded') left.collapse();
+          await w.settle();
+          const before = { left: left.collapsed, right: right.collapsed };
+          const held = content(w);
+
+          await openAiEditor(w);
+          if (route.startsWith('trial')) await runTrial(w);
+          if (route === 'trial+adopt') await adoptTrial(w);
+
+          w.view.openAiCardPopover(w.node('B'));
+          await w.settle(); await w.settle();
+          if (w.view.aiCardOpen?.nodeId !== w.node('B').id) failures.push('B did not open');
+          // I5 while B is open.
+          if (width >= 650 && w.ws.central() < 320) failures.push(`B open: central pane ${w.ws.central()}px`);
+          // B's reader (an open pane: behind a panel the room folded at most); a hidden or closed pane stays so (I2).
+          if (rightStart === 'open' && (content(w) !== 'reader:B' || !w.host.detailsShown())) failures.push(`B open: the pane shows ${pane(w)}, expected reader:B`);
+          if (rightStart === 'folded' && pane(w) !== `hidden ${held}`) failures.push(`B open: the pane shows ${pane(w)}, expected hidden ${held}`);
+          if (rightStart === 'pane closed' && content(w) !== 'none') failures.push(`B open: the closed pane holds ${pane(w)} (A's trial leaf left)`);
+
+          await closeAiEditor(w);
+          if (w.view.aiCardOpen !== null) failures.push('B did not close');
+          const after = { left: left.collapsed, right: right.collapsed };
+          if (JSON.stringify(after) !== JSON.stringify(before)) failures.push(`B closed: panels ${JSON.stringify(after)}, expected ${JSON.stringify(before)}`);
+          const settled = w.log.changes.length;
+          await w.settle(); await w.settle();
+          if (w.log.changes.length !== settled) failures.push(`after close: ${w.log.changes.slice(settled)}`);
+          // As when B alone opens and closes: its official note goes back in the pane (also behind a folded panel).
+          const want = rightStart === 'pane closed' ? 'none' : 'reader:B';
+          if (content(w) !== want) failures.push(`B closed: the pane holds ${content(w)}, expected ${want}`);
+          if (paneLeaves(w) > 1) failures.push(`${paneLeaves(w)} pane leaves`);
+          if (emptyReaders(w)) failures.push('an empty reader would be saved');
+          if (w.log.focus.length) failures.push(`focus taken: ${w.log.focus}`);
+          assert.deepEqual(failures, []);
+        });
+
 // ---- Matrix B: the right pane ---------------------------------------------------------------------------------------
 // Each state starts from a pane the user opened once (the 「筆記」 button), then card A selected.
 const states = {

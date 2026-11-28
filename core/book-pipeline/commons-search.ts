@@ -344,6 +344,8 @@ export async function searchCommons(
 ): Promise<{
   bySlot: Map<number, CommonsCandidate[]>;
   requests: number;
+  /** Requests Commons answered (status 200, with or without a usable file): none of `requests` answered is a search that failed. */
+  answered: number;
   limited: boolean;
   cut: number[];
   rejected: Partial<Record<CommonsRejection, number>>;
@@ -353,6 +355,7 @@ export async function searchCommons(
   const queue = options.queue ?? commonsQueue;
   const bySlot = new Map<number, CommonsCandidate[]>();
   let requests = 0;
+  let answered = 0;
   let limited = false;
   let waited = 0;
   const cut: number[] = [];
@@ -394,6 +397,7 @@ export async function searchCommons(
       let answer = await ask(query, 0);
       for (let retry = 1; answer?.status === 429 && !stopped(); retry++) answer = await ask(query, retry);
       if (!answer || answer.status !== 200) continue;
+      answered++;
       for (const candidate of parseCommonsAnswer(answer.text, slot, rejected)) {
         if (list.length >= COMMONS_PER_SLOT) break;
         if (!options.skip(candidate.url)) list.push(candidate);
@@ -402,7 +406,7 @@ export async function searchCommons(
     if (list.length) bySlot.set(slot.index, list);
     else if (limited || run.spent) cut.push(slot.index);
   }
-  return { bySlot, requests, limited: limited || run.spent, cut, rejected };
+  return { bySlot, requests, answered, limited: limited || run.spent, cut, rejected };
 }
 
 /** What a Commons file page says about a file, as {@link parseCommonsAnswer} reads it. */

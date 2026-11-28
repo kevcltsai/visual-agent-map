@@ -972,21 +972,53 @@ test('popover room (D1-x10c): a pane squeezed to 0px by both side panels still f
   assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'a 0px pane is squeezed, not unmeasured');
 });
 
-test('popover room (D1-x10c): a right panel the user had folded, unfolded by the reader, is folded back on close and the room is measured again', async () => {
-  const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
-  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
-  const left = dock(true), right = dock(true);
-  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
-  h.overlay.clientWidth = 600;
-  h.view.plugin.openDetails = async () => { right.expand(); h.overlay.clientWidth = 40; };
-  h.view.openAiCardPopover(h.node('A'));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(right.collapsed, true, 'the reader squeezed the pane: measured again after it opened, the right panel folds');
-  right.expand();
-  h.pop().keydown({ key: 'Escape' });
-  assert.equal(h.view.aiCardOpen, null);
-  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'closing leaves the panels folded as the user had them');
-});
+// D1-x10d: every combination of how the side panels start, the window width and what the user does while the editor is
+// open. A small layout model: each expanded panel takes 300px, the central pane gets the rest; the reader reveals the right
+// panel (as Obsidian's revealLeaf does) after the editor opened, reporting it through the reveal hook.
+for (const leftFolded of [false, true])
+  for (const rightFolded of [false, true])
+    for (const width of [600, 650, 700])
+      for (const user of ['none', 'left', 'right'])
+        test(`popover room matrix (D1-x10d): left ${leftFolded ? 'folded' : 'open'}, right ${rightFolded ? 'folded' : 'open'}, ${width}px, user toggles ${user}`, async () => {
+          const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+          const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+          const left = dock(leftFolded), right = dock(rightFolded);
+          h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+          const centre = () => Math.max(0, width - (left.collapsed ? 0 : 300) - (right.collapsed ? 0 : 300));
+          Object.defineProperty(h.overlay, 'clientWidth', { get: centre, configurable: true });
+          let listener = null, revealing = false;
+          h.view.plugin.onDetailsReveal = fn => { listener = fn; return () => { listener = null; }; };
+          h.view.plugin.detailsRevealing = () => revealing;
+          h.view.plugin.openDetails = async () => {
+            await null;
+            revealing = true;
+            right.expand();
+            h.view.makeRoomForAiCard(); // the resize the reveal causes
+            revealing = false;
+            listener?.();
+          };
+          h.view.openAiCardPopover(h.node('A'));
+          await new Promise(resolve => setTimeout(resolve, 0));
+          h.view.makeRoomForAiCard();
+          assert.ok(centre() >= 320, `the editor has room while open: ${centre()}px`);
+          const expected = { left: leftFolded, right: rightFolded };
+          if (user !== 'none') {
+            const touched = user === 'left' ? left : right;
+            if (touched.collapsed) touched.expand();
+            else touched.collapse();
+            expected[user] = touched.collapsed;
+            h.view.makeRoomForAiCard(); // the resize the user's toggle causes
+            h.view.makeRoomForAiCard();
+            assert.equal(touched.collapsed, expected[user], 'the panel the user changed is not changed back while the editor is open');
+          }
+          h.pop().keydown({ key: 'Escape' });
+          assert.equal(h.view.aiCardOpen, null);
+          assert.deepEqual(
+            { left: left.collapsed, right: right.collapsed },
+            expected,
+            'closing returns the panels to how they were, except the one the user changed last'
+          );
+        });
 
 test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);

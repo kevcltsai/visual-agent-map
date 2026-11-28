@@ -30,7 +30,7 @@ import {
   type RefindResult
 } from "./experiences/visual-map/book-pipeline-run";
 import type { StructureNode, StructureOp } from "./core/book-pipeline/structure-edit";
-import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+import { bookErrorReason, bookRefusalText, lockedSkippedNotice } from "./experiences/visual-map/book-pipeline-ui";
 import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import { writeOpenIssuesFile } from "./experiences/visual-map/book-open-issues-file";
 import {
@@ -923,7 +923,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       return view ? view.probeBookImage(url, signal) : { ok: false, reason: "no_view" };
     },
     backupNote: (path, raw) => this.backupBookNote(path, raw),
-    writeOpenIssues: (folder, language, content) =>
+    writeOpenIssues: (folder, language, content, existingOnly) =>
       writeOpenIssuesFile(
         {
           read: async path => {
@@ -941,8 +941,10 @@ export default class VisualAgentMapPlugin extends Plugin {
         },
         folder,
         language,
-        content
+        content,
+        existingOnly
       ),
+    lockedSkipped: titles => void new Notice(lockedSkippedNotice(titles)),
     notes: {
       readText: async path => {
         const open = this.openMarkdownViews(path)[0];

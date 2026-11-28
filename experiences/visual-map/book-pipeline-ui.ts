@@ -907,6 +907,11 @@ export function bookRefusalText(error: unknown): string {
   return t("ui.book_failed_0", bookErrorReason(error));
 }
 
+/** The notice for a book whose closing page was not written because its only gap is chapters the AI proofread skipped as locked. */
+export function lockedSkippedNotice(titles: readonly string[]): string {
+  return t("ui.book_locked_skipped_0", titles.join(t("ui.list_separator")));
+}
+
 /** Runs one runner entry; a refusal (or any error) is shown through `notify` instead of being thrown. */
 export async function runBookEntry(entry: () => Promise<void>, notify: (message: string) => void): Promise<void> {
   try {

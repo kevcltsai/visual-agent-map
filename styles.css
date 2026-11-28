@@ -46,6 +46,9 @@
 .is-focus-mode .vam-toolbar > :not(.vam-book-bar), .is-focus-mode .vam-canvas-controls, .is-focus-mode .vam-map-chat-toggle { display: none; }
 .is-focus-mode .vam-toolbar.is-focus-empty { display: none; }
 .vam-exit-focus { position: absolute; z-index: 5; top: 12px; right: 12px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); box-shadow: var(--shadow-s); }
+.vam-branch-focus { position: absolute; z-index: 5; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); }
+.vam-branch-focus-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-branch-focus-key { color: var(--text-faint); }
 .vam-icon-button:disabled { opacity: 0.4; cursor: default; }
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
@@ -315,6 +318,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-tools > .vam-ai-explore:hover { background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 80%, black); }
 .vam-node-tools > .vam-card-tool-more { min-width: 26px; padding-left: var(--vam-space-2); padding-right: var(--vam-space-2); }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+/* A greyed card action says why on the line under its name (V3.3 P1.8), lined up with the title past the icon. */
+.menu-item.vam-menu-has-reason { flex-wrap: wrap; }
+.menu-item .vam-menu-reason { flex-basis: 100%; padding-inline-start: 24px; color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: normal; }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
@@ -1689,6 +1695,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-map-search-close:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-view .vam-node.is-search-match { outline: 2px dashed var(--interactive-accent); outline-offset: 2px; }
 .vam-view .vam-node.is-search-current { outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
+/* A branch the search opened only for itself: dotted, so it reads as temporary. */
+.vam-view .vam-node.is-temp-open { outline: 2px dotted var(--text-muted); outline-offset: 2px; }
+.vam-view .vam-node .vam-search-temp-label { position: absolute; top: 0; right: 0; padding: 0 6px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); border-radius: var(--radius-s); pointer-events: none; }
 /* Presentation mode. Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-stage[data-presenting] .vam-node { opacity: 0.35; }
 .vam-view .vam-stage[data-presenting] .vam-node.is-presenting { opacity: 1; outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
@@ -2144,10 +2153,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 
 /* V3.3 A6: the selected card's edge entries ("+ Topic card"), on the side its child cards grow toward. Outside the card's layout box; shown with the card's toolbar rules. A second entry (A7) stacks in the same container. */
 .vam-node > .vam-card-edge { position: absolute; display: flex; gap: var(--vam-space-2); z-index: 2; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.12s ease; }
-.vam-node > .vam-card-edge.is-edge-right { left: 100%; top: 50%; flex-direction: column; align-items: flex-start; transform: translate(var(--vam-space-1), -50%); }
-.vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%); }
-.vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1)); }
-.vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1))); }
+.vam-node > .vam-card-edge.is-edge-right { left: 100%; top: 50%; flex-direction: column; align-items: flex-start; transform: translate(var(--vam-space-1), -50%);; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 0; }
+.vam-node > .vam-card-edge.is-edge-left { right: 100%; top: 50%; flex-direction: column; align-items: flex-end; transform: translate(calc(-1 * var(--vam-space-1)), -50%);; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 100% 0; }
+.vam-node > .vam-card-edge.is-edge-down { top: 100%; left: 50%; flex-direction: row; transform: translate(-50%, var(--vam-space-1));; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 0; }
+.vam-node > .vam-card-edge.is-edge-up { bottom: 100%; left: 50%; flex-direction: row; transform: translate(-50%, calc(-1 * var(--vam-space-1)));; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: 0 100%; }
 .vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node:focus-within > .vam-card-edge, .vam-viewport:not(.is-selecting):not(.is-multi-selected) .vam-node.is-selected > .vam-card-edge { opacity: 1; visibility: visible; pointer-events: auto; }
 .vam-card-edge .vam-card-edge-button { height: 22px /* A2 mockup */; padding: 0 var(--vam-space-2); border-radius: 999px /* pill, A2 */; border: 1px solid var(--vam-accent); background: var(--vam-surface); color: var(--vam-accent); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
 .vam-card-edge .vam-card-edge-button:hover { background: var(--vam-accent); color: var(--vam-surface); }
@@ -2192,3 +2201,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-knowledge-ref-modal .vam-knowledge-ref-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-knowledge-ref-modal .vam-knowledge-ref-detail { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow-y: auto; }
 @media (max-width: 480px) { .vam-view .vam-knowledge-ref { max-width: 200px; } }
+
+.vam-merge-draft-text { width: 100%; font-family: var(--font-monospace); font-size: var(--font-ui-small); }

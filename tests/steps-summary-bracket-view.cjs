@@ -54,7 +54,7 @@ async function harness({ direction, build, boxes } = {}) {
   const layout = (typeof boxes === 'function' ? boxes(ids) : boxes) ?? { [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [500, 450], [ids.b1]: [900, 150] };
   let pending = Promise.resolve();
   const notices = [], menus = [];
-  const Menu = class { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
+  const Menu = class { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; }, setSubmenu() { this.sub = Object.assign(Object.create(Menu.prototype), { items: [], separators: [] }); return this.sub; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -320,9 +320,14 @@ test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regu
   const opened = [];
   h.view.chooseTopicStyle = node => opened.push(node.id);
   h.view.onCanvasContextMenu(event());
-  assert.equal(titles().includes('Note style…'), false, 'the single-card right-click menu has no Note style…: it is in the toolbar More list');
+  const contextTitles = titles();
+  assert.equal(contextTitles.includes('Note style…'), true, 'B07: the single-card right-click menu has Note style… too');
+  h.menus.at(-1).items.find(i => i.title === 'Note style…').click();
+  assert.deepEqual(opened, [h.ids.b], 'the right-click entry opens the chooser for that topic');
+  opened.length = 0;
   const more = { getBoundingClientRect: () => ({ left: 10, bottom: 20 }) };
   h.view.openCardMoreMenu(more, h.view.map.nodes.find(n => n.id === h.ids.b));
+  assert.deepEqual(contextTitles.slice(contextTitles.indexOf('Card settings…')), titles(), 'the right-click lists the More list in its order');
   h.menus.at(-1).items.find(i => i.title === 'Note style…').click();
   assert.deepEqual(opened, [h.ids.b], 'the entry opens the chooser for the topic of the More list');
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
@@ -359,7 +364,7 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
   h.view.onCanvasContextMenu(event());
-  assert.equal(h.menus.at(-1).items.some(i => i.title === 'Add summary bracket'), false, 'one card: the bracket is in the toolbar More list, not the right-click menu');
+  assert.equal(h.menus.at(-1).items.some(i => i.title === 'Add summary bracket'), true, 'one card (B07): the bracket is in the right-click menu as in the toolbar More list');
   assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
   h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 10, bottom: 20 }) }, h.view.map.nodes.find(n => n.id === h.ids.b));
   const entryTitles = h.menus.at(-1).items.map(i => i.title);
@@ -441,7 +446,7 @@ test('bug bash #26 view: bracket text beside a card that is not a member is push
   assert.equal(find(h.el('s1'), i => i.tag === 'path').attrs.d, find(plainRun.el('s1'), i => i.tag === 'path').attrs.d, 'the brace is unchanged');
 });
 
-test('C1 card context menu: one topic gets its card actions in groups (new topics; research and fold; open and settings), then Remove; each entry runs the same action as its toolbar button', async () => {
+test('C1 card context menu (B07): one topic gets the toolbar actions, then the ⋯ list in its groups, Remove last; each entry runs the same action as its toolbar button', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
@@ -456,21 +461,30 @@ test('C1 card context menu: one topic gets its card actions in groups (new topic
   h.view.openDetails = node => calls.push(['details', node.id]);
   h.view.openNoteInTab = node => calls.push(['tab', node.id]);
   h.view.removeByKey = node => calls.push(['remove', node.id]);
+  h.view.startCardSummaryEdit = node => calls.push(['summary', node.id]);
+  h.view.addSummaryOver = ids => calls.push(['bracket', ...ids]);
+  h.view.openTidyPreview = id => calls.push(['tidy', id]);
+  h.view.chooseTopicStyle = node => calls.push(['style', node.id]);
+  h.view.openAiCardPopover = node => calls.push(['ai-card', node.id]);
+  h.view.enterBranchFocus = id => calls.push(['focus', id]);
+  h.view.copyAsKnowledgeRef = node => calls.push(['copy-ref', node.id]);
   h.view.onCanvasContextMenu(event());
   const menu = h.menus.at(-1);
   const titles = menu.items.map(i => i.title);
-  assert.deepEqual(titles, ['Add subtopic', 'Add sibling topic', 'Research this card', 'Collapse subtopics', 'Copy as reference', 'Open note', 'Card settings…', 'Make it an AI card', 'Remove from map']);
-  assert.deepEqual(menu.separators, [2, 5, 8], 'separators between the groups');
-  assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list of the toolbar More');
-  for (const gone of ['AI explore', 'This card', 'Select subtopics', 'Edit card', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);
+  assert.deepEqual(titles, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', 'Card settings…', 'Focus on this branch', 'Select subtopics', 'Add summary bracket', 'Tidy this branch', 'Note style…', 'Make it an AI card', 'Add sibling topic', 'Add another type', 'Copy as reference', 'Collapse subtopics', 'Remove from map']);
+  assert.deepEqual(menu.separators, [4, 11, 14], 'a separator after the toolbar part and between the ⋯ groups');
+  assert.ok(!titles.includes('Add text'), 'Add text lives only in the Add-another-type list');
+  assert.ok(menu.items.find(i => i.title === 'Add another type').sub.items.some(i => i.title === 'Add text'), 'Add text is in its submenu');
+  for (const gone of ['Research this card', 'This card', 'Edit card', 'Open details in right sidebar', 'Open note in new tab']) assert.ok(!titles.includes(gone), `${gone} is no longer in the single-card menu`);
   assert.equal(menu.items.at(-1).warning, true, 'Remove is marked as a warning');
-  for (const item of menu.items) item.click({ metaKey: false, ctrlKey: false });
+  // Every row but the submenu one (Add another type opens its list) runs on click.
+  for (const item of menu.items) if (item.title !== 'Add another type') item.click({ metaKey: false, ctrlKey: false });
   menu.items.find(i => i.title === 'Open note').click({ metaKey: true });
   await h.settle();
   const b = h.view.map.nodes.find(n => n.id === h.ids.b);
   // The two add entries go through the map's work queue, so they land after the direct ones; the order is not the point.
   const sorted = list => plain(list).map(item => JSON.stringify(item)).sort();
-  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['add', b.parentId], ['panel', h.ids.b, 'structure'], ['fold', h.ids.b], ['details', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
+  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['details', h.ids.b], ['summary', h.ids.b], ['panel', h.ids.b, 'structure'], ['focus', h.ids.b], ['select', h.ids.b], ['bracket', h.ids.b], ['tidy', h.ids.b], ['style', h.ids.b], ['ai-card', h.ids.b], ['add', b.parentId], ['copy-ref', h.ids.b], ['fold', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.onCanvasContextMenu(event());
   assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket'], 'several topics: only the bracket');

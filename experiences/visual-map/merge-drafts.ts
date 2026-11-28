@@ -49,9 +49,19 @@ export interface MergeTask {
   /** The supplement request failed: the block says so instead of silently leaving the sources out. */
   supplementFailed?: boolean;
   controller: AbortController;
-  /** running: the model works (Stop works); applying: the result is being written; a task that ends is removed. */
-  state: "running" | "applying";
+  /**
+   * running: the model works (Stop works); applying: the result is being written; draft-failed: the content check still
+   * failed after the one repair, nothing was written and the draft waits in memory ({@link MergeDrafts.failedDraft}).
+   * A task that ends is removed.
+   */
+  state: "running" | "applying" | "draft-failed";
   draft?: AiResult;
+  /** The content check of the draft (set when it failed). */
+  check?: MergeCheckResult;
+  /** What the chat turn that started this merge attached: sent with the map's sources in the supplement request only. */
+  referenceGroups?: ReferenceGroup[];
+  /** The chat reply that started this merge gets a result line when it fails (the chat's merge only). */
+  failedLine?: (text: string) => void;
   /** The request in flight (tests await it). */
   run?: Promise<void>;
 }
@@ -79,13 +89,20 @@ export interface MergeDraftPorts {
   recordFailure(label: string, error: unknown): string;
   notice(message: string): void;
   /** Writes the merged result (the view's History, selection and Undo Notice); the only write port. */
-  write(task: MergeTask, result: AiResult, check: MergeCheckResult): Promise<void>;
+  write(task: MergeTask, result: AiResult): Promise<void>;
+  /** The content check still failed: nothing was written; the view shows what is missing, with Retry and View draft. */
+  failed(task: MergeTask): void;
 }
 
 /** The AI merges of one view: the task per map, who still owns a card, and Stop. Writing stays in the view. */
 export class MergeDrafts {
   /** AI merges that hid their dialog, keyed by map path (one per map). */
   readonly tasks = new Map<string, MergeTask>();
+  /**
+   * The last merge whose content check failed, kept in memory only (never written) for Retry and View draft. Dropped when
+   * the view closes, the map is switched, or the same cards are merged again.
+   */
+  failedDraft: MergeTask | undefined;
   constructor(private readonly ports: MergeDraftPorts) {}
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   isMerging(nodeId: string, except?: MergeTask): boolean {
@@ -115,14 +132,26 @@ export class MergeDrafts {
   }
   /** The view closes: revoke ownership before aborting, so callbacks cannot see the departing tasks as live. */
   stopAll(): void {
+    this.dropFailed();
     const tasks = [...this.tasks.values()];
     this.tasks.clear();
     for (const task of tasks) task.controller.abort();
+  }
+  /** The kept failed draft goes away (the map is switched). */
+  dropFailed(): void {
+    this.failedDraft = undefined;
   }
   /** Registers a started merge: the task is set, `registered` runs (dialog hidden, started, render), then the run starts. */
   start(task: MergeTask, registered: () => void): MergeTask {
     const previous = this.tasks.get(task.mapPath);
     if (previous === task) return task;
+    const failed = this.failedDraft;
+    const ids = (item: MergeTask): string =>
+      item.sources
+        .map(source => source.id)
+        .sort()
+        .join("\n");
+    if (failed && failed.mapPath === task.mapPath && ids(failed) === ids(task)) this.dropFailed();
     this.tasks.set(task.mapPath, task);
     previous?.controller.abort();
     try {
@@ -214,7 +243,7 @@ export class MergeDrafts {
       let result = await ask(request);
       if (!(await sourcesUnchanged())) return;
       if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
-      // Programmatic content check, one repair round; whatever is still wrong then is applied with a warning.
+      // Programmatic content check, one repair round; whatever is still wrong then is not written (the draft is kept).
       let check = await this.ports.check(task, result);
       if (!this.isLive(task)) return;
       if (!check.ok) {
@@ -245,17 +274,33 @@ export class MergeDrafts {
           this.ports.recordFailure(t("log.merge_failed"), error);
         }
       }
+      if (!this.isLive(task)) return;
+      if (!check.ok) {
+        // Still wrong after the one repair: no write, the merge lock is released, and the draft stays in memory only.
+        endProgress();
+        task.state = "draft-failed";
+        task.draft = result;
+        task.check = check;
+        this.forget(task.mapPath, task);
+        this.failedDraft = task;
+        this.ports.changed();
+        this.ports.failed(task);
+        return;
+      }
       // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
       // never saw them, so nothing in them can change what the cards say.
       if (!this.isLive(task)) return;
-      if (snapshot.mapGroups.some(group => group.documents.length)) {
+      const supplementGroups = task.referenceGroups?.length
+        ? [...snapshot.mapGroups, ...task.referenceGroups]
+        : snapshot.mapGroups;
+      if (supplementGroups.some(group => group.documents.length)) {
         try {
           const supplement = await ask({
             ...request,
             summary: result.summary,
             detail: result.detail,
             task: mergeSupplementTask(language),
-            referenceGroups: snapshot.mapGroups
+            referenceGroups: supplementGroups
           });
           if (!(await sourcesUnchanged())) return;
           task.supplement = supplement.detail;
@@ -276,7 +321,7 @@ export class MergeDrafts {
       task.draft = result;
       this.ports.changed();
       if (!this.isLive(task)) return;
-      await this.ports.write(task, result, check);
+      await this.ports.write(task, result);
       // The write may already have forgotten the task before repainting the merged map.
       const owner = this.tasks.get(task.mapPath);
       this.forget(task.mapPath, task);

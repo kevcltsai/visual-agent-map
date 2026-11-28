@@ -77,6 +77,11 @@ export interface CommitOptions {
   label?: string;
   /** First publication only: an invalidated editor must not publish its pending change. */
   authorize?: () => boolean;
+  /**
+   * First publication only: awaited inside the commit, after its own reads and right before the first write; throwing
+   * abandons the step with nothing written (a caller's last look at what it read, e.g. an AI merge's sources).
+   */
+  beforeWrite?: () => Promise<void>;
 }
 /** The vault path commit chose for the attachment registered under `key`; throws for an unknown key. */
 export type AttachmentPath = (key: string) => string;
@@ -858,6 +863,10 @@ export function begin(deps: TransactionDeps): Transaction {
       return journal.notes.run(async () => {
         try {
           authorize();
+          if (options.beforeWrite) {
+            await options.beforeWrite();
+            authorize();
+          }
           await place(owner);
           for (const note of noteRecords) await note.write(note.path, attachment);
           for (const op of ops) {

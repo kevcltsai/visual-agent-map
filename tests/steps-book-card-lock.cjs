@@ -98,16 +98,19 @@ async function harness({ book, stages = {}, issue, phase }) {
 
 const named = (stage, label) => dom.findAll(stage, i => i.tag === 'button' && i.attrs?.['aria-label'] === label);
 const byCls = (stage, cls) => dom.findAll(stage, i => i.classes?.includes?.(cls) || i.cls?.split?.(' ').includes(cls));
-const menuOf = (h, nodeKey) => {
+// The right-click rows: title, whether it is greyed, and the hint lines drawn under it (menuHint).
+const menuRows = (h, nodeKey) => {
   const items = [];
-  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled() { return this; }, setChecked() { return this; }, setWarning() { return this; }, setSubmenu() { return { addItem() { return this; } }; }, onClick(fn) { it.fn = fn; return this; } });
-  const menu = { addItem(build) { const it = {}; build(chain(it)); items.push(it); return menu; }, addSeparator() { return menu; } };
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, setChecked() { return this; }, setWarning() { return this; }, setSubmenu() { return { addItem() { return this; }, addSeparator() { return this; } }; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass(c) { it.cls = c; }, createSpan(o) { it.hints.push(o); } } });
+  const menu = { addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return menu; }, addSeparator() { return menu; } };
   h.view.addCardMenuActions(menu, h.view.map.nodes.find(n => n.id === h.ids[nodeKey]));
-  return items.map(i => i.title);
+  return items;
 };
+// The titles of the rows that can be used now.
+const menuOf = (h, nodeKey) => menuRows(h, nodeKey).filter(i => !i.disabled).map(i => i.title);
 const atPhase = (h, phase) => { h.plugin.getBookPipelineProgress = () => (phase ? progress({ phase }) : undefined); h.view.bookPipelineSeen = null; };
 
-test('book lock: while the book writes, a card has no Research and no Add button; Note and More stay (More has no card settings or select subtopics: they are structure-locked)', async () => {
+test('book lock: while the book writes, a card has no Research and no Add button; Note and More stay (the menu greys Research, the new topics, card settings and select subtopics, with the book lock as the reason)', async () => {
   const h = await harness({ book: true, stages: { a: 'planned', b: 'planned' } });
   for (const phase of ['planning', 'writing', 'gate2']) {
     atPhase(h, phase);
@@ -116,9 +119,16 @@ test('book lock: while the book writes, a card has no Research and no Add button
     assert.equal(byCls(stage, 'vam-add-child-tool').length, 0, `${phase}: no Add`);
     assert.equal(byCls(stage, 'vam-detail-button').length, 3, `${phase}: Note stays on every card`);
     assert.equal(byCls(stage, 'vam-card-tool-more').length, 3, `${phase}: More stays on every card`);
+    const rows = menuRows(h, 'root');
     const items = menuOf(h, 'root');
-    for (const gone of [tr('ui.card_menu_research'), tr('ui.card_menu_add_child'), tr('ui.card_menu_add_sibling'), tr('ui.card_settings_menu'), tr('ui.select_subtopics')])
-      assert.ok(!items.includes(gone), `${phase}: menu has no ${gone}`);
+    for (const gone of [tr('ui.ai_explore'), tr('ui.card_menu_add_child'), tr('ui.card_menu_add_sibling'), tr('ui.card_settings_menu'), tr('ui.select_subtopics')]) {
+      assert.ok(!items.includes(gone), `${phase}: ${gone} cannot be used`);
+      const row = rows.find(i => i.title === gone);
+      assert.ok(row?.disabled, `${phase}: ${gone} is greyed`);
+      assert.deepEqual(row.hints.map(o => [o.cls, o.text]), [['vam-menu-reason', tr('ui.card_action_off_book_lock')]], `${phase}: ${gone} says why`);
+      assert.equal(row.cls, 'vam-menu-has-reason', `${phase}: ${gone}'s row wraps the reason onto its own line`);
+      assert.equal(row.fn, undefined, `${phase}: ${gone} has no click`);
+    }
     assert.ok(items.includes(tr('ui.card_menu_open_note')), `${phase}: read-only items stay`);
     assert.ok(items.includes(tr('ui.book_card_menu')), `${phase}: the book's own submenu (chapter role) stays`);
   }
@@ -137,7 +147,7 @@ test('book lock: the saved phase counts when the runner knows nothing (after a r
   assert.equal(byCls(stage, 'vam-add-child-tool').length, 3, 'gate 1: Add stays (the review detects hand edits)');
   assert.ok(menuOf(h, 'a').includes(tr('ui.card_settings_menu')), 'gate 1: card settings stay');
   assert.ok(menuOf(h, 'a').includes(tr('ui.card_menu_add_child')));
-  assert.ok(!menuOf(h, 'a').includes(tr('ui.card_menu_research')));
+  assert.ok(!menuOf(h, 'a').includes(tr('ui.ai_explore')));
 });
 
 test('book lock: done, and a map without a book, give every tool back', async () => {
@@ -146,7 +156,7 @@ test('book lock: done, and a map without a book, give every tool back', async ()
   let stage = h.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 3);
   assert.equal(byCls(stage, 'vam-add-child-tool').length, 3);
-  assert.ok(menuOf(h, 'a').includes(tr('ui.card_menu_research')));
+  assert.ok(menuOf(h, 'a').includes(tr('ui.ai_explore')));
   const plain = await harness({ book: false });
   stage = plain.paint();
   assert.equal(byCls(stage, 'vam-ai-explore').length, 3);

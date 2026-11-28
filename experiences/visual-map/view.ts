@@ -686,7 +686,12 @@ import {
 } from "./ai-mode";
 import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
 import { openStylePopover, type StylePopover, type StylePopoverState } from "./style-popover";
-import { openBatchColorPopover, type BatchColorPopover } from "./batch-popover";
+import {
+  openBatchColorPopover,
+  openBatchSizePopover,
+  type BatchColorPopover,
+  type BatchSizeChange
+} from "./batch-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
@@ -796,6 +801,18 @@ function isEditableTarget(target: unknown): boolean {
 }
 
 /** A copy of `node` without any AIM field: what an old AIM map shares. */
+/** Sets (or, with undefined, clears) a card's custom width and/or height in place: only the keys present change. */
+function applyCardSize(node: MapNode, change: BatchSizeChange): void {
+  if ("width" in change) {
+    if (change.width === undefined || change.width === CARD_WIDTH) delete node.width;
+    else node.width = clampCardWidth(change.width);
+  }
+  if ("height" in change) {
+    const height = change.height === undefined ? undefined : clampCardHeight(change.height);
+    if (height === undefined) delete node.height;
+    else node.height = height;
+  }
+}
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
   delete copy.aimKind;
@@ -1652,6 +1669,8 @@ export class VisualAgentMapView extends ItemView {
   private styleOpen: { nodeId: string; mapId: string; pop: StylePopover } | null = null;
   /** The selection bar's Color popover (B19b); a new bar (a repaint, a changed selection) closes it. */
   private batchColorPop: BatchColorPopover | null = null;
+  /** The selection bar's Size popover (B19c), closed the same way. */
+  private batchSizePop: BatchColorPopover | null = null;
   /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
   private aiCardOpen: {
     nodeId: string | null;
@@ -13238,6 +13257,7 @@ export class VisualAgentMapView extends ItemView {
       search: () => this.openMapSearch(),
       shortcuts: () => this.openKeyboardShortcuts(),
       openBatchColor: opener => this.openBatchColor(opener),
+      openBatchSize: opener => this.openBatchSize(opener),
       merge: () => this.openMerge(),
       multiResearch: () => this.openMultiResearch(),
       chooseParent: copy => this.chooseSelectedParent(copy),
@@ -13277,6 +13297,7 @@ export class VisualAgentMapView extends ItemView {
       titles: ids => ids.map(id => this.notes.get(id)?.title ?? id).join(t("ui.list_separator")),
       isArgumentCard: id => this.isArgumentCard(id),
       stylesEditable: !!node && this.markersEditable(node),
+      aimMap: !!this.map?.aim,
       aiRunning: id => this.aiStatusOf(id) === "running",
       summaryFieldOffered: () => {
         const note = node ? this.notes.get(node.id) : undefined;
@@ -20833,6 +20854,7 @@ export class VisualAgentMapView extends ItemView {
   private openBatchColor(opener?: HTMLElement): void {
     const open = this.batchColorPop;
     open?.close(false);
+    this.batchSizePop?.close(false);
     const host = opener?.parentElement;
     if (open || !opener || !host) return;
     const ids = [...this.selection.state.multiSelected];
@@ -20881,13 +20903,79 @@ export class VisualAgentMapView extends ItemView {
     await this.recolorTopics(ids, color);
   }
   /**
+   * The selection bar's Size popover (batch-popover.ts) above its button, as the Color one: each field shows the selection's
+   * one width or height, or "Mixed" (an unset height: "Auto"). Apply closes it and resizes the selection.
+   */
+  private openBatchSize(opener?: HTMLElement): void {
+    const open = this.batchSizePop;
+    open?.close(false);
+    this.batchColorPop?.close(false);
+    const host = opener?.parentElement;
+    if (open || !opener || !host || !this.map) return;
+    const ids = [...this.selection.state.multiSelected];
+    const nodes = this.map.nodes.filter(node => ids.includes(node.id) && !node.aimKind);
+    const widths = new Set(nodes.map(node => node.width ?? CARD_WIDTH));
+    const heights = new Set(nodes.map(node => node.height ?? null));
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (target && !pop.el.contains(target) && !opener.contains(target)) pop.close(false);
+    };
+    const state = {
+      width: widths.size > 1 ? ("mixed" as const) : ([...widths][0] ?? CARD_WIDTH),
+      height: heights.size > 1 ? ("mixed" as const) : ([...heights][0] ?? null)
+    };
+    const pop = openBatchSizePopover(host, opener, state, nodes.length, {
+      onApply: change => {
+        this.enqueue(async () => {
+          await this.changeSelectionSize(ids, change);
+          if (!opener.isConnected)
+            this.selectionBarEl?.querySelector<HTMLElement>('[data-card-action="batch-size"]')?.focus();
+        });
+      },
+      onClose: () => {
+        if (this.batchSizePop === pop) this.batchSizePop = null;
+        pop.el.ownerDocument?.removeEventListener("pointerdown", outside, true);
+      }
+    });
+    pop.el.style.left = `${opener.offsetLeft}px`;
+    pop.el.ownerDocument?.addEventListener("pointerdown", outside, true);
+    this.batchSizePop = pop;
+  }
+  /**
+   * Sets (or, with undefined, resets) the width and/or height of every selected card in one Map.md write and one undo step
+   * (P1.9): only the keys in `change`, as resizeCard; an old AIM card is left out. It rechecks the Size button's gates first
+   * (presentation, loading notes, an AI-locked or merging card, an AIM map): a refused write says why and writes nothing.
+   */
+  private async changeSelectionSize(ids: readonly string[], change: BatchSizeChange): Promise<void> {
+    if (!this.map) return;
+    const ctx = this.cardActionContext(ids);
+    const availability = actionsFor("toolbar", ctx).find(entry => entry.action.id === "batch-size")?.availability;
+    if (!availability?.ok) {
+      if (availability) new Notice(t(availability.reasonKey, ...(availability.reasonArgs ?? [])));
+      return;
+    }
+    const changed = (node: MapNode): boolean => {
+      const next = { ...node };
+      applyCardSize(next, change);
+      return next.width !== node.width || next.height !== node.height;
+    };
+    const targets = new Set(
+      this.map.nodes.filter(node => ids.includes(node.id) && !node.aimKind && changed(node)).map(node => node.id)
+    );
+    if (!targets.size) return;
+    await this.mapChange(map => {
+      for (const node of map.nodes) if (targets.has(node.id)) applyCardSize(node, change);
+    }, false);
+  }
+  /**
    * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card
-   * action registry (Color, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
+   * action registry (Color, Size, Move to…, Merge, Research), More (everything else, ending with the gesture help) and Done. An action that
    * cannot run stays focusable (aria-disabled) and its reason is written on a line below the row. The canvas keeps its height
    * free (see `has-selection-bar`).
    */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     this.batchColorPop?.close(false);
+    this.batchSizePop?.close(false);
     const selection = workspace.createDiv("vam-selection-bar");
     const count = this.selection.state.multiSelected.size;
     workspace.toggleClass?.("has-selection-bar", count > 0);
@@ -20923,7 +21011,7 @@ export class VisualAgentMapView extends ItemView {
         if (reasonText) new Notice(reasonText);
         else action.run(context, { opener: button });
       });
-      if (action.id === "batch-color") {
+      if (action.id === "batch-color" || action.id === "batch-size") {
         button.setAttr("data-card-action", action.id);
         button.setAttr("aria-haspopup", "dialog");
       }
@@ -26685,16 +26773,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map?.nodes.some(node => node.id === id)) return;
     await this.mapChange(map => {
       const node = map.nodes.find(item => item.id === id);
-      if (!node) return;
-      if ("width" in change) {
-        if (change.width === undefined || change.width === CARD_WIDTH) delete node.width;
-        else node.width = clampCardWidth(change.width);
-      }
-      if ("height" in change) {
-        const height = change.height === undefined ? undefined : clampCardHeight(change.height);
-        if (height === undefined) delete node.height;
-        else node.height = height;
-      }
+      if (node) applyCardSize(node, change);
     }, false);
   }
   /**

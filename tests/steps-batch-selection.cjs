@@ -215,3 +215,116 @@ test('B19b (parent ruling: the picture-book structure lock covers parent and ord
   for (const title of ['Root', 'A1', 'B']) assert.equal(after.get(NOTE(title)), before.get(NOTE(title)), `${title} is not selected`);
   assert.equal(after.get(MAP), before.get(MAP), 'Map.md unchanged');
 });
+
+// B19c (P1.9): the selection bar's Size popover. Width and height fields write only what was typed (or reset), in one Map.md
+// write and one undo step; the notes are not touched.
+/** Clicks Size in a fresh bar and returns the popover (null when none opened). */
+function openSize(h) {
+  const bar = h.bar();
+  const button = buttonOf(bar, 'Size ▾');
+  if (!button) return { bar, button, pop: null };
+  Object.defineProperty(button, 'parentElement', { configurable: true, get() { return this.parent; } });
+  button.fire('click');
+  return { bar, button, pop: bar.children.find(child => child.cls.includes('vam-batch-size-popover')) ?? null };
+}
+const inputs = pop => dom.findAll(pop, item => item.tag === 'input');
+const popButton = (pop, text) => dom.findAll(pop, item => item.tag === 'button' && item.text === text);
+const type = (input, value) => { input.value = value; input.fire('input'); };
+const sizes = async (h, titles) => { const map = await h.repo.readMap(MAP); return titles.map(title => { const node = map.nodes.find(n => n.id === h.named(title).id); return [title, node.width, node.height]; }); };
+
+test('B19c: mixed widths show "Mixed" and an unset height "Auto"; one width shows that width', async () => {
+  const h = await harness(SPEC);
+  await h.view.resizeCard(h.named('A').id, { width: 360 });
+  h.select(['A', 'B', 'C']);
+  const { button, pop } = openSize(h);
+  assert.ok(pop, 'the popover opens inside the selection bar'); assert.equal(button.attrs['aria-haspopup'], 'dialog');
+  const [width, height] = inputs(pop);
+  assert.equal(width.placeholder, 'Mixed'); assert.equal(width.value, '', 'nothing pre-filled');
+  assert.equal(height.placeholder, 'Auto'); assert.equal(height.value, '');
+  assert.equal(popButton(pop, 'Apply to 3 cards').length, 1); assert.equal(popButton(pop, 'Cancel').length, 1);
+  assert.equal(popButton(pop, 'Reset').length, 2, 'each field has its own Reset');
+  assert.equal(translate('zh-TW', 'ui.batch_size_mixed'), '未統一'); assert.equal(translate('zh-TW', 'ui.batch_size_auto'), '自動');
+  assert.equal(translate('zh-TW', 'ui.batch_size_apply_0', 3), '套用到 3 張');
+  h.select(['B', 'C']);
+  assert.equal(inputs(openSize(h).pop)[0].placeholder, '280', 'one width: that width');
+});
+
+test('B19c: Apply writes only the typed width to every selected card, the heights stay; one undo restores Map.md, redo writes again', async () => {
+  const h = await harness(SPEC);
+  await h.view.resizeCard(h.named('A').id, { height: 200 });
+  h.select(['A', 'B', 'C']);
+  const before = h.files(), history = h.view.history.past.length;
+  const { bar, pop } = openSize(h);
+  type(inputs(pop)[0], '400');
+  popButton(pop, 'Apply to 3 cards')[0].fire('click');
+  assert.equal(bar.children.includes(pop), false, 'Apply closes the popover');
+  await h.settled();
+  assert.deepEqual(await sizes(h, ['A', 'B', 'C', 'Root', 'A1']), [['A', 400, 200], ['B', 400, undefined], ['C', 400, undefined], ['Root', undefined, undefined], ['A1', undefined, undefined]]);
+  const after = h.files();
+  for (const [path, text] of before) if (path !== MAP) assert.equal(after.get(path), text, `${path}: notes are not written`);
+  assert.equal(h.view.history.past.length, history + 1, 'one history step');
+  await h.view.history.undo().undo();
+  assert.deepEqual(h.files(), before, 'one undo restores Map.md byte for byte');
+  await h.view.history.redo().redo();
+  assert.deepEqual(await sizes(h, ['A', 'B', 'C']), [['A', 400, 200], ['B', 400, undefined], ['C', 400, undefined]], 'redo');
+});
+
+test('B19c: Reset on height alone puts the heights back to Auto and keeps the widths; nothing typed writes nothing', async () => {
+  const h = await harness(SPEC);
+  await h.view.resizeCard(h.named('A').id, { width: 360, height: 200 });
+  h.select(['A', 'B']);
+  const held = h.files(), history = h.view.history.past.length;
+  let { pop } = openSize(h);
+  popButton(pop, 'Apply to 2 cards')[0].fire('click');
+  await h.settled();
+  assert.deepEqual(h.files(), held, 'Apply with nothing typed writes nothing'); assert.equal(h.view.history.past.length, history);
+  ({ pop } = openSize(h));
+  const [, height] = inputs(pop);
+  popButton(pop, 'Reset')[1].fire('click');
+  assert.equal(height.placeholder, 'Auto');
+  popButton(pop, 'Apply to 2 cards')[0].fire('click');
+  await h.settled();
+  assert.deepEqual(await sizes(h, ['A', 'B']), [['A', 360, undefined], ['B', undefined, undefined]]);
+  assert.equal(h.view.history.past.length, history + 1);
+});
+
+test('B19c: an AI-locked or merging card in the selection turns Size off with the group reason; neither the click nor the write entry writes', async () => {
+  const h = await harness(SPEC);
+  await h.repo.writeAiLocked(h.named('B').path, true);
+  await h.view.hydrate();
+  h.select(['A', 'B', 'C']);
+  const ids = ['A', 'B', 'C'].map(title => h.named(title).id);
+  const before = h.files(), history = h.view.history.past.length;
+  const reason = translate('en', 'ui.selection_locked_0_1', 1, 'B');
+  const { button, pop } = openSize(h);
+  assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.disabled, false); assert.equal(button.attrs.title, reason);
+  assert.equal(pop, null, 'no popover');
+  await h.view.changeSelectionSize(ids, { width: 400 });
+  assert.deepEqual(h.files(), before, 'Map.md and every note are byte-identical'); assert.equal(h.view.history.past.length, history);
+  assert.deepEqual(h.notices, [reason, reason], 'the click and the refused write each say why');
+  h.view.isMerging = id => id === h.named('C').id;
+  assert.equal(openSize(h).button.attrs.title, translate('en', 'ui.selection_locked_0_1', 2, 'B, C'));
+  await h.view.changeSelectionSize(ids, { width: 400 });
+  assert.deepEqual(h.files(), before, 'zero writes while merging');
+});
+
+test('B19c: an old AIM map has no Size button and its write entry writes nothing; the picture-book locks leave Size on', async () => {
+  const h = await harness(SPEC);
+  h.select(['A', 'C']);
+  const ids = ['A', 'C'].map(title => h.named(title).id);
+  const before = h.files();
+  h.view.map.aim = { version: 1 };
+  assert.equal(openSize(h).button, undefined, 'no Size on an AIM map');
+  assert.ok(buttonOf(h.bar(), 'Color ▾'), 'control: Color stays');
+  await h.view.changeSelectionSize(ids, { width: 400 });
+  assert.deepEqual(h.files(), before);
+  delete h.view.map.aim;
+  // A size changes neither parent, order nor another card's place: the structure lock (decision #62) leaves it on.
+  h.view.bookLock = () => ({ ai: true, structure: true });
+  const { button, pop } = openSize(h);
+  assert.equal(button.attrs['aria-disabled'], undefined); assert.ok(pop);
+  type(inputs(pop)[0], '320');
+  popButton(pop, 'Apply to 2 cards')[0].fire('click');
+  await h.settled();
+  assert.deepEqual(await sizes(h, ['A', 'B', 'C']), [['A', 320, undefined], ['B', undefined, undefined], ['C', 320, undefined]]);
+});

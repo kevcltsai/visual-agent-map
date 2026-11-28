@@ -5147,19 +5147,6 @@ export class VisualAgentMapView extends ItemView {
     if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
     return card;
   }
-  /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
-  private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
-    const menu = this.newMenu();
-    this.drawInDom(menu);
-    for (const kind of TOPIC_KINDS)
-      menu.addItem(item =>
-        item
-          .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-          .setIcon(kindIconId(kind))
-          .onClick(() => pick(kind))
-      );
-    menu.showAtMouseEvent(event);
-  }
   /** Collapse or expand every branch in one undoable change, then fit the map. `shownLevels` as in applyCollapseLevel. */
   private collapseTo(shownLevels: number | null): void {
     this.enqueue(async () => {
@@ -15410,26 +15397,38 @@ export class VisualAgentMapView extends ItemView {
     const mapCurrent = this.captureMapSession();
     const current = (): boolean => mapCurrent() && editorCurrent();
     let saved: LivingConfigSave | undefined;
+    // A refusal is reported once, below, in plain words: it is kept out of mutate(), whose own notice would show the raw code first.
+    let refused: Error | undefined;
     try {
       await this.plugin.mutate(async () => {
-        if (!current()) return;
-        if (!node) {
-          const name = values.title || aiCardTitle(values.question);
-          const found = parent ? this.mapNodeById(parent.id) : null;
-          if (parent && !found) throw new Error("changed-target-identity");
-          await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
-            prompt: joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator")),
-            current,
-            onSaved: result => {
-              saved = result;
-            }
-          });
-          return;
+        try {
+          if (!current()) return;
+          if (!node) {
+            const name = values.title || aiCardTitle(values.question);
+            const found = parent ? this.mapNodeById(parent.id) : null;
+            if (parent && !found) throw new Error("changed-target-identity");
+            await this.createNode(found ?? null, name, true, true, "topic", false, {}, afterTextId, {
+              prompt: joinPrompt(
+                values.question,
+                values.sources,
+                t("ui.ai_sources_label"),
+                t("ui.ai_sources_separator")
+              ),
+              current,
+              onSaved: result => {
+                saved = result;
+              }
+            });
+            return;
+          }
+          const target = this.mapNodeById(node.id);
+          if (!target || !current()) return;
+          saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
+        } catch (error) {
+          refused = error instanceof Error ? error : new Error(String(error));
         }
-        const target = this.mapNodeById(node.id);
-        if (!target || !current()) return;
-        saved = await this.writeAiCard(target, values, expectedPrompt, expectedConfigRevision, current);
       });
+      if (refused) throw refused;
       if (saved && !node && current()) this.closeAiCardPopover();
       return saved;
     } catch (error) {
@@ -16449,26 +16448,23 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Card settings (simplify 2026-11-26): first the look (a hypothesis's leaning and strength, colour, style, cover)
-    // and one "whole branch" checkbox; everything else waits under a folded "More". A locked card says so beside the title.
+    // Card settings (V3.3 P1.8): one flat list - a hypothesis's leaning and strength, the cover switch, type, parent,
+    // source topics, markers, link, relations (folded), branch layout and AI lock. A locked card says so beside the title.
+    // Colour, style and the whole-branch switch stay last until the toolbar's Style popover replaces them.
     const branch = { on: false };
     let repaintStrength: (() => void) | undefined;
     if (note) {
       repaintStrength = this.renderHypothesisSection(panel, node, close, "strength");
-      this.renderColorSection(panel, node, () => branch.on);
-      this.renderStyleSection(panel, node, () => branch.on);
       this.renderCoverSection(panel, node);
-      this.renderBranchToggle(panel, node, branch);
+      this.renderHypothesisSection(panel, node, close, "type", () => repaintStrength?.());
     }
-    const more = this.renderDisclosure(panel, t("ui.card_settings_more"));
-    if (note) this.renderHypothesisSection(more, node, close, "type", () => repaintStrength?.());
     // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
     let currentParent = node.parentId ?? null;
     let moveTo = (_parentId: string | null): void => {};
     const titleOf = (id: string): string =>
       this.notes.get(id)?.title ?? this.map?.nodes.find(candidate => candidate.id === id)?.path ?? "";
     const parentLabel = (): string => (currentParent ? titleOf(currentParent) : t("ui.no_parent_root_topic"));
-    const relationship = more.createDiv("vam-inspector-section vam-parent-section");
+    const relationship = panel.createDiv("vam-inspector-section vam-parent-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -16498,7 +16494,7 @@ export class VisualAgentMapView extends ItemView {
     if (note) {
       const sourcePaths = this.referenceSourcePaths(note, node.path);
       if (sourcePaths.length) {
-        const sources = more.createDiv("vam-reference-sources");
+        const sources = panel.createDiv("vam-reference-sources");
         sources.createEl("strong", { text: t("ui.source_topics") });
         for (const path of sourcePaths) {
           const sourceNode = this.map?.nodes.find(item => item.path === path),
@@ -16520,12 +16516,17 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       }
-      this.renderMarkerSection(more, node);
-      this.renderLinkSection(more, node);
+      this.renderMarkerSection(panel, node);
+      this.renderLinkSection(panel, node);
+      this.renderHypothesisSection(panel, node, close, "relations");
     }
-    if (this.branchLayoutChoices(node).length) this.renderBranchLayoutSection(more, node);
-    if (note) this.renderAiLockSection(more, node, heading);
-    if (note) this.renderAddSubtopic(more, node, close);
+    if (this.branchLayoutChoices(node).length) this.renderBranchLayoutSection(panel, node);
+    if (note) {
+      this.renderAiLockSection(panel, node, heading);
+      this.renderColorSection(panel, node, () => branch.on);
+      this.renderStyleSection(panel, node, () => branch.on);
+      this.renderBranchToggle(panel, node, branch);
+    }
     // Removing a card lives in its right-click menu; this dialog only closes.
     const actions = (host ?? panel).createDiv("vam-next-actions");
     const status = actions.createSpan({
@@ -16550,29 +16551,16 @@ export class VisualAgentMapView extends ItemView {
       status.setText(
         parentId ? t("ui.moved_under_0", this.notes.get(parentId)?.title ?? "") : t("ui.became_root_topic")
       );
+      // The same move as a drag onto a card (moveBranches): one history entry, laid out at once; the selection is kept.
       this.enqueue(async () => {
-        if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
-        await this.mapChange(map => {
-          if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
-          if (parentId) map.nodes = this.onScreenSiblingOrder(map);
-          const moving = map.nodes.find(n => n.id === node.id)!;
-          moving.parentId = parentId;
-          delete moving.afterTextId;
-          if (parentId) map.nodes = this.moveLastAmongSiblings(map.nodes, parentId, node.id);
-          const branch = new Set([node.id, ...descendants(map.nodes, node.id)]);
-          const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
-          if (parent) {
-            parent.collapsed = false;
-            this.arrangeBranch(map, parent.id, branch, undefined);
-          } else {
-            this.arrangeTree(map, node.id, branch);
-          }
-        });
+        const target = parentId ? this.map?.nodes.find(n => n.id === parentId) : null;
+        if (target === undefined) return;
+        await this.moveBranches([node], target, false);
       });
     };
   }
-  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
-  private renderDisclosure(parent: HTMLElement, label: string): HTMLElement {
+  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. */
+  private renderDisclosure(parent: HTMLElement, label: string): { toggle: HTMLButtonElement; body: HTMLElement } {
     const group = parent.createDiv("vam-disclosure");
     const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
     toggle.type = "button";
@@ -16588,7 +16576,7 @@ export class VisualAgentMapView extends ItemView {
       toggle.toggleClass("is-open", open);
       body.hidden = !open;
     });
-    return body;
+    return { toggle, body };
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -16865,18 +16853,6 @@ export class VisualAgentMapView extends ItemView {
     onClosed?: () => void
   ): void {
     this.relationEditor.openAnchorRelationEditor(ref, onChanged, onClosed);
-  }
-  /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
-  private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
-    if (!this.relationsEnabled()) return;
-    const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
-    addChild.addEventListener("click", event => {
-      event.stopPropagation();
-      this.openKindMenu(event, kind => {
-        close?.();
-        this.whenEditing(() => this.enqueue(() => this.addNode(node, undefined, true, true, kind)));
-      });
-    });
   }
   /** One 18px swatch for a type: the card's own outline (TOPIC_KIND_SHAPES), stroked in the type's colour. */
   private kindSwatch(parent: HTMLElement, kind: TopicKind): void {
@@ -17447,8 +17423,6 @@ export class VisualAgentMapView extends ItemView {
       choice.setAttr("aria-pressed", String(off));
       if (off) choice.addClass("is-pressed");
       if (focus) choice.focus();
-      if (!off && this.coverPictureOf(node))
-        this.button(group, t("ui.card_settings_cover_frame"), () => this.openCoverFrameEditor(node));
     };
     paint();
   }
@@ -17652,12 +17626,18 @@ export class VisualAgentMapView extends ItemView {
     panel: HTMLElement,
     node: MapNode,
     close?: () => void,
-    part: "all" | "strength" | "type" = "all",
+    part: "all" | "strength" | "type" | "relations" = "all",
     onKind?: () => void
   ): (() => void) | undefined {
     if (!this.relationsEnabled()) return;
-    const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
-    const body = section.createDiv("vam-hypothesis-body");
+    const section = panel.createDiv(
+      part === "relations"
+        ? "vam-inspector-section vam-relations-section"
+        : "vam-inspector-section vam-hypothesis-section"
+    );
+    // Card settings fold the relations away, closed, behind "Relations (N)".
+    const fold = part === "relations" ? this.renderDisclosure(section, "") : null;
+    const body = (fold?.body ?? section).createDiv("vam-hypothesis-body");
     const relationFocus: RelationListFocus = { editByPair: new Map(), anchorEdit: new Map(), addControl: null };
     const paint = (
       focusStrength = false,
@@ -17668,7 +17648,13 @@ export class VisualAgentMapView extends ItemView {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       section.hidden = part === "strength" && currentKind !== "hypothesis";
-      if (part !== "strength") {
+      if (fold) {
+        const count =
+          (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id).length +
+          anchorRelationsForTopic(this.map?.canvasItems ?? [], node.id).length;
+        fold.toggle.setText(t("ui.relations_count_0", String(count)));
+      }
+      if (part === "all" || part === "type") {
         body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
         const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
         kinds.setAttr("role", "group");
@@ -17691,7 +17677,7 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      if (currentKind === "hypothesis" && part !== "type") {
+      if (currentKind === "hypothesis" && (part === "all" || part === "strength")) {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "none",
           currentLeaning = this.argumentVerdictOf(node.id) ?? this.notes.get(node.id)?.hypothesisLeaning ?? "undecided";
         body.createEl("strong", {
@@ -17747,7 +17733,7 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      if (part !== "strength")
+      if (part === "all" || part === "relations")
         this.relationEditor.renderList(
           body,
           node,

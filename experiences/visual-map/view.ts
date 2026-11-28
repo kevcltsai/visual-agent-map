@@ -7933,13 +7933,37 @@ export class VisualAgentMapView extends ItemView {
           y: Math.max(...kids.map(kid => kid.y + (this.cardHeightOf(kid.id) ?? DEFAULT_CARD_HEIGHT))) - parent!.y + 24
         }
       : null;
+    const at = { x: below?.x ?? (parent?.width ?? CARD_WIDTH) + 40, y: (below?.y ?? 0) + siblings * 90 };
+    if (parent) {
+      // Then down, past whatever card or reference it would cover (a reference counts as 260×60, its widest).
+      const byId = new Map(shown.map(node => [node.id, node]));
+      const boxes = [
+        ...shown.map(node => ({
+          x: node.x,
+          y: node.y,
+          w: node.width ?? CARD_WIDTH,
+          h: this.cardHeightOf(node.id) ?? DEFAULT_CARD_HEIGHT
+        })),
+        ...visibleKnowledgeRefs(map).flatMap(item => {
+          const owner = byId.get(item.parentId);
+          return owner ? [{ x: owner.x + item.x, y: owner.y + item.y, w: 260, h: 60 }] : [];
+        })
+      ];
+      for (let step = 0; step <= boxes.length; step++) {
+        const x = parent.x + at.x,
+          y = parent.y + at.y;
+        const hit = boxes.find(box => x < box.x + box.w && box.x < x + 260 && y < box.y + box.h && box.y < y + 60);
+        if (!hit) break;
+        at.y = hit.y + hit.h + 24 - parent.y;
+      }
+    }
     const ref: KnowledgeRef = {
       id: `ref-${crypto.randomUUID()}`,
       mapId: target.mapId,
       nodeId: target.nodeId,
       parentId,
-      x: below?.x ?? (parent?.width ?? CARD_WIDTH) + 40,
-      y: (below?.y ?? 0) + siblings * 90,
+      x: at.x,
+      y: at.y,
       pathHint: probe.mapPath
     };
     const paths = this.knownRefPaths();

@@ -217,10 +217,11 @@ test('F01 FAIL 2: a real mouse drag on a reference card moves the reference, not
   const h = await harness();
   await h.settle(); h.view.paintKnowledgeRefs();
   const rig = pointerRig(h);
-  const before = { ...h.view.map.viewport };
+  const before = { ...h.view.map.viewport }, steps = h.view.history.past.length;
   const { panned } = rig.sequence([[100, 100], [130, 110], [160, 120]]);
   await h.settle(); await h.settle();
   assert.equal(panned, false, 'no canvas pan');
+  assert.equal(h.view.history.past.length, steps + 1, 'the drag is one undo step');
   assert.deepEqual({ x: h.view.map.viewport.x, y: h.view.map.viewport.y }, { x: before.x, y: before.y }, 'the canvas stays put');
   const ref = (await h.saved()).knowledgeRefs.find(r => r.id === 'ref-a');
   assert.deepEqual({ x: ref.x, y: ref.y }, { x: 360, y: 20 }, 'the reference moved by the drag');
@@ -238,4 +239,29 @@ test('F01 FAIL 3: a pasted reference sits clear of the parent card\'s existing c
   const kidBox = { x: kid.x, y: kid.y, w: kid.width ?? 280, h: kid.height ?? 180 };
   const overlap = refBox.x < kidBox.x + kidBox.w && kidBox.x < refBox.x + refBox.w && refBox.y < kidBox.y + kidBox.h && kidBox.y < refBox.y + refBox.h;
   assert.equal(overlap, false, `reference at ${JSON.stringify(refBox)} overlaps the child card at ${JSON.stringify(kidBox)}`);
+});
+
+test('F01 review: a pasted reference avoids every visible card, also a later sibling\'s children in the same column', async () => {
+  const h = await harness();
+  // Root's sibling B sits below Root, and B's child b1 sits right where "below Root's lowest child" would put the reference.
+  const b = await h.repo.createNote('B', 'gpt-6-luna', h.view.map, HOST, 'workspace');
+  Object.assign(b, { parentId: null, x: 80, y: 300 }); h.view.map.nodes.push(b);
+  const b1 = await h.repo.createNote('B one', 'gpt-6-luna', h.view.map, HOST, 'inherited');
+  Object.assign(b1, { parentId: b.id, x: 400, y: 300 }); h.view.map.nodes.push(b1);
+  await h.repo.saveMap(HOST, h.view.map); h.view.map = await h.repo.readMap(HOST); await h.view.hydrate();
+  (await h.viewOf(OTHER)).copyAsKnowledgeRef({ id: h.ids.original });
+  h.view.pasteKnowledgeRef(h.ids.root); await h.settle(); await h.settle();
+  const saved = await h.saved();
+  const root = saved.nodes.find(n => n.id === h.ids.root), kid = saved.nodes.find(n => n.id === h.ids.kid);
+  const ref = saved.knowledgeRefs.find(r => r.parentId === h.ids.root);
+  const refBox = { x: root.x + ref.x, y: root.y + ref.y, w: 260, h: 60 };
+  const others = [
+    ...saved.nodes.map(n => ({ name: n.title ?? n.id, x: n.x, y: n.y, w: n.width ?? 280, h: n.height ?? 180 })),
+    ...saved.knowledgeRefs.filter(r => r !== ref).map(r => { const p = saved.nodes.find(n => n.id === r.parentId); return { name: r.id, x: p.x + r.x, y: p.y + r.y, w: 260, h: 60 }; })
+  ];
+  for (const o of others) {
+    const overlap = refBox.x < o.x + o.w && o.x < refBox.x + refBox.w && refBox.y < o.y + o.h && o.y < refBox.y + refBox.h;
+    assert.equal(overlap, false, `reference at ${JSON.stringify(refBox)} overlaps ${o.name} at ${JSON.stringify(o)}`);
+  }
+  assert.ok(kid, 'the child card is still there');
 });

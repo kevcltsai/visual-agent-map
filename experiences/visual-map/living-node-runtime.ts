@@ -95,7 +95,8 @@ export interface LivingRoundPort {
   onAiLatestDropped?(id: string, reason: string): void;
   log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
-  onStart(total: number): void;
+  /** `total` is the cards to process; `excluded` (blocked before the start, locked targets) settle at once outside it. */
+  onStart(total: number, excluded: readonly string[]): void;
   /** Trial cards are an execution boundary: skipped themselves, used frozen when valid, otherwise blocking their dependents. */
   onTrialBoundary?(boundary: { skipped: string[]; frozen: string[]; blocked: string[] }): void;
   onRunning(id: string): void;
@@ -700,7 +701,7 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     };
     const dispatch = async (): Promise<void> => {
       if (!current()) return;
-      port.onStart(plan.order.length + plan.blocked.size + plan.lockedTargets.length);
+      port.onStart(plan.order.length, [...plan.blocked.keys(), ...plan.lockedTargets]);
       results = await executeLivingPlan(plan, {
         signal: lease.signal,
         inspect: async id => {

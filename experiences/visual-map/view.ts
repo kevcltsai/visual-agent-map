@@ -243,7 +243,8 @@ import {
   livingWithoutFence,
   renderLivingPreview
 } from "./living-node-markdown";
-import { livingReasonKey } from "./living-node-state";
+import { livingReasonKey, livingRoundStats } from "./living-node-state";
+import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -634,6 +635,7 @@ import {
   type AiCardStatus,
   type PromptBatchState,
   type PromptNoteRef,
+  type PromptOutcome,
   type PromptRunEntry
 } from "./prompt-run";
 import {
@@ -767,6 +769,23 @@ const INTERACTIVE_SELECTOR = [
   '[contenteditable="true"]',
   '[role="button"]'
 ].join(",");
+/** The last count of a Run All / Run Card round: only the classes that happened; "done" is changed + no-change only. */
+function livingRunSummary(outcome: PromptOutcome): string {
+  const parts = [
+    outcome.done &&
+      (outcome.noChange
+        ? t("ui.ai_run_summary_done_0_1", outcome.done, outcome.noChange)
+        : t("ui.ai_run_summary_done_0", outcome.done)),
+    outcome.failed && t("ui.ai_run_summary_failed_0", outcome.failed),
+    outcome.blocked && t("ui.ai_run_summary_blocked_0", outcome.blocked),
+    outcome.cancelled && t("ui.ai_run_summary_cancelled_0", outcome.cancelled),
+    outcome.skipped && t("ui.ai_run_summary_skipped_0", outcome.skipped),
+    outcome.reused && t("ui.ai_run_summary_reused_0", outcome.reused)
+  ].filter((part): part is string => !!part);
+  if (!parts.length) return "";
+  const list = parts.join(t("ui.ai_run_summary_separator"));
+  return t(outcome.stopped ? "ui.ai_run_summary_stopped_0" : "ui.ai_run_summary_finished_0", list);
+}
 /** True when a key event came from a text control, where the field owns the key (undo, Backspace, typing). */
 function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
@@ -6523,6 +6542,7 @@ export class VisualAgentMapView extends ItemView {
     const button = parent.createEl("button", { cls: "vam-run-all", attr: { type: "button" } });
     if (state) {
       const done = Math.min(state.finished + 1, state.total);
+      const known = !!state.planned && state.total > 0;
       const ring = createSvg("svg");
       ring.setAttribute("viewBox", "0 0 20 20");
       ring.addClass("vam-run-all-ring");
@@ -6536,12 +6556,13 @@ export class VisualAgentMapView extends ItemView {
       arc.setAttribute("cy", "10");
       arc.setAttribute("r", "8");
       arc.setAttribute("pathLength", "100");
-      arc.setAttribute("stroke-dasharray", `${Math.round((state.finished / Math.max(1, state.total)) * 100)} 100`);
+      arc.setAttribute("stroke-dasharray", `${known ? Math.round((state.finished / state.total) * 100) : 0} 100`);
       arc.addClass("vam-run-all-arc");
       ring.appendChild(track);
       ring.appendChild(arc);
       button.appendChild(ring);
-      button.createSpan({ cls: "vam-run-all-count", text: `${done} / ${state.total}` });
+      // "n / N" only once the round is planned and has cards to process.
+      if (known) button.createSpan({ cls: "vam-run-all-count", text: `${done} / ${state.total}` });
       button.addClass("is-running");
       button.setAttr("aria-label", t("ui.ai_run_all_stop"));
       button.setAttr("title", t("ui.ai_run_all_stop"));
@@ -21039,7 +21060,13 @@ export class VisualAgentMapView extends ItemView {
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
     const trialSkipped = new Set<string>();
-    const tally = { done: 0, failed: 0, blocked: 0 };
+    // Every card's result this round, for the last count; `excluded` settle at once and are not progress.
+    const results = new Map<string, LivingSettlement>();
+    let excluded = new Set<string>();
+    const outcomeOf = (stopped: boolean): PromptOutcome => {
+      const { success, ...rest } = livingRoundStats(results.values(), stopped);
+      return { done: success, ...rest, stopped };
+    };
     let warnedOptionalSources = false;
     const viewCurrent = (): boolean => session() && !this.plugin.repo.isDisposed();
     const current = (): boolean => viewCurrent() && !run.signal.aborted;
@@ -21049,6 +21076,8 @@ export class VisualAgentMapView extends ItemView {
       switch (event.kind) {
         case "start":
           state.total = event.total;
+          state.planned = true;
+          excluded = new Set(event.excluded);
           this.promptRuns.delete(mapPath);
           for (const id of trialSkipped) this.setPromptStatus(mapPath, id, "idle", failureReasons.get(id));
           if (current()) this.render();
@@ -21070,12 +21099,10 @@ export class VisualAgentMapView extends ItemView {
           if (event.skipped.length && viewCurrent()) new Notice(t("ui.living_node_trial_boundary"));
           break;
         case "settled": {
-          const result = event.result;
-          state.finished = Math.min(state.total, state.finished + 1);
+          const result = event.result as LivingSettlement;
+          results.set(event.id, result);
+          if (!excluded.has(event.id)) state.finished = Math.min(state.total, state.finished + 1);
           const usable = result === "changed" || result === "no-change" || result === "reused";
-          if (usable) tally.done++;
-          else if (result === "failed") tally.failed++;
-          else if (result === "blocked") tally.blocked++;
           this.setPromptStatus(
             mapPath,
             event.id,
@@ -21087,13 +21114,10 @@ export class VisualAgentMapView extends ItemView {
         case "done":
           // The skip line belongs to the batch only; the trial card is not stamped, so nothing else clears it.
           for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
-          state.outcome = { ...tally, stopped: run.signal.aborted || event.error === true };
+          state.outcome = outcomeOf(run.signal.aborted || event.error === true);
           if (session()) {
-            if (state.outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", state.outcome.done, state.total));
-            else if (state.outcome.failed || state.outcome.blocked)
-              new Notice(
-                t("ui.ai_run_finished_0_1_2", state.outcome.done, state.outcome.failed, state.outcome.blocked)
-              );
+            const summary = livingRunSummary(state.outcome);
+            if (summary) new Notice(summary);
           }
           finish(state.outcome);
           break;
@@ -21103,7 +21127,7 @@ export class VisualAgentMapView extends ItemView {
     state.leave = () => {
       unsubscribe();
       for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
-      state.outcome ??= { ...tally, stopped: true };
+      state.outcome ??= outcomeOf(true);
       finish(state.outcome);
     };
     if (existing) {
@@ -21154,7 +21178,7 @@ export class VisualAgentMapView extends ItemView {
                 );
             },
             confirm: (model, work) => this.plugin.confirmAiUsage(model, work),
-            onStart: total => run.emit({ kind: "start", total }),
+            onStart: (total, excluded) => run.emit({ kind: "start", total, excluded }),
             onTrialBoundary: boundary => run.emit({ kind: "trial", ...boundary }),
             onRunning: id => run.emit({ kind: "running", id }),
             onSettled: (id, result) => run.emit({ kind: "settled", id, result }),
@@ -25178,12 +25202,10 @@ export class VisualAgentMapView extends ItemView {
           work?.controller.signal
         );
         if (!outcome || outcome.stopped) return skipped("ui.map_chat_skip_stopped");
-        if (outcome.failed || outcome.blocked)
-          return {
-            status: "failed",
-            reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
-          };
-        return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
+        if (outcome.failed || outcome.blocked) return { status: "failed", reason: livingRunSummary(outcome) };
+        if (outcome.done) return { status: "done" };
+        // Every card was already current: nothing ran, so it is not "done".
+        return skipped(outcome.reused ? "ui.map_chat_skip_living_current" : "ui.prompt_run_nothing");
       }
       case "research_standard": {
         const researchTargets = targets.length ? targets : this.chatTargetIds(selection.ids);

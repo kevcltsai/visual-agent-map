@@ -117,7 +117,7 @@ export function promptSourceLinks(prompt: string): string[] {
 }
 
 export interface PromptOutcome {
-  /** Topics that ran and wrote. */
+  /** Topics that ran and wrote: changed or no-change only, never reused. */
   done: number;
   /** Topics whose own run failed. */
   failed: number;
@@ -125,6 +125,14 @@ export interface PromptOutcome {
   blocked: number;
   /** True when Stop (or closing the view) ended the batch early. */
   stopped: boolean;
+  /** The no-change part of `done`. */
+  noChange: number;
+  /** Cancelled, or not reached in a stopped round. */
+  cancelled: number;
+  /** Not run in a round that was not stopped (a locked or trial card). */
+  skipped: number;
+  /** Already current: nothing ran. */
+  reused: number;
 }
 
 export interface PromptRunDeps {
@@ -150,7 +158,16 @@ export interface PromptRunDeps {
  * caller's run is aborted) and nothing new starts.
  */
 export async function runPromptItems(items: readonly PromptPlanItem[], deps: PromptRunDeps): Promise<PromptOutcome> {
-  const outcome: PromptOutcome = { done: 0, failed: 0, blocked: 0, stopped: false };
+  const outcome: PromptOutcome = {
+    done: 0,
+    failed: 0,
+    blocked: 0,
+    stopped: false,
+    noChange: 0,
+    cancelled: 0,
+    skipped: 0,
+    reused: 0
+  };
   let finished = 0;
   for (const item of items) {
     if (deps.signal.aborted) {
@@ -222,6 +239,8 @@ export interface PromptBatchState {
   mapPath: string;
   controller: AbortController;
   total: number;
+  /** Set once the round is planned: until then `total` is not known and no "n / N" shows. */
+  planned?: boolean;
   /** Topics settled so far. */
   finished: number;
   /** The name of the topic running now. */

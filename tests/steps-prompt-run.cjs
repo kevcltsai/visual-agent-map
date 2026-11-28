@@ -101,7 +101,7 @@ test('runPromptItems: post-order calls, statuses, outcome counts; a failing chil
   assert.equal(statuses.get('a').status, 'blocked'); assert.equal(statuses.get('a').reason, 'below: A1');
   assert.equal(statuses.get('root').status, 'blocked', 'the grandparent is stuck too');
   assert.match(statuses.get('a1').reason, /boom/);
-  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false });
+  eq(outcome, { done: 3, failed: 1, blocked: 2, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 });
 
 test('runPromptItems: Stop returns the running card to idle and starts nothing new', async () => {
@@ -345,7 +345,7 @@ test('Run All: one call per unlocked AI card, dependency order, optional web on 
     assert.equal(call.options.task.webSearchOnly, true);
     assert.equal(call.options.task.optionalWebSearch, true);
   }
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   for (const [key] of TREE) assert.equal(stamp(h, key).result, 'ok');
   assert.match(h.raw('root'), /> Result: root/);
 });
@@ -499,6 +499,72 @@ test('toolbar Run all: disabled with a hint without an AI card; progress "n / N"
   button.click();
   await h.done();
   assert.equal(h.view.promptBatch.outcome.stopped, true);
+});
+
+// ---- V3.3 P3.6: n / N only once the round is planned, and the last count (D2-2) ---------------------------------------
+const MISSING = { prompt: 'Find facts\nSources: [[Missing]]' };
+const countOf = h => {
+  const bar = element('div');
+  h.view.renderRunAllButton(bar);
+  const button = find(bar, i => i.tag === 'button' && i.cls?.includes('is-running'));
+  return { button, count: button && find(button, i => i.cls?.includes('vam-run-all-count'))?.text };
+};
+
+test('D2-2 progress: no "n / N" before the round is planned; N leaves out cards blocked before the start and locked cards', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING], ['lk', null, { locked: true }]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  const early = countOf(h);
+  assert.ok(early.button, 'the stop button shows at once');
+  assert.equal(early.count, undefined, 'no "0 / 0" before the total is known');
+  await until(() => h.calls.length === 1);
+  assert.equal(countOf(h).count, '1 / 5', 'the blocked "solo" and the locked "lk" are not in N, nor counted as finished');
+  h.view.stopPromptBatch(); await h.done();
+  const g = await harness([['solo', null, MISSING]]);
+  await g.runAll(); await g.done();
+  assert.equal(g.view.promptBatch.total, 0, 'nothing to process: N is 0, so no "0 / 0" either');
+  assert.equal(g.view.promptBatch.outcome.blocked, 1);
+});
+
+test('D2-2 last count: the end notice lists each class that happened; "done" is changed + no-change only, reused is not done', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.fail.add('leaf1');
+  await h.runAll(); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 2, failed: 1, blocked: 3, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 2 done, 1 failed, 3 blocked');
+  h.plan.fail.delete('leaf1');
+  h.view.promptBatch = undefined;
+  await h.runAll(); await h.done();
+  // Run All forces every card: the two that were already done run again and write nothing new.
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 1, stopped: false, noChange: 2, cancelled: 0, skipped: 0, reused: 0 });
+  assert.equal(h.notices.at(-1), 'Run finished: 5 done (2 with no change), 1 blocked');
+  // Run Card on root: its valid dependencies are reused, and reused is not done.
+  h.view.promptBatch = undefined;
+  h.view.startPromptRun([h.node('root').id]); await h.done();
+  eq(h.view.promptBatch.outcome, { done: 1, failed: 0, blocked: 0, stopped: false, noChange: 1, cancelled: 0, skipped: 0, reused: 4 });
+  assert.equal(h.notices.at(-1), 'Run finished: 1 done (1 with no change), 4 already up to date');
+  const s = await harness(TREE);
+  s.plan.hang.add('leaf1');
+  await s.runAll();
+  await until(() => s.calls.length === 1);
+  s.view.stopPromptBatch(); await s.done();
+  eq(s.view.promptBatch.outcome, { done: 0, failed: 0, blocked: 0, stopped: true, noChange: 0, cancelled: 5, skipped: 0, reused: 0 });
+  assert.equal(s.notices.at(-1), 'Run stopped: 5 cancelled');
+});
+
+test('D2-2 chat: a run_living_* round where every card was already current says so, not "done"', async () => {
+  const h = await harness(TREE);
+  const first = await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] });
+  eq(first, { status: 'done' });
+  // The planner forces its targets today, so a whole reused round comes from the round's count, stubbed here.
+  const counts = { done: 0, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0 };
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 5 });
+  for (const [action, nodeIds] of [['run_living_all', []], ['run_living_card', [h.node('side').id]]]) {
+    const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action, nodeIds });
+    eq(outcome, { status: 'skipped', reason: 'already up to date, nothing was run' }, action);
+  }
+  h.view.runLivingBatch = async () => ({ ...counts, reused: 0 });
+  eq(await h.view.runChatSelection({ kind: 'run_map_action', action: 'run_living_all', nodeIds: [] }), { status: 'skipped', reason: 'There are no Prompt topics to run.' });
 });
 
 // ---- menus ------------------------------------------------------------------------------------------------------------
@@ -1001,8 +1067,8 @@ test('two views: a second view joins the running progress instead of starting or
   assert.ok(second.promptRunning());
   h.plan.go();
   await until(() => h.view.promptBatch.outcome && second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
-  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
+  eq(h.view.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.equal(h.calls.length, 5);
   assert.equal(second.promptBatch.finished, second.promptBatch.total);
   assert.equal(h.status('root'), 'done');
@@ -1051,7 +1117,7 @@ test('closing a view only unsubscribes; the last view closing cancels the run', 
   assert.equal(second.promptBatch.outcome, undefined, 'the run goes on for the remaining view');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
 
   const g = await harness(TREE);
   const other = await g.otherView();
@@ -1151,7 +1217,7 @@ test('a view that switches maps leaves the run; the round it started keeps readi
   const before = h.raw('side');
   h.plan.go();
   await until(() => second.promptBatch.outcome);
-  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false });
+  eq(second.promptBatch.outcome, { done: 5, failed: 0, blocked: 0, stopped: false, noChange: 0, cancelled: 0, skipped: 0, reused: 0 });
   assert.ok(reads.length > 0 && keys.length > 0, 'the round read sources and checked busy after the switch');
   eq([...new Set(reads)], [MAP], 'sources come from the original map');
   eq([...new Set(keys)], ['multi-research:' + MAP], 'the busy check is for the original map');

@@ -362,6 +362,18 @@ test('send: a retry reads the picture again (origin carries only the id)', async
   assert.match(h.control.requests[1].imageDataUrl, /^data:image\//);
 });
 
+test('send (G05): a retry after switching to a model without image input is still refused by the read backstop: nothing read, no AI call, a Notice', async () => {
+  const h = await harness();
+  h.select('img1');
+  await h.send('place anchors');
+  const origin = h.chat.transcriptList[0].origin;
+  h.control.caps = {};
+  await h.view.sendMapChat(origin);
+  assert.equal(h.control.reads, 1, 'only the first send read the picture');
+  assert.equal(h.control.requests.length, 1, 'the retry made no AI call');
+  assert.deepEqual(plain(h.notices), ['This model cannot read pictures. Pick another model or select no picture. Nothing was sent.']);
+});
+
 // ---- plan and mode -------------------------------------------------------------------------------------------------
 
 test('plan: "show me first" offers a plan for anchors and writes nothing; Apply writes them; the picture and its data URL are in no card, line or transcript', async () => {

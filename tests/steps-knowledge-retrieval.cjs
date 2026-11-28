@@ -243,6 +243,20 @@ test('view: more than five candidates and budget left - one call, the first five
   assert.equal(none.calls.sent.length, 0, 'no budget: nothing is sent');
 });
 
+test('view: the ranking request carries the chat\'s own language, the one the chat request uses', async () => {
+  const { outputLanguageForMap, mapChatLanguageSources } = load('core/content-language.ts');
+  for (const [mapTitle, uiLang, text] of [['pstack 技能解析', 'zh-TW', 'Please explain the Starter plan'], ['Starter plan overview', 'en', '請說明 Starter 方案']]) {
+    const want = outputLanguageForMap({ title: mapTitle }, uiLang, ...mapChatLanguageSources(text));
+    const ai = fakeAiCalls(reversed);
+    const h = await harness({ many: 8, aiCalls: ai });
+    await h.view.findPastCards(MESSAGE, live(), want);
+    assert.equal(ai.calls.sent[0].contentLanguage, want, text);
+  }
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view, /findPastCards\(message, signal, chatLanguage\)/, 'the send passes the language it computed');
+  assert.match(view, /contentLanguage: chatLanguage,/, 'and the chat request uses that same value');
+});
+
 test('view: no budget or a failed ranking keeps the word order, shows no error, and the record line says so', async () => {
   const plain = await harness({ many: 8, aiCalls: fakeAiCalls(reversed) });
   plain.plugin.aiCalls = undefined; // not even an AI object: still no error

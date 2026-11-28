@@ -3096,7 +3096,11 @@ export class VisualAgentMapView extends ItemView {
    * Past cards of other maps whose words match the message (P4.1): the in-memory index, never this map's own cards and never one the
    * user already added. A failure to read leaves the message as it was.
    */
-  private async findPastCards(message: string, signal: AbortSignal): Promise<CorpusCard[]> {
+  private async findPastCards(
+    message: string,
+    signal: AbortSignal,
+    contentLanguage?: ContentLanguage
+  ): Promise<CorpusCard[]> {
     const map = this.map;
     this.foundByWords = false;
     if (!map || !this.plugin.knowledgeIndex) return [];
@@ -3112,7 +3116,7 @@ export class VisualAgentMapView extends ItemView {
         },
         RETRIEVAL_CANDIDATE_LIMIT
       );
-      return await this.rankPastCards(candidates, message, signal);
+      return await this.rankPastCards(candidates, message, signal, contentLanguage);
     } catch {
       this.foundByWords = false;
       return [];
@@ -3123,7 +3127,12 @@ export class VisualAgentMapView extends ItemView {
    * AI-locked now is dropped before anything is sent), and one AI call, counted against this turn's call budget, orders them by meaning
    * from their titles and short excerpts. A refused budget, a failed call or a stop keeps the order of the exact step.
    */
-  private async rankPastCards(candidates: CorpusCard[], message: string, signal: AbortSignal): Promise<CorpusCard[]> {
+  private async rankPastCards(
+    candidates: CorpusCard[],
+    message: string,
+    signal: AbortSignal,
+    contentLanguage?: ContentLanguage
+  ): Promise<CorpusCard[]> {
     this.foundByWords = false;
     if (candidates.length <= RETRIEVAL_RESULT_LIMIT) return candidates;
     const resolved = await resolveKnowledgeRefs(
@@ -3160,7 +3169,7 @@ export class VisualAgentMapView extends ItemView {
             message,
             cards: usable.map(item => ({ id: item.id, title: item.card.title, excerpt: item.excerpt })),
             language: settings.language,
-            contentLanguage: outputLanguageForMap(this.map, settings.language, ...mapChatLanguageSources(message)),
+            ...(contentLanguage ? { contentLanguage } : {}),
             model: settings.cliModel,
             reasoning: normalizeReasoningLevel(settings.cliReasoning)
           },
@@ -24270,7 +24279,12 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
-    const otherMapCards = await this.takeOtherMapCards(await this.findPastCards(message, signal), message);
+    // The chat's own language, worked out once: the past-card ranking and the request below use the same value.
+    const chatLanguage = outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message));
+    const otherMapCards = await this.takeOtherMapCards(
+      await this.findPastCards(message, signal, chatLanguage),
+      message
+    );
     const foundNow = this.foundSent;
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
@@ -24333,7 +24347,7 @@ export class VisualAgentMapView extends ItemView {
       context,
       ...(imageDataUrl ? { imageDataUrl } : {}),
       language: settings.language,
-      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
+      contentLanguage: chatLanguage,
       model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };

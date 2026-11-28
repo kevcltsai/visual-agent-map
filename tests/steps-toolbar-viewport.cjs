@@ -1029,7 +1029,7 @@ test('F5: with the + circle gone, no CSS rule is left for it and the row keeps i
 test('card tool rows: stay clickable below 60% zoom, and with several cards selected only focus shows one', () => {
   const view = bareView({});
   const toggles = [];
-  view.viewportEl = { toggleClass: (name, on) => toggles.push([name, on]) };
+  view.viewportEl = { toggleClass: (name, on) => { if (name !== 'is-zoom-overview' && name !== 'is-zoom-detail') toggles.push([name, on]); } }; // the B12 tier classes have their own test
   view.stageEl = { style: { setProperty() {} } };
   view.map = { viewport: { x: 0, y: 0, zoom: 0.59 } };
   view.applyStageTransform();

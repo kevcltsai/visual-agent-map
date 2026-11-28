@@ -236,11 +236,11 @@ const mdOf = (comparison, extra = {}) => comparisonMarkdown(buildComparisonTable
 test('F08b markdown: the table is the displayed one (unknown cells, unit-split headers, row titles) as a GFM table', () => {
   const md = mdOf({ attributes: [{ name: 'Fee' }, { name: 'Discount' }], rows: [row('a', { value: '290', unit: 'NT$' }, '15%'), row('b', { value: '12', unit: 'US$' }, null), row('zz', '5', '1%')] });
   assert.equal(md, [
-    '|  | Fee (NT$) | Fee (US$) | Fee (no unit) | Discount (%) |',
+    '|  | Fee \\(NT\\$\\) | Fee \\(US\\$\\) | Fee \\(no unit\\) | Discount \\(\\%\\) |',
     '| --- | --- | --- | --- | --- |',
-    '| A Co | 290 | Unknown | Unknown | 15% |',
+    '| A Co | 290 | Unknown | Unknown | 15\\% |',
     '| B Co | Unknown | 12 | Unknown | Unknown |',
-    '| (gone) | Unknown | Unknown | 5 | 1% |'
+    '| \\(gone\\) | Unknown | Unknown | 5 | 1\\% |'
   ].join('\n'));
 });
 
@@ -250,12 +250,64 @@ test('F08b markdown (counter-example): pipes and line breaks in cells, titles an
   assert.equal(comparisonCell('x\\'), 'x\\\\');
   assert.equal(comparisonCell('x\\|y'), 'x\\\\\\|y');
   assert.equal(comparisonCell('  pad  '), 'pad');
+  assert.equal(comparisonCell('NT$290'), 'NT\\$290');
+  assert.equal(comparisonCell('a<b>&c'), 'a&lt;b&gt;&amp;c');
   const md = comparisonMarkdown(buildComparisonTable({ attributes: [{ name: 'A|B' }], rows: [row('a', 'x|y\nz')] }, { titleOf: () => 'T|1', unknown: 'U' }), { header: c => c.name, gone: 'g', notes: [] });
   const lines = md.split('\n');
   assert.equal(lines.length, 3);
   for (const line of lines) assert.equal(line.replace(/\\\|/g, '').split('|').length, 4, `exactly 3 cells in: ${line}`);
   assert.match(lines[2], /T\\\|1 \| x\\\|y<br>z/);
 });
+
+const INJECTIONS = [
+  '<!-- vam-living-node:begin v1 -->',
+  '<!-- vam-living-node:begin v1 -->x<!-- vam-living-node:end v1 -->',
+  '<!-- visual-agent-map:detail:end -->',
+  '<!-- vam-book-open-issues -->',
+  '[[x]]',
+  '![[x]]',
+  '<img src=x onerror=alert(1)>',
+  '<iframe src=x></iframe>',
+  '%%hidden%%',
+  '<!-- c -->',
+  'a<br>b'
+];
+
+test('F08b markdown (counter-example): every cell, header, unit and title is literal text; no marker, link, embed, comment or tag survives', () => {
+  const { splitLivingNodeRegion } = load('core/living-node-region.ts');
+  for (const bad of INJECTIONS) {
+    const md = comparisonMarkdown(buildComparisonTable({ attributes: [{ name: bad, unit: bad }], rows: [row('a', { value: bad, unit: bad })] }, { titleOf: () => bad, unknown: 'U' }), { header: c => comparisonColumnHeader(c, headerWords), gone: bad, notes: [] });
+    assert.equal(md.split('\n').length, 3, `still a 3-line table: ${bad}`);
+    assert.equal(splitLivingNodeRegion(md).region, '', `no region: ${bad}`);
+    assert.doesNotMatch(md.replace(/<br>/g, '').replace(/\\./g, ''), /[[\]%!<>]/, `every punctuation is escaped and only our own br remains: ${bad}`);
+  }
+  assert.equal(comparisonCell('a<br>b'), 'a&lt;br&gt;b', 'a model-written <br> is text, not a line break');
+  assert.equal(comparisonCell('NT$290'), 'NT\\$290', 'a normal value reads the same in reading mode');
+});
+
+for (const where of ['cell', 'attribute name', 'unit', 'card title']) {
+  test(`F08b save (counter-example): hostile text in a ${where} saves a plain card (no Living Node region, no link, no embed, no comment)`, async () => {
+    const { splitLivingNodeRegion } = load('core/living-node-region.ts');
+    for (const bad of INJECTIONS) {
+      const h = await harness();
+      await h.view.hydrate();
+      if (where === 'card title') h.view.notes.get(h.ids.a).title = bad;
+      const cmp = {
+        attributes: [{ name: where === 'attribute name' ? bad : 'Fee', ...(where === 'unit' ? { unit: bad } : {}) }],
+        rows: [row(h.ids.a, { value: where === 'cell' ? bad : 'NT$290', ...(where === 'unit' ? { unit: bad } : {}) }), row(h.ids.b, '5')]
+      };
+      const result = await h.view.saveComparison(cmp, anchorOf(h));
+      assert.equal(result.ok, true, `saved: ${bad}`);
+      const made = (await h.saved()).nodes.find(n => n.id === result.nodeId);
+      const text = await h.app.vault.read(h.app.vault.getAbstractFileByPath(made.path));
+      assert.equal(splitLivingNodeRegion(text).region, '', `no region: ${bad}`);
+      const table = text.split('\n').filter(line => line.startsWith('|')).join('\n');
+      const plainText = table.replace(/\\./g, '');
+      assert.doesNotMatch(plainText, /<!--|\[\[|!\[|<img|<iframe|%%/, `no unescaped marker in the table: ${bad}`);
+      assert.doesNotMatch(text, /<img|<iframe|%%hidden|<!-- c -->|<!--\s*vam-book-open-issues/, `none in the whole note: ${bad}`);
+    }
+  });
+}
 
 test('F08b markdown: the cut notes the chat shows follow the table, as plain italic lines', () => {
   const md = mdOf({ attributes: [{ name: 'Fee' }], rows: [row('a', '1')] }, { notes: ['3 more rows are not shown', '2 more *attributes*\nnot shown'] });
@@ -290,8 +342,8 @@ test('F08b save: one click makes exactly one new top-level card with the table a
   const clash = others.filter(n => { const p = rect(n), q = rect(made); return p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b; });
   assert.deepEqual(plain(clash.map(n => n.id)), [], 'placed clear of every other card (P1.4)');
   const text = await h.app.vault.read(h.app.vault.getAbstractFileByPath(made.path));
-  assert.match(text, /\| {2}\| Fee \(NT\$\) \| Fee \(US\$\) \| Discount \(%\) \|/);
-  assert.match(text, /\| Ribeye \| 290 \| Unknown \| 15% \|/);
+  assert.match(text, /\| {2}\| Fee \\\(NT\\\$\\\) \| Fee \\\(US\\\$\\\) \| Discount \\\(\\%\\\) \|/);
+  assert.match(text, /\| Ribeye \| 290 \| Unknown \| 15\\% \|/);
   assert.match(text, /\| Filet \| Unknown \| 12 \| Unknown \|/);
   for (const key of ['a', 'b']) {
     const node = mapBefore.nodes.find(n => n.id === h.ids[key]);
@@ -370,7 +422,7 @@ test('F08b save: a comparison whose cards are gone from the map still saves its 
   assert.equal(result.ok, true);
   const made = (await h.saved()).nodes.find(n => n.id === result.nodeId);
   const text = await h.app.vault.read(h.app.vault.getAbstractFileByPath(made.path));
-  assert.match(text, /\(card no longer on the map\) \| 2 \|/);
+  assert.match(text, /\\\(card no longer on the map\\\) \| 2 \|/);
   assert.equal((text.match(/\[\[[^\]]*Notes\/[^\]]*\]\]/g) ?? []).length >= 1, true);
 });
 

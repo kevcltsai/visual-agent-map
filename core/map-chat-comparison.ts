@@ -98,12 +98,18 @@ export function comparisonColumnHeader(
       : column.name;
 }
 
-/** One Markdown table cell: pipes escaped, line breaks written as `<br>`, so a cell never breaks the row. */
+/**
+ * One Markdown table cell, always literal text (the model reads untrusted cards): every ASCII punctuation character except `& < >`
+ * is backslash-escaped, then `& < >` become entities, and only then are line breaks written as our own `<br>`.
+ * So no marker, link, embed, comment or HTML tag the model wrote can survive in the note.
+ */
 export function comparisonCell(text: string): string {
   return text
     .trim()
-    .replace(/\\(?=\||$)/g, "\\\\")
-    .replace(/\|/g, "\\|")
+    .replace(/[!"#$%'()*+,\-./:;=?@[\\\]^_`{|}~]/g, "\\$&")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/\r\n?|\n/g, "<br>");
 }
 
@@ -115,10 +121,12 @@ export function comparisonMarkdown(
   table: ComparisonTable,
   options: { header: (column: ComparisonColumn) => string; gone: string; notes: string[] }
 ): string {
-  const row = (cells: string[]): string => `| ${cells.map(comparisonCell).join(" | ")} |`;
+  // Not ai/markdown-intake.ts: every cell is one line and escaped to literal text by comparisonCell, so there is nothing left to sanitize.
+  const line = (cells: string[]): string => `| ${cells.join(" | ")} |`;
+  const row = (cells: string[]): string => line(cells.map(comparisonCell));
   const lines = [
     row(["", ...table.columns.map(options.header)]),
-    row(["---", ...table.columns.map(() => "---")]),
+    line(["---", ...table.columns.map(() => "---")]),
     ...table.rows.map(entry => row([entry.title ?? options.gone, ...entry.cells]))
   ];
   return [lines.join("\n"), ...options.notes.map(note => `*${note.replace(/[*\r\n\s]+/g, " ").trim()}*`)].join("\n\n");

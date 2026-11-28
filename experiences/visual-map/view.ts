@@ -24899,7 +24899,10 @@ export class VisualAgentMapView extends ItemView {
         names.length
           ? t("ui.map_chat_comparison_card_title_0", names.join(t("ui.map_chat_count_separator")))
           : t("ui.new_topic")
-      ).trim() || t("ui.new_topic");
+      )
+        // The title becomes the note's H1: no tag, comment or hidden-text marker from a source card's title may reach it.
+        .replace(/[<>]|%%/g, "")
+        .trim() || t("ui.new_topic");
     const repo = this.plugin.repo;
     const parent = map.nodes.find(node => !node.parentId) ?? null;
     // The model and settings come from the map's first top-level topic, like any other new top-level card.

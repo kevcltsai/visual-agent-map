@@ -387,6 +387,8 @@ export class Repository {
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
   private disposed = false;
   private readonly noteWriteScope = new AsyncLocalStorage<NoteWriteGuard>();
+  /** Marks a viewport write: one started before unload still lands after dispose (only that Map.md viewport). */
+  private readonly viewportScope = new AsyncLocalStorage<true>();
   /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
   private readonly writtenCoordinates = new Map<string, string>();
 
@@ -395,7 +397,7 @@ export class Repository {
     readonly settings: Settings,
     recovery?: VaultWriteRecovery
   ) {
-    const stopped = (): boolean => this.disposed;
+    const stopped = (): boolean => this.disposed && !this.viewportScope.getStore();
     const message = (): string => this.message("error.unloaded_write_not_performed");
     const recoveryErrors = {
       conflict: () => new Error(this.message("error.recovery_write_conflict")),
@@ -1776,6 +1778,16 @@ export class Repository {
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
    * the map cannot overwrite fields it did not change (for example, research state saved meanwhile).
    */
+  /** Pan/zoom: writes only the viewport. Unload sends the last one, which may finish after dispose; no other write may. */
+  updateViewport(path: string, viewport: MapDocument["viewport"]): Promise<MapDocument> {
+    if (this.disposed) return Promise.reject(new Error(this.message("error.unloaded_write_not_performed")));
+    return this.viewportScope.run(true, () =>
+      this.updateMap(path, map => {
+        map.viewport = viewport;
+      })
+    );
+  }
+
   async updateMap(
     path: string,
     change: (map: MapDocument) => void,

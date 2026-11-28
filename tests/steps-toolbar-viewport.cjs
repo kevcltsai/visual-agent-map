@@ -79,7 +79,7 @@ function makeView(timers = { setTimeout, clearTimeout }) {
   Object.assign(view, {
     map: { nodes, viewport: { x: 40, y: 40, zoom: 1 } },
     cardEls: new Map(), summaryEls: new Map(),
-    plugin: { repo: { updateMap: async (...args) => { writes.push(args); } }, mutate: async fn => { await fn(); } },
+    plugin: { repo: { updateMap: async (...args) => { writes.push(args); }, updateViewport(path, viewport) { return this.updateMap(path, map => { map.viewport = viewport; }); } }, mutate: async fn => { await fn(); } },
     viewportEl: { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) },
     stageEl: { style: {}, querySelector: () => null },
     contentEl: { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ top: 12, bottom: 50 }) } : null) },
@@ -200,6 +200,31 @@ test('B viewport debounce: closing the view writes the last pending viewport at 
   clock.advance(1000);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(writes.length, 1, 'the cancelled timer writes nothing more');
+});
+
+test('B viewport debounce: unload writes a viewport still in its wait, and one already queued behind other work', async () => {
+  const clock = manualClock();
+  const waiting = makeView(clock);
+  waiting.view.plugin.viewportsPending = new Set();
+  waiting.view.map.viewport = { x: 1, y: 2, zoom: 1.25 };
+  waiting.view.saveViewport();
+  assert.ok(waiting.view.plugin.viewportsPending.has(waiting.view));
+  waiting.view.flushViewportOnUnload();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(waiting.writes.length, 1, 'the debounced viewport is written at unload');
+  assert.equal(waiting.view.plugin.viewportsPending.size, 0);
+  clock.advance(1000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(waiting.writes.length, 1, 'its cancelled timer writes nothing more');
+
+  const queued = makeView(clock);
+  queued.view.plugin.mutate = () => new Promise(() => {}); // the queue is busy and never reaches this write
+  queued.view.saveViewport();
+  clock.advance(500);
+  assert.equal(queued.view.viewportQueued, true);
+  queued.view.flushViewportOnUnload();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(queued.writes.length, 1, 'the queued viewport is written at unload, not lost behind the queue');
 });
 
 test('viewport persistence stamps only the map whose path was written', async () => {

@@ -26,6 +26,34 @@ integrationTest('repository: unload after a vault process is queued refuses the 
   assert.equal(contents.get(n.path), original);
 });
 
+integrationTest('B viewport debounce: a viewport write started before unload lands; a note write held at the same moment is still refused', async () => {
+  const { repo, app, contents } = fixture('en');
+  const n = await topicNote(repo);
+  const mapPath = await repo.createMap('Viewport map');
+  const original = contents.get(n.path);
+  let entered = 0, release;
+  const bothHeld = new Promise(resolve => { release = resolve; });
+  let ready;
+  const started = new Promise(resolve => { ready = resolve; });
+  const process = app.vault.process;
+  app.vault.process = async (file, change) => {
+    if (++entered === 2) ready();
+    await bothHeld;
+    return process(file, change);
+  };
+  const viewport = repo.updateViewport(mapPath, { x: 11, y: 22, zoom: 1.75 });
+  const note = assert.rejects(repo.updateNote(n.path, { summary: 'late result' }));
+  await started;
+  repo.dispose();
+  release();
+  await viewport;
+  await note;
+  assert.equal(contents.get(n.path), original, 'the other write is refused after dispose');
+  const saved = (await repo.readMap(mapPath)).viewport;
+  assert.deepEqual({ ...saved }, { x: 11, y: 22, zoom: 1.75 }, 'the last viewport is not lost');
+  await assert.rejects(repo.updateViewport(mapPath, { x: 0, y: 0, zoom: 1 }), 'a viewport write started after dispose is refused');
+});
+
 integrationTest('repository write recovery wraps both existing topic notes and Map.md through Vault.process', async () => {
   const { repo, app, contents } = fixture('en');
   const n = await topicNote(repo, 'Protected');

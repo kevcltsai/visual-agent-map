@@ -286,3 +286,41 @@ test('A7: the empty canvas hides "✦ AI root" in presentation and under bookLoc
     assert.equal(findAll(box, i => i.classes.has('vam-empty-add')).length, 1);
   }
 });
+
+// ---- B28-x: a name field that is hidden (zoom overview used to hide it) or never gets focus must not block later adds ----
+test('B28-x: a new name field that never gets focus is closed after the grace period, so ten clicks in a row add ten cards', async () => {
+  const h = await harness(); realAdd(h);
+  const other = { tag: 'body' };
+  const real = h.view.createInlineNameInput.bind(h.view);
+  // The field is "hidden" like under is-zoom-overview before the fix: not visible, focus stays elsewhere.
+  h.view.createInlineNameInput = (...a) => { const input = real(...a); input.ownerDocument = { activeElement: other }; input.checkVisibility = () => false; return input; };
+  const before = h.view.map.nodes.length;
+  for (let i = 1; i <= 10; i++) {
+    click(addBtn(h, 'leaf'));
+    await until(() => h.view.map.nodes.length === before + i);
+    assert.ok(h.view.inlineName?.created, `card ${i}: naming is open right after the add`);
+    click(addBtn(h, 'leaf')); await tick();
+    assert.equal(h.view.map.nodes.length, before + i, `card ${i}: a click while the first is still being named adds nothing`);
+    for (let w = 0; w < 40 && h.view.inlineName; w++) await new Promise(r => setTimeout(r, 25));
+    assert.equal(h.view.inlineName, null, `card ${i}: the stuck name field was closed`);
+  }
+  assert.equal(h.view.map.nodes.length, before + 10);
+  assert.equal(h.view.inlineNameGuardTimer, null, 'no timer left');
+});
+
+test('B28-x: a focused, visible name field is left alone; closing the view clears the guard timer', async () => {
+  const h = await harness(); realAdd(h);
+  const real = h.view.createInlineNameInput.bind(h.view);
+  let field;
+  h.view.createInlineNameInput = (...a) => { field = real(...a); field.ownerDocument = { get activeElement() { return field; } }; field.checkVisibility = () => true; return field; };
+  click(addBtn(h, 'leaf'));
+  await until(() => h.view.inlineName?.created && h.view.inlineNameGuardTimer !== null);
+  await new Promise(r => setTimeout(r, 450));
+  assert.ok(h.view.inlineName?.created, 'still naming after the grace period');
+  h.view.render();
+  assert.notEqual(h.view.inlineNameGuardTimer, null, 'a repaint re-arms the guard');
+  h.view.onClose?.();
+  await Promise.resolve();
+  await new Promise(r => setTimeout(r, 450));
+  assert.ok(h.view.inlineName?.created, 'closed view: the guard did not fire');
+});

@@ -193,6 +193,10 @@ export interface MapChatPlanCard {
   cancelLabel?: string;
   /** Nothing in the plan can be applied: only the refusals and the cancel button are shown. */
   noApply?: boolean;
+  /** The plan's new cards are drawn as a dashed preview on the canvas: the line said next to the buttons. */
+  previewNote?: string;
+  /** Why Apply cannot be pressed now (read when the card is drawn and when Apply is pressed); null or absent = it can. */
+  blocked?(): string | null;
   apply(): void;
   cancel(): void;
 }
@@ -1693,6 +1697,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       )}`
     );
     this.host.stateChanged?.();
+  }
+  /** Draws the waiting plan card again, so its Apply follows whether the map can be written now (a presentation began or ended). */
+  refreshPlan(): void {
+    if (this.pendingPlan()) this.renderLog();
   }
   /** The plan card still waiting for an answer, if any. */
   pendingPlan(): MapChatPlanCard | null {
@@ -3247,6 +3255,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.plan
         ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
+      // Whether Apply is greyed (and why) is part of the row, so redrawing after a presentation or a map switch follows it.
+      message.plan?.state === "pending" && !message.plan.noApply ? `blocked:${message.plan.blocked?.() ?? ""}` : "",
       message.choices
         ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}`
         : "",
@@ -3707,6 +3717,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
     if (diff) this.buildPlanDiff(card, diff);
     if (!folds) addDetail();
+    // One gate for every plan: when the plan's map is not the open one or is read-only here, Apply is greyed and says why.
+    const blocked = plan.noApply ? null : (plan.blocked?.() ?? null);
+    if (blocked !== null) card.createDiv({ cls: "vam-map-chat-plan-blocked", text: blocked });
+    else if (plan.previewNote) card.createDiv({ cls: "vam-map-chat-plan-note", text: plan.previewNote });
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = plan.noApply
       ? undefined
@@ -3715,6 +3729,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           text: plan.applyLabel ?? t("ui.map_chat_plan_apply"),
           attr: { type: "button" }
         });
+    if (apply && blocked !== null) apply.disabled = true;
     const cancel = buttons.createEl("button", {
       cls: "vam-map-chat-plan-cancel",
       text: plan.cancelLabel ?? t("ui.map_chat_plan_cancel"),

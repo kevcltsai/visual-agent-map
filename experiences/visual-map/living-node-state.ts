@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isSearchNotPerformed } from "../../ai/search-not-performed";
 import type { TranslationKey } from "../../i18n";
 import type { LivingSettlement, LivingValidity } from "./living-node-execution";
 
@@ -29,6 +30,7 @@ const CODE = /^[a-z][a-z0-9-]{1,63}$/;
 export function livingFailureCode(error: unknown): string {
   const message = String((error as { message?: unknown } | null)?.message ?? error);
   const code = CODE.test(message) ? message : "";
+  if (isSearchNotPerformed(error)) return "web-required";
   if (/required-web|forbidden-web|web-check|missing-search-decision/.test(code)) return "web-required";
   if (/too-large|^living-section-ambiguous/.test(code)) return "range-too-large";
   if (/^(stale-base|changed-knowledge|stale-or-cancelled-write|changed-[a-z-]+)$/.test(code)) return "source-changed";

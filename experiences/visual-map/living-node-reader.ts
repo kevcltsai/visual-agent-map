@@ -1,5 +1,6 @@
 import { Component, ItemView, MarkdownRenderer, type TFile, type WorkspaceLeaf } from "obsidian";
 import { getUiLanguage, t } from "../../i18n";
+import type { LivingChangeSummary } from "./living-node-changes";
 import { localizeLivingReader, readableDate } from "./living-node-markdown";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 
@@ -10,6 +11,7 @@ export class LivingReaderView extends ItemView {
   private owner?: string;
   private preview = "";
   private warnings: readonly string[] = [];
+  private changes?: LivingChangeSummary;
   private tab: "official" | "trial" = "trial";
   private invalid = false;
   private generation = 0;
@@ -40,13 +42,15 @@ export class LivingReaderView extends ItemView {
     preview: string,
     owner: string,
     warnings: readonly string[] = [],
-    invalid = false
+    invalid = false,
+    changes?: LivingChangeSummary
   ): Promise<void> {
     this.file = file;
     this.owner = owner;
     this.preview = preview;
     this.warnings = [...warnings];
     this.invalid = invalid;
+    this.changes = changes;
     this.tab = "trial";
     await this.paint();
   }
@@ -70,6 +74,27 @@ export class LivingReaderView extends ItemView {
     this.owner = undefined;
     this.preview = "";
     this.warnings = [];
+    this.changes = undefined;
+  }
+
+  private paintChanges(host: HTMLElement, changes: LivingChangeSummary): void {
+    const lines: string[] = [];
+    if (changes.firstRun) lines.push(t("ui.living_node_changes_first_run"));
+    else {
+      const counts = [
+        ["ui.living_node_changes_added_0", changes.added],
+        ["ui.living_node_changes_supplemented_0", changes.supplemented],
+        ["ui.living_node_changes_corrected_0", changes.corrected],
+        ["ui.living_node_changes_disputed_0", changes.disputed],
+        ["ui.living_node_changes_invalidated_0", changes.invalidated]
+      ] as const;
+      for (const [key, ids] of counts) if (ids.length) lines.push(t(key, ids.length));
+      if (changes.outputUpdated) lines.push(t("ui.living_node_changes_output_updated"));
+      if (!lines.length) lines.push(t("ui.living_node_changes_none"));
+    }
+    const box = host.createDiv({ cls: "vam-living-reader-changes", attr: { role: "status" } });
+    box.createEl("strong", { text: t("ui.living_node_changes_title") });
+    for (const line of lines) box.createDiv({ text: line });
   }
 
   private async paint(): Promise<void> {
@@ -104,6 +129,7 @@ export class LivingReaderView extends ItemView {
       });
       for (const warning of this.warnings)
         host.createDiv({ cls: "vam-living-reader-banner", text: warning, attr: { role: "status" } });
+      if (this.changes) this.paintChanges(host, this.changes);
     }
     const outline = host.createDiv("vam-living-reader-outline");
     const content = host.createDiv("vam-living-reader-content");

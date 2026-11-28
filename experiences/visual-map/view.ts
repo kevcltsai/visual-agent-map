@@ -222,7 +222,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import type { ReferenceGroup } from "../../ai/reference-materials";
+import { sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -614,6 +614,7 @@ import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } f
 import { sessionFor, type ClipRecord } from "./clipboard-session";
 import { cutSourceProblem, ledgerFor, sameApartFromStamps } from "./cross-map-history";
 import { computeTidy, mapSignature, overlayPositions, type TidyPreview } from "./layout-preview";
+import { planGhostLayout, type PlanGhostEdge, type PlanGhostRelation, type PlanGhostSpec } from "./chat-plan-preview";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -1345,9 +1346,16 @@ export class VisualAgentMapView extends ItemView {
   private set chatPlanToken(value: number) {
     this.mapChatConversation.planToken = value;
   }
-  /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
-  private chatPreview: { token: number; anchors: { imageId: string; x: number; y: number; note: string }[] } | null =
-    null;
+  /**
+   * The anchors the pending plan would place, drawn as dashed dots, and (`cards`, absent = none) the cards it would make, drawn as
+   * dashed cards; it only counts while its token is the plan's current one. Drawn only: never in map.nodes, the file or the history.
+   */
+  private chatPreview: {
+    token: number;
+    anchors: { imageId: string; x: number; y: number; note: string }[];
+    cards?: PlanGhostSpec[];
+    relations?: PlanGhostRelation[];
+  } | null = null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
    * the empty canvas, Esc, deleting the image and opening another map. Only the id is kept; the picture is read when a message is sent.
@@ -2238,6 +2246,8 @@ export class VisualAgentMapView extends ItemView {
     if (current.raf !== null) window.cancelAnimationFrame(current.raf);
     this.noteLoad = null;
     this.removeLoadStatus();
+    // A plan waiting for Apply was greyed "notes still loading": redraw it now that they are loaded.
+    this.chat?.refreshPlan();
   }
   private scheduleLoadBatch(load: NoteLoadState): void {
     if (load.raf !== null) return;
@@ -3009,6 +3019,8 @@ export class VisualAgentMapView extends ItemView {
       returnEl: card ? null : active
     };
     this.applyPresentationMarks(true);
+    // A waiting plan cannot be applied while the map is presented: its Apply greys and says why.
+    this.chat?.refreshPlan();
   }
   /** One key of a presentation. Everything it does is in memory: the camera follows, nothing is saved. */
   private stepPresentation(action: PresentationAction): void {
@@ -3136,6 +3148,7 @@ export class VisualAgentMapView extends ItemView {
     this.presentationBarEl?.remove();
     this.presentationBarEl = null;
     for (const card of this.cardEls.values()) card.toggleClass("is-presenting", false);
+    this.chat?.refreshPlan();
     if (!restore || this.closed || !this.map) return;
     const ids = new Set(this.map.nodes.map(node => node.id));
     const previous = this.selection.state.selected,
@@ -7943,15 +7956,48 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t(probe?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
       return;
     }
-    const parent = this.canvasNodes().find(node => node.id === parentId);
+    const shown = this.canvasNodes();
+    const parent = shown.find(node => node.id === parentId);
     const siblings = visibleKnowledgeRefs(map).filter(ref => ref.parentId === parentId).length;
+    // Right of the parent card; when it already has child cards, in their column just below the lowest one.
+    const kids = parent ? shown.filter(node => node.parentId === parentId) : [];
+    const below = kids.length
+      ? {
+          x: Math.min(...kids.map(kid => kid.x)) - parent!.x,
+          y: Math.max(...kids.map(kid => kid.y + (this.cardHeightOf(kid.id) ?? DEFAULT_CARD_HEIGHT))) - parent!.y + 24
+        }
+      : null;
+    const at = { x: below?.x ?? (parent?.width ?? CARD_WIDTH) + 40, y: (below?.y ?? 0) + siblings * 90 };
+    if (parent) {
+      // Then down, past whatever card or reference it would cover (a reference counts as 260×60, its widest).
+      const byId = new Map(shown.map(node => [node.id, node]));
+      const boxes = [
+        ...shown.map(node => ({
+          x: node.x,
+          y: node.y,
+          w: node.width ?? CARD_WIDTH,
+          h: this.cardHeightOf(node.id) ?? DEFAULT_CARD_HEIGHT
+        })),
+        ...visibleKnowledgeRefs(map).flatMap(item => {
+          const owner = byId.get(item.parentId);
+          return owner ? [{ x: owner.x + item.x, y: owner.y + item.y, w: 260, h: 60 }] : [];
+        })
+      ];
+      for (let step = 0; step <= boxes.length; step++) {
+        const x = parent.x + at.x,
+          y = parent.y + at.y;
+        const hit = boxes.find(box => x < box.x + box.w && box.x < x + 260 && y < box.y + box.h && box.y < y + 60);
+        if (!hit) break;
+        at.y = hit.y + hit.h + 24 - parent.y;
+      }
+    }
     const ref: KnowledgeRef = {
       id: `ref-${crypto.randomUUID()}`,
       mapId: target.mapId,
       nodeId: target.nodeId,
       parentId,
-      x: (parent?.width ?? CARD_WIDTH) + 40,
-      y: siblings * 90,
+      x: at.x,
+      y: at.y,
       pathHint: probe.mapPath
     };
     const paths = this.knownRefPaths();
@@ -8319,11 +8365,73 @@ export class VisualAgentMapView extends ItemView {
       if (image) this.paintAnchorPreview(el, image, image.path.split("/").pop() ?? image.path);
     }
   }
-  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots off the canvas. */
+  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots and dashed cards off the canvas. */
   private clearChatPreview(): void {
     if (!this.chatPreview) return;
     this.chatPreview = null;
     this.syncAnchorPreview();
+    this.paintPlanGhosts();
+  }
+  /**
+   * Draws the cards the pending plan would make as dashed cards in their own layer of the stage (V3.3 E3), replacing what was drawn
+   * before. The layer is not a card, an edge or a canvas item: the export, the search, the drag and the keyboard never see it, and it
+   * takes no pointer. Titles are untrusted and go in as text.
+   */
+  private paintPlanGhosts(): void {
+    const stage = this.stageEl;
+    if (!stage) return;
+    for (const old of Array.from(stage.querySelectorAll(".vam-plan-ghosts"))) old.remove();
+    const preview = this.chatPreview;
+    if ((!preview?.cards?.length && !preview?.relations?.length) || preview.token !== this.chatPlanToken || !this.map)
+      return;
+    const shown = this.canvasNodes();
+    const boxes = new Map(
+      shown.map(node => {
+        const el = this.cardEls.get(node.id);
+        return [
+          node.id,
+          {
+            x: node.x,
+            y: node.y,
+            width: el?.offsetWidth || node.width || CARD_WIDTH,
+            height: el?.offsetHeight || node.height || CARD_HEIGHT_MIN
+          }
+        ] as const;
+      })
+    );
+    const layout = planGhostLayout(
+      preview.cards ?? [],
+      boxes,
+      parentId => shown.flatMap(node => (node.parentId === parentId ? [boxes.get(node.id)!] : [])),
+      preview.relations ?? []
+    );
+    if (!layout.cards.length && !layout.relations.length) return;
+    const layer = stage.createDiv("vam-plan-ghosts");
+    layer.setAttr("aria-hidden", "true");
+    // Each line is a dashed rule turned from one end to the other (plain boxes: nothing the edge layer reads).
+    const rule = (edge: PlanGhostEdge, cls: string): void => {
+      const dx = edge.to.x - edge.from.x,
+        dy = edge.to.y - edge.from.y;
+      const line = layer.createDiv(cls);
+      line.style.left = `${edge.from.x}px`;
+      line.style.top = `${edge.from.y}px`;
+      line.style.width = `${Math.round(Math.hypot(dx, dy))}px`;
+      line.style.transform = `rotate(${Math.round((Math.atan2(dy, dx) * 180 * 100) / Math.PI) / 100}deg)`;
+    };
+    for (const edge of layout.edges) rule(edge, "vam-plan-ghost-edge");
+    for (const edge of layout.relations) rule(edge, "vam-plan-ghost-edge is-relation");
+    for (const card of layout.cards) {
+      const el = layer.createDiv(card.more ? "vam-plan-ghost is-more" : "vam-plan-ghost");
+      el.style.left = `${card.x}px`;
+      el.style.top = `${card.y}px`;
+      el.style.width = `${card.width}px`;
+      el.style.minHeight = `${card.height}px`;
+      el.createEl("small", { cls: "vam-plan-ghost-label", text: t("ui.map_chat_ghost_label") });
+      el.createDiv({
+        cls: "vam-plan-ghost-title",
+        text: card.more ? t("ui.map_chat_ghost_more_0", card.more) : card.title
+      });
+    }
   }
   /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
   private async deleteAnchor(imageId: string, anchorId: string): Promise<void> {
@@ -13058,6 +13166,7 @@ export class VisualAgentMapView extends ItemView {
       },
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
+      titles: ids => ids.map(id => this.notes.get(id)?.title ?? id).join(t("ui.list_separator")),
       isArgumentCard: id => this.isArgumentCard(id),
       stylesEditable: !!node && this.markersEditable(node),
       aiRunning: id => this.aiStatusOf(id) === "running",
@@ -13699,6 +13808,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderCanvasItems();
     this.renderTidyPreview(canvas);
     this.paintKnowledgeRefs();
+    this.paintPlanGhosts();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -16328,7 +16438,8 @@ export class VisualAgentMapView extends ItemView {
                   renderLivingPreview(trial.result),
                   viewSession,
                   currentTrial,
-                  warnings
+                  warnings,
+                  trial.changes
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 if (shown && currentTrial()) watchTrial(prepared);
@@ -20605,7 +20716,7 @@ export class VisualAgentMapView extends ItemView {
     for (const { action, availability } of entries) {
       if (action.id === "finish-selection") addMore();
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
-      const reasonText = availability.ok ? "" : t(availability.reasonKey);
+      const reasonText = availability.ok ? "" : t(availability.reasonKey, ...(availability.reasonArgs ?? []));
       const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
         if (reasonText) new Notice(reasonText);
         else action.run(context, {});
@@ -21476,22 +21587,39 @@ export class VisualAgentMapView extends ItemView {
       [...this.selection.state.multiSelected]
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
-    const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
+    const cardNames = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
     const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
+      // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
+      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      const refs = this.recombinedRefs(nodes);
+      const found = refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
+            () => new Map<string, RefResolution>()
+          )
+        : new Map<string, RefResolution>();
+      const listed = new Map<string, RefResolution>();
+      const refNames = refs.flatMap(ref => {
+        const resolution = found.get(ref.id);
+        const title = referenceTitle(resolution);
+        if (!title || !resolution) return [];
+        listed.set(ref.id, resolution);
+        return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
+      });
+      const names = [...cardNames, ...refNames];
       const dialog = new NextStepModal(
         this.app,
         this.plugin,
         (options, direction, failed, accepted, observer) =>
-          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
+          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer, undefined, listed),
         {
           names,
           initialTitle:
             pending?.title ??
-            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
+            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), cardNames),
           defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
           background: this.backgroundHooks(this.selectionTaskKey()),
           fields: {
@@ -21564,7 +21692,9 @@ export class VisualAgentMapView extends ItemView {
     failed: (message: string) => void,
     accepted: () => void,
     observer?: SynthesisObserver,
-    errorSink?: (error: unknown) => void
+    errorSink?: (error: unknown) => void,
+    /** The references the dialog named, as it read them; only these are sent. Without it they are read at run time. */
+    listedRefs?: ReadonlyMap<string, RefResolution>
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
@@ -21575,6 +21705,17 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.ai_locked_notice"));
       return;
     }
+    // The result is written as a new card, so a read-only map or a source an AI merge holds refuses it before any AI call.
+    // Read-only is what the card actions call it: a presentation, or notes still loading.
+    if (this.presentation || this.notesLoading()) {
+      failed(t("ui.synthesis_readonly"));
+      return;
+    }
+    if (sources.some(node => this.isMerging(node.id))) {
+      failed(t("ui.merge_locked"));
+      return;
+    }
+    const refs = this.recombinedRefs(sources);
     const mapId = this.map.id;
     let draftContext: TaskContext | undefined;
     await this.plugin.topicRuns.startSelectionSynthesis(this, {
@@ -21589,7 +21730,7 @@ export class VisualAgentMapView extends ItemView {
       mapId,
       changed: () => this.render(),
       model: () => this.selectionModel(sources),
-      readSources: (mode, language) => this.topicReferenceGroup(sources, mode, { language }),
+      readSources: (mode, language) => this.recombinationGroup(sources, refs, mode, language, listedRefs),
       startProgress: model => {
         return this.startTaskProgress(this.taskProgressKey("integration"), model);
       },
@@ -21755,6 +21896,46 @@ export class VisualAgentMapView extends ItemView {
       documents
     };
   }
+  /** The visible read-only references hanging on the given cards (P4.6: they are synthesized with them). */
+  private recombinedRefs(sources: readonly Pick<MapNode, "id">[]): KnowledgeRef[] {
+    if (!this.map) return [];
+    const ids = new Set(sources.map(node => node.id));
+    return visibleKnowledgeRefs(this.map).filter(ref => ids.has(ref.parentId));
+  }
+  /**
+   * What a selection synthesis reads (P4.6): the selected cards, then the originals of their references, read from the vault
+   * now (an original that cannot be used is left out). Each document carries its card id and its note's revision, so the new
+   * card cites every original by id, path and revision. Reads only.
+   */
+  private async recombinationGroup(
+    sources: MapNode[],
+    refs: readonly KnowledgeRef[],
+    mode: "strong" | "summary",
+    language?: ContentLanguage,
+    resolved?: ReadonlyMap<string, RefResolution>
+  ): Promise<ReferenceGroup> {
+    const found =
+      resolved ??
+      (refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO())
+        : new Map<string, RefResolution>());
+    const cited: { id: string; path: string }[] = sources.map(node => ({ id: node.id, path: node.path }));
+    for (const ref of refs) {
+      const resolved = found.get(ref.id);
+      if (resolved?.ok && !cited.some(item => item.path === resolved.notePath))
+        cited.push({ id: ref.nodeId, path: resolved.notePath });
+    }
+    const group = await this.topicReferenceGroup(cited, mode, { language });
+    const vault = this.app.vault;
+    const documents = await Promise.all(
+      group.documents.map(async (document, index) => {
+        const file = vault.getAbstractFileByPath(document.path);
+        if (!(file instanceof TFile)) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        return { ...document, nodeId: cited[index].id, rev: sourceRevision(await vault.read(file)) };
+      })
+    );
+    return { ...group, documents };
+  }
   private async saveIntegratedNode(
     title: string,
     sources: MapNode[],
@@ -21776,10 +21957,12 @@ export class VisualAgentMapView extends ItemView {
       task.state !== "applying"
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    const latest = await this.topicReferenceGroup(
+    // The references are taken again: one added or removed since the run started changes the sources, so nothing is saved.
+    const latest = await this.recombinationGroup(
       sources,
+      this.recombinedRefs(sources),
       task.options.synthesisContent === "summary" ? "summary" : "strong",
-      { language: task.options.outputLanguage }
+      task.options.outputLanguage
     );
     if (
       JSON.stringify(latest.documents) !== task.sourceContent ||
@@ -21807,7 +21990,8 @@ export class VisualAgentMapView extends ItemView {
           ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
-          sourcePaths: sources.map(source => source.path),
+          // Every note it was read from, the references' originals included.
+          sourcePaths: latest.documents.map(document => document.path),
           status: "completed",
           ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
         },
@@ -22297,6 +22481,7 @@ export class VisualAgentMapView extends ItemView {
         target.closest(".vam-boundary-label") ||
         target.closest(".vam-summary") ||
         target.closest(".vam-summary-text") ||
+        target.closest(".vam-knowledge-ref") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
       )
@@ -23305,11 +23490,16 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       chain: () => this.chatChainRunner,
       plans: () => this.chatRecordSession.plans,
-      showPreview: (token, anchors) => {
-        this.chatPreview = anchors.length ? { token, anchors } : null;
+      showPreview: (token, anchors, cards, relations = []) => {
+        this.chatPreview =
+          anchors.length || cards.length || relations.length
+            ? { token, anchors, ...(cards.length ? { cards } : {}), ...(relations.length ? { relations } : {}) }
+            : null;
         this.syncAnchorPreview();
+        this.paintPlanGhosts();
       },
       clearPreview: () => this.clearChatPreview(),
+      applyBlock: anchor => this.chatPlanBlock(anchor),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
@@ -23668,6 +23858,17 @@ export class VisualAgentMapView extends ItemView {
   }
   private releaseChatTask(): void {
     this.mapChatConversation.releaseChatTask();
+  }
+  /**
+   * The one gate of a plan's Apply (V3.3 E3): the reason it cannot be applied now, or null. Its map is not the open one (stale), or
+   * the map is read-only here: presented, or its notes still loading. Read when the card is drawn and again just before the write.
+   */
+  private chatPlanBlock(anchor: { path: string; id: string | undefined }): string | null {
+    if (this.closed || !this.map || this.path !== anchor.path || this.map.id !== anchor.id)
+      return t("ui.map_chat_plan_blocked_stale");
+    if (this.presentation) return t("ui.map_chat_plan_blocked_presenting");
+    if (this.notesLoading()) return t("ui.map_chat_plan_blocked_loading");
+    return null;
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {

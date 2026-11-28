@@ -644,6 +644,7 @@ import {
   cardActionKind,
   shortcutKeysFor,
   titleKeyFor,
+  type CardAction,
   type CardActionContext,
   type CardActionHost,
   type CardActionId,
@@ -679,6 +680,7 @@ import {
   type MapAiMode
 } from "./ai-mode";
 import { AiCardPopover, type AiCardPopoverValues } from "./ai-card-popover";
+import { openStylePopover, type StylePopover, type StylePopoverState } from "./style-popover";
 import { MapSourcePickerModal } from "../../ui/map-sources-panel";
 import {
   TopicChatWindow,
@@ -858,10 +860,17 @@ function toolsMeta(tools: HTMLElement): HTMLElement {
   }
   return meta;
 }
-/** The toolbar's "add summary" button, kept by reference so a refresh adds or drops it without a selector query. */
-const addSummaryTools = new WeakMap<HTMLElement, HTMLElement>();
 /** Each card's toolbar, so a refresh finds it without a selector query. */
 const cardToolbars = new WeakMap<HTMLElement, HTMLElement>();
+/** The class of each card toolbar button (paintCardTool): the styles and the tests find a button by it. */
+const CARD_TOOL_CLASSES: Partial<Record<CardActionId, string>> = {
+  research: "vam-ai-explore",
+  style: "vam-card-tool-style",
+  "open-note": "vam-detail-button",
+  "run-stop": "vam-card-tool-run",
+  "ai-lock": "vam-card-tool-ai-lock",
+  "ai-settings": "vam-card-tool-ai-settings"
+};
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -1604,6 +1613,8 @@ export class VisualAgentMapView extends ItemView {
   private topicChatSessions = new Map<string, TopicChatEntry>();
   /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
+  /** The toolbar Style popover (B08) and the card it styles; a repaint takes it out and puts it back. */
+  private styleOpen: { nodeId: string; mapId: string; pop: StylePopover } | null = null;
   /** The AI card setup window: `nodeId` is the card it edits, or null while it makes a new one under `parentId` (not made until 「存好」). */
   private aiCardOpen: {
     nodeId: string | null;
@@ -2717,7 +2728,7 @@ export class VisualAgentMapView extends ItemView {
     const bar = this.mapSearchBar;
     this.mapSearchBar = null;
     const search = this.mapSearch;
-    if (!search) return () => {};
+    if (!search) return () => (this.searchOpen || this.searchBadges.length ? this.applySearchMarks() : undefined);
     if (!this.map || this.closed) {
       this.closeMapSearch(false);
       return () => {};
@@ -2793,7 +2804,7 @@ export class VisualAgentMapView extends ItemView {
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
       card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
-      const temp = !!search && !!this.searchOpen?.expanded.has(id);
+      const temp = !!this.searchOpen?.expanded.has(id); // an outline reveal opens branches the same way, with no search box
       card.toggleClass("is-temp-open", temp);
       if (temp)
         this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));
@@ -3513,6 +3524,7 @@ export class VisualAgentMapView extends ItemView {
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.closeAiCardPopover();
+    this.styleOpen?.pop.close();
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
     else this.topicChatRecords?.close();
@@ -10619,42 +10631,164 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
-   * The selected card's toolbar: Research (the topic chat), Add (a topic under it, its type can change later), Note (the
-   * details sidebar; Cmd/Ctrl-click opens a new tab) and More (the rarer card actions). Every button has a text label.
+   * The selected card's toolbar, from the card action list (card-actions.ts CARD_TOOLBAR, B08): an ordinary card "AI explore |
+   * Style | Note | ⋯", an AI card "Run or Stop | Lock | AI explore | Settings | Note | ⋯". A button the moment refuses for
+   * loading or a picture-book lock is not drawn (read-only leaves Note alone); another refusal says why on click. Every
+   * button has a text label.
    */
-  private paintCardToolbar(tools: HTMLElement, node: MapNode, addSummary = false): void {
-    const bookLock = this.bookLock();
-    const tool = (label: string, cls: string, action: (event: MouseEvent, button: HTMLButtonElement) => void) => {
-      const button = this.button(tools, label, () => {});
-      button.addEventListener("click", event => this.whenEditing(() => action(event, button)));
-      button.addClass("vam-card-tool", cls);
-      return button;
-    };
-    // Read-only while the notes load: Note is the only entry (V3.3 P1.2).
-    const readOnly = this.notesLoading();
-    if (!bookLock.ai && !readOnly)
-      tool(t("ui.card_tool_research"), "vam-ai-explore", (_, button) => this.openTopicChat(node, button));
-    if (!bookLock.structure && !readOnly)
-      tool(t("ui.card_tool_add"), "vam-add-child-tool", () => this.enqueue(() => this.addNode(node)));
-    // Note only reads, so it works even when the map is read-only (notes still loading, a presentation).
-    const note = this.button(tools, t("ui.card_tool_note"), () => {});
-    note.addEventListener("click", event =>
-      event.metaKey || event.ctrlKey ? this.openNoteInTab(node) : this.openDetails(node)
-    );
-    note.addClass("vam-card-tool", "vam-detail-button");
-    note.setAttr("aria-label", t("ui.card_tool_note_label"));
-    // An empty summary offers its field here (the card face draws nothing for it).
-    if (addSummary && !readOnly)
-      addSummaryTools.set(
-        tools,
-        tool(t("ui.card_tool_add_summary"), "vam-card-tool-add-summary", () => this.startCardSummaryEdit(node, 0))
-      );
+  private paintCardToolbar(tools: HTMLElement, node: MapNode): CardActionContext {
+    const ctx = { ...this.cardActionContext(node), surface: "toolbar" as const };
+    for (const entry of actionsFor("toolbar", ctx))
+      this.paintCardTool(tools, node, ctx, entry.action, entry.availability);
     // ⋯ opens while the notes load too: its rows that write are greyed with the reason (decision #35, P1.1).
     const more = this.button(tools, "⋯", () => {});
     more.addEventListener("click", () => this.openCardMoreMenu(more, node));
     more.addClass("vam-card-tool", "vam-card-tool-more");
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
+    return ctx;
+  }
+  /** One toolbar button for `action`, or nothing when it is not drawn now; returns the button. */
+  private paintCardTool(
+    tools: HTMLElement,
+    node: MapNode,
+    ctx: CardActionContext,
+    action: CardAction,
+    availability: CardAvailability
+  ): HTMLButtonElement | null {
+    const stop = action.id === "stop-run-all" || (action.id === "run-stop" && ctx.aiRunning(node.id));
+    // A Stop shows only when it works; Note only reads. Neither goes through whenEditing.
+    const plain = stop || action.id === "open-note";
+    if (
+      !availability.ok &&
+      (stop ||
+        availability.reasonKey === CARD_ACTION_REASONS.readOnly ||
+        availability.reasonKey === CARD_ACTION_REASONS.bookLock)
+    )
+      return null;
+    const cls = stop ? "vam-card-tool-stop" : CARD_TOOL_CLASSES[action.id];
+    const button = this.button(tools, t(titleKeyFor(action, "toolbar", ctx)), () => {});
+    button.addClass("vam-card-tool", cls ?? `vam-card-tool-${action.id}`);
+    const run = (event: MouseEvent): void => {
+      const now = { ...this.cardActionContext(node), surface: "toolbar" as const };
+      const state = action.available(now);
+      if (!state.ok) new Notice(t(state.reasonKey));
+      else action.run(now, { opener: button, newTab: event.metaKey || event.ctrlKey });
+    };
+    button.addEventListener("click", event => (plain ? run(event) : this.whenEditing(() => run(event))));
+    if (action.id === "open-note") button.setAttr("aria-label", t("ui.card_tool_note_label"));
+    if (action.id === "style") button.setAttr("aria-haspopup", "dialog");
+    if (action.id === "ai-lock") button.setAttr("aria-pressed", String(ctx.note(node.id)?.aiLocked === true));
+    return button;
+  }
+  /**
+   * The AI card's first toolbar button again (Run, its Stop, or Run all's Stop) after its state changed: the old one goes,
+   * the new one comes first. Not while picking topics (no toolbar) or before the toolbar is drawn.
+   */
+  private repaintRunTool(tools: HTMLElement, node: MapNode, painted?: CardActionContext): void {
+    for (const child of Array.from(tools.children))
+      if (child.classList.contains("vam-card-tool-run") || child.classList.contains("vam-card-tool-stop"))
+        child.remove();
+    if (this.selection.state.multiSelectMode) return;
+    const ctx = { ...(painted ?? this.cardActionContext(node)), surface: "toolbar" as const };
+    const first = actionsFor("toolbar", ctx).filter(
+      entry => entry.action.id === "stop-run-all" || entry.action.id === "run-stop"
+    );
+    for (const entry of first.reverse()) {
+      const button = this.paintCardTool(tools, node, ctx, entry.action, entry.availability);
+      if (button) tools.prepend(button);
+    }
+  }
+  /** The card's toolbar Style button (the popover's anchor), if the card is drawn with one. */
+  private styleToolOf(id: string): HTMLElement | null {
+    const card = this.cardEls.get(id);
+    return (card && cardToolbars.get(card)?.querySelector<HTMLElement>(".vam-card-tool-style")) ?? null;
+  }
+  /** What the Style popover shows pressed for the card, as saved. */
+  private styleStateOf(id: string): StylePopoverState {
+    return {
+      color: TOPIC_COLORS.find(color => color === this.notes.get(id)?.color) ?? null,
+      styles: this.styleOf(id),
+      hasBranch: !!this.map && branchNoteIds(this.map.nodes, id).length > 1
+    };
+  }
+  /**
+   * The toolbar Style popover (style-popover.ts) for the card, under its Style button. Each choice is one write and one undo
+   * step through changeTopicColor or changeTopicStyle, after whenEditing, the structure lock and mergeUnlocked (the whole
+   * branch when the box is ticked); a refused choice puts the saved state back.
+   */
+  private openStyleFor(node: MapNode, opener?: HTMLElement): void {
+    this.styleOpen?.pop.close();
+    if (!this.map) return;
+    const anchor = opener ?? this.styleToolOf(node.id) ?? this.cardEls.get(node.id);
+    if (!anchor) return;
+    const host = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay") ?? this.contentEl;
+    const id = node.id;
+    const write = (branch: boolean, change: (live: MapNode) => Promise<void>): void => {
+      let queued = false;
+      this.whenEditing(() => {
+        const live = this.mapNodeById(id);
+        if (!live || this.bookLock().structure || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
+        queued = true;
+        this.enqueue(async () => {
+          await change(live);
+          if (this.styleOpen?.pop === pop) pop.update(this.styleStateOf(id));
+        });
+      });
+      if (!queued) pop.update(this.styleStateOf(id));
+    };
+    const pop = openStylePopover(host, anchor, this.styleStateOf(id), {
+      onColor: (color, branch) => write(branch, live => this.changeTopicColor(live, color, branch)),
+      onStyles: (styles, branch) => write(branch, live => this.changeTopicStyle(live, styles, branch)),
+      onClose: () => {
+        if (this.styleOpen?.pop !== pop) return;
+        this.styleOpen = null;
+        pop.el.ownerDocument?.removeEventListener("pointerdown", outside, true);
+        // A repaint replaced the button the popover opened from; the focus goes to the card's new one.
+        if (!anchor.isConnected) this.styleToolOf(id)?.focus();
+      }
+    });
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (target && !pop.el.contains(target) && !this.styleToolOf(id)?.contains(target)) pop.close();
+    };
+    pop.el.ownerDocument?.addEventListener("pointerdown", outside, true);
+    this.styleOpen = { nodeId: id, mapId: this.map.id, pop };
+    this.placeStylePopover();
+  }
+  /** Puts the Style popover just under its card's Style button (or the card), inside its host. */
+  private placeStylePopover(): void {
+    const open = this.styleOpen;
+    if (!open) return;
+    const anchor = this.styleToolOf(open.nodeId) ?? this.cardEls.get(open.nodeId);
+    const box = anchor?.getBoundingClientRect?.();
+    const area = open.pop.el.parentElement?.getBoundingClientRect?.();
+    if (!box || !area) return;
+    open.pop.el.style.left = `${Math.round(box.left - area.left)}px`;
+    open.pop.el.style.top = `${Math.round(box.bottom - area.top + 4)}px`;
+  }
+  /** Before a repaint: takes the Style popover out of the page; returns the control inside it that held the focus. */
+  private detachStylePopover(): HTMLElement | null {
+    const open = this.styleOpen;
+    if (!open) return null;
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    // Not instanceof HTMLElement: a popout window has its own HTMLElement.
+    const held = active && open.pop.el.contains(active) ? (active as HTMLElement) : null;
+    open.pop.el.remove();
+    return held;
+  }
+  /** After a repaint: puts the popover back under its card, or closes it when the card or the map is gone or cannot be styled. */
+  private remountStylePopover(held: HTMLElement | null): void {
+    const open = this.styleOpen;
+    if (!open) return;
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (!this.map || this.map.id !== open.mapId || !this.cardEls.get(open.nodeId) || !overlay) {
+      open.pop.close();
+      return;
+    }
+    overlay.appendChild(open.pop.el);
+    this.placeStylePopover();
+    held?.focus();
   }
   /** The edge "+ Topic card" on a single editable card (V3.3 A6); it sits on the card's edge and never changes its size. */
   private paintCardEdgeEntries(card: HTMLElement, node: MapNode): void {
@@ -12815,6 +12949,7 @@ export class VisualAgentMapView extends ItemView {
    */
   cardActionContext(target: MapNode | readonly string[] | null): CardActionContext {
     const node = target && "id" in target ? target : null;
+    const refsEditable = (): boolean => this.canEditKnowledgeRefs() && !(node && this.isMerging(node.id));
     this.cardActionHost ??= {
       stopRunAll: () => this.stopPromptBatch(),
       addTopic: () => this.enqueue(() => this.addNode(null)),
@@ -12824,6 +12959,8 @@ export class VisualAgentMapView extends ItemView {
       addSibling: card =>
         this.enqueue(() => this.addNode(this.map?.nodes.find(item => item.id === card.parentId) ?? null)),
       research: (card, opener) => this.openTopicChat(card, opener),
+      openStyle: (card, opener) => this.openStyleFor(card, opener),
+      stopAi: card => this.stopAiOn(card.path),
       rename: card => this.startCardTitleEdit(card, { select: true }),
       openNote: (card, newTab) => (newTab ? this.openNoteInTab(card) : this.openDetails(card)),
       addSummaryField: card => this.startCardSummaryEdit(card, 0),
@@ -12875,14 +13012,19 @@ export class VisualAgentMapView extends ItemView {
       managedMap: !!this.plugin.settings && isManagedMapPath(this.plugin.settings, this.path),
       emptyCanvas: !!this.map && !this.map.nodes.length && this.emptyCanvasState() === "idle",
       branchFocused: !!this.branchFocus,
+      // A getter: canEditKnowledgeRefs looks the selection up in the map, and only the right-click's reference entries read it
+      // (every card's toolbar builds this context on each render).
       knowledgeRefs: {
-        editable: this.canEditKnowledgeRefs() && !(node && this.isMerging(node.id)),
+        get editable() {
+          return refsEditable();
+        },
         copied: !!sessionFor(this.plugin).getReference()
       },
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
       isArgumentCard: id => this.isArgumentCard(id),
-      // paintCardToolbar's `addSummary` argument.
+      stylesEditable: !!node && this.markersEditable(node),
+      aiRunning: id => this.aiStatusOf(id) === "running",
       summaryFieldOffered: () => {
         const note = node ? this.notes.get(node.id) : undefined;
         return (
@@ -13259,6 +13401,7 @@ export class VisualAgentMapView extends ItemView {
     const restoreChatFocus = this.detachMapChat();
     const topicChatHeld = this.detachTopicChat();
     const aiCardHeld = this.detachAiCardPopover();
+    const styleHeld = this.detachStylePopover();
     const restoreSearch = this.holdMapSearch();
     this.mapSourcesControl?.detach();
     // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
@@ -13556,6 +13699,7 @@ export class VisualAgentMapView extends ItemView {
     restoreChatFocus();
     this.remountTopicChat(topicChatHeld);
     this.remountAiCardPopover(aiCardHeld);
+    this.remountStylePopover(styleHeld);
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
@@ -13860,17 +14004,8 @@ export class VisualAgentMapView extends ItemView {
     // and the model name live here and appear with the selection.
     const tools = card.createDiv("vam-node-tools");
     cardToolbars.set(card, tools);
-    if (!this.selection.state.multiSelectMode)
-      this.paintCardToolbar(
-        tools,
-        node,
-        !!note &&
-          !argumentView &&
-          this.cardTextEditable() &&
-          !research?.preview?.summary &&
-          this.inlineSummary?.id !== node.id &&
-          isPlaceholder(note.summary)
-      );
+    // The context the toolbar was drawn from also draws the AI card's first button below (paintPromptState), in this render.
+    const toolbarContext = this.selection.state.multiSelectMode ? undefined : this.paintCardToolbar(tools, node);
     if (note) this.paintCardEdgeEntries(card, node);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
@@ -14166,7 +14301,7 @@ export class VisualAgentMapView extends ItemView {
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
     // An AI card's star, question line and glyph hang on the title, so they are painted once it exists.
-    if (header) this.paintPromptState(card, header, node, note);
+    if (header) this.paintPromptState(card, header, node, note, toolbarContext);
     if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
       // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
       title.addClass("vam-sr-only");
@@ -15549,23 +15684,6 @@ export class VisualAgentMapView extends ItemView {
       summary?.removeClass("is-preview");
       this.paintPreviewLabel(card, false);
       if (editable) summary?.addClass("is-inline-editable");
-    }
-    // The toolbar's "add summary" button follows the same rule as the summary line above (an empty summary, not being typed).
-    const toolbar = cardToolbars.get(card);
-    const addTool = toolbar ? addSummaryTools.get(toolbar) : undefined;
-    const wantsAddTool =
-      !argumentView && !typing && editable && isPlaceholder(note.livingNode?.summary || note.summary);
-    if (addTool && !wantsAddTool) {
-      addTool.remove();
-      addSummaryTools.delete(toolbar!);
-    } else if (toolbar && !addTool && wantsAddTool && !this.selection.state.multiSelectMode) {
-      const fresh = this.button(toolbar, t("ui.card_tool_add_summary"), () => {});
-      fresh.addEventListener("click", () => this.whenEditing(() => this.startCardSummaryEdit(node, 0)));
-      fresh.addClass("vam-card-tool", "vam-card-tool-add-summary");
-      addSummaryTools.set(toolbar, fresh);
-      // Before the More button (the toolbar's last action); More is the first button after Note.
-      const more = Array.from(toolbar.children).find(child => child.classList.contains("vam-card-tool-more"));
-      if (more) toolbar.insertBefore(fresh, more);
     }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
     const status = card.querySelector<HTMLElement>(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
@@ -21261,7 +21379,13 @@ export class VisualAgentMapView extends ItemView {
    * What an AI card shows: a grey star before its name, its question (first line) under the name, and one state glyph after the
    * name (none when it is up to date; the lock button takes the place when locked). Safe to call again on the same card.
    */
-  private paintPromptState(card: HTMLElement, header: HTMLElement, node: MapNode, note: Note | undefined): void {
+  private paintPromptState(
+    card: HTMLElement,
+    header: HTMLElement,
+    node: MapNode,
+    note: Note | undefined,
+    toolbarContext?: CardActionContext
+  ): void {
     promptChips.get(header)?.forEach(chip => chip.remove());
     promptChips.delete(header);
     delete card.dataset.aiCard;
@@ -21326,21 +21450,10 @@ export class VisualAgentMapView extends ItemView {
       else header.prepend(chip);
       parts.push(chip);
     }
-    // Stop for a card Run all is working on: in the toolbar, so it shows with the selection (a card's own run has its Stop in the header).
-    const tools = cardToolbars.get(card) ?? card.querySelector<HTMLElement>(".vam-node-tools");
-    if (
-      status === "running" &&
-      tools &&
-      this.promptRunning() &&
-      this.promptEntryOf(node.id)?.status === "running" &&
-      !this.selection.state.multiSelectMode &&
-      !this.presentation
-    ) {
-      const stop = this.button(tools, t("ui.card_tool_stop"), () => this.stopPromptBatch());
-      stop.addClass("vam-card-tool", "vam-card-tool-stop");
-      tools.prepend(stop);
-      parts.push(stop);
-    }
+    // The toolbar's first button follows the state (B08): Run, or Stop while the AI works on the card (the header keeps its
+    // own Stop, decision #39).
+    const tools = cardToolbars.get(card);
+    if (tools) this.repaintRunTool(tools, node, toolbarContext);
     promptChips.set(header, parts);
     const named = cardLabels.get(card)?.textContent;
     const state = names.join(", ");

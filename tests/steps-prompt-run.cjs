@@ -627,10 +627,13 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
+  // The real card (renderNode) so the toolbar is the one paintPromptState repaints; the card label needs a real DOM.
+  h.view.labelCard = () => {};
   const paint = status => {
-    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' }); card.createEl('h3', { cls: 'vam-card-title' }); const tools = card.createDiv({ cls: 'vam-node-tools' });
     h.view.aiStatusMemo.set(node.id, status);
-    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    h.view.renderNode(node);
+    const card = h.view.cardEls.get(node.id);
+    const header = find(card, i => i.cls?.includes('vam-node-header')), tools = find(card, i => i.cls?.includes('vam-node-tools'));
     return { card, header, tools };
   };
   let stopped = 0; h.view.stopPromptBatch = () => { stopped++; };

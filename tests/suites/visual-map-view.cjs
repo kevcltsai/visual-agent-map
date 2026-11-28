@@ -19,21 +19,23 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   });
   const topic = node('parent');
   let detailsShown = false;
-  const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map([['parent.md', [{ title: 'Idea', task: 'Investigate', contribution: '' }]]]), expansionBatches: new Map(), detailsShown: () => detailsShown, setOutlineActive() {} });
-  view.stageEl = element('stage'); view.map = map([topic]);
+  const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map([['parent.md', [{ title: 'Idea', task: 'Investigate', contribution: '' }]]]), expansionBatches: new Map(), detailsShown: () => detailsShown, setOutlineActive() {}, settings: DEFAULT_SETTINGS });
+  view.stageEl = element('stage'); view.map = map([topic]); view.path = `${DEFAULT_SETTINGS.topicsFolder}/m/Map.md`;
   view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
   view.render = () => {};
   let added = 0, opened = [], details = [], next = [], renders = 0;
-  view.addNode = parent => { added += parent.id === topic.id ? 1 : 0; }; view.openAddMenu = () => { throw new Error('the toolbar Add adds right away, with no type menu'); }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
+  view.addNode = parent => { added += parent.id === topic.id ? 1 : 0; }; view.openAddMenu = () => { throw new Error('the edge + adds right away, with no type menu'); }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
   view.openDetails = topic => details.push(topic.id); view.openTopicChat = topic => next.push(topic.id); view.render = () => { renders++; };
   view.renderNode(topic);
   assert.equal(buttons.some(button => button.text === '+'), false, 'the + circle is gone');
-  const plus = buttons.find(button => button.text === 'Add');
+  // B08 (P1.8): the toolbar has no Add; the edge "+ Topic card" adds a subtopic right away.
+  assert.equal(buttons.some(button => button.text === 'Add'), false, 'no toolbar Add');
+  const plus = buttons.find(button => button.text === '+ Topic card');
   plus.click({ stopPropagation() {} });
-  assert.equal(added, 1, 'the toolbar Add adds a child right away');
+  assert.equal(added, 1, 'the edge + adds a child right away');
   const badge = buttons.find(button => button.text === 'View 1 expansion suggestions');
   badge.click({ stopPropagation() {} });
-  buttons.find(button => button.text === 'Research').click({ stopPropagation() {} });
+  buttons.find(button => button.text === 'AI explore').click({ stopPropagation() {} });
   view.newMenu = () => { throw new Error('the Note button opens no menu'); };
   buttons.find(button => button.text === 'Note').click({ stopPropagation() {}, metaKey: false, ctrlKey: false });
   assert.deepEqual(details, [topic.id], 'the Note button opens the details');
@@ -90,9 +92,10 @@ integrationTest('map cards keep the generic map actions; no card exposes an AIM 
   const ordinaryButtons = render(map([topic]));
   assert.ok(ordinaryButtons.some(button => button.text === '⋯' && button['aria-label'] === 'More card actions' && button['aria-haspopup'] === 'menu'), 'the toolbar has one labelled More button that opens a menu');
   assert.equal(ordinaryButtons.some(button => button.text === 'Structure' || button.text === 'Rename' || button.text === '+' || button['aria-label'] === 'This card'), false, 'Structure is in the More list, there is no Rename and no + circle');
-  assert.ok(ordinaryButtons.some(button => button.text === 'Research'), 'every card shows a labelled Research action');
+  assert.ok(ordinaryButtons.some(button => button.text === 'AI explore'), 'every card shows a labelled AI explore action');
   assert.ok(ordinaryButtons.some(button => button.text === 'Note' && /^Note: open in the right sidebar/.test(button['aria-label'])), 'Note names its action');
-  assert.ok(ordinaryButtons.some(button => button.text === 'Add'));
+  assert.ok(ordinaryButtons.some(button => button.text === 'Style'), 'and Style (B08)');
+  assert.equal(ordinaryButtons.some(button => button.text === 'Add'), false, 'no toolbar Add (B08: the edge + and Cmd-Enter add)');
   const ordinaryResult = node('ordinary-synthesis'); ordinaryResult.aimKind = 'synthesis';
   const ordinaryButtonsForResult = [], ordinaryResultView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
@@ -758,7 +761,11 @@ const selectionDom = () => {
       setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
       toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
       setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
-      querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} };
+      querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {},
+      // The AI card toolbar redraws its first button (B08 repaintRunTool): it reads classList, takes the old one out and prepends.
+      prepend(child) { this.children = [child, ...this.children.filter(item => item !== child)]; child.parent = this; } };
+    el.classList = { contains: name => el.classes.has(name) };
+    const remove = el.remove; el.remove = function () { remove.call(this); if (this.parent) this.parent.children = this.parent.children.filter(item => item !== this); };
     return el;
   };
   return make;
@@ -1221,7 +1228,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(outlined.map, null, 'no map left: the outline empties');
 });
-integrationTest('card toolbar: a selected card shows labelled Research, Add, Note and ⋯ buttons; no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
+integrationTest('card toolbar: a selected card shows labelled AI explore, Style, Note and ⋯ buttons (an AI card Run, Lock, AI explore, Settings, Note, ⋯; read-only only Note and ⋯); no Add, no hover icon row, no + circle, no select-mode tools (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until focus or selection (no longer hover), and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
@@ -1238,12 +1245,12 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
     return tools.children.filter(child => child.tag === 'button');
   };
   const names = buttons => buttons.map(button => button.text);
-  const expected = ['Research', 'Add', 'Note', '⋯'];
+  const expected = ['AI explore', 'Style', 'Note', '⋯'];
   // Unfolded card with a subtopic, a leaf and a folded card all show the same four buttons; Collapse, This card and Select subtopics are not tools any more.
   const buttons = toolsOf();
   assert.deepEqual(names(buttons), expected, 'four labelled buttons in order');
   assert.ok(buttons.every(button => button.classes.has('vam-card-tool') && !button.iconName), 'text buttons, no icon-only tool');
-  assert.deepEqual(buttons.map(button => [...button.classes].find(name => name !== 'vam-card-tool')), ['vam-ai-explore', 'vam-add-child-tool', 'vam-detail-button', 'vam-card-tool-more']);
+  assert.deepEqual(buttons.map(button => [...button.classes].find(name => name !== 'vam-card-tool')), ['vam-ai-explore', 'vam-card-tool-style', 'vam-detail-button', 'vam-card-tool-more']);
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
   const [, , note, more] = buttons;
   assert.match(note.attrs['aria-label'], /^Note: open in the right sidebar/); assert.equal(more.attrs['aria-label'], 'More card actions'); assert.equal(more.attrs['aria-haspopup'], 'menu');
@@ -1254,8 +1261,17 @@ integrationTest('card toolbar: a selected card shows labelled Research, Add, Not
   // Select mode: no toolbar at all.
   assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); })), [], 'select mode');
   assert.deepEqual(names(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b')), [], 'select mode, leaf');
+  // B08: an AI card (idle, its own lock on), and read-only while the notes load.
+  const aiCard = (more = () => {}) => ({ view }) => { Object.assign(view.notes.get('a'), { aiCard: true, prompt: 'Look into it' }); more(view); };
+  assert.deepEqual(names(toolsOf(aiCard())), ['Run', 'Lock', 'AI explore', 'Settings', 'Note', '⋯'], 'AI card, idle');
+  // Running (Stop takes Run's place) needs the header chips this double cannot draw: steps-card-toolbar covers it.
+  const locked = toolsOf(aiCard(view => { view.notes.get('a').aiLocked = true; }));
+  assert.deepEqual(names(locked), ['Run', 'Locked', 'AI explore', 'Settings', 'Note', '⋯'], 'AI card, locked');
+  assert.equal(locked[1].attrs['aria-pressed'], 'true', 'the lock shows pressed');
+  assert.deepEqual(names(toolsOf(({ view }) => { view.noteLoad = { pending: true }; })), ['Note', '⋯'], 'read-only: Note and ⋯ (its rows greyed, decision #35)');
   const { translate } = load('i18n.ts');
-  assert.deepEqual(['ui.card_tool_research', 'ui.card_tool_add', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['研究', '新增', '筆記', '更多卡片動作']);
+  assert.deepEqual(['ui.ai_explore', 'ui.topic_style', 'ui.card_tool_note', 'ui.card_tool_more'].map(key => translate('zh-TW', key)), ['AI 探索', '樣式', '筆記', '更多卡片動作']);
+  assert.deepEqual(['ui.card_tool_run', 'ui.card_tool_lock', 'ui.card_tool_ai_settings', 'ui.card_tool_stop'].map(key => translate('zh-TW', key)), ['執行', '鎖定', '設定', '停止']);
 });
 integrationTest('status pill: researched and unresearched topics show none (no success label on the card face, DELIVERY_V3_3 7 P1.2), other states keep theirs and screen readers still hear the status ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
@@ -1280,7 +1296,7 @@ integrationTest('status pill: researched and unresearched topics show none (no s
   const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
   assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
 });
-integrationTest('A4 two states: an unselected card keeps links, model, add-summary and the secondary actions out of its header; they sit in the card toolbar, and no success chip is drawn', () => {
+integrationTest('A4 two states: an unselected card keeps links, model and the secondary actions out of its header; they sit in the card toolbar (Add summary is in ⋯ since B08), and no success chip is drawn', () => {
   const f = heFixture({ notes: heNotes([
     ['fact', { summary: 'Has a summary', links: ['https://a.example/x'], modelOverride: true, model: 'gpt-x', status: 'completed' }],
     ['hyp', { summary: 'No conclusion yet', status: 'completed' }],
@@ -1303,11 +1319,11 @@ integrationTest('A4 two states: an unselected card keeps links, model, add-summa
   assert.ok(within(part(0, 'vam-node-tools'), c => has(c, 'vam-node-model-tag') && c.text === 'M:gpt-x').length === 1, 'model name in the toolbar');
   const meta = part(0, 'vam-node-tools').children.at(-1);
   assert.ok(has(meta, 'vam-node-tools-meta'), 'link count and model close the toolbar');
-  assert.equal(within(part(0, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, 'a card with a summary has no add-summary button');
-  const add = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool-add-summary'));
-  assert.equal(add.length, 1, 'an empty-summary card offers Add summary in the toolbar'); assert.equal(add[0].text, 'Add summary');
+  // B08 (P1.8): Add summary left the toolbar (it is in the card ⋯ and right-click, steps-card-toolbar); no card has it here.
+  for (let i = 0; i < 3; i++) assert.equal(within(part(i, 'vam-node-tools'), c => has(c, 'vam-card-tool-add-summary')).length, 0, `card ${i}: no add-summary button`);
   const buttons = within(part(1, 'vam-node-tools'), c => c.tag === 'button' && has(c, 'vam-card-tool')).map(c => c.text);
-  assert.deepEqual(buttons.slice(-2), ['Add summary', '⋯'], 'Add summary sits just before More');
+  assert.equal(buttons.at(-1), '⋯', 'an empty-summary card still ends its toolbar with More');
+  assert.ok(!buttons.includes('Add summary'), 'and has no Add summary button');
   assert.equal(within(part(2, 'vam-node-header'), c => has(c, 'vam-status-error')).length, 1, 'the error chip stays in the header');
   // The card-level add-summary line takes no room and shows nothing (the stylesheet hides it).
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');

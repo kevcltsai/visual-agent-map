@@ -448,6 +448,22 @@ test('B14: a search-opened branch carries a small label that disappears with the
   assert.equal(kept.removed, true, 'the label is removed when the search closes');
 });
 
+test('B32: an outline reveal shows the same opened-for-now mark as search, and removes it when folded back', async () => {
+  const h = await harness();
+  h.view.viewportEl.toggleClass = () => {};
+  const path = h.view.map.nodes.find(n => n.id === h.ids.deep).path;
+  assert.equal(await h.view.revealPath(path), true); await h.settle();
+  const labels = () => h.card('branch').children.filter(c => c.classes.has('vam-search-temp-label') && !c.removed);
+  assert.ok(h.card('branch').classes.has('is-temp-open'), 'the opened ancestor has the dashed mark');
+  assert.equal(labels().length, 1, 'one label on it');
+  assert.equal(labels()[0].text, 'Opened for search');
+  assert.equal(h.view.mapSearch, null, 'no search box is involved');
+  const other = h.view.map.nodes.find(n => n.id === h.ids.alpha).path;
+  assert.equal(await h.view.revealPath(other), true); await h.settle();
+  assert.equal(h.card('branch').classes.has('is-temp-open'), false, 'folded back: mark gone');
+  assert.equal(labels().length, 0, 'folded back: label gone');
+});
+
 test('B14: a hit that is already on screen jumps without repainting', async () => {
   const h = await harness({ collapse: false });
   h.press(h.card('alpha')); h.type('plan');

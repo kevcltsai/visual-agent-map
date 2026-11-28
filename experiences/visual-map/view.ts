@@ -2726,7 +2726,7 @@ export class VisualAgentMapView extends ItemView {
     const bar = this.mapSearchBar;
     this.mapSearchBar = null;
     const search = this.mapSearch;
-    if (!search) return () => {};
+    if (!search) return () => (this.searchOpen || this.searchBadges.length ? this.applySearchMarks() : undefined);
     if (!this.map || this.closed) {
       this.closeMapSearch(false);
       return () => {};
@@ -2802,7 +2802,7 @@ export class VisualAgentMapView extends ItemView {
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
       card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
-      const temp = !!search && !!this.searchOpen?.expanded.has(id);
+      const temp = !!this.searchOpen?.expanded.has(id); // an outline reveal opens branches the same way, with no search box
       card.toggleClass("is-temp-open", temp);
       if (temp)
         this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));

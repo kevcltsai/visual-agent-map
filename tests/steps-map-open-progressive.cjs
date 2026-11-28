@@ -311,7 +311,7 @@ test('d: while reading, the edit switches are off and edit keys, menus, details 
   card.handlers.get('click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
   view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 1, clientY: 1 });
   let draftRead = false;
-  view.chat = { isBusy: false, get draft() { draftRead = true; return 'hello'; } };
+  view.chat = { isBusy: false, refreshPlan() {}, get draft() { draftRead = true; return 'hello'; } };
   await view.sendMapChat();
   assert.equal(draftRead, false, 'the chat message is not even read');
   assert.equal(view.searchKey({ isComposing: false, defaultPrevented: false }), false, 'Mod+F is swallowed');

@@ -95,7 +95,8 @@ export interface LivingRoundPort {
   onAiLatestDropped?(id: string, reason: string): void;
   log?(level: "debug", message: string): void;
   confirm(model: string, run: () => Promise<void>): Promise<boolean>;
-  onStart(total: number): void;
+  /** `total` is the cards to process (`queued`, in order); `excluded` (blocked before the start, locked targets) settle at once outside it. */
+  onStart(total: number, excluded: readonly string[], queued: readonly string[]): void;
   /** Trial cards are an execution boundary: skipped themselves, used frozen when valid, otherwise blocking their dependents. */
   onTrialBoundary?(boundary: { skipped: string[]; frozen: string[]; blocked: string[] }): void;
   onRunning(id: string): void;
@@ -700,7 +701,11 @@ export async function runLivingRound(port: LivingRoundPort, requested?: readonly
     };
     const dispatch = async (): Promise<void> => {
       if (!current()) return;
-      port.onStart(plan.order.length + plan.blocked.size + plan.lockedTargets.length);
+      port.onStart(
+        plan.order.length,
+        [...plan.blocked.keys(), ...plan.lockedTargets],
+        plan.order.map(item => item.id)
+      );
       results = await executeLivingPlan(plan, {
         signal: lease.signal,
         inspect: async id => {
@@ -1119,7 +1124,8 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       ...(frozen ? (["frozen-source"] as const) : [])
     ];
     const input = await readInputs(readPort, map, id, snapshot, sources, warnings);
-    return { saved, snapshot, input, dependenciesReady, warnings: input.warnings };
+    const paths = sources.sources.map(source => source.path);
+    return { saved, snapshot, input, dependenciesReady, warnings: input.warnings, paths };
   };
   const prepared = await build(false);
   const candidate = {
@@ -1178,7 +1184,16 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       };
     }
   };
-  return { request, adoption, model: original.note.model, warnings: prepared.warnings };
+  /** The draft inputs still read as they did for this trial: the editor checks this when a watched note changes. */
+  const inputsCurrent = async (): Promise<boolean> => {
+    try {
+      return (await build(false)).input.inputRevision === candidate.inputRevision;
+    } catch {
+      return false;
+    }
+  };
+  const watched = [...new Set([target.path, ...prepared.paths])];
+  return { request, adoption, model: original.note.model, warnings: prepared.warnings, watched, inputsCurrent };
 }
 
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */

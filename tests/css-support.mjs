@@ -148,3 +148,32 @@ test("B28: the card edge entries keep a 22px screen height when zoomed out (same
     assert.equal(entry?.origin, origin, `${side}: origin on the corner that touches the card`);
   }
 });
+
+test("book styles: body pictures are not stretched, and the [!vam-book] hide rule never reaches the caption paragraph (V3.3 G01)", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  let hideRules = 0;
+  postcss.parse(css).walkRules((rule) => {
+    if (!/vam-picture-paragraph|vam-book/.test(rule.selector)) return;
+    rule.walkDecls((decl) => {
+      if (decl.prop === "object-fit") assert.ok(!/fill|cover/.test(decl.value), `${rule.selector}: object-fit ${decl.value}`);
+      assert.notEqual(decl.prop, "aspect-ratio", `${rule.selector} fixes an aspect ratio`);
+    });
+    if (/\[data-callout="vam-book"\]/.test(rule.selector) && rule.nodes.some((n) => n.prop === "display" && n.value === "none")) {
+      hideRules++;
+      assert.ok(!rule.selector.includes("vam-picture-paragraph"), rule.selector);
+    }
+  });
+  assert.ok(hideRules > 0, "the [!vam-book] hide rule is still there");
+});
+
+// B08: while notes load the toolbar (notes + the more button) stays reachable; only the resize handles are hidden.
+test("is-notes-loading rules do not hide the card toolbar", () => {
+  const css = readFileSync(resolve(root, "styles.css"), "utf8");
+  const hiding = [];
+  postcss.parse(css).walkRules((rule) => {
+    if (!rule.selector.includes("is-notes-loading")) return;
+    if (!rule.some((d) => d.prop === "display" && d.value === "none")) return;
+    for (const sel of rule.selectors) if (/vam-node-tools|vam-card-tool/.test(sel)) hiding.push(sel);
+  });
+  assert.deepEqual(hiding, []);
+});

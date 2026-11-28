@@ -18,7 +18,7 @@ export function showAppliedNotice(
   onClick: () => void,
   ms: number
 ): { hide(): void } {
-  const box = host.createDiv({ cls: "vam-book-applied-notice", attr: { role: "status" } });
+  const box = host.createDiv({ cls: "vam-book-applied-notice vam-tokens", attr: { role: "status" } });
   box.createSpan({ text: message });
   box.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" }).addEventListener("click", event => {
     event.preventDefault();

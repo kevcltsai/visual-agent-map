@@ -655,7 +655,7 @@ integrationTest('outline import dialog: the line says "Follow the topic type"; t
 
 // ---- B2-feat: integration from the chat (no dialog, the user's message is the direction) ---------------------------------
 const NOT_UNDOABLE_TEXT = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.';
-const chatApply = async (h, actions, message, baseline = {}) => (await h.view.applyMapChatActions({ actions, rejected: [], message }, { mdHashes: {}, topicHashes: baseline })).filter(l => l.text !== NOT_UNDOABLE_TEXT);
+const chatApply = async (h, actions, message, baseline = {}) => (await h.view.applyMapChatActions({ actions, rejected: [], message }, { mdHashes: {}, topicHashes: baseline, selectedIds: h.view.chatSelectionIds() })).filter(l => l.text !== NOT_UNDOABLE_TEXT);
 const synth = (nodeIds, extra = {}) => ({ kind: 'run_map_action', action: 'synthesize', nodeIds, title: '', goal: '', direction: 'model words', mode: '', images: false, ...extra });
 const spyOptions = h => { const seen = []; for (const name of ['startSynthesis', 'startSelectionSynthesis']) { const original = h.view[name].bind(h.view); h.view[name] = (target, options, ...rest) => { const { signal, onProgress, ...kept } = options; seen.push({ name, options: JSON.parse(JSON.stringify(kept)), direction: rest[0], hadSignal: !!signal }); return original(target, options, ...rest); }; } return seen; };
 

@@ -10,6 +10,7 @@ import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
+import type { LivingChangeSummary } from "./experiences/visual-map/living-node-changes";
 import { livingCoordinator } from "./experiences/visual-map/living-node-runtime";
 import { LivingIdentityStore, setLivingIdentityStore } from "./experiences/visual-map/living-node-sources";
 import { plainFailure } from "./ai/plain-error";
@@ -25,7 +26,8 @@ import {
   type BookPipelineProgress,
   type PipelineCard,
   type BookRerunResult,
-  type NotesApplyResult
+  type NotesApplyResult,
+  type RefindResult
 } from "./experiences/visual-map/book-pipeline-run";
 import type { StructureNode, StructureOp } from "./core/book-pipeline/structure-edit";
 import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
@@ -47,6 +49,8 @@ import {
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
 import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
+import { BookRefindSlot } from "./experiences/visual-map/book-pipeline-refind-slot";
+import { figureUrlAt } from "./core/book-pipeline/refind-slot";
 import { locateAppliedShown } from "./core/book-pipeline/notes-apply";
 import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 import {
@@ -316,9 +320,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const note = await this.repo.readNote(path);
       return { title: note.title, summary: note.summary };
     },
-    updateNote: async (path, patch) => {
-      await this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true });
-    },
+    updateNote: (path, patch) => this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true }),
     askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
     runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
     // requestUrl has no abort: verifySource races its own 15 s timeout and the runner's fence drops a late result.
@@ -482,6 +484,37 @@ export default class VisualAgentMapPlugin extends Plugin {
     setTick: (run, ms) => window.setInterval(run, ms),
     clearTick: handle => window.clearInterval(handle as number)
   });
+  /** "Find another picture" for one picture of a chapter (V3.3 P5.1b): the job, cancel, messages and the undo of the last swap. */
+  private readonly bookRefindSlot = new BookRefindSlot({
+    run: (path, url, signal) => this.runBookRefind(path, url, signal),
+    cancel: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (map) this.bookPipelineRuns.cancelNotes(map);
+    },
+    mapBusy: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (!map) return null;
+      if (this.bookPipelineRuns.isRunning(map)) return "drive";
+      return this.bookPipelineRuns.isApplyingNotes(map) ? "notes" : null;
+    },
+    codeOf: error => (error instanceof BookPipelineRunError ? error.code : undefined),
+    refusalText: error => bookRefusalText(error),
+    reasonText: error => bookErrorReason(error),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
+    notice: message => void new Notice(message),
+    noticeAction: (message, label, onClick, ms) =>
+      showAppliedNotice(
+        document.body,
+        { set: (run, delay) => window.setTimeout(run, delay), clear: handle => window.clearTimeout(handle as number) },
+        message,
+        label,
+        onClick,
+        ms
+      ),
+    changed: () => this.bookNotes.paint(),
+    setTimer: (run, ms) => window.setTimeout(run, ms),
+    clearTimer: handle => window.clearTimeout(handle as number)
+  });
   /** The light-green mark on the paragraphs just rewritten, in every open editor of the note (10 s). */
   private readonly bookHighlights = new AppliedHighlights({
     targets: () => this.bookHighlightTargets(),
@@ -555,6 +588,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       const read = readBookPipeline(map);
       if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
         return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
+    }
+    throw new BookPipelineRunError("missing");
+  }
+  /** Finds the chapter's map and card, then runs the runner's picture job (a refusal or failure is thrown to the controller). */
+  private async runBookRefind(path: string, url: string, signal: AbortSignal): Promise<RefindResult> {
+    for (const { file, map } of await this.repo.readableMaps()) {
+      const node = map.nodes.find(item => item.path === path);
+      const read = readBookPipeline(map);
+      if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
+        return await this.bookPipelineRuns.refindSlot(file.path, node.id, url, { signal });
     }
     throw new BookPipelineRunError("missing");
   }
@@ -651,6 +694,42 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     };
   }
+  /** The picture at the cursor of a chapter in an editor (the image line, its caption or its source line); undefined elsewhere. */
+  private bookFigureAt(editor: Editor, path: string | undefined): { path: string; url: string } | undefined {
+    if (!path || !this.bookNotes.isChapter(path)) return undefined;
+    const url = figureUrlAt(editor.getValue(), editor.getCursor().line);
+    return url ? { path, url } : undefined;
+  }
+  /** The editor menu item and the command of "find another picture" (no public API for a picture's menu in reading mode). */
+  private registerBookRefind(): void {
+    const refind = this.bookRefindSlot;
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, view) => {
+        const at = this.bookFigureAt(editor, view.file?.path);
+        if (!at) return;
+        const running = refind.isRunning(at.path);
+        menu.addItem(item =>
+          item
+            .setTitle(t(running ? "ui.book_refind_cancel" : "ui.book_refind_menu"))
+            .setIcon("image")
+            .onClick(() => refind.press(at.path, at.url))
+        );
+      })
+    );
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-refind-image",
+        name: t("ui.command_book_refind_image"),
+        editorCheckCallback: (checking, editor, ctx) => {
+          const at = this.bookFigureAt(editor, ctx.file?.path);
+          if (!at) return false;
+          if (!checking) refind.press(at.path, at.url);
+          return true;
+        }
+      }),
+      key: "ui.command_book_refind_image"
+    });
+  }
   private registerBookNotes(): void {
     const notes = this.bookNotes;
     this.registerEvent(
@@ -713,6 +792,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.command_book_note_undo"
     });
+    this.registerBookRefind();
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
@@ -1793,7 +1873,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       } catch (replaceError) {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
-      const { changed, error, nodePaths } = await this.rebaseMaps(pairs);
+      const { changed, error, nodePaths, scope } = await this.rebaseMaps(pairs);
       // A map node whose title was its old file name follows the new one (a custom title, a folder move and other notes are left alone).
       // Only the owner's own renames (not VAM's collision numbering) are followed, and a batch is first collapsed to origin -> final
       // so a chain (A -> B -> C) or a swap through a temporary name reads each file against the name it started with.
@@ -1822,7 +1902,10 @@ export default class VisualAgentMapPlugin extends Plugin {
           value => value === true || value === "true"
         );
       });
-      if (changed || vamFile) await this.rebuildDerivedData();
+      // VAM's own moves (an undo or redo parking pasted copies, for one) rebuild only the maps they touch: notes of a map
+      // nobody operated on stay as written (B27x). A move made outside VAM still rebuilds everything.
+      const outsideMove = renames.some(rename => rename.external);
+      if (changed || vamFile) await this.rebuildDerivedData(outsideMove ? undefined : scope);
       // Only one error can be thrown; the other is logged so it is not lost.
       if (sourceError && error) this.logs.appendLog("error", t("log.operation_failed_0", error.message));
       if (sourceError) throw sourceError;
@@ -1849,11 +1932,21 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   private async rebaseMaps(
     pairs: readonly RenamePair[]
-  ): Promise<{ changed: boolean; error?: Error; nodePaths: Set<string> }> {
+  ): Promise<{ changed: boolean; error?: Error; nodePaths: Set<string>; scope: { roots: string[]; paths: string[] } }> {
     let changed = false;
     const failed: string[] = [];
     const nodePaths = new Set<string>();
     const rebase = chainRebase(pairs);
+    // The maps a move touches: rebased, holding a moved note, or with a moved path in their folder; and the moved notes.
+    const moved = touchedPaths(pairs);
+    const scope = { roots: new Set<string>(), paths: new Set(pairs.map(([, to]) => to)) };
+    const touch = (mapPath: string, map: MapDocument, rebased: boolean): void => {
+      const root = this.repo.topicRoot(mapPath);
+      if (!rebased && !moved.some(path => path.startsWith(`${root}/`) || map.nodes.some(node => node.path === path)))
+        return;
+      scope.roots.add(root);
+      for (const node of map.nodes) scope.paths.add(node.path);
+    };
     // The scan identifies affected maps; it is not a write snapshot. Apply only the path change to the
     // current Map.md inside vault.process, preserving concurrent structural and coordinate edits.
     const save = async (path: string): Promise<void> => {
@@ -1862,11 +1955,13 @@ export default class VisualAgentMapPlugin extends Plugin {
         rebased = rebaseMapNotePaths(map, rebase);
       });
       changed ||= rebased;
+      touch(path, current, true);
       for (const node of current.nodes) nodePaths.add(node.path);
     };
     for (const { file, map } of await this.repo.readableMaps()) {
       const rebased = rebaseMapNotePaths(map, rebase);
       if (!rebased) {
+        touch(file.path, map, false);
         for (const node of map.nodes) nodePaths.add(node.path);
         continue;
       }
@@ -1887,7 +1982,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
       }
     }
-    return { changed, error, nodePaths };
+    return { changed, error, nodePaths, scope: { roots: [...scope.roots], paths: [...scope.paths] } };
   }
   private readonly unreadableReported = new Map<string, number>();
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */
@@ -2207,7 +2302,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     // A picture-book card (it has a book role) reads as a book page; see `.vam-book-page` in styles.css.
     const bookRole: unknown =
       leaf.view.file && this.app.metadataCache.getFileCache(leaf.view.file)?.frontmatter?.["book-role"];
-    leaf.view.containerEl.toggleClass("vam-book-page", typeof bookRole === "string" && bookRole !== "");
+    const isBook = typeof bookRole === "string" && bookRole !== "";
+    leaf.view.containerEl.toggleClass("vam-book-page", isBook);
+    // vam-tokens: the reader sits outside the map view, so it carries the VAM token root itself (V3.3 G01).
+    leaf.view.containerEl.toggleClass("vam-tokens", isBook);
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
   startBookPipeline(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {
@@ -2322,6 +2420,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (this.bookPaintTimer !== null) window.clearTimeout(this.bookPaintTimer);
     this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
+    this.bookRefindSlot.dispose();
     this.bookHighlights.dispose();
     this.readingHighlight.release();
     this.bookNotes.dispose();
@@ -2687,7 +2786,7 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation), `roots` to
    * the notes under those folders (a paste rebuilds only the target map, B27).
    */
-  async rebuildDerivedData(scope?: string[] | { roots: string[] }): Promise<void> {
+  async rebuildDerivedData(scope?: string[] | { roots: string[]; paths?: string[] }): Promise<void> {
     try {
       await this.repo.rebuildDerivedData(Array.isArray(scope) ? { roots: [], paths: scope } : scope);
     } catch (error) {
@@ -2721,9 +2820,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     markdown: string,
     owner: string,
     isCurrent: () => boolean,
-    warnings: readonly string[] = []
+    warnings: readonly string[] = [],
+    changes?: LivingChangeSummary
   ): Promise<boolean> {
-    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings);
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings, changes);
   }
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);

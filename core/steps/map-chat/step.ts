@@ -1,5 +1,10 @@
 import { escapeRegExp } from "../../escape-regexp";
 import { normalizeProgress, type MapChatProgress } from "../../map-chat-progress";
+import {
+  MAP_CHAT_COMPARISON_LIMIT,
+  type MapChatComparison,
+  type MapChatComparisonValue
+} from "../../map-chat-comparison";
 import { estimateMapChatTokens } from "../../map-chat-tokens";
 import { IGNORE_EXTRA_FIELDS } from "../../../ai/runtime/output-schema";
 import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
@@ -317,7 +322,10 @@ export interface MapChatResult {
   droppedOnRetry?: boolean;
   /** Relations the model suggests (V3.3 P4.4): never applied with the reply, only one by one when the user adopts it; absent = none. */
   suggestions?: MapChatRelationSuggestion[];
+  /** A comparison table of cards (V3.3 P4.5): shown read only under the reply, never written; absent = none. */
+  comparison?: MapChatComparison;
 }
+export { MAP_CHAT_COMPARISON_LIMIT };
 /** At most this many relation suggestions are kept from one reply (the first valid ones). */
 export const MAP_CHAT_SUGGESTION_LIMIT = 5;
 /** One suggested relation between two existing cards of this map, with why (`reason`) and where that comes from (`source`). */
@@ -509,6 +517,42 @@ export const MAP_CHAT_SCHEMA = {
         current: { type: "integer" }
       },
       required: ["steps"]
+    },
+    comparison: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        attributes: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: { name: STRING, unit: STRING },
+            required: ["name"]
+          }
+        },
+        rows: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              nodeId: STRING,
+              values: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: { value: { type: ["string", "null"] }, unit: { type: ["string", "null"] } },
+                  required: ["value"]
+                }
+              }
+            },
+            required: ["nodeId", "values"]
+          }
+        }
+      },
+      required: ["attributes", "rows"]
     },
     suggestions: {
       type: "array",
@@ -1164,6 +1208,7 @@ export function parseMapChat(
   if (thread > firstBrief && firstBrief >= 0) actions.splice(firstBrief, 0, ...actions.splice(thread, 1));
   if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
+  const comparison = parseComparison(body.comparison, known);
   const suggestions = Array.isArray(body.suggestions)
     ? relationSuggestions(body.suggestions, known, referenceIds, context.relations ?? [], context.aim === true)
     : undefined;
@@ -1174,7 +1219,58 @@ export function parseMapChat(
     remaining: normalizeRemaining(body.remaining),
     changeRequested: body.changeRequested === true,
     ...(progress ? { progress } : {}),
-    ...(suggestions ? { suggestions } : {})
+    ...(suggestions ? { suggestions } : {}),
+    ...(comparison ? { comparison } : {})
+  };
+}
+
+/** One comparison cell or name is one line of at most this many characters. */
+const COMPARISON_TEXT_MAX = 200;
+/**
+ * The comparison of a reply, checked: only cards of this map in this turn's context stay as rows (once each), at most
+ * {@link MAP_CHAT_COMPARISON_LIMIT} rows and attributes (what is over is counted in `truncated`), a missing, blank or non-text value is
+ * null, a short row is filled with null. Undefined when it has no attribute or no valid row, or is not an object: never fails the reply.
+ */
+function parseComparison(raw: unknown, known: ReadonlySet<string>): MapChatComparison | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const body = raw as Record<string, unknown>;
+  if (!Array.isArray(body.attributes) || !Array.isArray(body.rows)) return undefined;
+  const line = (value: unknown): string =>
+    typeof value === "string" ? [...value.replace(/\s+/g, " ").trim()].slice(0, COMPARISON_TEXT_MAX).join("") : "";
+  const objects = (list: readonly unknown[]): Record<string, unknown>[] =>
+    list.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object");
+  const named = objects(body.attributes).flatMap(entry => {
+    const name = line(entry.name);
+    const unit = line(entry.unit);
+    return name ? [{ name, ...(unit ? { unit } : {}) }] : [];
+  });
+  const seen = new Set<string>();
+  const valid = objects(body.rows).filter(entry => {
+    const nodeId = typeof entry.nodeId === "string" ? entry.nodeId.trim() : "";
+    if (!known.has(nodeId) || seen.has(nodeId)) return false;
+    seen.add(nodeId);
+    return true;
+  });
+  if (!named.length || !valid.length) return undefined;
+  const attributes = named.slice(0, MAP_CHAT_COMPARISON_LIMIT);
+  const rows = valid.slice(0, MAP_CHAT_COMPARISON_LIMIT).map(entry => {
+    const values = Array.isArray(entry.values) ? objects(entry.values) : [];
+    return {
+      nodeId: (entry.nodeId as string).trim(),
+      values: attributes.map((_, at): MapChatComparisonValue => {
+        const cell = values[at];
+        const value = cell ? line(cell.value) : "";
+        const unit = cell ? line(cell.unit) : "";
+        return value ? { value, ...(unit ? { unit } : {}) } : { value: null };
+      })
+    };
+  });
+  const cutRows = valid.length - rows.length;
+  const cutAttributes = named.length - attributes.length;
+  return {
+    attributes,
+    rows,
+    ...(cutRows || cutAttributes ? { truncated: { rows: cutRows, attributes: cutAttributes } } : {})
   };
 }
 
@@ -1235,7 +1331,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 36,
+  version: 37,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

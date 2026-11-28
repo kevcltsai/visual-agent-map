@@ -371,7 +371,8 @@ import {
   type NotePatch,
   type TopicInfo,
   isPlaceholder,
-  type TopicAppearanceChange
+  type TopicAppearanceChange,
+  AiWriterRefusal
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
@@ -3363,7 +3364,10 @@ export class VisualAgentMapView extends ItemView {
       }
       const name = (value ?? "").trim();
       if (!name || name === note.title) this.render();
-      else this.enqueue(() => this.noteChange(node, { title: name }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { title: name });
+        });
     });
     this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
     return input;
@@ -3448,7 +3452,10 @@ export class VisualAgentMapView extends ItemView {
         this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
       }
       if (!save || value === state.original.trim()) this.render();
-      else this.enqueue(() => this.noteChange(node, { summary: value }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { summary: value });
+        });
     };
     area.addEventListener("input", () => {
       state.draft = area.value;
@@ -12516,7 +12523,7 @@ export class VisualAgentMapView extends ItemView {
     sink: (entry: Action) => void = entry => this.history.push(entry),
     /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
     rejectAiCard = false
-  ): Promise<void> {
+  ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
@@ -12530,8 +12537,10 @@ export class VisualAgentMapView extends ItemView {
       before.previewInitialized = current.previewInitialized;
       before.previewAutoHash = current.previewAutoHash;
     }
-    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
-    await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard });
+    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
+    // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
+    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+      return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
       this.plugin.topicRuns.dropPending(node.path);
@@ -12572,6 +12581,7 @@ export class VisualAgentMapView extends ItemView {
     });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
     this.render();
+    return "written";
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
   private chartSnapshot(note: Note): string {
@@ -24717,6 +24727,8 @@ export class VisualAgentMapView extends ItemView {
       return await this.chatWriter.write(action, baseline, same, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      // The guarded commit refused the bytes (a Living Node or damaged markers appeared after the gate): skipped, nothing written.
+      if (error instanceof AiWriterRefusal) return { status: "skipped", reason: error.message };
       throw error;
     } finally {
       this.chatReadOnlyPaths = previous;

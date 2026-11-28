@@ -197,6 +197,8 @@ export interface BrokenTopic {
 const NOTE_CSS_CLASS = "visual-agent-map-node";
 /** Longest `last-error` stored in a note. */
 export const LAST_ERROR_LIMIT = 300;
+/** The shared AI writer gate refused the bytes being replaced (a Living Node, damaged markers): nothing was written. */
+export class AiWriterRefusal extends Error {}
 /** The failure reason kept on a note: the raw error message, whitespace collapsed, cut to {@link LAST_ERROR_LIMIT}. */
 export function failureReason(error: unknown): string {
   const raw = (error as { message?: unknown } | null | undefined)?.message;
@@ -1024,8 +1026,9 @@ export class Repository {
    */
   private admitAiWriter(content: string): void {
     const state = livingMarkerState(content);
-    if (state === "corrupt") throw new Error(this.message("error.living_node_markers_damaged"));
-    if (isLivingNodeNote(content, frontmatter(content))) throw new Error(this.message("ui.living_node_use_run_card"));
+    if (state === "corrupt") throw new AiWriterRefusal(this.message("error.living_node_markers_damaged"));
+    if (isLivingNodeNote(content, frontmatter(content)))
+      throw new AiWriterRefusal(this.message("ui.living_node_use_run_card"));
   }
 
   /** Settle only the still-running managed note, without reverting a status the owner changed meanwhile. */

@@ -17274,9 +17274,8 @@ export class VisualAgentMapView extends ItemView {
     // The reader revealing its leaf can unfold the right panel: that is VAM's doing, not the user's, and it takes width.
     const room = this.aiCardOpen.room;
     this.aiCardOpen.stopReveal = this.plugin.onDetailsReveal?.(() => {
-      if (this.aiCardOpen?.room !== room) return;
       room.accept(this.sideDock("right"));
-      this.makeRoomForAiCard();
+      if (this.aiCardOpen?.room === room) this.makeRoomForAiCard();
     });
     win.mount(overlay);
     this.makeRoomForAiCard();
@@ -17305,17 +17304,21 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
-    open.stopReveal?.();
-    open.room.restore();
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
       node && !this.closed && !this.plugin.repo.isDisposed()
         ? this.app.vault.getAbstractFileByPath(node.path)
         : undefined;
-    void this.plugin
-      .restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
-      .catch(() => {});
+    // Putting the official note back can reveal the right panel again: the side panels go back only after that.
+    void Promise.resolve(
+      this.plugin.restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
+    )
+      .catch(() => {})
+      .finally(() => {
+        open.stopReveal?.();
+        open.room.restore();
+      });
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {

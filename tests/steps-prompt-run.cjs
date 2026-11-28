@@ -959,6 +959,7 @@ test('popover room (D1-x10b): closing the editor reopens only the panel it folde
   assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'the user had folded the left; the editor folds the right');
   h.pop().keydown({ key: 'Escape' });
   assert.equal(h.view.aiCardOpen, null);
+  await new Promise(resolve => setTimeout(resolve, 0)); // the panels go back once the official note is back in the reader
   assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'closing reopens the right only; the user\'s left fold stays');
 });
 
@@ -989,7 +990,7 @@ for (const leftFolded of [false, true])
           let listener = null, revealing = false;
           h.view.plugin.onDetailsReveal = fn => { listener = fn; return () => { listener = null; }; };
           h.view.plugin.detailsRevealing = () => revealing;
-          h.view.plugin.openDetails = async () => {
+          const reveal = async () => {
             await null;
             revealing = true;
             right.expand();
@@ -997,6 +998,8 @@ for (const leftFolded of [false, true])
             revealing = false;
             listener?.();
           };
+          h.view.plugin.openDetails = reveal;
+          h.view.plugin.restoreLivingOfficial = reveal; // closing puts the official note back in the reader, revealing it
           h.view.openAiCardPopover(h.node('A'));
           await new Promise(resolve => setTimeout(resolve, 0));
           h.view.makeRoomForAiCard();
@@ -1013,6 +1016,7 @@ for (const leftFolded of [false, true])
           }
           h.pop().keydown({ key: 'Escape' });
           assert.equal(h.view.aiCardOpen, null);
+          await new Promise(resolve => setTimeout(resolve, 0));
           assert.deepEqual(
             { left: left.collapsed, right: right.collapsed },
             expected,

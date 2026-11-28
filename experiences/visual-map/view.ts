@@ -8670,6 +8670,13 @@ export class VisualAgentMapView extends ItemView {
   private canEditText(): boolean {
     return this.canEditCanvasItems() && !this.presentation;
   }
+  /** A new text block changes the map's structure: refused while a picture-book run locks it (decision #35); existing blocks stay editable. */
+  textAddLocked(): boolean {
+    return this.bookLock().structure;
+  }
+  private canAddText(): boolean {
+    return this.canEditText() && !this.textAddLocked();
+  }
   /**
    * Draws the text nodes (decisions #1, #5): a node under a shown, unfolded topic, or a free one (orphan, parent gone) at
    * its own place. A node under a folded topic is not drawn. Text goes in through textContent only; the editor is a
@@ -9211,7 +9218,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Adds a free text block at a stage point and opens its editor; one undo step. */
   private async addFreeText(point: { x: number; y: number } | null): Promise<void> {
-    if (!this.map || !this.canEditText()) return;
+    if (!this.map || !this.canAddText()) return;
     const id = `txt-${randomUUID().slice(0, 8)}`,
       at = point ?? { x: 0, y: 0 };
     this.pendingTextEditId = id;
@@ -9479,7 +9486,7 @@ export class VisualAgentMapView extends ItemView {
   addTextNodeUnder(parent?: MapNode | null): void {
     this.enqueue(async () => {
       if (!this.map) return;
-      if (!this.canEditText()) {
+      if (!this.canAddText()) {
         // Selection mode blocks canvas edits; say so instead of doing nothing (other reasons stay silent).
         if (this.selection.state.multiSelectMode) new Notice(t("ui.text_node_add_multiselect"));
         return;
@@ -10891,12 +10898,18 @@ export class VisualAgentMapView extends ItemView {
         .onClick(() => this.openCanvasImagePicker(point))
     );
     if (this.canEditText())
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.text_node_add_here"))
-          .setIcon("sticky-note")
-          .onClick(() => this.enqueue(() => this.addFreeText(point)))
-      );
+      menu.addItem(item => {
+        item.setTitle(t("ui.text_node_add_here")).setIcon("sticky-note");
+        // The picture-book lock greys the row and says why (decision #35).
+        if (this.textAddLocked()) {
+          this.drawInDom(menu);
+          item.setDisabled(true);
+          (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
+          this.menuHint(item, t(CARD_ACTION_REASONS.bookLock), "vam-menu-reason");
+          return;
+        }
+        item.onClick(() => this.enqueue(() => this.addFreeText(point)));
+      });
     if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs())
       menu.addItem(item =>
         item

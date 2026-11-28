@@ -1425,7 +1425,8 @@ export default class VisualAgentMapPlugin extends Plugin {
         name: t("ui.command_add_text_node"),
         checkCallback: checking => {
           const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
-          if (!view) return false;
+          // Selection mode still reaches addTextNodeUnder, which says why it adds nothing.
+          if (!view || view.textAddLocked()) return false;
           if (!checking) view.addTextNodeUnder();
           return true;
         }

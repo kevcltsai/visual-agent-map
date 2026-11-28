@@ -187,3 +187,42 @@ test('book lock: the entries refuse too while the book writes (AI chat, the + li
   // Drag: the reparent target check refuses while locked (source: the one check sits in targetAt).
   assert.ok(view_ts.includes('if (!this.canSelectTopics() || !this.map || this.bookLock().structure) return null;'), 'targetAt finds no new parent while locked');
 });
+
+test('book lock: a structure lock adds no text block from any entry (the panel and palette add, a free block, the canvas right-click): Map.md is not written', async () => {
+  const h = await harness({ book: true, stages: { a: 'planned' } });
+  atPhase(h, 'writing');
+  let pending = Promise.resolve();
+  h.plugin.mutate = work => (pending = pending.then(work));
+  const settle = async () => { await pending; await dom.tick(); await pending; };
+  const file = h.view.app.vault.getAbstractFileByPath(MAP);
+  const before = await h.view.app.vault.read(file);
+  const node = h.view.map.nodes.find(n => n.id === h.ids.a);
+  // The add list's Text row and the add-text-node command both call addTextNodeUnder (with and without a selected card).
+  h.view.addTextNodeUnder(node);
+  await settle();
+  h.view.selection.setSelected(null);
+  h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
+  h.view.addTextNodeUnder();
+  await settle();
+  assert.equal(await h.view.app.vault.read(file), before, 'no text block is written while the book writes');
+  assert.equal((h.view.map.canvasItems ?? []).length, 0);
+  assert.equal(h.view.textAddLocked?.(), true, 'the add-text-node command is not offered (its checkCallback asks textAddLocked)');
+  assert.ok(main_ts.includes('if (!view || view.textAddLocked()) return false;'), 'the palette command checks textAddLocked');
+  // The canvas right-click keeps "Add text here", greyed with the book lock as the reason.
+  const items = [];
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass() {}, createSpan(o) { it.hints.push(o.text); } } });
+  h.view.newMenu = () => ({ setUseNativeMenu() {}, addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return this; }, addSeparator() { return this; }, showAtMouseEvent() {} });
+  h.view.stagePoint = () => ({ x: 10, y: 10 });
+  h.view.onCanvasContextMenu({ target: { closest: () => null }, clientX: 5, clientY: 5, preventDefault() {} });
+  const row = items.find(i => i.title === tr('ui.text_node_add_here'));
+  assert.ok(row, 'the row stays');
+  assert.equal(row.disabled, true);
+  assert.equal(row.fn, undefined, 'a click does nothing');
+  assert.deepEqual(row.hints, [tr('ui.card_action_off_book_lock')]);
+  // Done gives it back: the same call writes one block.
+  atPhase(h, 'done');
+  assert.equal(h.view.textAddLocked(), false);
+  h.view.addTextNodeUnder(node);
+  await settle();
+  assert.notEqual(await h.view.app.vault.read(file), before, 'once the book is done a text block is added');
+});

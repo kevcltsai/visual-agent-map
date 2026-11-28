@@ -1834,6 +1834,13 @@ export class VisualAgentMapView extends ItemView {
   /** Ends the live in-place name field without saving (a repaint is about to replace it); the draft stays in `inlineName`. */
   private suspendInlineName: (() => void) | null = null;
   private inlineNameInput: HTMLInputElement | null = null;
+  /** Ends the live name field as Enter (true) or Esc (false) would. */
+  private finishInlineName: ((save: boolean) => void) | null = null;
+  /**
+   * Keys typed after a new topic is asked for but before its name field exists (the note and Map.md are written first):
+   * the text goes into the field when it is built, Enter or Esc ends it once the add has landed (V3.3 B29).
+   */
+  private earlyName: { text: string; end: "save" | "cancel" | null } | null = null;
   private summaryEls = new Map<string, HTMLElement>();
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
@@ -3029,6 +3036,7 @@ export class VisualAgentMapView extends ItemView {
     const release = (): void => {
       live = false;
       this.suspendInlineName = null;
+      this.finishInlineName = null;
     };
     this.suspendInlineName = () => {
       if (!live) return;
@@ -3043,6 +3051,16 @@ export class VisualAgentMapView extends ItemView {
       this.inlineNameInput = null;
       done(save ? value : null);
     };
+    this.finishInlineName = finish;
+    if (state.created && this.earlyName) {
+      if (this.earlyName.text) {
+        input.value = state.draft = this.earlyName.text;
+        state.fresh = false;
+        state.caret = undefined;
+      }
+      // From here on the keys go to the field itself.
+      this.earlyName = null;
+    }
     input.addEventListener("input", () => {
       state.draft = input.value;
       state.fresh = false;
@@ -5302,6 +5320,8 @@ export class VisualAgentMapView extends ItemView {
   private tidy: (TidyPreview & { branchId?: string; mapId: string; signature: string }) | null = null;
   private tidyBarEl: HTMLElement | null = null;
   private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
+  /** Where focus was when the preview opened; given back when it closes. */
+  private tidyReturnFocus: HTMLElement | null = null;
   private tidyArrange(map: MapDocument, branchId?: string): void {
     if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
     else this.arrangeAll(map);
@@ -5309,6 +5329,10 @@ export class VisualAgentMapView extends ItemView {
   private openTidyPreview(branchId?: string): void {
     if (!this.map || this.presentation || this.notesLoading()) return;
     this.clearTidy(false);
+    // A view built without a document (tests) has nothing to give back.
+    const active = typeof activeDocument === "undefined" ? null : (activeDocument.activeElement as HTMLElement | null);
+    this.tidyReturnFocus =
+      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active) ? active : null;
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
@@ -5338,6 +5362,9 @@ export class VisualAgentMapView extends ItemView {
     const had = this.tidy !== null;
     this.tidy = null;
     if (had && repaint && !this.closed) this.render();
+    const back = this.tidyReturnFocus;
+    this.tidyReturnFocus = null;
+    if (had && !this.closed) (back?.isConnected ? back : this.viewportEl)?.focus?.({ preventScroll: true });
   }
   /** One undo step. A map that changed since the preview is previewed again instead of written. */
   private applyTidy(): void {
@@ -11171,7 +11198,8 @@ export class VisualAgentMapView extends ItemView {
       await create(copies, pairs, newRelations);
       // Only the new copies are written, before the transaction; a failure parks them like any other.
       if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = cross ? cross.begin() : this.beginMapTransaction();
+      // The rebuild after the paste covers this map only: notes elsewhere (the copied source, for one) stay as written (B27).
+      const tx = cross ? cross.begin() : this.beginMapTransaction({ roots: [repo.topicRoot(this.path)] });
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       cross?.join(tx);
       entry = await tx
@@ -11906,10 +11934,10 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Builds the transaction file-moving methods share: Map.md of the open map is checked for outside edits first and adopted after each apply. */
-  private beginMapTransaction(): Transaction {
+  private beginMapTransaction(scope?: { roots: string[] }): Transaction {
     return beginTransaction({
       repo: this.plugin.repo,
-      rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      rebuildDerivedData: () => this.plugin.rebuildDerivedData(scope),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
       guardPath: path => this.assertChatWritable(path),
       validateStructure: (before, after) => validateLivingStructure(this.app, this.plugin.repo, before, after),
@@ -18205,7 +18233,43 @@ export class VisualAgentMapView extends ItemView {
    * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
    */
   private async addNode(...args: Parameters<VisualAgentMapView["createNode"]>): Promise<void> {
-    await this.createNode(...args);
+    const [, suggestedTitle, , focus = true] = args;
+    const release = suggestedTitle === undefined && focus && !this.inlineName ? this.holdEarlyNameKeys() : null;
+    try {
+      await this.createNode(...args);
+    } finally {
+      release?.();
+    }
+  }
+  /**
+   * Until the new topic's name field is built, typed characters (and Backspace) are held for it instead of reaching the
+   * canvas; Enter or Esc is kept and applied once the add has landed. Composing keys, shortcuts and keys typed into another
+   * field pass through. Returns the release, which also applies a held Enter or Esc.
+   */
+  private holdEarlyNameKeys(): (() => void) | null {
+    const win = this.contentEl.win as Window | undefined;
+    if (!win) return null;
+    const early: { text: string; end: "save" | "cancel" | null } = { text: "", end: null };
+    this.earlyName = early;
+    const hold = (event: KeyboardEvent): void => {
+      if (this.earlyName !== early || early.end || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)
+        return;
+      if ((event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) return;
+      if (event.key === "Enter") early.end = "save";
+      else if (event.key === "Escape") early.end = "cancel";
+      else if (event.key === "Backspace") early.text = [...early.text].slice(0, -1).join("");
+      else if ([...event.key].length === 1) early.text += event.key;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    win.addEventListener("keydown", hold, true);
+    return () => {
+      win.removeEventListener("keydown", hold, true);
+      if (this.earlyName === early) this.earlyName = null;
+      if (early.end && this.inlineName?.created && this.inlineName.createdStep)
+        this.finishInlineName?.(early.end === "save");
+    };
   }
   /** Makes a topic card (see `addNode`); returns it as placed, or undefined when none was made. */
   private async createNode(

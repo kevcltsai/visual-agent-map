@@ -430,6 +430,52 @@ test('21: Esc in the name field of a new topic takes the add back: no card, no M
   assert.equal(h.view.keepCanvasOnFieldRestore, true, 'the repaint does not pan');
 });
 
+// V3.3 B29: the name field only appears after the note and Map.md are written, so keys typed right after the pick
+// ("+ Add the first topic" → Topic) used to be lost and the card kept "New topic". They are held and handed to the field.
+const earlyWindow = h => {
+  const win = { listeners: [], addEventListener(name, fn, capture) { this.listeners.push({ name, fn, capture }); }, removeEventListener(name, fn) { this.listeners = this.listeners.filter(l => l.fn !== fn); } };
+  h.view.contentEl.win = win;
+  const key = (k, init = {}) => {
+    const event = { key: k, target: { closest: () => null }, isComposing: false, ctrlKey: false, metaKey: false, altKey: false, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...init };
+    for (const l of win.listeners.filter(l => l.name === 'keydown')) l.fn(event);
+    return event;
+  };
+  return { win, key };
+};
+test('21 (B29): keys typed before the new root\'s name field appears go into it; Enter typed early saves that name', async () => {
+  const h = await harness(); realAdd(h);
+  const { win, key } = earlyWindow(h);
+  const adding = h.view.addNode(null);
+  const typed = ['手', '機', ' ', 'x', 'Backspace', 'A'].map(k => key(k));
+  assert.equal(typed.every(e => e.defaultPrevented && e.stopped), true, 'held keys do not reach the canvas');
+  const composing = key('Process', { isComposing: true });
+  assert.equal(composing.defaultPrevented, false, 'a composing key is left alone');
+  const shortcut = key('z', { metaKey: true });
+  assert.equal(shortcut.defaultPrevented, false, 'a shortcut is left alone');
+  key('Enter');
+  await adding;
+  const fresh = freshCard(h);
+  await until(() => h.view.notes.get(fresh.id)?.title === '手機 A'); await tick(); await tick();
+  assert.equal(h.view.inlineName, null, 'the early Enter ended the edit');
+  assert.equal(win.listeners.length, 0, 'the key catcher is gone');
+});
+
+test('21 (B29): Esc typed before the new root\'s name field appears cancels the add: no card, no note', async () => {
+  const h = await harness(); realAdd(h);
+  const { win, key } = earlyWindow(h);
+  const notes = noteCount(h);
+  const trashFile = h.app.fileManager.trashFile;
+  h.app.fileManager.trashFile = async file => { await trashFile(file); h.contents.delete(file.path); };
+  const adding = h.view.addNode(null);
+  key('a'); key('Escape');
+  await adding;
+  await until(() => h.map().nodes.length === 4); await tick(); await tick();
+  assert.equal(noteCount(h), notes, 'no note is left');
+  assert.equal(h.view.inlineName, null);
+  assert.equal(h.view.history.canRedo, false, 'no redo');
+  assert.equal(win.listeners.length, 0, 'the key catcher is gone');
+});
+
 test('21: Enter while an input method is composing does not end the edit', async () => {
   const h = await harness(); realAdd(h);
   await h.view.addNode(null);

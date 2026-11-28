@@ -74,6 +74,7 @@ export async function importExchangeFile(
     new Notice(messageOf(error));
     return false;
   }
+  new Notice(t("ui.exchange_import_safety"));
   return true;
 }
 

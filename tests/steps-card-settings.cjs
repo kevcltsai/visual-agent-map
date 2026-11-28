@@ -3,6 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const suggests = [];
+const opened = [];
 const { load, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, core } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 const { element } = dom;
@@ -25,7 +26,7 @@ async function harness(spec) {
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const Base = dom.makeModal();
-  class Modal extends Base { open() { super.open(); this.close(); } }
+  class Modal extends Base { open() { opened.push(this); super.open(); this.close(); } }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: class { constructor(app, input) { this.inputEl = input; suggests.push(this); } close() {} }, Modal, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } }) });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
@@ -156,7 +157,8 @@ test('B11: card settings is one flat list in the P1.8 order; relations fold away
     const names = { 'vam-cover-section': 'cover', 'vam-parent-section': 'parent', 'vam-reference-sources': 'sources', 'vam-marker-section': 'markers', 'vam-link-section': 'link', 'vam-branch-layout-section': 'branch-layout', 'vam-ai-lock-section': 'ai-lock' };
     return names[cls.find(c => names[c])] ?? null;
   };
-  // Colour, style and the whole-branch switch stay at the end until the toolbar Style popover lands (B08).
+  // Colour and style live only in the toolbar's Style popover (B08, tests/steps-style-popover.cjs): no colour, style or
+  // whole-branch section here.
   assert.deepEqual(panel.children.map(label).filter(Boolean), ['strength', 'cover', 'type', 'parent', 'markers', 'link', 'relations', 'branch-layout', 'ai-lock']);
   const toggles = dom.findAll(panel, i => (i.cls ?? '').includes('vam-disclosure-toggle'));
   assert.deepEqual(toggles.map(b => b.text), ['Relations (1)'], 'no "More" fold; only the relations fold');
@@ -170,4 +172,36 @@ test('B11: card settings is one flat list in the P1.8 order; relations fold away
   const cover = panel.children.find(c => label(c) === 'cover');
   assert.deepEqual(dom.findAll(cover, i => i.tag === 'button').map(b => b.text), ['Turn card cover off'], 'the cover switch only: no "Crop and size…"');
   assert.equal(dom.findAll(panel, i => i.tag === 'button' && i.text === 'Add subtopic…').length, 0, 'no Add subtopic in card settings');
+  for (const cls of ['vam-color-section', 'vam-style-section', 'vam-branch-toggle'])
+    assert.equal(has(panel, cls), false, `no ${cls} in card settings`);
+});
+
+test('B11: card settings and expansion suggestions do not open while presenting or while notes load (P1.2 read-only)', async () => {
+  const h = await harness([['R', null, 80, 80], ['B', 'R', 420, 80]]);
+  const before = snapshot(h), map = h.contents.get(MAP);
+  for (const [name, set, unset] of [
+    ['presenting', () => { h.view.presentation = { ids: [], index: 0 }; }, () => { h.view.presentation = null; }],
+    ['notes loading', () => { h.view.noteLoad = {}; }, () => { h.view.noteLoad = null; }]
+  ]) {
+    set();
+    opened.length = 0;
+    h.view.openNodePanel(h.node('B'), 'structure');
+    h.view.openNodePanel(h.node('B'), 'proposals');
+    assert.equal(opened.length, 0, `${name}: no dialog opens`);
+    unset();
+  }
+  assert.deepEqual(snapshot(h), before, 'no note is written');
+  assert.equal(h.contents.get(MAP), map, 'Map.md is untouched');
+  // Editing again: the same call opens card settings.
+  opened.length = 0;
+  h.view.openNodePanel(h.node('B'), 'structure');
+  assert.equal(opened.length, 1);
+});
+
+test('B11: with colour and style gone from card settings, an AI card still reaches the Style popover from its ⋯ and right-click', () => {
+  const { ruleMoreSet, ruleContextSet, CARD_TOOLBAR } = load('experiences/visual-map/card-actions.ts', { obsidian });
+  assert.equal(CARD_TOOLBAR['ai-card'].includes('style'), false, 'no Style on the AI card toolbar');
+  assert.ok(ruleMoreSet('ai-card').includes('style'), 'Style… is in the AI card ⋯');
+  assert.ok(ruleContextSet('ai-card').includes('style'), 'and in its right-click menu');
+  assert.ok(CARD_TOOLBAR.card.includes('style'), 'an ordinary card has Style on its toolbar');
 });

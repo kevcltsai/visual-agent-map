@@ -186,7 +186,8 @@ export interface ArgumentRunPorts {
   /** Creates a note file and returns its node (not yet in the map). */
   createNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode>;
   readNote(path: string): Promise<{ title: string; summary: string }>;
-  updateNote(path: string, patch: { summary?: string; detail?: string }): Promise<void>;
+  /** The guarded write's outcome: "discarded" (a lock or a changed version refused it) is a failure of the step, not a success. */
+  updateNote(path: string, patch: { summary?: string; detail?: string }): Promise<"written" | "discarded" | void>;
   askModel(context: TaskContext, model: string, reasoning: unknown, signal: AbortSignal): Promise<AiResult>;
   /** Runs one of the six text-only steps (no web, no tools). Production: `askArgumentStep` over `providerArgumentRunner`. */
   runStep<Request extends ArgumentStepBase, Output>(
@@ -326,11 +327,14 @@ export class ArgumentRuns {
     if (input.detail !== undefined) safe.detail = intakeAiMarkdown(input.detail, { kind: "argument-detail" });
     return this.ports.createNote(safe, map, mapPath);
   }
-  private writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
+  private async writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
     const safe: { summary?: string; detail?: string } = {};
     if (patch.summary !== undefined) safe.summary = plainLine(patch.summary);
     if (patch.detail !== undefined) safe.detail = intakeAiMarkdown(patch.detail, { kind: "argument-detail" });
-    return this.ports.updateNote(path, safe);
+    if ((await this.ports.updateNote(path, safe)) === "discarded") {
+      this.ports.log("argument-run note write discarded");
+      throw new Error("argument note write discarded");
+    }
   }
 
   isRunning(mapPath: string): boolean {

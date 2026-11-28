@@ -151,6 +151,17 @@ export class LivingTrial {
     ready.savedContent = after;
   }
 
+  /** A ready preview still stands on these target bytes: the ones it read, or the ones of an accepted save. */
+  matchesTarget(content: string): boolean {
+    const ready = this.candidate;
+    return (
+      this.status === "ready" &&
+      !!ready &&
+      !this.adopting &&
+      (content === ready.snapshot.expectedContent || content === ready.savedContent)
+    );
+  }
+
   /** Never calls the provider. A failed or consumed candidate cannot be reused. */
   async adopt(port: LivingMarkdownPort, check: LivingAdoptionCheck): Promise<"written" | "discarded"> {
     const ready = this.candidate;

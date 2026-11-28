@@ -147,8 +147,8 @@ const TABLE = [
   // F01: shown only where references may change and not on a merging card (applies); the card gates otherwise.
   ['knowledge-ref-copy', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: false } }],
   ['knowledge-ref-paste', 'context', 'a', 'ok ro ok ok pr ms ok ok', { knowledgeRefs: { editable: true, copied: true } }],
-  // F09: read only, so no gate: every state answers ok.
-  ['impact', 'context', 'a', 'ok ok ok ok ok ok ok ok'],
+  // F09: read only; only the notes-loading gate (decision #35) greys it.
+  ['impact', 'context', 'a', 'ok ro ok ok ok ok ok ok'],
   ['remove', 'context', 'a', 'ok ro mg ok pr ms ok bk'], // single && !bookLock.structure; removeByKey → confirmRemoveNode refuses a merging branch
   // Keys (card keydown in renderNode, the view scope in installUndoScope, searchKey).
   ['add-child', 'key', 'a', 'ok ro ok ok pr ms ok bk'], // Mod+Enter: presentation/notesLoading/bookLock.structure swallowed, selection mode passed on

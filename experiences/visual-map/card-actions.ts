@@ -663,8 +663,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["context"],
     order: 168,
     group: 4,
-    // Read only (it writes nothing), so no editing gate: it works while loading, merging or on an AIM map.
-    available: () => OK,
+    // Read only (it writes nothing): it works while merging or on an AIM map, but like every row it is greyed while the notes load (decision #35).
+    available: ctx => gate(ctx, ["readOnly"]),
     run: ctx => ctx.host.impactAnalysis(card(ctx))
   },
   {

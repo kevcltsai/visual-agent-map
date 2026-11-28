@@ -64,6 +64,16 @@ test('F09 the card right-click menu has Impact analysis; it is also there on an 
   assert.equal(cardMenu(h, h.ids.kid).filter(i => i.title === 'Impact analysis').length, 1, 'picking');
 });
 
+test('F09 while the notes load the Impact analysis row is greyed with "notes loading" and does nothing; once loaded it is enabled (decision #35)', async () => {
+  const h = await harness();
+  const row = () => cardMenu(h, h.ids.root).find(i => i.title === 'Impact analysis');
+  assert.ok(!row().disabled, 'loaded: enabled');
+  h.view.noteLoad = { framed: false };
+  assert.equal(row().disabled, true, 'loading: greyed');
+  h.view.noteLoad = null;
+  assert.ok(!row().disabled, 'loaded again: enabled');
+});
+
 test('F09 choosing it hands the chat window a read-only result: direct (relation, subtopic, reference card by the title already read) and speculative apart; no write', async () => {
   const h = await harness();
   await h.settle();

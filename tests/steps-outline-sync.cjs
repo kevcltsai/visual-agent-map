@@ -130,6 +130,7 @@ async function viewWithMap() {
   const plugin = { mutate: () => { calls.mutate++; return Promise.resolve(); }, expansionBatches: new Map(), setOutlineActive: path => calls.active.push(path) };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {} };
+  view.contentEl = { focus() {} };
   view.render = () => {}; view.transform = () => {}; view.saveViewport = () => { calls.saved++; };
   view.mapChange = async () => { calls.mapChange++; };
   return { view, app, calls, text, ids: { root: root.id, child: child.id, leaf: leaf.id } };
@@ -170,7 +171,7 @@ for (const zoom of [1, 0.25]) for (const [w, h] of [[280, 79], [280, 99], [360, 
     const canvas = { left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 };
     view.viewportEl = { clientWidth: 800, clientHeight: 600, toggleClass() {}, getBoundingClientRect: () => canvas };
     const rects = { '.vam-map-tools': { left: 100, right: 700, top: 20, bottom: 64 }, '.vam-zoom-controls': { left: 300, right: 500, top: 560, bottom: 610 }, '.vam-map-chat.is-overlay': { left: 10, right: 130, top: 20, bottom: 620 } };
-    view.contentEl = { querySelector: selector => rects[selector] && { getBoundingClientRect: () => rects[selector] } };
+    view.contentEl = { focus() {}, querySelector: selector => rects[selector] && { getBoundingClientRect: () => rects[selector] } };
     view.cardEls = new Map([[leaf.id, fakeCard(w, h)]]);
     view.map.viewport = { x: 0, y: 0, zoom };
     await view.revealPath('leaf.md');

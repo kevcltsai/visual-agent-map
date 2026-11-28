@@ -19,7 +19,8 @@ export function collapseForEditorRoom(
   docks: readonly (SideDock | null | undefined)[],
   folded: Set<SideDock>
 ): boolean {
-  if (!width || width >= LIVING_EDITOR_MIN_WIDTH) return false;
+  // A width of 0 is a pane squeezed shut by both panels (the caller skips a hidden tab, whose boxes also measure 0).
+  if (width >= LIVING_EDITOR_MIN_WIDTH) return false;
   const dock = docks.find(item => item && !item.collapsed && !folded.has(item));
   if (!dock) return false;
   dock.collapse();
@@ -27,8 +28,13 @@ export function collapseForEditorRoom(
   return true;
 }
 
-/** When the editor closes: opens again only the panels it folded itself and that are still folded; the user's own folds stay. */
-export function restoreEditorRoom(folded: Set<SideDock>): void {
+/**
+ * When the editor closes: opens again only the panels it folded itself and that are still folded; the user's own folds stay.
+ * `revealed` holds panels the user had folded that opening the editor's reader unfolded: they are folded back.
+ */
+export function restoreEditorRoom(folded: Set<SideDock>, revealed: Set<SideDock>): void {
   for (const dock of folded) if (dock.collapsed) dock.expand();
+  for (const dock of revealed) if (!dock.collapsed) dock.collapse();
   folded.clear();
+  revealed.clear();
 }

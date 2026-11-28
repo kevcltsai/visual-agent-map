@@ -1754,6 +1754,8 @@ export class VisualAgentMapView extends ItemView {
     adoption?: LivingAdoptionCheck;
     /** Side panels this editor folded to make room; opened again when it closes. */
     folded: Set<SideDock>;
+    /** Side panels the user had folded that the editor's reader unfolded; folded back when it closes. */
+    revealed: Set<SideDock>;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -17035,7 +17037,8 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      folded: new Set()
+      folded: new Set(),
+      revealed: new Set()
     };
     win.mount(overlay);
     this.makeRoomForAiCard();
@@ -17045,10 +17048,23 @@ export class VisualAgentMapView extends ItemView {
           if (current() && names.length) win.markReplaced(names);
         })
         .catch(() => undefined);
-    if (node)
-      void this.plugin.openDetails(this.plugin.repo.file(node.path), viewSession).catch(error => {
-        if (current()) new Notice(error instanceof Error ? error.message : String(error));
-      });
+    if (node) {
+      const right = (this.app.workspace as { rightSplit?: SideDock } | undefined)?.rightSplit;
+      const rightFolded = right?.collapsed === true;
+      void this.plugin
+        .openDetails(this.plugin.repo.file(node.path), viewSession)
+        .then(() => {
+          // The reader opens in the right panel: a panel the user had folded is folded back on close, and the room is
+          // measured again now that the reader took its width.
+          const open = this.aiCardOpen;
+          if (!current() || !open) return;
+          if (right && rightFolded && !right.collapsed) open.revealed.add(right);
+          this.makeRoomForAiCard();
+        })
+        .catch(error => {
+          if (current()) new Notice(error instanceof Error ? error.message : String(error));
+        });
+    }
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
@@ -17057,7 +17073,7 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
-    restoreEditorRoom(open.folded);
+    restoreEditorRoom(open.folded, open.revealed);
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
@@ -17202,8 +17218,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** A narrow window with both side panels open leaves the central editor a few dozen pixels: fold a side panel until it fits. */
   private makeRoomForAiCard(): void {
-    if (!this.aiCardOpen) return;
-    const width = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay")?.clientWidth ?? 0;
+    if (!this.aiCardOpen || this.hiddenTab()) return;
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (!overlay) return;
+    const width = overlay.clientWidth ?? 0;
     const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
     collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit], this.aiCardOpen.folded);
   }

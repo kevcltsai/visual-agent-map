@@ -4317,6 +4317,16 @@ export class BookPipelineRuns {
     }
     return { checked, issues };
   }
+  /** True when the run has chapters and every one of them reads as `ai-locked` now (an unreadable chapter does not count as locked). */
+  private async allLocked(drive: Drive): Promise<boolean> {
+    const order = effectiveOrder(drive.store.state);
+    if (!order.length) return false;
+    for (const id of order) {
+      const info = drive.cards.get(id);
+      if (!info || !(await this.ports.readCard(info.path).catch(() => undefined))?.aiLocked) return false;
+    }
+    return true;
+  }
   /** Writes the closing page (one retry). False when it could not be written: the book must not show as done. */
   private async writeClosingPage(drive: Drive): Promise<boolean> {
     const root = drive.cards.get(drive.rootId);
@@ -4325,6 +4335,8 @@ export class BookPipelineRuns {
       if (this.dead(drive)) return false;
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
+        // ai-flows AI lock: a book whose every chapter is locked and that nothing checked gets no page (no file is added for it).
+        if (!checked && (await this.allLocked(drive))) return true;
         const content = composeOpenIssuesNote({
           bookTitle: root.title,
           language: drive.config.language,

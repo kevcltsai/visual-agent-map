@@ -6,9 +6,13 @@
  */
 import { foldSearchText, loadAuthorizedCards, type CorpusCard } from "./cross-map-corpus";
 import type { KnowledgeRefIO } from "./knowledge-refs";
+import { BudgetExhaustedError, type AdmissionContext } from "../../core/admission";
+import { MAX_CONDENSE_CALLS } from "../../core/source-gateway";
 
 /** Cards found for one message; the same number the chat sends at most. */
 export const RETRIEVAL_RESULT_LIMIT = 5;
+/** Cards the exact step hands to the ranking; the chat still takes {@link RETRIEVAL_RESULT_LIMIT} of them. */
+export const RETRIEVAL_CANDIDATE_LIMIT = 20;
 /** Words of one message that are looked up; a pasted page must not turn into thousands of comparisons per card. */
 const MAX_TOKENS = 64;
 const STOP_WORDS = new Set(
@@ -203,4 +207,46 @@ export function excerptOf(
     .join("\n");
   if (text.length > room) text = `${text.slice(0, Math.max(0, room - 1))}…`;
   return { summary: head, detail: text, cut: true };
+}
+
+/**
+ * The call budget of one chat turn: {@link MAX_CONDENSE_CALLS} requests in all, of which `used` were already spent this turn (the source
+ * condensing, counted at its worst case). Each reservation takes one; the one after the last is refused with `BudgetExhaustedError`.
+ */
+export function turnAdmission(used: number): AdmissionContext {
+  let taken = used;
+  return {
+    reserve(): Promise<void> {
+      if (taken >= MAX_CONDENSE_CALLS) return Promise.reject(new BudgetExhaustedError());
+      taken++;
+      return Promise.resolve();
+    }
+  };
+}
+
+/**
+ * The cards the chat takes from `candidates` (in the order the exact step gave them). Up to `limit` candidates need no ranking and no call.
+ * More: `rank` is asked once for the ids best first; the ones it leaves out follow in the exact order. A refusal (budget), a failure or a
+ * stop gives the exact order and says so (`byWords`) - the user is never shown an error for it.
+ */
+export async function pickRanked<T>(
+  candidates: readonly T[],
+  keyOf: (item: T) => string,
+  rank: (ids: string[]) => Promise<string[]>,
+  limit = RETRIEVAL_RESULT_LIMIT
+): Promise<{ cards: T[]; byWords: boolean }> {
+  if (candidates.length <= limit) return { cards: [...candidates], byWords: false };
+  try {
+    const order = await rank(candidates.map(keyOf));
+    const byKey = new Map(candidates.map(item => [keyOf(item), item]));
+    const first: T[] = [];
+    for (const id of new Set(order)) {
+      const item = byKey.get(id);
+      if (item !== undefined) first.push(item);
+    }
+    const rest = candidates.filter(item => !first.includes(item));
+    return { cards: [...first, ...rest].slice(0, limit), byWords: false };
+  } catch {
+    return { cards: candidates.slice(0, limit), byWords: true };
+  }
 }

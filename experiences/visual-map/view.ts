@@ -97,7 +97,17 @@ import { CrossMapSearch } from "./cross-map-search";
 import { renderCrossMapResults } from "./cross-map-results";
 import type { CorpusCard } from "./cross-map-corpus";
 import { readAiLocked } from "../../note-values";
-import { excerptOf, findCards, raceAbort } from "./knowledge-retrieval";
+import {
+  excerptOf,
+  findCards,
+  pickRanked,
+  raceAbort,
+  RETRIEVAL_CANDIDATE_LIMIT,
+  RETRIEVAL_RESULT_LIMIT,
+  turnAdmission
+} from "./knowledge-retrieval";
+import { runCardRank } from "../../core/card-rank-service";
+import { estimateCondenseCalls } from "../../core/source-gateway";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -3088,18 +3098,83 @@ export class VisualAgentMapView extends ItemView {
    */
   private async findPastCards(message: string, signal: AbortSignal): Promise<CorpusCard[]> {
     const map = this.map;
+    this.foundByWords = false;
     if (!map || !this.plugin.knowledgeIndex) return [];
     try {
       const cards = await raceAbort(this.plugin.knowledgeIndex.get(), signal, []);
       if (signal.aborted) return [];
-      return findCards(cards, message, {
-        mapId: map.id,
-        keys: new Set([...this.chatOtherCards.values()].map(card => `${card.mapId}\u0000${card.nodeId}`))
-      });
+      const candidates = findCards(
+        cards,
+        message,
+        {
+          mapId: map.id,
+          keys: new Set([...this.chatOtherCards.values()].map(card => `${card.mapId}\u0000${card.nodeId}`))
+        },
+        RETRIEVAL_CANDIDATE_LIMIT
+      );
+      return await this.rankPastCards(candidates, message, signal);
     } catch {
+      this.foundByWords = false;
       return [];
     }
   }
+  /**
+   * More candidates than the chat takes: they are read again under the reference rules (a card that is gone, archived, unreadable or
+   * AI-locked now is dropped before anything is sent), and one AI call, counted against this turn's call budget, orders them by meaning
+   * from their titles and short excerpts. A refused budget, a failed call or a stop keeps the order of the exact step.
+   */
+  private async rankPastCards(candidates: CorpusCard[], message: string, signal: AbortSignal): Promise<CorpusCard[]> {
+    this.foundByWords = false;
+    if (candidates.length <= RETRIEVAL_RESULT_LIMIT) return candidates;
+    const resolved = await resolveKnowledgeRefs(
+      candidates.map((card, index) => ({
+        id: String(index),
+        mapId: card.mapId,
+        nodeId: card.nodeId,
+        pathHint: card.mapPath
+      })),
+      this.plugin.repo.knowledgeRefIO(),
+      { withBody: true }
+    );
+    const usable: { id: string; card: CorpusCard; excerpt: string }[] = [];
+    for (const [index, card] of candidates.entries()) {
+      const read = resolved.get(String(index));
+      if (!read?.ok || signal.aborted) continue;
+      const fm = await Promise.resolve(this.plugin.repo.knowledgeRefIO().noteFrontmatter(read.notePath)).catch(
+        () => null
+      );
+      if (!fm || readAiLocked(fm)) continue;
+      const part = excerptOf(read.summary ?? "", read.detail ?? "", message);
+      usable.push({ id: `c${usable.length + 1}`, card, excerpt: `${part.summary}\n${part.detail}` });
+    }
+    if (signal.aborted) return [];
+    const settings = this.plugin.settings;
+    const picked = await pickRanked(
+      usable,
+      item => item.id,
+      () =>
+        runCardRank(
+          this.plugin.aiCalls,
+          {
+            ...this.usageMapField(),
+            message,
+            cards: usable.map(item => ({ id: item.id, title: item.card.title, excerpt: item.excerpt })),
+            language: settings.language,
+            contentLanguage: outputLanguageForMap(this.map, settings.language, ...mapChatLanguageSources(message)),
+            model: settings.cliModel,
+            reasoning: normalizeReasoningLevel(settings.cliReasoning)
+          },
+          { signal, admission: turnAdmission(this.chatTurnCalls) }
+        )
+    );
+    if (signal.aborted) return [];
+    this.foundByWords = picked.byWords;
+    return picked.cards.map(item => item.card);
+  }
+  /** Set by the last `findPastCards`: there were more candidates than the chat takes and they stayed in the order of their words. */
+  private foundByWords = false;
+  /** Requests this turn already spent from the call budget (the source condensing, at its worst case); reset by `chatMapSources`. */
+  private chatTurnCalls = 0;
   /**
    * The waiting cards for this message (the ones the user added first, then `found` ones), read again now under the reference rules
    * (a card that is gone, archived or unreadable is dropped), then forgotten. The found ones carry `foundByAi` and are named in a
@@ -3158,13 +3233,17 @@ export class VisualAgentMapView extends ItemView {
         ...(pick.foundBy ? { foundByAi: true } : {})
       });
     }
-    this.foundSent = { cards: sentFound, cut };
+    this.foundSent = { cards: sentFound, cut, byWords: this.foundByWords };
     return cards;
   }
   /** What the last `takeOtherMapCards` found by itself and sent; read at once by the request builder. */
-  private foundSent: { cards: CorpusCard[]; cut: boolean } = { cards: [], cut: false };
+  private foundSent: { cards: CorpusCard[]; cut: boolean; byWords: boolean } = {
+    cards: [],
+    cut: false,
+    byWords: false
+  };
   /** The found cards of a built request, told to the user once its turn went through (and written to the record when it was sent). */
-  private chatFound = new WeakMap<object, { cards: CorpusCard[]; cut: boolean }>();
+  private chatFound = new WeakMap<object, { cards: CorpusCard[]; cut: boolean; byWords: boolean }>();
   /** "AI found N past cards", each a link that locates it, so a reply that names a card can be followed. */
   private noticeFoundCards(found: { cards: readonly CorpusCard[]; cut: boolean }): void {
     const make = (window as { createFragment?: typeof createFragment }).createFragment;
@@ -16559,14 +16638,17 @@ export class VisualAgentMapView extends ItemView {
     const conversation = this.chatConversation;
     const current = (): boolean =>
       !this.closed && this.path === mapPath && this.map?.id === mapId && this.chatConversation === conversation;
+    this.chatTurnCalls = 0;
     const groups = await this.readMapSourceGroups(signal);
     const settings = this.plugin.settings;
     const material = await mapChatSourceMaterial({
       groups,
       mapPath,
       cache: this.chatSourceCache,
-      condense: () =>
-        this.plugin.aiTasks.condenseReferences(
+      condense: () => {
+        // Condensing is not reserved call by call here: this turn's budget counts its worst case.
+        this.chatTurnCalls = estimateCondenseCalls(groups);
+        return this.plugin.aiTasks.condenseReferences(
           {
             title: this.map?.title ?? "",
             summary: "",
@@ -16584,7 +16666,8 @@ export class VisualAgentMapView extends ItemView {
           settings.cliModel,
           normalizeReasoningLevel(settings.cliReasoning),
           signal
-        ),
+        );
+      },
       refuse: () => new Error(t("ui.source_context_exceeds_budget"))
     });
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -24536,7 +24619,9 @@ export class VisualAgentMapView extends ItemView {
     if (!record || !found) return;
     record.event("cards_found", {
       topics: found.cards.map(card => ({ id: card.mapTitle, title: card.title })),
-      ...(found.cut ? { reason: "cut" } : {})
+      ...(found.cut || found.byWords
+        ? { reason: [found.cut ? "cut" : "", found.byWords ? "ranked by words" : ""].filter(Boolean).join(", ") }
+        : {})
     });
   }
   /** Writes the `sources_read` mark once per record conversation (the sources were sent: a reopened conversation keeps its writes behind the plan). */

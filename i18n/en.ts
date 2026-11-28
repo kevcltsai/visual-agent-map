@@ -1578,7 +1578,8 @@ export const en = {
   "ui.map_chat_skip_attached_read_only": "the file is outside this map\u2019s folder, so the chat only reads it",
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_fail_changed": "the card was changed after you sent the message, so this step wrote nothing",
-  "ui.map_chat_fail_batch_timeout": "this was not written in time and was not kept (lines marked done were kept); ask again",
+  "ui.map_chat_fail_batch_timeout":
+    "this was not written in time and was not kept (lines marked done were kept); ask again",
   "ui.map_chat_fail_unknown": "this step could not be completed",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",

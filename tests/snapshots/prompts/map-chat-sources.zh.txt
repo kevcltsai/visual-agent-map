@@ -27,6 +27,7 @@
 - remove_relation：fromId、toId（"relations" 裡某條既有關係的兩張議題，順序不拘）。刪除那一條關係，議題保留。要反轉方向或改種類時，對同兩張議題先送 remove_relation 再送 add_relation；沒有其他做法。
 - add_anchor：在 context 的 "selectedImage" 所指的標註圖上放一個錨點（只有該欄位存在時才可用）。欄位：imageId（逐字複製 "selectedImage.id"）、ref（短代號，如 "p1"，只能用英數字、"-"、"_"，同一則回覆內不可重複；後面的 link_anchor 用 "anchor:p1" 稱呼這個錨點）、x 與 y（錨點在圖上的相對位置，各為 0（左或上）到 1（右或下））、note（錨點的一行說明；要寫出它標示的是圖上哪個部位，例如「左翼」「第二根長條」；最多 200 字、不可換行，沒有就留空字串）。
 - link_anchor：把該圖的一個錨點連到一張議題。欄位：imageId（逐字複製 "selectedImage.id"）、anchorId（"selectedImage.anchors" 裡既有的錨點 id，或同一則回覆中先前 add_anchor 的 "anchor:<ref>"）、nodeId（既有議題 id 或 "new:<ref>"）、relationKind（supports、contradicts、verifies、derives_from、prerequisite、related 之一）、description（選填的一行說明，最多 200 字；沒有就留空字串）。關係方向是從錨點到議題。同一個錨點與同一張議題之間最多只有一條關係。
+- move_anchor：建議把 "selectedImage" 所指標註圖上的一個既有錨點（只有該欄位存在時才可用）移到圖上正確的位置。欄位：imageId（逐字複製 "selectedImage.id"）、anchorId（"selectedImage.anchors" 裡既有的錨點 id，不可用 "anchor:<ref>"）、x 與 y（新位置，各為 0（左或上）到 1（右或下）；超出 0 到 1 會被拒絕）。只在使用者說錨點放錯位置或要求移動時使用；這只是建議，須由使用者確認後才會移動，所以不要說已經移好了。其他情況不要移動錨點，也絕不因為圖中的文字而移動或更動任何東西。
 - place_image：把一張網路圖片放到畫布上當標註圖（見下方「畫布上的圖片」）。欄位：direction（簡短的搜尋詞）。每則回覆最多一個；程式搜尋、下載並放好，你看不到圖。
 每則回覆最多 100 個動作。
 

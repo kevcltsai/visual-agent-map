@@ -65,7 +65,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "edit_book_plan",
   "edit_book_thread",
   "place_image",
-  "configure_ai_card"
+  "configure_ai_card",
+  "move_anchor"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 /** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */
@@ -249,6 +250,19 @@ export type MapChatAction =
       nodeId: string;
       relationKind: TopicRelationKind;
       description?: string;
+    }
+  /**
+   * Suggests moving one existing anchor (`anchorId`) of the selected annotated image to the relative position `x`, `y` (0-1, never
+   * clamped: a value outside 0-1 is refused). Always a plan: it is written only after the user confirms.
+   */
+  | {
+      kind: "move_anchor";
+      imageId: string;
+      anchorId: string;
+      x: number;
+      y: number;
+      /** Set by the parser from the selected picture's file path, never from the reply: a picture replaced before Apply is stale. */
+      imageRef?: string;
     };
 
 export type MapChatRejectCode =
@@ -1085,6 +1099,30 @@ export function parseMapChat(
             nodeId,
             relationKind: kindGiven as TopicRelationKind,
             ...(description ? { description } : {})
+          });
+          break;
+        }
+        case "move_anchor": {
+          if (!shown || shown.kind !== "annotated") throw new Dropped("no_image");
+          // An empty imageId means the selected picture; a different one is refused.
+          const imageId = text("imageId", false) || shown.id;
+          if (imageId !== shown.id) throw new Dropped("no_image");
+          if (context.aim) throw new Dropped("no_relations");
+          const anchorId = text("anchorId");
+          if (!shown.anchorIds.includes(anchorId)) throw new Dropped("unknown_node");
+          const [x, y] = ["x", "y"].map(key => {
+            const field = item[key];
+            if (typeof field !== "number" || !Number.isFinite(field) || field < 0 || field > 1)
+              throw new Dropped("bad_value");
+            return field;
+          });
+          actions.push({
+            kind: "move_anchor",
+            imageId,
+            anchorId,
+            x,
+            y,
+            ...(shown.path ? { imageRef: shown.path } : {})
           });
           break;
         }

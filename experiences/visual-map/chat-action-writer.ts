@@ -4,7 +4,10 @@ import {
   anchorRelationAllowed,
   ANCHOR_LIMIT,
   findAnnotatedImage,
-  type AnchorRelation
+  isImage2dAnchor,
+  updateAnchor,
+  type AnchorRelation,
+  type AnnotatedImageItem
 } from "./canvas-items";
 import type { Transaction, TransactionEntry } from "./map-transaction";
 import { randomUUID } from "node:crypto";
@@ -416,6 +419,8 @@ export class ChatActionWriter {
       case "add_anchor":
       case "link_anchor":
         return this.chatChangeAnchor(action, real, run);
+      case "move_anchor":
+        return this.chatMoveAnchor(action);
       case "set_appearance":
         return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
@@ -892,6 +897,42 @@ export class ChatActionWriter {
       run.ringAdded.set(action.imageId, added);
     }
     return { status: "done" };
+  }
+  /**
+   * move_anchor (G06a): runs only from a confirmed plan. The same Map.md write as dragging an anchor by hand (`updateAnchor`),
+   * checked again against the map being edited: a picture that was deleted or turned back into an ordinary one, or an anchor
+   * that is gone, is stale and writes nothing. Never on an AIM map.
+   */
+  private async chatMoveAnchor(action: Extract<MapChatAction, { kind: "move_anchor" }>): Promise<ChatOutcome> {
+    if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const items = this.map.canvasItems ?? [];
+    const image = findAnnotatedImage(items, action.imageId);
+    if (!image)
+      return skipped(
+        items.some(item => item.id === action.imageId && item.kind === "image")
+          ? "ui.map_chat_skip_image_plain"
+          : "ui.map_chat_skip_image_gone"
+      );
+    /** Why this write is stale or cannot move the anchor now; null = it can. */
+    const refusal = (current: AnnotatedImageItem): TranslationKey | null => {
+      // The picture file was replaced since the suggestion: the position was meant for another picture.
+      if (action.imageRef !== undefined && current.path !== action.imageRef) return "ui.map_chat_skip_image_gone";
+      const anchor = current.anchors.find(entry => entry.id === action.anchorId);
+      // Only a 2D position can be moved; never answer "done" without moving.
+      return anchor && isImage2dAnchor(anchor) ? null : "ui.map_chat_skip_anchor_gone";
+    };
+    const early = refusal(image);
+    if (early) return skipped(early);
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.ports.mapChange(map => {
+      const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
+      box.refused = current ? refusal(current) : "ui.map_chat_skip_image_gone";
+      if (!box.refused)
+        map.canvasItems = updateAnchor(map.canvasItems ?? [], action.imageId, action.anchorId, {
+          at: { x: action.x, y: action.y }
+        });
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

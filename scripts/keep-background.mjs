@@ -51,9 +51,16 @@ export async function applyPolicy(appProfile, policy, connect = connectCdp, time
   finally { try { cdp?.close(); } catch { /* already closed */ } }
 }
 
+// macOS 27 ignores `-only` and prints the full record (`pid = 828`, `bundle path="..."`); older releases print `"pid"=828`.
+// Reading neither left every front app unknown, so focus was never handed back.
+export function parseFrontApp(info = "") {
+  const pid = /"pid"=(\d+)|\bpid = (\d+)/.exec(info);
+  const path = /"LSBundlePath"="([^"]+)"|bundle path="([^"]+)"/.exec(info);
+  return { pid: Number(pid?.[1] ?? pid?.[2]), path: path?.[1] ?? path?.[2] };
+}
+
 export function frontApp() {
-  const info = spawnSync("sh", ["-c", "lsappinfo info -only pid -only bundlepath \"$(lsappinfo front)\""], { encoding: "utf8" }).stdout ?? "";
-  return { pid: Number(/"pid"=(\d+)/.exec(info)?.[1]), path: /"LSBundlePath"="([^"]+)"/.exec(info)?.[1] };
+  return parseFrontApp(spawnSync("sh", ["-c", "lsappinfo info -only pid -only bundlepath \"$(lsappinfo front)\""], { encoding: "utf8" }).stdout ?? "");
 }
 
 function processAlive(pid) {

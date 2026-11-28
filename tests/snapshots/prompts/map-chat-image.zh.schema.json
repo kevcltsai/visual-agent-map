@@ -44,7 +44,8 @@
               "edit_book_plan",
               "edit_book_thread",
               "place_image",
-              "configure_ai_card"
+              "configure_ai_card",
+              "move_anchor"
             ]
           },
           "nodeId": {

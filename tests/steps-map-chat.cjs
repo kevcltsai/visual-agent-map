@@ -140,7 +140,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property but "rewrite" is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 30);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 31);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).filter(key => key !== 'rewrite').sort());
   // Codex strict output: every object in the schema Codex gets, top level included, lists all its properties as required (a missing one is a 400).
@@ -622,7 +622,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-14, -7)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-15, -8)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -706,7 +706,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan', 'edit_book_thread', 'place_image', 'configure_ai_card']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan', 'edit_book_thread', 'place_image', 'configure_ai_card', 'move_anchor']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);

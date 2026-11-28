@@ -80,6 +80,15 @@ export interface ChatPreviewAnchor {
   y: number;
   note: string;
 }
+/** One anchor a pending plan would move: the dashed dot is drawn at `x`, `y`, a light link to where the anchor is now. */
+export interface ChatPreviewMove {
+  imageId: string;
+  anchorId: string;
+  x: number;
+  y: number;
+  /** The picture file the position was meant for; a picture replaced by another file is no longer drawn on. */
+  imageRef?: string;
+}
 /** What applying a plan is given beyond the reply: the context the basis is judged by and where the started work is collected. */
 export interface ChatPlanApplyOptions {
   context: Pick<MapChatContext, "basis" | "parents">;
@@ -111,13 +120,14 @@ export interface MapChatConversationPorts {
   plans(): WeakMap<MapChatPlanCard, MapChatTurnRecord>;
   /**
    * Draws the plan's anchors as dashed dots, the cards it would make as dashed cards and the relations it would add as dashed lines
-   * (empty lists clear them), only while `token` is the plan's current one. Drawn only: never a node or a relation of the map.
+   * and the anchors it would move as a dashed dot with a link to where they are now (empty lists clear them), only while `token` is the plan's current one. Drawn only: never a node or a relation of the map.
    */
   showPreview(
     token: number,
     anchors: ChatPreviewAnchor[],
     cards: PlanGhostSpec[],
-    relations: PlanGhostRelation[]
+    relations: PlanGhostRelation[],
+    moves: ChatPreviewMove[]
   ): void;
   clearPreview(): void;
   /** Why the plan made for `anchor` cannot be applied now (its map is not the open one, or the map is read-only here); null = it can. */
@@ -243,6 +253,8 @@ export class MapChatConversation {
         return t("ui.map_chat_plan_reason_auto_apply_confirm");
       case "book_plan_edit":
         return t("ui.map_chat_plan_reason_book_plan_edit");
+      case "move_anchor_confirm":
+        return t("ui.map_chat_plan_reason_move_anchor_confirm");
       case "living_node_confirm":
         return t("ui.living_node_chat_plan_confirm");
     }
@@ -269,6 +281,19 @@ export class MapChatConversation {
     // The cards and relations the plan would make are drawn as a dashed preview (V3.3 E3); the text list below stays the full account.
     // A suggested relation is a dashed line too, until it is adopted.
     const ghosts = planGhostSpecs(result.actions);
+    const movesToShow = result.actions.flatMap(action =>
+      action.kind === "move_anchor"
+        ? [
+            {
+              imageId: action.imageId,
+              anchorId: action.anchorId,
+              x: action.x,
+              y: action.y,
+              ...(action.imageRef !== undefined ? { imageRef: action.imageRef } : {})
+            }
+          ]
+        : []
+    );
     const suggested = (result.suggestions ?? []).map((suggestion): MapChatAction => ({
       kind: "add_relation",
       fromId: suggestion.fromId,
@@ -277,10 +302,16 @@ export class MapChatConversation {
     }));
     const rows: MapChatSuggestionRow[] = [];
     const drawPreview = (): void =>
-      this.ports.showPreview(token, anchorsToPlace, ghosts, [
-        ...planGhostRelations(result.actions),
-        ...planGhostRelations(suggested.filter((_, at) => rows[at]?.state !== "adopted"))
-      ]);
+      this.ports.showPreview(
+        token,
+        anchorsToPlace,
+        ghosts,
+        [
+          ...planGhostRelations(result.actions),
+          ...planGhostRelations(suggested.filter((_, at) => rows[at]?.state !== "adopted"))
+        ],
+        movesToShow
+      );
     drawPreview();
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.

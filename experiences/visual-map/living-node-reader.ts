@@ -1,6 +1,6 @@
-import { Component, ItemView, MarkdownRenderer, type TFile, type WorkspaceLeaf } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, parseYaml, type TFile, type WorkspaceLeaf } from "obsidian";
 import { getUiLanguage, t } from "../../i18n";
-import type { LivingChangeSummary } from "./living-node-changes";
+import { readLivingLastChange, type LivingChangeSummary } from "./living-node-changes";
 import { localizeLivingReader, readableDate } from "./living-node-markdown";
 import { decodeCalloutSections, removeSection } from "../../core/repository-note-body";
 
@@ -77,9 +77,11 @@ export class LivingReaderView extends ItemView {
     this.changes = undefined;
   }
 
-  private paintChanges(host: HTMLElement, changes: LivingChangeSummary): void {
+  private paintChanges(host: HTMLElement, changes: LivingChangeSummary | undefined): void {
     const lines: string[] = [];
-    if (changes.firstRun) lines.push(t("ui.living_node_changes_first_run"));
+    // No stored changes (formal tab): the card may have run before, so never call it the first run.
+    if (!changes) lines.push(t("ui.living_node_changes_no_baseline"));
+    else if (changes.firstRun) lines.push(t("ui.living_node_changes_first_run"));
     else {
       const counts = [
         ["ui.living_node_changes_added_0", changes.added],
@@ -95,6 +97,23 @@ export class LivingReaderView extends ItemView {
     const box = host.createDiv({ cls: "vam-living-reader-changes", attr: { role: "status" } });
     box.createEl("strong", { text: t("ui.living_node_changes_title") });
     for (const line of lines) box.createDiv({ text: line });
+  }
+
+  /** The formal tab's changes: the last changed commit while it is still the latest check, "no changes" after a later no-change run, else no baseline. */
+  private lastChangeOf(raw: string): LivingChangeSummary | undefined {
+    const stored = readLivingLastChange(raw, parseYaml);
+    if (!stored) return undefined;
+    return stored.checkedAt === undefined || stored.checkedAt === stored.at
+      ? stored.changes
+      : {
+          ...stored.changes,
+          added: [],
+          supplemented: [],
+          corrected: [],
+          disputed: [],
+          invalidated: [],
+          outputUpdated: false
+        };
   }
 
   private async paint(): Promise<void> {
@@ -131,14 +150,22 @@ export class LivingReaderView extends ItemView {
         host.createDiv({ cls: "vam-living-reader-banner", text: warning, attr: { role: "status" } });
       if (this.changes) this.paintChanges(host, this.changes);
     }
+    let raw = "";
+    if (this.tab === "official") {
+      try {
+        raw = await this.app.vault.read(file);
+      } catch {
+        // The content block below reports the missing note.
+      }
+      if (generation !== this.generation) return;
+      this.paintChanges(host, this.lastChangeOf(raw));
+    }
     const outline = host.createDiv("vam-living-reader-outline");
     const content = host.createDiv("vam-living-reader-content");
     try {
       let markdown = this.preview;
       if (this.tab === "official") {
-        markdown = decodeCalloutSections(
-          (await this.app.vault.read(file)).replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")
-        );
+        markdown = decodeCalloutSections(raw.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
         markdown = removeSection(markdown, "Prompt");
         markdown = removeSection(markdown, "Rules");
       }

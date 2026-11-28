@@ -498,7 +498,6 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-lock-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; margin-right: auto; padding: 1px 4px 1px 10px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-card-lock-pill[hidden] { display: none; }
 .vam-card-lock-pill button.vam-card-lock-unlock { height: auto; padding: 0 8px; border-radius: 999px; font-size: var(--font-ui-smaller); }
-.vam-topic-modal .vam-branch-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .vam-inspector-topic { margin: -8px 0 14px; color: var(--text-muted); }
 /* Card settings (ticket 41): the add-relation sentence, the folded groups and the AI lock state. Classes below are not collected by the share viewer. */
 .vam-topic-modal .vam-relation-list { max-height: 9em; overflow-y: auto; }
@@ -1537,11 +1536,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="blue"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="blue"] { background: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="purple"], .vam-style-popover .vam-color-swatch[data-topic-color-swatch="purple"] { background: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch, .vam-style-popover .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
-.vam-topic-modal .vam-color-section > button { margin-top: 8px; }
-.vam-topic-modal .vam-topic-colors button[aria-checked="true"], .vam-topic-modal .vam-topic-colors button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
-.vam-topic-modal .vam-style-section > button { margin-top: 8px; }
-.vam-topic-modal .vam-topic-style-size-label { margin: 8px 0 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-topic-modal .vam-topic-style-sizes button[aria-checked="true"], .vam-topic-modal .vam-topic-style-sizes button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
 .vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
 .vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }
 /* Topic style (card-style): bold, text size and thick border on the card, thick line on the edge into it. Every rule starts with .vam-view so the share viewer does not collect it. Only the type, colour and status rules above set shape, fill and dashes; these set weight, size and width, and a selected or relation-end card adds 1px on top. */

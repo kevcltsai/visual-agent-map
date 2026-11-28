@@ -17361,7 +17361,9 @@ export class VisualAgentMapView extends ItemView {
   private selectionTaskKey(): string {
     return `selection:${this.path}`;
   }
+  /** Card settings or expansion suggestions; not while presenting or loading notes, when the map is read-only (P1.2). */
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
+    if (this.presentation || this.notesLoading()) return;
     const render = (content: HTMLElement, close: () => void, host: HTMLElement): void =>
       this.renderInspector(content, node, mode, close, host);
     this.openMapModal(
@@ -17408,8 +17410,7 @@ export class VisualAgentMapView extends ItemView {
     if (mode !== "structure") return;
     // Card settings (V3.3 P1.8): one flat list - a hypothesis's leaning and strength, the cover switch, type, parent,
     // source topics, markers, link, relations (folded), branch layout and AI lock. A locked card says so beside the title.
-    // Colour, style and the whole-branch switch stay last until the toolbar's Style popover replaces them.
-    const branch = { on: false };
+    // Colour and style live only in the card toolbar's Style popover.
     let repaintStrength: (() => void) | undefined;
     if (note) {
       repaintStrength = this.renderHypothesisSection(panel, node, close, "strength");
@@ -17481,9 +17482,6 @@ export class VisualAgentMapView extends ItemView {
     if (this.branchLayoutChoices(node).length) this.renderBranchLayoutSection(panel, node);
     if (note) {
       this.renderAiLockSection(panel, node, heading);
-      this.renderColorSection(panel, node, () => branch.on);
-      this.renderStyleSection(panel, node, () => branch.on);
-      this.renderBranchToggle(panel, node, branch);
     }
     // Removing a card lives in its right-click menu; this dialog only closes.
     const actions = (host ?? panel).createDiv("vam-next-actions");
@@ -18384,58 +18382,6 @@ export class VisualAgentMapView extends ItemView {
     };
     paint();
   }
-  /** The colour menu of the topic panel: None and six named colours as a radiogroup; `branch()` true colours the whole branch. */
-  private renderColorSection(panel: HTMLElement, node: MapNode, branch: () => boolean = () => false): void {
-    if (!this.markersEditable(node)) return;
-    const section = panel.createDiv("vam-inspector-section vam-color-section");
-    section.createEl("strong", { text: t("ui.topic_color"), cls: "vam-topic-tree-heading vam-section-heading" });
-    const group = section.createDiv("vam-topic-colors vam-choice-group");
-    group.setAttr("role", "radiogroup");
-    group.setAttr("aria-label", t("ui.topic_color"));
-    const choices: (TopicColor | null)[] = [null, ...TOPIC_COLORS];
-    const current = (): TopicColor | null =>
-      TOPIC_COLORS.find(color => color === this.notes.get(node.id)?.color) ?? null;
-    const paint = (focusId?: TopicColor | null): void => {
-      group.empty();
-      const active = current();
-      choices.forEach((id, index) => {
-        const choice = this.button(group, id ? t(colorLabelKey(id)) : t("ui.topic_color_none"), () => {
-          this.enqueue(async () => {
-            await this.changeTopicColor(node, id, branch());
-            paint(id);
-          });
-        });
-        if (id) {
-          const swatch = choice.createSpan({ cls: "vam-color-swatch", attr: { "aria-hidden": "true" } });
-          swatch.dataset.topicColorSwatch = id;
-        }
-        const on = id === active;
-        choice.setAttr("role", "radio");
-        choice.setAttr("aria-checked", String(on));
-        if (on) choice.addClass("is-pressed");
-        // One tab stop for the group; the arrow keys move and choose, as in a native radio group.
-        if (!this.renderingCard) choice.tabIndex = on ? 0 : -1;
-        choice.addEventListener("keydown", event => {
-          const step =
-            event.key === "ArrowRight" || event.key === "ArrowDown"
-              ? 1
-              : event.key === "ArrowLeft" || event.key === "ArrowUp"
-                ? -1
-                : 0;
-          if (!step) return;
-          event.preventDefault();
-          const next = (index + step + choices.length) % choices.length;
-          this.enqueue(async () => {
-            await this.changeTopicColor(node, choices[next], branch());
-            paint(choices[next]);
-          });
-        });
-        // Repainting replaced the button; keep the keyboard focus on the one just chosen.
-        if (focusId !== undefined && id === focusId) choice.focus();
-      });
-    };
-    paint();
-  }
   /**
    * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
    * in one undoable step. Only the notes whose colour really changes are written; Map.md changes only its viewport. A
@@ -18464,88 +18410,6 @@ export class VisualAgentMapView extends ItemView {
   /** The styles a topic note shows now (whitelisted tokens only). */
   private styleOf(id: string): TopicStyle[] {
     return TOPIC_STYLES.filter(style => this.notes.get(id)?.style?.includes(style));
-  }
-  /**
-   * The style menu of the topic panel: bold, thick border and thick line as pressed-state switches, the text size as a
-   * radiogroup (arrow keys choose); `branch()` true gives the whole branch the same styles.
-   */
-  private renderStyleSection(panel: HTMLElement, node: MapNode, branch: () => boolean = () => false): void {
-    if (!this.markersEditable(node)) return;
-    const section = panel.createDiv("vam-inspector-section vam-style-section");
-    section.createEl("strong", { text: t("ui.topic_style"), cls: "vam-topic-tree-heading vam-section-heading" });
-    const switches = section.createDiv("vam-topic-style-switches vam-choice-group");
-    switches.setAttr("role", "group");
-    switches.setAttr("aria-label", t("ui.topic_style"));
-    const sizes: (TopicStyle | null)[] = [null, "text-small", "text-large"];
-    const sizeOf = (): TopicStyle | null => sizes.find(id => id && this.styleOf(node.id).includes(id)) ?? null;
-    const withSize = (size: TopicStyle | null): TopicStyle[] => [
-      ...this.styleOf(node.id).filter(id => id !== "text-small" && id !== "text-large"),
-      ...(size ? [size] : [])
-    ];
-    const paint = (focus?: { toggle?: TopicStyle; size?: TopicStyle | null }): void => {
-      switches.empty();
-      for (const id of ["bold", "border-thick", "line-thick"] as const) {
-        const on = this.styleOf(node.id).includes(id);
-        const choice = this.button(switches, t(styleLabelKey(id)), () => {
-          const current = this.styleOf(node.id);
-          this.enqueue(async () => {
-            await this.changeTopicStyle(node, on ? current.filter(item => item !== id) : [...current, id], branch());
-            paint({ toggle: id });
-          });
-        });
-        choice.setAttr("aria-pressed", String(on));
-        if (on) choice.addClass("is-pressed");
-        if (focus?.toggle === id) choice.focus();
-      }
-      group.empty();
-      const active = sizeOf();
-      sizes.forEach((id, index) => {
-        const text = id ? t(styleLabelKey(id)) : t("ui.topic_style_size_standard");
-        const choice = this.button(group, text, () => {
-          this.enqueue(async () => {
-            await this.changeTopicStyle(node, withSize(id), branch());
-            paint({ size: id });
-          });
-        });
-        const on = id === active;
-        choice.setAttr("role", "radio");
-        choice.setAttr("aria-checked", String(on));
-        if (on) choice.addClass("is-pressed");
-        if (!this.renderingCard) choice.tabIndex = on ? 0 : -1;
-        choice.addEventListener("keydown", event => {
-          const step =
-            event.key === "ArrowRight" || event.key === "ArrowDown"
-              ? 1
-              : event.key === "ArrowLeft" || event.key === "ArrowUp"
-                ? -1
-                : 0;
-          if (!step) return;
-          event.preventDefault();
-          const next = (index + step + sizes.length) % sizes.length;
-          this.enqueue(async () => {
-            await this.changeTopicStyle(node, withSize(sizes[next]), branch());
-            paint({ size: sizes[next] });
-          });
-        });
-        if (focus && focus.size !== undefined && id === focus.size) choice.focus();
-      });
-    };
-    section.createDiv({ text: t("ui.topic_style_size"), cls: "vam-topic-style-size-label" });
-    const group = section.createDiv("vam-topic-style-sizes vam-choice-group");
-    group.setAttr("role", "radiogroup");
-    group.setAttr("aria-label", t("ui.topic_style_size"));
-    paint();
-  }
-  /** One checkbox for the colour and style above: while it is ticked, a change goes to the card and every card under it. */
-  private renderBranchToggle(panel: HTMLElement, node: MapNode, branch: { on: boolean }): void {
-    if (!this.markersEditable(node) || branchNoteIds(this.map!.nodes, node.id).length < 2) return;
-    const row = panel.createEl("label", { cls: "vam-inspector-section vam-branch-toggle" });
-    const box = row.createEl("input", { type: "checkbox", cls: "vam-branch-toggle-box" });
-    box.checked = branch.on;
-    box.addEventListener("change", () => {
-      branch.on = box.checked;
-    });
-    row.createSpan({ text: t("ui.card_settings_whole_branch") });
   }
   /**
    * Sets the whitelisted styles of one topic, or of the topic and all its descendants (folded ones too), in one undoable

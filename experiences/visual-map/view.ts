@@ -12348,7 +12348,15 @@ export class VisualAgentMapView extends ItemView {
             }
             if (items) map.canvasItems = items;
           }
-          const rest = new Set([...moved].filter(id => leadCarried || !branchOf.get(lead.id)!.has(id)));
+          // Only branches that are carried (or the lead, already arranged) shift and push; a branch of another way is left for the arrangement below.
+          const left = new Set(
+            roots
+              .filter(root => !carried.has(root.id) && root.id !== lead.id)
+              .flatMap(root => [...branchOf.get(root.id)!])
+          );
+          const rest = new Set(
+            [...moved].filter(id => !left.has(id) && (leadCarried || !branchOf.get(lead.id)!.has(id)))
+          );
           for (const node of map.nodes) {
             const was = rest.has(node.id) ? start.get(node.id) : undefined;
             if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });

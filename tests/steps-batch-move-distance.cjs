@@ -138,14 +138,22 @@ test('B19d-x: a card outside the moved branches that nothing covers keeps its ex
 });
 
 test('B19d-x: branches from different old parents are judged one by one: the same-way ones are carried whole, the other way may be re-arranged, 0 overlaps', async () => {
-  const spec = [...HAND, ['Pd', 'Root', 1360, 1100, { direction: 'down' }], ['D', 'Pd', 1360, 1250], ['D1', 'D', 1360, 1400]];
+  const spec = [...HAND, ['Pd', 'Root', 1360, 1100, { direction: 'down' }], ['D', 'Pd', 1360, 1250], ['D1', 'D', 1360, 1400], ['W', 'Pd', 1720, 2306]];
   const h = await harness(spec);
   h.select(['A', 'B', 'C', 'D']);
   const keep = ['A', 'A1', 'A2', 'A3', 'B', 'B1', 'C'];
   const rel = () => keep.flatMap((one, i) => keep.slice(i + 1).map(two => [h.named(two).x - h.named(one).x, h.named(two).y - h.named(one).y]));
   const before = rel();
-    await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  const was = new Map(h.view.map.nodes.map(n => [n.id, [n.x, n.y]]));
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
   assert.equal(h.named('D').parentId, h.named('Target').id);
   assert.deepEqual(rel(), before, 'the same-way branches keep every offset');
+  const movedIds = new Set(['A', 'A1', 'A2', 'A3', 'B', 'B1', 'C', 'D', 'D1'].map(title => h.named(title).id));
+  const finals = [...movedIds].map(id => h.view.map.nodes.find(n => n.id === id));
+  for (const n of h.view.map.nodes) {
+    if (movedIds.has(n.id)) continue;
+    const [x, y] = was.get(n.id);
+    if (!finals.some(m => Math.abs(m.y - y) < 80 && Math.abs(m.x - x) < 200)) assert.deepEqual([n.x, n.y], [x, y], `${h.view.notes.get(n.id)?.title} was not covered, so it stays`);
+  }
   assert.deepEqual(overlaps(h), []);
 });

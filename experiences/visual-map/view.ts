@@ -21341,8 +21341,10 @@ export class VisualAgentMapView extends ItemView {
       this.map.nodes.filter(node => ids.includes(node.id) && !node.aimKind && changed(node)).map(node => node.id)
     );
     if (!targets.size) return;
+    const grew = this.drawCardSize(targets, change);
     await this.mapChange(map => {
       for (const node of map.nodes) if (targets.has(node.id)) applyCardSize(node, change);
+      if (grew.size) this.tidyAfterResize(map, grew);
     }, false);
   }
   /**
@@ -27276,10 +27278,35 @@ export class VisualAgentMapView extends ItemView {
     change: { width?: number | undefined; height?: number | undefined }
   ): Promise<void> {
     if (!this.map?.nodes.some(node => node.id === id)) return;
+    const grew = this.drawCardSize([id], change);
     await this.mapChange(map => {
       const node = map.nodes.find(item => item.id === id);
       if (node) applyCardSize(node, change);
+      if (grew.size) this.tidyAfterResize(map, grew);
     }, false);
+  }
+  /**
+   * Draws the cards `ids` at the size `change` gives them before it is written and returns the ones taller than the height
+   * settling last saw (a handle drag has drawn its card already), so the write that sets the size also pushes apart what they
+   * now cover: one Map.md write and one undo step (B19c-x). The repaint after the write draws them for real; a failed write
+   * repaints the old sizes.
+   */
+  private drawCardSize(ids: Iterable<string>, change: BatchSizeChange): Set<string> {
+    const grew = new Set<string>();
+    const seen = this.heightsSeenMap === this.map?.id ? this.heightsSeen : new Map<string, number>();
+    for (const id of ids) {
+      const card = this.cardEls.get(id),
+        node = this.mapNodeById(id);
+      if (!card || !node) continue;
+      const before = seen.get(id) ?? card.offsetHeight,
+        next = { ...node };
+      applyCardSize(next, change);
+      card.style.width = next.width ? `${next.width}px` : "";
+      if (this.inlineSummary?.id !== id) card.style.height = next.height ? `${next.height}px` : "";
+      this.fitKindShapeBody(card, this.shapeKindOf(id));
+      if (card.offsetHeight > before) grew.add(id);
+    }
+    return grew;
   }
   /**
    * The height handle on a card's bottom edge, also an ARIA (horizontal) splitter. It behaves like the width handle: a drag

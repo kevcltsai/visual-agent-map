@@ -803,7 +803,8 @@ export class Repository {
 
   /** Parses already-read note content; `readNote` reads the file once and calls this. */
   private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
-    const file = this.file(path),
+    // From the path, not the file: a card shown before its note is written has none (see `noteFromContent`).
+    const basename = path.slice(path.lastIndexOf("/") + 1).replace(/\.[^.]*$/, ""),
       decoded = decodeCalloutSections(upgradeLegacyAimText(raw)),
       fm = frontmatter(decoded),
       // A torn or duplicated region is cut out before sections are read, so it cannot leak into Detail or Prompt; a paired region already ends its section.
@@ -883,7 +884,7 @@ export class Repository {
     }
     return {
       ...(livingNode ? { livingNode } : {}),
-      title: noteTitle(content, fm, file.basename),
+      title: noteTitle(content, fm, basename),
       summary: section(content, "Current Summary") || text(fm.summary, placeholder(this.noteLanguage)),
       prompt: section(content, "Prompt"),
       rules: section(content, "Rules"),
@@ -1240,7 +1241,8 @@ export class Repository {
     mapPath: string,
     modelSource: ModelSource,
     initial: NewNoteInitial = {},
-    onCreate?: (path: string) => void
+    /** Called with the path and text of each attempt to create the file, just before it is written. */
+    onCreate?: (path: string, text: string) => void
   ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
@@ -1332,14 +1334,15 @@ export class Repository {
     folder: string,
     title: string,
     content: string | ((path: string) => string),
-    onCreate?: (path: string) => void
+    onCreate?: (path: string, text: string) => void
   ): Promise<TFile> {
     const failed = new Set<string>();
     for (let attempt = 1; ; attempt++) {
       const path = this.unique(folder, title, failed);
-      onCreate?.(path);
+      const text = typeof content === "function" ? content(path) : content;
+      onCreate?.(path, text);
       try {
-        return await this.app.vault.create(path, typeof content === "function" ? content(path) : content);
+        return await this.app.vault.create(path, text);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (attempt >= 5 || !/already exists/i.test(message)) throw error;

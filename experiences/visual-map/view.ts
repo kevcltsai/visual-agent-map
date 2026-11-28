@@ -129,6 +129,7 @@ import {
   isTransactionError,
   withVerifiedNoteHistory,
   type AttachmentPath,
+  type NewCard,
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
@@ -396,6 +397,8 @@ import {
   normalizeMapChatOpen,
   normalizeMapChatImageMode,
   rebaseMapNotePaths,
+  type ModelSource,
+  type NewNoteInitial,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -779,6 +782,15 @@ const BRANCH_LABEL = {
 } as const;
 export const VIEW_TYPE = "visual-agent-map-view";
 /** What a cross-map cut adds to writeNewBranches: its own transaction, the source map's part of it, and the success step. */
+/** A card shown on the map before its note exists: the transaction that lists it makes the note (see `Transaction.createNote`). */
+interface PendingCard {
+  /** The card as shown; its path is only the one the note is expected to get. */
+  node: MapNode;
+  title: string;
+  model: string;
+  modelSource: ModelSource;
+  initial: NewNoteInitial;
+}
 interface CrossCut {
   /** Reads what must be put back byte for byte if the commit fails; runs before `begin`. */
   snapshot: () => Promise<void>;
@@ -1525,8 +1537,19 @@ export class VisualAgentMapView extends ItemView {
     freshNotes: () => this.freshNotes(),
     freshNotesOf: ids => this.freshNotesOf(ids),
     topicState: (id, fresh) => this.chatTopicState(id, fresh),
-    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
-      this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart, summary) =>
+      this.addNode(
+        parentNode,
+        suggestedTitle,
+        rebuildDerivedData,
+        focus,
+        kind,
+        keyboardFocus,
+        hypothesisStart,
+        undefined,
+        undefined,
+        { summary }
+      ),
     createLivingNode: (parent, action, rebuild, current, allowSource) =>
       this.createNode(
         parent,
@@ -1674,6 +1697,8 @@ export class VisualAgentMapView extends ItemView {
     on: boolean;
     base: MapDocument | null;
     created: string[];
+    /** Cards shown but not yet made: their notes are written by the flush's transaction (see {@link PendingCard}). */
+    cards: PendingCard[];
     /** Where the batch began: the map it belongs to, and the place in the reply's history group its one entry goes back to. */
     path: string;
     mapId: string;
@@ -7087,6 +7112,29 @@ export class VisualAgentMapView extends ItemView {
     });
     return button;
   }
+  private newCard(card: PendingCard, mapId: string, mapPath: string, parkFolder: string): NewCard {
+    return {
+      title: card.title,
+      model: card.model,
+      map: { id: mapId },
+      mapPath,
+      modelSource: card.modelSource,
+      initial: { ...card.initial, nodeId: card.node.id },
+      parkFolder
+    };
+  }
+  /** After a step made card notes: the cards' notes are read from the files they were written to (their path is final now). */
+  private async readMadeNotes(cards: PendingCard[]): Promise<void> {
+    for (const card of cards) {
+      const node = this.map?.nodes.find(item => item.id === card.node.id);
+      if (!node || !this.map) continue;
+      try {
+        this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map));
+      } catch {
+        // The preview stays until the next read of the map.
+      }
+    }
+  }
   /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
@@ -7100,13 +7148,21 @@ export class VisualAgentMapView extends ItemView {
   private async flushChatMapBatch(): Promise<void> {
     const batch = this.chatMapBatch;
     const base = batch?.base;
-    if (!batch || !base || !this.map) return;
+    if (!batch || !base) return;
     const created = batch.created;
+    const cards = batch.cards;
     batch.base = null;
     batch.created = [];
+    batch.cards = [];
+    const forget = (): void => {
+      for (const card of cards) this.notes.delete(card.node.id);
+    };
     // Another map is open now (or the view is gone): the staged cards belong to the one the reply began on, and the open map
     // is not touched, so the whole batch fails.
-    if (this.closed || this.path !== batch.path || this.map.id !== batch.mapId) throw new Error("changed-target");
+    if (!this.map || this.closed || this.path !== batch.path || this.map.id !== batch.mapId) {
+      forget();
+      throw new Error("changed-target");
+    }
     const final = clone(this.map);
     const viewport = clone(this.map.viewport);
     const mapPath = this.path;
@@ -7117,22 +7173,34 @@ export class VisualAgentMapView extends ItemView {
       const disk = await this.plugin.repo.readMap(mapPath);
       this.adoptSavedMap(disk);
       const tx = this.beginMapTransaction();
-      for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
+      const parkFolder = this.plugin.repo.topicFolder(mapPath, "Unassigned");
+      for (const path of created) tx.create(path, parkFolder, base.id);
+      for (const card of cards) tx.createNote(card.node.id, this.newCard(card, base.id, mapPath, parkFolder));
       const entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, _resolve, _attachment, made) => {
           if (structure(map) === structure(base)) {
             const target = map as unknown as Record<string, unknown>;
             for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
             Object.assign(target, final);
           } else applyStagedDelta(map, base, final);
           map.viewport = clone(viewport);
+          // Each staged card is on the final map with the path its note was given, and hangs on a card that is there too:
+          // a map that lost the parent meanwhile cannot be written (it would not read back).
+          for (const card of cards) {
+            const node = map.nodes.find(item => item.id === card.node.id);
+            if (!node || (node.parentId !== null && !map.nodes.some(item => item.id === node.parentId)))
+              throw new Error("changed-target");
+            node.path = made(card.node.id).path;
+          }
         })
         .commit({ deferRebuild: true });
       this.history.pushAt(entry, batch.historyAt);
     } catch (error) {
+      forget();
       this.render();
       throw error;
     }
+    await this.readMadeNotes(cards);
     this.render();
   }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
@@ -7158,7 +7226,8 @@ export class VisualAgentMapView extends ItemView {
     rebuildDerivedData = true,
     created: string[] = [],
     attachment?: { name: string; data: ArrayBuffer },
-    authorize?: () => boolean
+    authorize?: () => boolean,
+    cards: PendingCard[] = []
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     this.clearTidy(false);
@@ -7188,11 +7257,14 @@ export class VisualAgentMapView extends ItemView {
       }
       if (graph(snapshot) !== graph(map)) this.livingGraph = undefined;
       staging.created.push(...created);
+      staging.cards.push(...cards);
       this.render();
       return null;
     }
     const tx = this.beginMapTransaction();
-    for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    const parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
+    for (const path of created) tx.create(path, parkFolder, this.map.id);
+    for (const card of cards) tx.createNote(card.node.id, this.newCard(card, this.map.id, this.path, parkFolder));
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
     if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before!: MapDocument, after!: MapDocument;
@@ -7201,10 +7273,12 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     try {
       const entry = await tx
-        .editMap(mapPath, (map, _resolve, attachmentPath) => {
+        .editMap(mapPath, (map, _resolve, attachmentPath, made) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
+          // The card the change adds carries the path its note was given at commit.
+          for (const card of cards) card.node.path = made(card.node.id).path;
           change(map, attachmentPath);
           this.pruneSummariesIn(map);
           after = clone(map);
@@ -7217,9 +7291,11 @@ export class VisualAgentMapView extends ItemView {
       if (this.map && (this.map !== opened || JSON.stringify(after.viewport) !== JSON.stringify(viewport)))
         this.map.viewport = clone(after.viewport);
     } catch (error) {
+      for (const card of cards) this.notes.delete(card.node.id);
       this.render();
       throw error;
     }
+    await this.readMadeNotes(cards);
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
@@ -7229,7 +7305,7 @@ export class VisualAgentMapView extends ItemView {
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
     if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
-      if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
+      if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0 || cards.length > 0))
         await this.plugin.rebuildDerivedData();
     } catch (error) {
       this.render();
@@ -19647,7 +19723,9 @@ export class VisualAgentMapView extends ItemView {
       current: () => boolean;
       allowSource?: (path: string) => boolean;
       onSaved: (saved: LivingConfigSave) => void;
-    }
+    },
+    /** A titled card's finished summary: it is part of the note when the note is made (never a second write). */
+    start: { summary?: string } = {}
   ): Promise<MapNode | undefined> {
     if (!this.map || (livingConfig && !livingConfig.current())) return undefined;
     const creationMapPath = this.path;
@@ -19658,8 +19736,18 @@ export class VisualAgentMapView extends ItemView {
     // No name given (the "+", the toolbar, the keys): the card appears with a default name and its title opens for typing.
     const interactive = suggestedTitle === undefined;
     // One resolution: a manual ancestor's model is inherited, otherwise the current model.
-    const model = parent
-      ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+    // A card given its title has no note until the map transaction that lists it makes one; one named in its field (and a
+    // Living card, which is configured first) is a note at once.
+    const deferred = !livingConfig && !interactive;
+    // A card still waiting for its note has no file to resolve from: the model comes from its nearest card that has one.
+    const waiting = new Set(this.chatMapBatch?.cards.map(card => card.node.path));
+    let modelParent = parent;
+    while (modelParent && waiting.has(modelParent.path)) {
+      const above: string | null = modelParent.parentId;
+      modelParent = (above && this.map.nodes.find(item => item.id === above)) || null;
+    }
+    const model = modelParent
+      ? (await this.plugin.repo.resolveTopicModel(modelParent.path, this.map ?? undefined)).model
       : this.plugin.currentModelChoice().model;
     if (livingConfig && !livingConfig.current()) return undefined;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
@@ -19670,24 +19758,27 @@ export class VisualAgentMapView extends ItemView {
       t("ui.new_topic"),
       this.map.nodes.map(item => this.notes.get(item.id)?.title ?? "")
     );
-    const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName,
-      model,
-      this.map,
-      this.path,
-      parent ? "inherited" : "workspace",
-      // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      {
-        researchMode: "local",
-        ...(typed ? { topicKind: kind } : {}),
-        ...(typed && kind === "hypothesis"
-          ? {
-              ...(hypothesisStart.leaning ? { hypothesisLeaning: hypothesisStart.leaning } : {}),
-              ...(hypothesisStart.strength ? { hypothesisStrength: hypothesisStart.strength } : {})
-            }
-          : {})
-      }
-    );
+    const title = sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName;
+    const modelSource: ModelSource = parent ? "inherited" : "workspace";
+    // A new topic starts in Quick mode (a research of it may still be run in Standard).
+    const initial: NewNoteInitial = {
+      researchMode: "local",
+      ...(typed ? { topicKind: kind } : {}),
+      ...(typed && kind === "hypothesis"
+        ? {
+            ...(hypothesisStart.leaning ? { hypothesisLeaning: hypothesisStart.leaning } : {}),
+            ...(hypothesisStart.strength ? { hypothesisStrength: hypothesisStart.strength } : {})
+          }
+        : {}),
+      ...(deferred && start.summary ? { complete: { patch: { summary: start.summary } } } : {})
+    };
+    let node: MapNode;
+    let preview: string | undefined;
+    if (deferred) {
+      const shown = this.plugin.repo.previewNote(title, model, this.map, this.path, modelSource, initial, waiting);
+      node = shown.node;
+      preview = shown.content;
+    } else node = await this.plugin.repo.createNote(title, model, this.map, this.path, modelSource, initial);
     // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
@@ -19727,7 +19818,11 @@ export class VisualAgentMapView extends ItemView {
         if (!livingConfig.current()) throw new Error("changed-target");
       }
       if (!this.map) throw new Error("changed-target");
-      const preparedNote = await repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] });
+      const shownMap = { ...this.map, nodes: [...this.map.nodes, node] };
+      const preparedNote =
+        preview !== undefined
+          ? await repo.noteFromContent(node.path, preview, shownMap)
+          : await repo.readNote(node.path, shownMap);
       if (livingConfig && !livingConfig.current()) throw new Error("changed-target");
       this.notes.set(node.id, preparedNote);
       // A batch card (focus false) leaves the selection to its caller.
@@ -19745,8 +19840,10 @@ export class VisualAgentMapView extends ItemView {
         map => {
           if (livingConfig && (map.id !== creationMapId || graph(map) !== configurationGraph))
             throw new Error("changed-target-identity");
-          map.nodes.push(node);
           const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+          // The parent is gone from the map being written (another write took it): the card would not read back.
+          if (parent && !owner) throw new Error("changed-target");
+          map.nodes.push(node);
           // Only a block that hangs on this very topic can be followed; anything else adds an ordinary child.
           const follows =
             owner && afterTextId
@@ -19783,9 +19880,10 @@ export class VisualAgentMapView extends ItemView {
           }
         },
         livingConfig ? false : rebuildDerivedData,
-        [node.path],
+        deferred ? [] : [node.path],
         undefined,
-        livingConfig?.current
+        livingConfig?.current,
+        deferred ? [{ node, title, model, modelSource, initial }] : []
       );
       if (livingConfig && configured) {
         livingConfig.onSaved(configured);
@@ -19802,6 +19900,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
+      if (deferred) this.notes.delete(node.id);
       if (
         livingConfig &&
         provisionalFile &&
@@ -25591,7 +25690,9 @@ export class VisualAgentMapView extends ItemView {
     // A reply that adds many cards writes them to Map.md once: the card writes (and the layout after them) are staged in
     // memory and written as one transaction before anything else writes, or at the end.
     const stage =
-      adds > 0 && batched && !scope ? { on: false, base: null, created: [], path: "", mapId: "", historyAt: 0 } : null;
+      adds > 0 && batched && !scope
+        ? { on: false, base: null, created: [], cards: [], path: "", mapId: "", historyAt: 0 }
+        : null;
     const staged: { index: number; label: string; ids: string[] }[] = [];
     this.chatMapBatch = stage;
     const settleStaged = async (): Promise<void> => {

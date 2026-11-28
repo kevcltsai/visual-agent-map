@@ -195,7 +195,9 @@ export interface ChatWriterPorts {
     focus?: boolean,
     kind?: TopicKind,
     keyboardFocus?: boolean,
-    hypothesisStart?: { leaning?: HypothesisLeaning; strength?: HypothesisStrength }
+    hypothesisStart?: { leaning?: HypothesisLeaning; strength?: HypothesisStrength },
+    /** The card's summary, written with its note when the note is made. */
+    summary?: string
   ): Promise<void>;
   /** Same prepublication configuration and creation path as the central editor. */
   createLivingNode?(
@@ -351,17 +353,21 @@ export class ChatActionWriter {
         if (run.deferRebuild) run.ownershipDirty = true;
         // The type is written when the note is created, like "+ Topic" of that type (the parser dropped it on an AIM map).
         // Its leaning and strength go in the same creation (initial values), not a write after it.
-        await this.ports.addNode(parent, action.title, !run.deferRebuild, false, action.topicKind ?? "topic", false, {
-          leaning: action.leaning,
-          strength: action.strength
-        });
+        await this.ports.addNode(
+          parent,
+          action.title,
+          !run.deferRebuild,
+          false,
+          action.topicKind ?? "topic",
+          false,
+          { leaning: action.leaning, strength: action.strength },
+          action.summary
+        );
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);
         run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
-        if (action.summary && (await this.ports.noteChange(created, { summary: action.summary })) === "discarded")
-          return skipped("ui.map_chat_skip_stale");
         return done;
       }
       case "configure_ai_card": {

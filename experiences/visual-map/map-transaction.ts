@@ -941,16 +941,21 @@ export function begin(deps: TransactionDeps): Transaction {
           await place(owner);
           // A made note joins `ops` as a create (undo parks it, redo puts it back) and the journal as soon as it exists.
           for (const item of cards) {
+            // What the file was written with (not read back): an edit that lands right after it is a change to keep.
+            let written: string | undefined;
             const node = await repo.createNote(
               item.title,
               item.model,
               item.map as MapDocument,
               item.mapPath,
               item.modelSource,
-              item.initial
+              item.initial,
+              (_path, text) => {
+                written = text;
+              }
             );
             const file = repo.file(node.path);
-            journal.cards!.push({ path: node.path, file, text: await repo.app.vault.read(file) });
+            journal.cards!.push({ path: node.path, file, text: written ?? (await repo.app.vault.read(file)) });
             madeCards.push({ key: item.key, node });
             const note = await repo.readNote(node.path);
             const op: FileOp = {

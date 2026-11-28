@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { test, load, root, plain } = require('../support.cjs');
+const { test, load, root, plain, reapIfOrphaned } = require('../support.cjs');
 const { buildSync } = require('../build.cjs');
 
 const html = load('experiences/sharing/share-html.ts');
@@ -413,6 +413,7 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = u
   let stopped = false;
   let exitInfo = null;
   child.once('exit', (code, signal) => { exitInfo = { code, signal }; });
+  reapIfOrphaned(child, profile);
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`dumpDomLight timed out after ${timeoutMs} ms`)), timeoutMs); });
   const work = async () => {
     // Chrome picks a free port itself (port 0) and writes it to DevToolsActivePort; wait for that within the overall timeout.
@@ -468,6 +469,28 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = u
     try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`dumpDomLight: could not remove temp profile: ${error.message}`); }
   }
 }
+
+test('headless Chrome cleanup: when the test process is killed before its finally runs, the browser and its profile are still removed', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-reaper-'));
+  const profile = path.join(directory, 'profile');
+  fs.mkdirSync(profile);
+  // Stand-ins: a killed test process, and a long-running "Chrome" it started in its own process group.
+  const script = `const { spawn } = require('node:child_process'); const { reapIfOrphaned } = require(${JSON.stringify(path.join(root, 'tests', 'support.cjs'))}); const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true }); reapIfOrphaned(child, ${JSON.stringify(profile)}); console.log(child.pid); setInterval(() => {}, 1000);`;
+  const parent = spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const browser = Number(await new Promise(resolve => parent.stdout.once('data', data => resolve(String(data).trim()))));
+  const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  try {
+    assert.ok(alive(browser), 'the stand-in browser is running');
+    parent.kill('SIGKILL');
+    for (let i = 0; i < 50 && alive(browser); i++) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(alive(browser), false, 'the browser is ended once its test process is gone');
+    for (let i = 0; i < 20 && fs.existsSync(profile); i++) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(fs.existsSync(profile), false, 'the temp profile is removed');
+  } finally {
+    try { process.kill(browser, 'SIGKILL'); } catch { /* already gone */ }
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test('sharing viewer language: a plain file shows exactly the P1 page (same DOM in headless Chrome, light scheme pinned)', async t => {
   const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);

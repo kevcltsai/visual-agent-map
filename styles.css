@@ -1723,6 +1723,20 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-map-search-count { flex: none; min-width: 3ch; color: var(--text-muted); font-size: var(--font-ui-small); white-space: nowrap; }
 .vam-view .vam-map-search-close { flex: none; padding: 0 8px; background: transparent; box-shadow: none; }
 .vam-view .vam-map-search-close:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search { flex-wrap: wrap; }
+.vam-view .vam-map-search-scope { display: flex; flex: none; gap: 2px; }
+.vam-view .vam-map-search-scope-btn { padding: 0 8px; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-scope-btn.is-on { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-view .vam-map-search-scope-btn:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-search-results { display: none; flex: 1 0 100%; max-height: 40vh; overflow-y: auto; }
+.vam-view .vam-map-search-results.is-open { display: block; }
+.vam-view .vam-map-search-results-note { padding: 4px 2px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-view .vam-map-search-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px; border-top: 1px solid var(--background-modifier-border); }
+.vam-view .vam-map-search-result-label { display: flex; flex-direction: column; min-width: 0; }
+.vam-view .vam-map-search-result-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-view .vam-map-search-result-map { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-search-result-actions { display: flex; flex: none; gap: 4px; }
+.vam-view .vam-map-search-result-actions button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-view .vam-node.is-search-match { outline: 2px dashed var(--interactive-accent); outline-offset: 2px; }
 .vam-view .vam-node.is-search-current { outline: 3px solid var(--interactive-accent); outline-offset: 3px; }
 /* A branch the search opened only for itself: dotted, so it reads as temporary. */
@@ -2217,8 +2231,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-resume-open:hover { color: var(--text-normal); }
 .vam-map-chat-resume-open:focus-visible, .vam-map-chat-resume-close:focus-visible, .vam-map-chat-resume-locate:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-resume-icon .svg-icon { width: 14px; height: 14px; }
-.vam-map-chat-resume { padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
-.vam-map-chat-resume[hidden] { display: none; }
+.vam-map-chat-resume, .vam-map-chat-impact { padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); font-size: var(--font-ui-smaller); }
+.vam-map-chat-resume[hidden], .vam-map-chat-impact[hidden] { display: none; }
 .vam-map-chat-resume-head { display: flex; align-items: center; justify-content: space-between; font-weight: var(--font-semibold); }
 .vam-map-chat-resume-note, .vam-map-chat-resume-empty, .vam-map-chat-resume-record, .vam-map-chat-resume-gone { color: var(--text-muted); }
 .vam-map-chat-resume-list { margin: 4px 0 0; padding: 0; list-style: none; }
@@ -2227,6 +2241,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-resume-record { flex-basis: 100%; }
 .vam-map-chat-resume-record[hidden] { display: none; }
 .vam-map-chat-resume-locate { padding: 0 8px; height: 24px; font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-map-chat-impact-heading { margin-top: 6px; font-weight: var(--font-semibold); }
+.vam-map-chat-impact .vam-map-chat-resume-record { flex-basis: auto; }
+.vam-map-chat-impact .vam-map-chat-resume-record[hidden] { display: none; }
 
 /* B09: the selection bar's reason line (V3.3 P1.8f) and the reason under a greyed row of its ⋯ menu. */
 .vam-selection-bar.has-why { flex-wrap: wrap; row-gap: var(--vam-space-1); }

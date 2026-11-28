@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { test, root, load } = require('../support.cjs');
+const { test, root, load, reapIfOrphaned } = require('../support.cjs');
 
 const tokens = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/color/obsidian-default-tokens.json'), 'utf8'));
 const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -52,7 +52,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-presenting-dim="1"', 700, 60, '<h3 class="vam-card-title">Other topic</h3>')}
     <div class="vam-node is-presenting" style="left:700px;top:260px"><h3 class="vam-card-title">Current topic</h3><p class="vam-card-summary">Current summary</p></div>
   </div>
-  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button></div><div class="vam-view"><div class="vam-map-search"><input class="vam-map-search-input" type="search" aria-label="Search topics"><span class="vam-map-search-count">3/7</span><button class="vam-map-search-close" aria-label="Close search">x</button></div><div class="vam-node is-search-match" style="position:static;width:120px;height:20px"></div><div class="vam-node is-search-current" style="position:static;width:120px;height:20px"></div><div class="vam-presentation-bar"><span class="vam-presentation-count">3/12</span><button class="vam-presentation-exit">Exit presentation (Esc)</button></div></div></div>
+  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button></div><div class="vam-view"><div class="vam-map-search"><input class="vam-map-search-input" type="search" aria-label="Search topics"><span class="vam-map-search-scope" role="radiogroup"><button class="vam-map-search-scope-btn is-on" role="radio" aria-checked="true">This map</button><button class="vam-map-search-scope-btn" role="radio" aria-checked="false">All maps</button></span><span class="vam-map-search-count">3/7</span><button class="vam-map-search-close" aria-label="Close search">x</button></div><div class="vam-node is-search-match" style="position:static;width:120px;height:20px"></div><div class="vam-node is-search-current" style="position:static;width:120px;height:20px"></div><div class="vam-presentation-bar"><span class="vam-presentation-count">3/12</span><button class="vam-presentation-exit">Exit presentation (Esc)</button></div></div></div>
 </div>
 </div>
 <div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div><div class="vam-share-note vam-share-error">Share failed</div><div class="vam-share-error">Save failed</div>
@@ -97,6 +97,8 @@ const CASES = [
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
   ['map-search-count', '.vam-map-search-count', 'color', 4.5],
   ['map-search-close', '.vam-map-search-close', 'color', 4.5],
+  ['map-search-scope-on', '.vam-map-search-scope-btn.is-on', 'color', 4.5],
+  ['map-search-scope-off', '.vam-map-search-scope-btn:not(.is-on)', 'color', 4.5],
   ['map-search-match-outline', '.vam-view .vam-node.is-search-match', 'outline', 3],
   ['map-search-current-outline', '.vam-view .vam-node.is-search-current', 'outline', 3],
   ['presenting-title', '.vam-stage[data-presenting] .is-presenting .vam-card-title', 'color', 4.5],
@@ -193,6 +195,7 @@ async function withChrome(chrome, directory, url, drive, timeoutMs = 90000) {
   const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--use-mock-keychain', '--password-store=basic', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,900', 'about:blank'], { stdio: 'ignore', detached: true });
   let timer; let stopped = false; let exitInfo = null;
   child.once('exit', (code, signal) => { exitInfo = { code, signal }; });
+  reapIfOrphaned(child, profile);
   const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Chrome run timed out after ${timeoutMs} ms`)), timeoutMs); });
   const work = async () => {
     let target;

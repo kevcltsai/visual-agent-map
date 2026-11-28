@@ -40,6 +40,7 @@ export type CardActionId =
   | "add-other"
   | "knowledge-ref-copy"
   | "knowledge-ref-paste"
+  | "impact"
   | "book"
   | "remove"
   | "reorder-sibling"
@@ -120,6 +121,8 @@ export interface CardActionHost {
   /** Copy as reference (copyAsKnowledgeRef) / Paste reference under the card (pasteKnowledgeRef). */
   copyKnowledgeRef(node: MapNode): void;
   pasteKnowledgeRef(node: MapNode): void;
+  /** Impact analysis (F09): the card's direct and guessed impact, shown read-only in the map chat window. */
+  impactAnalysis(node: MapNode): void;
   zoomFit(): void;
   zoomReset(): void;
   search(): void;
@@ -651,6 +654,18 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     applies: ctx => ctx.knowledgeRefs.editable && ctx.knowledgeRefs.copied,
     available: ctx => gate(ctx, CARD),
     run: ctx => ctx.host.pasteKnowledgeRef(card(ctx))
+  },
+  {
+    id: "impact",
+    titleKey: "ui.card_menu_impact",
+    icon: "git-fork",
+    scope: ["card", "ai-card"],
+    surfaces: ["context"],
+    order: 168,
+    group: 4,
+    // Read only (it writes nothing): it works while merging or on an AIM map, but like every row it is greyed while the notes load (decision #35).
+    available: ctx => gate(ctx, ["readOnly"]),
+    run: ctx => ctx.host.impactAnalysis(card(ctx))
   },
   {
     id: "toggle-collapse",

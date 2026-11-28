@@ -31,6 +31,54 @@ S.integrationTest('Living Node: first commit uses real Repository guard and pres
   assert.equal((actual.match(/vam-living-node:begin/g) ?? []).length, 1);
 });
 
+S.integrationTest('Living Node: a note without a Current Summary section syncs only its frontmatter summary, body bytes unchanged, and the right pane reads it (D1-x9)', async () => {
+  for (const [fm, expected] of [['', 'Current findings'], ['summary: ""\n', 'Current findings'], ['summary: 尚未形成結論\n', 'Current findings'], ['summary: Mine\n', 'Mine']]) {
+    const f = S.fixture();
+    await f.app.vault.create(path, initial.replace('ai-card: true\n', 'ai-card: true\n' + fm));
+    const body = f.contents.get(path).replace(/^---[\s\S]*?\n---\n/, '');
+    assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+    const after = f.contents.get(path);
+    assert.ok(!after.includes('## Current Summary'));
+    assert.ok(after.includes('# Existing title\n\n## Detail\n\nManual notes, never replace.\n'));
+    assert.ok(after.includes(body.trimEnd()), 'body bytes are unchanged');
+    assert.equal((await f.repo.readNote(path)).summary, expected);
+    assert.equal((after.match(/^summary:/gm) ?? []).length, 1);
+  }
+  // The previous AI output counts as the AI's own summary: the next commit replaces it.
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  const base = readLivingMarkdown(old);
+  const next = request(f, { base, baseGeneration: livingGeneration(old), proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text: 'Newer findings', evidence: ['e1'] }] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, next), 'written');
+  assert.equal((await f.repo.readNote(path)).summary, 'Newer findings');
+});
+
+S.integrationTest('Living Node demo 3: a newly created AI card gets frontmatter summary and Current Summary on run and on adopt (D1-x9)', async () => {
+  const f = S.fixture('en');
+  const mapPath = await f.repo.createMap('Demo map');
+  const map = await f.repo.readMap(mapPath);
+  const card = await f.repo.createNote('Demo card', 'model-a', map, mapPath, 'workspace');
+  map.nodes.push(card);
+  await f.repo.saveMap(mapPath, map);
+  await f.repo.writeAiCard(card.path, true);
+  assert.ok(f.contents.get(card.path).includes('## Current Summary'));
+  let n = 0;
+  for (const text of ['Run summary', 'Adopted summary']) {
+    n++;
+    const expectedContent = f.contents.get(card.path);
+    const base = readLivingMarkdown(expectedContent);
+    const candidate = { executionId: 'demo' + n, cardId: card.id, mapId: map.id, baseRevision: livingSnapshotRevision(expectedContent), inputRevision: 'i' + n, viewSession: 'v' };
+    const r = request(f, { path: card.path, expectedContent, candidate, base, baseGeneration: livingGeneration(expectedContent),
+      proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] } });
+    assert.equal(await commitLivingMarkdown(f.repo, r), 'written');
+    const after = f.contents.get(card.path);
+    assert.ok(new RegExp('^summary: "?' + text + '"?$', 'm').test(after), 'frontmatter summary');
+    assert.ok(new RegExp('## Current Summary\\n\\n' + text + '\\n').test(after), 'Current Summary section');
+    assert.equal((await f.repo.readNote(card.path)).summary, text);
+  }
+});
+
 S.integrationTest('Living Node write boundary: unsupported AI writers cannot overwrite even flag-only cards; manual and formal writes remain possible', async () => {
   const f = await setup();
   const before = f.contents.get(path);
@@ -1339,7 +1387,9 @@ S.integrationTest('Living Node A28: a failed storage write leaves the note byte-
   assert.equal(await commitLivingMarkdown(restarted, request(f, { expectedContent: committed, candidate: { baseRevision: livingSnapshotRevision(committed) }, base: readLivingMarkdown(committed) })), 'discarded');
   assert.equal(f.contents.get(path), committed);
   assert.equal((committed.match(/vam-living-node:begin/g) ?? []).length, 1);
-  assert.equal((committed.match(/Current findings/g) ?? []).length, 1);
+  assert.equal((committed.match(/^> Current findings$/gm) ?? []).length, 1);
+  assert.equal((committed.match(/^summary: "?Current findings"?$/gm) ?? []).length, 1);
+  assert.equal((committed.match(/Current findings/g) ?? []).length, 2);
   // Derived data is rebuilt from the note bytes alone.
   const note = await restarted.readNote(path);
   assert.equal(note.livingNode.knowledgeRevision, readLivingMarkdown(committed).revision);

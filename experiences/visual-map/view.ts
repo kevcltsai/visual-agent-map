@@ -92,6 +92,9 @@ import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAG
 import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
 import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
 import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from "./map-focus";
+import { CrossMapSearch } from "./cross-map-search";
+import { renderCrossMapResults } from "./cross-map-results";
+import type { CorpusCard } from "./cross-map-corpus";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -519,6 +522,7 @@ import {
 } from "../../core/map-chat-basis";
 import {
   buildMapChatContext,
+  MAP_CHAT_OTHER_CARDS_LIMIT,
   type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
@@ -555,6 +559,7 @@ import {
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { buildResumeSummary, type ResumeSummary } from "../../core/map-chat-resume";
+import { buildImpact } from "../../core/map-impact";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
@@ -795,6 +800,47 @@ function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
 }
 
+/**
+ * Puts what a reply's staged card changes did (`base` to `final`) on `target`, a map that others have changed since `base`:
+ * new cards are added (a missing parent fails it), and a field a staged change moved is set where the card still has the
+ * value it had in `base`. What the others changed stays.
+ */
+function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocument): void {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  const baseNodes = new Map(base.nodes.map(node => [node.id, node]));
+  const nodes = new Map(target.nodes.map(node => [node.id, node]));
+  for (const node of final.nodes) {
+    const was = baseNodes.get(node.id);
+    const now = nodes.get(node.id);
+    if (!was) {
+      if (now) continue;
+      if (node.parentId && !nodes.has(node.parentId)) throw new Error("changed-target");
+      const added = clone(node);
+      target.nodes.push(added);
+      nodes.set(added.id, added);
+      continue;
+    }
+    if (!now) throw new Error("changed-target");
+    const fields = now as unknown as Record<string, unknown>;
+    const from = was as unknown as Record<string, unknown>;
+    const to = node as unknown as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+      if (same(from[key], to[key])) continue;
+      if (!same(fields[key], from[key])) throw new Error("changed-target");
+      if (key in to) fields[key] = clone(to[key]);
+      else delete fields[key];
+    }
+  }
+  const fields = target as unknown as Record<string, unknown>;
+  const from = base as unknown as Record<string, unknown>;
+  const to = final as unknown as Record<string, unknown>;
+  for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+    if (key === "nodes" || key === "viewport" || same(from[key], to[key])) continue;
+    if (!same(fields[key], from[key])) throw new Error("changed-target");
+    if (key in to) fields[key] = clone(to[key]);
+    else delete fields[key];
+  }
+}
 /** A copy of `node` without any AIM field: what an old AIM map shares. */
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
@@ -1581,6 +1627,19 @@ export class VisualAgentMapView extends ItemView {
     return (this.unsyncedPaths ??= new UnsyncedPaths());
   }
   private heldViews: VisualAgentMapView[] = [];
+  /**
+   * While a reply that adds many cards is applied, its card writes (`on`) change the map in memory only; {@link flushChatMapBatch}
+   * then writes the lot to Map.md as one map transaction. `base` is the map as it was before the first staged change.
+   */
+  private chatMapBatch: {
+    on: boolean;
+    base: MapDocument | null;
+    created: string[];
+    /** Where the batch began: the map it belongs to, and the place in the reply's history group its one entry goes back to. */
+    path: string;
+    mapId: string;
+    historyAt: number;
+  } | null = null;
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
@@ -1861,6 +1920,8 @@ export class VisualAgentMapView extends ItemView {
   /** What the references on this map resolved to the last time they were read (memory only; never saved). */
   private refResolved = new Map<string, RefResolution>();
   private refLayerEl: HTMLElement | null = null;
+  /** The drawn references that resolved (an unavailable or orphan one is not here): a relation line may end at one (V3.3 P4.4). */
+  private readonly refEls = new Map<string, HTMLElement>();
   private refResolveSeq = 0;
   private shareRefTitles = new Map<string, string | null>();
   private refResolveTimer: number | null = null;
@@ -2160,6 +2221,8 @@ export class VisualAgentMapView extends ItemView {
     returnNodeId: string | null;
     returnEl: HTMLElement | null;
     cancelAnnouncement: (() => void) | null;
+    /** The scope switch and the cross-map snapshot (P4.2); "This map" until the user presses "All maps". */
+    cross?: CrossMapSearch;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
   /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
@@ -2753,6 +2816,16 @@ export class VisualAgentMapView extends ItemView {
     this.applySearchMarks();
     this.focusMapSearch();
   }
+  /** The scope switch of an open search, made when first needed (it reads nothing until "All maps" is pressed). */
+  private crossOf(search: { cross?: CrossMapSearch }): CrossMapSearch {
+    const made: CrossMapSearch = (search.cross ??= new CrossMapSearch(
+      () => this.plugin.repo.knowledgeRefIO(),
+      () => {
+        if (!this.closed && this.mapSearch?.cross === made) this.applySearchMarks();
+      }
+    ));
+    return made;
+  }
   private mountMapSearch(): void {
     const search = this.mapSearch;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -2761,6 +2834,19 @@ export class VisualAgentMapView extends ItemView {
     const bar = buildMapSearchBar(overlay, {
       query: search.query,
       label: t("ui.map_search_label"),
+      scope: {
+        value: this.crossOf(search).scope,
+        groupLabel: t("ui.map_search_scope_label"),
+        mapLabel: t("ui.map_search_scope_map"),
+        allLabel: t("ui.map_search_scope_all")
+      },
+      onScope: scope => {
+        if (!live()) return;
+        search.currentId = null;
+        this.crossOf(search).setScope(scope);
+        this.mapSearchBar?.setScope(scope);
+        this.applySearchMarks();
+      },
       closeLabel: t("ui.map_search_close"),
       countText: this.mapSearchCountText(),
       onInput: value => {
@@ -2851,6 +2937,11 @@ export class VisualAgentMapView extends ItemView {
   private mapSearchCountText(): string {
     const search = this.mapSearch;
     if (!search || search.query === "") return "";
+    if (this.crossOf(search).scope === "all") {
+      if (this.crossOf(search).state !== "ready") return "";
+      const total = this.crossOf(search).hits(search.query).total;
+      return total ? t("ui.map_search_count_0", total) : t("ui.map_search_none");
+    }
     const matches = this.mapSearchResult()?.matches ?? [];
     if (!matches.length) return t("ui.map_search_none");
     const at = search.currentId === null ? -1 : matches.indexOf(search.currentId);
@@ -2859,7 +2950,10 @@ export class VisualAgentMapView extends ItemView {
   /** Marks the matching cards (the current one stronger) and refreshes the visible count. Never touches how a card is built. */
   private applySearchMarks(): void {
     const search = this.mapSearch;
-    const matches = new Set(search ? (this.mapSearchResult()?.matches ?? []) : []);
+    // The canvas marks belong to "This map"; the other scope lists its hits in the box instead.
+    const matches = new Set(
+      search && this.crossOf(search).scope === "map" ? (this.mapSearchResult()?.matches ?? []) : []
+    );
     this.clearSearchBadges();
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
@@ -2870,6 +2964,123 @@ export class VisualAgentMapView extends ItemView {
         this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));
     }
     this.mapSearchBar?.setCount(this.mapSearchCountText());
+    this.renderCrossResults();
+  }
+  /** The cross-map hits under the search field: the snapshot filtered by the query now. Empty while the scope is this map. */
+  private renderCrossResults(): void {
+    const search = this.mapSearch;
+    const host = this.mapSearchBar?.results;
+    if (!search || !host || !this.map) return;
+    renderCrossMapResults(
+      host,
+      {
+        state: this.crossOf(search).state,
+        query: search.query,
+        hits: this.crossOf(search).hits(search.query),
+        currentMapId: this.map.id
+      },
+      {
+        loading: t("ui.map_search_all_loading"),
+        failed: t("ui.map_search_all_failed"),
+        none: t("ui.map_search_none"),
+        more: (shown, total) => t("ui.map_search_all_more_0_1", shown, total),
+        locate: t("ui.map_search_locate"),
+        cite: t("ui.map_search_cite"),
+        toChat: t("ui.map_search_to_chat")
+      },
+      {
+        locate: card => void this.locateCrossMapCard(card),
+        cite: card => this.citeCrossMapCard(card),
+        toChat: card => this.addCrossMapCardToChat(card)
+      }
+    );
+  }
+  /**
+   * Locate: the card of this map, or of another one, shown with the camera only (no layout, no collapse, no Map.md write). Another
+   * map follows switchToMap: a tab that has it open shows it; while this tab has running work it opens in a new tab; else this tab.
+   */
+  async locateCrossMapCard(card: CorpusCard): Promise<void> {
+    const here = this.map;
+    if (!here || this.closed) return;
+    try {
+      let target: VisualAgentMapView | null | "this" = null;
+      if (card.mapId === here.id) target = "this";
+      else {
+        const open = this.plugin.findMapLeaf(card.mapPath);
+        if (open) {
+          await this.plugin.showLeaf(open);
+          target = open.view instanceof VisualAgentMapView ? open.view : null;
+        } else if (this.hasRunningWork()) target = await this.plugin.openMapInNewTab(card.mapPath);
+        else {
+          await this.plugin.mutate(() => this.openMapInMutation(card.mapPath));
+          target = !this.closed && this.path === card.mapPath ? "this" : null;
+        }
+      }
+      if (!target || !(await (target === "this" ? this : target).revealPath(card.notePath)))
+        new Notice(t("ui.map_search_locate_failed"));
+    } catch (error) {
+      errorNotice(error);
+    }
+  }
+  /** Cite: a read-only reference to the card under the selected card (the root when none is selected), through the one addKnowledgeRef entry. */
+  citeCrossMapCard(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId">): void {
+    const map = this.map;
+    if (!map) return;
+    const selected = this.selection.state.selected;
+    const parentId =
+      (selected && map.nodes.some(node => node.id === selected) ? selected : undefined) ??
+      map.nodes.find(node => node.parentId === null)?.id;
+    if (!parentId) {
+      new Notice(t("ui.knowledge_ref_need_card"));
+      return;
+    }
+    const target = { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath };
+    this.enqueue(() => this.addKnowledgeRef(target, parentId));
+  }
+  /** Cards of other maps the user added to the next chat message: only the identity is kept; the text is read again when it is sent. */
+  private chatOtherCards = new Map<string, { mapId: string; nodeId: string; mapPath: string }>();
+  addCrossMapCardToChat(card: Pick<CorpusCard, "mapId" | "mapPath" | "nodeId" | "title">): void {
+    const key = `${card.mapId}\u0000${card.nodeId}`;
+    if (this.chatOtherCards.has(key)) {
+      new Notice(t("ui.map_search_chat_already"));
+      return;
+    }
+    if (this.chatOtherCards.size >= MAP_CHAT_OTHER_CARDS_LIMIT) {
+      new Notice(t("ui.map_search_chat_full_0", MAP_CHAT_OTHER_CARDS_LIMIT));
+      return;
+    }
+    this.chatOtherCards.set(key, { mapId: card.mapId, nodeId: card.nodeId, mapPath: card.mapPath });
+    new Notice(t("ui.map_search_chat_added_0", card.title));
+  }
+  /** The waiting cards for this message, read again now under the reference rules (a card that is gone, archived or unreadable is dropped), then forgotten. */
+  async takeOtherMapCards(): Promise<NonNullable<Parameters<typeof buildMapChatContext>[0]["otherMapCards"]>> {
+    const picked = [...this.chatOtherCards.values()];
+    this.chatOtherCards.clear();
+    if (!picked.length) return [];
+    const found = await resolveKnowledgeRefs(
+      picked.map((card, index) => ({
+        id: String(index),
+        mapId: card.mapId,
+        nodeId: card.nodeId,
+        pathHint: card.mapPath
+      })),
+      this.plugin.repo.knowledgeRefIO(),
+      { withBody: true }
+    );
+    return picked.flatMap((_, index) => {
+      const card = found.get(String(index));
+      return card?.ok
+        ? [
+            {
+              mapTitle: card.mapTitle,
+              title: card.title,
+              summary: card.summary ?? "",
+              detail: card.detail ?? "",
+              notePath: card.notePath
+            }
+          ]
+        : [];
+    });
   }
   /** The small "opened for search" labels; kept outside renderNode and removed whenever the marks are redone or the search ends. */
   private searchBadges: HTMLElement[] = [];
@@ -2878,7 +3089,11 @@ export class VisualAgentMapView extends ItemView {
     this.searchBadges = [];
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
-  private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
+  private announceSearchLater(search: {
+    query: string;
+    cancelAnnouncement: (() => void) | null;
+    cross?: CrossMapSearch;
+  }): void {
     search.cancelAnnouncement?.();
     const timerWindow = this.contentEl.ownerDocument?.defaultView ?? window;
     const cancel = (): void => {
@@ -2890,7 +3105,10 @@ export class VisualAgentMapView extends ItemView {
       if (search.cancelAnnouncement !== cancel) return;
       search.cancelAnnouncement = null;
       if (this.closed || this.mapSearch !== search || search.query === "") return;
-      const total = this.mapSearchResult()?.matches.length ?? 0;
+      const total =
+        this.crossOf(search).scope === "all"
+          ? this.crossOf(search).hits(search.query).total
+          : (this.mapSearchResult()?.matches.length ?? 0);
       this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
     }, 300);
     search.cancelAnnouncement = cancel;
@@ -2900,6 +3118,7 @@ export class VisualAgentMapView extends ItemView {
     const search = this.mapSearch;
     if (!search || !this.map || this.closed) return;
     search.cancelAnnouncement?.();
+    if (this.crossOf(search).scope === "all") return; // the hits of every map are rows with a Locate button, not steps
     const query = search.query;
     const result = this.mapSearchResult();
     const step = result ? stepSearch(result, search.currentId, delta) : null;
@@ -2961,6 +3180,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     search.cancelAnnouncement?.();
+    search.cross?.dispose();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
@@ -6653,6 +6873,50 @@ export class VisualAgentMapView extends ItemView {
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
   }
+  /**
+   * Writes what a reply's staged card changes left in memory as one map transaction (one Map.md write, one history entry). The
+   * map goes back to its state before the first staged change first, so the transaction's outside-edit check and stale checks
+   * compare what is on disk with what the reply started from; a Map.md that is no longer that fails the whole batch (nothing
+   * is written and the map is as it was).
+   */
+  private async flushChatMapBatch(): Promise<void> {
+    const batch = this.chatMapBatch;
+    const base = batch?.base;
+    if (!batch || !base || !this.map) return;
+    const created = batch.created;
+    batch.base = null;
+    batch.created = [];
+    // Another map is open now (or the view is gone): the staged cards belong to the one the reply began on, and the open map
+    // is not touched, so the whole batch fails.
+    if (this.closed || this.path !== batch.path || this.map.id !== batch.mapId) throw new Error("changed-target");
+    const final = clone(this.map);
+    const viewport = clone(this.map.viewport);
+    const mapPath = this.path;
+    const structure = (doc: MapDocument): string => JSON.stringify({ ...doc, viewport: null });
+    try {
+      // The map goes back to what is stored (the reply's start, or what another write made of it meanwhile), so the
+      // transaction's outside-edit check does not open the conflict window over the staged cards.
+      const disk = await this.plugin.repo.readMap(mapPath);
+      this.adoptSavedMap(disk);
+      const tx = this.beginMapTransaction();
+      for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
+      const entry = await tx
+        .editMap(mapPath, map => {
+          if (structure(map) === structure(base)) {
+            const target = map as unknown as Record<string, unknown>;
+            for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
+            Object.assign(target, final);
+          } else applyStagedDelta(map, base, final);
+          map.viewport = clone(viewport);
+        })
+        .commit({ deferRebuild: true });
+      this.history.pushAt(entry, batch.historyAt);
+    } catch (error) {
+      this.render();
+      throw error;
+    }
+    this.render();
+  }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
   private async resolveMapConflict(): Promise<boolean> {
     if (!this.map) return false;
@@ -6680,6 +6944,35 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     this.clearTidy(false);
+    const staging = this.chatMapBatch;
+    if (staging?.on && !attachment && !authorize) {
+      const map = this.map;
+      // Another map is open now: the staged cards stay out of it (the flush fails the batch).
+      if (staging.base && (this.path !== staging.path || map.id !== staging.mapId)) throw new Error("changed-target");
+      const snapshot = clone(map);
+      if (!staging.base) {
+        staging.base = snapshot;
+        staging.path = this.path;
+        staging.mapId = snapshot.id;
+        staging.historyAt = this.history.groupSize;
+      }
+      const graph = (doc: MapDocument): string =>
+        JSON.stringify(doc.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+      try {
+        change(map, () => {
+          throw new Error("no attachment in a staged change");
+        });
+        this.pruneSummariesIn(map);
+      } catch (error) {
+        this.adoptSavedMap(snapshot);
+        this.render();
+        throw error;
+      }
+      if (graph(snapshot) !== graph(map)) this.livingGraph = undefined;
+      staging.created.push(...created);
+      this.render();
+      return null;
+    }
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
@@ -7763,6 +8056,9 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || seq !== this.refResolveSeq || this.map?.id !== map.id) return;
     this.refResolved = found;
     this.paintKnowledgeRefs();
+    // A relation line to a reference appears (or goes) with what the reference resolved to.
+    const refIds = new Set(refs.map(ref => ref.id));
+    if ((map.topicRelations ?? []).some(link => refIds.has(link.from) || refIds.has(link.to))) this.drawEdges();
   }
   /**
    * Draws the references of the open map in a layer after the cards. They are not cards of the map: they live in
@@ -7771,6 +8067,7 @@ export class VisualAgentMapView extends ItemView {
   private paintKnowledgeRefs(): void {
     this.refLayerEl?.remove();
     this.refLayerEl = null;
+    this.refEls.clear();
     const stage = this.stageEl,
       map = this.map;
     if (!stage || !map) return;
@@ -7790,6 +8087,7 @@ export class VisualAgentMapView extends ItemView {
       if (!found) missing = true;
       const el = layer.createDiv("vam-knowledge-ref");
       el.dataset.refId = ref.id;
+      if (found?.ok) this.refEls.set(ref.id, el);
       el.setAttr("role", "note");
       el.tabIndex = 0;
       el.style.left = `${parent.x + ref.x}px`;
@@ -13252,6 +13550,7 @@ export class VisualAgentMapView extends ItemView {
       exitBranchFocus: () => void this.exitBranchFocus(),
       copyKnowledgeRef: card => this.copyAsKnowledgeRef(card),
       pasteKnowledgeRef: card => this.pasteKnowledgeRef(card.id),
+      impactAnalysis: card => void this.showCardImpact(card.id),
       zoomFit: () => this.fit(),
       zoomReset: () => {
         if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
@@ -15851,8 +16150,12 @@ export class VisualAgentMapView extends ItemView {
     this.focusNode(node, false, true);
     // Focus goes back to the map (no scroll), so Esc after a reveal reaches the map's key handler, not a chat control.
     this.contentEl.focus({ preventScroll: true });
+    // The reader the outline opens beside the map slides in after this: the canvas narrows for a while, so re-centre on resize.
+    this.revealResize = { id: node.id, until: Date.now() + 500 };
     return true;
   }
+  /** The card an outline reveal just centred, re-centred while the canvas or its insets change until `until` (ms). */
+  private revealResize: { id: string; until: number } | null = null;
   /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
   private foldRevealUnless(node: MapNode): void {
     const open = this.searchOpen;
@@ -16525,102 +16828,115 @@ export class VisualAgentMapView extends ItemView {
           saving = run;
           return run;
         },
-        trial: node
-          ? async values => {
-              invalidateTrial();
-              // A card in a formal run cannot be tried out; the run reads and writes it.
-              if (
-                livingCoordinator(this.plugin).runOf(mapPath) ||
-                livingCoordinator(this.plugin).formalBusy(node.path)
-              ) {
-                new Notice(t("ui.living_node_trial_formal_busy"));
-                return false;
-              }
-              const attempt = new AbortController();
-              activeTrial = attempt;
-              const currentTrial = (): boolean =>
-                current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
-              try {
-                const prepared = await prepareLivingTrial(
-                  {
-                    app: this.app,
-                    repo: this.plugin.repo,
-                    calls: this.plugin.aiCalls,
-                    mapPath,
-                    viewSession,
-                    signal: attempt.signal,
-                    current: currentTrial,
-                    language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
-                    mapSources: signal => this.readLivingMapSourceReport(signal)
-                  },
-                  node.id,
-                  promptOf(values)
-                );
-                let ready = false;
-                let started = false;
-                win.setTrialWaiting(true);
-                try {
-                  await this.plugin.confirmAiUsage(prepared.model, async () => {
-                    win.setTrialWaiting(false);
-                    if (!currentTrial()) return;
-                    started = true;
-                    ready = await trial.run(prepared.request);
-                  });
-                } finally {
-                  win.setTrialWaiting(false);
-                }
-                if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
-                  // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
-                  if (currentTrial() && started) {
-                    invalidateTrial();
-                    new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
-                    win.showTrialFailure(failed.key, failed.code);
-                  }
-                  return false;
-                }
-                this.aiCardOpen.adoption = prepared.adoption;
-                const warnings = prepared.warnings.map(warning =>
-                  warning.startsWith("suppressed-dropped:")
-                    ? t("ui.living_node_suppressed_dropped_0", Number(warning.slice(19)))
-                    : t(
-                        warning === "upstream-stale"
-                          ? "ui.living_node_trial_stale_sources"
-                          : warning === "frozen-source"
-                            ? "ui.living_node_trial_frozen_sources"
-                            : warning === "omitted-edits-skipped"
-                              ? "ui.living_node_omitted_edits_skipped"
-                              : warning === "ai-latest-user-edited"
-                                ? "ui.living_node_ai_latest_user_edited"
-                                : warning === "ai-latest-deleted"
-                                  ? "ui.living_node_ai_latest_deleted"
-                                  : "ui.living_node_optional_source_unavailable"
-                      )
-                );
-                const shown = await this.plugin.showLivingTrial(
-                  this.plugin.repo.file(node.path),
-                  renderLivingPreview(trial.result),
-                  viewSession,
-                  currentTrial,
-                  warnings,
-                  trial.changes
-                );
-                if (!shown && currentTrial()) invalidateTrial();
-                if (shown && currentTrial()) watchTrial(prepared);
-                return shown && currentTrial();
-              } catch (error) {
-                if (currentTrial()) {
-                  invalidateTrial();
-                  const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
-                  new Notice(reason);
-                  const failed = livingTrialReason(error);
-                  win.showTrialFailure(failed.key, failed.code);
-                }
-                return false;
-              }
+        trial: async values => {
+          invalidateTrial();
+          // A card in a formal run cannot be tried out; the run reads and writes it. An unsaved card has no formal state.
+          if (
+            node &&
+            (livingCoordinator(this.plugin).runOf(mapPath) || livingCoordinator(this.plugin).formalBusy(node.path))
+          ) {
+            new Notice(t("ui.living_node_trial_formal_busy"));
+            return false;
+          }
+          // An unsaved new card is tried from memory: no file, no configuration, nothing written.
+          const draft = node
+            ? undefined
+            : {
+                path: this.plugin.repo.topicFolder(mapPath, "Notes") + "/" + viewSession + ".md",
+                title: values.title || aiCardTitle(values.question),
+                parentId: parent?.id ?? null,
+                model: parent
+                  ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+                  : this.plugin.currentModelChoice().model
+              };
+          const targetId = node?.id ?? viewSession;
+          const targetPath = node?.path ?? draft!.path;
+          const attempt = new AbortController();
+          activeTrial = attempt;
+          const currentTrial = (): boolean =>
+            current() && activeTrial === attempt && !attempt.signal.aborted && this.aiCardOpen?.trial === trial;
+          try {
+            const prepared = await prepareLivingTrial(
+              {
+                app: this.app,
+                repo: this.plugin.repo,
+                calls: this.plugin.aiCalls,
+                mapPath,
+                viewSession,
+                signal: attempt.signal,
+                current: currentTrial,
+                language: (map, note) => cardOutputLanguage(map, this.plugin.settings.language, note.title),
+                mapSources: signal => this.readLivingMapSourceReport(signal)
+              },
+              targetId,
+              promptOf(values),
+              draft
+            );
+            let ready = false;
+            let started = false;
+            win.setTrialWaiting(true);
+            try {
+              await this.plugin.confirmAiUsage(prepared.model, async () => {
+                win.setTrialWaiting(false);
+                if (!currentTrial()) return;
+                started = true;
+                ready = await trial.run(prepared.request);
+              });
+            } finally {
+              win.setTrialWaiting(false);
             }
-          : undefined,
-        stopTrial: node ? invalidateTrial : undefined,
+            if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
+              // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
+              if (currentTrial() && started) {
+                invalidateTrial();
+                new Notice(t("ui.living_node_trial_invalid"));
+                const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
+                win.showTrialFailure(failed.key, failed.code);
+              }
+              return false;
+            }
+            this.aiCardOpen.adoption = prepared.adoption;
+            const warnings = prepared.warnings.map(warning =>
+              warning.startsWith("suppressed-dropped:")
+                ? t("ui.living_node_suppressed_dropped_0", Number(warning.slice(19)))
+                : t(
+                    warning === "upstream-stale"
+                      ? "ui.living_node_trial_stale_sources"
+                      : warning === "frozen-source"
+                        ? "ui.living_node_trial_frozen_sources"
+                        : warning === "omitted-edits-skipped"
+                          ? "ui.living_node_omitted_edits_skipped"
+                          : warning === "ai-latest-user-edited"
+                            ? "ui.living_node_ai_latest_user_edited"
+                            : warning === "ai-latest-deleted"
+                              ? "ui.living_node_ai_latest_deleted"
+                              : "ui.living_node_optional_source_unavailable"
+                  )
+            );
+            const shown = await this.plugin.showLivingTrial(
+              this.plugin.repo.file(node ? targetPath : mapPath),
+              renderLivingPreview(trial.result),
+              viewSession,
+              currentTrial,
+              warnings,
+              trial.changes,
+              !node
+            );
+            if (!shown && currentTrial()) invalidateTrial();
+            if (shown && currentTrial()) watchTrial(prepared);
+            return shown && currentTrial();
+          } catch (error) {
+            if (currentTrial()) {
+              invalidateTrial();
+              const reason = this.plugin.recordFailure(t("ui.living_node_trial"), error);
+              new Notice(reason);
+              const failed = livingTrialReason(error);
+              win.showTrialFailure(failed.key, failed.code);
+            }
+            return false;
+          }
+        },
+        stopTrial: invalidateTrial,
         adopt: node
           ? async () => {
               const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
@@ -18566,6 +18882,11 @@ export class VisualAgentMapView extends ItemView {
     return (
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
+  }
+  /** The resolved title of one of this map's knowledge references; undefined when it is not one or not resolved (V3.3 P4.4). */
+  private knowledgeRefTitle(id: string): string | undefined {
+    const found = this.refResolved.get(id);
+    return found?.ok ? found.title : undefined;
   }
   /** The notes of these cards read again from disk (a missing card or note is left out). */
   private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
@@ -21837,7 +22158,8 @@ export class VisualAgentMapView extends ItemView {
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
       // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
-      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      // dialog names exactly the ones the run sends (an unnamed one is not sent). An original with an empty title is still
+      // listed, by its note name, so the set sent matches what the save check reads again.
       const refs = this.recombinedRefs(nodes);
       const found = refs.length
         ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
@@ -21847,8 +22169,8 @@ export class VisualAgentMapView extends ItemView {
       const listed = new Map<string, RefResolution>();
       const refNames = refs.flatMap(ref => {
         const resolution = found.get(ref.id);
-        const title = referenceTitle(resolution);
-        if (!title || !resolution) return [];
+        if (!resolution?.ok) return [];
+        const title = referenceTitle(resolution) ?? resolution.notePath.split("/").at(-1)?.replace(/\.md$/, "");
         listed.set(ref.id, resolution);
         return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
       });
@@ -23093,6 +23415,15 @@ export class VisualAgentMapView extends ItemView {
     }
     // The suggestion card's room ends above the zoom bar and hint, which this clearance moves.
     this.placeMapTools();
+    // Last: a resize and the status bar (it grows when the reader makes a note active) both move the visible centre.
+    this.recentreReveal();
+  }
+  /** Centres an outline reveal's card again on the visible area, while the reveal's window lasts. */
+  private recentreReveal(): void {
+    const reveal = this.revealResize;
+    const revealed = reveal && Date.now() < reveal.until ? this.mapNodeById(reveal.id) : undefined;
+    if (revealed) this.focusNode(revealed, false, true);
+    else this.revealResize = null;
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);
@@ -23644,6 +23975,7 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
+    const otherMapCards = await this.takeOtherMapCards();
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();
@@ -23680,11 +24012,19 @@ export class VisualAgentMapView extends ItemView {
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
+      // This map's own references (V3.3 P4.4): a relation may end at one; the title only when it is already resolved.
+      knowledgeRefs: this.relationsEnabled()
+        ? visibleKnowledgeRefs(map).map(ref => {
+            const found = this.refResolved.get(ref.id);
+            return { id: ref.id, ...(found?.ok ? { title: found.title } : {}) };
+          })
+        : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
       ...(mapSources ? { mapSources } : {}),
+      ...(otherMapCards.length ? { otherMapCards } : {}),
       ...(bookPlan ? { bookPlan } : {}),
       ...(continuation ? { continuation } : {})
     });
@@ -24007,6 +24347,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatAutoApply = false;
     this.chatResearched.clear();
     this.chatResearchSent.clear();
+    this.chatOtherCards.clear();
     this.chatStartedResearch = false;
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;
@@ -24084,6 +24425,36 @@ export class VisualAgentMapView extends ItemView {
       window.setTimeout(() => card.removeClass("is-chat-located"), CHAT_LOCATE_FLASH_MS);
     }
     return true;
+  }
+  /**
+   * "Impact analysis" (F09): what this card touches in THIS map, shown read-only in the chat window. Nothing is written, no
+   * provider is called, no other map is read (a reference card shows only the title this view already resolved).
+   */
+  private async showCardImpact(id: string): Promise<void> {
+    const map = this.map;
+    const chat = this.chat;
+    if (!map || !chat) return;
+    let livingConsumerIds: string[] = [];
+    try {
+      livingConsumerIds = await livingRemovalConsumers(this.app, this.plugin.repo, clone(map), new Set([id]));
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Impact analysis: ${errorMessage(error)}`);
+    }
+    if (this.map !== map || this.chat !== chat) return;
+    const cards = map.nodes.map(node => {
+      const note = this.notes.get(node.id);
+      return {
+        id: node.id,
+        parentId: node.parentId ?? null,
+        title: note?.title ?? "",
+        summary: note?.livingNode?.summary || note?.summary || ""
+      };
+    });
+    const refs = visibleKnowledgeRefs(map).map(ref => {
+      const found = this.refResolved.get(ref.id);
+      return { id: ref.id, parentId: ref.parentId, ...(found?.ok ? { title: found.title } : {}) };
+    });
+    chat.showImpact(buildImpact({ targetId: id, cards, relations: map.topicRelations ?? [], livingConsumerIds, refs }));
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
@@ -24208,7 +24579,11 @@ export class VisualAgentMapView extends ItemView {
   ): string {
     const nodes = this.map?.nodes ?? [];
     const title = (id: string): string =>
-      refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
+      refTitles?.get(id) ??
+      this.notes.get(id)?.title ??
+      nodes.find(node => node.id === id)?.path ??
+      this.knowledgeRefTitle(id) ??
+      id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {
       case "add_child": {
@@ -24598,6 +24973,31 @@ export class VisualAgentMapView extends ItemView {
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
+    // A reply that adds many cards writes them to Map.md once: the card writes (and the layout after them) are staged in
+    // memory and written as one transaction before anything else writes, or at the end.
+    const stage =
+      adds > 0 && batched && !scope ? { on: false, base: null, created: [], path: "", mapId: "", historyAt: 0 } : null;
+    const staged: { index: number; label: string; ids: string[] }[] = [];
+    this.chatMapBatch = stage;
+    const settleStaged = async (): Promise<void> => {
+      if (!stage?.base) return;
+      try {
+        await this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        wrote = true;
+      } catch (error) {
+        // All or nothing: the cards of the batch were not written, so their lines say so and the run forgets them.
+        for (const item of staged) {
+          lines[item.index] = this.chatLine(item.label, { status: "failed", reason: errorMessage(error) });
+          for (const id of item.ids) {
+            const at = run.created.indexOf(id);
+            if (at >= 0) run.created.splice(at, 1);
+            for (const [ref, made] of run.refs) if (made === id) run.refs.delete(ref);
+            this.notes.delete(id);
+          }
+        }
+      }
+      staged.length = 0;
+    };
     try {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
@@ -24623,6 +25023,7 @@ export class VisualAgentMapView extends ItemView {
             lines[index] = this.chatLine(label, lost());
             continue;
           }
+          await settleStaged();
           lines[index] = this.chatLine(label, await this.chatPlaceCanvasImage(action.direction, options.work));
           continue;
         }
@@ -24645,6 +25046,8 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        const staging = !!stage && action.kind === "add_child" && !action.livingPrompt;
+        if (!staging) await settleStaged();
         if (action.kind === "rename_map") {
           // The folder moves with the name, so the reply's anchor follows the map to its new path.
           const fromRoot = this.plugin.repo.topicRoot(anchor.path);
@@ -24687,6 +25090,7 @@ export class VisualAgentMapView extends ItemView {
         // The card an add_child made is the first one the run gained during it.
         const made = run.created.length;
         try {
+          if (stage) stage.on = staging;
           // Auto-apply: no plan card stood in front of this write, so the file is copied to the backups folder first (once per chain).
           const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
@@ -24700,12 +25104,16 @@ export class VisualAgentMapView extends ItemView {
             });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
+        } finally {
+          if (stage) stage.on = false;
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key = normalizeVaultPath(action.path);
           if (key) autoChain.createdFiles.add(key);
         }
-        if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        // A staged card counts as written once the batch is (see settleStaged).
+        const heldBack = staging && box.outcome.status === "done";
+        if (box.outcome.status !== "skipped" && action.kind !== "focus_topic" && !heldBack) wrote = true;
         if (
           box.outcome.status === "done" &&
           (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note")
@@ -24716,6 +25124,7 @@ export class VisualAgentMapView extends ItemView {
           layoutDone = true;
         }
         lines[index] = this.chatTargetLine(this.chatLine(label, box.outcome), action, run, made);
+        if (heldBack) staged.push({ index, label, ids: run.created.slice(made) });
       }
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
       let arranged = false;
@@ -24731,6 +25140,7 @@ export class VisualAgentMapView extends ItemView {
         !result.actions.some(action => action.kind === "auto_layout")
       ) {
         try {
+          if (stage) stage.on = true;
           await this.plugin.mutate(() =>
             this.history.ownWrites(async () => {
               if (!same() || !this.map) return;
@@ -24746,6 +25156,8 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        } finally {
+          if (stage) stage.on = false;
         }
       }
       // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
@@ -24755,6 +25167,7 @@ export class VisualAgentMapView extends ItemView {
         this.flushChatRender();
         if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
+            if (stage) stage.on = true;
             await this.plugin.mutate(() =>
               this.history.ownWrites(async () => {
                 if (!same() || !this.map) return;
@@ -24765,6 +25178,8 @@ export class VisualAgentMapView extends ItemView {
             );
           } catch {
             // The writes are done already; only the tidy-up failed, and the user can lay the map out by hand.
+          } finally {
+            if (stage) stage.on = false;
           }
         }
       }
@@ -24788,6 +25203,7 @@ export class VisualAgentMapView extends ItemView {
           : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
+          if (stage) stage.on = true;
           await this.plugin.mutate(() =>
             this.history.ownWrites(async () => {
               if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
@@ -24837,10 +25253,15 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        } finally {
+          if (stage) stage.on = false;
         }
       }
+      await settleStaged();
     } finally {
       // Whatever ended the loop (done, stopped, closed, thrown), the derived data, the held repaint and the re-read happen once.
+      await settleStaged();
+      if (this.chatMapBatch === stage) this.chatMapBatch = null;
       await this.settleChatBatch(run);
       // The writes become one undo step of this view. Each was a map transaction (or a guarded file write) like a manual edit,
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
@@ -27812,8 +28233,8 @@ export class VisualAgentMapView extends ItemView {
       anchor?: AnchorLine;
     }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
-      const from = this.cardEls.get(relation.from),
-        to = this.cardEls.get(relation.to);
+      const from = this.cardEls.get(relation.from) ?? this.refEls.get(relation.from),
+        to = this.cardEls.get(relation.to) ?? this.refEls.get(relation.to);
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }

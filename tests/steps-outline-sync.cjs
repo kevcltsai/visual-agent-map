@@ -200,3 +200,62 @@ test('C08: outline search also reads summaries and Details; a row matched only b
   const hit = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-body-hit'))[0];
   assert.equal(hit.text, 'In text');
 });
+
+// B15-y: the reader opened by an outline click takes width from the map; the card is centred on the width left after it opens.
+async function outlineClick(readerOpen) {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  let width = readerOpen ? 500 : 800; // the canvas: 800px, 500px once the 300px reader is beside it
+  const centred = [];
+  const view = { leaf: {}, hasPath: () => true, revealPath: async () => { centred.push(width / 2); return true; } };
+  const host = {
+    views: () => [view], app: { workspace: { revealLeaf: async () => {} } }, repo: { file: path => ({ path }) },
+    openDetails: async () => { width = 500; }
+  };
+  await Plugin.prototype.revealFromOutline.call(host, 'leaf.md');
+  return { centred, visibleCentre: width / 2 };
+}
+
+test('B15-y: the first outline click with the reader closed centres the card on the canvas left after the reader opens (≤1px)', async () => {
+  const { centred, visibleCentre } = await outlineClick(false);
+  assert.ok(centred.length >= 1);
+  assert.ok(Math.abs(centred.at(-1) - visibleCentre) <= 1, `centred at ${centred.at(-1)}, visible centre ${visibleCentre}`);
+});
+
+test('B15-y: with the reader already open an outline click centres once, as before', async () => {
+  const { centred, visibleCentre } = await outlineClick(true);
+  assert.deepEqual(centred, [visibleCentre]);
+});
+
+test('B15-y: while the reader slides in after an outline reveal, each canvas resize re-centres the card; later resizes leave the camera', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  for (const name of ['drawWhenShown', 'syncHeaderNarrow', 'syncReaderToggle', 'syncChatNarrow', 'fitKindShapes']) view[name] = () => {};
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500; // the reader took 300px
+  view.onResize();
+  const after = { ...view.map.viewport };
+  view.viewportEl.clientWidth = 800;
+  view.map.viewport = { x: 0, y: 0, zoom: 1 };
+  await view.revealPath('leaf.md');
+  view.viewportEl.clientWidth = 500;
+  const expected = { ...view.map.viewport, x: view.map.viewport.x - 150 };
+  assert.ok(Math.abs(after.x - expected.x) <= 1 && Math.abs(after.y - expected.y) <= 1, `after resize ${JSON.stringify(after)} vs ${JSON.stringify(expected)}`);
+  view.revealResize.until = Date.now() - 1; // the reveal is over
+  view.map.viewport = { x: 7, y: 9, zoom: 1 };
+  view.onResize();
+  assert.deepEqual({ ...view.map.viewport }, { x: 7, y: 9, zoom: 1 }, 'a resize after the reveal does not move the camera');
+});
+
+test('B15-y: the status bar growing during an outline reveal (the reader made a note active) re-centres the card on the new bottom inset', async () => {
+  const { view } = await viewWithMap();
+  const leaf = view.map.nodes[2]; leaf.x = 1000; leaf.y = 400;
+  let bottomInset = 0;
+  view.canvasInsets = () => ({ top: 0, right: 0, bottom: bottomInset, left: 0 });
+  view.contentEl = { ownerDocument: null, querySelector: () => null }; view.placeMapTools = () => {};
+  await view.revealPath('leaf.md');
+  const before = view.map.viewport.y;
+  bottomInset = 26; // the zoom bar rose above the taller status bar
+  view.syncStatusBarClearance();
+  assert.ok(Math.abs(view.map.viewport.y - (before - 13)) <= 1, `y ${view.map.viewport.y}, expected ${before - 13}`);
+});

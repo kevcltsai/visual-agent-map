@@ -222,7 +222,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import type { ReferenceGroup } from "../../ai/reference-materials";
+import { documentsSnapshot, sourceNodeId, sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -7123,8 +7123,8 @@ export class VisualAgentMapView extends ItemView {
     const group = await this.topicReferenceGroup(sources, "strong", { origin: false });
     const mapGroups = await this.readMapSourceGroups(signal);
     const content = mapGroups.length
-      ? `${JSON.stringify(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
-      : JSON.stringify(group.documents);
+      ? `${documentsSnapshot(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
+      : documentsSnapshot(group.documents);
     return { group, mapGroups, content };
   }
   /** Compares the merged summary and Detail with what the sources hold (numbers, links, embeds; no invented numbers). */
@@ -20840,7 +20840,7 @@ export class VisualAgentMapView extends ItemView {
           options?.signal
         );
         childSources = await readSources();
-        const sourceSnapshot = JSON.stringify(childSources.documents);
+        const sourceSnapshot = documentsSnapshot(childSources.documents);
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
         const language = this.plugin.settings.language;
@@ -20863,7 +20863,7 @@ export class VisualAgentMapView extends ItemView {
             this.path !== mapPath ||
             this.map?.id !== mapId ||
             childIds() !== startIds,
-          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+          sourcesChanged: async () => documentsSnapshot((await readSources()).documents) !== sourceSnapshot
         };
       },
       onStarted: async () => {
@@ -21676,6 +21676,13 @@ export class VisualAgentMapView extends ItemView {
     const notes = await Promise.all(
       sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
     );
+    // The file as the other source paths read it, so a citation of this topic carries its node id and file revision, not those of the text below.
+    const files = await Promise.all(
+      sources.map(async source => {
+        const file = this.app.vault.getAbstractFileByPath(source.path);
+        return file instanceof TFile ? livingNoteForModel(await this.app.vault.read(file)) : undefined;
+      })
+    );
     const documents = sources.map((source, index) => {
       const note = notes[index];
       const finding = note.newFindings.trim();
@@ -21691,7 +21698,10 @@ export class VisualAgentMapView extends ItemView {
       ]
         .filter(Boolean)
         .join("\n\n");
-      return { path: source.path, content };
+      const file = files[index];
+      return file === undefined
+        ? { path: source.path, content }
+        : { path: source.path, content, nodeId: sourceNodeId(file), rev: sourceRevision(file) };
     });
     return {
       id: `mind-map:${this.map?.id ?? "selected"}`,
@@ -21727,7 +21737,7 @@ export class VisualAgentMapView extends ItemView {
       { language: task.options.outputLanguage }
     );
     if (
-      JSON.stringify(latest.documents) !== task.sourceContent ||
+      documentsSnapshot(latest.documents) !== task.sourceContent ||
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));

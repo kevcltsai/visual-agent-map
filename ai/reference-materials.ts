@@ -14,6 +14,15 @@ export interface ReferenceDocument {
   /** {@link sourceRevision} of the content; computed when not given. */
   rev?: string;
 }
+/** The key that tells whether the documents a task was given changed: what the model sees, without the citation identity (`nodeId`, `rev`). */
+export function documentsSnapshot(documents: ReferenceDocument[]): string {
+  return JSON.stringify(
+    documents.map(document => {
+      const { nodeId, rev, ...rest } = document;
+      return rest;
+    })
+  );
+}
 export interface ReferenceGroup {
   id: string;
   name: string;

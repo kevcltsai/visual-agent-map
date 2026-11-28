@@ -314,7 +314,7 @@ export function abandonAi(
   if (locked) {
     done.open = locked.open.map(item => ({ ...item }));
     done.locked = [...locked.ids];
-  }
+  } else delete done.locked;
   setAiSlot(next, nodeId, done);
   next.revision++;
   return next;
@@ -572,8 +572,11 @@ export function applyAiFailure(data: BookPipelineData, token: AiToken): Committe
   const slot: AiProofState = { ...found };
   if (slot.attempts >= MAX_STEP_ATTEMPTS) {
     slot.done = true;
-    if (slot.step === "proof") slot.incomplete = true;
-    else if (slot.again) {
+    if (slot.step === "proof") {
+      // A failed check read nothing: an earlier check's locked chapters (kept by "fix again") are not why it is incomplete.
+      slot.incomplete = true;
+      delete slot.locked;
+    } else if (slot.again) {
       // The problems are already listed (one more round over a finished proofread): the ones this round tried are marked, not listed twice.
       const squash = (text: string): string => text.replace(/\s+/g, "");
       const tried = slot.pending ?? [];

@@ -7,7 +7,7 @@ const { load: loadReplay } = require('./support-replay.cjs');
 const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe, expansionUnsafeRule } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
-const { cardRevision } = S.load('core/book-pipeline/machine.ts');
+const { cardRevision, fixAgainPlan } = S.load('core/book-pipeline/machine.ts');
 const review = S.load('experiences/visual-map/book-pipeline-review.ts');
 /** The sentences the review box of chapter `i` lists after the run (gate 2's own rules): the box must say what really happened. */
 const boxReasons = async (r, i) => {
@@ -6268,6 +6268,7 @@ const lockedFindingRig = async (aiFix = async request => request.targets.map(t =
   const r = await aiRig({
     aiBookProof: async request => {
       holder.checks++;
+      if (holder.fail) throw new Error('book check down');
       if (holder.checks === 1) {
         await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true); holder.locked = holder.r.raw(1);
         return { checks: [bookProblem(request, 2, 3), { ...bookProblem(request, 3, 2), id: 'B2' }], prior: [], dropped: {} };
@@ -6307,6 +6308,21 @@ test('AI lock, whole book: once the chapter is unlocked, "fix again" sends its k
   const slot = (await r.state()).bookProof;
   assert.ok(!slot.incomplete && !slot.locked, 'complete again');
   assert.ok(!slot.open.some(item => item.reason === 'ai_locked'));
+});
+test('AI lock, whole book: unlocked, "fix again" whose re-check keeps failing gives up the whole book: the old locked list is gone, no more "fix again", the page says the book is not finished', async () => {
+  const { r, holder } = await lockedFindingRig();
+  await r.repo.writeAiLocked(r.nodes[1].path, false);
+  holder.fail = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const state = await r.state();
+  const slot = state.bookProof;
+  assert.equal(slot.done, true);
+  assert.equal(slot.incomplete, true, 'the failed re-check leaves the book incomplete');
+  assert.equal(slot.locked, undefined, `no stale locked chapters: ${JSON.stringify(slot.locked)}`);
+  assert.equal(fixAgainPlan(state, 0).book, false, 'a failed proofread is not offered one more round');
+  const page = pageFiles(holder.v).at(-1)[1];
+  assert.doesNotMatch(page, /SecretTitleA：AI 校對沒有跑完/, `the unlocked chapter is not named as the reason: ${page}`);
+  assert.match(page, /^- AI 校對沒有跑完，這章沒有完整查過$/m, 'the book as a whole is named as not fully checked');
 });
 test('AI lock, whole book: the check\'s chapter numbers map back past a chapter locked before it: chapter 2 of the call is the book\'s chapter 3', async () => {
   const holder = {};

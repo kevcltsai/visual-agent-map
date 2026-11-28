@@ -534,6 +534,7 @@ import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
+import { aiWriteGate } from "../../core/ai-write-gate";
 import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   pickLatest,
@@ -647,6 +648,7 @@ import { StructureReviewModal } from "./structure-review-modal";
 import {
   buildStructureReviewNodes,
   isSuggestionStale,
+  structureContentVersion,
   type StructureReviewResult,
   type StructureSuggestion
 } from "../../core/structure-review-service";
@@ -4432,6 +4434,11 @@ export class VisualAgentMapView extends ItemView {
     const tree = (): ReturnType<typeof buildStructureReviewNodes> =>
       session() && this.map ? buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), scopeId) : [];
     const nodes = tree();
+    // The cards as the review sent them; the apply compares the notes on disk with this.
+    const reviewed = (id: string): string | undefined => {
+      const card = nodes.find(item => item.id === id);
+      return card ? structureContentVersion(card) : undefined;
+    };
     const rootQuestion = scopeId ? (this.describeForReview(scopeId)?.title ?? "") : this.map.title;
     const staleReason = (suggestion: StructureSuggestion): string | null => {
       if (!session()) return t("ui.structure_review_stale_missing");
@@ -4458,7 +4465,7 @@ export class VisualAgentMapView extends ItemView {
         scope: scopeId ? "branch" : "map",
         titleOf: id => (windowCurrent() ? (this.describeForReview(id)?.title ?? "") : ""),
         staleReason: windowStale,
-        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, windowStale),
+        apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, windowStale, reviewed),
         highlight: ids => {
           if (windowCurrent()) this.highlightStructure(ids);
         },
@@ -4597,7 +4604,9 @@ export class VisualAgentMapView extends ItemView {
   private applyStructureSuggestion(
     suggestion: StructureSuggestion,
     title: string,
-    staleReason: (suggestion: StructureSuggestion) => string | null
+    staleReason: (suggestion: StructureSuggestion) => string | null,
+    /** The content version of a card as the review sent it; absent: no content check (the structure checks still run). */
+    reviewed?: (id: string) => string | undefined
   ): Promise<boolean> {
     const guard = (): void => {
       const reason = staleReason(suggestion);
@@ -4626,6 +4635,17 @@ export class VisualAgentMapView extends ItemView {
         const fresh = await this.freshNotes();
         guard();
         if (this.structureLockReason(suggestion, fresh)) throw new Error(t("ui.ai_locked_notice"));
+        // The shared AI write gate, content version: a card the suggestion names that changed on disk since the review
+        // (edited outside the window, the view not caught up yet) abandons the suggestion; nothing is written.
+        for (const id of [suggestion.targetId, suggestion.newParentId, suggestion.mergeIntoId]) {
+          const read = id ? reviewed?.(id) : undefined;
+          const note = id ? fresh.get(id) : undefined;
+          if (read === undefined || !note) continue;
+          if (aiWriteGate({ owned: true, version: { read, now: structureContentVersion(note) } }).length) {
+            new Notice(t("ui.structure_review_stale_content"));
+            throw new Error(t("ui.structure_review_stale_content"));
+          }
+        }
         await work();
       });
     if (suggestion.kind === "strengthen")

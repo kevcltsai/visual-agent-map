@@ -1247,6 +1247,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.structure_review_title_required": "請先輸入新議題的名稱。",
   "ui.structure_review_stale_missing": "這項建議已過期：它提到的卡片已不在心智圖上。",
   "ui.structure_review_stale_changed": "這項建議已過期：卡片在檢視後被改名或移動了。",
+  "ui.structure_review_stale_content": "這項建議已過期：相關卡片在檢視後被改過，沒有套用。",
   "ui.structure_review_stale_structure": "這項建議已不適用：現在套用會形成循環或沒有任何改變。",
   "ui.structure_review_merge_title": "把「{0}」合併到「{1}」",
   "ui.structure_review_merge_desc":

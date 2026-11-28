@@ -1318,6 +1318,8 @@ export const en = {
   "ui.structure_review_stale_missing": "This suggestion is out of date: a card it refers to is no longer on the map.",
   "ui.structure_review_stale_changed":
     "This suggestion is out of date: the card was renamed or moved after the review.",
+  "ui.structure_review_stale_content":
+    "This suggestion is out of date: a card it refers to was changed after the review. Nothing was applied.",
   "ui.structure_review_stale_structure":
     "This suggestion no longer fits the map: applying it now would create a loop or change nothing.",
   "ui.structure_review_merge_title": "Merge “{0}” into “{1}”",

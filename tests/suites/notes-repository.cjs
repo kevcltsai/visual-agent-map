@@ -2801,3 +2801,24 @@ integrationTest('a note whose managed marker is removed before a rename commit i
   assert.ok(detached);
   assert.equal(contents.get(note.path), detached);
 });
+
+integrationTest('AI write gate: an AI writer (rejectAiCard) is refused on a note locked at commit; a manual guarded write is not', async () => {
+  const { repo, contents } = fixture();
+  const note = await topicNote(repo, 'Gated');
+  await repo.writeAiLocked(note.path, true);
+  const locked = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true }), 'discarded');
+  assert.equal(await repo.updateNoteRawGuarded(note.path, text => `${text}\nAI`, { rejectAiCard: true }), 'discarded');
+  assert.equal(contents.get(note.path), locked, 'the locked note is byte for byte unchanged');
+  // Owner part of the gate: a stopped AI run writes nothing; the version part: text the caller did not read is not replaced.
+  await repo.writeAiLocked(note.path, false);
+  const open = contents.get(note.path);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, authorize: () => false }), 'discarded');
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, expectedContent: `${open}x` }), 'discarded');
+  assert.equal(contents.get(note.path), open);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'AI' }, { rejectAiCard: true, expectedContent: open }), 'written');
+  // A manual edit never calls the gate: the owner may edit a locked note.
+  await repo.writeAiLocked(note.path, true);
+  assert.equal(await repo.updateNoteGuarded(note.path, { summary: 'Mine' }, { expectedContent: contents.get(note.path) }), 'written');
+  assert.equal((await repo.readNote(note.path)).summary, 'Mine');
+});

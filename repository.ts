@@ -109,6 +109,7 @@ import { normalizeReasoningLevel } from "./ai/task-policy";
 import { resolveTaskModel } from "./ai/model-resolution";
 import { standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { readOnce, type NoteReadContext } from "./core/note-read-context";
+import { aiWriteGate } from "./core/ai-write-gate";
 import type { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
@@ -950,7 +951,11 @@ export class Repository {
     const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
-      if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))) {
+      if (
+        rejectAiCard
+          ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize(content))
+          : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))
+      ) {
         outcome = "discarded";
         return content;
       }
@@ -979,7 +984,11 @@ export class Repository {
     const { expectedContent, authorize, rejectAiCard } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
-      if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
+      if (
+        rejectAiCard
+          ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize())
+          : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())
+      ) {
         outcome = "discarded";
         return content;
       }
@@ -987,6 +996,23 @@ export class Repository {
       return transform(content);
     });
     return outcome;
+  }
+
+  /**
+   * The shared AI write gate on the bytes being replaced, for an AI writer only (a manual edit keeps the plain checks): the
+   * caller's run still owns the write, the note is not `ai-locked` now, and it is still the text the caller read. The
+   * Living Node refusal stays in `admitAiWriter`, which throws its own message.
+   */
+  private aiWriteBlocked(content: string, expectedContent: string | undefined, owned: () => boolean): boolean {
+    // Same order as before: the content check first, so `authorize` only runs on the text the caller read.
+    if (
+      aiWriteGate({
+        owned: true,
+        version: expectedContent === undefined ? undefined : { read: expectedContent, now: content }
+      }).length
+    )
+      return true;
+    return aiWriteGate({ owned: owned(), aiLocked: readAiLocked(frontmatter(content)) }).length > 0;
   }
 
   /**

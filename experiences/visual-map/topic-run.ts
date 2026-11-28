@@ -5,6 +5,7 @@
  */
 import { isBudgetExhausted } from "../../core/admission";
 import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
+import { aiWriteGate } from "../../core/ai-write-gate";
 import { isAiCard } from "./prompt-run";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
@@ -41,6 +42,29 @@ import type { AgentTaskHandle, RunOnceModel, SynthesisObserver, TaskOptions } fr
 import { withThinkingOrigin } from "./thinking-origin";
 import { neutralizeText } from "../../core/book-pipeline/note-sections";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
+
+/** Which note the run read: another note at the same path (a different map or topic id) is not the run's topic. */
+const noteIdentity = (note: Note): string => `${note.mapId}\n${note.topicId}`;
+
+/** Everything a research result is written over: a different value at commit means the topic changed while the AI ran. */
+const researchVersion = (note: Note, status: string | undefined): string =>
+  JSON.stringify([
+    status,
+    note.newFindings,
+    note.visualReferences,
+    note.thinkingOrigin,
+    note.title,
+    note.prompt,
+    note.rules,
+    note.detail,
+    note.summary,
+    note.model,
+    note.reasoning,
+    note.researchMode,
+    note.visualMode,
+    note.sourcePaths,
+    note.referencePaths
+  ]);
 
 /** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
 export const CHART_JOB_LIMIT = 3;
@@ -974,10 +998,18 @@ export class TopicRuns {
           const { note: latest, content: expectedContent } = repo.readNoteSnapshot
             ? await repo.readNoteSnapshot(path, options.map())
             : { note: await repo.readNote(path, options.map()), content: undefined };
-          // The late-result fence: a topic locked while the AI ran gets nothing (its status is already back).
-          if (latest.aiLocked) throw aiLockedError();
-          if (isAiCard(latest)) throw new Error(t("ui.living_node_use_run_card"));
-          if (latest.status !== note.status || noteSnapshot(latest) !== snapshot) throw changed();
+          // The late-result fence (the shared AI write gate): a topic locked while the AI ran gets nothing (its status is
+          // already back); a Living Node card is read-only here; another note at the path or a changed topic is stale.
+          const blocked = aiWriteGate({
+            owned: true,
+            aiLocked: latest.aiLocked === true,
+            readOnly: isAiCard(latest),
+            identity: { read: noteIdentity(note), now: noteIdentity(latest) },
+            version: { read: `${note.status}\n${snapshot}`, now: `${latest.status}\n${noteSnapshot(latest)}` }
+          });
+          if (blocked.includes("ai_locked")) throw aiLockedError();
+          if (blocked.includes("read_only")) throw new Error(t("ui.living_node_use_run_card"));
+          if (blocked.length) throw changed();
           const mode: WritebackMode = prepared.updateMode ?? "merge";
           const noteLanguage = noteLanguageOf(outputLanguage);
           const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
@@ -1161,9 +1193,13 @@ export class TopicRuns {
             if (options.signal.aborted || options.mapChanged())
               throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
             const latest = await options.readSources();
-            if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
-            // Stop pressed while the sources were re-read still wins: nothing is written.
-            if (options.signal.aborted) throw aborted();
+            // The shared AI write gate: changed sources, then Stop pressed while they were re-read; nothing is written.
+            const blocked = aiWriteGate({
+              owned: !options.signal.aborted,
+              version: { read: options.recordedSources(), now: JSON.stringify(latest.documents) }
+            });
+            if (blocked.includes("stale")) throw changed();
+            if (blocked.includes("owner_changed")) throw aborted();
             if (options.closed()) throw changed();
             const mark = options.applying();
             await this.ports.mutate()(() => options.write(result));
@@ -1493,25 +1529,17 @@ export class TopicRuns {
           const { note: latest, content: expectedContent } = repo.readNoteSnapshot
             ? await repo.readNoteSnapshot(path, options.map)
             : { note: await repo.readNote(path, options.map), content: undefined };
-          const stale =
-            latest.status !== "running" ||
-            latest.newFindings !== note.newFindings ||
-            latest.visualReferences !== note.visualReferences ||
-            latest.thinkingOrigin !== note.thinkingOrigin ||
-            latest.title !== note.title ||
-            latest.prompt !== note.prompt ||
-            latest.rules !== note.rules ||
-            latest.detail !== note.detail ||
-            latest.summary !== note.summary ||
-            latest.model !== note.model ||
-            latest.reasoning !== note.reasoning ||
-            latest.researchMode !== note.researchMode ||
-            latest.visualMode !== note.visualMode ||
-            latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
-            JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-          // The late-result fence: a topic locked while the AI ran gets nothing but its status back.
-          const locked = latest.aiLocked === true;
-          if (controller.signal.aborted || stale || locked || isAiCard(latest)) {
+          // The late-result fence (the shared AI write gate): a topic locked while the AI ran gets nothing but its status back.
+          const blocked = aiWriteGate({
+            owned: !controller.signal.aborted,
+            aiLocked: latest.aiLocked === true,
+            readOnly: isAiCard(latest),
+            identity: { read: noteIdentity(note), now: noteIdentity(latest) },
+            version: { read: researchVersion(note, "running"), now: researchVersion(latest, latest.status) }
+          });
+          const locked = blocked.includes("ai_locked");
+          const stale = blocked.includes("stale") || blocked.includes("identity_changed");
+          if (blocked.length) {
             await this.settleRunning(repo, path, { status: note.status });
             if (exchangeId)
               exchanges()?.failed(
@@ -1519,7 +1547,7 @@ export class TopicRuns {
                 t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
               );
             if (locked) fail(t("ui.ai_locked_notice"));
-            else if (isAiCard(latest)) fail(t("ui.living_node_use_run_card"));
+            else if (blocked.includes("read_only")) fail(t("ui.living_node_use_run_card"));
             else if (stale) {
               options.pipeline?.onDiscarded?.();
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));

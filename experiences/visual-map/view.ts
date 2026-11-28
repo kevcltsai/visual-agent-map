@@ -795,6 +795,47 @@ function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
 }
 
+/**
+ * Puts what a reply's staged card changes did (`base` to `final`) on `target`, a map that others have changed since `base`:
+ * new cards are added (a missing parent fails it), and a field a staged change moved is set where the card still has the
+ * value it had in `base`. What the others changed stays.
+ */
+function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocument): void {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  const baseNodes = new Map(base.nodes.map(node => [node.id, node]));
+  const nodes = new Map(target.nodes.map(node => [node.id, node]));
+  for (const node of final.nodes) {
+    const was = baseNodes.get(node.id);
+    const now = nodes.get(node.id);
+    if (!was) {
+      if (now) continue;
+      if (node.parentId && !nodes.has(node.parentId)) throw new Error("changed-target");
+      const added = clone(node);
+      target.nodes.push(added);
+      nodes.set(added.id, added);
+      continue;
+    }
+    if (!now) throw new Error("changed-target");
+    const fields = now as unknown as Record<string, unknown>;
+    const from = was as unknown as Record<string, unknown>;
+    const to = node as unknown as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+      if (same(from[key], to[key])) continue;
+      if (!same(fields[key], from[key])) throw new Error("changed-target");
+      if (key in to) fields[key] = clone(to[key]);
+      else delete fields[key];
+    }
+  }
+  const fields = target as unknown as Record<string, unknown>;
+  const from = base as unknown as Record<string, unknown>;
+  const to = final as unknown as Record<string, unknown>;
+  for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+    if (key === "nodes" || key === "viewport" || same(from[key], to[key])) continue;
+    if (!same(fields[key], from[key])) throw new Error("changed-target");
+    if (key in to) fields[key] = clone(to[key]);
+    else delete fields[key];
+  }
+}
 /** A copy of `node` without any AIM field: what an old AIM map shares. */
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
@@ -1581,6 +1622,19 @@ export class VisualAgentMapView extends ItemView {
     return (this.unsyncedPaths ??= new UnsyncedPaths());
   }
   private heldViews: VisualAgentMapView[] = [];
+  /**
+   * While a reply that adds many cards is applied, its card writes (`on`) change the map in memory only; {@link flushChatMapBatch}
+   * then writes the lot to Map.md as one map transaction. `base` is the map as it was before the first staged change.
+   */
+  private chatMapBatch: {
+    on: boolean;
+    base: MapDocument | null;
+    created: string[];
+    /** Where the batch began: the map it belongs to, and the place in the reply's history group its one entry goes back to. */
+    path: string;
+    mapId: string;
+    historyAt: number;
+  } | null = null;
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
@@ -6653,6 +6707,50 @@ export class VisualAgentMapView extends ItemView {
   private async mapChange(change: (map: MapDocument) => void, rebuildDerivedData = true): Promise<void> {
     await this.mapChangeSnapshots(change, rebuildDerivedData);
   }
+  /**
+   * Writes what a reply's staged card changes left in memory as one map transaction (one Map.md write, one history entry). The
+   * map goes back to its state before the first staged change first, so the transaction's outside-edit check and stale checks
+   * compare what is on disk with what the reply started from; a Map.md that is no longer that fails the whole batch (nothing
+   * is written and the map is as it was).
+   */
+  private async flushChatMapBatch(): Promise<void> {
+    const batch = this.chatMapBatch;
+    const base = batch?.base;
+    if (!batch || !base || !this.map) return;
+    const created = batch.created;
+    batch.base = null;
+    batch.created = [];
+    // Another map is open now (or the view is gone): the staged cards belong to the one the reply began on, and the open map
+    // is not touched, so the whole batch fails.
+    if (this.closed || this.path !== batch.path || this.map.id !== batch.mapId) throw new Error("changed-target");
+    const final = clone(this.map);
+    const viewport = clone(this.map.viewport);
+    const mapPath = this.path;
+    const structure = (doc: MapDocument): string => JSON.stringify({ ...doc, viewport: null });
+    try {
+      // The map goes back to what is stored (the reply's start, or what another write made of it meanwhile), so the
+      // transaction's outside-edit check does not open the conflict window over the staged cards.
+      const disk = await this.plugin.repo.readMap(mapPath);
+      this.adoptSavedMap(disk);
+      const tx = this.beginMapTransaction();
+      for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
+      const entry = await tx
+        .editMap(mapPath, map => {
+          if (structure(map) === structure(base)) {
+            const target = map as unknown as Record<string, unknown>;
+            for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
+            Object.assign(target, final);
+          } else applyStagedDelta(map, base, final);
+          map.viewport = clone(viewport);
+        })
+        .commit({ deferRebuild: true });
+      this.history.pushAt(entry, batch.historyAt);
+    } catch (error) {
+      this.render();
+      throw error;
+    }
+    this.render();
+  }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
   private async resolveMapConflict(): Promise<boolean> {
     if (!this.map) return false;
@@ -6680,6 +6778,35 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     this.clearTidy(false);
+    const staging = this.chatMapBatch;
+    if (staging?.on && !attachment && !authorize) {
+      const map = this.map;
+      // Another map is open now: the staged cards stay out of it (the flush fails the batch).
+      if (staging.base && (this.path !== staging.path || map.id !== staging.mapId)) throw new Error("changed-target");
+      const snapshot = clone(map);
+      if (!staging.base) {
+        staging.base = snapshot;
+        staging.path = this.path;
+        staging.mapId = snapshot.id;
+        staging.historyAt = this.history.groupSize;
+      }
+      const graph = (doc: MapDocument): string =>
+        JSON.stringify(doc.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+      try {
+        change(map, () => {
+          throw new Error("no attachment in a staged change");
+        });
+        this.pruneSummariesIn(map);
+      } catch (error) {
+        this.adoptSavedMap(snapshot);
+        this.render();
+        throw error;
+      }
+      if (graph(snapshot) !== graph(map)) this.livingGraph = undefined;
+      staging.created.push(...created);
+      this.render();
+      return null;
+    }
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
     // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
@@ -24607,6 +24734,31 @@ export class VisualAgentMapView extends ItemView {
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
+    // A reply that adds many cards writes them to Map.md once: the card writes (and the layout after them) are staged in
+    // memory and written as one transaction before anything else writes, or at the end.
+    const stage =
+      adds > 0 && batched && !scope ? { on: false, base: null, created: [], path: "", mapId: "", historyAt: 0 } : null;
+    const staged: { index: number; label: string; ids: string[] }[] = [];
+    this.chatMapBatch = stage;
+    const settleStaged = async (): Promise<void> => {
+      if (!stage?.base) return;
+      try {
+        await this.plugin.mutate(() => this.history.ownWrites(() => this.flushChatMapBatch()));
+        wrote = true;
+      } catch (error) {
+        // All or nothing: the cards of the batch were not written, so their lines say so and the run forgets them.
+        for (const item of staged) {
+          lines[item.index] = this.chatLine(item.label, { status: "failed", reason: errorMessage(error) });
+          for (const id of item.ids) {
+            const at = run.created.indexOf(id);
+            if (at >= 0) run.created.splice(at, 1);
+            for (const [ref, made] of run.refs) if (made === id) run.refs.delete(ref);
+            this.notes.delete(id);
+          }
+        }
+      }
+      staged.length = 0;
+    };
     try {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
@@ -24632,6 +24784,7 @@ export class VisualAgentMapView extends ItemView {
             lines[index] = this.chatLine(label, lost());
             continue;
           }
+          await settleStaged();
           lines[index] = this.chatLine(label, await this.chatPlaceCanvasImage(action.direction, options.work));
           continue;
         }
@@ -24654,6 +24807,8 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        const staging = !!stage && action.kind === "add_child" && !action.livingPrompt;
+        if (!staging) await settleStaged();
         if (action.kind === "rename_map") {
           // The folder moves with the name, so the reply's anchor follows the map to its new path.
           const fromRoot = this.plugin.repo.topicRoot(anchor.path);
@@ -24696,6 +24851,7 @@ export class VisualAgentMapView extends ItemView {
         // The card an add_child made is the first one the run gained during it.
         const made = run.created.length;
         try {
+          if (stage) stage.on = staging;
           // Auto-apply: no plan card stood in front of this write, so the file is copied to the backups folder first (once per chain).
           const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
@@ -24709,12 +24865,16 @@ export class VisualAgentMapView extends ItemView {
             });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
+        } finally {
+          if (stage) stage.on = false;
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key = normalizeVaultPath(action.path);
           if (key) autoChain.createdFiles.add(key);
         }
-        if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        // A staged card counts as written once the batch is (see settleStaged).
+        const heldBack = staging && box.outcome.status === "done";
+        if (box.outcome.status !== "skipped" && action.kind !== "focus_topic" && !heldBack) wrote = true;
         if (
           box.outcome.status === "done" &&
           (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note")
@@ -24725,6 +24885,7 @@ export class VisualAgentMapView extends ItemView {
           layoutDone = true;
         }
         lines[index] = this.chatTargetLine(this.chatLine(label, box.outcome), action, run, made);
+        if (heldBack) staged.push({ index, label, ids: run.created.slice(made) });
       }
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
       let arranged = false;
@@ -24740,6 +24901,7 @@ export class VisualAgentMapView extends ItemView {
         !result.actions.some(action => action.kind === "auto_layout")
       ) {
         try {
+          if (stage) stage.on = true;
           await this.plugin.mutate(() =>
             this.history.ownWrites(async () => {
               if (!same() || !this.map) return;
@@ -24755,6 +24917,8 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        } finally {
+          if (stage) stage.on = false;
         }
       }
       // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
@@ -24764,6 +24928,7 @@ export class VisualAgentMapView extends ItemView {
         this.flushChatRender();
         if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
+            if (stage) stage.on = true;
             await this.plugin.mutate(() =>
               this.history.ownWrites(async () => {
                 if (!same() || !this.map) return;
@@ -24774,6 +24939,8 @@ export class VisualAgentMapView extends ItemView {
             );
           } catch {
             // The writes are done already; only the tidy-up failed, and the user can lay the map out by hand.
+          } finally {
+            if (stage) stage.on = false;
           }
         }
       }
@@ -24797,6 +24964,7 @@ export class VisualAgentMapView extends ItemView {
           : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
+          if (stage) stage.on = true;
           await this.plugin.mutate(() =>
             this.history.ownWrites(async () => {
               if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
@@ -24846,10 +25014,15 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        } finally {
+          if (stage) stage.on = false;
         }
       }
+      await settleStaged();
     } finally {
       // Whatever ended the loop (done, stopped, closed, thrown), the derived data, the held repaint and the re-read happen once.
+      await settleStaged();
+      if (this.chatMapBatch === stage) this.chatMapBatch = null;
       await this.settleChatBatch(run);
       // The writes become one undo step of this view. Each was a map transaction (or a guarded file write) like a manual edit,
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry

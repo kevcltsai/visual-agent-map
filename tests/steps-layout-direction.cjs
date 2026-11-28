@@ -493,4 +493,163 @@ test('E2-x: a batch of AI cards neither pans the view nor changes the selection 
   assert.equal(h2.view.selection.state.selected, h2.named('Added').id);
 });
 
+
+// ---- E2-y: a reply's batch of cards is one Map.md write ----
+// Counts every write of Map.md (vault.process / modify / create over it) on the harness's fake vault.
+const countMapWrites = h => {
+  const vault = h.view.app.vault;
+  const counter = { n: 0 };
+  for (const name of ['process', 'modify', 'create']) {
+    const original = vault[name]?.bind(vault);
+    if (!original) continue;
+    vault[name] = async (target, ...rest) => {
+      if ((target?.path ?? target) === MAP && counter.refuse) throw new Error('disk refused the write');
+      const result = await original(target, ...rest);
+      if ((target?.path ?? target) === MAP) counter.n++;
+      return result;
+    };
+  }
+  return counter;
+};
+const kidsOf = (h, count) => Array.from({ length: count }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: h.named('Root').id, title: `Kid${i}` }));
+const mapJson = h => JSON.stringify({ ...h.view.map, viewport: null });
+
+test('E2-y: a reply that adds 12 cards writes Map.md once, and Undo takes all 12 back in one step', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  const before = await h.saved();
+  const steps = h.view.history.past.length;
+  await chatApply(h, kidsOf(h, 12));
+  assert.equal(h.view.map.nodes.length, tree4.length + 12);
+  assert.equal((await h.saved()).nodes.length, tree4.length + 12, 'the cards are on disk');
+  assert.equal(writes.n, 1, 'one write of Map.md for the whole batch');
+  assert.equal(h.view.history.past.length, steps + 1, 'one undo step');
+  await h.view.travel(false);
+  assert.equal((await h.saved()).nodes.length, before.nodes.length, 'one undo removes the whole batch');
+});
+
+test('E2-y: a batch whose write is refused writes nothing: Map.md and the open map stay as they were', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  const before = mapJson(h);
+  const diskBefore = JSON.stringify(await h.saved());
+  // The write of the batch fails (the cards were laid out in memory): nothing is written and the map goes back.
+  writes.refuse = true;
+  const lines = await chatApply(h, kidsOf(h, 12));
+  assert.equal(writes.n, 0);
+  assert.equal(mapJson(h), before, 'the open map is as before');
+  assert.equal(JSON.stringify(await h.saved()), diskBefore);
+  assert.equal(lines.filter(line => line.status === 'failed').length, 12, 'every card of the batch is reported as not written');
+});
+
+test('E2-y: a card skipped by validation keeps its own line; the others are still written once', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  const actions = [...kidsOf(h, 6), { kind: 'add_child', ref: 'x', parentId: 'no-such-card', title: 'Orphan' }];
+  const lines = await chatApply(h, actions);
+  assert.equal(lines[6].status, 'skipped');
+  assert.equal(h.view.map.nodes.length, tree4.length + 6);
+  assert.equal(writes.n, 1);
+});
+
+test('E2-y: one card still writes Map.md once', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  await chatApply(h, kidsOf(h, 1));
+  assert.equal(writes.n, 1);
+  assert.equal(h.view.map.nodes.length, tree4.length + 1);
+});
+
+// Runs `during` right after the nth card note of a reply is made (the reply is mid-batch then).
+const afterNthCard = (h, nth, during) => {
+  const original = h.repo.createNote.bind(h.repo);
+  let count = 0;
+  h.repo.createNote = async (...args) => {
+    const made = await original(...args);
+    if (++count === nth) await during();
+    return made;
+  };
+};
+
+test('E2-y: 6 cards with summaries: one Undo takes all back (notes still there while summaries are undone), Redo brings them back in order', async () => {
+  const h = await harness(tree4);
+  const before = await h.saved();
+  const acts = kidsOf(h, 6).map((a, i) => ({ ...a, summary: `S${i}` }));
+  const lines = await chatApply(h, acts);
+  assert.equal(lines.filter(line => line.status === 'failed').length, 0);
+  assert.equal((await h.saved()).nodes.length, before.nodes.length + 6);
+  await h.view.travel(false);
+  assert.equal((await h.saved()).nodes.length, before.nodes.length, 'undo returns the map');
+  await h.view.travel(true);
+  const after = await h.saved();
+  assert.equal(after.nodes.length, before.nodes.length + 6, 'redo brings the cards back');
+  const kid = after.nodes.find(n => n.id === h.view.map.nodes.find(m => m.path === after.nodes.at(-1).path).id);
+  assert.equal((await h.repo.readNote(kid.path)).summary.length > 0, true, 'and their summaries');
+});
+
+test('E2-y: the map changes under the reply (another map opens): the open map and its Map.md are not written, the batch is reported failed', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  const disk = JSON.stringify(await h.saved());
+  const other = { id: 'map-other', title: 'Other', version: 1, nodes: [{ id: 'o1', parentId: null, path: 'o1.md', x: 0, y: 0 }], viewport: { x: 0, y: 0, zoom: 1 } };
+  const otherJson = JSON.stringify(other);
+  afterNthCard(h, 3, async () => { h.view.path = 'Agent Workspace/Topics/map-other/Map.md'; h.view.map = other; });
+  const lines = await chatApply(h, kidsOf(h, 8));
+  assert.equal(writes.n, 0, 'no write of the old map');
+  assert.equal(JSON.stringify(await h.saved()), disk, 'the old map is as it was');
+  assert.equal(JSON.stringify(h.view.map), otherJson, 'the open map keeps its own content');
+  assert.ok(lines.some(line => line.status === 'failed'), 'the batch is reported');
+});
+
+test('E2-y: another write of Map.md during the batch is kept: the staged cards are put on it, one write, no conflict window', async () => {
+  const h = await harness(tree4);
+  const root = h.named('Root');
+  const extra = await h.repo.createNote('Elsewhere', 'gpt-6-luna', { id: 'map-d', title: 'Direction', version: 1, nodes: [] }, MAP, 'workspace');
+  Object.assign(extra, { parentId: root.id, x: 1360, y: 600 });
+  afterNthCard(h, 3, async () => {
+    const doc = await h.repo.readMap(MAP);
+    doc.nodes.push(extra);
+    await h.view.app.vault.process(h.view.app.vault.getAbstractFileByPath(MAP), () => support.core.serializeMap(doc));
+  });
+  const lines = await chatApply(h, kidsOf(h, 6));
+  assert.equal(lines.filter(line => line.status === 'failed').map(line => line.text).join('|'), '');
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length + 1 + 6, 'their card and the six');
+  assert.ok(saved.nodes.some(n => n.id === extra.id));
+  assert.ok(h.view.map.nodes.some(n => n.id === extra.id), 'the screen shows their card too');
+  assert.equal(h.view.map.nodes.length, saved.nodes.length);
+});
+
+const outsideEdit = (h, change) => async () => {
+  const doc = await h.repo.readMap(MAP);
+  change(doc);
+  await h.view.app.vault.process(h.view.app.vault.getAbstractFileByPath(MAP), () => support.core.serializeMap(doc));
+};
+
+test('E2-y: the parent card of the batch is deleted by another write during it: nothing of the batch is written and the lines say why', async () => {
+  const h = await harness(tree4);
+  const parent = h.named('B').id;
+  afterNthCard(h, 3, outsideEdit(h, doc => { doc.nodes = doc.nodes.filter(n => n.id !== parent); }));
+  const actions = kidsOf(h, 6).map(a => ({ ...a, parentId: parent }));
+  const lines = await chatApply(h, actions);
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length - 1, 'only their change is on disk: no card of the batch');
+  assert.equal(saved.nodes.some(n => n.parentId === parent), false);
+  assert.equal(lines.filter(line => line.status === 'failed').length, 6, 'every card of the batch says it was not written');
+  assert.ok(lines.every(line => !line.text || line.status !== 'failed' || /changed-target/.test(line.text)), 'with the reason');
+});
+
+test('E2-y: another write changes a card field the batch also changes: theirs is not overwritten, the batch is not written', async () => {
+  const h = await harness(tree4);
+  const root = h.named('Root');
+  root.collapsed = true;
+  await h.repo.saveMap(MAP, h.view.map);
+  afterNthCard(h, 3, outsideEdit(h, doc => { doc.nodes.find(n => n.id === root.id).collapsed = false; doc.nodes.find(n => n.id === root.id).x += 7; }));
+  const lines = await chatApply(h, kidsOf(h, 6));
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length, 'no card of the batch is on disk');
+  assert.equal(saved.nodes.find(n => n.id === root.id).x, 1007, 'their edit is still there');
+  assert.equal(lines.filter(line => line.status === 'failed').length, 6);
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

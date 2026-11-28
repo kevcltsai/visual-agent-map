@@ -477,11 +477,15 @@ test('E2-x: a batch of AI cards neither pans the view nor changes the selection 
   const seen = [];
   const select = h.view.selection.setSelected.bind(h.view.selection);
   h.view.selection.setSelected = id => { seen.push(id); return select(id); };
+  const panFlags = [];
+  const applySel = h.view.applySelectionChange.bind(h.view);
+  h.view.applySelectionChange = change => { panFlags.push(h.view.keepCanvasOnSelect); return applySel(change); };
   const kids = Array.from({ length: 12 }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: h.named('Root').id, title: `Kid${i}` }));
   await chatApply(h, kids);
   assert.equal(h.view.map.nodes.length, tree4.length + 12);
   assert.deepEqual({ ...h.view.map.viewport }, { x: 194, y: 40, zoom: 1 }, 'the view stays where it was');
   const created = new Set(h.view.map.nodes.filter(n => /^Kid/.test(h.view.notes.get(n.id)?.title ?? '')).map(n => n.id));
+  assert.ok(panFlags.length && panFlags.every(Boolean), 'the reply selects its branch root with the tool-row pan switched off');
   assert.equal(seen.filter(id => created.has(id) && id !== seen.at(-1)).length, 0, 'no per-card selection of the new cards');
   const h2 = await harness(tree4);
   h2.view.selection.setSelected(h2.named('B').id);

@@ -2182,6 +2182,8 @@ export class VisualAgentMapView extends ItemView {
   private restoringFocus = false;
   /** True only while a repaint opens a card title/summary field or hands focus back from one: the tool row must not pan the canvas then. */
   private keepCanvasOnFieldRestore = false;
+  /** True only while a chat reply selects its new branch root: the tool row must not pan the canvas then. */
+  private keepCanvasOnSelect = false;
   private onMapWindowFocus(): void {
     if (!this.focusRestorePending) return;
     this.focusRestorePending = false;
@@ -15023,7 +15025,13 @@ export class VisualAgentMapView extends ItemView {
     // A framing action (Show all) is mid-way: its viewport is the answer, so the row stays where it fits instead of moving the canvas.
     // Likewise a repaint putting focus back (opening or closing a card's title/summary field redraws the card, which is taller
     // or shorter by the field and its hint): the user did not navigate, so the canvas must stay where it is.
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.keepCanvasOnFieldRestore) {
+    if (
+      (spot.pan.dx || spot.pan.dy) &&
+      this.map &&
+      !this.framingViewport &&
+      !this.keepCanvasOnFieldRestore &&
+      !this.keepCanvasOnSelect
+    ) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -24574,8 +24582,15 @@ export class VisualAgentMapView extends ItemView {
       // A topic chat does not move the user's selection.
     } else if (run.ringImages?.size) {
       if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
-    } else if (branchRoot && same() && !this.closed)
-      this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+    } else if (branchRoot && same() && !this.closed) {
+      // Selecting the reply's branch root must not pan the view to fit its tool row (#56: a finished reply never moves the picture).
+      this.keepCanvasOnSelect = true;
+      try {
+        this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+      } finally {
+        this.keepCanvasOnSelect = false;
+      }
+    }
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles, selection.ids);

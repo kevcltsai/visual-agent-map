@@ -5165,3 +5165,31 @@ integrationTest('Living Node A29: a committed run is one undo step; undo and red
   await assert.rejects(() => pushed[0].undo());
   assert.equal(f.contents.get(path), edited);
 });
+test('B12-y: entering and leaving the detail tier batch the card reads before the writes', () => {
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
+  const log = [];
+  const makeCard = id => {
+    const card = { dataset: {}, classes: new Set(), heightValue: '', scroll: 300, client: 100,
+      style: { removeProperty() { card.heightValue = ''; log.push(`${id}:w`); } },
+      toggleClass(name, on) { on ? card.classes.add(name) : card.classes.delete(name); log.push(`${id}:w`); },
+      createSpan() { log.push(`${id}:w`); }, querySelector: () => null };
+    Object.defineProperty(card.style, 'height', { get: () => card.heightValue, set: v => { card.heightValue = v; log.push(`${id}:w`); } });
+    Object.defineProperty(card, 'offsetHeight', { get: () => { log.push(`${id}:r`); return 100; } });
+    Object.defineProperty(card, 'scrollHeight', { get: () => { log.push(`${id}:r`); return card.scroll; } });
+    Object.defineProperty(card, 'clientHeight', { get: () => { log.push(`${id}:r`); return card.client; } });
+    return card;
+  };
+  const view = Object.create(VisualAgentMapView.prototype);
+  const cards = ['a', 'b', 'c'].map(makeCard);
+  view.cardEls = new Map(cards.map((card, i) => [`n${i}`, card]));
+  const phases = () => log.map(e => e.slice(-1)).join('').replace(/(.)\1+/g, '$1');
+  view.holdDetailHeights(true);
+  assert.equal(phases(), 'rw', 'hold: all heights read, then all written');
+  assert.ok(cards.every(card => card.heightValue === '100px' && card.dataset.detailHold === '1'));
+  log.length = 0; view.remeasureDetailClips();
+  assert.equal(phases(), 'wrw', 'clip measure: all off, all read, all on');
+  assert.ok(cards.every(card => card.classes.has('is-clipped')));
+  log.length = 0; view.releaseDetailHeights();
+  assert.equal(phases(), 'w', 'release writes only: held cards leave the detail hold');
+  assert.ok(cards.every(card => card.heightValue === '' && !card.classes.has('is-clipped')));
+});

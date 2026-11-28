@@ -15429,6 +15429,12 @@ export class VisualAgentMapView extends ItemView {
     card.toggleClass("is-clipped", clipped);
     return clipped;
   }
+  /** measureClipped over many cards without interleaving: all classes off, then all reads (one layout), then all classes on. */
+  private measureClippedBatch(cards: HTMLElement[]): void {
+    for (const card of cards) card.toggleClass("is-clipped", false);
+    const clipped = cards.map(card => card.scrollHeight > card.clientHeight + 1);
+    cards.forEach((card, i) => card.toggleClass("is-clipped", clipped[i]));
+  }
   private markClipped(card: HTMLElement, fixed: boolean): void {
     if (fixed) this.measureClipped(card);
     else card.toggleClass("is-clipped", false);
@@ -23117,6 +23123,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private holdDetailHeights(live: boolean): void {
     if (!this.cardEls) return;
+    // Reads first, writes after: no layout is forced between two cards.
+    const held: Array<[HTMLElement, number]> = [];
     for (const [id, card] of this.cardEls) {
       if (card.dataset.detailHold || card.style.height !== "") continue;
       const height = live
@@ -23124,25 +23132,29 @@ export class VisualAgentMapView extends ItemView {
         : this.heightsSeenMap === this.map?.id
           ? this.heightsSeen.get(id)
           : undefined;
-      if (!height) continue;
+      if (height) held.push([card, height]);
+    }
+    for (const [card, height] of held) {
       card.style.height = `${height}px`;
       card.dataset.detailHold = "1";
       this.ensureClipParts(card);
-      if (!live) this.measureClipped(card);
     }
+    if (!live) this.measureClippedBatch(held.map(([card]) => card));
   }
   /** Cards with a set height changed their content lines too: their clipped state is looked at again after the class is on. */
   private remeasureDetailClips(): void {
-    for (const card of this.cardEls?.values() ?? []) if (card.style.height !== "") this.measureClipped(card);
+    this.measureClippedBatch([...(this.cardEls?.values() ?? [])].filter(card => card.style.height !== ""));
   }
   private releaseDetailHeights(): void {
+    const remeasure: HTMLElement[] = [];
     for (const card of this.cardEls?.values() ?? []) {
       if (card.dataset.detailHold) {
         card.style.removeProperty("height");
         delete card.dataset.detailHold;
         card.toggleClass("is-clipped", false);
-      } else if (card.style.height !== "") this.measureClipped(card);
+      } else if (card.style.height !== "") remeasure.push(card);
     }
+    this.measureClippedBatch(remeasure);
   }
   /** The zoom tier the viewport classes show now, and the viewport element they were put on. */
   private zoomTier: ZoomTier = "normal";

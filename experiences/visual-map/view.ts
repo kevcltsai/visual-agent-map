@@ -1461,7 +1461,12 @@ export class VisualAgentMapView extends ItemView {
         }
       ),
     noteChange: (node, patch) =>
-      this.noteChange(node, patch, undefined, patch.summary !== undefined || patch.detail !== undefined),
+      this.noteChange(
+        node,
+        patch,
+        undefined,
+        patch.summary !== undefined || patch.detail !== undefined ? true : "lock"
+      ),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
     chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
@@ -10698,7 +10703,16 @@ export class VisualAgentMapView extends ItemView {
   /** Registers the three entries on the canvas; AIM maps and topic selection mode get none (D11). */
   private setupCanvasImageInput(): void {
     const viewport = this.viewportEl;
-    if (!viewport || !this.canEditCanvasItems()) return;
+    if (!viewport) return;
+    // V3.3 G04-y: the right-click is bound in every state, or the image menu (rows greyed with a reason) never opens while
+    // several topics are picked or the notes load. Without edit rights only the image's own menu answers; the rest stays shut.
+    // Safe only while openImageMenu greys its writing rows in every state where canEditCanvasItems() is false: a new
+    // condition there must also set the image menu's `off` reason.
+    viewport.addEventListener("contextmenu", event => {
+      if (this.canEditCanvasItems() || (event.target as Element | null)?.closest?.(".vam-canvas-image"))
+        this.onCanvasContextMenu(event);
+    });
+    if (!this.canEditCanvasItems()) return;
     viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
     viewport.addEventListener("dragleave", event => this.onCanvasDragLeave(event));
     viewport.addEventListener("drop", event => this.onCanvasDrop(event));
@@ -10714,7 +10728,6 @@ export class VisualAgentMapView extends ItemView {
       viewport.addEventListener(name, () => {
         this.internalDrag = false;
       });
-    viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
   }
   private onCanvasPointerMove(event: { clientX: number; clientY: number }): void {
@@ -10942,8 +10955,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The toolbar Style popover (style-popover.ts) for the card, under its Style button. Each choice is one write and one undo
-   * step through changeTopicColor or changeTopicStyle, after whenEditing, the structure lock and mergeUnlocked (the whole
-   * branch when the box is ticked); a refused choice puts the saved state back.
+   * step through changeTopicColor or changeTopicStyle, after whenEditing and mergeUnlocked (the whole branch when the box
+   * is ticked; not the picture-book locks, decision #62); a refused choice puts the saved state back.
    */
   private openStyleFor(node: MapNode, opener?: HTMLElement): void {
     this.styleOpen?.pop.close();
@@ -10956,7 +10969,7 @@ export class VisualAgentMapView extends ItemView {
       let queued = false;
       this.whenEditing(() => {
         const live = this.mapNodeById(id);
-        if (!live || this.bookLock().structure || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
+        if (!live || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
         queued = true;
         this.enqueue(async () => {
           await change(live);
@@ -12766,8 +12779,8 @@ export class VisualAgentMapView extends ItemView {
     patch: NotePatch,
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry),
-    /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
-    rejectAiCard = false
+    /** Chat writes: the AI-card refusal (true, content) or only the AI lock ("lock", a rename) is checked on the bytes at the write, not on this view's cached note. */
+    rejectAiCard: boolean | "lock" = false
   ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
@@ -12784,7 +12797,13 @@ export class VisualAgentMapView extends ItemView {
     }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
     // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
-    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+    if (
+      (await this.plugin.repo.updateNoteGuarded(
+        node.path,
+        patch,
+        rejectAiCard === "lock" ? { rejectAiLock: true } : { rejectAiCard }
+      )) === "discarded"
+    )
       return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
@@ -16534,17 +16553,23 @@ export class VisualAgentMapView extends ItemView {
                 );
                 let ready = false;
                 let started = false;
-                await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (!currentTrial()) return;
-                  started = true;
-                  ready = await trial.run(prepared.request);
-                });
+                win.setTrialWaiting(true);
+                try {
+                  await this.plugin.confirmAiUsage(prepared.model, async () => {
+                    win.setTrialWaiting(false);
+                    if (!currentTrial()) return;
+                    started = true;
+                    ready = await trial.run(prepared.request);
+                  });
+                } finally {
+                  win.setTrialWaiting(false);
+                }
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
                   // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
                   if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failureCode ?? "");
+                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
                     win.showTrialFailure(failed.key, failed.code);
                   }
                   return false;
@@ -23770,6 +23795,7 @@ export class VisualAgentMapView extends ItemView {
       },
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
+      mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).

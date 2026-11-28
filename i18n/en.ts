@@ -1289,6 +1289,7 @@ export const en = {
   "ui.living_node_save_reason_ambiguous": "More than one card matches a source note",
   "ui.living_node_source_line_0_1": "Source: {0} ({1})",
   "ui.living_node_generated_0": "Generated: {0}",
+  "ui.living_node_trial_waiting_consent": "Press Agree in the usage dialog to start the trial.",
   "ui.living_node_source_replaced": "The source note was replaced and needs to be confirmed again.",
   "ui.living_node_suppressed_dropped_0": "Skipped {0} proposed observation(s) you deleted earlier.",
   "ui.living_node_optional_source_unavailable":
@@ -1671,6 +1672,12 @@ export const en = {
   "ui.map_chat_skip_map_not_opened": "the new map was created but could not be opened here",
   "ui.map_chat_plan_title": "Plan to review",
   "ui.map_chat_plan_intro": "Nothing changes until you choose Apply.",
+  "ui.map_chat_relation_suggest_heading": "Suggested relations (at most 5)",
+  "ui.map_chat_relation_suggest_reason_0_1": "Reason: {0} Source: {1}",
+  "ui.map_chat_relation_suggest_adopt": "Adopt",
+  "ui.map_chat_relation_suggest_adopted": "Adopted",
+  "ui.map_chat_relation_suggest_failed": "Not added",
+  "ui.map_chat_relation_suggest_summary": "Nothing is added until you adopt a suggestion.",
   "ui.map_chat_plan_preview_note":
     "The dashed cards on the canvas are the new cards. The map is checked again just before Apply.",
   "ui.map_chat_plan_blocked_stale": "Apply is off: this plan was made for a map that is no longer open.",

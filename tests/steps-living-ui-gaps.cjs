@@ -236,6 +236,7 @@ export { livingTrialReason } from "./experiences/visual-map/living-node-trial-re
 export { LivingTrial } from "./experiences/visual-map/living-node-trial";
 export { setUiLanguage } from "./i18n";
 export { searchNotPerformedError } from "./ai/search-not-performed";
+export { livingSnapshotRevision } from "./experiences/visual-map/living-node-markdown";
 `, { obsidian: S.obsidian });
 
 test('trial failure: a source changed during the run has its own reason in every language (D1-x10)', () => {
@@ -295,6 +296,26 @@ test('trial failure: the setup window shows the reason and the code line; a fail
   assert.equal(trial.failureCode, 'stale-base');
 });
 
+test('trial failure (D1-x5b): a real trial whose runtime did not search ends with the web reason, a generic error with the provider reason', async () => {
+  reasonModule.setUiLanguage('en');
+  const lease = { signal: new AbortController().signal, current: () => true, release() {}, stop() {} };
+  const run = async error => {
+    const trial = new reasonModule.LivingTrial({ acquire: () => lease });
+    const ok = await trial.run({
+      candidate: { mapId: 'm', viewSession: 's', baseRevision: reasonModule.livingSnapshotRevision('') }, path: 'a.md', expectedContent: '', base: { revision: 'empty' },
+      context: {}, generate: async () => { throw error; }, stillCurrent: async () => true
+    });
+    assert.equal(ok, false);
+    return reasonModule.livingTrialReason(trial.failure ?? trial.failureCode ?? '');
+  };
+  const web = await run(reasonModule.searchNotPerformedError());
+  assert.equal(web.key, 'ui.living_node_trial_reason_web');
+  assert.equal(web.code, '', 'the sentence is never shown as a code');
+  const provider = await run(new Error('connect ECONNRESET /Users/me/secret'));
+  assert.equal(provider.key, 'ui.living_node_trial_reason_provider');
+  assert.equal(provider.code, '');
+});
+
 test('setup window: an open failure follows a language change (zh-TW, en, zh-CN)', () => {
   ui.setUiLanguage('zh-TW');
   try {
@@ -310,4 +331,59 @@ test('setup window: an open failure follows a language change (zh-TW, en, zh-CN)
     assert.equal(reason(), ui.t('ui.living_node_trial_reason_provider'));
     assert.notEqual(reason(), first);
   } finally { ui.setUiLanguage('en'); }
+});
+
+// ---- D1-x8: editor wait state, convert lock, readable trial preview ----------------------------------------------------
+const buttonOf = (el, key) => find(el, i => i.tag === 'button' && i.text === ui.t(key));
+const statusOf = el => find(el, i => i.attrs?.role === 'status');
+
+test('D1-x8: while the first-send consent is pending the editor shows the wait state, not "AI running"', async () => {
+  ui.setUiLanguage('zh-TW');
+  let release;
+  let win;
+  const ctx = open({
+    convert: async () => true,
+    trial: () => new Promise(resolve => { release = resolve; })
+  });
+  win = ctx.win;
+  buttonOf(ctx.el, 'ui.living_node_try_prompt').click();
+  assert.equal(statusOf(ctx.el).text, ui.t('ui.ai_running'), 'before the consent question the run is simply running');
+  win.setTrialWaiting(true);
+  const waiting = statusOf(ctx.el).text;
+  assert.notEqual(waiting, ui.t('ui.ai_running'));
+  assert.ok(waiting.includes(ui.t('ui.ai_card_status_waiting')), waiting);
+  assert.ok(waiting.includes(ui.t('ui.living_node_trial_waiting_consent')), waiting);
+  win.setTrialWaiting(false);
+  assert.equal(statusOf(ctx.el).text, ui.t('ui.ai_running'), 'after consent the run is running');
+  release(false);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(statusOf(ctx.el).text, '');
+});
+
+test('D1-x8: the convert button is disabled for the whole trial and enabled again when it ends', async () => {
+  let release;
+  const ctx = open({ convert: async () => true, trial: () => new Promise(resolve => { release = resolve; }) });
+  const convert = buttonOf(ctx.el, 'ui.living_node_convert');
+  assert.equal(!!convert.disabled, false);
+  buttonOf(ctx.el, 'ui.living_node_try_prompt').click();
+  assert.equal(convert.disabled, true, 'locked while the trial runs');
+  release(true);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(convert.disabled, false, 'free again after the trial');
+});
+
+test('D1-x8: the trial preview of an observation shows no internal field names', () => {
+  const field = (name, value) => `- ${name}: ${JSON.stringify(value)}`;
+  const preview = [
+    '## Living Node', '', '### Observation', field('ID', 'r1'), field('Subject', 'price'), field('Scope', 'daily'),
+    field('Granularity', 'day'), field('Event time', '2026-11-26'), field('Validity', 'active'), field('Ownership', 'ai'), '',
+    '> 100', '', '#### Evidence', sourceLine('https://example.com/x', '2026-11-26T00:00:00Z'),
+    '', '#### History', field('Time', '2026-11-25T00:00:00Z'), field('Reason', 'corrected'), '', '> 90'
+  ].join('\n');
+  const shown = markdown.localizeLivingReader(preview, labels, true);
+  for (const name of ['ID:', 'Subject', 'Scope', 'Granularity', 'Event time', 'Validity', 'Ownership', 'Observation', '- Time:', '- Reason:'])
+    assert.equal(shown.includes(name), false, name + '\n' + shown);
+  assert.ok(shown.includes('### price'), 'the subject is the heading');
+  assert.ok(shown.includes('D(2026-11-26)') && shown.includes('corrected') && shown.includes('> 100'), shown);
+  assert.equal(markdown.localizeLivingReader('### Observation\n' + field('Subject', 'x'), labels, true).includes('Subject'), true, 'a block not in the written format is left alone');
 });

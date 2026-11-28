@@ -19,7 +19,7 @@ const { MAP_KEYBOARD_SHORTCUTS } = S.load('ui/modals/keyboard-shortcuts-modal.ts
 const { en } = S.load('i18n/en.ts');
 const { zhTW } = S.load('i18n/zh-TW.ts');
 const { zhCN } = S.load('i18n/zh-CN.ts');
-const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, commandTitleKey, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet } = actions;
+const { CARD_ACTIONS, actionsFor, cardActionKind, titleKeyFor, commandTitleKey, shortcutKeysFor, CARD_COMMANDS, CARD_TOOLBAR, CARD_ACTION_REASONS, ruleMoreSet, ruleContextSet, TOOLBAR_ONLY } = actions;
 
 // a (root, child b), b (leaf under a), ai (an AI card), d (a second root).
 const nodes = [
@@ -58,6 +58,8 @@ function ctxFor(target, state, extra = {}) {
     isMerging: () => state === 'merging',
     isArgumentCard: () => false,
     summaryFieldOffered: () => true,
+    stylesEditable: true,
+    aiRunning: () => false,
     bookMenu: () => true,
     mergeBlock: () => null,
     multiResearchRunning: () => false,
@@ -92,14 +94,24 @@ const TABLE = [
   ['zoom-reset', 'command', null, 'ok ok ok ok ok ok ok ok'],
   ['search', 'command', null, 'ok ok ok ok pr ok ok ok'], // run(!this.presentation)
   ['shortcuts', 'command', null, 'ok ok ok ok ok ok ok ok'], // run(true)
-  // Card toolbar (paintCardToolbar): drawn only outside topic selection; every button runs through whenEditing (presentation, notesLoading).
+  // Card toolbar (paintCardToolbar, from CARD_TOOLBAR since B08): drawn only outside topic selection; a button refused for
+  // loading or a picture-book lock is not drawn; every other button runs through whenEditing (presentation, notesLoading).
   ['research', 'toolbar', 'a', 'ok ro ok al pr ms bk ok'], // if (!bookLock.ai); openTopicChat refuses an AI-locked card
-  ['add-child', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'], // if (!bookLock.structure)
+  // B08: Style (hidden under the structure lock; each popover choice also goes through mergeUnlocked).
+  ['style', 'toolbar', 'a', 'ok ro ok ok pr ms ok bk'],
+  // B08: the AI card's Run (as Run card), Lock and Settings (as Edit AI card).
+  ['run-stop', 'toolbar', 'ai', 'ok ro ok al pr ms bk ok'],
+  ['ai-lock', 'toolbar', 'ai', 'ok ro ok ok pr ms ok ok'],
+  ['ai-settings', 'toolbar', 'ai', 'ok ro ok ok pr ms bk ok'],
+  // B08: Add subtopic left the toolbar (the edge "+ Topic card" and Cmd+Enter replace it); the right-click keeps it.
+  ['add-child', 'context', 'a', 'ok ro ok ok pr ms ok bk'],
   // Note: a plain button since V3.3 A5 (no whenEditing): it works while loading and presenting.
   ['open-note', 'toolbar', 'a', 'ok ok ok ok ok ms ok ok'],
   // Run all's Stop (paintPromptState, V3.3 A5): on the AI card Run all is working on; hidden while picking topics or presenting.
   ['stop-run-all', 'toolbar', 'ai', 'ok ok ok ok pr ms ok ok', { runAllWorking: id => id === 'ai' }],
-  ['add-summary-field', 'toolbar', 'a', 'ok ro ok ok pr ms ok ok'], // the addSummary argument
+  // B08: the AI card's own Stop while the AI works on it, a plain button like Run all's.
+  ['run-stop', 'toolbar', 'ai', 'ok ok ok ok pr ms ok ok', { aiRunning: id => id === 'ai' }],
+  ['add-summary-field', 'more', 'a', 'ok ro ok ok pr ms ok ok'], // B08: out of the toolbar into ⋯ (summaryFieldOffered)
   // Edge "+ Topic card" (paintCardEdgeEntries, V3.3 A6): drawn while cardTextEditable (not loading, presenting or picking) and
   // !bookLock.structure; the click goes through whenEditing. It reads neither merging nor the AI locks.
   ['edge-add-topic', 'edge', 'a', 'ok ro ok ok pr ms ok bk'],
@@ -206,8 +218,8 @@ test('card actions: what a card offers follows the card, as the entries decide i
   assert.equal(titleKeyFor(action('ai-card'), 'more', ctxFor('ai', 'normal')), 'ui.ai_card_edit');
   assert.equal(titleKeyFor(action('ai-card'), 'more', ctxFor('a', 'normal')), 'ui.ai_card_set');
   assert.ok(!ids('more', ctxFor('a', 'normal', { isArgumentCard: () => true })).includes('ai-card'));
-  // The toolbar's Add summary only when the paint offers it; the book row only when the card is a chapter.
-  assert.ok(!ids('toolbar', ctxFor('a', 'normal', { summaryFieldOffered: () => false })).includes('add-summary-field'));
+  // Add summary only on an empty summary; the book row only when the card is a chapter.
+  assert.ok(!ids('more', ctxFor('a', 'normal', { summaryFieldOffered: () => false })).includes('add-summary-field'));
   assert.ok(!ids('context', ctxFor('a', 'normal', { bookMenu: () => false })).includes('book'));
   // A root has no sibling order to change by Alt+arrow (shiftSiblingByKey needs a parent).
   assert.ok(!ids('key', ctxFor('a', 'normal')).includes('reorder-sibling'));
@@ -236,19 +248,20 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   eq(orders, [...orders].sort((x, y) => x - y), 'CARD_ACTIONS is in order');
   assert.equal(new Set(orders).size, orders.length);
   assert.equal(new Set(CARD_ACTIONS.map(item => item.id)).size, CARD_ACTIONS.length);
-  // paintCardToolbar: Research, Add, Note, Add summary (then ⋯).
-  eq(ids('toolbar', ctxFor('a', 'normal')), ['research', 'add-child', 'open-note', 'add-summary-field']);
-  // The AI card's toolbar is the card's with Run all's Stop first (paintPromptState prepends it).
-  eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', ...CARD_TOOLBAR.card]);
-  eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'research', 'add-child', 'open-note', 'add-summary-field']);
-  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
-  // add sibling, add another type (add subtopic is on the toolbar) | fold, remove.
+  // paintCardToolbar (B08, mockup §4): AI explore, Style, Note (then ⋯).
+  eq(ids('toolbar', ctxFor('a', 'normal')), ['research', 'style', 'open-note']);
+  // The AI card: Run (Stop while running; Run all's Stop while the batch works on it), Lock, AI explore, Settings, Note.
+  eq(CARD_TOOLBAR['ai-card'], ['stop-run-all', 'run-stop', 'ai-lock', 'research', 'ai-settings', 'open-note']);
+  eq(ids('toolbar', ctxFor('ai', 'normal')), ['run-stop', 'ai-lock', 'research', 'ai-settings', 'open-note']);
+  eq(ids('toolbar', ctxFor('ai', 'normal', { runAllWorking: id => id === 'ai' })), ['stop-run-all', 'ai-lock', 'research', 'ai-settings', 'open-note']);
+  // openCardMoreMenu (B06, ticket 06 and mockup §4): settings, focus this branch (B13), add summary (B08), select subtopics, summary bracket, tidy this branch (A10), note style, run, AI card, book |
+  // add subtopic (B08: off the toolbar), add sibling, add another type | fold, remove. An AI card has Style here (not on its toolbar).
   const grouped = (surface, ctx) => actionsFor(surface, ctx).map(entry => `${entry.action.group}:${entry.action.id}`);
-  eq(grouped('more', ctxFor('ai', 'normal')), ['3:card-settings', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:remove']);
-  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
+  eq(grouped('more', ctxFor('ai', 'normal')), ['2:style', '3:card-settings', '3:add-summary-field', '3:summary-add', '3:note-style', '3:run-card', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:remove']);
+  eq(grouped('more', ctxFor('a', 'normal')), ['3:card-settings', '3:focus-branch', '3:add-summary-field', '3:select-subtopics', '3:summary-add', '3:tidy-branch', '3:note-style', '3:ai-card', '3:book', '4:add-child', '4:add-sibling', '4:add-other', '5:toggle-collapse', '5:remove']);
   // addCardMenuActions (B07): the toolbar's actions in its order, then the ⋯ list in its order (the view puts a separator between them).
   eq(ids('context', ctxFor('a', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('a', 'normal'))]);
-  eq(ids('context', ctxFor('ai', 'normal')), [...CARD_TOOLBAR.card, ...ids('more', ctxFor('ai', 'normal'))]);
+  eq(ids('context', ctxFor('ai', 'normal')), ['research', 'open-note', ...ids('more', ctxFor('ai', 'normal'))]);
   assert.equal(action('add-other').group, 4, 'the ⋯ list puts a separator before Add another type');
   // renderSelectionBar (B09): Move to, Merge, Research, (⋯) Done; openSelectionMoreMenu: Synthesize … AI lock | Clear, Remove, Selection help.
   eq(ids('toolbar', ctxFor(['a', 'd'], 'normal')), ['move-to', 'merge', 'multi-research', 'finish-selection']);
@@ -257,7 +270,7 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   for (const kind of ['card', 'ai-card']) {
     const more = ruleMoreSet(kind);
     assert.ok(more.every(id => !CARD_TOOLBAR[kind].includes(id)));
-    eq(ruleContextSet(kind), [...CARD_TOOLBAR[kind].filter(id => id !== 'stop-run-all'), 'separator', ...more]);
+    eq(ruleContextSet(kind), [...CARD_TOOLBAR[kind].filter(id => !TOOLBAR_ONLY.includes(id)), 'separator', ...more]);
   }
   assert.ok(ruleMoreSet('ai-card').includes('run-card') && !ruleMoreSet('card').includes('run-card'));
 });
@@ -329,7 +342,10 @@ test('card actions: run hands each action to the view method its entry calls now
   eq(run('toggle-collapse', 'a', 'context'), [['toggleCollapse', 'a', false]]);
   eq(run('toggle-collapse', 'a', 'key'), [['toggleCollapse', 'a', true]]);
   eq(run('toggle-collapse', 'a', 'command'), [['toggleCollapse', 'a', true]]);
-  eq(run('add-summary-field', 'a', 'toolbar'), [['addSummaryField', 'a']]);
+  eq(run('add-summary-field', 'a', 'more'), [['addSummaryField', 'a']]);
+  eq(run('style', 'a', 'toolbar', { opener: 'button' }), [['openStyle', 'a', 'button']]);
+  eq(run('run-stop', 'ai', 'toolbar'), [['runCard', 'ai']]);
+  eq(run('ai-settings', 'ai', 'toolbar'), [['editAiCard', 'ai']]);
   eq(run('card-settings', 'a', 'more'), [['cardSettings', 'a']]);
   eq(run('run-card', 'ai', 'more'), [['runCard', 'ai']]);
   eq(run('ai-card', 'a', 'more'), [['editAiCard', 'a']]);
@@ -431,7 +447,10 @@ test('card actions: the view builds the context next to mapCommand; the palette,
   const selectionStart = view.indexOf('  private renderSelectionBar('), selectionEnd = view.indexOf("  /** The dialog's choices for each child's research");
   assert.ok(selectionStart > 0 && selectionEnd > selectionStart);
   assert.equal(count(view.slice(selectionStart, selectionEnd)), 2, 'B09: the bar and its ⋯');
-  assert.equal(count(view), 4, 'no other entry reads the registry yet');
+  // B08: the card toolbar and its first button's repaint (paintPromptState).
+  assert.equal(count(body('private paintCardToolbar')), 1, 'paintCardToolbar');
+  assert.equal(count(body('private repaintRunTool')), 1, 'repaintRunTool');
+  assert.equal(count(view), 6, 'no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);
@@ -479,10 +498,28 @@ test('card actions: Run all Stop (V3.3 A5) only on the AI card Run all is workin
   const { calls, host } = recorder();
   action('stop-run-all').run({ ...ctxFor('ai', 'normal', working), host, surface: 'toolbar' });
   eq(calls, [['stopRunAll']]);
-  // The source condition and the plain Note button the registry mirrors.
+  // B08: the toolbar draws it from the list; paintPromptState repaints the first button; a Stop and Note skip whenEditing.
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /status === "running" &&\s*tools &&\s*this\.promptRunning\(\) &&\s*this\.promptEntryOf\(node\.id\)\?\.status === "running" &&\s*!this\.selection\.state\.multiSelectMode &&\s*!this\.presentation\s*\) \{\s*const stop = this\.button\(tools, t\("ui\.card_tool_stop"\), \(\) => this\.stopPromptBatch\(\)\);/);
-  assert.match(view, /const note = this\.button\(tools, t\("ui\.card_tool_note"\), \(\) => \{\}\);\s*note\.addEventListener\("click", event =>\s*event\.metaKey \|\| event\.ctrlKey/);
+  assert.match(view, /const tools = cardToolbars\.get\(card\);\s*if \(tools\) this\.repaintRunTool\(tools, node\);/);
+  assert.match(view, /const plain = stop \|\| action\.id === "open-note";/);
+});
+
+test('card actions: B08 the AI card Run turns into its Stop while the AI works on it; Lock says Locked and toggles', () => {
+  const running = { aiRunning: id => id === 'ai' };
+  assert.equal(titleKeyFor(action('run-stop'), 'toolbar', ctxFor('ai', 'normal')), 'ui.card_tool_run');
+  assert.equal(titleKeyFor(action('run-stop'), 'toolbar', ctxFor('ai', 'normal', running)), 'ui.card_tool_stop');
+  const { calls, host } = recorder();
+  action('run-stop').run({ ...ctxFor('ai', 'normal', running), host, surface: 'toolbar' });
+  eq(calls.map(([name, node]) => [name, node.id]), [['stopAi', 'ai']]);
+  // Run card and Edit AI card stay in the ⋯ and right-click; the toolbar-only buttons never repeat there.
+  for (const id of ['run-stop', 'ai-lock', 'ai-settings']) assert.ok(!ruleContextSet('ai-card').includes(id) && !ruleMoreSet('ai-card').includes(id), id);
+  assert.equal(titleKeyFor(action('ai-lock'), 'toolbar', ctxFor('ai', 'normal')), 'ui.card_tool_lock');
+  assert.equal(titleKeyFor(action('ai-lock'), 'toolbar', ctxFor('ai', 'aiLocked')), 'ui.card_tool_locked');
+  const lock = recorder();
+  action('ai-lock').run({ ...ctxFor('ai', 'aiLocked'), host: lock.host, surface: 'toolbar' });
+  eq(lock.calls.map(([name, nodes, locked]) => [name, nodes.map(node => node.id), locked]), [['setAiLock', ['ai'], false]]);
+  for (const key of ['ui.card_tool_run', 'ui.card_tool_lock', 'ui.card_tool_locked', 'ui.card_tool_ai_settings', 'ui.card_menu_style'])
+    for (const dictionary of [en, zhTW, zhCN]) assert.ok(dictionary[key]?.trim(), key);
 });
 
 test('card actions: the A7 AI entries, edge "✦ AI card" and empty-canvas "✦ AI root", as the view draws and runs them', () => {

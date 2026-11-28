@@ -492,25 +492,24 @@ export class AiTaskService {
       // After the count repair (whose reply could drop a marker) and before the program's full-text blocks: a web URL this reply
       // adds that the run never opened and no input held is marked unverified (a Quick run opens none). A top reply is only the new part.
       if (readerFacingDetail(input) && !input.countRepair && role === undefined) {
-        const inputs = [
+        // The user, the task and a reference document vouch for a URL even if the previous Detail marked it.
+        const given = [
           input.task,
           input.userTexts,
-          input.detail,
-          input.sourceContext,
           ...(input.referenceGroups ?? []).flatMap(group => group.documents.map(document => document.content))
         ];
         const markers = (["zh-TW", "en"] as const).map(language => translateNote(language, "note.source_unverified"));
         // A URL the previous Detail still marks was never vouched for: dropping the marker in a rewrite does not make it known.
         const unvouched = new Set(markedUrlsIn(input.detail ?? "", markers).map(webUrlKey));
-        const known = [
-          ...openedUrls,
-          ...webUrlsIn(inputs.filter(Boolean).join("\n")).filter(url => !unvouched.has(webUrlKey(url)))
-        ];
+        const known = webUrlsIn([input.detail, input.sourceContext].filter(Boolean).join("\n")).filter(
+          url => !unvouched.has(webUrlKey(url))
+        );
         result.detail = markUnverifiedUrls(
           result.detail,
           known,
           translateNote(outputLanguage, "note.source_unverified"),
-          markers
+          markers,
+          [...openedUrls, ...webUrlsIn(given.filter(Boolean).join("\n"))]
         );
       }
       // After the count repair, so the repair never sees (or rewrites) the fetched text.

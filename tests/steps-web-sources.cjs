@@ -7,7 +7,8 @@ const { markUnverifiedUrls, webUrlKey, webUrlsIn } = S.load('core/web-sources.ts
 const { translate, translateNote } = S.load('i18n.ts');
 
 const M = '(source not verified)';
-const mark = (detail, known = []) => markUnverifiedUrls(detail, known, M, [M, '（來源未驗證）', '（来源未验证）']);
+const MARKERS = [M, '（來源未驗證）', '（来源未验证）'];
+const mark = (detail, known = [], verified = []) => markUnverifiedUrls(detail, known, M, MARKERS, verified);
 
 test('a fabricated URL is marked after the link, after an autolink and after a bare URL (before its trailing punctuation)', () => {
   assert.equal(mark('See [Paper](https://fake.example/p).'), `See [Paper](https://fake.example/p) ${M}.`);
@@ -38,6 +39,19 @@ test('code, images, embeds, HTML tags and reference definitions are left byte fo
 });
 test('the URL text of a link is one URL: [url](url) gets one marker', () => {
   assert.equal(mark('[https://fake.example/p](https://fake.example/p)'), `[https://fake.example/p](https://fake.example/p) ${M}`);
+});
+test('a marker never goes inside a link destination: nested brackets, nested parentheses and an apostrophe mark after the `)`', () => {
+  assert.equal(mark('[[PDF] Report](https://f.example/r.pdf)'), `[[PDF] Report](https://f.example/r.pdf) ${M}`);
+  assert.equal(mark('[t](https://x.example/a_(b_(c)))'), `[t](https://x.example/a_(b_(c))) ${M}`);
+  assert.equal(mark("[t](https://x.example/p's)"), `[t](https://x.example/p's) ${M}`);
+  assert.equal(mark("[t](https://x.example/p's)", ['https://x.example/p']), "[t](https://x.example/p's)", 'known by the plain URL run');
+  for (const text of ['[t](https://x.example/a_(b_(c_(d))))', '[t](https://x.example/a_(b'])
+    assert.equal(mark(text), text, 'a destination that cannot be read gets no marker');
+});
+test('a copied marker after a verified URL is removed (any locale); an unverified one is kept once', () => {
+  assert.equal(mark(`[f](https://f.example/a) ${M} and https://f.example/b（來源未驗證）.`, [], ['https://f.example/a', 'https://f.example/b']), '[f](https://f.example/a) and https://f.example/b.');
+  assert.equal(mark(`[f](https://f.example/a) ${M}`, ['https://f.example/a']), `[f](https://f.example/a) ${M}`, 'only known, not verified: kept');
+  assert.equal(mark(`[f](https://f.example/a) ${M} (source not verified) text`, [], ['https://f.example/a']), `[f](https://f.example/a) (source not verified) text`, 'only the marker right after the URL');
 });
 test('webUrlsIn finds the URLs of any text without trailing punctuation', () => {
   assert.deepEqual([...webUrlsIn('a https://x.example/1, b [t](http://y.example/2) c <https://z.example/3>.')], ['https://x.example/1', 'http://y.example/2', 'https://z.example/3']);
@@ -93,6 +107,19 @@ test('AiTaskService: a rewrite that drops an earlier marker gets it back; a run 
   const prev = `[f](${FAKE}) ${M}`;
   assert.equal((await rig([], `[f](${FAKE})`).askModel(ctx({ detail: prev }), 'gpt-6-luna', 'low')).detail, prev, 'the previous Detail does not vouch for a URL it marked');
   assert.equal((await rig([FAKE], `[f](${FAKE})`).askModel(standard({ detail: prev }), 'gpt-6-luna', 'low')).detail, `[f](${FAKE})`, 'opened now: verified');
+});
+test('AiTaskService: a reply that copies the previous marker loses it once this run opened the page, and keeps it once otherwise', async () => {
+  const prev = `See [f](${FAKE}) ${M}`;
+  assert.equal((await rig([FAKE], prev).askModel(standard({ detail: prev }), 'gpt-6-luna', 'low')).detail, `See [f](${FAKE})`);
+  assert.equal((await rig([], prev).askModel(standard({ detail: prev }), 'gpt-6-luna', 'low')).detail, prev);
+});
+test('AiTaskService: a URL the user, the task or a reference gave stays plain even if the previous Detail marked it', async () => {
+  const prev = `[u](https://user.example/b) ${M}\n[t](https://task.example/c) ${M}\n[r](https://ref.example/d) ${M}\n[f](${FAKE}) ${M}`;
+  const result = await rig([], prev).askModel(ctx({
+    detail: prev, userTexts: 'Pasted https://user.example/b', task: 'Read https://task.example/c',
+    referenceGroups: [{ id: 'g', name: 'G', location: 'L', documents: [{ path: 'r.md', content: 'see https://ref.example/d' }] }], referenceDelivery: 'direct'
+  }), 'gpt-6-luna', 'low');
+  assert.equal(result.detail, `[u](https://user.example/b)\n[t](https://task.example/c)\n[r](https://ref.example/d)\n[f](${FAKE}) ${M}`);
 });
 test('AiTaskService: an intermediate (not reader-facing) reply is not marked', async () => {
   const result = await rig([], `[f](${FAKE})`).askModel(ctx({ intermediateDetail: true }), 'gpt-6-luna', 'low');

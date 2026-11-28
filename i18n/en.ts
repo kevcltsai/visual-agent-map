@@ -1027,7 +1027,7 @@ export const en = {
   "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
   "ui.ai_unlock_selected": "Unlock for AI",
   "ui.ai_locked_some_0_1": "{0} of {1} locked",
-  "ui.card_action_off_read_only": "The mind map can't be changed right now",
+  "ui.card_action_off_notes_loading": "Notes are still loading",
   "ui.card_action_off_merging": "This card is being merged; try again when it finishes",
   "ui.card_action_off_ai_lock": "This card is locked from AI; unlock it in the toolbar first",
   "ui.card_action_off_book_lock": "The picture book is running on this mind map; try again when it stops",

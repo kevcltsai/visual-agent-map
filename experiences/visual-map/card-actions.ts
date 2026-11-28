@@ -66,7 +66,7 @@ export type CardAvailability = { ok: true } | { ok: false; reasonKey: Translatio
 
 /** The six plain reasons an action cannot run now (more specific ones come from the selection, such as mergeCheck's). */
 export const CARD_ACTION_REASONS = {
-  readOnly: "ui.card_action_off_read_only",
+  readOnly: "ui.card_action_off_notes_loading",
   merging: "ui.card_action_off_merging",
   aiLock: "ui.card_action_off_ai_lock",
   bookLock: "ui.card_action_off_book_lock",
@@ -333,7 +333,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 2,
     // The command opens the details whenever a card is selected, presenting or picking topics included. The toolbar's Note
     // only reads, so it works while loading and presenting (V3.3 A5); the toolbar is not drawn while picking topics.
-    // B05: while the notes load the toolbar hides Research, Add, Add summary and ⋯ (not drawn) instead of refusing a click.
+    // B05: while the notes load the toolbar hides Research, Add and Add summary; ⋯ still opens, its rows greyed with the reason.
     available: ctx =>
       ctx.surface === "command" ? OK : ctx.surface === "toolbar" ? gate(ctx, ["multiSelect"]) : gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openNote(card(ctx), options?.newTab ?? false)

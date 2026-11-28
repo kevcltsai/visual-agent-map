@@ -968,7 +968,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_locked_suggestions_skipped_0": "{0} 条建议涉及锁定的议题，已跳过",
   "ui.ai_unlock_selected": "解除 AI 锁定",
   "ui.ai_locked_some_0_1": "{1} 个中有 {0} 个已锁定",
-  "ui.card_action_off_read_only": "这张心智图目前只读，不能修改",
+  "ui.card_action_off_notes_loading": "笔记加载中",
   "ui.card_action_off_merging": "这张卡正在合并，完成后再操作",
   "ui.card_action_off_ai_lock": "这张卡已锁定，不让 AI 修改；先在工具栏解除锁定",
   "ui.card_action_off_book_lock": "图文书正在这张心智图上执行，停止后再操作",

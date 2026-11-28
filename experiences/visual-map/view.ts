@@ -2245,7 +2245,9 @@ export class VisualAgentMapView extends ItemView {
       ".vam-map-title-button",
       ".vam-map-switch-button",
       ".vam-new-map",
-      ".vam-zoom-controls"
+      ".vam-zoom-controls",
+      // A card's ⋯ opens while reading: every row that writes is greyed with the reason (decision #35).
+      ".vam-card-tool-more"
     ].join(", ");
     const lock = (host: ParentNode | null | undefined): void => {
       for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
@@ -10395,14 +10397,16 @@ export class VisualAgentMapView extends ItemView {
     );
     note.addClass("vam-card-tool", "vam-detail-button");
     note.setAttr("aria-label", t("ui.card_tool_note_label"));
-    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
-    if (addSummary)
+    if (addSummary && !readOnly)
       addSummaryTools.set(
         tools,
         tool(t("ui.card_tool_add_summary"), "vam-card-tool-add-summary", () => this.startCardSummaryEdit(node, 0))
       );
-    const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
+    // ⋯ opens while the notes load too: its rows that write are greyed with the reason (decision #35, P1.1).
+    const more = this.button(tools, "⋯", () => {});
+    more.addEventListener("click", () => this.openCardMoreMenu(more, node));
+    more.addClass("vam-card-tool", "vam-card-tool-more");
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
   }
@@ -10493,8 +10497,8 @@ export class VisualAgentMapView extends ItemView {
       const next = toolbar.includes(action.id) ? "toolbar" : action.group;
       if (section !== null && next !== section) menu.addSeparator();
       section = next;
-      // The picture book draws its own row and submenu (addBookMenu).
-      if (action.id === "book") {
+      // The picture book draws its own row and submenu (addBookMenu); greyed, it is a plain row with the reason.
+      if (action.id === "book" && availability.ok) {
         action.run(ctx, { menu });
         continue;
       }
@@ -10827,11 +10831,18 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const card = hit?.closest?.<HTMLElement>(".vam-node");
-    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && this.canEditSummary()) {
+    // While the notes load one card's list still opens, its rows that write greyed with the reason (decision #35, P1.1).
+    const loadingCard =
+      !!this.map && !this.presentation && this.notesLoading() && !this.selection.state.multiSelectMode;
+    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && (this.canEditSummary() || loadingCard)) {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
       if (cardId) {
         event.preventDefault();
-        const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
+        // Loading: only the card's own list, never the selection's rows.
+        const ids =
+          !loadingCard && this.selection.state.multiSelected.has(cardId)
+            ? [...this.selection.state.multiSelected]
+            : [cardId];
         const menu = this.newMenu(cardId);
         // One topic outside topic selection: the card's whole list (its toolbar's, then its ⋯ list, Remove last), drawn by
         // Obsidian so a greyed row can show its reason.

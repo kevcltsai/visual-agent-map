@@ -529,6 +529,17 @@ export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">
   const gone = data.removed;
   return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
 }
+/**
+ * ai-flows AI lock: the run has no closing page to write (and the bar no button to it) when the whole-book check left every card out as
+ * locked and nothing was checked or is open. Read from the saved state only, so the runner and the bar agree.
+ */
+export function closingPageSkipped(data: BookPipelineData): boolean {
+  const order = effectiveOrder(data);
+  const locked = data.bookProof?.locked;
+  if (!order.length || !locked || !order.every(id => locked.includes(id))) return false;
+  const slots = [data.bookProof, ...order.map(id => data.aiProof?.[id])];
+  return slots.every(slot => !slot || (!slot.checked && !slot.open.length));
+}
 /** How the map's cards (`mapIds`) differ from what the run accepted: new cards, and cards of the run that are gone. */
 export function mapDifference(
   data: BookPipelineData,

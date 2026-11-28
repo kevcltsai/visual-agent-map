@@ -125,6 +125,7 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  closingPageSkipped,
   effectiveOrder,
   BOOK_EXPAND_PASSES,
   mapDifference,
@@ -4323,6 +4324,8 @@ export class BookPipelineRuns {
     if (!this.ports.writeOpenIssues || !root) return !this.ports.writeOpenIssues;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.dead(drive)) return false;
+      // ai-flows AI lock: a book whose every chapter is locked and that nothing checked gets no page (no file is added for it).
+      if (closingPageSkipped(drive.store.state)) return true;
       try {
         const { checked, issues } = await this.openIssuesOf(drive);
         const content = composeOpenIssuesNote({

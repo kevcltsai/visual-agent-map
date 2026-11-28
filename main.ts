@@ -1422,7 +1422,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     // batch exists: takes back card notes whose Map.md write a crash cut off. A failure is logged by mutate, not fatal.
     const adoptOrphans = this.mutate(
       async () => {
-        const adopted = await this.repo.adoptOrphanNodeNotes();
+        const adopted = await this.repo.adoptOrphanNodeNotes({
+          skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
+          failed: (mapPath, error) =>
+            this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
+        });
         if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
       },
       { sync: false }

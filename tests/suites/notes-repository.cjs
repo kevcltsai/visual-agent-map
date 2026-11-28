@@ -386,6 +386,30 @@ integrationTest('adoption leaves an orphan that names another map or lies outsid
   assert.equal((await repo.readMap(mapB)).nodes.length, 0);
   assert.equal(JSON.stringify(untouched.map(path => contents.get(path))), JSON.stringify(before), 'the other notes are not rewritten');
 });
+integrationTest('adoption skips a copy whose node-id is already used and leaves Map.md unchanged', async () => {
+  const { repo, app, contents } = fixture();
+  const mapPath = await repo.createMap('Copies'), doc = await repo.readMap(mapPath);
+  const real = await repo.createNote('Real', 'a', doc, mapPath, 'workspace');
+  await repo.updateMap(mapPath, current => { current.nodes.push(real); });
+  const copyPath = real.path.replace(/\.md$/, ' (conflict).md');
+  await app.vault.create(copyPath, contents.get(real.path));
+  const mapBefore = contents.get(mapPath), skipped = [];
+  assert.equal(await repo.adoptOrphanNodeNotes({ skipped: path => skipped.push(path) }), 0);
+  assert.equal(JSON.stringify(skipped), JSON.stringify([copyPath]));
+  assert.equal(contents.get(mapPath), mapBefore);
+});
+integrationTest('adoption of one map failing does not stop the later maps', async () => {
+  const { repo } = fixture();
+  const mapA = await repo.createMap('Aaa'), mapB = await repo.createMap('Bbb');
+  const a = await repo.createNote('A', 'a', await repo.readMap(mapA), mapA, 'workspace');
+  const b = await repo.createNote('B', 'a', await repo.readMap(mapB), mapB, 'workspace');
+  const original = repo.updateMap.bind(repo), failures = [];
+  repo.updateMap = (path, ...rest) => path === mapA ? Promise.reject(new Error('read-only')) : original(path, ...rest);
+  assert.equal(await repo.adoptOrphanNodeNotes({ failed: (path, error) => failures.push([path, error.message]) }), 1);
+  assert.equal(JSON.stringify(failures), JSON.stringify([[mapA, 'read-only']]));
+  assert.ok((await repo.readMap(mapB)).nodes.some(node => node.id === b.id));
+  assert.equal((await repo.readMap(mapA)).nodes.some(node => node.id === a.id), false);
+});
 integrationTest('adoption twice gives identical Map.md bytes and no duplicate node', async () => {
   const { repo, contents } = fixture();
   const mapPath = await repo.createMap('Twice'), doc = await repo.readMap(mapPath);

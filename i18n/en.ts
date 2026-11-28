@@ -7,6 +7,8 @@ export const en = {
   "log.recovery_snapshot_retained_0": "Recovery copy retained: {0}",
   "log.recovery_scan_failed": "Could not check for pending recovery copies.",
   "log.adopted_orphan_notes_0": "Recovered {0} card note(s) that a crash had left out of their map.",
+  "log.orphan_note_skipped_duplicate_id_0":
+    "Left a card note out of its map because its node id is missing or already used (a copy?): {0}",
   "ui.recovery_snapshots_found_0":
     'A save did not finish last time. VAM kept a copy of the original content in {0}; your notes were not changed. To recover it, follow "Interrupted Markdown writes" in INSTALL.',
   "ui.output_language": "Answer language for this task",

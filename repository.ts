@@ -1970,10 +1970,17 @@ export class Repository {
    * Must run only when no chat batch can be in flight (plugin startup), and before any rebuildDerivedData, which
    * strips `agent-map-id` from notes no map owns. Returns how many notes were adopted.
    */
-  async adoptOrphanNodeNotes(): Promise<number> {
+  async adoptOrphanNodeNotes(
+    report: { skipped?: (path: string) => void; failed?: (mapPath: string, error: unknown) => void } = {}
+  ): Promise<number> {
     const maps = await this.readableMaps();
-    const listed = new Set<string>();
-    for (const { map } of maps) for (const node of map.nodes) listed.add(node.path);
+    const listed = new Set<string>(),
+      usedIds = new Set<string>();
+    for (const { map } of maps)
+      for (const node of map.nodes) {
+        listed.add(node.path);
+        usedIds.add(node.id);
+      }
     const candidates: { path: string; id: string; mapId: string }[] = [];
     for (const file of await this.markedFiles("agent-map-node")) {
       if (listed.has(file.path)) continue;
@@ -1994,27 +2001,40 @@ export class Repository {
           !item.path.startsWith(`${root}/Unassigned/`)
       );
       if (!own.length) continue;
-      await this.updateMap(file.path, current => {
-        const present = new Set(current.nodes.map(node => node.path)),
-          ids = new Set(current.nodes.map(node => node.id));
-        const fresh = own.filter(
-          item => !present.has(item.path) && this.app.vault.getAbstractFileByPath(item.path) instanceof TFile
-        );
-        const top = current.nodes.reduce((max, node) => Math.max(max, node.y), -140) + 220;
-        fresh.forEach((item, index) => {
-          const id = item.id && !ids.has(item.id) ? item.id : crypto.randomUUID();
-          ids.add(id);
-          current.nodes.push({
-            id,
-            path: item.path,
-            parentId: null,
-            x: 80 + Math.floor(index / 6) * 340,
-            y: top + (index % 6) * 220,
-            collapsed: false
-          });
-          adopted++;
+      let added = 0;
+      try {
+        await this.updateMap(file.path, current => {
+          added = 0;
+          const present = new Set(current.nodes.map(node => node.path));
+          const fresh = own.filter(
+            item => !present.has(item.path) && this.app.vault.getAbstractFileByPath(item.path) instanceof TFile
+          );
+          const top = current.nodes.reduce((max, node) => Math.max(max, node.y), -140) + 220;
+          let index = 0;
+          for (const item of fresh) {
+            // A real crash orphan has a node id nobody uses; a taken or missing id is a sync-conflict or hand-made copy.
+            if (!item.id || usedIds.has(item.id)) {
+              report.skipped?.(item.path);
+              continue;
+            }
+            usedIds.add(item.id);
+            current.nodes.push({
+              id: item.id,
+              path: item.path,
+              parentId: null,
+              x: 80 + Math.floor(index / 6) * 340,
+              y: top + (index % 6) * 220,
+              collapsed: false
+            });
+            index++;
+            added++;
+          }
         });
-      });
+        adopted += added;
+      } catch (error) {
+        // One unwritable map must not keep the later maps from getting their orphans back.
+        report.failed?.(file.path, error);
+      }
     }
     return adopted;
   }

@@ -9,6 +9,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.recovery_snapshot_retained_0": "已保留恢复副本：{0}",
   "log.recovery_scan_failed": "无法检查尚待处理的恢复副本。",
   "log.adopted_orphan_notes_0": "已把 {0} 张因崩溃而未列入地图的卡片收回地图。",
+  "log.orphan_note_skipped_duplicate_id_0": "未收回卡片 {0}：节点 id 缺失或已被使用（可能是副本）。",
   "ui.recovery_snapshots_found_0":
     "上次有一次保存没完成。VAM 已把原来的内容另存在 {0}，你的笔记没有被改动。需要找回时，照 INSTALL 的“Interrupted Markdown writes”说明操作。",
   "ui.output_language": "本次回答语言",

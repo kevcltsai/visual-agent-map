@@ -2726,12 +2726,22 @@ export class VisualAgentMapView extends ItemView {
   private applySearchMarks(): void {
     const search = this.mapSearch;
     const matches = new Set(search ? (this.mapSearchResult()?.matches ?? []) : []);
+    this.clearSearchBadges();
     for (const [id, card] of this.cardEls) {
       card.toggleClass("is-search-match", matches.has(id));
       card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
-      card.toggleClass("is-temp-open", !!search && !!this.searchOpen?.expanded.has(id));
+      const temp = !!search && !!this.searchOpen?.expanded.has(id);
+      card.toggleClass("is-temp-open", temp);
+      if (temp)
+        this.searchBadges.push(card.createSpan({ cls: "vam-search-temp-label", text: t("ui.search_temp_open") }));
     }
     this.mapSearchBar?.setCount(this.mapSearchCountText());
+  }
+  /** The small "opened for search" labels; kept outside renderNode and removed whenever the marks are redone or the search ends. */
+  private searchBadges: HTMLElement[] = [];
+  private clearSearchBadges(): void {
+    for (const badge of this.searchBadges) badge.remove();
+    this.searchBadges = [];
   }
   /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
   private announceSearchLater(search: { query: string; cancelAnnouncement: (() => void) | null }): void {
@@ -2783,6 +2793,7 @@ export class VisualAgentMapView extends ItemView {
     const had = this.searchOpen;
     const same = !!had && had.expanded.size === ancestors.length && ancestors.every(id => had.expanded.has(id));
     if (same && had.signature === mapSignature(map)) return;
+    if (!had && !ancestors.length) return; // the hit is already on screen: nothing to open, nothing to repaint
     if (!ancestors.length) {
       this.searchOpen = null;
     } else {
@@ -2808,14 +2819,22 @@ export class VisualAgentMapView extends ItemView {
   /** Closes the box and clears the marks. Esc passes `restoreFocus`: focus returns to where the search began, else to the map. */
   private closeMapSearch(restoreFocus: boolean): void {
     const search = this.mapSearch;
-    if (!search) return;
+    if (!search) {
+      // An outline reveal can leave a view-only opening with no search box: leaving the map closes it too.
+      if (this.searchOpen) {
+        this.searchOpen = null;
+        if (!this.closed && this.map) this.render();
+      }
+      return;
+    }
     search.cancelAnnouncement?.();
     this.mapSearch = null;
     this.mapSearchBar?.root.remove();
     this.mapSearchBar = null;
     const hadOpen = this.searchOpen !== null;
     this.searchOpen = null;
-    if (hadOpen && restoreFocus && !this.closed && this.map) this.render();
+    if (hadOpen && !this.closed && this.map) this.render();
+    this.clearSearchBadges();
     for (const card of this.cardEls.values()) {
       card.toggleClass("is-search-match", false);
       card.toggleClass("is-search-current", false);
@@ -15143,22 +15162,15 @@ export class VisualAgentMapView extends ItemView {
   /**
    * Brings an outline topic into view: selects its card and centers it. Never writes collapse or the map file.
    * Multi-select keeps its selection; the outline only moves the camera there. False when the map lacks the topic.
-   * A card inside a collapsed branch is not drawn: the camera goes to its nearest visible ancestor instead.
-   * P1.6b's view-only temporary expand replaces this fallback.
+   * A card inside a collapsed branch is shown by the same view-only temporary expand a search hit uses (P1.6).
    */
   async revealPath(path: string): Promise<boolean> {
     const node = this.map?.nodes.find(item => item.path === path);
     if (!this.map || !node) return false;
-    let visible: MapNode = node;
-    for (let parent = node.parentId; parent;) {
-      const ancestor = this.map.nodes.find(item => item.id === parent);
-      if (!ancestor) break;
-      if (ancestor.collapsed) visible = ancestor;
-      parent = ancestor.parentId;
-    }
+    this.openForSearch(collapsedAncestors(this.map.nodes, node.id));
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
-    this.focusNode(visible, false);
+    this.focusNode(node, false);
     return true;
   }
   private selectMapNode(node: MapNode): void {

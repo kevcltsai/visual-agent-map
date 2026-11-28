@@ -268,3 +268,18 @@ test('B12-x: a card painted inside the detail tier is held at its last normal he
   view.settleCardHeights();
   assert.equal(cards.a.offsetHeight, 119);
 });
+
+test('B28-x: the overview rule lets the new-card name field show (same rule as the title), and no tier rule hides it again', () => {
+  const css = read('styles.css');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ sel: m[1].trim(), body: m[2] }));
+  const overview = rules.filter(r => r.sel.includes('is-zoom-overview'));
+  const hide = overview.find(r => /\.vam-node > :not\(svg\)\s*$/.test(r.sel) && /visibility:\s*hidden/.test(r.body));
+  assert.ok(hide, 'the overview hide rule exists (this test is about what it spares)');
+  const spare = overview.find(r => /visibility:\s*visible/.test(r.body) && r.sel.split(',').some(s => /\.vam-node > \.vam-card-title-input$/.test(s.trim())));
+  assert.ok(spare, 'a visible rule names .vam-node > .vam-card-title-input under is-zoom-overview');
+  assert.ok(css.indexOf(spare.sel) > css.indexOf(hide.sel), 'the spare rule comes after the hide rule (same specificity, later wins)');
+  assert.doesNotMatch(spare.body, /!important/); assert.doesNotMatch(spare.sel, /:has\(/);
+  // No other zoom tier rule hides direct children of a node.
+  const others = rules.filter(r => /is-zoom-|is-zoomed-out/.test(r.sel) && /visibility:\s*hidden/.test(r.body) && r !== hide);
+  assert.deepEqual(others.map(r => r.sel).filter(s => /card-title-input/.test(s)), []);
+});

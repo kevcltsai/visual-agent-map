@@ -221,6 +221,20 @@ export { setUiLanguage } from "./i18n";
 export { searchNotPerformedError } from "./ai/search-not-performed";
 `, { obsidian: S.obsidian });
 
+test('trial failure: a source changed during the run has its own reason in every language (D1-x10)', () => {
+  const reasons = {};
+  for (const lang of ['zh-TW', 'zh-CN', 'en']) {
+    reasonModule.setUiLanguage(lang);
+    const r = reasonModule.livingTrialReason('source-changed');
+    assert.equal(r.key, 'ui.living_node_trial_reason_source_changed');
+    assert.notEqual(r.key, 'ui.living_node_trial_reason_provider');
+    assert.notEqual(r.reason, 'ui.living_node_trial_reason_source_changed', 'translated, not the bare key');
+    reasons[lang] = r.reason;
+  }
+  assert.equal(new Set(Object.values(reasons)).size, 3);
+  reasonModule.setUiLanguage('en');
+});
+
 test('trial failure: a provider error and a validation error each give a short reason, with the raw code only as a detail', () => {
   reasonModule.setUiLanguage('en');
   const provider = reasonModule.livingTrialReason(new Error('Request to /Users/me/secret prompt "my private question" failed'));

@@ -111,6 +111,45 @@ export function summarizeLivingChanges(
   return summary;
 }
 
+/** Diagnostic frontmatter key: the last changed commit's record ids per change kind. Never text; never part of a knowledge revision. */
+export const LIVING_LAST_CHANGE_KEY = "living-node-last-change";
+const LAST_CHANGE_KINDS = ["added", "supplemented", "corrected", "disputed", "invalidated"] as const;
+
+/** The key's value for a changed commit that had a baseline: `at` is the commit time, then only record ids. */
+export function livingLastChangeValue(summary: LivingChangeSummary, at: string): string {
+  return JSON.stringify({
+    at,
+    ...Object.fromEntries(LAST_CHANGE_KINDS.map(kind => [kind, summary[kind]])),
+    output: summary.outputUpdated
+  });
+}
+
+/** What the key says, with the time it was written; undefined when absent or malformed (no baseline is then shown). */
+export function readLivingLastChange(
+  content: string,
+  parse: (yaml: string) => unknown
+): { at: string; checkedAt?: string; changes: LivingChangeSummary } | undefined {
+  try {
+    const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1];
+    const fm = block ? (parse(block) as Record<string, unknown> | null) : null;
+    const raw = fm?.[LIVING_LAST_CHANGE_KEY];
+    const value = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+    if (!value || typeof value.at !== "string" || typeof value.output !== "boolean") return undefined;
+    const lists = LAST_CHANGE_KINDS.map(kind => value[kind]);
+    if (!lists.every(list => Array.isArray(list) && list.every(id => typeof id === "string"))) return undefined;
+    const [added, supplemented, corrected, disputed, invalidated] = lists;
+    return {
+      at: value.at,
+      ...(typeof fm?.["living-node-last-successful-check"] === "string"
+        ? { checkedAt: fm["living-node-last-successful-check"] }
+        : {}),
+      changes: { firstRun: false, added, supplemented, corrected, disputed, invalidated, outputUpdated: value.output }
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export interface LivingChangeContext {
   /** Evidence collected by the trusted source resolver, not IDs invented by the model. */
   evidence: readonly LivingEvidence[];

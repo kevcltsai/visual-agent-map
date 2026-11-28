@@ -72,6 +72,21 @@ test('owner vault update neither seeds nor requires fixture maps; other vaults s
   assert.throws(() => verifyTestVault(owner), /Fixture\/settings/);
 });
 
+test('--update-current on the owner vault never writes or changes codexPath / claudePath (the stub guard is not applied)', t => {
+  const { folder } = environment(t);
+  const owner = join(folder, 'owner', 'current');
+  prepareTestVault({ vault: owner });
+  const file = join(owner, '.obsidian/plugins/visual-agent-map/data.json');
+  const saved = JSON.parse(readFileSync(file, 'utf8')); delete saved.codexPath; delete saved.claudePath;
+  writeFileSync(file, JSON.stringify(saved, null, 2));
+  rmSync(join(owner, '.obsidian/vam-provider-guard'), { recursive: true });
+  const before = readFileSync(file, 'utf8');
+  writeFileSync(join(owner, '.obsidian/plugins/visual-agent-map/main.js'), 'stale plugin build');
+  updateCurrentTestVault({ vault: owner, owner, ownerIdleConfirmed: true });
+  assert.equal(readFileSync(file, 'utf8'), before);
+  assert.equal(existsSync(join(owner, '.obsidian/vam-provider-guard')), false);
+});
+
 test('in-place refresh preserves complete user-modified source-selection fixtures', t => {
   const { vault } = environment(t); prepareTestVault({ vault });
   const fixture = join(vault, 'Agent Workspace/Topics/Local Source Fixture');
@@ -228,7 +243,8 @@ test('onboarding is clean and reinstall preserves Markdown and attachment bytes 
   const { vault } = environment(t);
   prepareTestVault({ vault, profile: 'onboarding' });
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
-  assert.equal(existsSync(join(plugin, 'data.json')), false);
+  // Onboarding has no user settings; the only thing in data.json is the stub-mode provider guard.
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(plugin, 'data.json'), 'utf8'))).sort(), ['claudePath', 'codexPath']);
   assert.equal(existsSync(join(vault, 'Agent Workspace')), false);
   prepareTestVault({ vault, profile: 'reinstall' });
   const verify = phase => execFileSync(process.execPath, [join(root, 'scripts/verify-reinstall-test-vault.mjs'), vault, phase], { stdio: 'pipe' });

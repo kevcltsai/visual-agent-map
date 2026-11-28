@@ -2,7 +2,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync,
 import { createHash } from "node:crypto";
 import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installProviderGuard, stubProvidersEnabled } from "./provider-guard.mjs";
+import { installProviderGuard } from "./provider-guard.mjs";
 
 // The config folder every harness-made vault (session vaults and the owner's testing vault) is created with.
 export const harnessConfigDir = ".obsidian";
@@ -38,7 +38,7 @@ export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Works
   notePaths.forEach((path, index) => writeFileSync(path, notes[index]));
 }
 
-export function createTestVault({ vault, artifact = root, profile: requested = "normal", workspaceRoot = "Agent Workspace", stubProviders = stubProvidersEnabled() }) {
+export function createTestVault({ vault, artifact = root, profile: requested = "normal", workspaceRoot = "Agent Workspace", live = null, stubProviders = true }) {
   if (!["onboarding", "normal", "reinstall"].includes(requested)) throw new Error(`Unknown test-vault profile: ${requested}`);
   if (isAbsolute(workspaceRoot) || workspaceRoot.split(/[\\/]/).some(part => part === ".." || part === ".obsidian" || !part)) throw new Error("Workspace must be a relative fixture folder.");
   const assets = ["main.js", "manifest.json", "styles.css"];
@@ -55,8 +55,8 @@ export function createTestVault({ vault, artifact = root, profile: requested = "
   // Native menus are invisible to CDP and need a focused window; Obsidian's own DOM menus work in the background.
   writeFileSync(join(config, "appearance.json"), JSON.stringify({ nativeMenus: false }, null, 2));
 
-  // Stub mode: every provider path in this vault is a guard that fails and logs, so a call no stub caught cannot reach a real claude / codex.
-  const guard = stubProviders ? installProviderGuard(config) : null;
+  // Stub mode is the default (stubProviders: false is for nothing in the harness): every provider path in this vault is a guard that fails and logs, so a call no stub caught cannot reach a real claude / codex.
+  const guard = stubProviders ? installProviderGuard(config, { live }) : null;
   const guardSettings = guard ? { codexPath: guard.codexPath, claudePath: guard.claudePath } : {};
   if (guard && requested === "onboarding") writeFileSync(join(plugin, "data.json"), JSON.stringify(guardSettings, null, 2));
 

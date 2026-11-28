@@ -17,6 +17,7 @@ import { syncModelSelect } from "../../core/model-discovery";
 import { BOOK_POOL, LOOKS_PER_CHAPTER } from "./book-pipeline-run";
 import {
   EDIT_MESSAGE_CHARS,
+  EDIT_REPLY_CHARS,
   type EditSettingsResult,
   type EditSettingsTurn
 } from "../../core/steps/book-pipeline/edit-settings";
@@ -481,7 +482,7 @@ export class BookStartModal extends Modal {
     // chief editor the line sits under the request box, where it says why Send waits.
     this.suggestingEl = (ask ?? settings).createEl("p", { cls: "vam-book-start-suggesting" });
     this.suggestingEl.createSpan({ cls: "vam-book-start-spinner", attr: { "aria-hidden": "true" } });
-    this.suggestingEl.createSpan({ text: t("ui.book_start_suggesting") });
+    this.suggestingEl.createSpan({ text: t(ask ? "ui.book_start_suggesting_ask" : "ui.book_start_suggesting") });
     this.suggestingEl.setAttr("role", "status");
     settings.addClass("is-loading");
     this.settingsEl = settings;
@@ -621,7 +622,8 @@ export class BookStartModal extends Modal {
     run?.abort();
   }
   private applyEdit(message: string, result: EditSettingsResult): void {
-    const undo: { field: BookSettingField; before: string; written: string }[] = [];
+    // `beforeWritten`: what the editor had written in the field before this turn (undo hands the field back to that turn).
+    const undo: { field: BookSettingField; before: string; beforeWritten: string; written: string }[] = [];
     const kept: string[] = [];
     for (const field of BOOK_SETTING_FIELDS) {
       const text = result.changes[field];
@@ -633,7 +635,7 @@ export class BookStartModal extends Modal {
         kept.push(t(FIELD_LABEL[field]));
         continue;
       }
-      undo.push({ field, before: area.value, written: text });
+      undo.push({ field, before: area.value, beforeWritten: this.marks.get(field)?.written ?? "", written: text });
       area.value = text;
       area.removeClass("vam-book-start-suggested");
       this.marks.set(field, { written: text, chip: this.marks.get(field)?.chip ?? null });
@@ -643,7 +645,10 @@ export class BookStartModal extends Modal {
     bubble?.createEl("b", { text: t("ui.book_chat_editor") });
     bubble?.createSpan({ cls: "vam-book-chat-reply", text: result.reply });
     if (kept.length)
-      bubble?.createEl("p", { cls: "vam-book-chat-kept", text: t("ui.book_chat_kept_0", kept.join("、")) });
+      bubble?.createEl("p", {
+        cls: "vam-book-chat-kept",
+        text: t("ui.book_chat_kept_0", kept.join(t("ui.list_separator")))
+      });
     if (bubble && undo.length) {
       const button = bubble.createEl("button", { cls: "vam-book-chat-undo", text: t("ui.book_chat_undo") });
       button.addEventListener("click", () => {
@@ -652,13 +657,20 @@ export class BookStartModal extends Modal {
           const area = this.fields?.areas.get(item.field);
           if (!area || area.value !== item.written) continue;
           area.value = item.before;
+          const mark = this.marks.get(item.field);
+          if (mark) mark.written = item.beforeWritten;
           if (!item.before.trim() && this.suggested[item.field]) area.addClass("vam-book-start-suggested");
           this.refreshMark(item.field);
         }
         button.remove();
       });
     }
-    this.turns.push({ owner: message, editor: result.reply });
+    // The next turn's history says which fields stayed, so the editor does not believe its change landed (the note is never cut off).
+    const note = kept.length ? t("ui.book_chat_kept_turn_0", kept.join(t("ui.list_separator"))) : "";
+    const editor = note
+      ? `${result.reply.slice(0, Math.max(0, EDIT_REPLY_CHARS - note.length - 1))} ${note}`
+      : result.reply;
+    this.turns.push({ owner: message, editor });
   }
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {

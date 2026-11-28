@@ -587,7 +587,8 @@ const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
 const shown = el => { for (let n = el; n; n = n.parent) if (n.hidden || (n.tag === 'details' && !n.open)) return false; return true; };
 const field = (modal, label) => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
 
-test('start card: opens with the estimate (every step counted, about minutes), the six settings open (no <details>), the four model dropdowns always shown below the estimate (no summary, no change link); nothing starts yet', async () => {
+test('start card without editSettings (the fallback; the folded card with the request box is tests/steps-book-pipeline-start-nl.cjs): opens with the estimate (every step counted, about minutes), the six settings open (no <details>), the four model dropdowns always shown below the estimate (no summary, no change link); nothing starts yet', async () => {
+  // This harness gives the plugin no editBookSettings, so the card has no request box and nothing is folded (V3.3 P5.1a).
   const h = await harness({ book: false });
   const modal = await openCard(h);
   assert.ok(modal.isOpen);
@@ -596,7 +597,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(all.includes('3 張卡 · 約 40 分鐘 · 約 67 次 AI 呼叫'), all.join('|'));
   assert.ok(all.includes('AI 會企劃、寫作、找圖、校對每一章；企劃好後停下來讓你看方向。'), 'one intro sentence holds the old promise lines');
   assert.ok(!all.some(x => /只會停一次|重跑那一章|前言 \+|會先停下/.test(x)), 'no promise lines, no breakdown, no pause note');
-  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
+  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block without editSettings: the settings are always open');
   const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
   assert.equal(areas.length, 6);
   for (const area of areas) assert.ok(shown(area), 'each field is on screen');

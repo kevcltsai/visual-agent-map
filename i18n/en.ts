@@ -3104,6 +3104,7 @@ export const en = {
   "ui.book_start_proof_same_as_author": "Best a different model from the author",
   "ui.book_start_suggesting":
     "The AI is thinking up suggestions from the subject; they fill the fields below when ready",
+  "ui.book_start_suggesting_ask": "The AI is thinking up suggestions; you can send once they are ready",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
   "ui.book_progress_step_images": "Pictures",
@@ -3149,7 +3150,8 @@ export const en = {
   "ui.book_chat_undo": "Undo this turn",
   "ui.book_chat_failed": "The chief editor did not answer, so nothing changed.",
   "ui.book_chat_edited": "Chief editor changed this",
-  "ui.book_chat_kept_0": "Kept what you filled in: {0}",
+  "ui.book_chat_kept_0": "Kept what you filled in: {0}. To change them, open Advanced settings",
+  "ui.book_chat_kept_turn_0": "(filled in by the owner, not changed: {0})",
   "ui.book_settings_view": "Book settings",
   "ui.book_settings_view_failed": "Could not read the book settings.",
   "ui.book_settings_view_hint": "To change them, press Stop first, then tell the chief editor.",

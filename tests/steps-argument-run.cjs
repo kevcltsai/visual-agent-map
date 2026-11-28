@@ -2131,3 +2131,19 @@ test('P1b: Stop while the one call is out pauses with user and writes nothing; t
   assert.equal(state.hypotheses.length, 0);
   assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 3);
 });
+
+// ---- D1-x1: the guarded writer's outcome reaches the runner ----
+test('D1-x1: a discarded note write (lock / changed version) is not success: the run does not conclude and stops with error', async () => {
+  const r = await rig({ script: { step: steps() }, ports: { updateNote: async () => 'discarded' } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.notEqual(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, 'error');
+});
+test('D1-x1: a refused note write (admitAiWriter throws) is not success either', async () => {
+  const r = await rig({ script: { step: steps() }, ports: { updateNote: async () => { throw new Error('refused'); } } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.notEqual(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, 'error');
+});

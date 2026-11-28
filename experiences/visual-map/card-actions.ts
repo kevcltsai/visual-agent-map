@@ -47,6 +47,7 @@ export type CardActionId =
   | "zoom-reset"
   | "search"
   | "shortcuts"
+  | "batch-color"
   | "merge"
   | "multi-research"
   | "move-to"
@@ -123,6 +124,8 @@ export interface CardActionHost {
   zoomReset(): void;
   search(): void;
   shortcuts(): void;
+  /** The selection's Color popover (batch-popover.ts) above its button (`opener`) in the selection bar. */
+  openBatchColor(opener?: HTMLElement): void;
   merge(): void;
   multiResearch(): void;
   chooseParent(copy: boolean): void;
@@ -409,9 +412,9 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     order: 35,
     group: 2,
     // B08: the toolbar's Style (an AI card has it in its ⋯); each choice in the popover goes through whenEditing and
-    // mergeUnlocked. Hidden under the picture-book structure lock.
+    // mergeUnlocked. A colour or style is neither card AI nor structure (decision #62), so the picture-book locks keep it.
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.stylesEditable,
-    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    available: ctx => gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openStyle(card(ctx), options?.opener)
   },
   {
@@ -745,6 +748,19 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   // The topic selection (renderSelectionBar, openSelectionMoreMenu, and the right-click on a selection). The bar reads
   // neither presentation nor notesLoading; the picture-book lock takes the AI actions, and the structure ones.
   {
+    // P1.9 (B19b): one colour for the whole selection, one write and one undo step (changeSelectionColor rechecks these). A
+    // colour changes neither parent nor order, so the picture-book locks (card AI, structure) leave it on.
+    id: "batch-color",
+    titleKey: "ui.batch_color",
+    icon: "palette",
+    scope: ["multi"],
+    surfaces: ["toolbar"],
+    order: 295,
+    group: 1,
+    available: ctx => then(gate(ctx, ["presentation", "readOnly"]), () => selectionLock(ctx)),
+    run: (ctx, options) => ctx.host.openBatchColor(options?.opener)
+  },
+  {
     id: "merge",
     titleKey: "ui.merge",
     icon: "combine",
@@ -917,7 +933,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
   card: ["research", "style", "open-note"],
   "ai-card": ["stop-run-all", "run-stop", "ai-lock", "research", "ai-settings", "open-note"],
-  multi: ["move-to", "merge", "multi-research", "finish-selection"]
+  multi: ["batch-color", "move-to", "merge", "multi-research", "finish-selection"]
 };
 
 /** The palette commands (main.ts registers them by these ids) and the mapCommand action each one runs today. */

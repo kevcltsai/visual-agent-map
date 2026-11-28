@@ -2504,3 +2504,85 @@ S.integrationTest('Living Node rebuild: a Living card whose derived fields reall
   assert.match(after, /Child topics: .*\[\[.*Child\]\]/);
   assert.equal(readLivingMarkdown(after).output.text, 'Result');
 });
+
+// ---- D2-8: living-node-last-change (ids + kinds only, diagnostic, only on a changed commit that has a baseline) ----
+const LAST_CHANGE = 'living-node-last-change';
+const SECRET = 'SECRET-CLAIM-TEXT-9f3';
+const appendOp = (id, claim = SECRET) => ({ kind: 'append', id, subject: 'stock', scope: 'price', granularity: 'daily', eventTime: '2026-11-27', claim, evidence: ['e1'] });
+const lastChange = content => {
+  const raw = S.obsidian.parseYaml(content.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1])[LAST_CHANGE];
+  return raw === undefined ? undefined : JSON.parse(raw);
+};
+async function committedTwice() {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const first = f.contents.get(path);
+  const base = readLivingMarkdown(first);
+  const second = request(f, { base, baseGeneration: livingGeneration(first), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, second), 'written');
+  return { f, first, second: f.contents.get(path) };
+}
+
+S.integrationTest('Living Node last change: written only for a changed commit with a baseline; ids and kinds only, never body text', async () => {
+  const { f, first, second } = await committedTwice();
+  assert.equal(first.includes(LAST_CHANGE), false, 'the first commit has no baseline, so no key');
+  assert.deepEqual(lastChange(second), { at: 't2', added: ['r1'], supplemented: [], corrected: [], disputed: [], invalidated: [], output: false });
+  const line = second.split('\n').find(l => l.startsWith(LAST_CHANGE));
+  assert.equal(line.includes(SECRET) || line.includes('Current findings'), false, 'no claim, output or evidence text in the key');
+  // A no-change commit writes nothing new into the key.
+  const base = readLivingMarkdown(second);
+  const third = request(f, { base, baseGeneration: livingGeneration(second), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e3' }, context: { ...context, at: 't3' } });
+  assert.equal(await commitLivingMarkdown(f.repo, third), 'written');
+  assert.equal(f.contents.get(path).split('\n').find(l => l.startsWith(LAST_CHANGE)), line);
+  assert.ok(f.contents.get(path).includes('living-node-last-successful-check: "t3"'));
+});
+
+S.integrationTest('Living Node last change: failed, blocked, discarded and stale commits leave the note without the key', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const before = f.contents.get(path);
+  const base = readLivingMarkdown(before);
+  const make = extra => request(f, { base, baseGeneration: livingGeneration(before), proposal: { baseRevision: base.revision, operations: [appendOp('r1')] }, candidate: { executionId: 'e9' }, ...extra });
+  const aborted = new AbortController(); aborted.abort();
+  assert.equal(await commitLivingMarkdown(f.repo, make({ signal: aborted.signal })), 'discarded');
+  assert.equal(await commitLivingMarkdown(f.repo, make({ isCurrent: () => false })), 'discarded');
+  await assert.rejects(() => commitLivingMarkdown(f.repo, make({ proposal: { baseRevision: base.revision, operations: [appendOp('r1', '  ')] } })));
+  assert.equal(f.contents.get(path), before);
+  assert.equal(before.includes(LAST_CHANGE), false);
+});
+
+S.integrationTest('Living Node last change: the key does not change the knowledge revision or the region', async () => {
+  const { second } = await committedTwice();
+  const stripped = second.split('\n').filter(l => !l.startsWith(LAST_CHANGE)).join('\n');
+  assert.notEqual(stripped, second);
+  assert.equal(readLivingMarkdown(second).revision, readLivingMarkdown(stripped).revision);
+  assert.equal(second.match(/living-node-success-knowledge: .+/)[0], stripped.match(/living-node-success-knowledge: .+/)[0]);
+  const region = text => text.slice(text.indexOf('<!-- vam-living-node:begin'), text.indexOf('<!-- vam-living-node:end'));
+  assert.equal(region(second), region(stripped));
+});
+
+S.integrationTest('Living Node last change: a copy drops the key; share text and share scan treat it as internal', async () => {
+  const { f, second } = await committedTwice();
+  assert.ok(lastChange(second));
+  const map = { id: 'map', title: 'Map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const copy = await f.repo.duplicateNote(path, map, 'Agent Workspace/Topics/map/Map.md', { keepTitle: true });
+  assert.equal(f.contents.get(copy.path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(copy.path)).revision, readLivingMarkdown(second).revision);
+  const shared = S.load('experiences/sharing/living-node-redaction.ts').redactLivingShareText(second);
+  assert.equal(shared.includes(LAST_CHANGE) || shared.includes('"added"'), false);
+  assert.ok(S.load('experiences/sharing/share-leak-scan.ts').INTERNAL_FIELD_NAMES.includes(LAST_CHANGE));
+});
+
+S.integrationTest('Living Node last change: an old card without the key round-trips byte-identical and reads as no baseline', async () => {
+  const f = await setup();
+  assert.equal(await commitLivingMarkdown(f.repo, request(f)), 'written');
+  const old = f.contents.get(path);
+  assert.equal(lastChange(old), undefined);
+  const { readLivingLastChange } = S.load('experiences/visual-map/living-node-changes.ts');
+  assert.equal(readLivingLastChange(old, S.obsidian.parseYaml), undefined);
+  const base = readLivingMarkdown(old);
+  const again = request(f, { base, baseGeneration: livingGeneration(old), proposal: { baseRevision: base.revision, operations: [] }, candidate: { executionId: 'e2' }, context: { ...context, at: 't2' } });
+  assert.equal(await commitLivingMarkdown(f.repo, again), 'written');
+  assert.equal(f.contents.get(path).includes(LAST_CHANGE), false);
+  assert.equal(readLivingMarkdown(f.contents.get(path)).revision, base.revision);
+});

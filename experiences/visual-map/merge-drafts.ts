@@ -58,6 +58,8 @@ export interface MergeTask {
   draft?: AiResult;
   /** The content check of the draft (set when it failed). */
   check?: MergeCheckResult;
+  /** What the chat turn that started this merge attached: sent with the map's sources in the supplement request only. */
+  referenceGroups?: ReferenceGroup[];
   /** The chat reply that started this merge gets a result line when it fails (the chat's merge only). */
   failedLine?: (text: string) => void;
   /** The request in flight (tests await it). */
@@ -288,14 +290,17 @@ export class MergeDrafts {
       // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
       // never saw them, so nothing in them can change what the cards say.
       if (!this.isLive(task)) return;
-      if (snapshot.mapGroups.some(group => group.documents.length)) {
+      const supplementGroups = task.referenceGroups?.length
+        ? [...snapshot.mapGroups, ...task.referenceGroups]
+        : snapshot.mapGroups;
+      if (supplementGroups.some(group => group.documents.length)) {
         try {
           const supplement = await ask({
             ...request,
             summary: result.summary,
             detail: result.detail,
             task: mergeSupplementTask(language),
-            referenceGroups: snapshot.mapGroups
+            referenceGroups: supplementGroups
           });
           if (!(await sourcesUnchanged())) return;
           task.supplement = supplement.detail;

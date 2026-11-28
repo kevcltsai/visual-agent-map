@@ -4386,7 +4386,8 @@ export class VisualAgentMapView extends ItemView {
               .filter(item => item.parentId === node.id)
               .map(item => this.notes.get(item.id)?.title ?? "")
           },
-          signal
+          signal,
+          request.chatSources
         );
         check(signal);
         const result = await this.plugin.outlineGeneration.generate(requestWithSources, signal, steer);
@@ -6600,6 +6601,7 @@ export class VisualAgentMapView extends ItemView {
       replyStep?: ChatReplyStep;
       appearance?: TopicAppearanceChange;
       failedLine?: (text: string) => void;
+      referenceGroups?: ReferenceGroup[];
     } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
@@ -6649,6 +6651,7 @@ export class VisualAgentMapView extends ItemView {
         ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         ...(options.appearance ? { appearance: options.appearance } : {}),
         ...(options.failedLine ? { failedLine: options.failedLine } : {}),
+        ...(options.referenceGroups?.length ? { referenceGroups: options.referenceGroups } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -15410,13 +15413,15 @@ export class VisualAgentMapView extends ItemView {
    */
   private async withOutlineSources(
     request: OutlineGenerateRequest,
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** Sent beside the map's sources (a chat turn's attachments), in the same untrusted block. */
+    extraGroups: ReferenceGroup[] = []
   ): Promise<OutlineGenerateRequest> {
     const session = this.captureBackgroundSession();
     const check = (): void => {
       if (!session() || signal.aborted) throw new DOMException("Aborted", "AbortError");
     };
-    const groups = await this.readMapSourceGroups(signal);
+    const groups = [...(await this.readMapSourceGroups(signal)), ...extraGroups];
     check();
     const sourceMaterial = await outlineSourceMaterial(request, groups, () => {
       check();
@@ -24871,6 +24876,8 @@ export class VisualAgentMapView extends ItemView {
         const expandChat = this.chat;
         const expandTurns = expandChat?.transcript().length ?? 0;
         const expandRecord = this.chatLastRecord;
+        // The same sources as a research this turn starts: the map's own (read by the outline request) plus this turn's attachments.
+        const expandGroups = this.chatTurnReferences;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,
           title: note.title,
@@ -24889,7 +24896,13 @@ export class VisualAgentMapView extends ItemView {
                   resolve({ status: "stopped" });
                   return;
                 }
-                const outcome = (await this.chatExpand(parent, action.direction, work?.controller.signal)) ?? {
+                const outcome = (await this.chatExpand(
+                  parent,
+                  action.direction,
+                  work?.controller.signal,
+                  undefined,
+                  expandGroups
+                )) ?? {
                   status: "succeeded" as const,
                   titles: []
                 };
@@ -24969,6 +24982,8 @@ export class VisualAgentMapView extends ItemView {
           const mergeRecord = this.chatLastRecord;
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
             keepTitle: true,
+            // The same sources as a research this turn starts: this turn's attachments join the map's in the supplement request.
+            referenceGroups: this.chatTurnReferences,
             ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}),
             ...(held ? { appearance: held } : {}),
             failedLine: text => {
@@ -25410,7 +25425,9 @@ export class VisualAgentMapView extends ItemView {
     parent: MapNode,
     direction: string,
     signal?: AbortSignal,
-    steer?: ResearchSteer
+    steer?: ResearchSteer,
+    /** What the map chat's turn attached; they join the map's sources in the outline request (the topic chat sends none). */
+    turnGroups: ReferenceGroup[] = []
   ): Promise<ChatExpandOutcome> {
     // A batch that is still reading its sources has marked the parent but not registered yet.
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.quickExpandPending.has(parent.path)) {
@@ -25451,7 +25468,8 @@ export class VisualAgentMapView extends ItemView {
             this.outputLanguageMemory().outputLanguage,
             this.map?.title
           ),
-          limits
+          limits,
+          ...(turnGroups.length ? { chatSources: turnGroups } : {})
         },
         controller.signal,
         steer
@@ -25506,6 +25524,8 @@ export class VisualAgentMapView extends ItemView {
     if (!nodes.length) return skipped("ui.map_chat_skip_unavailable");
     const settings = this.plugin.settings;
     const remembered = this.outputLanguageMemory().outputLanguage;
+    // The same sources as a research this turn starts: the map's own plus what this turn attached (taken now, before any wait).
+    const turnGroups = this.chatTurnReferences;
     if (nodes.length === 1) {
       const node = nodes[0];
       if (!map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
@@ -25526,7 +25546,7 @@ export class VisualAgentMapView extends ItemView {
           remembered,
           map.title
         ),
-        referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
+        referenceGroups: [...(await this.readMapSourceGroups(new AbortController().signal)), ...turnGroups]
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)
@@ -25540,7 +25560,7 @@ export class VisualAgentMapView extends ItemView {
     const options = chatSynthesisOptions({
       outputLanguage: defaultOutputLanguage(settings.language, "", undefined, remembered),
       synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names),
-      referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
+      referenceGroups: [...(await this.readMapSourceGroups(new AbortController().signal)), ...turnGroups]
     });
     // The run lives on the selection bar, so the sources are the selection while it runs.
     this.chatSelect(nodes.map(node => node.id));

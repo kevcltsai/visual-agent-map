@@ -1,7 +1,7 @@
 // MergeDrafts (experiences/visual-map/merge-drafts.ts) on its own: fake ports, deferred model calls, no real waiting.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load } = require('./support.cjs');
+const { load, plain } = require('./support.cjs');
 const { MergeDrafts } = load('experiences/visual-map/merge-drafts.ts', { obsidian: {} });
 const { t } = load('i18n.ts');
 
@@ -26,7 +26,7 @@ function world(options = {}) {
     language: () => 'en',
     detailTemplate: () => ({}),
     progress: task => ({ observer: { onAttempt: id => events.push([task, id]) }, end: () => progress.push(task) }),
-    snapshot: async () => ({ group: { documents: [] }, mapGroups: [], content: options.contents ? options.contents.shift() : state.content }),
+    snapshot: async () => ({ group: { documents: [] }, mapGroups: options.mapGroups ?? [], content: options.contents ? options.contents.shift() : state.content }),
     ask: (context, model, reasoning, signal, observer) => new Promise((resolve, reject) => asks.push({ context, signal, observer, resolve, reject })),
     check: async (task, result) => { checks.push(result); return options.check ? options.check(task, result) : { ok: true, missing: [], added: [] }; },
     recordFailure: (label, error) => `${label}: ${error}`,
@@ -237,4 +237,25 @@ test('merge drafts: a failed repair request keeps the first draft and still writ
   assert.equal(task.state, 'draft-failed');
   assert.equal(task.draft, RESULT, 'the first draft is kept');
   assert.deepEqual(w.failed, [task]);
+});
+
+test('merge drafts (V3.3 #04): the chat turn\'s attachments join the map sources in the supplement request only; none of either asks once', async () => {
+  const mapGroup = { id: 'map-source', name: 'Map sources', location: '', documents: [{ path: 'S.md', content: 's' }] };
+  const turnGroup = { id: 'chat-references', name: 'Chat references', location: '', documents: [{ path: 'N.md', content: 'n' }] };
+  for (const [mapGroups, referenceGroups, expected] of [[[mapGroup], [turnGroup], [mapGroup, turnGroup]], [[], [turnGroup], [turnGroup]], [[mapGroup], undefined, [mapGroup]], [[], [], null]]) {
+    const w = world({ mapGroups });
+    const task = { ...newTask('map.md'), ...(referenceGroups ? { referenceGroups } : {}) };
+    w.drafts.start(task, () => {});
+    await flush();
+    w.asks[0].resolve(RESULT);
+    await flush();
+    assert.deepEqual(plain(w.asks[0].context.referenceGroups), [{ documents: [] }], 'the merged text is written from the cards only');
+    if (expected) {
+      assert.equal(w.asks.length, 2);
+      assert.deepEqual(plain(w.asks[1].context.referenceGroups), expected);
+      w.asks[1].resolve({ ...RESULT, detail: 'supplement' });
+    } else assert.equal(w.asks.length, 1, 'no sources and no attachments: no supplement request');
+    await task.run;
+    assert.equal(w.writes.length, 1);
+  }
 });

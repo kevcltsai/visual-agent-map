@@ -7220,6 +7220,14 @@ export class VisualAgentMapView extends ItemView {
     // the map the batch began from (the flush merges another write in), not with the staged cards.
     const staged = this.chatMapBatch?.base;
     if (structure(disk) === structure(staged ?? this.map)) return false;
+    // A view whose re-read is held back by another view's reply batch (holdChatBatch) has not read the batch's own Map.md
+    // writes yet: the difference is that owed read, not an outside edit. It takes the stored map now, as its synchronize
+    // would at the end of the batch; a conflict window here would offer its stale map over the batch's cards.
+    if (!staged && this.syncHold > 0 && this.syncPending) {
+      this.adoptSavedMap(disk);
+      this.history.clear();
+      return false;
+    }
     const local = clone(this.map);
     // A cross-map cut refuses to touch this map while its conflict window is still open.
     this.conflictOpen = true;

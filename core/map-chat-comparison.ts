@@ -85,3 +85,41 @@ export function buildComparisonTable(
   }));
   return { columns, rows };
 }
+
+/** The header text of one column: "Name (unit)", "Name (no unit)" for the unitless column of a split attribute, else the name. */
+export function comparisonColumnHeader(
+  column: ComparisonColumn,
+  words: { withUnit: (name: string, unit: string) => string; noUnit: (name: string) => string }
+): string {
+  return column.unit !== null
+    ? words.withUnit(column.name, column.unit)
+    : column.split
+      ? words.noUnit(column.name)
+      : column.name;
+}
+
+/** One Markdown table cell: pipes escaped, line breaks written as `<br>`, so a cell never breaks the row. */
+export function comparisonCell(text: string): string {
+  return text
+    .trim()
+    .replace(/\\(?=\||$)/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r\n?|\n/g, "<br>");
+}
+
+/**
+ * The comparison as a Markdown table exactly as the chat shows it (same columns, headers, unknown cells, row titles), then the cut
+ * notes the chat shows under it. The source-card links are not here: the note's `source-notes` makes the repository write them.
+ */
+export function comparisonMarkdown(
+  table: ComparisonTable,
+  options: { header: (column: ComparisonColumn) => string; gone: string; notes: string[] }
+): string {
+  const row = (cells: string[]): string => `| ${cells.map(comparisonCell).join(" | ")} |`;
+  const lines = [
+    row(["", ...table.columns.map(options.header)]),
+    row(["---", ...table.columns.map(() => "---")]),
+    ...table.rows.map(entry => row([entry.title ?? options.gone, ...entry.cells]))
+  ];
+  return [lines.join("\n"), ...options.notes.map(note => `*${note.replace(/[*\r\n\s]+/g, " ").trim()}*`)].join("\n\n");
+}

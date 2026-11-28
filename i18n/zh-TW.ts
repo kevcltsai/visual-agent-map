@@ -2989,6 +2989,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_refused_backup_failed": "備份沒存成功，所以沒有改動章節。",
   "ui.book_refused_nothing": "這一章沒有可套用的備註。",
   "ui.book_refused_unsafe": "這項還原會讓卡片消失，沒有還原任何東西。",
+  "ui.book_refused_not_slot": "這張圖不是圖文書流程放的（或已手動改過），所以不會重找。",
   "ui.book_abandon": "放棄這本",
   "ui.book_remove": "改回一般心智圖",
   "ui.book_abandon_title": "放棄這本圖文書？",

@@ -3182,6 +3182,8 @@ export const en = {
   "ui.book_refused_backup_failed": "The backup could not be saved, so the chapter was not changed.",
   "ui.book_refused_nothing": "This chapter has no note to apply.",
   "ui.book_refused_unsafe": "This undo would make a card disappear, so nothing was undone.",
+  "ui.book_refused_not_slot":
+    "This picture was not placed by the picture-book run (or it was changed by hand), so it is not searched for again.",
   "ui.book_abandon": "Give up this book",
   "ui.book_remove": "Back to plain mind map",
   "ui.book_abandon_title": "Give up this picture book?",

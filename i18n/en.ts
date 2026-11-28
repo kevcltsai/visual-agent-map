@@ -745,6 +745,9 @@ export const en = {
   "ui.annotated_image_label_preview_0_1": "{0}. {1} anchor(s) in the plan preview.",
   "ui.annotated_image_preview_note":
     "Dashed dots are where the plan would put anchors. They are only placed when you press Apply.",
+  "ui.annotated_image_label_move_0_1": "{0}. Plan preview: {1} anchor(s) would move.",
+  "ui.annotated_image_move_note":
+    "The dashed dot is where the plan would move the anchor; the line starts at where it is now. It only moves when you press Apply.",
   "ui.annotated_image_convert": "Convert to annotated image…",
   "ui.annotated_image_open_original": "Open original file",
   "ui.annotated_image_delete_plain": "Delete image",
@@ -756,7 +759,7 @@ export const en = {
   "ui.annotated_image_edit_title": "Edit note",
   "ui.annotated_image_note_label": "Note (optional)",
   "ui.annotated_image_note_hint":
-    "Write what this picture is and what to research. Research and expansion cannot see the picture; they read this line and the anchor notes. The map chat looks at the picture when you select it.",
+    "Write what this picture is and what to research. Research and expansion don't look at images; they read this line and the anchor notes. Mind map chat can see the image you select.",
   "ui.annotated_image_convert_button": "Convert",
   "ui.annotated_image_place_anchor": "Place anchor",
   "ui.image_explore": "Image exploration",
@@ -806,7 +809,7 @@ export const en = {
     "← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",
   "ui.anchor_no_note_notice":
-    "This image has no note yet. Research and expansion cannot see pictures; add one sentence on what it is and what to research.",
+    "This image has no note yet. Research and expansion don't look at images; add one sentence on what it is and what to research. Mind map chat can see the image you select.",
   "ui.anchor_limit": "This image already has the most anchors it can hold ({0}).",
   "ui.canvas_boundaries_group": "Frames",
   "ui.canvas_boundary_label": "Frame: {0}",
@@ -1059,6 +1062,9 @@ export const en = {
   "ui.card_action_off_no_lockable": "None of the selected cards can be locked",
   "ui.selection_locked_0_1":
     "△ {0} of them are locked or being merged ({1}), so this group cannot change color, size, position or merge. Take them out of the selection, or unlock them first.",
+  "ui.batch_color": "Color ▾",
+  "ui.batch_color_title_0": "Color for {0} cards",
+  "ui.batch_color_mixed": "Mixed",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "Workspace default",
@@ -1244,6 +1250,7 @@ export const en = {
   "ui.living_node_trial_unsaved": "Trial · not saved",
   "ui.living_node_changes_title": "This run's changes",
   "ui.living_node_changes_first_run": "First run: there is no baseline to compare against.",
+  "ui.living_node_changes_no_baseline": "No baseline to compare against.",
   "ui.living_node_changes_none": "No changes this time.",
   "ui.living_node_changes_added_0": "Added: {0}",
   "ui.living_node_changes_supplemented_0": "Supplemented with new evidence: {0}",
@@ -1394,6 +1401,7 @@ export const en = {
   "ui.map_chat_ref_selected_0": "Selected: {0}",
   "ui.map_chat_ref_image_annotated_0": "Selected: annotated image · {0}",
   "ui.map_chat_ref_image_plain_0": "Selected: image · {0}",
+  "ui.map_chat_image_sent": "This image goes to the AI",
   "ui.map_chat_image_mode_label": "Before AI edits the picture",
   "ui.map_chat_image_mode_preview": "Show me first",
   "ui.map_chat_image_mode_direct": "Apply directly",
@@ -1672,11 +1680,13 @@ export const en = {
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",
   "ui.map_chat_plan_reason_many_research_0": "Starts research on {0} topics",
   "ui.map_chat_plan_reason_new_map": "Creates a new map and opens it",
+  "ui.map_chat_plan_reason_move_anchor_confirm": "Moves an anchor on the picture; it waits for your confirmation",
   "ui.map_chat_plan_reason_image_preview": "Places or links anchors on the picture",
   "ui.map_chat_plan_reason_image_other_actions":
     "This question came with a picture, and the reply wants more than anchors and new topics. The picture is not trusted",
   "ui.map_chat_do_add_anchor_0": "Place an anchor: “{0}”",
   "ui.map_chat_do_add_anchor_empty": "Place an anchor (no note)",
+  "ui.map_chat_do_move_anchor_0": "Move anchor “{0}”",
   "ui.map_chat_do_link_anchor_0_1_2": "Link anchor “{0}” to “{1}” ({2})",
   "ui.map_chat_anchor_unnamed": "an anchor with no note",
   "ui.map_chat_skip_image_gone": "the picture is no longer on the canvas",
@@ -3123,6 +3133,8 @@ export const en = {
   "ui.argument_searched_0": "Tried {0} searches; the note lists them",
   "ui.argument_paused_reason_user": "You stopped it",
   "ui.argument_paused_reason_error": "The AI reply was not in the right format; a retry also failed",
+  "ui.argument_paused_reason_write_discarded":
+    "The note was changed or locked while the step ran, so this step was not written; you can resume",
   "ui.argument_paused_reason_interrupted": "Interrupted last time",
   "ui.argument_paused_reason_limit": "Research calls used up",
   "ui.argument_paused_resume_aria": "Resume research from where it stopped",

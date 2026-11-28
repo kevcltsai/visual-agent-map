@@ -24901,7 +24901,8 @@ export class VisualAgentMapView extends ItemView {
           : t("ui.new_topic")
       )
         // The title becomes the note's H1: no tag, comment or hidden-text marker from a source card's title may reach it.
-        .replace(/[<>]|%%/g, "")
+        .replace(/[<>]/g, "")
+        .replace(/%+/g, match => (match.length > 1 ? "%" : match))
         .trim() || t("ui.new_topic");
     const repo = this.plugin.repo;
     const parent = map.nodes.find(node => !node.parentId) ?? null;

@@ -270,7 +270,8 @@ const INJECTIONS = [
   '<iframe src=x></iframe>',
   '%%hidden%%',
   '<!-- c -->',
-  'a<br>b'
+  'a<br>b',
+  '%<%x%>%'
 ];
 
 test('F08b markdown (counter-example): every cell, header, unit and title is literal text; no marker, link, embed, comment or tag survives', () => {
@@ -305,6 +306,7 @@ for (const where of ['cell', 'attribute name', 'unit', 'card title']) {
       const plainText = table.replace(/\\./g, '');
       assert.doesNotMatch(plainText, /<!--|\[\[|!\[|<img|<iframe|%%/, `no unescaped marker in the table: ${bad}`);
       assert.doesNotMatch(text, /<img|<iframe|%%hidden|<!-- c -->|<!--\s*vam-book-open-issues/, `none in the whole note: ${bad}`);
+      assert.doesNotMatch(text, /%%/, `no Obsidian comment marker anywhere in the note: ${bad}`);
     }
   });
 }

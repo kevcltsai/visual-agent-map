@@ -16420,7 +16420,7 @@ export class VisualAgentMapView extends ItemView {
                   if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failureCode ?? "");
+                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
                     win.showTrialFailure(failed.key, failed.code);
                   }
                   return false;

@@ -430,6 +430,52 @@ test('21: Esc in the name field of a new topic takes the add back: no card, no M
   assert.equal(h.view.keepCanvasOnFieldRestore, true, 'the repaint does not pan');
 });
 
+// V3.3 B29: the name field only appears after the note and Map.md are written, so keys typed right after the pick
+// ("+ Add the first topic" → Topic) used to be lost and the card kept "New topic". They are held and handed to the field.
+const earlyWindow = h => {
+  const win = { listeners: [], addEventListener(name, fn, capture) { this.listeners.push({ name, fn, capture }); }, removeEventListener(name, fn) { this.listeners = this.listeners.filter(l => l.fn !== fn); } };
+  h.view.contentEl.win = win;
+  const key = (k, init = {}) => {
+    const event = { key: k, target: { closest: () => null }, isComposing: false, ctrlKey: false, metaKey: false, altKey: false, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...init };
+    for (const l of win.listeners.filter(l => l.name === 'keydown')) l.fn(event);
+    return event;
+  };
+  return { win, key };
+};
+test('21 (B29): keys typed before the new root\'s name field appears go into it; Enter typed early saves that name', async () => {
+  const h = await harness(); realAdd(h);
+  const { win, key } = earlyWindow(h);
+  const adding = h.view.addNode(null);
+  const typed = ['手', '機', ' ', 'x', 'Backspace', 'A'].map(k => key(k));
+  assert.equal(typed.every(e => e.defaultPrevented && e.stopped), true, 'held keys do not reach the canvas');
+  const composing = key('Process', { isComposing: true });
+  assert.equal(composing.defaultPrevented, false, 'a composing key is left alone');
+  const shortcut = key('z', { metaKey: true });
+  assert.equal(shortcut.defaultPrevented, false, 'a shortcut is left alone');
+  key('Enter');
+  await adding;
+  const fresh = freshCard(h);
+  await until(() => h.view.notes.get(fresh.id)?.title === '手機 A'); await tick(); await tick();
+  assert.equal(h.view.inlineName, null, 'the early Enter ended the edit');
+  assert.equal(win.listeners.length, 0, 'the key catcher is gone');
+});
+
+test('21 (B29): Esc typed before the new root\'s name field appears cancels the add: no card, no note', async () => {
+  const h = await harness(); realAdd(h);
+  const { win, key } = earlyWindow(h);
+  const notes = noteCount(h);
+  const trashFile = h.app.fileManager.trashFile;
+  h.app.fileManager.trashFile = async file => { await trashFile(file); h.contents.delete(file.path); };
+  const adding = h.view.addNode(null);
+  key('a'); key('Escape');
+  await adding;
+  await until(() => h.map().nodes.length === 4); await tick(); await tick();
+  assert.equal(noteCount(h), notes, 'no note is left');
+  assert.equal(h.view.inlineName, null);
+  assert.equal(h.view.history.canRedo, false, 'no redo');
+  assert.equal(win.listeners.length, 0, 'the key catcher is gone');
+});
+
 test('21: Enter while an input method is composing does not end the edit', async () => {
   const h = await harness(); realAdd(h);
   await h.view.addNode(null);
@@ -571,4 +617,124 @@ test('A8 coverage K3: Delete on a branch, "remove only this node": one history e
   assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId ?? null, null, 'the child became a root');
   await h.view.travel(false); await tick();
   assert.equal(h.map().nodes.find(n => n.id === h.ids.kid).parentId, h.ids.branch, 'Undo restores the child under the branch');
+});
+
+// V3.3 B10: the map keys run the card action list, as the card menus and the palette do.
+const recordHost = h => {
+  const calls = [], ids = [];
+  const context = h.view.cardActionContext.bind(h.view), keyAction = h.view.cardKeyAction.bind(h.view);
+  const host = new Proxy({}, { get: (_, name) => (...args) => { calls.push([name, args[0]?.id ?? null]); } });
+  h.view.cardActionContext = target => ({ ...context(target), host });
+  h.view.cardKeyAction = (id, ...rest) => { const run = keyAction(id, ...rest); return run ? () => { ids.push(id); run(); } : run; };
+  return { calls, ids, reset() { calls.length = 0; ids.length = 0; } };
+};
+const scopeKey = (h, modifiers, key) => h.view.scope.keys.find(k => k.key === key && k.modifiers.length === modifiers.length && modifiers.every(m => k.modifiers.includes(m)));
+const contextItems = (h, key) => {
+  const items = [];
+  const menu = { addItem(cb) { const it = {}; cb({ setTitle(t) { it.title = t; return this; }, setIcon() { return this; }, onClick(fn) { it.run = fn; return this; }, setDisabled(d) { it.disabled = d; return this; }, setWarning() { return this; }, setChecked() { return this; }, setSection() { return this; }, setSubmenu() { return menu; } }); items.push(it); return menu; }, addSeparator() { return menu; } };
+  h.view.addCardMenuActions(menu, h.view.map.nodes.find(n => n.id === h.ids[key]), true);
+  return items;
+};
+
+test('B10: every map key runs the same card action id, through the same host call, as its right-click item or command', async () => {
+  const h = await harness();
+  const rec = recordHost(h);
+  const doc = { activeElement: null }; h.view.contentEl.ownerDocument = doc;
+  const viaKey = (key, cardKey, init = {}) => { rec.reset(); const event = send(h, cardKey, key, init); h.view.onSpaceKeyUp(); return { prevented: event.defaultPrevented, ids: [...rec.ids], calls: rec.calls.map(c => [...c]) }; };
+  const viaScope = (modifiers, key, cardKey) => { rec.reset(); doc.activeElement = h.card(cardKey); const handled = scopeKey(h, modifiers, key).func({ key, isComposing: false, defaultPrevented: false }, {}) === false; doc.activeElement = null; return { handled, ids: [...rec.ids], calls: rec.calls.map(c => [...c]) }; };
+  const viaMenu = (title, cardKey) => { const item = contextItems(h, cardKey).find(i => i.title === title); assert.ok(item?.run, title); rec.reset(); item.run(); return rec.calls.map(c => [...c]); };
+  const viaCommand = (action, cardKey) => { rec.reset(); h.view.selection.setSelected(h.ids[cardKey]); assert.equal(h.view.mapCommand(action, false), true, action); return rec.calls.map(c => [...c]); };
+  const leaf = h.ids.leaf, branch = h.ids.branch;
+  const rows = [
+    // [key on the card, init, card, action id, host call, the same action from a menu or the palette]
+    ['Enter', { ctrlKey: true }, 'leaf', 'add-child', [['addChild', leaf]], () => viaMenu('Add subtopic', 'leaf')],
+    ['Enter', { metaKey: true }, 'leaf', 'add-child', [['addChild', leaf]], () => viaCommand('add-subtopic', 'leaf')],
+    ['Enter', { shiftKey: true }, 'leaf', 'add-sibling', [['addSibling', leaf]], () => viaCommand('add-sibling', 'leaf')],
+    ['Enter', {}, 'leaf', 'rename', [['rename', leaf]], () => viaCommand('rename', 'leaf')],
+    ['F2', {}, 'leaf', 'rename', [['rename', leaf]], () => viaCommand('rename', 'leaf')],
+    ['Delete', {}, 'leaf', 'remove', [['remove', leaf]], () => viaMenu('Remove from map', 'leaf')],
+    ['Backspace', {}, 'leaf', 'remove', [['remove', leaf]], () => viaMenu('Remove from map', 'leaf')],
+    [' ', { code: 'Space' }, 'branch', 'toggle-collapse', [['toggleCollapse', branch]], () => viaMenu('Collapse subtopics', 'branch')],
+    ['ArrowDown', { altKey: true }, 'leaf', 'reorder-sibling', [['reorderSibling', leaf]], null]
+  ];
+  for (const [key, init, cardKey, id, calls, other] of rows) {
+    const label = `${key} ${JSON.stringify(init)}`;
+    const got = viaKey(key, cardKey, init);
+    assert.equal(got.prevented, true, `${label}: taken`);
+    assert.deepEqual(got.ids, [id], `${label}: runs ${id}`);
+    assert.deepEqual(got.calls, calls, `${label}: the action's host call`);
+    if (other) assert.deepEqual(other(), calls, `${label}: the menu / palette entry makes the same call`);
+  }
+  // The view scope's keys (Obsidian takes Mod+Enter before the card; F2 is Obsidian's Rename file).
+  assert.deepEqual(viaScope(['Mod'], 'Enter', 'leaf'), { handled: true, ids: ['add-child'], calls: [['addChild', leaf]] });
+  assert.deepEqual(viaScope(['Shift'], 'Enter', 'leaf'), { handled: true, ids: ['add-sibling'], calls: [['addSibling', leaf]] });
+  assert.deepEqual(viaScope([], 'F2', 'leaf'), { handled: true, ids: ['rename'], calls: [['rename', leaf]] });
+  // The dialog lists the same keys the action list names.
+  const fs = require('node:fs'), path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/card-actions.ts'), 'utf8');
+  for (const [id, row] of [['rename', 'ui.shortcut_rename'], ['add-child', 'ui.shortcut_add_subtopic'], ['add-sibling', 'ui.shortcut_add_sibling'], ['toggle-collapse', 'ui.shortcut_toggle_collapse'], ['remove', 'ui.shortcut_remove'], ['reorder-sibling', 'ui.shortcut_reorder_sibling']]) {
+    const at = source.indexOf(`id: "${id}"`);
+    assert.match(source.slice(at, source.indexOf('\n  },', at)), new RegExp(`shortcut: "${row.replace(/\./g, '\\.')}"[\\s\\S]*surfaces: \\[[^\\]]*"key"`), id);
+  }
+});
+
+test('B10: a key whose card action cannot run now runs nothing and leaves the event alone (no preventDefault)', async () => {
+  const h = await harness();
+  const rec = recordHost(h);
+  const keys = [['Enter', { ctrlKey: true }, 'leaf'], ['Enter', { shiftKey: true }, 'leaf'], ['Enter', {}, 'leaf'], ['F2', {}, 'leaf'], ['Delete', {}, 'leaf'], ['Backspace', {}, 'leaf'], [' ', { code: 'Space' }, 'branch'], ['ArrowDown', { altKey: true }, 'leaf']];
+  const none = why => {
+    for (const [key, init, cardKey] of keys) {
+      const event = send(h, cardKey, key, init); h.view.onSpaceKeyUp();
+      assert.equal(event.defaultPrevented, false, `${why}: ${key} ${JSON.stringify(init)} left alone`);
+    }
+    assert.deepEqual(rec.calls, [], `${why}: nothing ran`); assert.deepEqual(rec.ids, []);
+  };
+  h.view.noteLoad = {}; none('notes loading'); h.view.noteLoad = null;
+  h.view.presentation = { order: [], currentId: 'x' }; none('presenting'); h.view.presentation = null;
+  // Picture-book structure lock: adding and removing stop; rename and fold still run.
+  h.view.bookLock = () => ({ ai: false, structure: true });
+  for (const [key, init] of [['Enter', { ctrlKey: true }], ['Enter', { shiftKey: true }], ['Delete', {}]]) assert.equal(send(h, 'leaf', key, init).defaultPrevented, false, `book lock: ${key}`);
+  assert.deepEqual(rec.calls, [], 'book lock: nothing added or removed'); delete h.view.bookLock;
+  assert.deepEqual(rec.ids, [], 'book lock: Mod/Shift+Enter do not fall through to Rename'); assert.equal(h.view.inlineName, null, 'book lock: no title field opened');
+  // Not offered at all: Alt+arrow on a root, Space on a leaf, F2 / Enter on a card without a read note.
+  assert.equal(send(h, 'root', 'ArrowDown', { altKey: true }).defaultPrevented, false, 'a root has no sibling order to change');
+  assert.equal(send(h, 'leaf', ' ', { code: 'Space' }).defaultPrevented, false, 'a leaf has nothing to fold'); h.view.onSpaceKeyUp();
+  h.view.notes.delete(h.ids.leaf);
+  for (const key of ['F2', 'Enter']) assert.equal(send(h, 'leaf', key).defaultPrevented, false, `${key} without a note`);
+  assert.deepEqual(rec.calls, []);
+});
+
+test('B10: a merging card refuses Delete and Alt+arrow without taking the key; one merge Notice per press', async () => {
+  const h = await harness();
+  const rec = recordHost(h);
+  h.view.mergeDrafts.tasks.set(MAP, { mapPath: MAP, sources: [{ id: h.ids.leaf }], controller: new AbortController() });
+  const before = h.Notice.all.length;
+  assert.equal(send(h, 'leaf', 'Delete').defaultPrevented, false);
+  assert.equal(send(h, 'leaf', 'Delete', { repeat: true }).defaultPrevented, false);
+  assert.equal(send(h, 'leaf', 'ArrowUp', { altKey: true }).defaultPrevented, false);
+  assert.deepEqual(rec.calls, []);
+  assert.deepEqual(h.Notice.all.slice(before).map(n => String(n.message)), ['Merging; try again when it finishes', 'Merging; try again when it finishes'], 'the held repeat adds no Notice');
+});
+
+test('B10: keys in a field inside the card, during IME composition, or with focus off the card are never taken', async () => {
+  const h = await harness();
+  const rec = recordHost(h);
+  const keys = [['Enter', { ctrlKey: true }, 'leaf'], ['Enter', { shiftKey: true }, 'leaf'], ['Enter', {}, 'leaf'], ['F2', {}, 'leaf'], ['Delete', {}, 'leaf'], ['Backspace', {}, 'leaf'], [' ', { code: 'Space' }, 'branch'], ['ArrowDown', { altKey: true }, 'leaf']];
+  const input = element('input');
+  for (const [key, init, cardKey] of keys) {
+    assert.equal(send(h, cardKey, key, { ...init, target: input }).defaultPrevented, false, `field: ${key}`); h.view.onSpaceKeyUp();
+    assert.equal(send(h, cardKey, key, { ...init, isComposing: true }).defaultPrevented, false, `IME: ${key}`); h.view.onSpaceKeyUp();
+  }
+  assert.equal(h.view.inlineName, null, 'no title field opened');
+  // The view scope: IME, a field in the card, the map chat or another pane (anything but the card itself) pass on.
+  const doc = { activeElement: h.card('leaf') }; h.view.contentEl.ownerDocument = doc;
+  for (const [mods, key] of [[['Mod'], 'Enter'], [['Shift'], 'Enter'], [[], 'F2']]) {
+    doc.activeElement = h.card('leaf');
+    assert.equal(scopeKey(h, mods, key).func({ key, isComposing: true, defaultPrevented: false }, {}), true, `scope IME: ${key}`);
+    for (const other of [input, element('div')]) {
+      doc.activeElement = other;
+      assert.equal(scopeKey(h, mods, key).func({ key, isComposing: false, defaultPrevented: false }, {}), true, `scope off the card: ${mods.join('+')}${key}`);
+    }
+  }
+  assert.deepEqual(rec.calls, []); assert.deepEqual(rec.ids, []);
 });

@@ -4,6 +4,7 @@ import type { LivingValidity } from "./living-node-execution";
 
 const REASON_KEYS: Record<string, TranslationKey> = {
   "source-replaced": "ui.living_node_source_replaced",
+  "map-file-source": "ui.living_node_reason_map_file",
   "upstream-trial": "ui.living_node_upstream_trial",
   "missing-source": "ui.living_node_reason_missing_source",
   "dependency-blocked": "ui.living_node_reason_dependency",
@@ -33,6 +34,7 @@ export function livingFailureCode(error: unknown): string {
   if (/^(stale-base|changed-knowledge|stale-or-cancelled-write|changed-[a-z-]+)$/.test(code)) return "source-changed";
   if (/^(ambiguous-living-node-region|invalid-generation|invalid-receipts|unknown-ownership)$/.test(code))
     return "markers-damaged";
+  if (code === "map-file-source") return code;
   if (/^(unauthorized-source|missing-source|invalid-source)$/.test(code)) return "missing-source";
   if (/^(cancelled|living-node-busy.*|missing-or-locked-target|missing-target|locked-target|empty-prompt)$/.test(code))
     return "failed";

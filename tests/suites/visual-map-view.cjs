@@ -127,7 +127,7 @@ integrationTest('a topic waiting in a research batch shows a scheduled frame and
   assert.equal(card.dataset.status, 'idea'); assert.equal(all(card, item => item.cls === 'vam-status vam-status-queued').length, 0);
 });
 // B15 (P1.6c): an outline reveal is read-only navigation, like a search hit (V3.3 decision #7): it never writes collapse.
-integrationTest('outline reveal selects the topic without writing collapse, centers on the top collapsed ancestor, and reports unknown paths', async () => {
+integrationTest('outline reveal selects the topic without writing collapse, centers on the topic (opened for the view only), and reports unknown paths', async () => {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const root = node('root'), child = node('child'), leaf = node('leaf');
   child.parentId = root.id; leaf.parentId = child.id; root.collapsed = true; child.collapsed = true;
@@ -143,7 +143,7 @@ integrationTest('outline reveal selects the topic without writing collapse, cent
   assert.equal(changes, 0, 'no map change'); assert.equal(saves, 0, 'the camera move is not saved');
   assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0);
   assert.equal(active.at(-1), 'leaf.md', 'the outline is told the active topic');
-  assert.deepEqual(plain(doc.viewport), { x: 400 - (root.x + 140), y: 300 - (root.y + 80), zoom: 1 }, 'centered on the top collapsed ancestor');
+  assert.deepEqual(plain(doc.viewport), { x: 400 - (leaf.x + 140), y: 300 - (leaf.y + 80), zoom: 1 }, 'centered on the topic itself'); // B14: P1.6 reveal only temporarily opens the branch for the view
   view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');
   assert.deepEqual([...view.selection.state.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selection.state.selected, null);
@@ -1633,7 +1633,7 @@ integrationTest('Select subtopics: shown in the More list only for an unfolded c
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
     const more = tools.children.find(child => child.tag === 'button' && child.classes.has('vam-card-tool-more'));
     const items = [];
-    fixture.view.newMenu = () => { const menu = { addItem(cb) { const entry = { setTitle(title) { entry.title = title; return entry; }, setIcon() { return entry; }, onClick(fn) { entry.click = fn; return entry; } }; cb(entry); items.push(entry); return menu; }, addSeparator() { return menu; }, showAtPosition() {} }; return menu; };
+    fixture.view.newMenu = () => { const menu = { addItem(cb) { const entry = { setTitle(title) { entry.title = title; return entry; }, setIcon() { return entry; }, setWarning() { return entry; }, onClick(fn) { entry.click = fn; return entry; } }; cb(entry); items.push(entry); return menu; }, addSeparator() { return menu; }, showAtPosition() {} }; return menu; };
     if (more) { more.getBoundingClientRect = () => ({ left: 0, bottom: 0 }); more.handlers.get('click')({ stopPropagation() {} }); }
     return { fixture, items, hasMore: !!more };
   };
@@ -1867,7 +1867,7 @@ function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [], opened = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
   const Notice = class { constructor(message) { notices.push(message); } };
-  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; } };
+  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, setWarning: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('experiences/visual-map/view.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
@@ -4504,9 +4504,28 @@ test('bug bash #12: a tool row wider than the whole visible canvas wraps and eve
 });
 integrationTest('C5: the map commands apply only to an active map view (topic ones only with a selected card, editing ones never in a presentation) and run the same actions as the card tools', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const tuples = [...source.matchAll(/\["(map-[a-z-]+)", "(ui\.command_map_[a-z_]+)", "([a-z-]+)"\]/g)].map(m => [m[1], m[2], m[3]]);
-  assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
-  assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(action, checking\) \?\? false/, 'no map view: the command does not apply');
+  // main.ts registers the card action list's palette commands (B05): [id, name key, mapCommand action].
+  const { CARD_COMMANDS, commandTitleKey } = load('experiences/visual-map/card-actions.ts', { obsidian });
+  const tuples = CARD_COMMANDS.map(entry => [entry.commandId, commandTitleKey(entry.action), entry.mapAction]);
+  assert.ok(tuples.every(([id]) => /^map-[a-z-]+$/.test(id)), 'ids as before');
+  // The names are the card action list's (ticket 05): the same as the card ⋯ and right-click.
+  assert.deepEqual(JSON.parse(JSON.stringify(tuples.map(([id, key]) => [id, key]))), [
+    ['map-add-topic', 'ui.command_map_add_topic'],
+    ['map-add-subtopic', 'ui.card_menu_add_child'],
+    ['map-add-sibling', 'ui.card_menu_add_sibling'],
+    ['map-ai-explore-selected', 'ui.ai_explore'],
+    ['map-rename-selected', 'ui.shortcut_rename'],
+    ['map-open-selected-details', 'ui.card_menu_open_note'],
+    ['map-toggle-collapse-selected', 'ui.card_menu_collapse'],
+    ['map-focus-branch', 'ui.focus_branch'],
+    ['map-zoom-to-fit', 'ui.command_map_zoom_fit'],
+    ['map-zoom-reset', 'ui.command_map_zoom_reset'],
+    ['map-search', 'ui.command_map_search'],
+    ['map-keyboard-shortcuts', 'ui.command_map_shortcuts']
+  ]);
+  assert.ok(tuples.length >= 6 && tuples.length <= 12, `${tuples.length} map commands`);
+  assert.match(source, /for \(const \{ commandId, mapAction, action \} of CARD_COMMANDS\)/, 'main.ts registers the list');
+  assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(mapAction, checking\) \?\? false/, 'no map view: the command does not apply');
   const { translate } = load('i18n.ts');
   for (const [, key] of tuples) for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(translate(language, key) && translate(language, key) !== key, `${language} ${key}`);
   const { view } = selectionView(load, {}, { ...obsidian, Modal: class { open() { this.opened = true; } close() {} } });
@@ -4521,23 +4540,55 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.zoomBy = factor => calls.push(['zoom', factor]);
   view.openMapSearch = () => calls.push(['search']);
   view.openKeyboardShortcuts = () => calls.push(['keys']);
+  view.enterBranchFocus = id => calls.push(['focus', id]);
   view.viewportEl = view.viewportEl ?? dom.element('div');
   const actions = tuples.map(t => t[2]);
   view.selection.setSelected(null);
   const none = Object.fromEntries(actions.map(action => [action, view.mapCommand(action, true)]));
-  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
+  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'focus-branch': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
   assert.deepEqual(calls, [], 'checking runs nothing');
   view.selection.setSelected('c'); assert.equal(view.mapCommand('toggle-collapse', true), false, 'a card with no subtopics');
-  const target = view.map.nodes.find(node => node.parentId);
+  assert.equal(view.mapCommand('focus-branch', true), false, 'B13: a card with no subtopics has no branch to focus');
+  const target = view.map.nodes.find(node => node.parentId && view.map.nodes.some(child => child.parentId === node.id));
+  assert.ok(target, 'the fixture has a subtopic with subtopics');
   view.selection.setSelected(target.id);
   for (const action of actions) assert.equal(view.mapCommand(action, false), true, action);
-  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
+  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['focus', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
   view.presentation = { order: [], currentId: 'x' };
   for (const action of ['add-topic', 'rename', 'search', 'toggle-collapse']) assert.equal(view.mapCommand(action, true), false, `presentation: ${action}`);
   view.presentation = null;
   view.selection.toggleMultiSelect(); assert.equal(view.mapCommand('toggle-collapse', true), false, 'selection mode: toggle-collapse'); view.selection.toggleMultiSelect();
   view.map = null;
   for (const action of actions) assert.equal(view.mapCommand(action, true), false, `no map: ${action}`);
+});
+integrationTest('C5: the map commands write nothing while the notes load or the picture book locks the card (decision #35); reading and zoom stay', () => {
+  const { view } = selectionView(load, {}, { ...obsidian, Modal: class { open() { this.opened = true; } close() {} } });
+  const calls = [];
+  view.enqueue = work => work();
+  view.addNode = parent => { calls.push(['add', parent?.id ?? null]); };
+  view.openTopicChat = node => calls.push(['ai', node.id]);
+  view.startCardTitleEdit = node => calls.push(['rename', node.id]);
+  view.toggleCollapsed = node => calls.push(['collapse', node.id]);
+  view.openDetails = node => calls.push(['details', node.id]);
+  view.viewportEl = view.viewportEl ?? dom.element('div');
+  const target = view.map.nodes.find(node => node.parentId);
+  view.selection.setSelected(target.id);
+  const writes = ['add-topic', 'add-subtopic', 'add-sibling', 'ai-explore', 'rename', 'toggle-collapse'];
+  for (const action of writes) assert.equal(view.mapCommand(action, true), true, `before: ${action}`);
+  view.noteLoad = {};
+  for (const action of writes) {
+    assert.equal(view.mapCommand(action, true), false, `notes loading: ${action} is not offered`);
+    assert.equal(view.mapCommand(action, false), false, `notes loading: ${action} does not run`);
+  }
+  assert.deepEqual(calls, [], 'nothing ran while the notes load');
+  for (const action of ['open-details', 'zoom-fit', 'shortcuts']) assert.equal(view.mapCommand(action, true), true, `notes loading: ${action} stays`);
+  view.noteLoad = null;
+  view.bookLock = () => ({ ai: true, structure: false });
+  assert.equal(view.mapCommand('ai-explore', true), false, 'book AI lock: no AI explore');
+  assert.equal(view.mapCommand('add-subtopic', true), true, 'book AI lock: adding stays');
+  view.bookLock = () => ({ ai: false, structure: true });
+  for (const action of ['add-topic', 'add-subtopic', 'add-sibling']) assert.equal(view.mapCommand(action, true), false, `book structure lock: ${action}`);
+  assert.equal(view.mapCommand('ai-explore', true), true, 'book structure lock: AI explore stays');
 });
 integrationTest('C5: Keyboard shortcuts lists the map keys (Mod reads ⌘ on macOS, Ctrl elsewhere) and is in the More mind map actions menu', () => {
   const { MAP_KEYBOARD_SHORTCUTS, shortcutLabel } = load('ui/modals/keyboard-shortcuts-modal.ts', { obsidian: { ...obsidian, Platform: { isMacOS: false } } });

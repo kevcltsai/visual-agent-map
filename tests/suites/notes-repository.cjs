@@ -266,6 +266,19 @@ integrationTest('managed references stay outside Detail and preserve user-author
   assert.match(contents.get(n.path), /User content/); assert.equal((await repo.readNote(n.path)).detail, 'New detail');
   assert.ok(app.vault.getAbstractFileByPath(mapPath));
 });
+integrationTest('user paragraphs after the references block stay byte-identical and outside Preview on rebuild', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  await repo.createMap('Map A', [n]);
+  await repo.rebuildDerivedData();
+  const trailing = 'My own paragraph after references.\n\n- my list item\n\nLast **user** line.';
+  contents.set(n.path, `${contents.get(n.path).trimEnd()}\n\n${trailing}\n`);
+  await repo.rebuildDerivedData();
+  const text = contents.get(n.path);
+  assert.ok(text.includes(trailing), text);
+  assert.doesNotMatch(text, /^> .*My own paragraph/m);
+  await repo.rebuildDerivedData();
+  assert.equal(contents.get(n.path), text);
+});
 integrationTest('a note cannot belong to two maps', async () => {
   const { repo } = fixture(); const n = await topicNote(repo, 'shared');
   await repo.createMap('One', [n]); await repo.createMap('Two', [n]);

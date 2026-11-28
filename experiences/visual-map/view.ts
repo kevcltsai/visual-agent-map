@@ -796,6 +796,45 @@ function isEditableTarget(target: unknown): boolean {
 }
 
 /** A copy of `node` without any AIM field: what an old AIM map shares. */
+/**
+ * Puts what a reply's staged card changes did (`base` to `final`) on `target`, a map that others have changed since `base`:
+ * new cards are added (a missing parent fails it), and a field a staged change moved is set where the card still has the
+ * value it had in `base`. What the others changed stays.
+ */
+function applyStagedDelta(target: MapDocument, base: MapDocument, final: MapDocument): void {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  const baseNodes = new Map(base.nodes.map(node => [node.id, node]));
+  const nodes = new Map(target.nodes.map(node => [node.id, node]));
+  for (const node of final.nodes) {
+    const was = baseNodes.get(node.id);
+    const now = nodes.get(node.id);
+    if (!was) {
+      if (now) continue;
+      if (node.parentId && !nodes.has(node.parentId)) throw new Error("changed-target");
+      const added = clone(node);
+      target.nodes.push(added);
+      nodes.set(added.id, added);
+      continue;
+    }
+    if (!now) continue;
+    const fields = now as unknown as Record<string, unknown>;
+    const from = was as unknown as Record<string, unknown>;
+    const to = node as unknown as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+      if (same(from[key], to[key]) || !same(fields[key], from[key])) continue;
+      if (key in to) fields[key] = clone(to[key]);
+      else delete fields[key];
+    }
+  }
+  const fields = target as unknown as Record<string, unknown>;
+  const from = base as unknown as Record<string, unknown>;
+  const to = final as unknown as Record<string, unknown>;
+  for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+    if (key === "nodes" || key === "viewport" || same(from[key], to[key]) || !same(fields[key], from[key])) continue;
+    if (key in to) fields[key] = clone(to[key]);
+    else delete fields[key];
+  }
+}
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
   delete copy.aimKind;
@@ -1580,7 +1619,15 @@ export class VisualAgentMapView extends ItemView {
    * While a reply that adds many cards is applied, its card writes (`on`) change the map in memory only; {@link flushChatMapBatch}
    * then writes the lot to Map.md as one map transaction. `base` is the map as it was before the first staged change.
    */
-  private chatMapBatch: { on: boolean; base: MapDocument | null; created: string[] } | null = null;
+  private chatMapBatch: {
+    on: boolean;
+    base: MapDocument | null;
+    created: string[];
+    /** Where the batch began: the map it belongs to, and the place in the reply's history group its one entry goes back to. */
+    path: string;
+    mapId: string;
+    historyAt: number;
+  } | null = null;
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
   private chatWorkspaceEl: HTMLElement | null = null;
@@ -6664,24 +6711,31 @@ export class VisualAgentMapView extends ItemView {
     const created = batch.created;
     batch.base = null;
     batch.created = [];
+    // Another map is open now (or the view is gone): the staged cards belong to the one the reply began on, and the open map
+    // is not touched, so the whole batch fails.
+    if (this.closed || this.path !== batch.path || this.map.id !== batch.mapId) throw new Error("changed-target");
     const final = clone(this.map);
     const viewport = clone(this.map.viewport);
     const mapPath = this.path;
-    this.adoptSavedMap(base);
-    const tx = this.beginMapTransaction();
-    for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
     const structure = (doc: MapDocument): string => JSON.stringify({ ...doc, viewport: null });
     try {
+      // The map goes back to what is stored (the reply's start, or what another write made of it meanwhile), so the
+      // transaction's outside-edit check does not open the conflict window over the staged cards.
+      const disk = await this.plugin.repo.readMap(mapPath);
+      this.adoptSavedMap(disk);
+      const tx = this.beginMapTransaction();
+      for (const path of created) tx.create(path, this.plugin.repo.topicFolder(mapPath, "Unassigned"), base.id);
       const entry = await tx
         .editMap(mapPath, map => {
-          if (structure(map) !== structure(base)) throw new Error("changed-target");
-          const target = map as unknown as Record<string, unknown>;
-          for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
-          Object.assign(target, final);
+          if (structure(map) === structure(base)) {
+            const target = map as unknown as Record<string, unknown>;
+            for (const key of Object.keys(target)) if (!(key in final)) delete target[key];
+            Object.assign(target, final);
+          } else applyStagedDelta(map, base, final);
           map.viewport = clone(viewport);
         })
         .commit({ deferRebuild: true });
-      this.history.push(entry);
+      this.history.pushAt(entry, batch.historyAt);
     } catch (error) {
       this.render();
       throw error;
@@ -6718,8 +6772,15 @@ export class VisualAgentMapView extends ItemView {
     const staging = this.chatMapBatch;
     if (staging?.on && !attachment && !authorize) {
       const map = this.map;
+      // Another map is open now: the staged cards stay out of it (the flush fails the batch).
+      if (staging.base && (this.path !== staging.path || map.id !== staging.mapId)) throw new Error("changed-target");
       const snapshot = clone(map);
-      staging.base ??= snapshot;
+      if (!staging.base) {
+        staging.base = snapshot;
+        staging.path = this.path;
+        staging.mapId = snapshot.id;
+        staging.historyAt = this.history.groupSize;
+      }
       const graph = (doc: MapDocument): string =>
         JSON.stringify(doc.nodes.map(node => [node.id, node.path, node.parentId]).sort());
       try {
@@ -24621,7 +24682,8 @@ export class VisualAgentMapView extends ItemView {
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     // A reply that adds many cards writes them to Map.md once: the card writes (and the layout after them) are staged in
     // memory and written as one transaction before anything else writes, or at the end.
-    const stage = adds > 0 && batched && !scope ? { on: false, base: null, created: [] } : null;
+    const stage =
+      adds > 0 && batched && !scope ? { on: false, base: null, created: [], path: "", mapId: "", historyAt: 0 } : null;
     const staged: { index: number; label: string; ids: string[] }[] = [];
     this.chatMapBatch = stage;
     const settleStaged = async (): Promise<void> => {

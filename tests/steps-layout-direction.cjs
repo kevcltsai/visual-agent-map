@@ -560,4 +560,64 @@ test('E2-y: one card still writes Map.md once', async () => {
   assert.equal(h.view.map.nodes.length, tree4.length + 1);
 });
 
+// Runs `during` right after the nth card note of a reply is made (the reply is mid-batch then).
+const afterNthCard = (h, nth, during) => {
+  const original = h.repo.createNote.bind(h.repo);
+  let count = 0;
+  h.repo.createNote = async (...args) => {
+    const made = await original(...args);
+    if (++count === nth) await during();
+    return made;
+  };
+};
+
+test('E2-y: 6 cards with summaries: one Undo takes all back (notes still there while summaries are undone), Redo brings them back in order', async () => {
+  const h = await harness(tree4);
+  const before = await h.saved();
+  const acts = kidsOf(h, 6).map((a, i) => ({ ...a, summary: `S${i}` }));
+  const lines = await chatApply(h, acts);
+  assert.equal(lines.filter(line => line.status === 'failed').length, 0);
+  assert.equal((await h.saved()).nodes.length, before.nodes.length + 6);
+  await h.view.travel(false);
+  assert.equal((await h.saved()).nodes.length, before.nodes.length, 'undo returns the map');
+  await h.view.travel(true);
+  const after = await h.saved();
+  assert.equal(after.nodes.length, before.nodes.length + 6, 'redo brings the cards back');
+  const kid = after.nodes.find(n => n.id === h.view.map.nodes.find(m => m.path === after.nodes.at(-1).path).id);
+  assert.equal((await h.repo.readNote(kid.path)).summary.length > 0, true, 'and their summaries');
+});
+
+test('E2-y: the map changes under the reply (another map opens): the open map and its Map.md are not written, the batch is reported failed', async () => {
+  const h = await harness(tree4);
+  const writes = countMapWrites(h);
+  const disk = JSON.stringify(await h.saved());
+  const other = { id: 'map-other', title: 'Other', version: 1, nodes: [{ id: 'o1', parentId: null, path: 'o1.md', x: 0, y: 0 }], viewport: { x: 0, y: 0, zoom: 1 } };
+  const otherJson = JSON.stringify(other);
+  afterNthCard(h, 3, async () => { h.view.path = 'Agent Workspace/Topics/map-other/Map.md'; h.view.map = other; });
+  const lines = await chatApply(h, kidsOf(h, 8));
+  assert.equal(writes.n, 0, 'no write of the old map');
+  assert.equal(JSON.stringify(await h.saved()), disk, 'the old map is as it was');
+  assert.equal(JSON.stringify(h.view.map), otherJson, 'the open map keeps its own content');
+  assert.ok(lines.some(line => line.status === 'failed'), 'the batch is reported');
+});
+
+test('E2-y: another write of Map.md during the batch is kept: the staged cards are put on it, one write, no conflict window', async () => {
+  const h = await harness(tree4);
+  const root = h.named('Root');
+  const extra = await h.repo.createNote('Elsewhere', 'gpt-6-luna', { id: 'map-d', title: 'Direction', version: 1, nodes: [] }, MAP, 'workspace');
+  Object.assign(extra, { parentId: root.id, x: 1360, y: 600 });
+  afterNthCard(h, 3, async () => {
+    const doc = await h.repo.readMap(MAP);
+    doc.nodes.push(extra);
+    await h.view.app.vault.process(h.view.app.vault.getAbstractFileByPath(MAP), () => support.core.serializeMap(doc));
+  });
+  const lines = await chatApply(h, kidsOf(h, 6));
+  assert.equal(lines.filter(line => line.status === 'failed').map(line => line.text).join('|'), '');
+  const saved = await h.saved();
+  assert.equal(saved.nodes.length, tree4.length + 1 + 6, 'their card and the six');
+  assert.ok(saved.nodes.some(n => n.id === extra.id));
+  assert.ok(h.view.map.nodes.some(n => n.id === extra.id), 'the screen shows their card too');
+  assert.equal(h.view.map.nodes.length, saved.nodes.length);
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

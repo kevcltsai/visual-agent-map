@@ -4050,12 +4050,13 @@ integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops hal
   let asked = 0; const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 8 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))], {}, () => ++asked < 6);
   assert.ok(lines.some(l => l.status === 'skipped')); assert.equal(counts.rebuild, 1);
 });
-integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch still raises the conflict window, once, and the batch goes on', async () => {
+integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch is kept (no conflict window: the staged cards are put on it) and the batch goes on', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
   const createNote = h.repo.createNote.bind(h.repo);
   h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
   const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
-  assert.equal((h.control.modals ?? []).length, 1, 'the conflict window was asked once'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+  assert.equal((h.control.modals ?? []).length, 0, 'no conflict window: the staged cards are put on their version'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
+  assert.equal((await h.repo.readMap(MAP)).title, 'Edited outside', 'their change is kept'); assert.equal((await h.repo.readMap(MAP)).nodes.length, 8);
 });
 
 

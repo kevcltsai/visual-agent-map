@@ -738,6 +738,19 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     }
     this.future = [];
   }
+  /** How many entries the open group holds now (0 when none is open): a place to put a later entry back to with {@link pushAt}. */
+  get groupSize(): number {
+    return this.grouped?.length ?? 0;
+  }
+  /** Like {@link push}, but an entry that joins the open group goes at `index` (so undo, which runs the group backwards, reaches it later). */
+  pushAt(entry: T, index: number): void {
+    if (this.grouped && this.owning > 0) {
+      this.grouped.splice(Math.min(Math.max(index, 0), this.grouped.length), 0, entry);
+      this.future = [];
+      return;
+    }
+    this.push(entry);
+  }
   /** Forgets the step redo would bring back (one cancelled for good, so redo must not replay it). */
   dropRedo(): void {
     this.future.pop();

@@ -686,6 +686,7 @@ export const en = {
   "ui.map_search_label": "Search topics",
   "ui.map_search_count_0": "{0} matches",
   "ui.map_search_none": "No matches",
+  "ui.search_temp_open": "Opened for search",
   "ui.map_search_position_0_1_2": "{0}/{1}: {2}",
   "ui.map_search_close": "Close search",
   "ui.presentation_start": "Start presentation",

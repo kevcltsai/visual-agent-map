@@ -431,7 +431,8 @@ test('card actions: the view builds the context next to mapCommand; the palette,
   const selectionStart = view.indexOf('  private renderSelectionBar('), selectionEnd = view.indexOf("  /** The dialog's choices for each child's research");
   assert.ok(selectionStart > 0 && selectionEnd > selectionStart);
   assert.equal(count(view.slice(selectionStart, selectionEnd)), 2, 'B09: the bar and its ⋯');
-  assert.equal(count(view), 4, 'no other entry reads the registry yet');
+  assert.equal(count(body('private cardKeyAction')), 1, 'B10: the map keys (cardKeyAction)');
+  assert.equal(count(view), 5, 'the fifth is B10\'s key entry, cardKeyAction; no other entry reads the registry yet');
   assert.equal((view.match(/CARD_ACTIONS/g) ?? []).length, 0);
   assert.match(body('private openCardMoreMenu'), /this\.addCardActions\(menu, "more", node\)/);
   assert.match(body('private addCardMenuActions'), /this\.addCardActions\(menu, "context", node,/);

@@ -23082,10 +23082,12 @@ export class VisualAgentMapView extends ItemView {
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    // A continuous pan or zoom writes Map.md once, after it stops; closing, switching maps and unload flush it at once.
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
       this.queueViewportWrite();
-    }, 250);
+    }, 500);
+    this.plugin.viewportsPending?.add(this);
   }
   /** A viewport write skips the re-read of every note; saves that arrive while one waits in the queue join it. */
   private queueViewportWrite(): void {
@@ -23110,14 +23112,20 @@ export class VisualAgentMapView extends ItemView {
     this.viewportTimer = null;
     await this.persistViewport();
   }
+  /** Unload: a pan or zoom still in its debounce, or queued behind other work, is written now. */
+  flushViewportOnUnload(): void {
+    if (this.viewportTimer === null && !this.viewportQueued) return;
+    if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    void this.persistViewport().catch(() => undefined);
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
+    this.plugin.viewportsPending?.delete(this);
     if (!this.map || !this.path) return;
     const path = this.path;
     const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };
-    const written = await this.plugin.repo.updateMap(path, map => {
-      map.viewport = viewport;
-    });
+    const written = await this.plugin.repo.updateViewport(path, viewport);
     // A late write for the previous map must not stamp the newly opened map.
     if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.

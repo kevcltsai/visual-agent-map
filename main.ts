@@ -272,6 +272,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
   private unloaded = false;
   /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
+  /** Map views with a pan or zoom not yet written (waiting for the debounce or queued); unload sends them at once. */
+  readonly viewportsPending = new Set<{ flushViewportOnUnload(): void }>();
   readonly researchProgress = new ResearchProgressStore();
   /** Owns the background chart queue. Every port is read on use: tests and onload replace these objects after construction. */
   readonly topicRuns = new TopicRuns({
@@ -2426,6 +2428,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookHighlights.dispose();
     this.readingHighlight.release();
     this.bookNotes.dispose();
+    // The last pan or zoom is not lost: it is sent now, and only that viewport write may land after dispose.
+    for (const view of [...this.viewportsPending]) view.flushViewportOnUnload();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     // A pending external-delete reconcile must not touch the disposed repo after unload.

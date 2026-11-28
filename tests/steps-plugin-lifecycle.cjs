@@ -28,6 +28,16 @@ test('unload clears the pending external reconciliation so no repo work runs aft
   assert.equal(mutated, 0, 'the 500 ms reconcile timer never fired after unload');
 });
 
+test('B viewport debounce: unload sends every pending viewport first, then releases the vault at once', () => {
+  const plugin = newPlugin();
+  const order = [];
+  plugin.repo = { dispose() { order.push('dispose'); } };
+  plugin.viewportsPending.add({ flushViewportOnUnload() { order.push('flush A'); } });
+  plugin.viewportsPending.add({ flushViewportOnUnload() { order.push('flush B'); } });
+  plugin.onunload();
+  assert.deepEqual(order, ['flush A', 'flush B', 'dispose'], 'dispose stays synchronous, after the flushes started');
+});
+
 test('one external delete batch scans the maps once, however many notes were deleted', async () => {
   const plugin = newPlugin();
   const checked = [];

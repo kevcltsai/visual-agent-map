@@ -22590,7 +22590,12 @@ export class VisualAgentMapView extends ItemView {
       group.documents.map(async (document, index) => {
         const file = vault.getAbstractFileByPath(document.path);
         if (!(file instanceof TFile)) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        return { ...document, nodeId: cited[index].id, rev: sourceRevision(await vault.read(file)) };
+        // The revision of the note as the model view (the same read topicReferenceGroup does), so a later comparison agrees.
+        return {
+          ...document,
+          nodeId: cited[index].id,
+          rev: sourceRevision(livingNoteForModel(await vault.read(file)))
+        };
       })
     );
     return { ...group, documents };

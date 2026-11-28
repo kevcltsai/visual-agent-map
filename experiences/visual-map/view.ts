@@ -18491,7 +18491,9 @@ export class VisualAgentMapView extends ItemView {
     if (!focus) return this.map?.nodes.find(n => n.id === node.id) ?? node;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
-    this.focusNode(placed);
+    // The camera follows in memory only: a saved camera would be a second Map.md write about 300 ms after the card's
+    // own (B30, one write per new card); the next pan or zoom saves it.
+    this.focusNode(placed, false);
     // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();

@@ -5771,7 +5771,7 @@ export class VisualAgentMapView extends ItemView {
         if (placed) {
           this.selection.setSelected(placed.id);
           this.render();
-          this.focusNode(placed);
+          this.focusNode(placed, false);
         }
       });
     } catch {
@@ -11529,7 +11529,7 @@ export class VisualAgentMapView extends ItemView {
       if (landed) {
         this.selection.setSelected(landed.id);
         this.render();
-        this.focusNode(landed);
+        this.focusNode(landed, false);
       }
       return;
     }
@@ -11564,7 +11564,7 @@ export class VisualAgentMapView extends ItemView {
         if (moved) {
           this.selection.setSelected(moved.id);
           this.render();
-          this.focusNode(moved);
+          this.focusNode(moved, false);
         }
         return;
       }
@@ -11625,7 +11625,7 @@ export class VisualAgentMapView extends ItemView {
     if (placed) {
       this.selection.setSelected(placed.id);
       this.render();
-      this.focusNode(placed);
+      this.focusNode(placed, false);
     }
   }
   /** The recorded source of a copy made in another map, when that map still holds exactly those topics and notes; else null. */

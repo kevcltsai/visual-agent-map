@@ -103,3 +103,41 @@ test('B30: a drop that passes a sibling re-orders the siblings, so only their pa
   for (const line of lines) assert.match(line, /Child topics: \[\[.*\/A\]\], \[\[.*\/B\]\], \[\[.*\/C\]\]/);
   assert.match(h.contents.get(root.path), /Child topics: \[\[.*\/A\]\], \[\[.*\/C\]\], \[\[.*\/B\]\]/);
 });
+
+// B31: pasting branches and importing an outline into the open map write Map.md once too (camera follows in memory).
+const clip = (...titles) => ({ format: 'vam-branch', version: 1, clipId: 'clip-b31', relations: [], nodes: titles.map((title, i) => ({ id: `c${i}`, parent: i === 0 ? null : 'c0', title, kind: 'topic', body: '' })) });
+const outlineOf = (...titles) => titles.map((title, index) => ({ index, title, level: index ? 2 : 1, parent: index ? 0 : null, line: index }));
+
+test('B31: pasting a branch of 3 cards writes Map.md once and one undo removes it', async () => {
+  const h = await harness([['Root', null, 80, 80], ['Kid', 'Root', 420, 80]]);
+  const before = h.contents.get(MAP);
+  h.view.plugin.currentModelChoice = () => ({ model: 'gpt-6-luna' });
+  h.view.selection.setSelected(h.node('Root').id);
+  h.writes.length = 0;
+  await h.view.pasteBranches(clip('P', 'P1', 'P2'), JSON.stringify(clip('P', 'P1', 'P2')));
+  await wait(400);
+  assert.equal(h.view.map.nodes.length, 5, 'three cards pasted');
+  assert.equal(h.mapWrites().length, 1, `Map.md written ${h.mapWrites().length} times`);
+  h.writes.length = 0;
+  await h.view.travel(false);
+  await wait(400);
+  assert.equal(h.view.history.canUndo, false, 'one undo step');
+  assert.deepEqual(core.parseMap(h.contents.get(MAP)).nodes, core.parseMap(before).nodes, 'undo restored the map');
+});
+
+test('B31: importing an outline of 3 cards into the open map writes Map.md once and one undo removes it', async () => {
+  const h = await harness([['Root', null, 80, 80], ['Kid', 'Root', 420, 80]]);
+  const before = h.contents.get(MAP);
+  h.view.plugin.currentModelChoice = () => ({ model: 'gpt-6-luna' });
+  h.view.outlineImportTarget = () => ({ map: 'editable' });
+  h.writes.length = 0;
+  await h.view.importOutlineIntoMap({ nodes: outlineOf('O', 'O1', 'O2'), source: null, shallowResearch: false }, { kind: 'tree' });
+  await wait(400);
+  assert.equal(h.view.map.nodes.length, 5, 'three cards imported');
+  assert.equal(h.mapWrites().length, 1, `Map.md written ${h.mapWrites().length} times`);
+  h.writes.length = 0;
+  await h.view.travel(false);
+  await wait(400);
+  assert.equal(h.view.history.canUndo, false, 'one undo step');
+  assert.deepEqual(core.parseMap(h.contents.get(MAP)).nodes, core.parseMap(before).nodes, 'undo restored the map');
+});

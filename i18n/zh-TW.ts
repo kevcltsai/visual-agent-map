@@ -1215,6 +1215,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_save_reason_ambiguous": "有多張卡片對應到同一個來源筆記",
   "ui.living_node_source_line_0_1": "來源：{0}（{1}）",
   "ui.living_node_generated_0": "產生時間：{0}",
+  "ui.living_node_trial_waiting_consent": "請在用量對話框按同意後才會開始試跑。",
   "ui.living_node_source_replaced": "來源已被取代，需重新確認",
   "ui.living_node_suppressed_dropped_0": "已略過 {0} 條你先前刪除過的觀察。",
   "ui.living_node_optional_source_unavailable": "部分心智圖級選用來源無法讀取；本次結果僅使用可取得的資料。",

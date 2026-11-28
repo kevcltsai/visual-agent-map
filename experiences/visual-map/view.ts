@@ -16517,11 +16517,17 @@ export class VisualAgentMapView extends ItemView {
                 );
                 let ready = false;
                 let started = false;
-                await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (!currentTrial()) return;
-                  started = true;
-                  ready = await trial.run(prepared.request);
-                });
+                win.setTrialWaiting(true);
+                try {
+                  await this.plugin.confirmAiUsage(prepared.model, async () => {
+                    win.setTrialWaiting(false);
+                    if (!currentTrial()) return;
+                    started = true;
+                    ready = await trial.run(prepared.request);
+                  });
+                } finally {
+                  win.setTrialWaiting(false);
+                }
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
                   // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
                   if (currentTrial() && started) {

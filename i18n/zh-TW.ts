@@ -2382,6 +2382,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.knowledge_ref_unusable": "原卡無法取用，沒有加入引用。",
   "ui.knowledge_ref_ambiguous": "有兩張圖的圖 id 相同，無法分辨原卡。",
   "ui.knowledge_ref_skipped_0": "已略過 {0} 張引用卡；引用不會被複製。",
+  "ui.synthesis_readonly": "這張圖目前唯讀，沒有整合。",
   "ui.knowledge_ref_modal_hint": "唯讀：這是原卡目前的內容。",
   "ui.knowledge_ref_export_prefix": "[引用]",
   "ui.knowledge_ref_export_unavailable": "無法取用的引用",

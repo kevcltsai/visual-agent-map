@@ -2528,6 +2528,7 @@ export const en = {
   "ui.knowledge_ref_unusable": "The original card cannot be used, so no reference was added.",
   "ui.knowledge_ref_ambiguous": "Two maps share this map id, so the original card cannot be told apart.",
   "ui.knowledge_ref_skipped_0": "{0} reference cards were skipped; references are not copied.",
+  "ui.synthesis_readonly": "This map is read-only here, so nothing was synthesized.",
   "ui.knowledge_ref_modal_hint": "Read-only: this is the original card as it is now.",
   "ui.knowledge_ref_export_prefix": "[Reference]",
   "ui.knowledge_ref_export_unavailable": "Unavailable reference",

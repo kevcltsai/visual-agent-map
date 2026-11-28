@@ -222,7 +222,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import type { ReferenceGroup } from "../../ai/reference-materials";
+import { sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -21400,7 +21400,13 @@ export class VisualAgentMapView extends ItemView {
       [...this.selection.state.multiSelected]
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
-    const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
+    const cardNames = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
+    // The read-only references hanging on the selected cards are synthesized too (P4.6): the dialog names them.
+    const refNames = this.recombinedRefs(nodes).flatMap(ref => {
+      const title = referenceTitle(this.refResolved.get(ref.id));
+      return title ? [`${t("ui.knowledge_ref_export_prefix")} ${title}`] : [];
+    });
+    const names = [...cardNames, ...refNames];
     const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
@@ -21415,7 +21421,7 @@ export class VisualAgentMapView extends ItemView {
           names,
           initialTitle:
             pending?.title ??
-            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
+            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), cardNames),
           defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
           background: this.backgroundHooks(this.selectionTaskKey()),
           fields: {
@@ -21499,6 +21505,17 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.ai_locked_notice"));
       return;
     }
+    // The result is written as a new card, so a read-only map or a source an AI merge holds refuses it before any AI call.
+    // Read-only is what the card actions call it: a presentation, or notes still loading.
+    if (this.presentation || this.notesLoading()) {
+      failed(t("ui.synthesis_readonly"));
+      return;
+    }
+    if (sources.some(node => this.isMerging(node.id))) {
+      failed(t("ui.merge_locked"));
+      return;
+    }
+    const refs = this.recombinedRefs(sources);
     const mapId = this.map.id;
     let draftContext: TaskContext | undefined;
     await this.plugin.topicRuns.startSelectionSynthesis(this, {
@@ -21513,7 +21530,7 @@ export class VisualAgentMapView extends ItemView {
       mapId,
       changed: () => this.render(),
       model: () => this.selectionModel(sources),
-      readSources: (mode, language) => this.topicReferenceGroup(sources, mode, { language }),
+      readSources: (mode, language) => this.recombinationGroup(sources, refs, mode, language),
       startProgress: model => {
         return this.startTaskProgress(this.taskProgressKey("integration"), model);
       },
@@ -21679,6 +21696,43 @@ export class VisualAgentMapView extends ItemView {
       documents
     };
   }
+  /** The visible read-only references hanging on the given cards (P4.6: they are synthesized with them). */
+  private recombinedRefs(sources: readonly Pick<MapNode, "id">[]): KnowledgeRef[] {
+    if (!this.map) return [];
+    const ids = new Set(sources.map(node => node.id));
+    return visibleKnowledgeRefs(this.map).filter(ref => ids.has(ref.parentId));
+  }
+  /**
+   * What a selection synthesis reads (P4.6): the selected cards, then the originals of their references, read from the vault
+   * now (an original that cannot be used is left out). Each document carries its card id and its note's revision, so the new
+   * card cites every original by id, path and revision. Reads only.
+   */
+  private async recombinationGroup(
+    sources: MapNode[],
+    refs: readonly KnowledgeRef[],
+    mode: "strong" | "summary",
+    language?: ContentLanguage
+  ): Promise<ReferenceGroup> {
+    const found = refs.length
+      ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO())
+      : new Map<string, RefResolution>();
+    const cited: { id: string; path: string }[] = sources.map(node => ({ id: node.id, path: node.path }));
+    for (const ref of refs) {
+      const resolved = found.get(ref.id);
+      if (resolved?.ok && !cited.some(item => item.path === resolved.notePath))
+        cited.push({ id: ref.nodeId, path: resolved.notePath });
+    }
+    const group = await this.topicReferenceGroup(cited, mode, { language });
+    const vault = this.app.vault;
+    const documents = await Promise.all(
+      group.documents.map(async (document, index) => {
+        const file = vault.getAbstractFileByPath(document.path);
+        if (!(file instanceof TFile)) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        return { ...document, nodeId: cited[index].id, rev: sourceRevision(await vault.read(file)) };
+      })
+    );
+    return { ...group, documents };
+  }
   private async saveIntegratedNode(
     title: string,
     sources: MapNode[],
@@ -21700,10 +21754,12 @@ export class VisualAgentMapView extends ItemView {
       task.state !== "applying"
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    const latest = await this.topicReferenceGroup(
+    // The references are taken again: one added or removed since the run started changes the sources, so nothing is saved.
+    const latest = await this.recombinationGroup(
       sources,
+      this.recombinedRefs(sources),
       task.options.synthesisContent === "summary" ? "summary" : "strong",
-      { language: task.options.outputLanguage }
+      task.options.outputLanguage
     );
     if (
       JSON.stringify(latest.documents) !== task.sourceContent ||
@@ -21731,7 +21787,8 @@ export class VisualAgentMapView extends ItemView {
           ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
-          sourcePaths: sources.map(source => source.path),
+          // Every note it was read from, the references' originals included.
+          sourcePaths: latest.documents.map(document => document.path),
           status: "completed",
           ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
         },

@@ -2382,6 +2382,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.knowledge_ref_unusable": "原卡无法使用，没有加入引用。",
   "ui.knowledge_ref_ambiguous": "有两张图的图 id 相同，无法分辨原卡。",
   "ui.knowledge_ref_skipped_0": "已略过 {0} 张引用卡；引用不会被复制。",
+  "ui.synthesis_readonly": "这张图目前只读，没有整合。",
   "ui.knowledge_ref_modal_hint": "只读：这是原卡当前的内容。",
   "ui.knowledge_ref_export_prefix": "[引用]",
   "ui.knowledge_ref_export_unavailable": "无法取用的引用",

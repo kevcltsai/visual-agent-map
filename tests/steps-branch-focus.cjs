@@ -212,7 +212,6 @@ test('B13-9: adding a child while focused keeps the pre-focus viewport in Map.md
   const { h, onDisk } = await focusedEdit(async h => {
     await h.view.addNode(h.view.map.nodes.find(n => n.id === h.ids.branch), 'Fresh');
   });
-  console.log('DBG', onDisk.nodes.map(n=>n.title), JSON.stringify(onDisk.viewport));
   assert.equal(onDisk.nodes.length, 6, 'the edit really reached disk (5 cards + the new child)');
   assert.deepEqual(vp(onDisk.viewport), { x: 12, y: 34, zoom: 0.9 });
 });

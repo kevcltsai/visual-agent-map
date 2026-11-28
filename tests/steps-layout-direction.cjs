@@ -430,7 +430,7 @@ test('V6: in a left map the cards a map chat reply adds (and its auto_layout) go
 });
 
 // ---- Map trial bug 2: after a reply that made cards, the new branch's root is selected (a presentation starts at 1/N) ----
-test('V7: a reply that made cards ends with the new branch root selected, also below the auto-layout threshold; Show all replaces the centring', async () => {
+test('V7: a reply that made cards ends with the new branch root selected, also below the auto-layout threshold; the view keeps its frame (no Show all)', async () => {
   for (const count of [7, 2]) {
     const h = await harness(tree4.slice(0, 1));
     const kids = Array.from({ length: count - 1 }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: 'new:r', title: `Kid${i}` }));
@@ -438,7 +438,7 @@ test('V7: a reply that made cards ends with the new branch root selected, also b
     h.view.notes = new Map(await Promise.all(h.view.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)])));
     assert.equal(h.view.map.nodes.length, count + 1);
     assert.equal(h.view.selection.state.selected, h.named('Branch').id, `${count} new cards: the branch root, not the last card`);
-    assert.equal(h.fits(), count >= 5 ? 1 : 0, `${count} new cards: Show all only after an auto layout`);
+    assert.equal(h.fits(), 0, `${count} new cards: the view is not re-framed (P2.4)`);
   }
 });
 

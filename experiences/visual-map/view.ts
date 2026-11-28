@@ -798,6 +798,10 @@ const TASK_PROGRESS_PREFIX = "vam-task:";
 const EXPORT_TARGET_SLOT = "vam-export-target";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
+/** How long the "added N cards" corner hint stays after a reply's batch. */
+const CHAT_ADDED_HINT_MS = 8000;
+/** How long a located card flashes (Locate on a chat result, resume item or the corner hint). */
+const CHAT_LOCATE_FLASH_MS = 1200;
 /** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
 const MERGE_FINDINGS_NOTICE_LIMIT = 5;
 /**
@@ -2136,6 +2140,11 @@ export class VisualAgentMapView extends ItemView {
   private coverPending = new WeakSet<HTMLImageElement>();
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
+  /** The canvas corner (zoom controls) of the last render: the "added N cards" hint is drawn there. */
+  private canvasControlsEl: HTMLElement | null = null;
+  /** After a reply added many cards: how many, and the first one Locate goes to. Kept across renders until it times out. */
+  private chatAddedHint: { mapId: string; count: number; nodeId: string } | null = null;
+  private chatAddedHintTimer: number | null = null;
   private statusBarObserver: ResizeObserver | null = null;
   private statusBarObserved: Element | null = null;
   /** While a card renders, its buttons stay out of the tab order until that card is focused. */
@@ -13584,6 +13593,8 @@ export class VisualAgentMapView extends ItemView {
           })
         : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
+    this.canvasControlsEl = controls;
+    this.renderChatAddedHint();
     const zoom = controls.createDiv("vam-zoom-controls");
     // Far left of the zoom controls; absent when the usage store could not be created.
     this.usageControl?.mount(zoom, controls);
@@ -23371,7 +23382,7 @@ export class VisualAgentMapView extends ItemView {
       },
       clearPreview: () => this.clearChatPreview(),
       refTitles: actions => this.chatRefTitles(actions),
-      actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
+      actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
       applyActions: (...args) => this.applyMapChatActions(...args),
       notesLoading: () => this.notesLoading(),
@@ -23634,11 +23645,22 @@ export class VisualAgentMapView extends ItemView {
       return { state: "empty", items: [] };
     }
   }
-  /** "Locate" on a resume item: centres the card (the camera moves in memory only, the viewport is not saved). */
+  /**
+   * "Locate" on a resume item, a result line or the corner hint: centres the card at the same zoom (the camera moves in memory
+   * only, the viewport is not saved) and flashes it once.
+   */
   private locateChatTopic(id: string): boolean {
     const node = this.map?.nodes.find(item => item.id === id);
     if (!node) return false;
     this.focusNode(node, false);
+    const card = this.cardEls.get(id);
+    if (card) {
+      card.removeClass("is-chat-located");
+      // Read once so a second Locate restarts the flash.
+      void card.offsetWidth;
+      card.addClass("is-chat-located");
+      window.setTimeout(() => card.removeClass("is-chat-located"), CHAT_LOCATE_FLASH_MS);
+    }
     return true;
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
@@ -23745,11 +23767,16 @@ export class VisualAgentMapView extends ItemView {
       else if (action.kind === "add_anchor") titles.set(`${MAP_CHAT_ANCHOR_PREFIX}${action.ref}`, action.note);
     return titles;
   }
-  private chatActionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>): string {
+  /** `selection`: the cards selected when the message was sent; an action that names no card is labelled with these. */
+  private chatActionLabel(
+    action: MapChatAction,
+    refTitles?: ReadonlyMap<string, string>,
+    selection: readonly string[] = []
+  ): string {
     const nodes = this.map?.nodes ?? [];
     const title = (id: string): string =>
       refTitles?.get(id) ?? this.notes.get(id)?.title ?? nodes.find(node => node.id === id)?.path ?? id;
-    const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
+    const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {
       case "add_child": {
         // Include the complete executable configuration in the confirmation, not merely the card title.
@@ -23855,16 +23882,16 @@ export class VisualAgentMapView extends ItemView {
                 chatResearchMode(action, this.map?.aiMode) === "quick"
                   ? "ui.map_chat_do_research_quick"
                   : "ui.map_chat_do_research_standard"
-              ) + this.chatModelSuffix(this.chatTargetModels(action.nodeIds))
+              ) + this.chatModelSuffix(this.chatTargetModels(action.nodeIds, selection))
             );
           case "expand":
             return (
               t("ui.map_chat_do_expand_0", targets(action.nodeIds)) +
-              this.chatModelSuffix(this.chatTargetModels(action.nodeIds))
+              this.chatModelSuffix(this.chatTargetModels(action.nodeIds, selection))
             );
           case "synthesize": {
-            const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
-            const models = this.chatTargetModels(ids);
+            const ids = action.nodeIds.length ? action.nodeIds : [...selection];
+            const models = this.chatTargetModels(ids, selection);
             return (
               t("ui.map_chat_do_synthesize") +
               // Several cards run on the one shared override, else the current model (see selectionModel).
@@ -23874,10 +23901,10 @@ export class VisualAgentMapView extends ItemView {
           case "merge":
             return t("ui.map_chat_do_merge_0", action.title);
           case "find_images": {
-            const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
+            const ids = action.nodeIds.length ? action.nodeIds : [...selection];
             return (
               t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "…") +
-              this.chatModelSuffix(this.chatTargetModels(ids))
+              this.chatModelSuffix(this.chatTargetModels(ids, selection))
             );
           }
         }
@@ -23946,9 +23973,9 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!this.closed) this.flushSteers(true);
   }
-  /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
-  private chatTargetModels(ids: string[]): string[] {
-    const list = ids.length ? ids : this.chatSelectionIds();
+  /** The models the named cards (else the selection sent with the message) run on, each once, from the cards the view already holds. */
+  private chatTargetModels(ids: string[], selection: readonly string[]): string[] {
+    const list = ids.length ? ids : selection;
     const models = list.map(id => this.notes.get(id)?.model || this.currentModelId());
     return [...new Set(models.length ? models : [this.currentModelId()])];
   }
@@ -24056,7 +24083,7 @@ export class VisualAgentMapView extends ItemView {
       /** The user's message; an integration in the reply takes it as its direction. */
       message?: string;
     },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths" | "bookPlan">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths" | "bookPlan" | "selectedIds">,
     alive: () => boolean = () => true,
     anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
@@ -24106,6 +24133,9 @@ export class VisualAgentMapView extends ItemView {
     // True once the reply stopped before its end (the user's Stop, or the view going away).
     let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
+    // The cards selected when the message was sent: an action that names no card works on these (a select_topics of the reply
+    // replaces them). Never the selection of now: the user may have clicked other cards while the reply or its plan waited.
+    const selection = { ids: [...(baseline.selectedIds ?? [])] };
     let wrote = false;
     // True once a create_map failed: the rest would land in the map the user is looking at, which is not what was asked.
     let noNewMap = false;
@@ -24140,14 +24170,14 @@ export class VisualAgentMapView extends ItemView {
         }
         if (verdicts && verdicts[index] !== "ok") {
           lines[index] = this.chatLine(
-            this.chatActionLabel(action, refTitles),
+            this.chatActionLabel(action, refTitles, selection.ids),
             skipped(verdicts[index] === "out" ? "ui.topic_chat_out_of_scope" : "ui.map_chat_skip_unavailable")
           );
           continue;
         }
         // The picture goes on the canvas after the search (in the background); the chain waits for it through work.canvasImage.
         if (action.kind === "place_image") {
-          const label = this.chatActionLabel(action, refTitles);
+          const label = this.chatActionLabel(action, refTitles, selection.ids);
           if (!same()) {
             stopped = true;
             lines[index] = this.chatLine(label, lost());
@@ -24165,7 +24195,7 @@ export class VisualAgentMapView extends ItemView {
           later.push(index);
           continue;
         }
-        const label = this.chatActionLabel(action, refTitles);
+        const label = this.chatActionLabel(action, refTitles, selection.ids);
         if (!same()) {
           stopped = true;
           lines[index] = this.chatLine(label, lost());
@@ -24214,6 +24244,8 @@ export class VisualAgentMapView extends ItemView {
             ? { ...action, path: `${movedRoot.to}${key.slice(movedRoot.from.length)}` }
             : action;
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
+        // The card an add_child made is the first one the run gained during it.
+        const made = run.created.length;
         try {
           // Auto-apply: no plan card stood in front of this write, so the file is copied to the backups folder first (once per chain).
           const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
@@ -24243,7 +24275,7 @@ export class VisualAgentMapView extends ItemView {
           laidOutCount = run.created.length;
           layoutDone = true;
         }
-        lines[index] = this.chatLine(label, box.outcome);
+        lines[index] = this.chatTargetLine(this.chatLine(label, box.outcome), action, run, made);
       }
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
       let arranged = false;
@@ -24267,8 +24299,8 @@ export class VisualAgentMapView extends ItemView {
               await this.mapChange(map => {
                 this.arrangeAll(map);
               }, false);
-              // A card the reply asked to look at is where the view goes; showing the whole map is only the default.
-              if (!result.actions.some(action => action.kind === "focus_topic")) this.fit();
+              // The view keeps its frame (P2.4): a corner hint says how many cards came and goes to them on request.
+              if (!result.actions.some(action => action.kind === "focus_topic")) this.showChatAddedHint(run.created);
               arranged = true;
             })
           );
@@ -24358,9 +24390,9 @@ export class VisualAgentMapView extends ItemView {
                 }
                 this.fitCards(members);
               }
-              // Show all, as after a whole layout, when only the batch was placed.
+              // The view keeps its frame here too; the corner hint points to the batch.
               if (local && !stopped && !ringed && !result.actions.some(action => action.kind === "focus_topic"))
-                this.fit();
+                this.showChatAddedHint(run.created);
             })
           );
         } catch {
@@ -24406,7 +24438,7 @@ export class VisualAgentMapView extends ItemView {
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
-      const label = this.chatActionLabel(action, refTitles);
+      const label = this.chatActionLabel(action, refTitles, selection.ids);
       let outcome: ChatOutcome;
       if (!same()) outcome = lost();
       else if (noNewMap) outcome = skipped(noNewMapReason);
@@ -24465,7 +24497,8 @@ export class VisualAgentMapView extends ItemView {
                   laterBatch,
                   asked,
                   options.work,
-                  Boolean(options.continuation)
+                  Boolean(options.continuation),
+                  selection
                 )
               : skipped("ui.map_chat_skip_parent_missing");
             if (
@@ -24493,7 +24526,7 @@ export class VisualAgentMapView extends ItemView {
           outcome = { status: "failed", reason: errorMessage(error) };
         }
       }
-      lines[index] = this.chatLine(label, outcome);
+      lines[index] = this.chatTargetLine(this.chatLine(label, outcome), action, run, run.created.length);
     }
     // What each new card was built from, judged from what this round was shown (never asked of the model).
     if (options.context) {
@@ -24522,6 +24555,20 @@ export class VisualAgentMapView extends ItemView {
     if (later.some(index => result.actions[index].kind === "run_map_action" && lines[index]?.status === "done"))
       all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
+  }
+  /**
+   * The line with the one card it is about (P2.4a), so the panel can offer "Locate": the card an add_child made (the first the run
+   * gained from `made` on), else the action's nodeId or its only nodeIds entry, a `new:` ref resolved to the card this reply made.
+   * Kept in memory only: the record does not save it.
+   */
+  private chatTargetLine(line: MapChatLine, action: MapChatAction, run: ChatRun, made: number): MapChatLine {
+    let raw: string | undefined;
+    if (action.kind === "add_child") raw = run.created[made];
+    else if ("nodeId" in action && typeof action.nodeId === "string") raw = action.nodeId;
+    else if ("nodeIds" in action && Array.isArray(action.nodeIds) && action.nodeIds.length === 1)
+      raw = action.nodeIds[0];
+    const id = raw?.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length)) : raw;
+    return id ? { ...line, nodeId: id } : line;
   }
   /** The root of the branch a reply made: its first card without a parent, else the first card it made. */
   private chatBranchRoot(run: ChatRun): MapNode | undefined {
@@ -24970,10 +25017,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The cards the AI picked last: an action with no cards named works on these, not on what the user clicked meanwhile. */
   private aiTargets: string[] | null = null;
-  private chatTargetIds(): string[] {
-    if (this.selection.state.multiSelectMode) return this.chatSelectionIds();
-    const ids = (this.aiTargets ?? []).filter(id => this.map?.nodes.some(node => node.id === id));
-    return ids.length ? ids : this.chatSelectionIds();
+  /** `selection`: the cards selected when the message was sent (see applyMapChatActions), never the selection of now. */
+  private chatTargetIds(selection: readonly string[]): string[] {
+    const known = (ids: readonly string[]): string[] => ids.filter(id => this.map?.nodes.some(node => node.id === id));
+    if (this.selection.state.multiSelectMode) return known(selection);
+    const ids = known(this.aiTargets ?? []);
+    return ids.length ? ids : known(selection);
   }
   private highlightFadeTimer: number | null = null;
   /** Forgets the departing map's AI targets and cancels its pending fade. */
@@ -24981,6 +25030,43 @@ export class VisualAgentMapView extends ItemView {
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.highlightFadeTimer = null;
     this.aiTargets = null;
+    this.hideChatAddedHint();
+  }
+  /** Shows "Added N cards · Locate ›" in the canvas corner for a while; the view itself does not move. */
+  private showChatAddedHint(created: readonly string[]): void {
+    const nodeId = created.find(id => this.map?.nodes.some(node => node.id === id));
+    if (!this.map || !nodeId) return;
+    if (this.chatAddedHintTimer !== null) window.clearTimeout(this.chatAddedHintTimer);
+    this.chatAddedHint = { mapId: this.map.id, count: created.length, nodeId };
+    const timer = window.setTimeout(() => {
+      if (this.chatAddedHintTimer === timer) this.hideChatAddedHint();
+    }, CHAT_ADDED_HINT_MS);
+    this.chatAddedHintTimer = timer;
+    this.renderChatAddedHint();
+  }
+  private hideChatAddedHint(): void {
+    if (this.chatAddedHintTimer !== null) window.clearTimeout(this.chatAddedHintTimer);
+    this.chatAddedHintTimer = null;
+    this.chatAddedHint = null;
+    this.renderChatAddedHint();
+  }
+  /** (Re)draws the hint in the corner of the last render, above the zoom controls; nothing when there is none or the map changed. */
+  private renderChatAddedHint(): void {
+    const controls = this.canvasControlsEl;
+    if (!controls) return;
+    controls.querySelector(".vam-chat-added-hint")?.remove();
+    const hint = this.chatAddedHint;
+    if (!hint || this.map?.id !== hint.mapId) return;
+    const el = controls.createDiv({ cls: "vam-chat-added-hint", attr: { role: "status" } });
+    // Shown only after a batch (MAP_CHAT_AUTO_LAYOUT_MIN_NEW or more), so the count is never one.
+    el.createSpan({ text: t("ui.map_chat_added_cards", String(hint.count)) });
+    const locate = el.createEl("button", { text: t("ui.map_chat_locate"), cls: "vam-chat-added-locate" });
+    locate.setAttr("type", "button");
+    locate.addEventListener("click", event => {
+      event.stopPropagation();
+      this.hideChatAddedHint();
+      this.locateChatTopic(hint.nodeId);
+    });
   }
   /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
   private armHighlightFade(idleSince: number | null = null): void {
@@ -25160,7 +25246,9 @@ export class VisualAgentMapView extends ItemView {
     /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
     work?: ChatRoundWork,
     /** An automatic continuation round: a picture search reads researched text and ignores the model's direction. */
-    continuation = false
+    continuation = false,
+    /** The cards selected when the message was sent (none given: none); a select_topics of the reply replaces them. */
+    selection: { ids: string[] } = { ids: [] }
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -25170,6 +25258,7 @@ export class VisualAgentMapView extends ItemView {
       const ids = action.all ? map.nodes.map(node => node.id) : known(action.nodeIds);
       if (!ids.length) return skipped("ui.map_chat_skip_topic_gone");
       this.chatSelect(ids);
+      selection.ids = ids;
       if (work) work.selected = ids;
       return { status: "done" };
     }
@@ -25185,7 +25274,7 @@ export class VisualAgentMapView extends ItemView {
     };
     const writesTargets =
       action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
-    const lockIds = targets.length ? targets : this.chatTargetIds();
+    const lockIds = targets.length ? targets : this.chatTargetIds(selection.ids);
     if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
       return skipped("ui.ai_locked_notice");
     switch (action.action) {
@@ -25224,8 +25313,9 @@ export class VisualAgentMapView extends ItemView {
         return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
       }
       case "research_standard": {
-        if (targets.length) this.chatSelect(targets);
-        else if (!this.selection.state.multiSelectMode && this.aiTargets?.length) this.chatSelect(this.chatTargetIds());
+        const researchTargets = targets.length ? targets : this.chatTargetIds(selection.ids);
+        if (!researchTargets.length) return skipped("ui.map_chat_skip_unavailable");
+        this.chatSelect(researchTargets);
         if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         // A batch already running is told in the result, not only by the Notice the research itself shows.
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))
@@ -25318,7 +25408,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done" };
       }
       case "expand": {
-        const ids = targets.length ? targets : this.chatTargetIds();
+        const ids = targets.length ? targets : this.chatTargetIds(selection.ids);
         const parents = known(ids)
           .map(id => this.map?.nodes.find(node => node.id === id))
           .filter((node): node is MapNode => !!node && !this.aiLockReason("addChild", [node.id]));
@@ -25404,9 +25494,11 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatTargetIds(), message);
+        return this.chatSynthesize(targets.length ? targets : this.chatTargetIds(selection.ids), message);
       case "merge": {
-        if (targets.length) this.chatSelect(targets);
+        const mergeIds = targets.length ? targets : this.chatTargetIds(selection.ids);
+        if (!mergeIds.length) return skipped("ui.map_chat_skip_unavailable");
+        this.chatSelect(mergeIds);
         const title = action.title.trim();
         if (!title) return skipped("ui.map_chat_skip_unavailable");
         if (this.mergeDrafts.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
@@ -25457,7 +25549,12 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done" };
       }
       case "find_images":
-        return this.chatFindImages(action.direction, targets, batch, continuation);
+        return this.chatFindImages(
+          action.direction,
+          targets.length ? targets : this.chatTargetIds(selection.ids),
+          batch,
+          continuation
+        );
     }
   }
   /**
@@ -25475,7 +25572,7 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
-    const wanted = targets.length ? targets : this.chatTargetIds();
+    const wanted = targets;
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
     const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const found = await this.chatImageFinder.find(map, chat, wanted, direction, readsResearch, batch);

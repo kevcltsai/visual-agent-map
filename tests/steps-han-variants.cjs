@@ -83,3 +83,12 @@ test('outline: no markers map, empty lists and non-whitelisted ids add nothing',
     assert.equal(rows[0].attrs['aria-label'], undefined);
   }
 });
+
+test('parent picker (matchesTitle) finds Traditional titles with a Simplified query and the other way round', () => {
+  const { matchesTitle } = load('ui/card-search-field.ts', { obsidian: { ...obsidian, AbstractInputSuggest: class {}, setIcon() {} } });
+  assert.equal(matchesTitle('圖書館計畫', '图书'), true);
+  assert.equal(matchesTitle('图书馆计划', '圖書'), true);
+  assert.equal(matchesTitle('Istanbul 圖', 'İSTANBUL'), true);
+  assert.equal(matchesTitle('圖書館', '旅'), false);
+  assert.equal(matchesTitle('anything', '   '), true, 'a blank query still lists every card');
+});

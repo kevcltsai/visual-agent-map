@@ -245,7 +245,8 @@ function inlineCode(text: string): string {
   return longest ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
 }
 
-const FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
+/** The definition text leaves out the `%%vam-src:…%%` comment after a source wikilink, so old and new formats compare alike. */
+const FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*?)(?:[ \t]*%%vam-src:[^%\n]*%%)?[ \t]*$/;
 const FOOTNOTE_REF = /\[\^([^\]\s]+)\](?!\(|:)/g;
 
 /** The footnote definitions of a text outside code: id to the definition text. */

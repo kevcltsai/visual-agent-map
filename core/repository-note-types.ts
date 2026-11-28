@@ -91,5 +91,7 @@ export interface Note extends PipelineFields {
   color?: TopicColor;
   /** From `topic-style` frontmatter, whitelisted tokens only (one text size at most); absent when there are none. */
   style?: TopicStyle[];
+  /** Written only: `research-retrieved-at`, when a Standard research last retrieved from the web (ISO, replaced each time). readNote leaves it unset. */
+  researchRetrievedAt?: string;
 }
 export type NotePatch = Partial<Note>;

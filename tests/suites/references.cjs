@@ -21,9 +21,9 @@ test('reference batches include every selected Markdown source, deduplicate over
   assert.match(one, /^src-[0-9a-z]+$/);
   assert.equal(api.resolveDetailReferences('See [[source.md]]', groups), 'See External source: /Volumes/Refs/source.md');
   // Intentional contract change: [S#] becomes a numbered footnote plus one definition, not a long [[path]] link.
-  assert.equal(api.resolveDetailReferences('Vault [S1], external [S2]', groups), 'Vault [^1], external [^2]\n\n[^1]: [[Maps/A/one.md|one]]\n[^2]: External source: /Volumes/Refs/source.md\n');
+  assert.equal(api.resolveDetailReferences('Vault [S1], external [S2]', groups), 'Vault [^1], external [^2]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:13c41861%%\n[^2]: External source: /Volumes/Refs/source.md\n');
   const namesake = [{ id: 'mixed', documents: [{ path: 'Vault/source.md', content: 'vault' }, { path: '/Volumes/Refs/source.md', external: true, content: 'external' }] }];
-  assert.equal(api.resolveDetailReferences('Vault [S1], external [S2]', namesake), 'Vault [^1], external [^2]\n\n[^1]: [[Vault/source.md|source]]\n[^2]: External source: /Volumes/Refs/source.md\n');
+  assert.equal(api.resolveDetailReferences('Vault [S1], external [S2]', namesake), 'Vault [^1], external [^2]\n\n[^1]: [[Vault/source.md|source]]%%vam-src:-:2e33365d%%\n[^2]: External source: /Volumes/Refs/source.md\n');
   assert.equal(api.resolveDetailReferences('Ambiguous [[source.md]]', namesake), 'Ambiguous Source to confirm: source.md');
   assert.equal(api.resolveDetailReferences('Exact [[Vault/source.md]]', namesake), 'Exact [[Vault/source.md]]');
   assert.equal(api.resolveDetailReferences('Unknown [S3]', namesake), 'Unknown Source to confirm: [S3]');
@@ -45,14 +45,14 @@ test('source footnotes: numbered by first use, one definition per source, placed
   const zh = '### 核心結論\n\n甲[S2]乙[S1]丙[S2]外部[S3]\n\n### 證據與來源\n\n- 文字證據\n\n### 取捨與限制\n\n限制';
   const out = api.resolveDetailReferences(zh, groups);
   assert.ok(out.includes('甲[^1]乙[^2]丙[^1]外部[^3]'));
-  assert.ok(out.includes('- 文字證據\n\n[^1]: [[Maps/B/two.md|two]]\n[^2]: [[Maps/A/one.md|one]]\n[^3]: External source: /Volumes/Refs/x.md\n\n### 取捨與限制'));
+  assert.ok(out.includes('- 文字證據\n\n[^1]: [[Maps/B/two.md|two]]%%vam-src:-:1aee8d83%%\n[^2]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n[^3]: External source: /Volumes/Refs/x.md\n\n### 取捨與限制'));
   assert.equal(out.split('[^1]:').length, 2);
   const en = api.resolveDetailReferences('### Core conclusions\n\nA[S2]\n\n### Evidence and sources\n\nnotes\n\n### Open questions\n\nq', groups);
-  assert.ok(en.includes('notes\n\n[^1]: [[Maps/B/two.md|two]]\n\n### Open questions'));
+  assert.ok(en.includes('notes\n\n[^1]: [[Maps/B/two.md|two]]%%vam-src:-:1aee8d83%%\n\n### Open questions'));
   // Absent evidence section: appended at the end.
-  assert.equal(api.resolveDetailReferences('Body[S1]', groups), 'Body[^1]\n\n[^1]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences('Body[S1]', groups), 'Body[^1]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // A definition the reply already wrote is reused, not duplicated; unused definitions are dropped.
-  assert.equal(api.resolveDetailReferences('Body[S1]\n\n[^9]: [[Maps/Z/unused.md|unused]]', groups), 'Body[^1]\n\n[^1]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences('Body[S1]\n\n[^9]: [[Maps/Z/unused.md|unused]]', groups), 'Body[^1]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   assert.equal(api.resolveDetailReferences('Body[^7]\n\n[^7]: [[Maps/A/one.md|one]]', groups), 'Body[^1]\n\n[^1]: [[Maps/A/one.md|one]]\n');
   // Summary: markers removed, no footnotes.
   assert.equal(api.resolveSummaryReferences('結論 [S1]。重點[S2] [S9] end', groups), '結論。重點 end');
@@ -69,9 +69,9 @@ test('source footnotes survive reruns: numbers stay consistent, kept references 
   const previous = 'Old[^1] and[^2]\n\n[^1]: [[Maps/Old/gone.md|gone]]\n[^2]: [[Maps/A/one.md|one]]';
   // The reply keeps [^1] and [^2] without definitions and cites one.md again as [S1] and two.md as [S2].
   const rerun = api.resolveDetailReferences('New[S2] kept[^1] again[S1] same[^2]', groups, previous);
-  assert.equal(rerun, 'New[^1] kept[^2] again[^3] same[^3]\n\n[^1]: [[Maps/B/two.md|two]]\n[^2]: [[Maps/Old/gone.md|gone]]\n[^3]: [[Maps/A/one.md|one]]\n');
+  assert.equal(rerun, 'New[^1] kept[^2] again[^3] same[^3]\n\n[^1]: [[Maps/B/two.md|two]]%%vam-src:-:1aee8d83%%\n[^2]: [[Maps/Old/gone.md|gone]]\n[^3]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // A reference after which a colon follows mid-line is still a reference.
-  assert.equal(api.resolveDetailReferences('Fact[S1]: more', groups), 'Fact[^1]: more\n\n[^1]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences('Fact[S1]: more', groups), 'Fact[^1]: more\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // A source footnote nothing can restore becomes a source to confirm; a footnote VAM does not own stays as written.
   assert.equal(api.resolveDetailReferences('C[^src-dead000]', []), 'C Source to confirm: src-dead000');
   assert.equal(api.resolveDetailReferences('C[^4]', []), 'C[^4]');
@@ -102,13 +102,13 @@ test('source footnotes leave code, links and the writer\'s own footnotes untouch
   const code = 'Match `/[^a-z]+/` here[S1].\n\n```js\nconst re = /[^0-9]/;\n[^x]: code line\n```\n\nSee [^foo](https://x.y) and ![^img](a.png).';
   const out = api.resolveDetailReferences(code, groups);
   assert.ok(out.startsWith('Match `/[^a-z]+/` here[^1].\n\n```js\nconst re = /[^0-9]/;\n[^x]: code line\n```\n\nSee [^foo](https://x.y) and ![^img](a.png).'));
-  assert.ok(out.endsWith('[^1]: [[Maps/A/one.md|one]]\n'));
+  assert.ok(out.endsWith('[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n'));
   // Without sources the resolver may still run (the detail contains "[^"); it must change nothing here.
   const plain = 'Use `[^x]` and\n\n```\n[^1]: not a footnote\n```';
   assert.equal(api.resolveDetailReferences(plain, []), plain);
   // The writer's own footnote keeps its label, text and continuation line; source numbers skip its number.
   const own = 'Claim[^1] and fact[S1].\n\n[^1]: My own note\n    continued here';
-  assert.equal(api.resolveDetailReferences(own, groups), 'Claim[^1] and fact[^2].\n\n[^1]: My own note\n    continued here\n\n[^2]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences(own, groups), 'Claim[^1] and fact[^2].\n\n[^1]: My own note\n    continued here\n\n[^2]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // canonicalDetail never moves lines out of a code block.
   const canon = canonicalDetail('### Core conclusions\n\n```\n[^x]: [[a.md|a]]\n```', 'en');
   assert.ok(canon.includes('```\n[^x]: [[a.md|a]]\n```'));
@@ -119,11 +119,11 @@ test('source footnotes never reuse the number of a footnote kept as written', ()
   const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: '' }, { path: 'Maps/B/two.md', content: '' }] }];
   // The reply kept the writer's [^2] but dropped its definition, and cites two new sources.
   const out = api.resolveDetailReferences('Claim[^2] fact[S1] other[S2]', groups, 'Claim[^2]\n\n[^2]: my own remark');
-  assert.equal(out, 'Claim[^2] fact[^1] other[^3]\n\n[^1]: [[Maps/A/one.md|one]]\n[^3]: [[Maps/B/two.md|two]]\n');
-  assert.equal(api.resolveDetailReferences('Claim[^1] fact[S1]', groups), 'Claim[^1] fact[^2]\n\n[^2]: [[Maps/A/one.md|one]]\n');
+  assert.equal(out, 'Claim[^2] fact[^1] other[^3]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n[^3]: [[Maps/B/two.md|two]]%%vam-src:-:1aee8d83%%\n');
+  assert.equal(api.resolveDetailReferences('Claim[^1] fact[S1]', groups), 'Claim[^1] fact[^2]\n\n[^2]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // A fence opened with an info string is not closed by another info-string line.
   const fenced = '```js\nx\n```js\ny\n```\n\nAfter[S1]';
-  assert.equal(api.resolveDetailReferences(fenced, groups), '```js\nx\n```js\ny\n```\n\nAfter[^1]\n\n[^1]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences(fenced, groups), '```js\nx\n```js\ny\n```\n\nAfter[^1]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:-:1aee8d83%%\n');
   // The same note written with and without ".md" shares one number.
   assert.equal(api.resolveDetailReferences('A[^7] B[S1]\n\n[^7]: [[Maps/A/one]]', groups), 'A[^1] B[^1]\n\n[^1]: [[Maps/A/one]]\n');
 });
@@ -156,7 +156,7 @@ test('resolveDetailReferences: a copied footnote one note defines becomes that s
   const ambiguous = api.resolveDetailReferences('Claim[^1] ok', docs('a[^1]\n\n[^1]: x', 'b[^1]\n\n[^1]: y'));
   assert.doesNotMatch(ambiguous, /\[\^/);
   const single = api.resolveDetailReferences('Claim[^1] ok', docs('a[^1]\n\n[^1]: x', 'b'));
-  assert.equal(single, 'Claim[^1] ok\n\n[^1]: [[Notes/N0.md|N0]]\n');
+  assert.equal(single, 'Claim[^1] ok\n\n[^1]: [[Notes/N0.md|N0]]%%vam-src:-:2cdaacfa%%\n');
   const code = api.resolveDetailReferences('Claim `[^7]`\n\n```\n[^8]\n```', docs('plain'));
   assert.equal(code, 'Claim `[^7]`\n\n```\n[^8]\n```');
 });
@@ -184,4 +184,73 @@ test('external references: same relative file under two labels gets two footnote
   assert.match(catalog, /\[S3\] Vault note \(wikilink\): docs\/x\.md/, 'a vault note with the same path is not swallowed by the external one');
   const detail = api.resolveDetailReferences('A [S1]. B [S2]. C [S3].\n\n### Sources\n', groups);
   assert.match(detail, /\[\^1\]: .*docs\/x\.md/); assert.match(detail, /\[\^2\]: .*docs#2\/x\.md/); assert.match(detail, /\[\^3\]: \[\[docs\/x\.md\|x\]\]/);
+});
+
+// V3.3 #05: a new source footnote keeps the note's node id and revision as `%%vam-src:<node-id|->:<rev8>%%`.
+test('source identity: a new definition carries the node id and the body revision; a non-VAM note writes "-"; frontmatter and line endings do not change the revision', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const vam = '---\nagent-map-node: true\nnode-id: "3f2a9c1e-0b7d-4e21-9a55-1c2d3e4f5a6b"\n---\nBody text\n';
+  const rev = api.sourceRevision(vam);
+  assert.match(rev, /^[0-9a-f]{8}$/);
+  assert.equal(api.sourceNodeId(vam), '3f2a9c1e-0b7d-4e21-9a55-1c2d3e4f5a6b');
+  assert.equal(api.sourceNodeId('Body text\n'), undefined);
+  assert.equal(api.sourceRevision('---\r\nnode-id: other\r\nupdated: 2026\r\n---\r\nBody text\r\n\r\n'), rev, 'CRLF, frontmatter and trailing blank lines are not part of the body');
+  assert.notEqual(api.sourceRevision(vam.replace('Body text', 'Body text!')), rev);
+  const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: vam }, { path: 'Notes/plain.md', content: 'Body text' }, { path: '/x/e.md', external: true, content: 'e' }] }];
+  assert.equal(api.resolveDetailReferences('A[S1] B[S2] C[S3]', groups), `A[^1] B[^2] C[^3]\n\n[^1]: [[Maps/A/one.md|one]]%%vam-src:3f2a9c1e-0b7d-4e21-9a55-1c2d3e4f5a6b:${rev}%%\n[^2]: [[Notes/plain.md|plain]]%%vam-src:-:${rev}%%\n[^3]: External source: /x/e.md\n`);
+  // A given nodeId/rev wins over the content; an id outside [A-Za-z0-9_-] is not written.
+  assert.equal(api.resolveDetailReferences('A[S1]', [{ id: 'g', documents: [{ path: 'n.md', content: 'x', nodeId: 'id-1', rev: 'abcdef01' }] }]), 'A[^1]\n\n[^1]: [[n.md|n]]%%vam-src:id-1:abcdef01%%\n');
+  assert.equal(api.resolveDetailReferences('A[S1]', [{ id: 'g', documents: [{ path: 'n.md', content: 'x', nodeId: 'a:b' }] }]), `A[^1]\n\n[^1]: [[n.md|n]]%%vam-src:-:${api.sourceRevision('x')}%%\n`);
+});
+
+test('source identity: old-format definitions read, re-research and canonicalize unchanged; the same source and revision re-run is byte-identical', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const { canonicalDetail, sourceFootnoteDefinition, withoutSourceIdentity } = load('ai/result-utils.ts', { obsidian });
+  const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: 'one' }, { path: 'Maps/B/two.md', content: 'two' }] }];
+  const fresh = `[[Maps/A/one.md|one]]%%vam-src:-:${api.sourceRevision('one')}%%`;
+  assert.deepEqual(plain(sourceFootnoteDefinition(`[^1]: ${fresh}`)), { label: '1', target: fresh });
+  assert.deepEqual(plain(sourceFootnoteDefinition('[^1]: [[Maps/A/one.md|one]]')), { label: '1', target: '[[Maps/A/one.md|one]]' });
+  assert.equal(sourceFootnoteDefinition('[^1]: [[a]]%%vam-src:bad id:1%%'), null, 'a malformed comment is the writer\'s footnote');
+  assert.equal(withoutSourceIdentity(fresh), '[[Maps/A/one.md|one]]');
+  // Old detail, re-research keeps [^1] without re-citing it: the old definition comes back as written.
+  const old = 'Old[^1] other[^2]\n\n[^1]: [[Maps/A/one.md|one]]\n[^2]: [[Maps/Gone/x.md|x]]';
+  assert.equal(api.resolveDetailReferences('Kept[^1] new[S2]', groups, old), `Kept[^1] new[^2]\n\n[^1]: [[Maps/A/one.md|one]]\n[^2]: [[Maps/B/two.md|two]]%%vam-src:-:${api.sourceRevision('two')}%%\n`);
+  // An old-format definition the reply carries is read as the same source as a fresh [S#] of that note: one number.
+  assert.equal(api.resolveDetailReferences('A[^7] B[S1]\n\n[^7]: [[Maps/A/one.md|one]]', groups), 'A[^1] B[^1]\n\n[^1]: [[Maps/A/one.md|one]]\n');
+  assert.equal(api.resolveDetailReferences(old, []), `${old}\n`, 'reading an old detail with no sources changes nothing');
+  // Idempotent: same sources, same revision.
+  const once = api.resolveDetailReferences('### Core conclusions\n\nA[S2] b[S1]\n\n### Evidence and sources\n\nnotes', groups);
+  assert.equal(api.resolveDetailReferences(once, groups, once), once);
+  assert.equal(api.resolveDetailReferences('### Core conclusions\n\nA[S2] b[S1]\n\n### Evidence and sources\n\nnotes', groups, once), once);
+  assert.ok(canonicalDetail(once, 'en').includes(`### Sources\n\nnotes\n\n[^1]: [[Maps/B/two.md|two]]%%vam-src:-:${api.sourceRevision('two')}%%\n[^2]: ${fresh}`), 'the new format joins the sources section');
+});
+
+test('source identity: compareCitation tells same, changed, relocated (found by id after a rename or move) and missing; a namesake at another path is never the source', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const note = body => `---\nnode-id: n-1\n---\n${body}`;
+  const docs = [{ path: 'Maps/A/one.md', content: note('v1') }];
+  const target = api.resolveDetailReferences('A[S1]', [{ id: 'g', documents: docs }]).split('[^1]: ')[1].trim();
+  const status = (t, documents) => api.compareCitation(t, documents)?.status;
+  assert.equal(status(target, docs), 'same');
+  assert.equal(status(target, [{ path: 'Maps/A/one.md', content: note('v2') }]), 'changed');
+  assert.equal(status(target, [{ path: 'Maps/A/one.md', content: '---\nnode-id: n-1\nupdated: x\n---\nv1' }]), 'same', 'a frontmatter edit is not a content change');
+  const moved = api.compareCitation(target, [{ path: 'Archive/renamed.md', content: note('v1') }]);
+  assert.equal(moved.status, 'relocated'); assert.equal(moved.document.path, 'Archive/renamed.md');
+  assert.equal(status(target, [{ path: 'Maps/B/one.md', content: 'v1' }]), 'missing', 'same basename at another path, no id: not the source');
+  assert.equal(status(target, [{ path: 'Maps/A/one.md', external: true, content: note('v1') }]), 'missing', 'an external file is never the vault note');
+  assert.equal(status(target, []), 'missing');
+  // Old format: no id or revision, so only the path tells.
+  assert.equal(status('[[Maps/A/one.md|one]]', docs), 'same');
+  assert.equal(status('[[Maps/A/one|one]]', docs), 'same');
+  assert.equal(status('[[Maps/A/one.md|one]]', [{ path: 'X/one.md', content: note('v1') }]), 'missing');
+  // A non-VAM note ("-") is found by path only.
+  assert.equal(status('[[Notes/p.md|p]]%%vam-src:-:00000000%%', [{ path: 'Other/p.md', content: '' }]), 'missing');
+  assert.equal(api.compareCitation('External source: /x/e.md', docs), null);
+});
+
+test('source identity: two notes with one basename at different paths get two numbers; a bare name for them stays a source to confirm', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const groups = [{ id: 'g', documents: [{ path: 'Maps/A/same.md', content: 'a' }, { path: 'Maps/B/same.md', content: 'b' }] }];
+  const out = api.resolveDetailReferences('A[S1] B[S2] C[[same]]', groups);
+  assert.equal(out, `A[^1] B[^2] C${'Source to confirm: same'}\n\n[^1]: [[Maps/A/same.md|same]]%%vam-src:-:${api.sourceRevision('a')}%%\n[^2]: [[Maps/B/same.md|same]]%%vam-src:-:${api.sourceRevision('b')}%%\n`);
 });

@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { attachTopicRuns, startResearch } = require('../support.cjs');
 const { test, integrationTest, load, core, map, plain, obsidian, DEFAULT_SETTINGS, fixture, topicNote } = require('../support.cjs');
+const { loadSource } = require('../support-replay.cjs');
 test('AI result formatting always produces the canonical knowledge structure', async () => {
   const { canonicalDetail } = load('ai/result-utils.ts', { obsidian });
   const result = canonicalDetail('New analysis');
@@ -926,6 +927,38 @@ integrationTest('Quick prompt guards: a helper request, a count repair or an int
   assert.equal(gate({ ...quickBase, mode: undefined, mapAiMode: 'quick' }), true, 'no mode means a task');
   for (const patch of [{ mapAiMode: 'standard' }, { mapAiMode: undefined }, { researchMode: 'research' }, { mode: 'synthesize' }, { countRepair: true }, { intermediateDetail: true }])
     assert.equal(gate({ ...quickBase, mapAiMode: 'quick', ...patch }), false, JSON.stringify(patch));
+});
+// V3.3 #07: both source-safety texts, in both instruction languages, carry the same evidence rules, and every task prompt
+// gets the variant of its content language whatever the UI language is (one bundle, so setUiLanguage reaches the prompt).
+integrationTest('Source safety (V3.3 #07): evidence and inference apart, counter-evidence kept in the disagreements section or the body, missing or outdated data said, style and citation format first; same rules in en and zh, Standard and Quick, for every content and UI language', () => {
+  const RULES = {
+    en: ['Keep evidence and inference apart', "carries that source's citation", 'marked as inference', 'Keep counter-evidence and unresolved contradictions', "the template's section on disagreements and limits", 'in the body if the template has no such section', 'When evidence is insufficient', 'may be outdated', 'do not state a certain conclusion', 'The note style and the source citation format take precedence over these rules'],
+    zh: ['證據與推論分開', '要附上該來源的引用', '標明是推論', '保留反證與未解的矛盾', '模板中談不同看法與限制的段落', '模板沒有這類段落時寫在正文', '不足時', '資料可能過時', '不要下確定的結論', '筆記風格與來源引用格式的規則優先於這些規則']
+  };
+  const m = loadSource(`
+export { SOURCE_SAFETY, SOURCE_SAFETY_QUICK } from "./core/steps/_shared/fragments";
+export { generalTaskPrompt } from "./core/steps/task/render";
+export { setUiLanguage, instructionLanguageOf } from "./i18n";
+`, { obsidian });
+  for (const instruction of ['en', 'zh']) for (const [name, pair] of [['standard', m.SOURCE_SAFETY], ['quick', m.SOURCE_SAFETY_QUICK]]) {
+    for (const rule of RULES[instruction]) assert.ok(pair[instruction].includes(rule), `${name}/${instruction}: ${rule}`);
+  }
+  // The existing missing-data wording stays: Standard keeps its fixed sentence, Quick still forbids invented citations.
+  assert.ok(m.SOURCE_SAFETY.en.includes("write 'Insufficient information'") && m.SOURCE_SAFETY.zh.includes('寫出「現有資料不足」'));
+  assert.ok(m.SOURCE_SAFETY_QUICK.en.includes('do not invent citations') && m.SOURCE_SAFETY_QUICK.zh.includes('不得編造引用'));
+  for (const ui of ['en', 'zh-TW', 'zh-CN']) {
+    m.setUiLanguage(ui);
+    for (const language of ['en', 'zh-TW', 'zh-CN', 'ja']) for (const provider of ['codex', 'claude']) for (const [name, patch] of [['standard', { researchMode: 'research' }], ['local', {}], ['quick', { mapAiMode: 'quick' }]]) {
+      const own = m.instructionLanguageOf(language), other = own === 'en' ? 'zh' : 'en';
+      const [chosen, unused] = name === 'quick' ? [m.SOURCE_SAFETY_QUICK, m.SOURCE_SAFETY] : [m.SOURCE_SAFETY, m.SOURCE_SAFETY_QUICK];
+      const text = m.generalTaskPrompt({ ...quickBase, ...patch, outputLanguage: language }, language, provider);
+      const where = `ui ${ui}, ${language}, ${provider}, ${name}`;
+      assert.equal(text.split(chosen[own]).length, 2, `${where}: the ${own} source-safety text once`);
+      for (const rule of RULES[other]) assert.equal(text.includes(rule), false, `${where}: no ${other} rule`);
+      assert.equal(text.includes(unused[own]), false, `${where}: not the other variant`);
+    }
+  }
+  m.setUiLanguage('en');
 });
 integrationTest('Quick research reaches the providers without any web tool; a Standard research from the dialog still hits the forced-web gate', async () => {
   const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');

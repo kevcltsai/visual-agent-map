@@ -2259,7 +2259,9 @@ export class VisualAgentMapView extends ItemView {
       ".vam-map-title-button",
       ".vam-map-switch-button",
       ".vam-new-map",
-      ".vam-zoom-controls"
+      ".vam-zoom-controls",
+      // A card's ⋯ opens while reading: every row that writes is greyed with the reason (decision #35).
+      ".vam-card-tool-more"
     ].join(", ");
     const lock = (host: ParentNode | null | undefined): void => {
       for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
@@ -2733,17 +2735,46 @@ export class VisualAgentMapView extends ItemView {
       if (start !== null && end !== null) input.setSelectionRange(start, end);
     };
   }
+  /** The last result: one keystroke asks for it several times (marks, count, announcement, step) but computes it once. */
+  private mapSearchMemo: { query: string; signature: string; notes: Note[]; result: MapSearchResult } | null = null;
+  /** Summary and Detail joined once per loaded note, so the same string is folded only once. */
+  private searchBodies = new WeakMap<Note, { summary: string; detail: string; body: string }>();
+  private searchBodyOf(note: Note | undefined): string {
+    if (!note) return "";
+    const kept = this.searchBodies.get(note);
+    if (kept && kept.summary === note.summary && kept.detail === note.detail) return kept.body;
+    const body = `${note.summary}\n${note.detail}`;
+    this.searchBodies.set(note, { summary: note.summary, detail: note.detail, body });
+    return body;
+  }
   private mapSearchResult(): MapSearchResult | null {
     if (!this.map || !this.mapSearch) return null;
     const direction = layoutOf(this.map).direction;
-    return searchMap(
+    const query = this.mapSearch.query;
+    const signature = `${direction}|${mapSignature(this.map)}`;
+    const notes = this.map.nodes.map(node => this.notes.get(node.id) as Note);
+    const memo = this.mapSearchMemo;
+    if (
+      memo &&
+      memo.query === query &&
+      memo.signature === signature &&
+      memo.notes.length === notes.length &&
+      memo.notes.every((note, i) => note === notes[i])
+    )
+      return memo.result;
+    const result = searchMap(
       this.map.nodes,
       supersededAimNodeIds(this.map),
-      id => this.notes.get(id)?.title ?? "",
-      this.mapSearch.query,
+      id => {
+        const note = this.notes.get(id);
+        return { title: note?.title ?? "", body: this.searchBodyOf(note) };
+      },
+      query,
       ["down", "up"].includes(direction) ? "x" : "y",
       direction === "balanced"
     );
+    this.mapSearchMemo = { query, signature, notes, result };
+    return result;
   }
   private mapSearchCountText(): string {
     const search = this.mapSearch;
@@ -2813,9 +2844,8 @@ export class VisualAgentMapView extends ItemView {
     // Keyboard-style move: the camera follows in memory and Map.md's viewport is not written.
     this.focusNode(target, false);
     this.applySearchMarks();
-    this.announcer?.setText(
-      t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "")
-    );
+    const spoken = t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "");
+    this.announcer?.setText(result?.bodyOnly.has(step.id) ? `${spoken}${t("ui.map_search_body_hit")}` : spoken);
   }
   /** Shows exactly `ancestors` open (the rest of an earlier jump folds back) and works out where the revealed cards stand, on a copy. */
   private openForSearch(ancestors: string[]): void {
@@ -8757,6 +8787,9 @@ export class VisualAgentMapView extends ItemView {
     event.preventDefault();
     const menu = this.newMenu(),
       annotated = isAnnotatedImage(image) ? image : null;
+    // P5.3 Image exploration comes first, from the card action list.
+    this.addCardActions(menu, "context", { image: { id, annotated: !!annotated } });
+    menu.addSeparator();
     if (annotated) {
       menu.addItem(item =>
         item
@@ -8827,6 +8860,30 @@ export class VisualAgentMapView extends ItemView {
       menu.showAtPosition({ x: box.left, y: box.bottom });
     } else menu.showAtMouseEvent(event);
   }
+  /**
+   * P5.3 Image exploration: an annotated image becomes the map chat's picture at once. A plain image is converted first, only
+   * after the user agrees: Cancel writes nothing and gives the chat no picture.
+   */
+  private exploreImage(id: string): void {
+    const image = (this.map?.canvasItems ?? []).find(item => (item as { id?: unknown }).id === id);
+    if (!image) return;
+    if (isAnnotatedImage(image)) return this.showImageInChat(id);
+    if (image.kind !== "image" || !this.canEditCanvasItems()) return;
+    new ImageNoteModal(this.app, "explore", "", note =>
+      this.enqueue(async () => {
+        await this.changeCanvasItems(id, items => convertToAnnotatedImage(items, id, note));
+        if (findAnnotatedImage(this.map?.canvasItems ?? [], id)) this.showImageInChat(id);
+      })
+    ).open();
+  }
+  /** Makes `id` the chat's picture and opens the map chat at its message field. */
+  private showImageInChat(id: string): void {
+    this.setChatImage(id);
+    const chat = this.chat;
+    if (!chat) return;
+    if (chat.isHero) chat.focusInput();
+    else chat.setOpen(true, true);
+  }
   private convertImageDialog(id: string): void {
     if (!this.canEditCanvasItems()) return;
     new ImageNoteModal(this.app, "convert", "", note =>
@@ -8859,6 +8916,13 @@ export class VisualAgentMapView extends ItemView {
   /** Text nodes change only on a map the user may edit, and never while presenting. */
   private canEditText(): boolean {
     return this.canEditCanvasItems() && !this.presentation;
+  }
+  /** A new text block changes the map's structure: refused while a picture-book run locks it (decision #35); existing blocks stay editable. */
+  textAddLocked(): boolean {
+    return this.bookLock().structure;
+  }
+  private canAddText(): boolean {
+    return this.canEditText() && !this.textAddLocked();
   }
   /**
    * Draws the text nodes (decisions #1, #5): a node under a shown, unfolded topic, or a free one (orphan, parent gone) at
@@ -9401,7 +9465,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Adds a free text block at a stage point and opens its editor; one undo step. */
   private async addFreeText(point: { x: number; y: number } | null): Promise<void> {
-    if (!this.map || !this.canEditText()) return;
+    if (!this.map || !this.canAddText()) return;
     const id = `txt-${randomUUID().slice(0, 8)}`,
       at = point ?? { x: 0, y: 0 };
     this.pendingTextEditId = id;
@@ -9669,7 +9733,7 @@ export class VisualAgentMapView extends ItemView {
   addTextNodeUnder(parent?: MapNode | null): void {
     this.enqueue(async () => {
       if (!this.map) return;
-      if (!this.canEditText()) {
+      if (!this.canAddText()) {
         // Selection mode blocks canvas edits; say so instead of doing nothing (other reasons stay silent).
         if (this.selection.state.multiSelectMode) new Notice(t("ui.text_node_add_multiselect"));
         return;
@@ -10578,14 +10642,16 @@ export class VisualAgentMapView extends ItemView {
     );
     note.addClass("vam-card-tool", "vam-detail-button");
     note.setAttr("aria-label", t("ui.card_tool_note_label"));
-    if (readOnly) return;
     // An empty summary offers its field here (the card face draws nothing for it).
-    if (addSummary)
+    if (addSummary && !readOnly)
       addSummaryTools.set(
         tools,
         tool(t("ui.card_tool_add_summary"), "vam-card-tool-add-summary", () => this.startCardSummaryEdit(node, 0))
       );
-    const more = tool("⋯", "vam-card-tool-more", (_, button) => this.openCardMoreMenu(button, node));
+    // ⋯ opens while the notes load too: its rows that write are greyed with the reason (decision #35, P1.1).
+    const more = this.button(tools, "⋯", () => {});
+    more.addEventListener("click", () => this.openCardMoreMenu(more, node));
+    more.addClass("vam-card-tool", "vam-card-tool-more");
     more.setAttr("aria-label", t("ui.card_tool_more"));
     more.setAttr("aria-haspopup", "menu");
   }
@@ -10658,16 +10724,18 @@ export class VisualAgentMapView extends ItemView {
     this.addCardActions(menu, "context", node, withRemove ? [] : ["remove"]);
   }
   /**
-   * The card actions `surface` offers for `node`, in order: a separator after the toolbar's part and between groups. One that
-   * cannot run now stays, greyed, with its reason on the next line; a click checks again before it runs.
+   * The card actions `surface` offers for `node` (or for a canvas image, P5.3), in order: a separator after the toolbar's part
+   * and between groups. One that cannot run now stays, greyed, with its reason on the next line; a click checks again before it runs.
    */
   private addCardActions(
     menu: Menu,
     surface: "more" | "context",
-    node: MapNode,
+    node: MapNode | { image: { id: string; annotated: boolean } },
     skip: readonly CardActionId[] = []
   ): void {
-    const ctx = { ...this.cardActionContext(node), surface };
+    const contextNow = (): CardActionContext =>
+      "image" in node ? { ...this.cardActionContext(null), image: node.image } : this.cardActionContext(node);
+    const ctx = { ...contextNow(), surface };
     const kind = cardActionKind(ctx);
     const toolbar: readonly CardActionId[] = kind === "card" || kind === "ai-card" ? CARD_TOOLBAR[kind] : [];
     let section: number | "toolbar" | null = null;
@@ -10676,14 +10744,14 @@ export class VisualAgentMapView extends ItemView {
       const next = toolbar.includes(action.id) ? "toolbar" : action.group;
       if (section !== null && next !== section) menu.addSeparator();
       section = next;
-      // The picture book draws its own row and submenu (addBookMenu).
-      if (action.id === "book") {
+      // The picture book draws its own row and submenu (addBookMenu); greyed, it is a plain row with the reason.
+      if (action.id === "book" && availability.ok) {
         action.run(ctx, { menu });
         continue;
       }
       const run = (newTab: boolean, target?: Menu): void =>
         this.whenEditing(() => {
-          const now = { ...this.cardActionContext(node), surface };
+          const now = { ...contextNow(), surface };
           if (action.available(now).ok) action.run(now, { newTab, menu: target });
         });
       let sub: Menu | undefined;
@@ -11010,11 +11078,18 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const card = hit?.closest?.<HTMLElement>(".vam-node");
-    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && this.canEditSummary()) {
+    // While the notes load one card's list still opens, its rows that write greyed with the reason (decision #35, P1.1).
+    const loadingCard =
+      !!this.map && !this.presentation && this.notesLoading() && !this.selection.state.multiSelectMode;
+    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && (this.canEditSummary() || loadingCard)) {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
       if (cardId) {
         event.preventDefault();
-        const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
+        // Loading: only the card's own list, never the selection's rows.
+        const ids =
+          !loadingCard && this.selection.state.multiSelected.has(cardId)
+            ? [...this.selection.state.multiSelected]
+            : [cardId];
         const menu = this.newMenu(cardId);
         // One topic outside topic selection: the card's whole list (its toolbar's, then its ⋯ list, Remove last), drawn by
         // Obsidian so a greyed row can show its reason.
@@ -11081,12 +11156,18 @@ export class VisualAgentMapView extends ItemView {
         .onClick(() => this.openCanvasImagePicker(point))
     );
     if (this.canEditText())
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.text_node_add_here"))
-          .setIcon("sticky-note")
-          .onClick(() => this.enqueue(() => this.addFreeText(point)))
-      );
+      menu.addItem(item => {
+        item.setTitle(t("ui.text_node_add_here")).setIcon("sticky-note");
+        // The picture-book lock greys the row and says why (decision #35).
+        if (this.textAddLocked()) {
+          this.drawInDom(menu);
+          item.setDisabled(true);
+          (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-menu-has-reason");
+          this.menuHint(item, t(CARD_ACTION_REASONS.bookLock), "vam-menu-reason");
+          return;
+        }
+        item.onClick(() => this.enqueue(() => this.addFreeText(point)));
+      });
     if (sessionFor(this.plugin).getReference() && this.canEditKnowledgeRefs())
       menu.addItem(item =>
         item
@@ -12775,7 +12856,8 @@ export class VisualAgentMapView extends ItemView {
       selectionHelp: () => {
         new Notice(t("ui.drag_to_select_topics_hint"), 12000);
       },
-      finishSelection: () => this.applySelectionChange(this.selection.toggleMultiSelect())
+      finishSelection: () => this.applySelectionChange(this.selection.toggleMultiSelect()),
+      exploreImage: id => this.exploreImage(id)
     };
     return {
       node,

@@ -35,7 +35,7 @@ async function harness({ aim = false } = {}) {
     addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning() { return this; }, setDisabled(v) { this.disabled = v; return this; }, onClick(h) { this.click = h; return this; } }; cb(item); this.items.push(item); return this; }
     addSeparator() { return this; } showAtMouseEvent() { return this; } showAtPosition() { return this; }
   }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Menu, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment, setTimeout, clearTimeout });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Menu, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment, createSvg: dom.createSvg, setTimeout, clearTimeout });
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -264,4 +264,59 @@ test('F01 review: a pasted reference avoids every visible card, also a later sib
     assert.equal(overlap, false, `reference at ${JSON.stringify(refBox)} overlaps ${o.name} at ${JSON.stringify(o)}`);
   }
   assert.ok(kid, 'the child card is still there');
+});
+
+// F01-x: a reference card hangs from its parent card by a dashed connector drawn by drawEdges.
+const connectorHarness = async ({ parent = true } = {}) => {
+  const h = await harness();
+  await h.settle();
+  const host = { children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); } };
+  h.view.edgesEl = host; h.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  const box = (el, left, top, w, hh) => Object.assign(el, { offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: hh });
+  for (const n of h.view.map.nodes) h.view.cardEls.set(n.id, box({}, n.x, n.y, 200, 60));
+  if (!parent) h.view.map.knowledgeRefs[0].parentId = 'gone';
+  h.view.paintKnowledgeRefs();
+  const ref = h.view.refCardEls.get('ref-a');
+  if (ref) { box(ref.el, 700, 80, 160, 50); }
+  const connectors = () => host.children.filter(c => c.classes.includes('vam-ref-connector'));
+  return { h, host, ref, connectors };
+};
+const endOf = d => { const nums = d.match(/-?\d+(\.\d+)?/g).map(Number); return { x: nums.at(-2), y: nums.at(-1) }; };
+
+test('F01-x a visible reference gets one connector from its parent card whose end sits on the reference card edge', async () => {
+  const { h, connectors } = await connectorHarness();
+  h.view.drawEdges();
+  const lines = connectors();
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].attrs['data-ref-id'], 'ref-a');
+  const end = endOf(lines[0].attrs.d);
+  assert.ok(Math.abs(end.x - 700) <= 12 || Math.abs(end.x - 860) <= 12, `end x ${end.x} at a ref card edge`);
+  assert.ok(end.y >= 80 - 12 && end.y <= 130 + 12, `end y ${end.y} within the ref card`);
+});
+
+test('F01-x the connector follows a moved reference card and a moved parent card', async () => {
+  const { h, ref, connectors } = await connectorHarness();
+  h.view.drawEdges();
+  const before = connectors()[0].attrs.d;
+  Object.assign(ref.el, { offsetLeft: 700, offsetTop: 400 });
+  h.view.placeRefConnector('ref-a');
+  const afterRef = connectors()[0].attrs.d;
+  assert.notEqual(afterRef, before);
+  assert.ok(endOf(afterRef).y >= 400 - 12);
+  h.view.placeRefConnector('ref-a', { x: 0, y: 900, width: 200, height: 60 });
+  assert.notEqual(connectors()[0].attrs.d, afterRef);
+  h.view.drawEdges();
+  assert.equal(connectors().length, 1, 'a redraw replaces it rather than adding another');
+});
+
+test('F01-x a reference whose parent card is gone draws no connector; an unavailable reference still does', async () => {
+  const orphan = await connectorHarness({ parent: false });
+  orphan.h.view.drawEdges();
+  assert.equal(orphan.connectors().length, 0);
+  const { h, connectors } = await connectorHarness();
+  h.view.refResolved.set('ref-a', { ok: false, reason: 'missing' });
+  h.view.paintKnowledgeRefs();
+  Object.assign(h.view.refCardEls.get('ref-a').el, { offsetLeft: 700, offsetTop: 80, offsetWidth: 160, offsetHeight: 50 });
+  h.view.drawEdges();
+  assert.equal(connectors().length, 1);
 });

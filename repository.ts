@@ -297,7 +297,8 @@ function guardWrites<T extends object>(
   recovery?: VaultWriteRecovery,
   recoveryErrors?: { conflict: () => Error; backup: () => Error; saveOpenEditors: (file: TFile) => Promise<void> },
   noteGuard?: () => NoteWriteGuard | undefined,
-  damagedMarkers?: () => Error
+  damagedMarkers?: () => Error,
+  spared?: (change: unknown) => boolean
 ): T {
   return new Proxy(target, {
     get(object, property) {
@@ -306,7 +307,9 @@ function guardWrites<T extends object>(
       const call = value as (this: object, ...args: unknown[]) => unknown;
       return writes.has(property)
         ? (...args: unknown[]) => {
-            if (disposed()) return Promise.reject(new Error(message()));
+            // Only this one call may finish after dispose (the last viewport); nothing it sets off inherits that.
+            const stopped = spared?.(args[1]) ? (): boolean => false : disposed;
+            if (stopped()) return Promise.reject(new Error(message()));
             if (
               property === "process" &&
               damagedMarkers &&
@@ -359,7 +362,7 @@ function guardWrites<T extends object>(
                 process: transform =>
                   Reflect.apply(call, object, [file, transform, ...args.slice(2)]) as Promise<string>,
                 change,
-                stopped: disposed,
+                stopped,
                 stoppedError: () => new Error(message()),
                 conflictError: recoveryErrors.conflict,
                 backupError: recoveryErrors.backup
@@ -369,7 +372,7 @@ function guardWrites<T extends object>(
             if ((property === "process" || property === "processFrontMatter") && typeof args[1] === "function") {
               const change = args[1] as (...values: unknown[]) => unknown;
               args[1] = (...values: unknown[]): unknown => {
-                if (disposed()) throw new Error(message());
+                if (stopped()) throw new Error(message());
                 return change(...values);
               };
             }
@@ -387,6 +390,8 @@ export class Repository {
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
   private disposed = false;
   private readonly noteWriteScope = new AsyncLocalStorage<NoteWriteGuard>();
+  /** The Map.md transforms of viewport writes: one started before unload still lands after dispose (that call only). */
+  private readonly viewportChanges = new WeakSet<object>();
   /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
   private readonly writtenCoordinates = new Map<string, string>();
 
@@ -396,6 +401,7 @@ export class Repository {
     recovery?: VaultWriteRecovery
   ) {
     const stopped = (): boolean => this.disposed;
+    const spared = (change: unknown): boolean => typeof change === "function" && this.viewportChanges.has(change);
     const message = (): string => this.message("error.unloaded_write_not_performed");
     const recoveryErrors = {
       conflict: () => new Error(this.message("error.recovery_write_conflict")),
@@ -426,7 +432,8 @@ export class Repository {
             recovery,
             recoveryErrors,
             noteGuard,
-            damagedMarkers
+            damagedMarkers,
+            spared
           );
         if (property === "fileManager") return guardWrites(value as object, FILE_MANAGER_WRITES, stopped, message);
         return value;
@@ -1776,6 +1783,16 @@ export class Repository {
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
    * the map cannot overwrite fields it did not change (for example, research state saved meanwhile).
    */
+  /** Pan/zoom: writes only the viewport. Unload sends the last one, which may finish after dispose; no other write may. */
+  updateViewport(path: string, viewport: MapDocument["viewport"]): Promise<MapDocument> {
+    if (this.disposed) return Promise.reject(new Error(this.message("error.unloaded_write_not_performed")));
+    const change = (map: MapDocument): void => {
+      map.viewport = viewport;
+    };
+    this.viewportChanges.add(change);
+    return this.updateMap(path, change);
+  }
+
   async updateMap(
     path: string,
     change: (map: MapDocument) => void,
@@ -1783,7 +1800,7 @@ export class Repository {
   ): Promise<MapDocument> {
     let updated: MapDocument | undefined;
     let print = "";
-    await this.app.vault.process(this.file(path), content => {
+    const transform = (content: string): string => {
       const map = parseMap(content);
       const before = coordinatePrint(map);
       change(map);
@@ -1792,7 +1809,9 @@ export class Repository {
       print = this.printAfterWrite(path, before, coordinatePrint(map));
       recordWrite?.({ before: content, after: text });
       return text;
-    });
+    };
+    if (this.viewportChanges.has(change)) this.viewportChanges.add(transform);
+    await this.app.vault.process(this.file(path), transform);
     this.writtenCoordinates.set(path, print);
     return updated!;
   }

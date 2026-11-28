@@ -1,7 +1,7 @@
 import { Keymap, setIcon } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
-import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
+import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis, type ReplyBasis } from "../../core/map-chat-basis";
 import { MAP_CHAT_TURN_CHAR_LIMIT, type MapChatContinuationInput, type MapChatTurn } from "../../core/map-chat-context";
 import {
   MAP_CHAT_AUTO_MAX_CALLS,
@@ -379,6 +379,8 @@ export interface MapChatMessage {
   resume?: MapChatResumePoint;
   /** On an assistant message: research notes of the conversation this round did not read (in memory only). */
   unread?: { title: string; oversize: boolean }[];
+  /** On an assistant message: what the program gave this round to read, the line under the answer (in memory only, not saved). */
+  replyBasis?: ReplyBasis;
   /** On an assistant message: it built a book outline asked for with the book example, so it offers the book start card (in memory only). */
   bookOffer?: true;
 }
@@ -1374,6 +1376,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!this.hasTurn(turn)) return;
     if (items.length) turn.assistant.unread = items.map(item => ({ title: item.title, oversize: item.oversize }));
     else delete turn.assistant.unread;
+    this.renderLog();
+  }
+  /** What the round was given to read (decided by the program, never by the model): one line under the answer. */
+  setReplyBasis(turn: MapChatTurnHandle, basis: ReplyBasis): void {
+    if (!this.hasTurn(turn)) return;
+    turn.assistant.replyBasis = { notes: basis.notes, research: basis.research };
     this.renderLog();
   }
   /** Follow-ups of the latest question wait for the turn to end (a continuation hands over to them). */
@@ -3389,6 +3397,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       t("ui.map_chat_batch_stopped_0_1_2", 0, 0, 0),
       (message.unread ?? []).map(item => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
       JSON.stringify(message.lines.map(line => line.basis ?? null)),
+      message.replyBasis ? `rb:${message.replyBasis.notes}:${message.replyBasis.research ? 1 : 0}` : "",
+      t("ui.map_chat_reply_basis_inference"),
       t("ui.map_chat_basis_title_only"),
       t("ui.map_chat_chain_wait_tail"),
       t("ui.map_chat_seen_image_0", ""),
@@ -3564,6 +3574,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (message.replyBasis) this.buildReplyBasis(row, message.replyBasis);
     for (const steer of message.steers ?? []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
@@ -3618,6 +3629,23 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         });
     }
     return { row, body, more };
+  }
+
+  /**
+   * The line under an answer: the notes and research the program gave the round to read, then "inference" (what the answer adds
+   * beyond them, or all of it when nothing was read). The model's own claims of reading are never shown here.
+   */
+  private buildReplyBasis(row: HTMLElement, basis: ReplyBasis): void {
+    const line = row.createDiv({ cls: "vam-map-chat-reply-basis" });
+    const tag = (cls: string, text: string): void =>
+      void line.createSpan({ cls: `vam-map-chat-reply-basis-tag ${cls}`, text });
+    if (basis.notes)
+      tag(
+        "is-read",
+        basis.notes === 1 ? t("ui.map_chat_reply_basis_note_one") : t("ui.map_chat_reply_basis_notes_0", basis.notes)
+      );
+    if (basis.research) tag("is-read", t("ui.map_chat_reply_basis_research"));
+    tag("is-inference", t("ui.map_chat_reply_basis_inference"));
   }
 
   /**

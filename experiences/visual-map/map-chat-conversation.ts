@@ -7,6 +7,7 @@ import {
   syncAutoApply,
   type MapChatChainInterrupt
 } from "../../core/map-chat-chain";
+import { replyBasisOf } from "../../core/map-chat-basis";
 import type { MapChatContext } from "../../core/map-chat-context";
 import { CHAT_PLAN_GROUP_ORDER, chatPlanGroupOf } from "../../core/map-chat-layout";
 import {
@@ -67,6 +68,7 @@ export type ChatTurnPanel = ChatPlanPanel &
     | "attachComparison"
     | "fail"
     | "setUnreadNotes"
+    | "setReplyBasis"
     | "addSteer"
     | "setSteerState"
     | "takeQueued"
@@ -815,6 +817,7 @@ export class MapChatConversation {
               if (chat.isBusy) {
                 chat.finish(result.reply, []);
                 if (result.comparison) chat.attachComparison(result.comparison, anchor);
+                chat.setReplyBasis(turn, replyBasisOf(request.context.basis));
                 this.showUnreadResearch(chat, turn, request.context);
                 this.ports.markTurn(origin, request);
                 // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
@@ -856,6 +859,7 @@ export class MapChatConversation {
               const entry = this.ports.replyEntry();
               const shown = chat.finish(result.reply, lines);
               if (result.comparison) chat.attachComparison(result.comparison, anchor);
+              chat.setReplyBasis(turn, replyBasisOf(request.context.basis));
               this.showUnreadResearch(chat, turn, request.context);
               this.ports.markTurn(origin, request, entry);
               if (record?.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))

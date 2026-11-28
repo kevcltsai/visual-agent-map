@@ -97,7 +97,17 @@ import { CrossMapSearch } from "./cross-map-search";
 import { renderCrossMapResults } from "./cross-map-results";
 import type { CorpusCard } from "./cross-map-corpus";
 import { readAiLocked } from "../../note-values";
-import { excerptOf, findCards, raceAbort } from "./knowledge-retrieval";
+import {
+  excerptOf,
+  findCards,
+  pickRanked,
+  raceAbort,
+  RETRIEVAL_CANDIDATE_LIMIT,
+  RETRIEVAL_RESULT_LIMIT,
+  turnAdmission
+} from "./knowledge-retrieval";
+import { runCardRank } from "../../core/card-rank-service";
+import { estimateCondenseCalls } from "../../core/source-gateway";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -188,6 +198,7 @@ import {
 } from "./card-cover";
 import { paintCardEdge, type CardEdgeEntry, type CardEdgeSide } from "./card-edge-entry";
 import { cardIndex, type CardIndex } from "./card-index";
+import { nextZoomTier, type ZoomTier } from "./zoom-tier";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
@@ -256,7 +267,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { collapseForEditorRoom, restoreEditorRoom, type SideDock } from "./living-editor-room";
+import { EditorRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -1761,10 +1772,10 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController;
     viewSession: string;
     adoption?: LivingAdoptionCheck;
-    /** Side panels this editor folded to make room; opened again when it closes. */
-    folded: Set<SideDock>;
-    /** Side panels the user had folded that the editor's reader unfolded; folded back when it closes. */
-    revealed: Set<SideDock>;
+    /** The room this editor makes among the side panels, given back when it closes. */
+    room: EditorRoom;
+    /** Ends the subscription to the reader's reveals. */
+    stopReveal?: () => void;
   } | null = null;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
@@ -1903,13 +1914,23 @@ export class VisualAgentMapView extends ItemView {
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
   private cardHeightOf = (id: string): number | undefined =>
-    this.cardEls.get(id)?.offsetHeight ||
+    this.layoutCardHeightOf(id) ||
     // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
     this.map?.nodes.find(node => node.id === id)?.height ||
     // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
     (this.isTextId(id)
       ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
-      : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+      : medianHeight(
+          this.inZoomTier() ? [...this.heightsSeen.values()] : [...this.cardEls.values()].map(card => card.offsetHeight)
+        ));
+  private inZoomTier(): boolean {
+    return this.zoomTier === "overview" || this.zoomTier === "detail";
+  }
+  /** A drawn card's height for layout and share: at overview / detail zoom the cards are taller on purpose, so the last normal-zoom height counts. */
+  private layoutCardHeightOf(id: string): number | undefined {
+    if (this.inZoomTier()) return this.heightsSeenMap === this.map?.id ? this.heightsSeen.get(id) : undefined;
+    return this.cardEls.get(id)?.offsetHeight;
+  }
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -2240,6 +2261,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintBranchSize: ((id: string) => number) | null = null;
+  /** The map's child lists for the paint in progress (the detail line counts a card's direct sub-topics). */
+  private paintChildren: Map<string, MapNode[]> | null = null;
   /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
   private paintCardIndex: CardIndex | null = null;
   /** The book structure computed once for a whole paint (every card asks for its place); null outside a paint. */
@@ -2386,7 +2409,8 @@ export class VisualAgentMapView extends ItemView {
     const shown = new Map(this.canvasNodes().map(node => [node.id, node]));
     const fits: Array<() => void> = [];
     this.renderingCard = true;
-    this.paintBranchSize = branchSizeResolver(childIndex(this.map.nodes));
+    this.paintChildren = childIndex(this.map.nodes);
+    this.paintBranchSize = branchSizeResolver(this.paintChildren);
     this.paintCardIndex = cardIndex(this.map.nodes);
     this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
@@ -2408,6 +2432,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintBranchSize = null;
+      this.paintChildren = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -3095,20 +3120,94 @@ export class VisualAgentMapView extends ItemView {
    * Past cards of other maps whose words match the message (P4.1): the in-memory index, never this map's own cards and never one the
    * user already added. A failure to read leaves the message as it was.
    */
-  private async findPastCards(message: string, signal: AbortSignal): Promise<CorpusCard[]> {
+  private async findPastCards(
+    message: string,
+    signal: AbortSignal,
+    contentLanguage?: ContentLanguage
+  ): Promise<CorpusCard[]> {
     const map = this.map;
+    this.foundByWords = false;
     if (!map || !this.plugin.knowledgeIndex) return [];
     try {
       const cards = await raceAbort(this.plugin.knowledgeIndex.get(), signal, []);
       if (signal.aborted) return [];
-      return findCards(cards, message, {
-        mapId: map.id,
-        keys: new Set([...this.chatOtherCards.values()].map(card => `${card.mapId}\u0000${card.nodeId}`))
-      });
+      const candidates = findCards(
+        cards,
+        message,
+        {
+          mapId: map.id,
+          keys: new Set([...this.chatOtherCards.values()].map(card => `${card.mapId}\u0000${card.nodeId}`))
+        },
+        RETRIEVAL_CANDIDATE_LIMIT
+      );
+      return await this.rankPastCards(candidates, message, signal, contentLanguage);
     } catch {
+      this.foundByWords = false;
       return [];
     }
   }
+  /**
+   * More candidates than the chat takes: they are read again under the reference rules (a card that is gone, archived, unreadable or
+   * AI-locked now is dropped before anything is sent), and one AI call, counted against this turn's call budget, orders them by meaning
+   * from their titles and short excerpts. A refused budget, a failed call or a stop keeps the order of the exact step.
+   */
+  private async rankPastCards(
+    candidates: CorpusCard[],
+    message: string,
+    signal: AbortSignal,
+    contentLanguage?: ContentLanguage
+  ): Promise<CorpusCard[]> {
+    this.foundByWords = false;
+    if (candidates.length <= RETRIEVAL_RESULT_LIMIT) return candidates;
+    const resolved = await resolveKnowledgeRefs(
+      candidates.map((card, index) => ({
+        id: String(index),
+        mapId: card.mapId,
+        nodeId: card.nodeId,
+        pathHint: card.mapPath
+      })),
+      this.plugin.repo.knowledgeRefIO(),
+      { withBody: true }
+    );
+    const usable: { id: string; card: CorpusCard; excerpt: string }[] = [];
+    for (const [index, card] of candidates.entries()) {
+      const read = resolved.get(String(index));
+      if (!read?.ok || signal.aborted) continue;
+      const fm = await Promise.resolve(this.plugin.repo.knowledgeRefIO().noteFrontmatter(read.notePath)).catch(
+        () => null
+      );
+      if (!fm || readAiLocked(fm)) continue;
+      const part = excerptOf(read.summary ?? "", read.detail ?? "", message);
+      usable.push({ id: `c${usable.length + 1}`, card, excerpt: `${part.summary}\n${part.detail}` });
+    }
+    if (signal.aborted) return [];
+    const settings = this.plugin.settings;
+    const picked = await pickRanked(
+      usable,
+      item => item.id,
+      () =>
+        runCardRank(
+          this.plugin.aiCalls,
+          {
+            ...this.usageMapField(),
+            message,
+            cards: usable.map(item => ({ id: item.id, title: item.card.title, excerpt: item.excerpt })),
+            language: settings.language,
+            ...(contentLanguage ? { contentLanguage } : {}),
+            model: settings.cliModel,
+            reasoning: normalizeReasoningLevel(settings.cliReasoning)
+          },
+          { signal, admission: turnAdmission(this.chatTurnCalls) }
+        )
+    );
+    if (signal.aborted) return [];
+    this.foundByWords = picked.byWords;
+    return picked.cards.map(item => item.card);
+  }
+  /** Set by the last `findPastCards`: there were more candidates than the chat takes and they stayed in the order of their words. */
+  private foundByWords = false;
+  /** Requests this turn already spent from the call budget (the source condensing, at its worst case); reset by `chatMapSources`. */
+  private chatTurnCalls = 0;
   /**
    * The waiting cards for this message (the ones the user added first, then `found` ones), read again now under the reference rules
    * (a card that is gone, archived or unreadable is dropped), then forgotten. The found ones carry `foundByAi` and are named in a
@@ -3167,13 +3266,17 @@ export class VisualAgentMapView extends ItemView {
         ...(pick.foundBy ? { foundByAi: true } : {})
       });
     }
-    this.foundSent = { cards: sentFound, cut };
+    this.foundSent = { cards: sentFound, cut, byWords: this.foundByWords };
     return cards;
   }
   /** What the last `takeOtherMapCards` found by itself and sent; read at once by the request builder. */
-  private foundSent: { cards: CorpusCard[]; cut: boolean } = { cards: [], cut: false };
+  private foundSent: { cards: CorpusCard[]; cut: boolean; byWords: boolean } = {
+    cards: [],
+    cut: false,
+    byWords: false
+  };
   /** The found cards of a built request, told to the user once its turn went through (and written to the record when it was sent). */
-  private chatFound = new WeakMap<object, { cards: CorpusCard[]; cut: boolean }>();
+  private chatFound = new WeakMap<object, { cards: CorpusCard[]; cut: boolean; byWords: boolean }>();
   /** "AI found N past cards", each a link that locates it, so a reply that names a card can be followed. */
   private noticeFoundCards(found: { cards: readonly CorpusCard[]; cut: boolean }): void {
     const make = (window as { createFragment?: typeof createFragment }).createFragment;
@@ -14354,7 +14457,8 @@ export class VisualAgentMapView extends ItemView {
     this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
     // Every card shows its branch size: count all branches once for this paint.
-    this.paintBranchSize = this.map ? branchSizeResolver(childIndex(this.map.nodes)) : null;
+    this.paintChildren = this.map ? childIndex(this.map.nodes) : null;
+    this.paintBranchSize = this.paintChildren ? branchSizeResolver(this.paintChildren) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     this.paintBookStructure = { value: this.bookStructureNow() };
     const fits: Array<() => void> = [];
@@ -14365,6 +14469,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintBranchSize = null;
+      this.paintChildren = null;
       this.paintCardIndex = null;
       this.paintBookStructure = null;
       this.pendingCardFits = null;
@@ -14899,7 +15004,9 @@ export class VisualAgentMapView extends ItemView {
           text: label
         });
       if (batch.status === "running")
-        this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path));
+        this.button(header, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path)).addClass(
+          "vam-node-stop"
+        );
       if (batch.failures.length) {
         const failure = header.createSpan({
           cls: "vam-status vam-status-error",
@@ -14938,12 +15045,14 @@ export class VisualAgentMapView extends ItemView {
           )
         ),
         () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
-      );
+      ).addClass("vam-node-stop");
     }
     if (research?.slow && research.resend)
       this.button(header, t("ui.research_resend"), () => this.plugin.researchProgress.get(node.path)?.resend?.());
     if (research?.stage === "charts")
-      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
+      this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path)).addClass(
+        "vam-node-stop"
+      );
     const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(tools, t("ui.view_0_expansion_suggestions", pendingCount), () =>
@@ -14978,7 +15087,9 @@ export class VisualAgentMapView extends ItemView {
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
-        this.button(header, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path));
+        this.button(header, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path)).addClass(
+          "vam-node-stop"
+        );
       } else if (synthesis.state !== "directions") {
         header.createSpan({
           cls: "vam-status vam-status-error",
@@ -15087,6 +15198,16 @@ export class VisualAgentMapView extends ItemView {
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
     else if (this.inlineSummary?.id === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
+    // Built for every card and shown by the stylesheet only in the detail zoom tier, so a zoom change repaints nothing.
+    card.createEl("p", {
+      cls: "vam-card-detail-line",
+      text: t(
+        "ui.card_detail_line_0_1_2",
+        this.linksOf(node.id).length,
+        t(TOPIC_KIND_SHAPES[kind].labelKey),
+        this.paintChildren?.get(node.id)?.length ?? 0
+      )
+    });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -15814,6 +15935,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
     if (this.noteLoad) return;
+    // A zoom tier (overview / detail) changes card heights on purpose: that is never a reason to push a neighbour. Looked at again at normal zoom.
+    if (this.zoomTier === "overview" || this.zoomTier === "detail") return;
     // A chat reply or an active drag has not finished placing its cards. Preserve the previous heights until it is done.
     if (this.renderHold > 0 || this.history.grouping || this.dragging) return;
     const now = new Map<string, number>();
@@ -16256,7 +16379,7 @@ export class VisualAgentMapView extends ItemView {
       const card = this.cardEls.get(id);
       const cover = card ? cardCovers.get(card) : undefined;
       if (cover && !cover.frame.classList.contains("is-sized")) ringMeasured = false;
-      const height = card?.offsetHeight;
+      const height = this.layoutCardHeightOf(id);
       if (height) ringHeights.set(id, height);
     }
     if (!ringMeasured) ringHeights.clear();
@@ -16580,14 +16703,17 @@ export class VisualAgentMapView extends ItemView {
     const conversation = this.chatConversation;
     const current = (): boolean =>
       !this.closed && this.path === mapPath && this.map?.id === mapId && this.chatConversation === conversation;
+    this.chatTurnCalls = 0;
     const groups = await this.readMapSourceGroups(signal);
     const settings = this.plugin.settings;
     const material = await mapChatSourceMaterial({
       groups,
       mapPath,
       cache: this.chatSourceCache,
-      condense: () =>
-        this.plugin.aiTasks.condenseReferences(
+      condense: () => {
+        // Condensing is not reserved call by call here: this turn's budget counts its worst case.
+        this.chatTurnCalls = estimateCondenseCalls(groups);
+        return this.plugin.aiTasks.condenseReferences(
           {
             title: this.map?.title ?? "",
             summary: "",
@@ -16605,7 +16731,8 @@ export class VisualAgentMapView extends ItemView {
           settings.cliModel,
           normalizeReasoningLevel(settings.cliReasoning),
           signal
-        ),
+        );
+      },
       refuse: () => new Error(t("ui.source_context_exceeds_budget"))
     });
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -17131,9 +17258,15 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      folded: new Set(),
-      revealed: new Set()
+      room: new EditorRoom(this.sideDocks())
     };
+    // The reader revealing its leaf can unfold the right panel: that is VAM's doing, not the user's, and it takes width.
+    const room = this.aiCardOpen.room;
+    this.aiCardOpen.stopReveal = this.plugin.onDetailsReveal?.(() => {
+      if (this.aiCardOpen?.room !== room) return;
+      room.accept(this.sideDock("right"));
+      this.makeRoomForAiCard();
+    });
     win.mount(overlay);
     this.makeRoomForAiCard();
     if (node)
@@ -17143,17 +17276,11 @@ export class VisualAgentMapView extends ItemView {
         })
         .catch(() => undefined);
     if (node) {
-      const right = (this.app.workspace as { rightSplit?: SideDock } | undefined)?.rightSplit;
-      const rightFolded = right?.collapsed === true;
       void this.plugin
         .openDetails(this.plugin.repo.file(node.path), viewSession)
         .then(() => {
-          // The reader opens in the right panel: a panel the user had folded is folded back on close, and the room is
-          // measured again now that the reader took its width.
-          const open = this.aiCardOpen;
-          if (!current() || !open) return;
-          if (right && rightFolded && !right.collapsed) open.revealed.add(right);
-          this.makeRoomForAiCard();
+          // The reader took width in the right panel: the room is measured again.
+          if (current() && this.aiCardOpen) this.makeRoomForAiCard();
         })
         .catch(error => {
           if (current()) new Notice(error instanceof Error ? error.message : String(error));
@@ -17167,7 +17294,8 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
-    restoreEditorRoom(open.folded, open.revealed);
+    open.stopReveal?.();
+    open.room.restore();
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
@@ -17316,8 +17444,17 @@ export class VisualAgentMapView extends ItemView {
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
     const width = overlay.clientWidth ?? 0;
-    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock };
-    collapseForEditorRoom(width, [workspace?.leftSplit, workspace?.rightSplit], this.aiCardOpen.folded);
+    // A resize while the reader is revealing its leaf comes from VAM unfolding the right panel, not from the user.
+    if (this.plugin.detailsRevealing?.()) this.aiCardOpen.room.accept(this.sideDock("right"));
+    this.aiCardOpen.room.fit(width);
+  }
+  private sideDock(side: "left" | "right"): SideDock | undefined {
+    const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock } | undefined;
+    return side === "left" ? workspace?.leftSplit : workspace?.rightSplit;
+  }
+  /** Obsidian's side panels, the left one first. */
+  private sideDocks(): SideDock[] {
+    return [this.sideDock("left"), this.sideDock("right")].filter((dock): dock is SideDock => !!dock);
   }
   /** Before a repaint: takes the setup window out of the page; true when it held the focus. */
   private detachAiCardPopover(): boolean {
@@ -17371,6 +17508,7 @@ export class VisualAgentMapView extends ItemView {
     const node = (): MapNode | undefined => this.map?.nodes.find(item => item.id === entry.nodeId);
     return {
       topicTitle: () => this.notes.get(entry.nodeId)?.title ?? node()?.path ?? "",
+      mapSourceCount: () => this.mapSourcesControl?.sourceCount ?? 0,
       anchor: () => {
         const card = this.cardEls.get(entry.nodeId);
         const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -22909,10 +23047,24 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
     // Below this zoom the tool rows are hidden (they would cover neighbouring cards), see styles.css.
     this.viewportEl?.toggleClass("is-zoomed-out", zoom < TOOLS_MIN_ZOOM);
+    // The zoom tier (overview / normal / detail) is a class on the viewport: toggled only when the tier changes or the viewport element is new.
+    const tier = nextZoomTier(this.zoomTier, zoom);
+    if (tier !== this.zoomTier || this.zoomTierEl !== this.viewportEl) {
+      this.zoomTier = tier;
+      this.zoomTierEl = this.viewportEl ?? null;
+      this.viewportEl?.toggleClass("is-zoom-overview", tier === "overview");
+      this.viewportEl?.toggleClass("is-zoom-detail", tier === "detail");
+    }
   }
+  /** The zoom tier the viewport classes show now, and the viewport element they were put on. */
+  private zoomTier: ZoomTier = "normal";
+  private zoomTierEl: HTMLElement | null = null;
   private transform(): void {
     if (!this.map || !this.stageEl) return;
+    const tierBefore = this.zoomTier;
     this.applyStageTransform();
+    // The detail tier gives summaries more lines, so card heights change: the lines between cards follow (no repaint, no tidy-up).
+    if (this.zoomTier !== tierBefore) this.drawEdges();
     this.topicChatOpen?.win.reposition();
     const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
@@ -22925,8 +23077,14 @@ export class VisualAgentMapView extends ItemView {
     // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");
-    this.zoomLabel?.setText(`${Math.round(zoom * 100)}%`);
-    this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
+    const tierWord =
+      this.zoomTier === "overview"
+        ? ` ${t("ui.zoom_tier_overview")}`
+        : this.zoomTier === "detail"
+          ? ` ${t("ui.zoom_tier_detail")}`
+          : "";
+    this.zoomLabel?.setText(`${Math.round(zoom * 100)}%${tierWord}`);
+    this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%${tierWord}`));
   }
   private saveViewport(): void {
     // The user moved the view while the notes were read: the final render must not clear the toolbar and shift it again.
@@ -22940,10 +23098,12 @@ export class VisualAgentMapView extends ItemView {
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    // A continuous pan or zoom writes Map.md once, after it stops; closing, switching maps and unload flush it at once.
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
       this.queueViewportWrite();
-    }, 250);
+    }, 500);
+    this.plugin.viewportsPending?.add(this);
   }
   /** A viewport write skips the re-read of every note; saves that arrive while one waits in the queue join it. */
   private queueViewportWrite(): void {
@@ -22968,14 +23128,20 @@ export class VisualAgentMapView extends ItemView {
     this.viewportTimer = null;
     await this.persistViewport();
   }
+  /** Unload: a pan or zoom still in its debounce, or queued behind other work, is written now. */
+  flushViewportOnUnload(): void {
+    if (this.viewportTimer === null && !this.viewportQueued) return;
+    if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    void this.persistViewport().catch(() => undefined);
+  }
   /** Pan/zoom writes only the viewport onto the current file, never this view's possibly older map copy. */
   private async persistViewport(): Promise<void> {
+    this.plugin.viewportsPending?.delete(this);
     if (!this.map || !this.path) return;
     const path = this.path;
     const viewport = { ...(this.branchFocus?.viewport ?? this.map.viewport) };
-    const written = await this.plugin.repo.updateMap(path, map => {
-      map.viewport = viewport;
-    });
+    const written = await this.plugin.repo.updateViewport(path, viewport);
     // A late write for the previous map must not stamp the newly opened map.
     if (this.path !== path) return;
     // The write may stamp a derived field (legacy AIM content language); adopt it so the next change sees no conflict.
@@ -24223,7 +24389,12 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
-    const otherMapCards = await this.takeOtherMapCards(await this.findPastCards(message, signal), message);
+    // The chat's own language, worked out once: the past-card ranking and the request below use the same value.
+    const chatLanguage = outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message));
+    const otherMapCards = await this.takeOtherMapCards(
+      await this.findPastCards(message, signal, chatLanguage),
+      message
+    );
     const foundNow = this.foundSent;
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
@@ -24286,7 +24457,7 @@ export class VisualAgentMapView extends ItemView {
       context,
       ...(imageDataUrl ? { imageDataUrl } : {}),
       language: settings.language,
-      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
+      contentLanguage: chatLanguage,
       model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
@@ -24572,7 +24743,9 @@ export class VisualAgentMapView extends ItemView {
     if (!record || !found) return;
     record.event("cards_found", {
       topics: found.cards.map(card => ({ id: card.mapTitle, title: card.title })),
-      ...(found.cut ? { reason: "cut" } : {})
+      ...(found.cut || found.byWords
+        ? { reason: [found.cut ? "cut" : "", found.byWords ? "ranked by words" : ""].filter(Boolean).join(", ") }
+        : {})
     });
   }
   /** Writes the `sources_read` mark once per record conversation (the sources were sent: a reopened conversation keeps its writes behind the plan). */

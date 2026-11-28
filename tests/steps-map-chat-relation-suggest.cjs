@@ -72,7 +72,7 @@ function fakeChat() {
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
     refreshPlan() { chat.calls.push(['refreshPlan']); chat.painted = chat.plans.filter(p => p.state === 'pending').map(p => (p.suggestions ?? []).map(row => row.blocked())); },
-    markTurn() {}, refreshReplyUndo() {}, completedTurns: () => [], conversationId: undefined,
+    markTurn() {}, refreshReplyUndo() {}, setReplyBasis() {}, completedTurns: () => [], conversationId: undefined,
     takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft() {},
     setApplying() {}, focusInput() {}, reset() {},
     hasQueuedSteers: () => false, setChainWaiting() {}, endChain() {}, beginAutoRound(_r, _m, _rem, origin) { return chat.begin('auto', origin); }

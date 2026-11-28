@@ -28,7 +28,7 @@ function fakeChat(control) {
     markStopped() { chat.isBusy = false; chat.calls.push(['stopped']); },
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
-    markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {},
+    markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {}, setReplyBasis() {},
     completedTurns: () => [], conversationId: undefined,
     takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft(texts) { chat.calls.push(['restore', texts]); },
     setApplying() {}, focusInput() {}, reset() {},

@@ -243,7 +243,7 @@ import {
   livingWithoutFence,
   renderLivingPreview
 } from "./living-node-markdown";
-import { livingReasonKey, livingRoundStats } from "./living-node-state";
+import { livingCardState, livingReasonKey, livingRoundStats } from "./living-node-state";
 import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
@@ -21019,10 +21019,16 @@ export class VisualAgentMapView extends ItemView {
     }
     void this.runLivingBatch(requested);
   }
-  private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
+  private setPromptStatus(
+    mapPath: string,
+    id: string,
+    status: PromptRunEntry["status"],
+    reason?: string,
+    settled?: Pick<PromptRunEntry, "settlement" | "aborted">
+  ): void {
     let entries = this.promptRuns.get(mapPath);
     if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
-    entries.set(id, reason === undefined ? { status } : { status, reason });
+    entries.set(id, { status, ...(reason === undefined ? {} : { reason }), ...settled });
     // A batch resets every queued topic in one synchronous loop; paint once for all of them.
     if (this.promptRenderQueued) return;
     this.promptRenderQueued = true;
@@ -21079,6 +21085,8 @@ export class VisualAgentMapView extends ItemView {
           state.planned = true;
           excluded = new Set(event.excluded);
           this.promptRuns.delete(mapPath);
+          // A card of this round not reached yet waits, whatever an earlier round left on it.
+          for (const id of event.queued) this.setPromptStatus(mapPath, id, "waiting");
           for (const id of trialSkipped) this.setPromptStatus(mapPath, id, "idle", failureReasons.get(id));
           if (current()) this.render();
           break;
@@ -21107,7 +21115,8 @@ export class VisualAgentMapView extends ItemView {
             mapPath,
             event.id,
             usable ? "done" : result === "failed" || result === "blocked" ? "blocked" : "idle",
-            failureReasons.get(event.id)
+            failureReasons.get(event.id),
+            { settlement: result, aborted: run.signal.aborted }
           );
           break;
         }
@@ -21116,7 +21125,10 @@ export class VisualAgentMapView extends ItemView {
           for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
           state.outcome = outcomeOf(run.signal.aborted || event.error === true);
           if (session()) {
-            const summary = livingRunSummary(state.outcome);
+            // Stopped before any card ran (while planning or confirming): still say the run stopped.
+            const summary =
+              livingRunSummary(state.outcome) ||
+              (run.signal.aborted ? t("ui.ai_run_summary_stopped_0", t("ui.ai_run_summary_none")) : "");
             if (summary) new Notice(summary);
           }
           finish(state.outcome);
@@ -21178,7 +21190,7 @@ export class VisualAgentMapView extends ItemView {
                 );
             },
             confirm: (model, work) => this.plugin.confirmAiUsage(model, work),
-            onStart: (total, excluded) => run.emit({ kind: "start", total, excluded }),
+            onStart: (total, excluded, queued) => run.emit({ kind: "start", total, excluded, queued }),
             onTrialBoundary: boundary => run.emit({ kind: "trial", ...boundary }),
             onRunning: id => run.emit({ kind: "running", id }),
             onSettled: (id, result) => run.emit({ kind: "settled", id, result }),
@@ -21257,16 +21269,23 @@ export class VisualAgentMapView extends ItemView {
     if (!node || !note || !isAiCard(note)) return undefined;
     const known = this.aiStatusMemo.get(id);
     if (known) return known;
-    const entry = this.promptRunning() ? this.promptEntryOf(id) : undefined;
-    let status: AiCardStatus;
-    if (this.aiWorkingOn(node)) status = "running";
-    else if (entry?.status === "blocked") status = "failed";
-    else if (entry?.status === "done") status = "done";
-    else if (note.livingNode?.outcome === "failed" || note.livingNode?.outcome === "blocked") status = "failed";
-    else {
-      const validity = this.livingValidity.get(id);
-      status = validity === "valid" ? "done" : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
-    }
+    const running = this.promptRunning();
+    const entry = this.promptEntryOf(id);
+    // After the round only a stop is taken from it: a cancelled attempt is not stamped on the card, the rest is.
+    const settled =
+      running || entry?.settlement === "cancelled" || (entry?.settlement === "not-run" && entry.aborted)
+        ? entry
+        : undefined;
+    const validity = this.livingValidity.get(id) ?? "none";
+    const state = livingCardState({
+      runtime: this.aiWorkingOn(node) ? "running" : running && entry?.status === "waiting" ? "waiting" : "idle",
+      settlement: settled?.settlement,
+      aborted: settled?.aborted,
+      latestOutcome: note.livingNode?.outcome ?? "never",
+      validity
+    });
+    const status: AiCardStatus =
+      state !== "suggested" ? state : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
     this.aiStatusMemo.set(id, status);
     return status;
   }
@@ -21280,7 +21299,8 @@ export class VisualAgentMapView extends ItemView {
     if (note.livingNode?.lastSuccessfulCheck)
       lines.push(t("ui.living_node_last_success") + ": " + note.livingNode.lastSuccessfulCheck);
     if (note.livingNode?.lastAttempt) lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
-    if (status === "failed" && this.promptEntryOf(node.id)?.reason) lines.push(this.promptEntryOf(node.id)!.reason!);
+    if ((status === "failed" || status === "blocked") && this.promptEntryOf(node.id)?.reason)
+      lines.push(this.promptEntryOf(node.id)!.reason!);
     return lines.join("\n");
   }
   /**
@@ -21302,7 +21322,14 @@ export class VisualAgentMapView extends ItemView {
     const title = card.querySelector<HTMLElement>(".vam-card-title");
     const parts: HTMLElement[] = [];
     const status = this.aiStatusOf(node.id) ?? "pending";
-    const names: string[] = [t("ui.ai_card"), t(`ui.ai_card_status_${status}`)];
+    // Failed, blocked or stopped knowledge may also be out of date: both are said.
+    const shown: AiCardStatus[] = [status];
+    if (
+      (status === "failed" || status === "blocked" || status === "stopped") &&
+      (this.livingValidity.get(node.id) === "stale" || note.livingNode?.damaged)
+    )
+      shown.push("stale");
+    const names: string[] = [t("ui.ai_card"), ...shown.map(each => t(`ui.ai_card_status_${each}`))];
     if (title) {
       const star = createSpan({ cls: "vam-ai-star", attr: { role: "img", "aria-label": t("ui.ai_card") } });
       setIcon(star, "sparkles");
@@ -21349,14 +21376,18 @@ export class VisualAgentMapView extends ItemView {
         parts.push(line);
       }
     }
-    // Running, stale and failed say so in the header with a mark and words, never by colour alone (the lock label takes the place when locked).
-    if ((status === "running" || status === "stale" || status === "failed") && note.aiLocked !== true) {
-      const chip = createSpan({ cls: `vam-status vam-status-${status}`, text: t(`ui.ai_card_status_${status}`) });
-      chip.setAttr("title", this.aiStatusTip(node, note, status));
-      const check = header.querySelector<HTMLElement>(":scope > input");
-      if (check) check.after(chip);
-      else header.prepend(chip);
-      parts.push(chip);
+    // Progress and trouble say so in the header with a mark and words, never by colour alone; done and suggested say nothing
+    // here (the lock label takes the place when locked).
+    if (status !== "done" && status !== "pending" && note.aiLocked !== true) {
+      let anchor = header.querySelector<HTMLElement>(":scope > input");
+      for (const each of shown) {
+        const chip = createSpan({ cls: `vam-status vam-status-${each}`, text: t(`ui.ai_card_status_${each}`) });
+        chip.setAttr("title", this.aiStatusTip(node, note, each));
+        if (anchor) anchor.after(chip);
+        else header.prepend(chip);
+        anchor = chip;
+        parts.push(chip);
+      }
     }
     // The toolbar's first button follows the state (B08): Run, or Stop while the AI works on the card (the header keeps its
     // own Stop, decision #39).

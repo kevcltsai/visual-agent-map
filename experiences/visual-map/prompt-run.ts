@@ -7,7 +7,10 @@
  * (its own summary stands in). An ordinary card never runs and stops the chain (its children's results do not pass upward
  * through it, and their failure does not block its parent).
  */
-export type PromptRunStatus = "idle" | "running" | "done" | "blocked";
+import type { LivingSettlement } from "./living-node-execution";
+
+/** "waiting": queued in this round, not reached yet. */
+export type PromptRunStatus = "idle" | "waiting" | "running" | "done" | "blocked";
 
 export interface PromptNodeRef {
   id: string;
@@ -233,6 +236,9 @@ export interface PromptRunEntry {
   status: PromptRunStatus;
   /** Why a topic is stuck (its own failure or the children that did not succeed). */
   reason?: string;
+  /** This round's result for the card, and whether the round was stopped by then (a not-run card is then stopped). */
+  settlement?: LivingSettlement;
+  aborted?: boolean;
 }
 /** The run-all batch a view holds: live while `outcome` is unset, then the result until dismissed. */
 export interface PromptBatchState {
@@ -288,7 +294,8 @@ export function promptInputKey(input: PromptInput): string {
   return fnv1a(JSON.stringify([input.prompt.trim(), children, sources]));
 }
 
-export type AiCardStatus = "pending" | "running" | "stale" | "failed" | "done";
+/** The card face: "pending" is a suggested card (never run, or nothing out of date to say), "stale" one that needs a rerun. */
+export type AiCardStatus = "pending" | "waiting" | "running" | "stale" | "failed" | "blocked" | "stopped" | "done";
 export interface AiCardStatusInput {
   /** True while this view's run (batch or single AI job) is working on the card. */
   running: boolean;

@@ -662,7 +662,7 @@ test('card face: a star and one state glyph by the name, the question line under
   assert.equal(ordinary.card.dataset.aiCard, undefined);
 });
 
-test('V3.3 P1.2: running, stale and failed AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
+test('V3.3 P1.2 / D2-3: running, waiting, failed, blocked, stopped and stale AI cards say their state in the header with a mark and words; pending keeps its glyph; done and locked say nothing here', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
   const face = () => {
@@ -676,7 +676,7 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
     return f;
   };
   const chips = header => findAll(header, i => i.cls?.split(' ').includes('vam-status'));
-  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Not finished']]) {
+  for (const [status, cls, text] of [['running', 'vam-status-running', 'Running'], ['waiting', 'vam-status-waiting', 'Waiting'], ['stale', 'vam-status-stale', 'Needs rerun'], ['failed', 'vam-status-failed', 'Failed'], ['blocked', 'vam-status-blocked', 'Blocked'], ['stopped', 'vam-status-stopped', 'Stopped']]) {
     const f = paint(status);
     const [chip, ...rest] = chips(f.header);
     assert.equal(rest.length, 0, `${status}: one label`);
@@ -688,6 +688,54 @@ test('V3.3 P1.2: running, stale and failed AI cards say their state in the heade
   }
   for (const status of ['done', 'pending']) assert.equal(chips(paint(status).header).length, 0, `${status}: no header label`);
   assert.equal(chips(paint('stale', { aiLocked: true }).header).length, 0, 'locked: the lock label takes the place');
+  assert.equal(find(paint('pending').title, i => i.cls?.includes('vam-ai-glyph-pending'))?.attrs.title.split('\n')[0], 'Not run yet', 'pending: its glyph has words too');
+});
+
+test('D2-3 card face: a failed, blocked or stopped card whose knowledge is out of date shows both labels; repainting keeps two', async () => {
+  const h = await harness([['a', null, { prompt: 'Why?' }]]);
+  const node = h.node('a');
+  h.view.livingValidity.set(node.id, 'stale');
+  for (const [status, text] of [['failed', 'Failed'], ['blocked', 'Blocked'], ['stopped', 'Stopped']]) {
+    const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+    card.createEl('h3', { cls: 'vam-card-title' });
+    const texts = () => findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text);
+    h.view.aiStatusMemo.set(node.id, status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], status);
+    h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+    eq(texts(), [text, 'Needs rerun'], `${status}: repainting does not stack labels`);
+  }
+  h.view.livingValidity.set(node.id, 'valid');
+  const card = element('div'), header = card.createDiv({ cls: 'vam-node-header' });
+  card.createEl('h3', { cls: 'vam-card-title' });
+  h.view.aiStatusMemo.set(node.id, 'failed');
+  h.view.paintPromptState(card, header, node, h.view.notes.get(node.id));
+  eq(findAll(header, i => i.cls?.split(' ').includes('vam-status')).map(i => i.text), ['Failed'], 'old knowledge still valid: no rerun label');
+});
+
+test('D2-3 real round: queued cards wait, the running one runs, a blocked one says blocked; Stop leaves the unreached ones stopped', async () => {
+  const h = await harness([...TREE, ['solo', null, MISSING]]);
+  h.plan.hang.add('leaf1');
+  await h.runAll();
+  await until(() => h.calls.some(c => c.key === 'leaf1'));
+  const state = key => { h.view.aiStatusMemo.clear(); return h.view.aiStatusOf(h.node(key).id); };
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['running', 'waiting', 'waiting', 'blocked']);
+  h.view.stopPromptBatch(); await h.done();
+  eq(['leaf1', 'mid', 'root', 'solo'].map(state), ['stopped', 'stopped', 'stopped', 'blocked'], 'after the round');
+  const f = await harness(TREE);
+  f.plan.fail.add('leaf1');
+  await f.runAll(); await f.done();
+  f.view.aiStatusMemo.clear();
+  eq(['leaf1', 'mid', 'root'].map(key => f.view.aiStatusOf(f.node(key).id)), ['failed', 'blocked', 'blocked'], 'a failure is "failed", the cards that needed it "blocked"');
+});
+
+test('D2-3 Stop before the round is planned still says the run stopped', async () => {
+  const h = await harness(TREE);
+  await h.runAll();
+  h.view.stopPromptBatch(); await h.done();
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.view.promptBatch.outcome.stopped, true);
+  assert.equal(h.notices.at(-1), 'Run stopped: no card ran');
 });
 
 test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown with the selection); other states do not', async () => {
@@ -717,7 +765,7 @@ test('V3.3 P1.2: a running AI card of Run all offers Stop in its toolbar (shown 
 });
 
 // ---- review fixes: stale state between batches, popover prefill, save path ----------------------------------------------
-test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (stale after a Prompt edit, not done)', async () => {
+test('two batches: a card not yet reached by batch 2 is not shown done from batch 1 (waiting, its knowledge stale after a Prompt edit)', async () => {
   const h = await harness([['Y', null], ['X', null]]);
   await h.runAll(); await h.done();
   assert.equal(h.status('X'), 'done');
@@ -728,9 +776,10 @@ test('two batches: a card not yet reached by batch 2 is not shown done from batc
   h.plan.hang.add('Y');
   await h.runAll();
   await until(() => h.calls.filter(c => c.key === 'Y').length === 2);
-  assert.equal(h.status('X'), undefined, 'batch 1 left nothing for X');
+  assert.equal(h.status('X'), 'waiting', 'batch 2 queued X; batch 1 left nothing for it');
   h.view.aiStatusMemo.clear();
-  assert.equal(h.view.aiStatusOf(h.node('X').id), 'stale');
+  assert.equal(h.view.aiStatusOf(h.node('X').id), 'waiting', 'not reached yet: waiting, never done');
+  assert.equal(h.view.livingValidity.get(h.node('X').id), 'stale', 'its knowledge is still out of date');
   h.view.stopPromptBatch(); await h.done();
 });
 

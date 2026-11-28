@@ -1102,6 +1102,7 @@ export type MapCommandAction =
   | "rename"
   | "open-details"
   | "toggle-collapse"
+  | "focus-branch"
   | "zoom-fit"
   | "zoom-reset"
   | "search"

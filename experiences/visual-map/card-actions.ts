@@ -819,6 +819,7 @@ export const CARD_COMMANDS: readonly { commandId: string; mapAction: MapCommandA
   { commandId: "map-rename-selected", mapAction: "rename", action: "rename" },
   { commandId: "map-open-selected-details", mapAction: "open-details", action: "open-note" },
   { commandId: "map-toggle-collapse-selected", mapAction: "toggle-collapse", action: "toggle-collapse" },
+  { commandId: "map-focus-branch", mapAction: "focus-branch", action: "focus-branch" },
   { commandId: "map-zoom-to-fit", mapAction: "zoom-fit", action: "zoom-fit" },
   { commandId: "map-zoom-reset", mapAction: "zoom-reset", action: "zoom-reset" },
   { commandId: "map-search", mapAction: "search", action: "search" },

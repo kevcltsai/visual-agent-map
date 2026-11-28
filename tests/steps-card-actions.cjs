@@ -262,9 +262,9 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   assert.ok(ruleMoreSet('ai-card').includes('run-card') && !ruleMoreSet('card').includes('run-card'));
 });
 
-test('card actions: the eleven palette commands keep their ids and take the card action list names', () => {
-  // The ids and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids); each name is the
-  // list's name, the one the card ⋯ and right-click show (ticket 05).
+test('card actions: the eleven palette commands keep their ids, B13 adds Focus on this branch, and all take the card action list names', () => {
+  // The ids and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids), plus B13's new one; each
+  // name is the list's name, the one the card ⋯ and right-click show (ticket 05).
   const commands = [
     ['map-add-topic', 'ui.command_map_add_topic', 'add-topic'],
     ['map-add-subtopic', 'ui.card_menu_add_child', 'add-subtopic'],
@@ -273,12 +273,13 @@ test('card actions: the eleven palette commands keep their ids and take the card
     ['map-rename-selected', 'ui.shortcut_rename', 'rename'],
     ['map-open-selected-details', 'ui.card_menu_open_note', 'open-details'],
     ['map-toggle-collapse-selected', 'ui.card_menu_collapse', 'toggle-collapse'],
+    ['map-focus-branch', 'ui.focus_branch', 'focus-branch'],
     ['map-zoom-to-fit', 'ui.command_map_zoom_fit', 'zoom-fit'],
     ['map-zoom-reset', 'ui.command_map_zoom_reset', 'zoom-reset'],
     ['map-search', 'ui.command_map_search', 'search'],
     ['map-keyboard-shortcuts', 'ui.command_map_shortcuts', 'shortcuts']
   ].map(([id, key, mapAction]) => ({ id, key, mapAction }));
-  assert.equal(CARD_COMMANDS.length, 11);
+  assert.equal(CARD_COMMANDS.length, 12);
   eq(CARD_COMMANDS.map(entry => entry.commandId), commands.map(entry => entry.id));
   for (const { id, key, mapAction } of commands) {
     const entry = CARD_COMMANDS.find(item => item.commandId === id);
@@ -371,6 +372,9 @@ test('card actions: B13 focus this branch (card) and leave focus (map) as enterB
   assert.ok(!ids('context', ctxFor('a', 'normal', { branchFocused: true })).includes('focus-branch'), 'hidden while focused');
   for (const surface of ['toolbar', 'key', 'edge', 'canvas']) assert.ok(!ids(surface, ctxFor('a', 'normal')).includes('focus-branch'), surface);
   assert.ok(ruleMoreSet('card').includes('focus-branch') && ruleContextSet('card').includes('focus-branch'));
+  // The palette's entry (main.ts registers CARD_COMMANDS) runs the same action, named as the list names it.
+  eq(CARD_COMMANDS.filter(entry => entry.action === 'focus-branch').map(entry => [entry.commandId, entry.mapAction]), [['map-focus-branch', 'focus-branch']]);
+  assert.equal(commandTitleKey('focus-branch'), 'ui.focus_branch');
   // enterBranchFocus refuses while presenting; picking topics has no card entries.
   assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'normal'))), CODE.ok);
   assert.deepEqual(S.plain(availability('focus-branch', 'context', ctxFor('a', 'presentation'))), CODE.pr);

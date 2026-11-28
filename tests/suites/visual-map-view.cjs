@@ -4517,12 +4517,13 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
     ['map-rename-selected', 'ui.shortcut_rename'],
     ['map-open-selected-details', 'ui.card_menu_open_note'],
     ['map-toggle-collapse-selected', 'ui.card_menu_collapse'],
+    ['map-focus-branch', 'ui.focus_branch'],
     ['map-zoom-to-fit', 'ui.command_map_zoom_fit'],
     ['map-zoom-reset', 'ui.command_map_zoom_reset'],
     ['map-search', 'ui.command_map_search'],
     ['map-keyboard-shortcuts', 'ui.command_map_shortcuts']
   ]);
-  assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
+  assert.ok(tuples.length >= 6 && tuples.length <= 12, `${tuples.length} map commands`);
   assert.match(source, /for \(const \{ commandId, mapAction, action \} of CARD_COMMANDS\)/, 'main.ts registers the list');
   assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(mapAction, checking\) \?\? false/, 'no map view: the command does not apply');
   const { translate } = load('i18n.ts');
@@ -4539,17 +4540,20 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.zoomBy = factor => calls.push(['zoom', factor]);
   view.openMapSearch = () => calls.push(['search']);
   view.openKeyboardShortcuts = () => calls.push(['keys']);
+  view.enterBranchFocus = id => calls.push(['focus', id]);
   view.viewportEl = view.viewportEl ?? dom.element('div');
   const actions = tuples.map(t => t[2]);
   view.selection.setSelected(null);
   const none = Object.fromEntries(actions.map(action => [action, view.mapCommand(action, true)]));
-  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
+  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'focus-branch': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
   assert.deepEqual(calls, [], 'checking runs nothing');
   view.selection.setSelected('c'); assert.equal(view.mapCommand('toggle-collapse', true), false, 'a card with no subtopics');
-  const target = view.map.nodes.find(node => node.parentId);
+  assert.equal(view.mapCommand('focus-branch', true), false, 'B13: a card with no subtopics has no branch to focus');
+  const target = view.map.nodes.find(node => node.parentId && view.map.nodes.some(child => child.parentId === node.id));
+  assert.ok(target, 'the fixture has a subtopic with subtopics');
   view.selection.setSelected(target.id);
   for (const action of actions) assert.equal(view.mapCommand(action, false), true, action);
-  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
+  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['focus', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
   view.presentation = { order: [], currentId: 'x' };
   for (const action of ['add-topic', 'rename', 'search', 'toggle-collapse']) assert.equal(view.mapCommand(action, true), false, `presentation: ${action}`);
   view.presentation = null;

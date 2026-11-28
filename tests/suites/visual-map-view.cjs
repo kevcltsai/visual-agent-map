@@ -5165,7 +5165,7 @@ integrationTest('Living Node A29: a committed run is one undo step; undo and red
   await assert.rejects(() => pushed[0].undo());
   assert.equal(f.contents.get(path), edited);
 });
-test('B12-y: entering and leaving the detail tier batch the card reads before the writes', () => {
+function batchProbe() {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian });
   const log = [];
   const makeCard = id => {
@@ -5179,10 +5179,13 @@ test('B12-y: entering and leaving the detail tier batch the card reads before th
     Object.defineProperty(card, 'clientHeight', { get: () => { log.push(`${id}:r`); return card.client; } });
     return card;
   };
-  const view = Object.create(VisualAgentMapView.prototype);
+  const phases = () => log.map(e => e.slice(-1)).join('').replace(/(.)\1+/g, '$1');
+  return { view: Object.create(VisualAgentMapView.prototype), log, makeCard, phases };
+}
+test('B12-y: entering and leaving the detail tier batch the card reads before the writes', () => {
+  const { view, log, makeCard, phases } = batchProbe();
   const cards = ['a', 'b', 'c'].map(makeCard);
   view.cardEls = new Map(cards.map((card, i) => [`n${i}`, card]));
-  const phases = () => log.map(e => e.slice(-1)).join('').replace(/(.)\1+/g, '$1');
   view.holdDetailHeights(true);
   assert.equal(phases(), 'rw', 'hold: all heights read, then all written');
   assert.ok(cards.every(card => card.heightValue === '100px' && card.dataset.detailHold === '1'));
@@ -5192,4 +5195,24 @@ test('B12-y: entering and leaving the detail tier batch the card reads before th
   log.length = 0; view.releaseDetailHeights();
   assert.equal(phases(), 'w', 'release writes only: held cards leave the detail hold');
   assert.ok(cards.every(card => card.heightValue === '' && !card.classes.has('is-clipped')));
+});
+test('B12-y: release measures the cards that kept their own height in one batch after the held cards are freed', () => {
+  const { view, log, makeCard, phases } = batchProbe();
+  const [m1, held, m2] = ['a', 'b', 'c'].map(makeCard);
+  m1.heightValue = '80px'; m2.heightValue = '80px'; held.heightValue = '100px'; held.dataset.detailHold = '1';
+  view.cardEls = new Map([['n1', m1], ['n2', held], ['n3', m2]]);
+  view.releaseDetailHeights();
+  assert.equal(phases(), 'wrw', 'one write pass, then a single measuring read, then the classes back on (no read between two cards)');
+  assert.equal(log.filter(e => e.endsWith(':r')).length, 4, 'each measured card is read for scrollHeight and clientHeight once');
+  assert.equal(held.heightValue, '');
+  assert.ok(m1.classes.has('is-clipped') && m2.classes.has('is-clipped') && m1.heightValue === '80px');
+});
+test('B12-y: holdDetailHeights(false) holds from the last normal heights, then measures all cards in one batch', () => {
+  const { view, log, makeCard, phases } = batchProbe();
+  const cards = ['a', 'b', 'c'].map(makeCard);
+  view.map = { id: 'm' }; view.heightsSeenMap = 'm'; view.heightsSeen = new Map([['n1', 70], ['n2', 70], ['n3', 70]]);
+  view.cardEls = new Map(cards.map((card, i) => [`n${i + 1}`, card]));
+  view.holdDetailHeights(false);
+  assert.equal(phases(), 'wrw', 'writes, then one measuring read, then the classes on');
+  assert.ok(cards.every(card => card.heightValue === '70px' && card.dataset.detailHold === '1' && card.classes.has('is-clipped')));
 });

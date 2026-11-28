@@ -6,6 +6,7 @@ export const en = {
   "error.recovery_backup_failed": "Could not verify the recovery copy. The original file was not changed.",
   "log.recovery_snapshot_retained_0": "Recovery copy retained: {0}",
   "log.recovery_scan_failed": "Could not check for pending recovery copies.",
+  "log.adopted_orphan_notes_0": "Recovered {0} card note(s) that a crash had left out of their map.",
   "ui.recovery_snapshots_found_0":
     'A save did not finish last time. VAM kept a copy of the original content in {0}; your notes were not changed. To recover it, follow "Interrupted Markdown writes" in INSTALL.',
   "ui.output_language": "Answer language for this task",

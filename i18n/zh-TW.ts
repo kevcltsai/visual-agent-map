@@ -8,6 +8,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.recovery_backup_failed": "無法確認復原副本完整，原檔未改動。",
   "log.recovery_snapshot_retained_0": "已保留復原副本：{0}",
   "log.recovery_scan_failed": "無法檢查尚待處理的復原副本。",
+  "log.adopted_orphan_notes_0": "已把 {0} 張因當機而未列入地圖的卡片收回地圖。",
   "ui.recovery_snapshots_found_0":
     "上次有一次存檔沒完成。VAM 已把原本的內容另存在 {0}，你的筆記沒有被改動。需要找回時，照 INSTALL 的「Markdown 寫入中斷」說明操作。",
   "ui.output_language": "本次回答語言",

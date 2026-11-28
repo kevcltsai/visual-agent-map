@@ -353,12 +353,50 @@ integrationTest('a crash between a new card note and its Map.md write leaves no 
   // The note is written first (createNote); the process dies before Map.md lists it, so saveMap never runs.
   const orphan = await repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
   assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
-  // Next load: every recovery the plugin has (missing-path repair, then the derived-data rebuild).
-  await repo.reconcileMissingNodePaths();
+  // Next load, in the order main.ts onload runs it: adoption first, then the derived-data rebuild (which strips the
+  // map id from any note no map lists, so it must never run before adoption).
+  assert.equal(await repo.adoptOrphanNodeNotes(), 1);
   await repo.rebuildDerivedData();
   const map = await repo.readMap(mapPath);
   assert.ok(contents.has(orphan.path), 'the user note is never deleted');
-  assert.ok(map.nodes.some(item => item.id === orphan.id), 'the orphan note is listed in Map.md again');
+  assert.ok(map.nodes.some(item => item.id === orphan.id && item.parentId === null), 'the orphan note is listed in Map.md again');
+  assert.match(contents.get(orphan.path), /agent-map-id: /, 'the note keeps its map id');
+});
+integrationTest('DX-crash order: a derived-data rebuild before adoption strips the orphan\'s map id, so adoption must come first', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Order'), doc = await repo.readMap(mapPath);
+  const orphan = await repo.createNote('Late', 'a', doc, mapPath, 'workspace');
+  await repo.rebuildDerivedData();
+  assert.doesNotMatch(contents.get(orphan.path), /agent-map-id: /);
+  assert.equal(await repo.adoptOrphanNodeNotes(), 0);
+});
+integrationTest('adoption leaves an orphan that names another map or lies outside this map\'s topic root alone', async () => {
+  const { repo, app, contents } = fixture();
+  const mapA = await repo.createMap('Alpha'), mapB = await repo.createMap('Beta');
+  const docA = await repo.readMap(mapA), docB = await repo.readMap(mapB);
+  const own = await repo.createNote('Own', 'a', docA, mapA, 'workspace');
+  const namesB = await repo.createNote('Names B', 'a', docA, mapA, 'workspace');
+  contents.set(namesB.path, contents.get(namesB.path).replace(`agent-map-id: ${docA.id}`, `agent-map-id: ${docB.id}`));
+  const inB = await repo.createNote('In B', 'a', docB, mapB, 'workspace');
+  contents.set(inB.path, contents.get(inB.path).replace(`agent-map-id: ${docB.id}`, `agent-map-id: ${docA.id}`));
+  await app.vault.create('Elsewhere/Stray.md', contents.get(own.path).replace(/node-id: \S+/, 'node-id: stray-1'));
+  const untouched = ['Elsewhere/Stray.md', namesB.path, inB.path], before = untouched.map(path => contents.get(path));
+  assert.equal(await repo.adoptOrphanNodeNotes(), 1, 'only the note naming A inside A\'s root is adopted');
+  assert.equal(JSON.stringify((await repo.readMap(mapA)).nodes.map(item => item.id)), JSON.stringify([own.id]));
+  assert.equal((await repo.readMap(mapB)).nodes.length, 0);
+  assert.equal(JSON.stringify(untouched.map(path => contents.get(path))), JSON.stringify(before), 'the other notes are not rewritten');
+});
+integrationTest('adoption twice gives identical Map.md bytes and no duplicate node', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Twice'), doc = await repo.readMap(mapPath);
+  const a = await repo.createNote('A', 'a', doc, mapPath, 'workspace'), b = await repo.createNote('B', 'a', doc, mapPath, 'workspace');
+  assert.equal(await repo.adoptOrphanNodeNotes(), 2);
+  const once = contents.get(mapPath);
+  assert.equal(await repo.adoptOrphanNodeNotes(), 0);
+  assert.equal(contents.get(mapPath), once);
+  const map = await repo.readMap(mapPath);
+  assert.equal(JSON.stringify(map.nodes.map(item => item.id).sort()), JSON.stringify([a.id, b.id].sort()));
+  assert.equal(new Set(map.nodes.map(item => item.path)).size, 2);
 });
 integrationTest('missing path reconciliation keeps an external map edit during citation updates', async () => {
   const { repo, app } = fixture();

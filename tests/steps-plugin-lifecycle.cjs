@@ -130,6 +130,40 @@ test('P3.9 load: a vault with a stale Living card makes no AI call and writes no
   assert.deepEqual(writes, [], 'unload writes nothing');
 });
 
+test('DX-orphan startup: onload adopts a crash-orphaned card note before ready resolves, before any rebuild strips its map id, and before any view exists', async () => {
+  const f = S.fixture('en');
+  const mapPath = await f.repo.createMap('Crashed batch'), doc = await f.repo.readMap(mapPath);
+  const orphan = await f.repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
+  const events = [];
+  let viewsAsked = 0;
+  const bare = new lifecycle.default();
+  const plugin = new Proxy(bare, { get: (target, key, receiver) => key in target || typeof key !== 'string' || !/^(register|add)/.test(key) ? Reflect.get(target, key, receiver) : () => ({ setAttribute() {}, addClass() {}, addEventListener() {} }) });
+  plugin.manifest = { id: 'visual-agent-map', version: '0.0.0-test', dir: '' };
+  plugin.app = { ...f.app, fileManager: f.app.fileManager,
+    metadataCache: { ...f.app.metadataCache, on: () => ({}) },
+    vault: { ...f.app.vault, on: () => ({}) },
+    workspace: { onLayoutReady: () => {}, on: () => ({}), getLeavesOfType: () => { viewsAsked++; return []; }, getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: false }, loadLocalStorage: () => null, saveLocalStorage() {} };
+  // Not yet migrated: the startup rebuild runs too, and must find the orphan already listed.
+  plugin.loadData = async () => ({ migrated: false, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
+  plugin.saveData = async () => {};
+  plugin.addCommand = command => command;
+  const logs = [];
+  plugin.logs = { appendLog: (level, line) => logs.push([level, line]), dispose() {} };
+  await plugin.onload();
+  const proto = Object.getPrototypeOf(bare.repo);
+  for (const name of ['adoptOrphanNodeNotes', 'rebuildDerivedData']) {
+    const original = bare.repo[name];
+    bare.repo[name] = async (...args) => { events.push(`${name}:start`); try { return await original.apply(bare.repo, args); } finally { events.push(`${name}:end`); } };
+  }
+  void proto;
+  await plugin.ready;
+  bare.onunload();
+  const map = await f.repo.readMap(mapPath);
+  assert.ok(map.nodes.some(node => node.id === orphan.id), 'the orphan is listed in Map.md once ready resolves');
+  assert.match(f.contents.get(orphan.path), /agent-map-id: /, 'its map id survived the startup rebuild');
+  assert.ok(logs.some(([, line]) => /Recovered 1 card note/.test(line)), 'the adoption is logged');
+});
+
 test('P3.9 unload: a Living result that arrives after unload, and unload itself, make no vault create, modify or delete', async () => {
   const f = S.fixture();
   const mapDoc = S.map([S.node('card')]);

@@ -1418,13 +1418,24 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     this.repo = new Repository(this.app, this.settings, recovery);
     this.repo.onUnreadableMaps = failures => this.reportUnreadableMaps(failures);
+    // First, before any rebuildDerivedData (it strips the map id from notes no map lists) and before a view or chat
+    // batch exists: takes back card notes whose Map.md write a crash cut off. A failure is logged by mutate, not fatal.
+    const adoptOrphans = this.mutate(
+      async () => {
+        const adopted = await this.repo.adoptOrphanNodeNotes();
+        if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
+      },
+      { sync: false }
+    ).catch(() => undefined);
     const initialize = (
       this.settings.migrated
-        ? Promise.resolve()
-        : this.repo.migrate().then(async () => {
-            await this.repo.rebuildDerivedData();
-            this.settings.migrated = true;
-          })
+        ? adoptOrphans
+        : adoptOrphans
+            .then(() => this.repo.migrate())
+            .then(async () => {
+              await this.repo.rebuildDerivedData();
+              this.settings.migrated = true;
+            })
     ).then(async () => {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {

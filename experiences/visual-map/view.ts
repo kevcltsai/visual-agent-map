@@ -106,6 +106,7 @@ import { isOpenIssuesNote, openIssuesFileName } from "../../core/book-pipeline/o
 import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
+import { MergeDraftModal } from "./merge-draft-modal";
 import {
   begin as beginTransaction,
   isTransactionError,
@@ -339,7 +340,12 @@ import { branchDirectionResolver, edgeBoxReader, lineKind, treeDepthResolver } f
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { anchorHiddenTopicIds, anchorTopicIds } from "./anchor-hide";
-import { checkMergePreservation, withSourceSupplement, type MergeCheckResult } from "../../core/steps/task/merge-check";
+import {
+  checkMergePreservation,
+  findingList,
+  withSourceSupplement,
+  type MergeCheckResult
+} from "../../core/steps/task/merge-check";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -781,6 +787,8 @@ const TASK_PROGRESS_PREFIX = "vam-task:";
 const EXPORT_TARGET_SLOT = "vam-export-target";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
+/** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
+const MERGE_FINDINGS_NOTICE_LIMIT = 5;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1547,8 +1555,11 @@ export class VisualAgentMapView extends ItemView {
     check: (task, result) => this.checkMergeResult(task, result),
     recordFailure: (label, error) => this.plugin.recordFailure(label, error),
     notice: message => new Notice(message),
-    write: (task, result, check) => this.writeMergeDraft(task, result, check)
+    write: (task, result) => this.writeMergeDraft(task, result),
+    failed: task => this.mergeDraftFailed(task)
   });
+  /** The Notice of the last merge whose content check failed (it stays until dismissed); hidden when its draft goes. */
+  private mergeFailureNotice: Notice | undefined;
   /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
   private chatReplyStep: ChatReplyStep | undefined;
   /**
@@ -3376,6 +3387,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesControl?.dispose();
     this.plugin.topicRuns.dropSyntheses(this);
     this.mergeDrafts.stopAll();
+    this.mergeFailureNotice?.hide();
     this.dropMapBackground();
     this.viewEpoch++;
     this.mapOpenEpoch++;
@@ -3826,6 +3838,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     if (this.path !== path) {
+      this.dropFailedMergeDraft();
       this.dropBookReviewSession();
       this.cancelPendingRefresh();
       this.dropCanvasInteractionModes();
@@ -6582,7 +6595,12 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean; replyStep?: ChatReplyStep; appearance?: TopicAppearanceChange } = {}
+    options: {
+      keepTitle?: boolean;
+      replyStep?: ChatReplyStep;
+      appearance?: TopicAppearanceChange;
+      failedLine?: (text: string) => void;
+    } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -6630,6 +6648,7 @@ export class VisualAgentMapView extends ItemView {
         ...(options.keepTitle ? { keepTitle: true } : {}),
         ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         ...(options.appearance ? { appearance: options.appearance } : {}),
+        ...(options.failedLine ? { failedLine: options.failedLine } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6649,7 +6668,7 @@ export class VisualAgentMapView extends ItemView {
     return began;
   }
   /** The merged result is written (History, the chat reply's step, Undo Notice); the run itself lives in MergeDrafts. */
-  private async writeMergeDraft(task: MergeTask, result: AiResult, check: MergeCheckResult): Promise<void> {
+  private async writeMergeDraft(task: MergeTask, result: AiResult): Promise<void> {
     const previous = this.history.undoEntry;
     await this.confirmMergeDraft(task, result.summary, result.detail);
     let entry = this.history.undoEntry;
@@ -6661,15 +6680,7 @@ export class VisualAgentMapView extends ItemView {
       entry = step.entry;
       folded = true;
     }
-    let done = t("ui.merge_done_0", task.title);
-    if (!check.ok) {
-      const found = check.missing.length + check.added.length;
-      this.plugin.recordFailure(
-        t("log.merge_check_warning"),
-        `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
-      );
-      done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
-    }
+    const done = t("ui.merge_done_0", task.title);
     // The Undo button only while this merge is still the newest history step.
     if (entry && (entry !== previous || folded))
       backgroundResultNotice(
@@ -6683,6 +6694,98 @@ export class VisualAgentMapView extends ItemView {
         MERGE_DONE_NOTICE_MS
       );
     else new Notice(done, MERGE_DONE_NOTICE_MS);
+  }
+  /** What the content check found, as lists (the same lists the repair request gets). */
+  private mergeFindings(check: MergeCheckResult, limit?: number): string {
+    const none = "";
+    return [
+      ...(check.missing.length ? [`${t("ui.merge_check_missing")}\n${findingList(check.missing, none, limit)}`] : []),
+      ...(check.added.length ? [`${t("ui.merge_check_added")}\n${findingList(check.added, none, limit)}`] : [])
+    ].join("\n");
+  }
+  /**
+   * The content check still failed after the one repair: nothing was written and the cards are free again. The Notice (it
+   * stays until dismissed) and the chat reply's result line say what is missing; Retry and View draft sit in the Notice.
+   */
+  private mergeDraftFailed(task: MergeTask): void {
+    const check = task.check;
+    if (!check) return;
+    this.plugin.recordFailure(
+      t("log.merge_check_warning"),
+      `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
+    );
+    // Where the focus was when the merge ended: View draft puts it back there when its window closes.
+    const back = this.contentEl?.ownerDocument?.activeElement;
+    const found = String(check.missing.length + check.added.length);
+    this.mergeFailureNotice?.hide();
+    this.mergeFailureNotice = backgroundResultNotice(
+      `${t("ui.merge_check_failed_0_1", task.title, found)}\n${this.mergeFindings(check, MERGE_FINDINGS_NOTICE_LIMIT)}`,
+      [
+        { label: t("ui.merge_retry"), open: () => this.retryFailedMerge(task) },
+        { label: t("ui.merge_view_draft"), open: () => this.viewFailedMergeDraft(task, back) }
+      ],
+      0
+    );
+    const items = [...check.missing, ...check.added];
+    const shown =
+      items.slice(0, MERGE_FINDINGS_NOTICE_LIMIT).join(t("ui.list_separator")) +
+      (items.length > MERGE_FINDINGS_NOTICE_LIMIT ? "…" : "");
+    task.failedLine?.(t("ui.merge_check_failed_chat_0_1_2", task.title, found, shown));
+  }
+  /** The kept draft of a failed merge goes (the map is switched); its Notice goes with it. */
+  private dropFailedMergeDraft(): void {
+    this.mergeDrafts.dropFailed();
+    this.mergeFailureNotice?.hide();
+    this.mergeFailureNotice = undefined;
+  }
+  /** Retry of a failed merge: the user's press only; it starts the merge again through the usage notice, as the dialog does. */
+  private retryFailedMerge(task: MergeTask): void {
+    if (this.closed || this.mergeDrafts.failedDraft !== task || this.path !== task.mapPath) {
+      new Notice(t("ui.merge_draft_gone"));
+      return;
+    }
+    if (this.mergeOpen || this.mergeDrafts.has(this.path)) {
+      new Notice(t("ui.merge_locked"));
+      return;
+    }
+    this.startMergeDraft(
+      task.title,
+      {
+        path: task.mapPath,
+        mapId: task.mapId,
+        parentId: task.parentId,
+        targetId: task.targetId,
+        sources: task.sources
+      },
+      () => {},
+      new AbortController().signal,
+      {
+        ...(task.keepTitle ? { keepTitle: true } : {}),
+        ...(task.appearance ? { appearance: task.appearance } : {})
+      }
+    ).catch(error => new Notice(this.plugin.recordFailure(t("log.merge_failed"), error)));
+  }
+  /** The draft of a failed merge, read only and copyable; nothing can be applied from it. */
+  private viewFailedMergeDraft(task: MergeTask, back: Element | null | undefined): void {
+    const draft = task.draft,
+      check = task.check;
+    if (this.closed || this.mergeDrafts.failedDraft !== task || !draft || !check) {
+      new Notice(t("ui.merge_draft_gone"));
+      return;
+    }
+    new MergeDraftModal(
+      this.app,
+      {
+        title: task.title,
+        findings: `${t("ui.merge_check_failed_0_1", task.title, String(check.missing.length + check.added.length))}\n${this.mergeFindings(check)}`,
+        text: `${draft.summary}\n\n${draft.detail}`.trim()
+      },
+      () => {
+        const earlier = back as HTMLElement | null | undefined;
+        const target = earlier?.isConnected && earlier !== earlier.ownerDocument.body ? earlier : this.contentEl;
+        target.focus();
+      }
+    ).open();
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
   private undoNotice(message: string, previous: Action | undefined): void {
@@ -6858,16 +6961,23 @@ export class VisualAgentMapView extends ItemView {
       repo = this.plugin.repo,
       before = clone(this.map),
       language = this.plugin.settings.language;
-    if (content) {
-      let latest: string | undefined;
+    // The sources must still be what the model was given (the shared AI write gate, version part). Compared here so a
+    // changed source writes nothing at all, and again inside the commit, right before its first write, so an edit made
+    // while the merge is being prepared abandons it too.
+    const sourcesUnchanged = async (): Promise<void> => {
+      if (!content) return;
+      let latest = "";
       try {
         latest = (await this.mergeSourceSnapshot(sources, new AbortController().signal)).content;
       } catch {
         /* An unreadable source is a changed source. */
+        latest = "\u0000unreadable";
       }
-      if (latest !== content.sourceContent) stale();
-    }
-    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked);
+      if (aiWriteGate({ owned: true, version: { read: content.sourceContent, now: latest } }).length) stale();
+    };
+    await sourcesUnchanged();
+    const beforeWrite = content ? sourcesUnchanged : undefined;
+    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked, beforeWrite);
     let detail = "";
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
@@ -6964,7 +7074,7 @@ export class VisualAgentMapView extends ItemView {
           this.takeRetargetDrops(retargetRelationsToTopic(map, ids, merged.id));
           if (adopted.size) this.arrangeBranch(map, merged.id, adopted, undefined);
         })
-        .commit({ label: t("ui.merge_topics_history") });
+        .commit({ label: t("ui.merge_topics_history"), ...(beforeWrite ? { beforeWrite } : {}) });
     } catch (error) {
       this.render();
       // The new note is created outside the transaction: park it (never delete it) and rebuild.
@@ -7031,7 +7141,9 @@ export class VisualAgentMapView extends ItemView {
         }
       | undefined,
     before: MapDocument,
-    asked?: TopicAppearanceChange
+    asked?: TopicAppearanceChange,
+    /** The AI merge's last look at its sources, inside the commit (see mergeSelected). */
+    beforeWrite?: () => Promise<void>
   ): Promise<void> {
     const [target, ...children] = sources,
       mapPath = this.path,
@@ -7110,7 +7222,7 @@ export class VisualAgentMapView extends ItemView {
           this.takeRetargetDrops(retargetRelationsToTopic(map, ids, target.id));
           if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })
-        .commit({ label: t("ui.merge_topics_history") });
+        .commit({ label: t("ui.merge_topics_history"), ...(beforeWrite ? { beforeWrite } : {}) });
     } catch (error) {
       this.render();
       throw this.mergeError(error);
@@ -24851,10 +24963,20 @@ export class VisualAgentMapView extends ItemView {
           snapshot.sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
         );
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
+          // A merge that fails its content check later says so under this reply, while the reply is still the last one.
+          const mergeChat = this.chat;
+          const mergeTurns = mergeChat?.transcript().length ?? 0;
+          const mergeRecord = this.chatLastRecord;
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
             keepTitle: true,
             ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}),
-            ...(held ? { appearance: held } : {})
+            ...(held ? { appearance: held } : {}),
+            failedLine: text => {
+              if (!mergeChat || this.chat !== mergeChat || this.closed || mergeChat.transcript().length !== mergeTurns)
+                return;
+              mergeChat.appendLines([{ status: "failed", text, loud: true }]);
+              mergeRecord?.relines();
+            }
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }

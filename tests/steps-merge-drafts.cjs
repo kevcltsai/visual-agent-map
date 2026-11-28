@@ -18,7 +18,7 @@ function newTask(mapPath, ids = ['a', 'b']) {
 
 function world(options = {}) {
   const state = { closed: false, path: 'map.md', content: 'same' };
-  const asks = [], changes = [], notices = [], writes = [], checks = [], progress = [], events = [];
+  const asks = [], changes = [], notices = [], writes = [], checks = [], progress = [], events = [], failed = [];
   const ports = {
     path: () => state.path,
     closed: () => state.closed,
@@ -31,10 +31,11 @@ function world(options = {}) {
     check: async (task, result) => { checks.push(result); return options.check ? options.check(task, result) : { ok: true, missing: [], added: [] }; },
     recordFailure: (label, error) => `${label}: ${error}`,
     notice: message => { notices.push(message); },
-    write: async (...args) => { writes.push(args); if (options.write) await options.write(...args); }
+    write: async (...args) => { writes.push(args); if (options.write) await options.write(...args); },
+    failed: task => { failed.push(task); }
   };
   const drafts = new MergeDrafts(ports);
-  return { drafts, state, asks, changes, notices, writes, checks, progress, events };
+  return { drafts, state, asks, changes, notices, writes, checks, progress, events, failed };
 }
 
 test('merge drafts: Stop while the model works forgets the task, and the late result writes and says nothing', async () => {
@@ -173,4 +174,67 @@ test('merge drafts: stopping during registration never starts a snapshot or prog
   assert.deepEqual(w.asks, []);
   assert.deepEqual(w.progress, []);
   assert.equal(w.drafts.has('map.md'), false);
+});
+
+// V3.3 #03: a merge whose content check still fails after the one repair writes nothing and keeps the draft in memory.
+const FAILING = { ok: false, missing: ['42'], added: ['99'] };
+const failedRun = async (ids = ['a', 'b']) => {
+  const w = world({ check: () => FAILING });
+  const task = newTask('map.md', ids);
+  w.drafts.start(task, () => {});
+  await flush();
+  w.asks[0].resolve(RESULT);
+  await flush();
+  w.asks[1].resolve({ ...RESULT, detail: 'repaired detail' });
+  await task.run;
+  return { w, task };
+};
+
+test('merge drafts: a check that still fails after the one repair writes nothing, releases the lock and keeps the draft', async () => {
+  const { w, task } = await failedRun();
+  assert.equal(w.asks.length, 2, 'the merge and exactly one repair request, never a second one');
+  assert.equal(w.writes.length, 0, 'the write port is never called');
+  assert.equal(task.state, 'draft-failed');
+  assert.deepEqual(task.check, FAILING);
+  assert.equal(task.draft.summary, RESULT.summary);
+  assert.equal(w.drafts.has('map.md'), false, 'the merge lock is released');
+  assert.equal(w.drafts.isMerging('a'), false);
+  assert.equal(w.drafts.failedDraft, task, 'the draft stays in memory');
+  assert.deepEqual(w.failed, [task], 'the view is told once');
+  assert.deepEqual(w.progress, [task], 'progress ended exactly once');
+  assert.deepEqual(w.notices, [], 'the failure Notice is the view\'s, not the stale or error one');
+  await flush();
+  assert.equal(w.asks.length, 2, 'nothing is retried by itself');
+});
+
+test('merge drafts: the kept draft is dropped by a new merge of the same cards or by closing; another group keeps it', async () => {
+  const { w, task } = await failedRun();
+  const other = w.drafts.start(newTask('map.md', ['c', 'd']), () => {});
+  assert.equal(w.drafts.failedDraft, task, 'a merge of other cards keeps it');
+  w.drafts.stop(other);
+  const again = w.drafts.start(newTask('map.md', ['b', 'a']), () => {});
+  assert.equal(w.drafts.failedDraft, undefined, 'merging the same cards again drops it');
+  w.drafts.stop(again);
+  const second = await failedRun();
+  second.w.drafts.stopAll();
+  assert.equal(second.w.drafts.failedDraft, undefined, 'closing the view drops it');
+  const third = await failedRun();
+  third.w.drafts.dropFailed();
+  assert.equal(third.w.drafts.failedDraft, undefined, 'switching maps drops it');
+});
+
+test('merge drafts: a failed repair request keeps the first draft and still writes nothing', async () => {
+  const w = world({ check: () => FAILING });
+  const task = newTask('map.md');
+  w.drafts.start(task, () => {});
+  await flush();
+  w.asks[0].resolve(RESULT);
+  await flush();
+  w.asks[1].reject(new Error('provider down'));
+  await task.run;
+  assert.equal(w.asks.length, 2);
+  assert.equal(w.writes.length, 0);
+  assert.equal(task.state, 'draft-failed');
+  assert.equal(task.draft, RESULT, 'the first draft is kept');
+  assert.deepEqual(w.failed, [task]);
 });

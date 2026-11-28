@@ -4150,6 +4150,22 @@ integrationTest('persona 17: a chat reply that recolours and then AI-merges is o
   const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
   assert.ok(titles.includes('Nothing to Fear'), 'the merged card is back after redo'); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
 });
+// V3.3 #03: the chat's merge whose content check still fails writes nothing; the reply gets a result line with the missing items.
+integrationTest('map chat merge: a merge that fails its content check adds a failed line with the missing items; nothing is merged and one undo takes back the recolour only', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('c')).color;
+  const appended = []; const chat = { transcript: () => [], appendLines: lines => appended.push(...lines) };
+  // Every other chat method the view calls (render, undo refresh) is a no-op here.
+  h.view.chat = new Proxy(chat, { get: (target, key) => (key in target ? target[key] : () => {}) });
+  h.view.checkMergeResult = async () => ({ ok: false, missing: ['42', 'https://example.org/a'], added: [] });
+  await mergeReply(h);
+  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards stay on the map');
+  assert.equal(h.view.mergeDrafts.tasks.size, 0, 'the merge lock is released'); assert.ok(h.view.mergeDrafts.failedDraft, 'the draft is kept');
+  eq(appended.map(l => l.status), ['failed']); assert.match(appended[0].text, /“Nothing to Fear”/); assert.match(appended[0].text, /42/); assert.match(appended[0].text, /example\.org\/a/);
+  assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1);
+  await h.view.travel(false);
+  assert.equal((await h.note('c')).color, colourBefore, 'one undo takes the recolour back'); assert.equal(h.view.history.canUndo, false);
+});
 integrationTest('persona 17: when another step was pushed before the merge lands, the merge stays its own step', async () => {
   const h = await harness({ viaSync: false }); await h.view.hydrate();
   const log = [];

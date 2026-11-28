@@ -10936,8 +10936,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The toolbar Style popover (style-popover.ts) for the card, under its Style button. Each choice is one write and one undo
-   * step through changeTopicColor or changeTopicStyle, after whenEditing, the structure lock and mergeUnlocked (the whole
-   * branch when the box is ticked); a refused choice puts the saved state back.
+   * step through changeTopicColor or changeTopicStyle, after whenEditing and mergeUnlocked (the whole branch when the box
+   * is ticked; not the picture-book locks, decision #62); a refused choice puts the saved state back.
    */
   private openStyleFor(node: MapNode, opener?: HTMLElement): void {
     this.styleOpen?.pop.close();
@@ -10950,7 +10950,7 @@ export class VisualAgentMapView extends ItemView {
       let queued = false;
       this.whenEditing(() => {
         const live = this.mapNodeById(id);
-        if (!live || this.bookLock().structure || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
+        if (!live || !this.mergeUnlocked(branch ? this.branchIds(id) : [id])) return;
         queued = true;
         this.enqueue(async () => {
           await change(live);

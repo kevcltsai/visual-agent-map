@@ -412,9 +412,9 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     order: 35,
     group: 2,
     // B08: the toolbar's Style (an AI card has it in its ⋯); each choice in the popover goes through whenEditing and
-    // mergeUnlocked. Hidden under the picture-book structure lock.
+    // mergeUnlocked. A colour or style is neither card AI nor structure (decision #62), so the picture-book locks keep it.
     applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.stylesEditable,
-    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    available: ctx => gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openStyle(card(ctx), options?.opener)
   },
   {

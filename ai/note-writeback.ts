@@ -11,6 +11,7 @@
 import { bareCalloutLines, titleBareCallouts } from "./callout-titles";
 import { NOTE_LANGUAGES, translate, type NoteLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
+import { withoutSourceIdentity } from "./result-utils";
 import { sectionLookup, type DetailTemplate } from "./detail-templates";
 import { isResearchNotesHeading } from "./section-aliases";
 
@@ -381,7 +382,9 @@ function composeTop(input: WritebackInput): WritebackResult {
       for (let line = item.first; line <= item.last; line++) drop.add(line);
       if (seen.has(item.label)) continue;
       seen.add(item.label);
-      if (oldTargets.get(item.label) === item.target) continue;
+      // The same source wikilink is the same definition, whether or not either carries the `%%vam-src:…%%` comment.
+      const oldTarget = oldTargets.get(item.label);
+      if (oldTarget !== undefined && withoutSourceIdentity(oldTarget) === withoutSourceIdentity(item.target)) continue;
       let label = item.label;
       if (/^\d+$/.test(label)) {
         counter++;

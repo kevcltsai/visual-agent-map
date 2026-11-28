@@ -2202,3 +2202,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-knowledge-ref-modal .vam-knowledge-ref-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-knowledge-ref-modal .vam-knowledge-ref-detail { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow-y: auto; }
 @media (max-width: 480px) { .vam-view .vam-knowledge-ref { max-width: 200px; } }
+
+.vam-merge-draft-text { width: 100%; font-family: var(--font-monospace); font-size: var(--font-ui-small); }

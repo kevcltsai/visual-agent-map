@@ -152,15 +152,15 @@ test('a missing picture that fails to load keeps the bar too', async () => {
   assert.equal(find(el, i => i.tag === 'img'), undefined);
 });
 
-test('menu on a plain image: convert, open original, delete; the Menu key opens it beside the image', async () => {
+test('menu on a plain image: image exploration, convert, open original, delete; the Menu key opens it beside the image', async () => {
   const h = await harness([image()]);
   h.view.render();
   const menu = h.contextMenu();
   assert.ok(menu.prevented && menu.mouse);
-  assert.deepEqual(menu.items.map(h.titleOf), ['Convert to annotated image…', 'Open original file', 'Delete image']);
+  assert.deepEqual(menu.items.map(h.titleOf), ['Image exploration…', 'Convert to annotated image…', 'Open original file', 'Delete image']);
   const key = h.contextMenu(true);
   assert.deepEqual(plain(key.at), { x: 7, y: 99 });
-  menu.items[1].fn();
+  menu.items[2].fn();
   assert.deepEqual(h.opened, ['attachments/a.png']);
 });
 
@@ -210,7 +210,7 @@ test('counter-example (cancel): Cancel or closing the dialog leaves the map and 
 test('edit note: dialog starts with the current note; Save changes it in one undo step; blank clears it', async () => {
   const h = await harness([annotated({ note: 'old', anchors: [anchor()] })]);
   h.view.render();
-  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
   h.pick(h.contextMenu(), 'Edit note').fn();
   const modal = h.modals.at(-1);
   assert.equal(modal.titleEl.text, 'Edit note');
@@ -393,7 +393,7 @@ test('anchors: pointerdown and click on an anchor do not reach the image (no dra
 test('place mode: menu item starts it with a centred crosshair and the hint bar; arrows move 2%, Shift 10%, clamped to 0-1', async () => {
   const h = await harness([annotated({ note: 'n' })]);
   h.view.render();
-  assert.equal(h.titleOf(h.contextMenu().items[0]), 'Place anchor');
+  assert.equal(h.titleOf(h.contextMenu().items[1]), 'Place anchor');
   h.pick(h.contextMenu(), 'Place anchor').fn();
   assert.equal(hint(h).attrs.role, 'status');
   assert.equal(hint(h).text, '← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse');
@@ -1065,13 +1065,13 @@ test('counter-example (preview anchor): a preview span without data-anchor-id st
   const h = await harness(withRelations);
   h.view.render();
   const menu = anchorMenu(h, { preview: true });
-  assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+  assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
 });
 
-test('counter-example (image blank area): right-click outside any anchor keeps the four-item image menu', async () => {
+test('counter-example (image blank area): right-click outside any anchor keeps the image menu (Image exploration first, then the four image items)', async () => {
   const h = await harness(withRelations);
   h.view.render();
-  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
 });
 
 test('regression: deleting the image from its menu keeps every topic of a ringed map', async () => {
@@ -1110,7 +1110,7 @@ test('counter-example (modes): in place mode or topic-pick mode a right-click on
     else h.view.picking = { topicId: 't', kind: 'related' };
     assert.ok(h.view[mode], mode);
     const menu = anchorMenu(h);
-    assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)'], mode);
+    assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Image exploration', 'Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)'], mode);
   }
 });
 
@@ -1396,4 +1396,79 @@ test('the click that ends an anchor drag does not toggle the anchor', async () =
   find(h.imageEl(), i => i.hasClass('vam-anchor')).click();
   assert.equal(h.view.canvasNodes().length, 1);
   assert.equal(h.view.anchorClickSuppressed, false);
+});
+
+// V3.3 G04 / P5.3: "Image exploration" is the image right-click's first row, drawn from the card action list (image-explore).
+test('image exploration (annotated): the menu row makes the image the chat picture at once and writes nothing', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const before = h.fileText(), entries = h.view.history.past.length;
+  const row = h.contextMenu().items[0];
+  assert.equal(h.titleOf(row), 'Image exploration');
+  assert.equal(row.icon, 'scan-search');
+  assert.equal(row.disabled, false);
+  row.fn();
+  await h.settle();
+  assert.equal(h.view.chatImageId, 'img1');
+  assert.deepEqual(plain(h.view.chatImage()), { id: 'img1', kind: 'annotated', note: 'n', name: 'a.png' });
+  assert.equal(h.modals.length, 0);
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+});
+
+test('image exploration (plain): it asks first; Convert and explore converts in one undo step, then the chat gets the picture', async () => {
+  const h = await harness([image()]);
+  h.view.render();
+  const entries = h.view.history.past.length;
+  h.pick(h.contextMenu(), 'Image exploration…').fn();
+  const modal = h.modals.at(-1);
+  assert.equal(modal.titleEl.text, 'Convert to an annotated image and let the AI see it?');
+  assert.deepEqual(dom.buttons(modal.modalEl), ['Cancel', 'Convert and explore']);
+  assert.equal(h.view.chatImageId, null, 'nothing goes to the chat before the user agrees');
+  find(modal.modalEl, i => i.tag === 'input').value = 'Cow scan';
+  dom.button(modal.modalEl, 'Convert and explore').click();
+  await h.settle();
+  assert.deepEqual(await h.onDisk(), [annotated({ note: 'Cow scan' })]);
+  assert.equal(h.view.history.past.length, entries + 1);
+  assert.equal(h.view.chatImageId, 'img1');
+  assert.equal(h.view.chatImage().kind, 'annotated');
+});
+
+test('counter-example (cancel): Cancel or closing the image exploration dialog writes nothing and gives the chat no picture', async () => {
+  const h = await harness([image()]);
+  h.view.render();
+  const before = h.fileText(), entries = h.view.history.past.length;
+  h.pick(h.contextMenu(), 'Image exploration…').fn();
+  find(h.modals.at(-1).modalEl, i => i.tag === 'input').value = 'typed';
+  dom.button(h.modals.at(-1).modalEl, 'Cancel').click();
+  h.pick(h.contextMenu(), 'Image exploration…').fn();
+  h.modals.at(-1).close();
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+  assert.equal(h.view.chatImageId, null);
+});
+
+test('counter-example (stale menu): a row clicked after the map turned read-only, selection mode or a presentation does nothing', async () => {
+  for (const mode of ['loading', 'selection', 'presentation'])
+    for (const items of [[image()], [annotated()]]) {
+      const h = await harness(items);
+      h.view.render();
+      const before = h.fileText();
+      const row = h.contextMenu().items[0];
+      if (mode === 'loading') h.view.notesLoading = () => true;
+      if (mode === 'selection') h.view.selection.toggleMultiSelect();
+      if (mode === 'presentation') h.view.presentation = {};
+      row.fn();
+      await h.settle();
+      assert.equal(h.modals.length, 0, mode);
+      assert.equal(h.view.chatImageId, null, mode);
+      assert.equal(h.fileText(), before, mode);
+    }
+});
+
+test('image exploration: the plain image row in Traditional Chinese (the annotated name is checked in steps-card-actions)', async () => {
+  const h = await harness([image()], 'zh-TW');
+  h.view.render();
+  assert.equal(h.titleOf(h.contextMenu().items[0]), '圖像探索…');
 });

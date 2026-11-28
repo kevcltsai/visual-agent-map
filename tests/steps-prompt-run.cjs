@@ -1423,7 +1423,7 @@ test('trial cancel: declining the usage confirmation or pressing Stop shows no f
   assert.ok(find(box(failed), i => i.hasClass?.('vam-living-editor-failure-reason')).text, 'a real failure says why');
 });
 
-test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note, and Note still opens the details', async () => {
+test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note and ⋯ (its rows greyed, decision #35), and Note still opens the details', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');
   let opened = 0; h.view.openDetails = () => { opened++; };
@@ -1432,7 +1432,7 @@ test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers on
   h.view.noteLoad = { pending: true };
   const loading = element('div');
   h.view.paintCardToolbar(loading, node, true);
-  assert.deepEqual(buttons(loading).map(b => hasCls(b, 'vam-detail-button')), [true], 'read-only: Note only');
+  assert.deepEqual(buttons(loading).map(b => [hasCls(b, 'vam-detail-button'), hasCls(b, 'vam-card-tool-more')]), [[true, false], [false, true]], 'read-only: Note and ⋯ only');
   buttons(loading)[0].click();
   assert.equal(opened, 1, 'Note only reads, so it works while read-only');
   h.view.noteLoad = null;

@@ -187,3 +187,84 @@ test('book lock: the entries refuse too while the book writes (AI chat, the + li
   // Drag: the reparent target check refuses while locked (source: the one check sits in targetAt).
   assert.ok(view_ts.includes('if (!this.canSelectTopics() || !this.map || this.bookLock().structure) return null;'), 'targetAt finds no new parent while locked');
 });
+
+test('book lock: a structure lock adds no text block from any entry (the panel and palette add, a free block, the canvas right-click): Map.md is not written', async () => {
+  const h = await harness({ book: true, stages: { a: 'planned' } });
+  atPhase(h, 'writing');
+  let pending = Promise.resolve();
+  h.plugin.mutate = work => (pending = pending.then(work));
+  const settle = async () => { await pending; await dom.tick(); await pending; };
+  const file = h.view.app.vault.getAbstractFileByPath(MAP);
+  const before = await h.view.app.vault.read(file);
+  const node = h.view.map.nodes.find(n => n.id === h.ids.a);
+  // The add list's Text row and the add-text-node command both call addTextNodeUnder (with and without a selected card).
+  h.view.addTextNodeUnder(node);
+  await settle();
+  h.view.selection.setSelected(null);
+  h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
+  h.view.addTextNodeUnder();
+  await settle();
+  assert.equal(await h.view.app.vault.read(file), before, 'no text block is written while the book writes');
+  assert.equal((h.view.map.canvasItems ?? []).length, 0);
+  assert.equal(h.view.textAddLocked?.(), true, 'the add-text-node command is not offered (its checkCallback asks textAddLocked)');
+  assert.ok(main_ts.includes('if (!view || view.textAddLocked()) return false;'), 'the palette command checks textAddLocked');
+  // The canvas right-click keeps "Add text here", greyed with the book lock as the reason.
+  const items = [];
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass() {}, createSpan(o) { it.hints.push(o.text); } } });
+  h.view.newMenu = () => ({ setUseNativeMenu() {}, addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return this; }, addSeparator() { return this; }, showAtMouseEvent() {} });
+  h.view.stagePoint = () => ({ x: 10, y: 10 });
+  h.view.onCanvasContextMenu({ target: { closest: () => null }, clientX: 5, clientY: 5, preventDefault() {} });
+  const row = items.find(i => i.title === tr('ui.text_node_add_here'));
+  assert.ok(row, 'the row stays');
+  assert.equal(row.disabled, true);
+  assert.equal(row.fn, undefined, 'a click does nothing');
+  assert.deepEqual(row.hints, [tr('ui.card_action_off_book_lock')]);
+  // Done gives it back: the same call writes one block.
+  atPhase(h, 'done');
+  assert.equal(h.view.textAddLocked(), false);
+  h.view.addTextNodeUnder(node);
+  await settle();
+  assert.notEqual(await h.view.app.vault.read(file), before, 'once the book is done a text block is added');
+});
+
+test('notes loading (decision #35, P1.1): the card ⋯ and right-click open, every row greyed with "notes loading" and no click; nothing is written', async () => {
+  const h = await harness({ book: false });
+  let pending = Promise.resolve(), mutations = 0;
+  h.plugin.mutate = work => { mutations++; return (pending = pending.then(work)); };
+  h.view.noteLoad = { framed: false };
+  const stage = h.paint();
+  const more = byCls(stage, 'vam-card-tool-more');
+  assert.equal(more.length, 3, 'every card keeps its ⋯ while loading');
+  // lockWhileLoading greys the other buttons, not ⋯.
+  h.view.contentEl = stage;
+  for (const button of more) button.getBoundingClientRect = () => ({ left: 0, bottom: 0 });
+  for (const button of more) button.closest = sel => (sel.split(', ').includes('.vam-card-tool-more') ? button : null);
+  h.view.lockWhileLoading();
+  assert.equal(more[0].disabled, false, 'lockWhileLoading keeps ⋯ usable');
+  assert.ok(byCls(stage, 'vam-detail-button').every(b => b.disabled), 'the other card buttons are still locked');
+  // ⋯ opens its menu; the right-click opens the card's list.
+  const opened = [];
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, setChecked() { return this; }, setWarning() { return this; }, setSubmenu() { return { addItem() { return this; }, addSeparator() { return this; } }; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass(c) { it.cls = c; }, createSpan(o) { it.hints.push(o.text); } } });
+  h.view.newMenu = () => { const items = []; opened.push(items); return { setUseNativeMenu() {}, addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return this; }, addSeparator() { return this; }, showAtPosition() {}, showAtMouseEvent() {} }; };
+  more[0].fire('click', { metaKey: false, ctrlKey: false });
+  assert.equal(opened.length, 1, '⋯ opens while the notes load');
+  const card = h.view.cardEls.get(h.ids.a);
+  h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, clientX: 5, clientY: 5, preventDefault() {} });
+  assert.equal(opened.length, 2, 'the right-click opens while the notes load');
+  for (const [name, rows] of [['⋯', opened[0]], ['right-click', opened[1]]]) {
+    assert.ok(rows.length > 3, `${name}: the card's whole list is drawn`);
+    for (const row of rows) {
+      assert.equal(row.disabled, true, `${name}: ${row.title} is greyed`);
+      assert.deepEqual(row.hints, [tr('ui.card_action_off_notes_loading')], `${name}: ${row.title} says the notes are loading`);
+      assert.equal(row.fn, undefined, `${name}: ${row.title} has no click`);
+    }
+  }
+  assert.equal(tr('ui.card_action_off_notes_loading'), '筆記載入中');
+  await pending;
+  assert.equal(mutations, 0, 'nothing is written');
+  // Presenting still opens neither.
+  h.view.presentation = true;
+  more[0].fire('click', { metaKey: false, ctrlKey: false });
+  h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, clientX: 5, clientY: 5, preventDefault() {} });
+  assert.equal(opened.length, 2, 'no menu while presenting');
+});

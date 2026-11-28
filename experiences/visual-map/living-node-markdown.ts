@@ -689,10 +689,12 @@ export const livingGeneration = (content: string): number => readLivingFence(fro
 function withLatestSummary(content: string, previous: string, latest: string): string {
   const headings = noteHeadingSet(content) ?? CANONICAL_HEADINGS;
   const canonical = canonicalHeadings(content, headings);
-  // A note without the section (not written by VAM) is not given one.
-  if (!/^## Current Summary[ \t]*\r?$/m.test(canonical)) return content;
-  const current = section(canonical, "Current Summary").trim();
+  const hasSection = /^## Current Summary[ \t]*\r?$/m.test(canonical);
+  const owned = frontmatter(content).summary;
+  const current = (hasSection ? section(canonical, "Current Summary") : typeof owned === "string" ? owned : "").trim();
   if (current && !isPlaceholder(current) && current !== previous.trim()) return content;
+  // A note without the section (not written by VAM) is not given one: its body stays as it is, only the frontmatter summary follows.
+  if (!hasSection) return setFrontmatterKeys(content, { summary: latest });
   // The section helper leaves no blank line before the next heading when the section grew; the note keeps its spacing.
   const body = replaceSummarySection(canonical, latest).replace(
     /(\n## Current Summary\r?\n\r?\n[\s\S]*?[^\n])\n(## )/,

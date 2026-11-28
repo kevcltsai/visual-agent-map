@@ -6160,3 +6160,88 @@ test('AI lock: applying the reader\'s notes to a locked chapter is refused with 
   assert.equal(r.calls.length, 0); assert.equal(r.stat.backups.length, backups);
   assert.equal(r.cardRaw(), before); assert.equal((await r.state()).budget.used, used);
 });
+
+// ai-flows §AI 鎖定, whole-book proofread: a locked chapter is left out of the call itself (its title and text are not sent, no fix target
+// of it is asked), never only refused at the write; with every chapter locked no call is made and "fix again" says the book is locked.
+const bookCalls = r => r.stat.ai.filter(([k]) => k === 'book');
+const sentText = request => JSON.stringify(request);
+test('AI lock, whole book: a chapter locked before the book proofread is not in the one call; its file is untouched', async () => {
+  const holder = {};
+  const r = await aiRig({
+    aiProof: async request => {
+      if (request.title === 'SecretTitleA') { await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true); holder.locked = holder.r.raw(1); }
+      return { checks: [], prior: [], dropped: {} };
+    }
+  });
+  holder.r = r;
+  await finishAi(r);
+  assert.ok(holder.locked, 'chapter A was locked after its write');
+  const books = bookCalls(r);
+  assert.equal(books.length, 1, 'one whole-book call');
+  same(books[0][1].chapters.map(c => c.title), ['SecretRootTitle', 'SecretTitleB'], 'the locked chapter is not sent');
+  assert.ok(!sentText(books[0][1]).includes('SecretTitleA'), 'no text of the locked chapter in the payload');
+  assert.equal(r.raw(1), holder.locked, 'the locked file is byte for byte as locked');
+  assert.equal((await r.state()).phase, 'done');
+});
+test('AI lock, whole book: a chapter locked after the check is not sent to the fix (no target, no text); the other chapter is fixed', async () => {
+  const holder = {};
+  let fixed = false;
+  const r = await aiRig({
+    aiBookProof: async request => {
+      if (!holder.locked) { await holder.r.repo.writeAiLocked(holder.r.nodes[1].path, true); holder.locked = holder.r.raw(1); }
+      if (fixed) return { checks: [], prior: [], dropped: {} };
+      return { checks: [bookProblem(request, 2, 3), { ...bookProblem(request, 3, 2), id: 'B2' }], prior: [], dropped: {} };
+    },
+    aiFix: async request => { fixed = true; return request.targets.map(t => ({ id: t.id, chapter: t.chapter, quote: request.chapters.find(c => c.number === t.chapter).text, replacement: `Book corrected ${t.chapter}` })); }
+  });
+  holder.r = r;
+  await finishAi(r);
+  const fixes = aiRuns(r, 'fix');
+  assert.equal(fixes.length, 1, 'one fix call');
+  same(fixes[0][1].chapters.map(c => [c.number, c.title]), [[1, 'SecretRootTitle'], [3, 'SecretTitleB']], 'the open chapters only, with their book numbers');
+  same(fixes[0][1].targets.map(t => t.id), ['B2'], 'no target in the locked chapter');
+  assert.ok(!sentText(fixes[0][1]).includes('SecretTitleA'));
+  assert.equal(r.raw(1), holder.locked, 'the locked file is byte for byte as locked');
+  assert.ok((await r.note(2)).detail.includes('Book corrected 3'), 'the open chapter is fixed');
+  const books = bookCalls(r);
+  assert.ok(books.length >= 2 && !sentText(books.at(-1)[1]).includes('SecretTitleA'), 'the re-check leaves the locked chapter out too');
+  assert.equal((await r.state()).phase, 'done');
+});
+test('AI lock, whole book: every chapter locked: no whole-book call, no fix, every file as locked', async () => {
+  const holder = { raws: {} };
+  const r = await aiRig({
+    aiProof: async request => {
+      const at = TITLES.indexOf(request.title);
+      await holder.r.repo.writeAiLocked(holder.r.nodes[at].path, true);
+      holder.raws[at] = holder.r.raw(at);
+      return { checks: [], prior: [], dropped: {} };
+    }
+  });
+  holder.r = r;
+  await finishAi(r);
+  same(Object.keys(holder.raws).sort(), ['0', '1', '2'], 'every chapter was locked');
+  assert.equal(bookCalls(r).length, 0, 'no whole-book call');
+  assert.equal(aiRuns(r, 'fix').length, 0);
+  for (let i = 0; i < 3; i++) assert.equal(r.raw(i), holder.raws[i], `chapter ${i} is byte for byte as locked`);
+  assert.equal((await r.state()).phase, 'done');
+  assert.ok(r.stat.logs.some(line => /ai_locked/.test(line)));
+});
+test('AI lock, whole book: "fix again" over a book whose chapters were all locked afterwards calls nothing and says the book is locked', async () => {
+  const r = await aiRig({
+    aiBookProof: async request => ({ checks: [bookProblem(request, 2, 3)], prior: [], dropped: {} }),
+    aiFix: async () => []
+  });
+  await finishAi(r);
+  for (let i = 0; i < 3; i++) await r.repo.writeAiLocked(r.nodes[i].path, true);
+  const raws = [0, 1, 2].map(i => r.raw(i));
+  const calls = r.stat.ai.length;
+  const saved = JSON.stringify(await r.state());
+  let refused;
+  await r.runs.fixAgain(r.mapPath).catch(error => { refused = error; });
+  while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  assert.equal(r.stat.ai.length, calls, 'no AI call');
+  // `ai_locked` is the refusal the bar shows as the existing ui.ai_locked_notice (REFUSAL_KEY).
+  assert.ok(refused instanceof BookPipelineRunError && refused.code === 'ai_locked', `refused as locked: ${refused && refused.code}`);
+  assert.equal(JSON.stringify(await r.state()), saved, 'the saved state is not touched');
+  for (let i = 0; i < 3; i++) assert.equal(r.raw(i), raws[i]);
+});

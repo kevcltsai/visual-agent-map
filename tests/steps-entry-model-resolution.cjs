@@ -30,7 +30,8 @@ async function harness() {
 
 async function addAndCaptureModel(h, parent) {
   let seen;
-  h.repo.createNote = async (_title, model) => { seen = model; throw new Error('stop'); };
+  // A titled card is only previewed (its note is made by the map transaction), so the model is seen at previewNote.
+  h.repo.previewNote = (_title, model) => { seen = model; throw new Error('stop'); };
   await h.view.addNode(parent, 'Child', true, false).catch(error => assert.equal(error.message, 'stop'));
   return seen;
 }

@@ -1,4 +1,4 @@
-// The plugin no longer imports node:fs: adapter-backed JSON stores, the shell executable probe and the Codex image reader.
+// Adapter-backed JSON stores, the shell executable probe and the Codex image reader go through the vault adapter; only the desktop atomic replace (store-fs-adapter.ts) uses node:fs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');

@@ -7060,7 +7060,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 36 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 37 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -10880,4 +10880,35 @@ test('F09 impact: a missing card, an empty result, the cap note, closing, a new 
   findAll(impactBlock(f), i => hasClass(i, 'vam-map-chat-resume-close'))[0].click(); assert.equal(impactBlock(f).hidden, true);
   f.panel.showImpact(impactResult()); f.panel.reset(); assert.equal(impactBlock(f).hidden, true);
   f.panel.showImpact(impactResult()); f.setLanguage('zh-TW'); f.panel.relabel(); assert.match(visibleText(impactBlock(f)), /直接依賴（有連線）/); assert.match(visibleText(impactBlock(f)), /可能影響（推測）/); f.setLanguage('en');
+});
+// ---- F08a comparison table: a read-only block under the reply (same block look as F03/F09), no button that writes ----------------
+const cmpRow = (nodeId, ...values) => ({ nodeId, values: values.map(v => (v && typeof v === 'object' ? v : { value: v })) });
+const cmpData = (extra = {}) => ({ attributes: [{ name: 'Fee' }, { name: 'Discount' }], rows: [cmpRow('a', { value: '290', unit: 'NT$' }, '15%'), cmpRow('b', { value: '12', unit: 'US$' }, null), cmpRow('gone', { value: '5', unit: 'NT$' }, '1%')], ...extra });
+const cmpBlock = f => find(f.panel.el, i => hasClass(i, 'vam-map-chat-comparison'));
+const cmpHeads = block => findAll(findAll(block, i => i.tag === 'tr')[0], i => i.tag === 'th').map(i => i.text);
+const cmpOf = f => { f.panel.begin('compare'); f.panel.finish('Here is the table', []); };
+test('F08a comparison: a table under the reply with the card titles, the unknown word, and one column per unit (separately listed, never converted)', () => {
+  const f = panelFixture(); cmpOf(f); f.panel.attachComparison(cmpData());
+  const block = cmpBlock(f); assert.ok(block, 'the block exists');
+  const headers = cmpHeads(block);
+  eq(headers, ['', 'Fee (NT$)', 'Fee (US$)', 'Discount (%)']);
+  const rows = findAll(block, i => i.tag === 'tr').slice(1).map(tr => findAll(tr, i => i.tag === 'td' || i.tag === 'th').map(c => c.text));
+  eq(rows, [['Topic A', '290', 'Unknown', '15%'], ['Topic B', 'Unknown', '12', 'Unknown'], ['(card no longer on the map)', '5', 'Unknown', '1%']]);
+  assert.equal(findAll(block, i => i.tag === 'button' || i.tag === 'input').length, 0, 'read only: no button, no field (the save button is F08b)');
+  assert.match(visibleText(block), /read only/i);
+});
+test('F08a comparison: a value with no unit next to unit values gets its own "no unit" column; the cut to 8 x 8 is said', () => {
+  const f = panelFixture(); cmpOf(f);
+  f.panel.attachComparison({ attributes: [{ name: 'Fee' }], rows: [cmpRow('a', { value: '290', unit: 'NT$' }), cmpRow('b', '350')], truncated: { rows: 3, attributes: 2 } });
+  const block = cmpBlock(f);
+  eq(cmpHeads(block), ['', 'Fee (NT$)', 'Fee (no unit)']);
+  assert.match(visibleText(block), /3 more rows are not shown/); assert.match(visibleText(block), /2 more attributes are not shown/);
+});
+test('F08a comparison: it is not a plan or a write, follows the interface language, and a new conversation clears it', () => {
+  const f = panelFixture(); cmpOf(f); f.panel.attachComparison(cmpData());
+  assert.equal(find(f.panel.el, i => hasClass(i, 'vam-map-chat-plan')), undefined, 'no plan card');
+  f.setLanguage('zh-TW'); f.panel.relabel();
+  eq(cmpHeads(cmpBlock(f)), ['', 'Fee（NT$）', 'Fee（US$）', 'Discount（%）']);
+  assert.match(visibleText(cmpBlock(f)), /未知/); f.setLanguage('en');
+  f.panel.reset(); assert.equal(cmpBlock(f), undefined);
 });

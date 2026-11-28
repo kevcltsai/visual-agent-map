@@ -38,7 +38,7 @@ export interface TopicChatSession {
   turns: readonly TopicChatTurn[];
   mode: TopicChatMode;
   running: boolean;
-  /** The button pressed but not yet sent; its suggestion shows as grey text until adopted. */
+  /** The button pressed but not yet sent; pressing it put its suggestion in the input. */
   draftKind: TopicChatButtonKind | null;
   draftText: string;
   /** The depth-choice card while it waits for an answer (it writes no record and starts no AI). */
@@ -59,6 +59,8 @@ export interface TopicChatRect {
 /** What the window needs from its owner; the view implements it. */
 export interface TopicChatHost {
   topicTitle(): string;
+  /** How many map sources (saved and outside the vault) a request of this window reads besides the card's note. */
+  mapSourceCount(): number;
   /** The topic card and the canvas area, both in the same (client) coordinates; null while the card is not drawn. */
   anchor(): { card: TopicChatRect; area: TopicChatRect; controls?: TopicChatRect | null } | null;
   session(): TopicChatSession;
@@ -107,11 +109,11 @@ export class TopicChatWindow {
   private readonly logEl: HTMLElement;
   private readonly inputEl: HTMLTextAreaElement;
   private readonly sendEl: HTMLButtonElement;
-  private readonly ghostEl: HTMLElement;
-  private readonly ghostTextEl: HTMLElement;
   private readonly modeHintEl: HTMLElement;
   private readonly kindEls = new Map<TopicChatButtonKind, HTMLButtonElement>();
   private readonly scopeEl: HTMLElement;
+  private readonly sourcesEl: HTMLElement;
+  private readonly modeEl: HTMLElement;
   private readonly webEl: HTMLInputElement;
   private readonly cleanups: Array<() => void> = [];
   private parentEl: HTMLElement | null = null;
@@ -147,8 +149,6 @@ export class TopicChatWindow {
     this.logEl = this.el.createDiv("vam-topic-chat-log");
 
     const actions = this.el.createDiv("vam-topic-chat-actions");
-    // What the next request covers: this card, or its whole branch for an integration.
-    this.scopeEl = actions.createSpan({ cls: "vam-topic-chat-scope" });
     for (const kind of KINDS) {
       const button = actions.createEl("button", {
         cls: "vam-topic-chat-action",
@@ -168,10 +168,11 @@ export class TopicChatWindow {
     });
     this.on(this.inputEl, "input", () => this.typed());
     this.on(this.inputEl, "keydown", event => this.keydown(event));
-    // The grey suggestion lives in an overlay that lays out like the input (it wraps the same way); the placeholder stays for
-    // assistive tech but is drawn transparent while this shows. Tab adopts it (see keydown); no on-screen label says so.
-    this.ghostEl = composer.createDiv({ cls: "vam-topic-chat-ghost", attr: { "aria-hidden": "true" } });
-    this.ghostTextEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-ph" });
+    // What the next request covers (this card, or its whole branch for an integration), what it reads, and whether it uses the web.
+    const meta = composer.createDiv("vam-topic-chat-meta");
+    this.scopeEl = meta.createSpan({ cls: "vam-topic-chat-scope" });
+    this.sourcesEl = meta.createSpan({ cls: "vam-topic-chat-sources" });
+    this.modeEl = meta.createSpan({ cls: "vam-topic-chat-mode" });
     const foot = composer.createDiv("vam-topic-chat-foot");
     // Web search is the one difference between the two AI modes: ticked is the standard mode, unticked the quick one.
     // The map remembers the mode once a research or expand is confirmed.
@@ -299,10 +300,12 @@ export class TopicChatWindow {
 
   private pickKind(kind: TopicChatButtonKind): void {
     if (this.host.session().running) return;
-    this.inputEl.value = "";
-    this.host.setDraft(kind, "");
+    // The suggestion goes into the input, all selected: send it as it is, or type over it.
+    this.inputEl.value = suggestion(kind);
+    this.host.setDraft(kind, this.inputEl.value);
     this.refresh();
     this.inputEl.focus();
+    this.inputEl.select();
   }
 
   private typed(): void {
@@ -312,16 +315,6 @@ export class TopicChatWindow {
   }
 
   private keydown(event: KeyboardEvent): void {
-    if (event.key === "Tab" && !event.shiftKey) {
-      const { draftKind, running } = this.host.session();
-      if (draftKind && !running && this.inputEl.value === "") {
-        event.preventDefault();
-        this.inputEl.value = suggestion(draftKind);
-        this.host.setDraft(draftKind, this.inputEl.value);
-        this.refresh();
-      }
-      return;
-    }
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
       void this.send();
@@ -329,7 +322,7 @@ export class TopicChatWindow {
   }
 
   private canSend(): boolean {
-    // A button pressed but its grey suggestion not adopted leaves the field empty: nothing to send. Typing alone is a question.
+    // An empty field has nothing to send, even with a button pressed. Typing alone is a question.
     return !this.submitting && this.inputEl.value.trim() !== "";
   }
 
@@ -378,15 +371,18 @@ export class TopicChatWindow {
     this.scopeEl.setText(
       t(session.draftKind === "synthesize" ? "ui.topic_chat_scope_branch" : "ui.topic_chat_scope_card")
     );
+    const sources = this.host.mapSourceCount();
+    this.sourcesEl.setText(
+      sources === 0
+        ? t("ui.topic_chat_sources_note")
+        : t(sources === 1 ? "ui.topic_chat_sources_note_map_one" : "ui.topic_chat_sources_note_map_0", sources)
+    );
+    this.modeEl.setText(t(`ui.topic_chat_meta_mode_${session.mode}`));
     this.modeHintEl.setText(session.running && !empty ? t("ui.map_chat_steer_hint") : "");
-    const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
     this.inputEl.setAttr(
       "placeholder",
-      ghost || (session.running ? t("ui.map_chat_steer_placeholder") : t("ui.topic_chat_placeholder"))
+      session.running ? t("ui.map_chat_steer_placeholder") : t("ui.topic_chat_placeholder")
     );
-    this.ghostEl.hidden = !ghost;
-    this.inputEl.toggleClass("is-ghost", !!ghost);
-    this.ghostTextEl.setText(ghost);
     this.sendEl.disabled = !this.canSend();
     this.paintLog(session);
     // The log changed height, so the window may no longer fit where it was put; then the newest turn is brought into view again.

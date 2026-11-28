@@ -65,6 +65,7 @@ export type ChatTurnPanel = ChatPlanPanel &
     | "restartWaiting"
     | "takeSteerTexts"
     | "finish"
+    | "attachComparison"
     | "fail"
     | "setUnreadNotes"
     | "setReplyBasis"
@@ -815,6 +816,7 @@ export class MapChatConversation {
               // Nothing is touched until the user applies the plan.
               if (chat.isBusy) {
                 chat.finish(result.reply, []);
+                if (result.comparison) chat.attachComparison(result.comparison);
                 chat.setReplyBasis(turn, replyBasisOf(request.context.basis));
                 this.showUnreadResearch(chat, turn, request.context);
                 this.ports.markTurn(origin, request);
@@ -856,6 +858,7 @@ export class MapChatConversation {
               // Read at once: the next reply's step replaces `chatReplyEntry`.
               const entry = this.ports.replyEntry();
               const shown = chat.finish(result.reply, lines);
+              if (result.comparison) chat.attachComparison(result.comparison);
               chat.setReplyBasis(turn, replyBasisOf(request.context.basis));
               this.showUnreadResearch(chat, turn, request.context);
               this.ports.markTurn(origin, request, entry);

@@ -638,6 +638,7 @@ import {
   type CardActionContext,
   type CardActionHost,
   type CardActionId,
+  type CardActionRunOptions,
   type CardAvailability
 } from "./card-actions";
 import {
@@ -2591,9 +2592,11 @@ export class VisualAgentMapView extends ItemView {
       const active = this.contentEl.ownerDocument?.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
       const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
-      const note = node && this.notes.get(node.id);
-      if (!node || !note) return true;
-      this.startCardTitleEdit(node, { select: true });
+      // The card action list's Rename (cardKeyAction); a card without a read note leaves F2 to Obsidian. While the notes
+      // load it renames nothing yet still claims the key, so Obsidian does not rename the file (decision #35).
+      const run = node && this.cardKeyAction("rename", node, event);
+      if (run === undefined) return true;
+      run?.();
       return false;
     });
     // Mod+Enter adds a subtopic and Shift+Enter a sibling of the focused card. Obsidian binds Mod+Enter to "open link in
@@ -2608,9 +2611,10 @@ export class VisualAgentMapView extends ItemView {
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
         const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
-        if (!node) return true;
-        const parent = sibling ? (this.map?.nodes.find(item => item.id === node.parentId) ?? null) : node;
-        this.enqueue(() => this.addNode(parent));
+        // The card action list's Add subtopic / Add sibling (cardKeyAction); one that cannot run leaves the key alone.
+        const run = node && this.cardKeyAction(sibling ? "add-sibling" : "add-child", node, event);
+        if (!run) return true;
+        run();
         return false;
       };
     scope.register(["Mod"], "Enter", cardKey(false));
@@ -10715,13 +10719,9 @@ export class VisualAgentMapView extends ItemView {
   private onCardSpaceDown(event: KeyboardEvent, node: MapNode): boolean {
     if (event.code !== "Space" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing)
       return false;
-    if (
-      this.selection.state.multiSelectMode ||
-      this.notesLoading() ||
-      this.presentation ||
-      !this.map?.nodes.some(item => item.parentId === node.id)
-    )
-      return false;
+    // The fold is the card action list's (cardKeyAction): offered only with subtopics, refused in selection mode, while
+    // the notes load and while presenting.
+    if (!this.cardKeyAction("toggle-collapse", node, event)) return false;
     event.preventDefault();
     if (!event.repeat) this.spacePendingNodeId = node.id;
     return true;
@@ -10734,7 +10734,7 @@ export class VisualAgentMapView extends ItemView {
     const id = this.spacePendingNodeId;
     this.spacePendingNodeId = null;
     const node = id ? this.map?.nodes.find(item => item.id === id) : undefined;
-    if (node) this.collapseByKey(node);
+    if (node) this.cardKeyAction("toggle-collapse", node)?.();
   }
   private onCanvasContextMenu(event: MouseEvent): void {
     const hit = event.target as Element | null;
@@ -13988,14 +13988,41 @@ export class VisualAgentMapView extends ItemView {
     if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, shapeKind));
     else this.fitKindShape(card, shapeKind);
   }
-  /** Keyboard handling for a focused card: sibling move, tree walk, delete, add, rename and select. */
+  /**
+   * A map key's card action (V3.3 B10): the action `id` for `node` from the card action list, under the gates its menus
+   * use. undefined: the action is not offered for this card; null: it cannot run now (a merging card says why, once per
+   * press); otherwise the run, which re-reads the moment.
+   */
+  private cardKeyAction(
+    id: CardActionId,
+    node: MapNode,
+    event?: KeyboardEvent,
+    options?: CardActionRunOptions
+  ): (() => void) | null | undefined {
+    const entry = actionsFor("key", this.cardActionContext(node)).find(row => row.action.id === id);
+    if (!entry) return undefined;
+    if (!entry.availability.ok) {
+      if (entry.availability.reasonKey === CARD_ACTION_REASONS.merging && !event?.repeat)
+        new Notice(t("ui.merge_locked"));
+      return null;
+    }
+    return () => entry.action.run({ ...this.cardActionContext(node), surface: "key" }, options);
+  }
+  /**
+   * Keyboard handling for a focused card: sibling move, tree walk, delete, add, rename and select. The card actions run
+   * through the card action list (cardKeyAction); one that cannot run now leaves the key alone. A key typed in a field
+   * inside the card (target) or during IME composition is never taken.
+   */
   private onCardKeydown(event: KeyboardEvent, card: HTMLElement, node: MapNode, note: Note | undefined): void {
     if (event.target !== card) return;
     // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
     if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+      const run =
+        !event.isComposing &&
+        this.cardKeyAction("reorder-sibling", node, event, { offset: ARROW_OFFSETS.get(event.key)! });
+      if (!run) return;
       event.preventDefault();
-      if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
-        this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+      run();
       return;
     }
     const target = this.keyboardNeighbor(node, event.key);
@@ -14005,34 +14032,38 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (this.onCardSpaceDown(event, node)) return;
-    const editable = !this.selection.state.multiSelectMode && !this.notesLoading() && !this.bookLock().structure;
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
-    if (editable && !event.isComposing) {
-      if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
-        event.preventDefault();
-        // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
-        if (!event.repeat) this.removeByKey(node);
-        return;
-      }
-      // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
-      if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
-        if (event.defaultPrevented) return; // the view scope already added the subtopic
-        event.preventDefault();
-        this.whenEditing(() => this.enqueue(() => this.addNode(node)));
-        return;
-      }
-      if (event.key === "Enter" && event.shiftKey && plain) {
-        if (event.defaultPrevented) return; // the view scope already added the sibling
-        event.preventDefault();
-        const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
-        this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
-        return;
-      }
-    }
-    if (event.key === "F2" && note && !event.isComposing && !this.selection.state.multiSelectMode) {
-      if (event.defaultPrevented) return; // the view scope already handled this F2
+    if (event.isComposing) return;
+    if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+      const run = this.cardKeyAction("remove", node, event);
+      if (!run) return;
       event.preventDefault();
-      this.startCardTitleEdit(node, { select: true });
+      // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
+      if (!event.repeat) run();
+      return;
+    }
+    // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).
+    const add =
+      event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+        ? "add-child"
+        : event.key === "Enter" && event.shiftKey && plain
+          ? "add-sibling"
+          : null;
+    // In selection mode Enter (with any of these) ticks the card below.
+    if (add && !this.selection.state.multiSelectMode) {
+      if (event.defaultPrevented) return; // the view scope already added the topic
+      const run = this.cardKeyAction(add, node, event);
+      if (!run) return;
+      event.preventDefault();
+      run();
+      return;
+    }
+    if (event.key === "F2") {
+      if (event.defaultPrevented) return; // the view scope already handled this F2
+      const run = this.cardKeyAction("rename", node, event);
+      if (!run) return;
+      event.preventDefault();
+      run();
       return;
     }
     if (event.key === "Enter") {
@@ -14041,9 +14072,10 @@ export class VisualAgentMapView extends ItemView {
       } else {
         // Enter selects the card and edits its title, as double-click does (the toolbar's Note opens the details).
         this.selectMapNode(node);
-        if (this.notesLoading() || !note || event.isComposing) return;
+        const run = note && this.cardKeyAction("rename", node, event);
+        if (!run) return;
         event.preventDefault();
-        this.startCardTitleEdit(node, { select: true });
+        run();
       }
     }
   }

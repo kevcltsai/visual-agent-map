@@ -1471,6 +1471,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_guard_map_source": "这个文件是这张地图的资料来源，对话只能读取",
   "ui.map_chat_skip_attached_read_only": "文件在这张地图的文件夹之外，对话只能读、不能改",
   "ui.map_chat_skip_stale": "发送后文件又被修改过",
+  "ui.map_chat_fail_changed": "目标卡在发送后被改过，这一步没有写入",
+  "ui.map_chat_fail_unknown": "这一步无法完成",
   "ui.map_chat_skip_topic_gone": "议题已不在心智图上",
   "ui.map_chat_skip_find_failed": "要替换的文字没有刚好出现一次",
   "ui.map_chat_skip_unsafe_mermaid": "这个修改会加入不被允许的图表",

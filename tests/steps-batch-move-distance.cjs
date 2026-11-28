@@ -40,7 +40,7 @@ async function harness(spec, language = 'en') {
   const select = titles => { if (!view.selection.state.multiSelectMode) view.selection.toggleMultiSelect(); view.selection.replaceMulti(titles.map(title => named(title).id)); };
   const bar = () => view.renderSelectionBar(dom.element('div'));
   const files = () => new Map([...contents].filter(([path]) => path.startsWith('Agent Workspace/Topics/map-b/')));
-  return { repo, view, named, select, bar, notices, files, settled: () => pending };
+  return { app, repo, view, named, select, bar, notices, files, settled: () => pending };
 }
 
 const SPEC = [['Root', null, 1000, 80], ['A', 'Root', 1360, 0], ['A1', 'A', 1720, 0], ['B', 'Root', 1360, 300], ['B1', 'B', 1720, 300], ['Target', 'Root', 1360, 700], ['T1', 'Target', 1720, 700]];
@@ -77,4 +77,47 @@ test('B19d: a single branch move is laid out as before (under the target, distan
   assert.equal(h.named('A').parentId, h.named('Target').id);
   assert.equal(h.named('A1').y - h.named('A').y, dist);
   assert.ok(h.named('A').x > h.named('Target').x);
+});
+
+// B19d-x: a batch move to a parent that grows the same way carries every branch as a whole block; hand-placed offsets inside a branch stay.
+const HAND = [['Root', null, 1000, 80], ['A', 'Root', 1360, 0], ['A1', 'A', 1720, -50], ['A2', 'A', 1790, 130], ['A3', 'A2', 2150, 260], ['B', 'Root', 1360, 300], ['B1', 'B', 1720, 300], ['C', 'Root', 1360, 500], ['Target', 'Root', 1360, 900], ['T1', 'Target', 1720, 900]];
+const ALL_MOVED = ['A', 'A1', 'A2', 'A3', 'B', 'B1', 'C'];
+const overlaps = h => {
+  const nodes = h.view.map.nodes, bad = [];
+  nodes.forEach((a, i) => nodes.slice(i + 1).forEach(b => { if (Math.abs(a.y - b.y) < 80 && Math.abs(a.x - b.x) < 200) bad.push(`${a.id}/${b.id}`); }));
+  return bad;
+};
+const mapWrites = h => {
+  const writes = [];
+  for (const name of ['process', 'modify']) {
+    const was = h.app.vault[name];
+    if (typeof was === 'function') h.app.vault[name] = function (file, ...rest) { if ((file.path ?? file) === MAP) writes.push(name); return was.call(this, file, ...rest); };
+  }
+  return writes;
+};
+
+test('B19d-x: a hand-arranged branch keeps every inner offset when three branches move under a parent growing the same way; 0 overlaps, one write, one undo', async () => {
+  const h = await harness(HAND);
+  h.select(['A', 'B', 'C']);
+  const rel = () => ALL_MOVED.flatMap((one, i) => ALL_MOVED.slice(i + 1).map(two => [`${one}-${two}`, h.named(two).x - h.named(one).x, h.named(two).y - h.named(one).y]));
+  const before = rel(), coords = new Map(h.view.map.nodes.map(n => [n.id, [n.x, n.y]])), files = h.files(), past = h.view.history.past.length;
+  const writes = mapWrites(h);
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  assert.equal(h.named('A').parentId, h.named('Target').id);
+  assert.deepEqual(rel(), before, 'every pair of moved cards keeps its offset');
+  assert.deepEqual(overlaps(h), [], 'nothing overlaps');
+  assert.equal(writes.length, 1, 'Map.md is written once');
+  assert.equal(h.view.history.past.length, past + 1, 'one history step');
+  await h.view.history.undo().undo();
+  assert.deepEqual(h.files(), files, 'one undo restores Map.md byte for byte');
+  for (const n of h.view.map.nodes) assert.deepEqual([n.x, n.y], coords.get(n.id), `${n.id} back at its place`);
+});
+
+test('B19d-x: moving the hand-arranged branches under a parent that grows the other way may re-arrange them, still 0 overlaps', async () => {
+  const h = await harness(HAND);
+  h.named('Target').layout = { direction: 'down' };
+  h.select(['A', 'B', 'C']);
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  assert.equal(h.named('A').parentId, h.named('Target').id);
+  assert.deepEqual(overlaps(h), []);
 });

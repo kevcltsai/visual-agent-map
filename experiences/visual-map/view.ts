@@ -2081,6 +2081,19 @@ export class VisualAgentMapView extends ItemView {
       settleMoving: true
     }).nodes;
   }
+  /** True when every branch root leaves a parent that grows in the way `target` grows (balanced: on the same side), so a batch move can carry the branches whole. */
+  private growsLikeTarget(map: MapDocument, roots: MapNode[], target: MapNode): boolean {
+    const way = branchDirectionResolver(map.nodes, layoutOf(map).direction, undefined, this.ringDirections(map));
+    const byId = new Map(map.nodes.map(node => [node.id, node]));
+    const side = (child: MapNode, parent: MapNode | undefined) => (parent ? Math.sign(child.x - parent.x) : 0);
+    const balanced = layoutOf(map).direction === "balanced";
+    const targetSide = side(target, target.parentId ? byId.get(target.parentId) : undefined);
+    return roots.every(root => {
+      const from = root.parentId ? byId.get(root.parentId) : undefined;
+      if (!from || way(from.id) !== way(target.id)) return false;
+      return !balanced || (targetSide !== 0 && side(root, from) === targetSide);
+    });
+  }
   /** True when new, unfolded or grown cards are placed locally (right, left, balanced, down, up); radial, timeline, fishbone and argument maps lay the whole map out (decision #18). */
   private placesLocally(map: MapDocument): boolean {
     if (readArgumentMap(map).kind === "usable") return false;
@@ -12292,6 +12305,8 @@ export class VisualAgentMapView extends ItemView {
       const branchOf = new Map<string, Set<string>>();
       // The siblings take the order on screen first; each moved topic then comes last among the new parent's children (before the layout).
       if (target) map.nodes = this.onScreenSiblingOrder(map);
+      // Decided before the move: every branch leaves a parent that grows the way the target grows (and on the same side in a balanced map).
+      const sameWay = !!target && roots.length > 1 && this.growsLikeTarget(map, roots, target);
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
@@ -12320,7 +12335,8 @@ export class VisualAgentMapView extends ItemView {
           const placed = map.nodes.find(node => node.id === lead.id)!;
           const dx = placed.x - first.x,
             dy = placed.y - first.y;
-          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          // Same growing way: the lead branch is carried whole too (its hand-placed inner offsets stay); otherwise it keeps the arrangement.
+          const rest = new Set([...moved].filter(id => sameWay || !branchOf.get(lead.id)!.has(id)));
           for (const node of map.nodes) {
             const was = rest.has(node.id) ? start.get(node.id) : undefined;
             if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });

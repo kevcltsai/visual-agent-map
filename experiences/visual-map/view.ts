@@ -15577,7 +15577,7 @@ export class VisualAgentMapView extends ItemView {
     this.openForSearch(collapsedAncestors(this.map.nodes, node.id));
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
-    this.focusNode(node, false);
+    this.focusNode(node, false, true);
     return true;
   }
   private selectMapNode(node: MapNode): void {
@@ -22119,19 +22119,24 @@ export class VisualAgentMapView extends ItemView {
     return tops;
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
-  private focusNode(target: MapNode, persist = true): void {
+  private focusNode(target: MapNode, persist = true, measured = false): void {
     if (!this.map || !this.viewportEl) return;
     const id = target.id;
     if (
       this.holdCamera(() => {
         const node = this.map?.nodes.find(item => item.id === id);
-        if (node) this.focusNode(node, persist);
+        if (node) this.focusNode(node, persist, measured);
       })
     )
       return;
+    // `measured` (outline reveal): centre on the card's laid-out box; other callers keep the fixed +80 estimate.
+    const card = measured ? this.cardEls.get(id) : undefined;
+    const centre = card?.offsetHeight
+      ? { x: target.x + (card.offsetWidth || (target.width ?? CARD_WIDTH)) / 2, y: target.y + card.offsetHeight / 2 }
+      : { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 };
     this.map.viewport = focusViewport(
       this.map.viewport,
-      { x: target.x + (target.width ?? CARD_WIDTH) / 2, y: target.y + 80 },
+      centre,
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
       this.canvasInsets()
     );

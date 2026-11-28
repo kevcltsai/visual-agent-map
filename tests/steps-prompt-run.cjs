@@ -1506,6 +1506,65 @@ test('P3.4 trial, preview, stop or close: the card and its source keep their byt
   assert.equal(sha(h.raw('N')), before[1], 'the source is untouched');
 });
 
+test('P3.4 a change to a source of a ready preview turns it invalid at once: the label says so, Adopt is off, the preview stays readable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const calls = h.calls.length;
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'The source changed' });
+  await until(() => h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession));
+  await dom.tick();
+  assert.equal(trial.state, 'invalid');
+  assert.ok(trial.result, 'the preview stays readable');
+  assert.equal(h.button('Adopt trial').disabled, true, 'Adopt is off without pressing it');
+  assert.equal(h.calls.length, calls, 'no AI call');
+  assert.equal(h.listeners.size, 0, 'nothing listens for an invalid preview');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'official'), false, 'the reader keeps the preview');
+});
+
+test('P3.4 the target card changed elsewhere turns the preview invalid; saving the same configuration keeps it adoptable', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { viewSession, trial } = h.view.aiCardOpen;
+  const seen = h.reader.length;
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 30; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'an identical save is not a change of the trial inputs');
+  assert.equal(h.reader.slice(seen).some(r => r[0] === 'invalid' && r[1] === viewSession), false);
+  assert.equal(h.button('Adopt trial').disabled, false);
+  const calls = h.calls.length;
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+  assert.equal(h.calls.length, calls, 'adopting makes no AI call');
+  await h.ready();
+  await h.repo.updateNote(h.node('A').path, { summary: 'The owner edited the card' });
+  await until(() => h.view.aiCardOpen.trial.state === 'invalid');
+  await dom.tick();
+  assert.equal(h.button('Adopt trial').disabled, true);
+});
+
+test('P3.4 the source listener ends with the editor: a later change does nothing, and reopening keeps one listener', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'one listener while a preview is ready');
+  h.view.closeAiCardPopover();
+  assert.equal(h.listeners.size, 0, 'closing removes it');
+  const seen = h.reader.length;
+  await h.repo.updateNote(h.node('N').path, { summary: 'Changed after close' });
+  for (let i = 0; i < 6; i++) await dom.tick();
+  eq(h.reader.slice(seen), [], 'a later change does nothing');
+  await h.ready();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'a second trial replaces the first listener');
+  h.view.closeAiCardPopover();
+  await h.ready();
+  assert.equal(h.listeners.size, 1, 'no leak across reopen');
+  await h.view.onClose().catch(() => {});
+  assert.equal(h.listeners.size, 0, 'closing the view removes it');
+});
+
 test('V3.3 P1.2: while notes are still loading (read-only) the toolbar offers only Note, and Note still opens the details', async () => {
   const h = await harness([['a', null, { prompt: 'Why?' }]]);
   const node = h.node('a');

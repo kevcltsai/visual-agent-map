@@ -216,6 +216,7 @@ import {
   Scope,
   TFile,
   type App,
+  type EventRef,
   WorkspaceLeaf,
   requestUrl,
   setIcon
@@ -15922,8 +15923,19 @@ export class VisualAgentMapView extends ItemView {
     const viewSession = randomUUID();
     const current = (): boolean => !controller.signal.aborted && mapSession() && !this.plugin.repo.isDisposed();
     let activeTrial: AbortController | undefined;
-    controller.signal.addEventListener("abort", () => activeTrial?.abort(), { once: true });
+    // A ready preview listens for changes to its card and sources until it is discarded or the editor closes.
+    let unwatch = (): void => {};
+    let saving: Promise<unknown> = Promise.resolve();
+    controller.signal.addEventListener(
+      "abort",
+      () => {
+        activeTrial?.abort();
+        unwatch();
+      },
+      { once: true }
+    );
     const invalidateTrial = (): void => {
+      unwatch();
       activeTrial?.abort();
       activeTrial = undefined;
       trial.invalidate();
@@ -15931,6 +15943,36 @@ export class VisualAgentMapView extends ItemView {
     };
     const promptOf = (values: AiCardPopoverValues): string =>
       joinPrompt(values.question, values.sources, t("ui.ai_sources_label"), t("ui.ai_sources_separator"));
+    /** A change to the card or a source turns the preview invalid at once; an accepted identical save does not. */
+    const watchTrial = (prepared: Awaited<ReturnType<typeof prepareLivingTrial>>): void => {
+      unwatch();
+      const paths = new Set(prepared.watched);
+      const ref: EventRef = this.app.vault.on("modify", file => {
+        if (paths.has(file.path)) void check();
+      });
+      let watching: EventRef | undefined = ref;
+      unwatch = () => {
+        if (!watching) return;
+        this.app.vault.offref(watching);
+        watching = undefined;
+      };
+      const check = async (): Promise<void> => {
+        await saving.catch(() => undefined);
+        if (watching !== ref || trial.state !== "ready") return;
+        let still = false;
+        try {
+          const content = await prepared.adoption.readSavedContent?.();
+          still = content !== undefined && trial.matchesTarget(content) && (await prepared.inputsCurrent());
+        } catch {
+          still = false;
+        }
+        if (still || watching !== ref || trial.state !== "ready") return;
+        invalidateTrial();
+        win.trialInvalidated();
+      };
+      // A change between the last input check and this listener is not missed.
+      void check();
+    };
     const win = new AiCardPopover(
       {
         cardTitle: node ? (note?.title ?? node.path) : null,
@@ -15940,23 +15982,27 @@ export class VisualAgentMapView extends ItemView {
           return area ? { card: area, area, controls: null } : null;
         },
         pickNote: (done, closed) => this.pickAiCardNote(node?.path ?? parent?.path ?? "", done, closed),
-        save: async values => {
-          const saved = await this.saveAiCard(
-            node,
-            parent,
-            afterTextId,
-            values,
-            expectedPrompt,
-            expectedConfigRevision,
-            current
-          );
-          if (!saved) return false;
-          if (node) {
-            expectedPrompt = promptOf(values);
-            expectedConfigRevision = saved.configRevision;
-            trial.acceptSave(saved.before, saved.after);
-          }
-          return true;
+        save: values => {
+          const run = (async () => {
+            const saved = await this.saveAiCard(
+              node,
+              parent,
+              afterTextId,
+              values,
+              expectedPrompt,
+              expectedConfigRevision,
+              current
+            );
+            if (!saved) return false;
+            if (node) {
+              expectedPrompt = promptOf(values);
+              expectedConfigRevision = saved.configRevision;
+              trial.acceptSave(saved.before, saved.after);
+            }
+            return true;
+          })();
+          saving = run;
+          return run;
         },
         trial: node
           ? async values => {
@@ -16032,6 +16078,7 @@ export class VisualAgentMapView extends ItemView {
                   warnings
                 );
                 if (!shown && currentTrial()) invalidateTrial();
+                if (shown && currentTrial()) watchTrial(prepared);
                 return shown && currentTrial();
               } catch (error) {
                 if (currentTrial()) {
@@ -16050,6 +16097,8 @@ export class VisualAgentMapView extends ItemView {
           ? async () => {
               const check = this.aiCardOpen?.trial === trial ? this.aiCardOpen.adoption : undefined;
               if (!check || !current()) return false;
+              // Adoption makes its own exact check and writes the card: its write is not a change of the preview.
+              unwatch();
               const outcome = await trial.adopt(this.plugin.repo, {
                 ...check,
                 onCommit: (path, before, after) => this.recordLivingCommit(path, before, after)

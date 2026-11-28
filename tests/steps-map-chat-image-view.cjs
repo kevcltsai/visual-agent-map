@@ -892,12 +892,13 @@ test('DX-orphan: a reply that adds many cards stages nothing until startup adopt
   const h = await harness();
   let release;
   h.view.plugin.orphansAdopted = new Promise(resolve => { release = resolve; });
-  const before = h.view.map.nodes.length;
+  const before = h.view.map.nodes.length, filesBefore = h.files.size;
   const actions = Array.from({ length: 5 }, (_, i) => topChild(`t${i}`, `Part ${i}`));
   const run = h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: {}, topicHashes: {} }, () => true);
   for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.view.chatMapBatch, null, 'no batch is staging while adoption is pending');
-  assert.equal((await h.saved()).nodes.length, before, 'no card note was written yet');
+  assert.equal((await h.saved()).nodes.length, before, 'Map.md lists no new card yet');
+  assert.equal(h.files.size, filesBefore, 'and the vault has no new note file');
   release();
   await run;
   assert.equal((await h.saved()).nodes.length, before + 5, 'once adoption settled, the five cards are written');

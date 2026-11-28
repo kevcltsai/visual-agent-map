@@ -25324,6 +25324,9 @@ export class VisualAgentMapView extends ItemView {
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
     options: ChatApplyOptions = {}
   ): Promise<MapChatLine[]> {
+    // Waits for startup adoption before anything is collected or staged: it could list a staged note whose Map.md write is
+    // pending, and an edit made during the wait must not fall into this reply's undo group.
+    await this.plugin.orphansAdopted;
     const touched = new Set<string>([anchor.path]);
     // The turn this reply belongs to (switch on): undo and redo of its writes are noted in that turn's conversation.
     const scope = options.topicScope;
@@ -25389,8 +25392,6 @@ export class VisualAgentMapView extends ItemView {
     // The copy belongs to the same round: its chip paths are the request's, not the latest message's.
     const chips = this.chatChipPaths.get(baseline);
     if (chips) this.chatChipPaths.set(own, chips);
-    // Cards are staged only after startup adoption has settled, or it could list a staged note whose Map.md write is pending.
-    await this.plugin.orphansAdopted;
     // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;

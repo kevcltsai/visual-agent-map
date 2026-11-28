@@ -187,10 +187,24 @@ test('DX-orphan startup (migrated vault): ready does not wait for the layout; ad
   t.bare.onunload();
 });
 
-test('DX-orphan startup (unmigrated vault): adoption runs inside ready, before the migrate rebuild strips the orphan\'s map id, without waiting for the layout', async () => {
+test('DX-orphan startup (unmigrated vault): adoption runs inside ready before the migrate rebuild strips the orphan\'s map id, and again after the layout for notes that appear later', async () => {
+  const t = await bootWithOrphan(false, { hideUntilScanned: true });
+  await t.plugin.ready;
+  assert.equal(t.adoptCalls.length, 1, 'adopted once inside ready, with the layout callbacks still held');
+  assert.equal((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === t.orphan.id), false, 'the vault scan had not reached the orphan yet');
+  assert.match(t.f.contents.get(t.orphan.path), /agent-map-id: /, 'the startup rebuild did not strip a note it could not see');
+  t.state.scanned = true;
+  t.fireLayout();
+  await t.plugin.orphansAdopted;
+  assert.equal(t.adoptCalls.length, 2, 'adopted again after the layout');
+  assert.ok((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === t.orphan.id), 'the orphan that appeared after the layout is listed');
+  t.bare.onunload();
+});
+
+test('DX-orphan startup (unmigrated vault, note already listed in the file list): the first adoption lists it before the rebuild, so its map id survives', async () => {
   const t = await bootWithOrphan(false, { hideUntilScanned: false });
   await t.plugin.ready;
-  assert.equal(t.layoutCallbacks.length > 0 && t.adoptCalls.length, 1, 'adopted once, with the layout callbacks still held');
+  assert.equal(t.adoptCalls.length, 1);
   assert.ok((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === t.orphan.id), 'the orphan is listed');
   assert.match(t.f.contents.get(t.orphan.path), /agent-map-id: /, 'its map id survived the startup rebuild');
   t.bare.onunload();

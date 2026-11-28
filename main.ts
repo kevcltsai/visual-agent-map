@@ -1435,13 +1435,15 @@ export default class VisualAgentMapPlugin extends Plugin {
         });
         if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
       }).catch(() => undefined);
-    this.orphansAdopted = this.settings.migrated
-      ? new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve)).then(adopt)
-      : adopt();
+    // An unmigrated vault adopts once inside `ready` (ahead of its migrate rebuild) and again after the layout, which
+    // catches notes Obsidian had not scanned yet; adoption is idempotent. `orphansAdopted` is the last of these.
+    const firstAdopt = this.settings.migrated ? Promise.resolve() : adopt();
+    const layoutReady = new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve));
+    this.orphansAdopted = firstAdopt.then(() => layoutReady).then(adopt);
     const initialize = (
       this.settings.migrated
         ? Promise.resolve()
-        : this.orphansAdopted
+        : firstAdopt
             .then(() => this.repo.migrate())
             .then(async () => {
               await this.repo.rebuildDerivedData();

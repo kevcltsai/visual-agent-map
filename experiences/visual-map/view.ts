@@ -23840,6 +23840,13 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
       case "add_anchor":
         return action.note ? t("ui.map_chat_do_add_anchor_0", action.note) : t("ui.map_chat_do_add_anchor_empty");
+      case "move_anchor":
+        return t(
+          "ui.map_chat_do_move_anchor_0",
+          findAnnotatedImage(this.map?.canvasItems ?? [], action.imageId)?.anchors.find(
+            anchor => anchor.id === action.anchorId
+          )?.note || t("ui.map_chat_anchor_unnamed")
+        );
       case "link_anchor": {
         const anchorNote =
           refTitles?.get(action.anchorId) ||
@@ -24874,6 +24881,7 @@ export class VisualAgentMapView extends ItemView {
       case "remove_relation":
       case "add_anchor":
       case "link_anchor":
+      case "move_anchor":
       case "auto_layout":
         paths.push(this.path);
         break;

@@ -1073,3 +1073,84 @@ for (const [name, flag] of [['paired region with the flag', true], ['converted p
     assert.equal(entry, null);
     assert.equal(h.contents.get(node.path), before, 'the cover embed is refused');
   });
+
+// ---- G06a: move_anchor is a plan, written once on confirmation -----------------------------------------------------------
+
+const moveAnchor = (anchorId, x, y, imageId = 'img1') => ({ kind: 'move_anchor', imageId, anchorId, x, y });
+const settled = h => until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+const posOf = async (h, id = 'old1') => plain((await h.image()).anchors.find(a => a.id === id)?.at);
+
+test('G06a: a suggested move waits as a plan, writes nothing (map file, undo stack) until Apply, then moves the anchor once', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'Chuck is lower', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  const fileBefore = h.contents.get(MAP);
+  await h.send('the Chuck anchor is misplaced');
+  assert.equal(h.chat.plans.length, 1);
+  assert.equal(h.chat.plans[0].reasons.length, 1);
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 }, 'pending: not moved');
+  assert.equal(h.contents.get(MAP), fileBefore, 'pending: Map.md is untouched');
+  assert.equal(h.view.history.undoEntry, undefined, 'pending: nothing on the undo stack');
+  h.chat.plans[0].apply(); await settled(h);
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.6, y: 0.7 });
+  assert.equal((await h.image()).anchors.length, 1);
+  assert.equal(h.chat.lines.at(-1).filter(l => l.status === 'failed').length, 0);
+});
+
+test('G06a: Cancel on a suggested move writes nothing', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  await h.send('x');
+  const fileBefore = h.contents.get(MAP);
+  h.chat.plans[0].cancel();
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 });
+  assert.equal(h.contents.get(MAP), fileBefore);
+  assert.equal(h.view.history.undoEntry, undefined);
+});
+
+test('G06a (counter-example): move_anchor is never applied directly: "apply at once" and auto-apply both still wait for confirmation', async () => {
+  for (const mode of ['direct', 'auto']) {
+    const h = await harness(); h.select('img1');
+    if (mode === 'direct') h.view.chatImageMode = () => 'direct'; else h.view.chatAutoApply = true;
+    h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+    await h.send('x');
+    assert.equal(h.chat.plans.length, 1, mode);
+    assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 }, mode);
+    assert.equal(h.view.history.undoEntry, undefined, mode);
+  }
+});
+
+test('G06a: the applied move is one undo step: undo restores the old position, redo moves it again', async () => {
+  const h = await harness(); h.select('img1');
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+  await h.send('x');
+  const before = plain(await h.saved());
+  h.chat.plans[0].apply(); await settled(h);
+  const after = plain(await h.saved());
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.deepEqual(plain(await h.saved()), before, 'one undo restores the old position');
+  assert.equal(h.view.history.undoEntry.label, 'earlier');
+  await h.view.travel(true);
+  assert.deepEqual(plain(await h.saved()), after);
+});
+
+test('G06a (counter-example): an anchor deleted, an image deleted or an image turned plain while the plan waits is stale: Apply writes nothing', async () => {
+  const cases = {
+    'anchor deleted': items => items.map(i => i.id === 'img1' ? { ...i, anchors: [] } : i),
+    'image deleted': items => items.filter(i => i.id !== 'img1'),
+    'image turned plain': items => items.map(i => i.id === 'img1' ? { id: 'img1', kind: 'image', path: i.path, x: i.x, y: i.y, w: i.w, h: i.h } : i)
+  };
+  for (const [name, change] of Object.entries(cases)) {
+    const h = await harness(); h.select('img1');
+    h.control.reply = async () => ({ reply: 'r', actions: [moveAnchor('old1', 0.6, 0.7)], rejected: [] });
+    await h.send('x');
+    await h.edit(change);
+    const fileBefore = h.contents.get(MAP);
+    h.view.history.undoEntry = undefined;
+    h.chat.plans[0].apply(); await settled(h);
+    assert.equal(h.contents.get(MAP), fileBefore, `${name}: Map.md is not written`);
+    assert.equal(h.view.history.undoEntry, undefined, `${name}: no undo step`);
+    assert.deepEqual(statuses(h.chat.lines.at(-1).filter(l => /^(Skipped|Done)/.test(l.text))), ['skipped'], name);
+  }
+});

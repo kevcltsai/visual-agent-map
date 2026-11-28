@@ -4,6 +4,7 @@ import {
   anchorRelationAllowed,
   ANCHOR_LIMIT,
   findAnnotatedImage,
+  updateAnchor,
   type AnchorRelation
 } from "./canvas-items";
 import type { Transaction, TransactionEntry } from "./map-transaction";
@@ -414,6 +415,8 @@ export class ChatActionWriter {
       case "add_anchor":
       case "link_anchor":
         return this.chatChangeAnchor(action, real, run);
+      case "move_anchor":
+        return this.chatMoveAnchor(action);
       case "set_appearance":
         return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
@@ -889,6 +892,35 @@ export class ChatActionWriter {
       run.ringAdded.set(action.imageId, added);
     }
     return { status: "done" };
+  }
+  /**
+   * move_anchor (G06a): runs only from a confirmed plan. The same Map.md write as dragging an anchor by hand (`updateAnchor`),
+   * checked again against the map being edited: a picture that was deleted or turned back into an ordinary one, or an anchor
+   * that is gone, is stale and writes nothing. Never on an AIM map.
+   */
+  private async chatMoveAnchor(action: Extract<MapChatAction, { kind: "move_anchor" }>): Promise<ChatOutcome> {
+    if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const items = this.map.canvasItems ?? [];
+    const image = findAnnotatedImage(items, action.imageId);
+    if (!image)
+      return skipped(
+        items.some(item => item.id === action.imageId && item.kind === "image")
+          ? "ui.map_chat_skip_image_plain"
+          : "ui.map_chat_skip_image_gone"
+      );
+    if (!image.anchors.some(anchor => anchor.id === action.anchorId)) return skipped("ui.map_chat_skip_anchor_gone");
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.ports.mapChange(map => {
+      const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
+      if (!current) box.refused = "ui.map_chat_skip_image_gone";
+      else if (!current.anchors.some(anchor => anchor.id === action.anchorId))
+        box.refused = "ui.map_chat_skip_anchor_gone";
+      else
+        map.canvasItems = updateAnchor(map.canvasItems ?? [], action.imageId, action.anchorId, {
+          at: { x: action.x, y: action.y }
+        });
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

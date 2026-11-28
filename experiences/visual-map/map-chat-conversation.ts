@@ -239,6 +239,8 @@ export class MapChatConversation {
         return t("ui.map_chat_plan_reason_auto_apply_confirm");
       case "book_plan_edit":
         return t("ui.map_chat_plan_reason_book_plan_edit");
+      case "move_anchor_confirm":
+        return t("ui.map_chat_plan_reason_move_anchor_confirm");
       case "living_node_confirm":
         return t("ui.living_node_chat_plan_confirm");
     }

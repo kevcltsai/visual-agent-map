@@ -446,15 +446,18 @@ const menuTitles = (h, fill) => {
   const menu = () => { const list = []; const m = { list, addItem(cb) { const e = entry(); cb(e.chain); list.push(e.it); return m; }, addSeparator() { list.push({ title: '—' }); return m; }, showAtPosition() {}, showAtMouseEvent() {} }; return m; };
   const root = menu(); fill(root); items.push(...root.list); return items;
 };
-test('a selected card shows labelled buttons: Research, Add, Note, More (and Add summary on an empty-summary card); Add adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
+test('a selected card shows labelled buttons: AI explore, Style, Note, More (B08: no Add, no Add summary); Add subtopic from ⋯ adds a child at once and Cmd/Ctrl-click on Note opens a new tab', async () => {
   const h = await harness();
   const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-card-tool'));
-  assert.deepEqual(tools.map(i => i.text), ['Research', 'Add', 'Note', 'Add summary', '⋯']);
+  assert.deepEqual(tools.map(i => i.text), ['AI explore', 'Style', 'Note', '⋯']);
+  assert.ok(!tools.some(i => i.classes.has('vam-add-child-tool') || i.classes.has('vam-card-tool-add-summary')), 'B08: Add and Add summary left the toolbar');
   assert.ok(tools.every(i => (i.text && i.text !== '⋯') || i.attrs['aria-label']), 'every button has a name');
   assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-add-child') || i.classes.has('vam-node-tool')).length, 0, 'no hover icons and no + circle');
   h.view.whenEditing = run => run();
   const run = (cls, init = {}) => tools.find(i => i.classes.has(cls)).handlers.get('click')({ metaKey: false, ctrlKey: false, stopPropagation() {}, ...init });
-  run('vam-add-child-tool'); await until(() => h.added.length === 1); assert.deepEqual(h.added, [h.ids.leaf], 'Add puts a subtopic under the card');
+  const leafNode = h.view.map.nodes.find(n => n.id === h.ids.leaf);
+  const add = menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, leafNode); }).find(i => i.title === 'Add subtopic');
+  add.run(); await until(() => h.added.length === 1); assert.deepEqual(h.added, [h.ids.leaf], 'Add subtopic (⋯) puts a subtopic under the card');
   const opened = []; h.view.openDetails = () => opened.push('details'); h.view.openNoteInTab = () => opened.push('tab');
   run('vam-detail-button'); run('vam-detail-button', { metaKey: true }); run('vam-detail-button', { ctrlKey: true });
   assert.deepEqual(opened, ['details', 'tab', 'tab']);
@@ -466,10 +469,11 @@ test('More lists card settings, the summary bracket, note style and the other to
   const node = key => h.view.map.nodes.find(n => n.id === h.ids[key]);
   const more = key => menuTitles(h, m => { h.view.newMenu = () => m; h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 0, bottom: 0 }) }, node(key)); });
   const leaf = more('leaf');
-  // B06 (mockup §4): settings, summary bracket, note style, AI card | the new topics not on the toolbar | remove.
-  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
+  // B06 (mockup §4): settings, Add summary (B08: off the toolbar; an empty summary), summary bracket, note style, AI card |
+  // the new topics, Add subtopic included (B08: off the toolbar) | remove.
+  assert.deepEqual(leaf.map(i => i.title), ['Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
   assert.ok(leaf.find(i => i.title === 'Add another type').sub.list.length >= 6, 'the topic types are in the submenu');
-  assert.deepEqual(more('branch').map(i => i.title).slice(0, 4), ['Card settings…', 'Focus on this branch', 'Select subtopics', 'Add summary bracket']);
+  assert.deepEqual(more('branch').map(i => i.title).slice(0, 5), ['Card settings…', 'Focus on this branch', 'Add summary', 'Select subtopics', 'Add summary bracket']);
 });
 test('right-click on one card: the toolbar actions, then the ⋯ list in its order, Remove last; Collapse only with subtopics; no picture-book entry on a map without a book', async () => {
   const h = await harness();
@@ -480,8 +484,8 @@ test('right-click on one card: the toolbar actions, then the ⋯ list in its ord
     h.view.onCanvasContextMenu({ target: { closest: sel => (sel === '.vam-node' ? card : null) }, preventDefault() {}, clientX: 5, clientY: 5 });
   }).map(i => i.title);
   const leaf = contextMenu('leaf');
-  // B07: the toolbar's actions (AI explore, Add subtopic, Open note, Add summary), a separator, then the ⋯ list as it is (Copy as reference: F01).
-  assert.deepEqual(leaf, ['AI explore', 'Add subtopic', 'Open note', 'Add summary', '—', 'Card settings…', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
+  // B07: the toolbar's actions (B08: AI explore, Style…, Open note), a separator, then the ⋯ list as it is (Copy as reference: F01).
+  assert.deepEqual(leaf, ['AI explore', 'Style…', 'Open note', '—', 'Card settings…', 'Add summary', 'Add summary bracket', 'Note style…', 'Make it an AI card', '—', 'Add subtopic', 'Add sibling topic', 'Add another type', 'Copy as reference', '—', 'Remove from map']);
   for (const gone of ['Research this card', 'This card', 'Select subtopics', 'Picture book', 'Collapse subtopics']) assert.ok(!leaf.includes(gone), `${gone} is not in a leaf card's menu`);
   assert.ok(contextMenu('branch').includes('Collapse subtopics'), 'a card with subtopics offers Collapse');
   node('branch').collapsed = true;

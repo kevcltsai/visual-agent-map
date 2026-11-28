@@ -17,14 +17,16 @@ import { syncModelSelect } from "../../core/model-discovery";
 import { BOOK_POOL, LOOKS_PER_CHAPTER } from "./book-pipeline-run";
 import {
   EDIT_MESSAGE_CHARS,
+  EDIT_REPLY_CHARS,
   type EditSettingsResult,
   type EditSettingsTurn
 } from "../../core/steps/book-pipeline/edit-settings";
 
 /**
- * The card shown when "Picture book" is pressed: what will happen, about how long and how many AI calls, the model of each
- * step (four dropdowns, always shown, below the estimate), and the six whole-book settings (always open; a grey italic suggestion
- * shows in an empty field and is used when the field stays empty). The only decisions are Start and Cancel.
+ * The card shown when "Picture book" is pressed: with the chief editor, a box on top to say in plain words what book is wanted (it
+ * fills the settings the owner left empty); what will happen, about how long and how many AI calls; the model of each step (four
+ * dropdowns) and the six whole-book settings (a grey italic suggestion shows in an empty field and is used when the field stays
+ * empty), folded into a closed "Advanced settings" with the chief editor and always open without. The only decisions are Start and Cancel.
  */
 
 /** How long the start card waits for its grey suggestions before it stays blank. */
@@ -215,7 +217,7 @@ export interface BookStartInput {
   /** Titles of the chapters still on the map (a mention of one is not a mention of a deleted chapter inside it). */
   chapterTitles?: readonly string[];
   /**
-   * One turn with the chief editor (the chat beside the fields; no chat without it). `settings` is what the fields show (typed text, else the grey
+   * One turn with the chief editor (the request box on top of the card; no box, and no folded settings, without it). `settings` is what the fields show (typed text, else the grey
    * suggestion). The call is dropped by `signal` when the card closes, Start is pressed or {@link BOOK_EDIT_TIMEOUT_MS} passes.
    */
   editSettings?: (
@@ -247,6 +249,7 @@ export class BookSettingsViewModal extends Modal {
   }
   onOpen(): void {
     const { contentEl } = this;
+    contentEl.addClass("vam-tokens");
     this.titleEl.setText(t("ui.book_settings_view"));
     const list = contentEl.createEl("dl", { cls: "vam-book-settings-list" });
     for (const field of BOOK_SETTING_FIELDS) {
@@ -451,32 +454,42 @@ export class BookStartModal extends Modal {
   onOpen(): void {
     this.opened = true;
     const { contentEl } = this;
+    contentEl.addClass("vam-tokens");
     this.titleEl.setText(t("ui.book_start_title"));
-    contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_start_intro") });
+    // With the chief editor: the owner's own words come first and the models and six settings fold into "Advanced settings" (closed);
+    // without it the card stays as it was (everything open).
+    const ask = this.input.editSettings ? contentEl.createDiv({ cls: "vam-book-start-ask" }) : null;
+    if (ask) this.renderChat(ask);
+    contentEl.createEl("p", {
+      cls: "vam-modal-intro",
+      text: t(ask ? "ui.book_start_intro_ask" : "ui.book_start_intro")
+    });
     this.estimateEl = contentEl.createEl("p", { cls: "vam-book-start-estimate" });
     this.estimateEl.setAttr("role", "status");
-    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
+    const advanced = ask ? contentEl.createEl("details", { cls: "vam-book-start-advanced" }) : null;
+    advanced?.createEl("summary", { text: t("ui.book_start_advanced") });
+    const body = advanced ?? contentEl;
+    const choice = body.createDiv({ cls: "vam-book-start-model-choice" });
     renderBookModelChoice(choice, {
       ...this.input.modelChoice,
       models: this.input.models,
       // A pick only changes this card's copy; it is saved when Start is pressed.
       onChange: () => this.refreshEstimate()
     });
-    const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
+    const settings = body.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));
     settings.createEl("strong", { text: t("ui.book_start_settings") });
-    // While the suggestions are being made: a spinner beside the line and a shimmer in each empty field (CSS, .is-loading).
-    this.suggestingEl = settings.createEl("p", { cls: "vam-book-start-suggesting" });
+    // While the suggestions are being made: a spinner beside the line and a shimmer in each empty field (CSS, .is-loading). With the
+    // chief editor the line sits under the request box, where it says why Send waits.
+    this.suggestingEl = (ask ?? settings).createEl("p", { cls: "vam-book-start-suggesting" });
     this.suggestingEl.createSpan({ cls: "vam-book-start-spinner", attr: { "aria-hidden": "true" } });
-    this.suggestingEl.createSpan({ text: t("ui.book_start_suggesting") });
+    this.suggestingEl.createSpan({ text: t(ask ? "ui.book_start_suggesting_ask" : "ui.book_start_suggesting") });
     this.suggestingEl.setAttr("role", "status");
     settings.addClass("is-loading");
     this.settingsEl = settings;
-    const split = this.input.editSettings ? settings.createDiv({ cls: "vam-book-start-split" }) : null;
-    if (split) this.renderChat(split.createDiv({ cls: "vam-book-start-chat" }));
     this.fields = renderBookSettingsFields(
-      split ? split.createDiv({ cls: "vam-book-start-fields" }) : settings,
+      settings,
       this.input.settings,
       this.input.deletedChapterTitles,
       this.input.chapterTitles
@@ -611,12 +624,20 @@ export class BookStartModal extends Modal {
     run?.abort();
   }
   private applyEdit(message: string, result: EditSettingsResult): void {
-    const undo: { field: BookSettingField; before: string; written: string }[] = [];
+    // `beforeWritten`: what the editor had written in the field before this turn (undo hands the field back to that turn).
+    const undo: { field: BookSettingField; before: string; beforeWritten: string; written: string }[] = [];
+    const kept: string[] = [];
     for (const field of BOOK_SETTING_FIELDS) {
       const text = result.changes[field];
       const area = this.fields?.areas.get(field);
       if (!text || !area) continue;
-      undo.push({ field, before: area.value, written: text });
+      // Only a field the owner has not filled: an empty one (grey suggestion or none) or one still holding what the editor wrote.
+      // Typed or prefilled text is the owner's and stays; the reply says which were kept.
+      if (area.value.trim() && area.value !== this.marks.get(field)?.written) {
+        kept.push(t(FIELD_LABEL[field]));
+        continue;
+      }
+      undo.push({ field, before: area.value, beforeWritten: this.marks.get(field)?.written ?? "", written: text });
       area.value = text;
       area.removeClass("vam-book-start-suggested");
       this.marks.set(field, { written: text, chip: this.marks.get(field)?.chip ?? null });
@@ -625,6 +646,11 @@ export class BookStartModal extends Modal {
     const bubble = this.chatLog?.createDiv({ cls: "vam-book-chat-ed" });
     bubble?.createEl("b", { text: t("ui.book_chat_editor") });
     bubble?.createSpan({ cls: "vam-book-chat-reply", text: result.reply });
+    if (kept.length)
+      bubble?.createEl("p", {
+        cls: "vam-book-chat-kept",
+        text: t("ui.book_chat_kept_0", kept.join(t("ui.list_separator")))
+      });
     if (bubble && undo.length) {
       const button = bubble.createEl("button", { cls: "vam-book-chat-undo", text: t("ui.book_chat_undo") });
       button.addEventListener("click", () => {
@@ -633,13 +659,20 @@ export class BookStartModal extends Modal {
           const area = this.fields?.areas.get(item.field);
           if (!area || area.value !== item.written) continue;
           area.value = item.before;
+          const mark = this.marks.get(item.field);
+          if (mark) mark.written = item.beforeWritten;
           if (!item.before.trim() && this.suggested[item.field]) area.addClass("vam-book-start-suggested");
           this.refreshMark(item.field);
         }
         button.remove();
       });
     }
-    this.turns.push({ owner: message, editor: result.reply });
+    // The next turn's history says which fields stayed, so the editor does not believe its change landed (the note is never cut off).
+    const note = kept.length ? t("ui.book_chat_kept_turn_0", kept.join(t("ui.list_separator"))) : "";
+    const editor = note
+      ? `${result.reply.slice(0, Math.max(0, EDIT_REPLY_CHARS - note.length - 1))} ${note}`
+      : result.reply;
+    this.turns.push({ owner: message, editor });
   }
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {

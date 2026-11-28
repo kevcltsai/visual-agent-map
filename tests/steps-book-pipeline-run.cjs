@@ -26,6 +26,8 @@ const { proofKey, evaluateProof, composeProofRecord } = S.load('core/book-pipeli
 const { findStoredProof, withoutResearchNotes, chapterBody, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
 const { stampDetail } = S.load('core/book-pipeline/body-integrity.ts');
+const { frontmatter } = S.load('core/repository-frontmatter.ts', { obsidian: S.obsidian });
+const { readAiLocked } = S.load('note-values.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -69,7 +71,7 @@ async function rig(over = {}) {
     updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (d.bookPipeline) { if (!over.trial) delete d.bookPipeline.trial; if (over.trial && !over.planReview) delete d.bookPipeline.planReview; } }),
     readCard: async path => {
       const note = await repo.readNote(path);
-      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } };
+      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), aiLocked: readAiLocked(frontmatter(contents.get(path))), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } };
     },
     writePipelineFields: (path, patch) => { stat.writes++; return repo.writePipelineFields(path, patch); },
     ...(over.noRolePort ? {} : { writePipelineRole: (path, role) => repo.writePipelineRole(path, role) }),
@@ -6080,4 +6082,81 @@ test('figure slots: stop during the call, or a card edited before the write, wri
   });
   assert.equal(outcomes[0], 'discarded');
   assert.match((await second.r.note(0)).detail, /擁有者新增一句。/);
+});
+
+// ai-flows §AI 鎖定: a chapter with `ai-locked: true` is skipped before any call (no plan, write or proof for it), its text stays, and its
+// reason is the locked one (not "dropped"); the other chapters run. Program bookkeeping (stage, issue, role keys) is not an AI write.
+const LOCKED = /^(?:Topic is locked; AI will not change it|議題已鎖定，AI 不會修改)$/;
+const withoutProgramKeys = raw => raw.replace(/^(?:book-role|book-role-by|pipeline-[a-z]+):.*\n/gm, '');
+test('AI lock: a locked chapter costs no AI call, keeps its text and shows the locked reason; the other chapters still run', async () => {
+  const r = await rig();
+  await r.repo.writeAiLocked(r.nodes[2].path, true);
+  const before = r.raw(2);
+  const id = r.nodes[2].id;
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  assert.equal((await r.state()).phase, 'done');
+  assert.ok(!r.stat.plan.includes(id), 'no card plan for the locked chapter');
+  assert.ok(!r.stat.author.includes(id), 'no write for the locked chapter');
+  assert.ok(!r.stat.proof.some(request => (request.title ?? request.card?.title) === TITLES[2]), 'no proofread for the locked chapter');
+  assert.equal(r.stat.author.length, 2, 'the two unlocked chapters are written');
+  assert.equal(stageOf(r.raw(0)), 'checked'); assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.equal(withoutProgramKeys(r.raw(2)), withoutProgramKeys(before), 'the locked note: nothing but the pipeline keys changed');
+  assert.match(r.raw(2), /^ai-locked: true$/m);
+  assert.equal(stageOf(r.raw(2)), 'needs-review');
+  assert.equal((await r.note(2)).pipelineIssue, 'plan failed: ai_locked');
+  const reasons = await boxReasons(r, 2);
+  assert.ok(reasons.some(p => LOCKED.test(p.text)), `the locked reason is shown: ${JSON.stringify(reasons)}`);
+  assert.ok(!reasons.some(p => /丟棄|已停止|dropped|discarded|stopped/i.test(p.text)), 'not reported as dropped or stopped');
+  assert.ok(r.stat.logs.some(line => /ai_locked/.test(line)));
+});
+test('AI lock: a chapter locked after its plan is not written (no author call) and shows the locked reason', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).phase, 'gate1');
+  await r.repo.writeAiLocked(r.nodes[1].path, true);
+  const before = r.raw(1);
+  await confirmDone(r.runs, r.mapPath);
+  assert.ok(!r.stat.author.includes(r.nodes[1].id));
+  assert.equal(withoutProgramKeys(r.raw(1)), withoutProgramKeys(before));
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: ai_locked');
+  assert.ok((await boxReasons(r, 1)).some(p => LOCKED.test(p.text)));
+  assert.equal(stageOf(r.raw(2)), 'checked');
+});
+test('AI lock: a locked book card (the root) stops the whole-book plan before its call, with the locked code', async () => {
+  const r = await rig();
+  await r.repo.writeAiLocked(r.nodes[0].path, true);
+  const before = r.raw(0);
+  await r.runs.start(r.mapPath).catch(() => undefined);
+  await settle();
+  assert.deepEqual(r.stat.plan, [], 'no whole-book plan call');
+  assert.equal((await r.state()).failureCode, 'ai_locked');
+  assert.equal(withoutProgramKeys(r.raw(0)), withoutProgramKeys(before));
+});
+test('AI lock: a lock landing while the author runs is still caught by the write fence (nothing written); the retry is skipped before its call', async () => {
+  const holder = {};
+  const r = await rig({ script: { author: async input => {
+    await input.admission.reserve();
+    const note = await holder.r.repo.readNote(input.path);
+    if (input.nodeId === holder.r.nodes[1].id) await holder.r.repo.writeAiLocked(input.path, true);
+    const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize, rejectAiCard: true });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  } } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  assert.equal(r.stat.author.filter(id => id === r.nodes[1].id).length, 1, 'one call (the lock came during it); the retry made none');
+  assert.ok(!(await r.note(1)).detail.includes(bodyOf(TITLES[1])), 'the late result was not written');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: ai_locked');
+  assert.equal(stageOf(r.raw(2)), 'checked');
+});
+test('AI lock: applying the reader\'s notes to a locked chapter is refused with the locked code before the backup and the call; nothing changes', async () => {
+  const r = await notesRig();
+  await r.repo.writeAiLocked(r.nodes[1].path, true);
+  const before = r.cardRaw();
+  const backups = r.stat.backups.length;
+  const used = (await r.state()).budget.used;
+  await assert.rejects(() => r.runs.applyNotes(r.mapPath, r.nodes[1].id), refusal('ai_locked'));
+  assert.equal(r.calls.length, 0); assert.equal(r.stat.backups.length, backups);
+  assert.equal(r.cardRaw(), before); assert.equal((await r.state()).budget.used, used);
 });

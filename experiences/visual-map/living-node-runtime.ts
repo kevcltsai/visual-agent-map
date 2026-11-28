@@ -1119,7 +1119,8 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       ...(frozen ? (["frozen-source"] as const) : [])
     ];
     const input = await readInputs(readPort, map, id, snapshot, sources, warnings);
-    return { saved, snapshot, input, dependenciesReady, warnings: input.warnings };
+    const paths = sources.sources.map(source => source.path);
+    return { saved, snapshot, input, dependenciesReady, warnings: input.warnings, paths };
   };
   const prepared = await build(false);
   const candidate = {
@@ -1178,7 +1179,16 @@ export async function prepareLivingTrial(port: LivingTrialPort, id: string, prom
       };
     }
   };
-  return { request, adoption, model: original.note.model, warnings: prepared.warnings };
+  /** The draft inputs still read as they did for this trial: the editor checks this when a watched note changes. */
+  const inputsCurrent = async (): Promise<boolean> => {
+    try {
+      return (await build(false)).input.inputRevision === candidate.inputRevision;
+    } catch {
+      return false;
+    }
+  };
+  const watched = [...new Set([target.path, ...prepared.paths])];
+  return { request, adoption, model: original.note.model, warnings: prepared.warnings, watched, inputsCurrent };
 }
 
 /** Local validity inspection makes no AI calls. A stale upstream is derived, not persisted as a knowledge change. */

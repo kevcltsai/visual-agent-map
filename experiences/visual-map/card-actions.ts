@@ -20,6 +20,10 @@ export type CardActionId =
   | "edge-ai-card"
   | "add-sibling"
   | "research"
+  | "style"
+  | "run-stop"
+  | "ai-lock"
+  | "ai-settings"
   | "toggle-collapse"
   | "focus-branch"
   | "leave-focus"
@@ -86,6 +90,10 @@ export interface CardActionHost {
   setupAiCard(parent: MapNode | null): void;
   addSibling(node: MapNode): void;
   research(node: MapNode, opener?: HTMLElement): void;
+  /** The Style popover (style-popover.ts) under the card's toolbar Style button (`opener`). */
+  openStyle(node: MapNode, opener?: HTMLElement): void;
+  /** Stops every AI run on the card (stopAiOn), as its header Stop does. */
+  stopAi(node: MapNode): void;
   rename(node: MapNode): void;
   openNote(node: MapNode, newTab: boolean): void;
   addSummaryField(node: MapNode): void;
@@ -156,8 +164,12 @@ export interface CardActionContext {
   note(id: string): PromptNoteRef | undefined;
   isMerging(id: string): boolean;
   isArgumentCard(id: string): boolean;
-  /** The toolbar's Add summary (an empty summary the card face does not draw). */
+  /** Add summary (an empty summary the card face does not draw). */
   summaryFieldOffered(): boolean;
+  /** The card's colour and styles may change here (markersEditable: not an AIM map). */
+  stylesEditable: boolean;
+  /** The AI works on this card now (aiStatusOf "running": a batch, a single run, research, a merge…). */
+  aiRunning(id: string): boolean;
   /** The card is a chapter of this map's picture book (addBookMenu has rows). */
   bookMenu(): boolean;
   /** Why the selection cannot be merged (mergeCheck), or null. */
@@ -258,6 +270,53 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: ctx => ctx.host.stopRunAll()
   },
   {
+    id: "run-stop",
+    titleKey: "ui.card_tool_run",
+    titleFor: ctx => (ctx.node && ctx.aiRunning(ctx.node.id) ? "ui.card_tool_stop" : "ui.card_tool_run"),
+    icon: "play",
+    iconFor: ctx => (ctx.node && ctx.aiRunning(ctx.node.id) ? "square" : "play"),
+    scope: ["ai-card"],
+    surfaces: ["toolbar"],
+    order: 6,
+    group: 1,
+    // B08: the AI card's first button, Run (startPromptRun, as Run card) or, while the AI works on the card, Stop. Run all's
+    // Stop (above) takes the place while the batch works on it. Stop is a plain button like Run all's: no whenEditing.
+    applies: ctx => !!ctx.node && !ctx.runAllWorking(ctx.node.id),
+    available: ctx =>
+      ctx.aiRunning(card(ctx).id)
+        ? gate(ctx, ["presentation", "multiSelect"])
+        : then(gate(ctx, [...CARD, "bookAi"]), () =>
+            ctx.note(card(ctx).id)?.aiLocked ? off(CARD_ACTION_REASONS.aiLock) : OK
+          ),
+    run: ctx => (ctx.aiRunning(card(ctx).id) ? ctx.host.stopAi(card(ctx)) : ctx.host.runCard(card(ctx)))
+  },
+  {
+    id: "ai-lock",
+    titleKey: "ui.card_tool_lock",
+    titleFor: ctx => (ctx.node && ctx.note(ctx.node.id)?.aiLocked ? "ui.card_tool_locked" : "ui.card_tool_lock"),
+    icon: "lock",
+    scope: ["ai-card"],
+    surfaces: ["toolbar"],
+    order: 7,
+    group: 1,
+    // B08: a toggle (aria-pressed); locking first stops the AI on the card (setAiLock). An argument card is the flow's.
+    applies: ctx => !!ctx.node && !ctx.isArgumentCard(ctx.node.id) && !!ctx.note(ctx.node.id),
+    available: ctx => gate(ctx, CARD),
+    run: ctx => ctx.host.setAiLock([card(ctx)], ctx.note(card(ctx).id)?.aiLocked !== true)
+  },
+  {
+    id: "ai-settings",
+    titleKey: "ui.card_tool_ai_settings",
+    icon: "settings",
+    scope: ["ai-card"],
+    surfaces: ["toolbar"],
+    order: 8,
+    group: 1,
+    // B08: the AI card setup (openAiCardPopover), as Edit AI card; an AI-locked card says so there.
+    available: ctx => gate(ctx, [...CARD, "bookAi"]),
+    run: ctx => ctx.host.editAiCard(card(ctx))
+  },
+  {
     id: "add-topic",
     titleKey: "ui.command_map_add_topic",
     icon: "plus",
@@ -314,7 +373,6 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "research",
     titleKey: "ui.ai_explore",
-    titles: { toolbar: "ui.card_tool_research" },
     icon: "sparkles",
     scope: ["card", "ai-card"],
     surfaces: ["toolbar", "context", "command"],
@@ -328,6 +386,21 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     run: (ctx, options) => ctx.host.research(card(ctx), options?.opener)
   },
   {
+    id: "style",
+    titleKey: "ui.card_menu_style",
+    titles: { toolbar: "ui.topic_style" },
+    icon: "paintbrush",
+    scope: ["card", "ai-card"],
+    surfaces: ["toolbar", "context"],
+    order: 35,
+    group: 2,
+    // B08: the toolbar's Style (an AI card has it in its ⋯); each choice in the popover goes through whenEditing and
+    // mergeUnlocked. Hidden under the picture-book structure lock.
+    applies: ctx => !!ctx.node && !!ctx.note(ctx.node.id) && ctx.stylesEditable,
+    available: ctx => gate(ctx, [...CARD, "bookStructure"]),
+    run: (ctx, options) => ctx.host.openStyle(card(ctx), options?.opener)
+  },
+  {
     id: "open-note",
     titleKey: "ui.card_menu_open_note",
     titles: { toolbar: "ui.card_tool_note" },
@@ -338,7 +411,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     group: 2,
     // The command opens the details whenever a card is selected, presenting or picking topics included. The toolbar's Note
     // only reads, so it works while loading and presenting (V3.3 A5); the toolbar is not drawn while picking topics.
-    // B05: while the notes load the toolbar hides Research, Add and Add summary; ⋯ still opens, its rows greyed with the reason.
+    // B05: while the notes load the toolbar hides every other button; ⋯ still opens, its rows greyed with the reason.
     available: ctx =>
       ctx.surface === "command" ? OK : ctx.surface === "toolbar" ? gate(ctx, ["multiSelect"]) : gate(ctx, CARD),
     run: (ctx, options) => ctx.host.openNote(card(ctx), options?.newTab ?? false)
@@ -398,7 +471,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     titleKey: "ui.card_tool_add_summary",
     icon: "text",
     scope: ["card", "ai-card"],
-    surfaces: ["toolbar"],
+    // B08: out of the toolbar, into the ⋯ and the right-click menu (mockup §4).
+    surfaces: ["more", "context"],
     order: 70,
     group: 3,
     applies: ctx => ctx.summaryFieldOffered(),
@@ -501,11 +575,11 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "add-child",
     titleKey: "ui.card_menu_add_child",
-    titles: { toolbar: "ui.card_tool_add" },
     icon: "plus",
     shortcut: "ui.shortcut_add_subtopic",
     scope: ["card", "ai-card"],
-    surfaces: ["toolbar", "context", "command", "key"],
+    // B08: off the toolbar (the edge "+ Topic card" and Cmd+Enter replace it); kept in the ⋯ and the right-click menu.
+    surfaces: ["more", "context", "command", "key"],
     order: 140,
     group: 4,
     available: ctx => gate(ctx, [...CARD, "bookStructure"]),
@@ -820,13 +894,12 @@ export const CARD_ACTIONS: readonly CardAction[] = [
 ];
 
 /**
- * The toolbar sets, in their order: the card toolbar, the AI card's (Run all's Stop first; B08 fills the rest of its own) and the
- * selection bar.
+ * The toolbar sets, in their order (B08, mockup §4): the card toolbar "AI explore | Style | Note", the AI card's "Run or Stop |
+ * Lock | AI explore | Settings | Note" (Run all's Stop takes Run's place) and the selection bar. ⋯ follows on a card.
  */
-const CARD_TOOLBAR_SET: readonly CardActionId[] = ["research", "add-child", "open-note", "add-summary-field"];
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
-  card: CARD_TOOLBAR_SET,
-  "ai-card": ["stop-run-all", ...CARD_TOOLBAR_SET],
+  card: ["research", "style", "open-note"],
+  "ai-card": ["stop-run-all", "run-stop", "ai-lock", "research", "ai-settings", "open-note"],
   multi: ["move-to", "merge", "multi-research", "finish-selection"]
 };
 
@@ -909,8 +982,11 @@ export function ruleMoreSet(kind: "card" | "ai-card"): CardActionId[] {
   ).map(action => action.id);
 }
 
-/** Toolbar actions the right-click menu never repeats (Run all's Stop belongs to the running card's toolbar only). */
-const TOOLBAR_ONLY: readonly CardActionId[] = ["stop-run-all"];
+/**
+ * Toolbar actions the right-click menu never repeats: Run all's Stop belongs to the running card's toolbar only; the AI
+ * card's Run, Lock and Settings are Run card, the card settings' AI lock and Edit AI card there.
+ */
+export const TOOLBAR_ONLY: readonly CardActionId[] = ["stop-run-all", "run-stop", "ai-lock", "ai-settings"];
 /** The card right-click (B07): the toolbar set (minus TOOLBAR_ONLY), a separator, then the ⋯ set. */
 export function ruleContextSet(kind: "card" | "ai-card"): (CardActionId | "separator")[] {
   return [...CARD_TOOLBAR[kind].filter(id => !TOOLBAR_ONLY.includes(id)), "separator", ...ruleMoreSet(kind)];

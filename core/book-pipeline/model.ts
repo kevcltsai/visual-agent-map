@@ -259,6 +259,11 @@ export interface AiProofState {
   applied?: string[];
   /** One more fix-and-check round over a finished proofread is in progress (`reopenAiRound`); an older save has none. */
   again?: true;
+  /**
+   * The whole book only: the chapters (card ids) the last check left out because they were AI-locked. With it the proofread is
+   * `incomplete` (never shown as all solved) yet may still take one more round ("fix again") once a chapter is unlocked.
+   */
+  locked?: string[];
 }
 
 /**
@@ -339,6 +344,7 @@ function aiProofShape(value: unknown): boolean {
   if (value.done !== undefined && typeof value.done !== "boolean") return false;
   if (value.incomplete !== undefined && typeof value.incomplete !== "boolean") return false;
   if (value.again !== undefined && value.again !== true) return false;
+  if (value.locked !== undefined && !isTextList(value.locked)) return false;
   if (!isCount(value.checked) || !isCount(value.fixed)) return false;
   const items = (list: unknown, extra: readonly string[]): boolean =>
     Array.isArray(list) &&

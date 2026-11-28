@@ -1308,6 +1308,14 @@ test('R1 abandon: giving up a stuck round of "fix again" leaves a done, incomple
   assert.equal(slot.open.length, 1, 'the problems stay listed');
 });
 
+test('abandon of a book that had AI-locked chapters: without `locked` the stale list is dropped (the whole book is incomplete); with it, the new list is kept', () => {
+  const state = doneBook([], [itemOf('B1', 'ai_locked', 'bq', 2)]);
+  state.bookProof = { ...state.bookProof, incomplete: true, locked: ['x'] };
+  assert.equal(machine.abandonAi(state).bookProof.locked, undefined, 'no stale locked chapters');
+  assert.equal(machine.fixAgainPlan(machine.abandonAi(state), 0).book, false, 'not offered one more round');
+  assert.deepEqual(plain(machine.abandonAi(state, undefined, { ids: ['y'], open: [] }).bookProof.locked), ['y']);
+});
+
 test('a book step that fails at the provider logs the provider message (one line, no paths), not only "failed"', () => {
   const { planFailMessage } = S.load('core/steps/book-pipeline/run.ts');
   const { proofFailMessage } = S.load('core/steps/book-pipeline/proofread.ts');

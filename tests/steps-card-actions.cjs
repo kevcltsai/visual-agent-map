@@ -26,7 +26,9 @@ const nodes = [
   { id: 'a', parentId: null, path: 'a.md', collapsed: false },
   { id: 'b', parentId: 'a', path: 'b.md', collapsed: false },
   { id: 'ai', parentId: null, path: 'ai.md', collapsed: false },
-  { id: 'd', parentId: null, path: 'd.md', collapsed: false }
+  { id: 'd', parentId: null, path: 'd.md', collapsed: false },
+  { id: 'p', parentId: null, path: 'p.md', collapsed: false },
+  { id: 'e', parentId: null, path: 'e.md', collapsed: false }
 ];
 const byId = id => nodes.find(node => node.id === id);
 const recorder = () => {
@@ -38,7 +40,7 @@ const CONTEXTS = ['normal', 'readOnly', 'merging', 'aiLocked', 'presentation', '
 function ctxFor(target, state, extra = {}) {
   const single = typeof target === 'string' ? byId(target) : null;
   const ids = single ? [single.id] : Array.isArray(target) ? target : [];
-  const notes = { a: { prompt: '' }, b: { prompt: '' }, d: { prompt: '' }, ai: { prompt: 'go', aiCard: true } };
+  const notes = { a: { prompt: '' }, b: { prompt: '' }, d: { prompt: '' }, ai: { prompt: 'go', aiCard: true }, p: { prompt: 'go' }, e: { prompt: '  ', aiCard: true } };
   if (state === 'aiLocked') for (const id of ids) notes[id] = { ...notes[id], aiLocked: true };
   return {
     node: single,
@@ -181,6 +183,22 @@ test('card actions: available matches every current entry under each context', (
       eq(availability(id, surface, ctxFor(target, state, extra)), CODE[codes[index]], `${id} on ${surface} (${state})`)
     );
   }
+});
+
+// P3.2: Run Card / Stop belong to a real AI card only (`ai-card` plus a non-empty Prompt). The ordinary card, AI lock and picture-book
+// lock rows are in the table above; a Prompt without `ai-card` and an `ai-card` with a blank Prompt are not AI cards.
+test('card actions: a Prompt-only card and an AI card with a blank Prompt never offer run-stop or run-card on any surface', () => {
+  const surfaces = ['toolbar', 'more', 'context', 'command', 'key', 'edge', 'canvas'];
+  for (const id of ['p', 'e'])
+    for (const state of CONTEXTS)
+      for (const surface of surfaces) {
+        const offered = actionsFor(surface, ctxFor(id, state)).map(entry => entry.action.id);
+        assert.ok(!offered.includes('run-stop') && !offered.includes('run-card'), `${id} (${state}) on ${surface}: ${offered}`);
+      }
+  assert.notEqual(cardActionKind(ctxFor('p', 'normal')), 'ai-card');
+  assert.notEqual(cardActionKind(ctxFor('e', 'normal')), 'ai-card');
+  assert.equal(cardActionKind(ctxFor('ai', 'normal')), 'ai-card', 'control: a real AI card still is one');
+  assert.ok(actionsFor('more', ctxFor('ai', 'normal')).some(entry => entry.action.id === 'run-card'), 'control: it offers Run Card');
 });
 
 test('card actions: the table covers every action, and every unavailable answer has a reason in all three languages', () => {

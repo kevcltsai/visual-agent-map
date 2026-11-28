@@ -905,6 +905,61 @@ test('save path: a new card is made only on save; the popover blocks an empty qu
   assert.match(h.contents.get(made.path), /Brand new\?/);
 });
 
+test('P3.2 cancelling a new AI card (switch map, close view, Esc) leaves nothing; only Cmd/Ctrl+Enter makes the card, and one undo removes it', async () => {
+  const { actionsFor } = S.load('experiences/visual-map/card-actions.ts', { obsidian });
+  const snapshot = h => JSON.stringify([...h.contents.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
+  const runActions = h => ['toolbar', 'more', 'context', 'command'].flatMap(surface =>
+    [...actionsFor(surface, h.view.cardActionContext(null)), ...h.mapDoc.nodes.flatMap(n => [...actionsFor(surface, h.view.cardActionContext(n))])]
+      .map(entry => entry.action.id).filter(id => id === 'run-stop' || id === 'run-card'));
+  const leaves = [
+    ['switching map', h => h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {})],
+    ['closing the view', h => h.view.onClose().catch(() => {})],
+    // Esc on a typed draft only offers Save / Discard / Keep editing (nothing is written, the editor stays); Discard closes it.
+    ['Esc then Discard', h => {
+      const choices = find(h.pop(), i => i.cls?.includes('vam-living-editor-close-choices'));
+      h.pop().keydown({ key: 'Escape' });
+      assert.equal(choices.hidden, false, 'Esc on a draft asks first');
+      assert.equal(h.view.aiCardOpen === null, false, 'the editor is still open');
+      assert.equal(h.mapDoc.nodes.length, 1, 'and nothing was made yet');
+      find(choices, i => i.tag === 'button' && i.text === 'Discard').click();
+    }]
+  ];
+  for (const [name, leave] of leaves) {
+    const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+    const count = h.mapDoc.nodes.length;
+    const past = h.view.history.past.length;
+    const before = snapshot(h);
+    h.view.openAiCardPopover(null, null);
+    h.question().value = 'A draft not yet saved?';
+    h.question().input();
+    assert.equal(h.saveButton().disabled, false, `${name}: the draft is ready to save`);
+    await leave(h);
+    await dom.tick(); await dom.tick();
+    assert.equal(h.view.aiCardOpen, null, `${name}: the editor is closed`);
+    assert.equal(findAll(h.overlay, i => i.cls?.includes('vam-living-editor')).length, 0, `${name}: no .vam-living-editor left`);
+    assert.equal(snapshot(h), before, `${name}: Map.md and every note byte for byte`);
+    assert.equal(h.mapDoc.nodes.length, count, `${name}: no card`);
+    assert.equal(h.view.history.past.length, past, `${name}: no history entry`);
+    assert.equal(h.calls.length, 0, `${name}: no AI call`);
+    eq(runActions(h), [], `${name}: no run-stop / run-card anywhere`);
+  }
+  // Control: Cmd/Ctrl+Enter is the one way a card appears.
+  const h = await popoverHarness([['A', null, { noAi: true, prompt: '' }]]);
+  const count = h.mapDoc.nodes.length;
+  const past = h.view.history.past.length;
+  h.view.openAiCardPopover(null, null);
+  h.question().value = 'Saved?';
+  h.question().input();
+  h.pop().keydown({ key: 'Enter', ctrlKey: true });
+  await until(() => h.mapDoc.nodes.length === count + 1);
+  await until(() => h.view.history.past.length === past + 1);
+  const made = h.mapDoc.nodes.at(-1);
+  assert.match(h.contents.get(made.path), /^ai-card: true$/m);
+  await h.view.history.undoEntry.undo();
+  assert.equal(h.mapDoc.nodes.length, count, 'one undo removes the card');
+  assert.equal(h.contents.has(made.path), false, 'and its note');
+});
+
 test('removeSection("Prompt") leaves a Prompt-looking callout inside a code fence alone', () => {
   const { load, obsidian } = require('./support.cjs');
   const body = load('core/repository-note-body.ts', { obsidian });

@@ -15569,6 +15569,10 @@ export class VisualAgentMapView extends ItemView {
   applySelectionChange(change: SelectionChange): void {
     // Choosing a card ends the picture selection of the chat (D7).
     if (change.touched.length) this.clearChatImage();
+    // Every way of choosing a card (pointer release, click, keys) ends here: an outline reveal's opening folds back unless it holds the new pick.
+    const picked = this.selection.state.selected;
+    const pickedNode = change.touched.length && picked ? this.map?.nodes.find(item => item.id === picked) : undefined;
+    if (pickedNode) this.foldRevealUnless(pickedNode);
     if (change.multiSelectModeChanged) {
       if (!this.closed) this.render();
       return;
@@ -16185,6 +16189,9 @@ export class VisualAgentMapView extends ItemView {
     if (!this.selection.state.multiSelectMode) this.applySelectionChange(this.selection.click(node.id));
     // Centering is the camera only: it is not saved, so an outline click never writes the map file.
     this.focusNode(node, false, true);
+    // Focus goes back to the map (no scroll), so Esc after a reveal reaches the map's key handler, not a chat control.
+    // A view built without a content element or a focusable one (tests) has nothing to focus.
+    if (typeof this.contentEl?.focus === "function") this.contentEl.focus({ preventScroll: true });
     // The reader the outline opens beside the map slides in after this: the canvas narrows for a while, so re-centre on resize.
     this.revealResize = { id: node.id, until: Date.now() + 500 };
     return true;
@@ -16703,7 +16710,6 @@ export class VisualAgentMapView extends ItemView {
     if ((event.target as Element).closest("button")) return;
     // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
     if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
-    this.foldRevealUnless(node);
     if (this.selection.state.multiSelectMode) {
       this.applySelectionChange(this.selection.toggleByClick(node.id));
       return;

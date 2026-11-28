@@ -10,6 +10,7 @@ import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
 import { CARD_COMMANDS, commandTitleKey } from "./experiences/visual-map/card-actions";
 import { NodeDetailsSidebar } from "./experiences/visual-map/node-details-sidebar";
 import { LIVING_READER_VIEW, LivingReaderView } from "./experiences/visual-map/living-node-reader";
+import type { LivingChangeSummary } from "./experiences/visual-map/living-node-changes";
 import { livingCoordinator } from "./experiences/visual-map/living-node-runtime";
 import { LivingIdentityStore, setLivingIdentityStore } from "./experiences/visual-map/living-node-sources";
 import { plainFailure } from "./ai/plain-error";
@@ -2819,9 +2820,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     markdown: string,
     owner: string,
     isCurrent: () => boolean,
-    warnings: readonly string[] = []
+    warnings: readonly string[] = [],
+    changes?: LivingChangeSummary
   ): Promise<boolean> {
-    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings);
+    return this.nodeDetailsSidebar.showLivingTrial(file, markdown, owner, isCurrent, warnings, changes);
   }
   invalidateLivingTrial(owner: string): void {
     this.nodeDetailsSidebar.invalidateLivingTrial(owner);

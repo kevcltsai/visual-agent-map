@@ -219,6 +219,7 @@ export { livingTrialReason } from "./experiences/visual-map/living-node-trial-re
 export { LivingTrial } from "./experiences/visual-map/living-node-trial";
 export { setUiLanguage } from "./i18n";
 export { searchNotPerformedError } from "./ai/search-not-performed";
+export { livingSnapshotRevision } from "./experiences/visual-map/living-node-markdown";
 `, { obsidian: S.obsidian });
 
 test('trial failure: a provider error and a validation error each give a short reason, with the raw code only as a detail', () => {
@@ -262,6 +263,26 @@ test('trial failure: the setup window shows the reason and the code line; a fail
   });
   assert.equal(ok, false);
   assert.equal(trial.failureCode, 'stale-base');
+});
+
+test('trial failure (D1-x5b): a real trial whose runtime did not search ends with the web reason, a generic error with the provider reason', async () => {
+  reasonModule.setUiLanguage('en');
+  const lease = { signal: new AbortController().signal, current: () => true, release() {}, stop() {} };
+  const run = async error => {
+    const trial = new reasonModule.LivingTrial({ acquire: () => lease });
+    const ok = await trial.run({
+      candidate: { mapId: 'm', viewSession: 's', baseRevision: reasonModule.livingSnapshotRevision('') }, path: 'a.md', expectedContent: '', base: { revision: 'empty' },
+      context: {}, generate: async () => { throw error; }, stillCurrent: async () => true
+    });
+    assert.equal(ok, false);
+    return reasonModule.livingTrialReason(trial.failure ?? trial.failureCode ?? '');
+  };
+  const web = await run(reasonModule.searchNotPerformedError());
+  assert.equal(web.key, 'ui.living_node_trial_reason_web');
+  assert.equal(web.code, '', 'the sentence is never shown as a code');
+  const provider = await run(new Error('connect ECONNRESET /Users/me/secret'));
+  assert.equal(provider.key, 'ui.living_node_trial_reason_provider');
+  assert.equal(provider.code, '');
 });
 
 test('setup window: an open failure follows a language change (zh-TW, en, zh-CN)', () => {

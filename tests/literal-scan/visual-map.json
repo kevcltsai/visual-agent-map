@@ -47,6 +47,11 @@
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
       "text": "These sentences of the chapter attribute a fact to a vague s",
       "reason": "model-facing one-line request to the author composed by the program from constant words plus the chapter's research-voice sentences as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
+    },
+    {
+      "file": "experiences/visual-map/knowledge-retrieval.ts",
+      "text": "the and for are was were with that this from you your can no",
+      "reason": "English stop-word list the card search drops before comparing words; matching data of the search, never sent to a model and never shown to the owner"
     }
   ]
 }

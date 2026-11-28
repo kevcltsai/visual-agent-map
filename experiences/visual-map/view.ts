@@ -790,8 +790,8 @@ interface CrossCut {
   finish: (entry: TransactionEntry) => Promise<void>;
 }
 interface Action {
-  undo: () => Promise<void>;
-  redo: () => Promise<void>;
+  undo: (scope?: Repository) => Promise<void>;
+  redo: (scope?: Repository) => Promise<void>;
   label?: string;
 }
 /** Message of any thrown value, without relying on instanceof Error (errors may cross realms). */
@@ -13477,14 +13477,19 @@ export class VisualAgentMapView extends ItemView {
       (oldValues as Record<string, unknown>)[field] = before[field];
       (newValues as Record<string, unknown>)[field] = after[field];
     }
-    const restore = async (expected: NotePatch, replacement: NotePatch): Promise<void> => {
-      const latest = await this.plugin.repo.readNote(path);
+    const restore = async (expected: NotePatch, replacement: NotePatch, scope?: Repository): Promise<void> => {
+      const repo = scope ?? this.plugin.repo;
+      const latest = await repo.readNote(path);
       for (const field of fields)
         if (JSON.stringify(latest[field]) !== JSON.stringify(expected[field]))
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      await this.plugin.repo.updateNote(path, replacement);
+      await repo.updateNote(path, replacement);
     };
-    this.history.push({ label, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
+    this.history.push({
+      label,
+      undo: scope => restore(newValues, oldValues, scope),
+      redo: scope => restore(oldValues, newValues, scope)
+    });
     this.updateHistoryButtons();
   }
   /** Shows the card in the right pane: the user's request, or (`follow`) a selection the pane follows when it is shown. */
@@ -13969,8 +13974,9 @@ export class VisualAgentMapView extends ItemView {
     this.map = await this.plugin.repo.readMap(this.path);
     const after = clone(this.map),
       afterRoot = this.plugin.repo.topicRoot(this.path);
-    const restore = async (map: MapDocument, root: string): Promise<void> => {
-      const nextPath = await this.plugin.repo.renameTopic(this.path, map.title, root);
+    const restore = async (map: MapDocument, root: string, scope?: Repository): Promise<void> => {
+      const repo = scope ?? this.plugin.repo;
+      const nextPath = await repo.renameTopic(this.path, map.title, root);
       if (this.path !== nextPath) {
         this.followTaskPaths(nextPath);
         this.path = nextPath;
@@ -13979,11 +13985,14 @@ export class VisualAgentMapView extends ItemView {
       this.map = clone(map);
       // One branch shown alone is view-only: Map.md keeps the camera from before the focus.
       const written = this.branchFocus ? { ...this.map, viewport: { ...this.branchFocus.viewport } } : this.map;
-      await this.plugin.repo.saveMap(this.path, written);
-      await this.plugin.rebuildDerivedData();
+      await repo.saveMap(this.path, written);
+      await this.plugin.rebuildDerivedData(undefined, repo);
       this.render();
     };
-    this.history.push({ undo: () => restore(before, beforeRoot), redo: () => restore(after, afterRoot) });
+    this.history.push({
+      undo: scope => restore(before, beforeRoot, scope),
+      redo: scope => restore(after, afterRoot, scope)
+    });
     this.render();
     this.app.workspace.requestSaveLayout();
   }
@@ -22317,8 +22326,8 @@ export class VisualAgentMapView extends ItemView {
   private recordLivingCommit(path: string, before: string, after: string): void {
     if (before === after || this.closed) return;
     // Each restore moves the replay fence, so the guard compares the note with the fence keys removed: any other edit refuses.
-    const restore = async (expected: string, replacement: string): Promise<void> => {
-      const repo = this.plugin.repo;
+    const restore = async (expected: string, replacement: string, scope?: Repository): Promise<void> => {
+      const repo = scope ?? this.plugin.repo;
       let written = false;
       const result = await repo.updateNoteRawGuarded(
         path,
@@ -22334,8 +22343,8 @@ export class VisualAgentMapView extends ItemView {
     };
     this.history.push({
       label: t("ui.living_node_run_card"),
-      undo: () => restore(after, before),
-      redo: () => restore(before, after)
+      undo: scope => restore(after, before, scope),
+      redo: scope => restore(before, after, scope)
     });
     this.updateHistoryButtons();
   }
@@ -26491,8 +26500,10 @@ export class VisualAgentMapView extends ItemView {
     record: MapChatTurnRecord | null = null
   ): Promise<ChatReplyStep | undefined> {
     if (!entries.length) return undefined;
+    // Where the map is now: a reply that renamed the map moves it, and its undo or redo moves it back.
+    let at = mapPath;
     const fingerprint = (snapshots?: Map<TFile, string>): Promise<string> =>
-      this.chatReplyFingerprint(mapPath, noteIds, files, parked, snapshots);
+      this.chatReplyFingerprint(at, noteIds, files, parked, snapshots);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
       const snapshots = new Map<TFile, string>();
@@ -26517,6 +26528,7 @@ export class VisualAgentMapView extends ItemView {
           throw error;
         }
       });
+      at = this.path;
       expected = await fingerprint();
       record?.event(redo ? "redo" : "undo");
     };

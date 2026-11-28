@@ -9709,6 +9709,55 @@ integrationTest('map chat: a file the reply creates under the old map folder aft
   assert.equal(h.contents.get('Notes/Elsewhere.md'), '# Elsewhere\n', 'a path outside the map folder is kept as given');
 });
 
+integrationTest('map chat: DX-fix2 - a reply that renames the map and adds a card is undone and redone as one step through the scoped repository', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate();
+  h.view.map.title = 'Untitled mind map';
+  await h.repo.saveMap(MAP, h.view.map);
+  const oldRoot = 'Agent Workspace/Topics/map-a';
+  const lines = await apply(h, [{ kind: 'rename_map', title: 'Art book' }, addRoot('r', 'Palette')]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  const newRoot = h.view.path.split('/').slice(0, -1).join('/');
+  assert.notEqual(newRoot, oldRoot, 'the map folder moved');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  const undone = h.view.history.undo(); await undone.undo();
+  assert.equal(h.view.map.title, 'Untitled mind map', 'the title is back');
+  assert.equal(h.view.map.nodes.length, 0, 'the card is gone');
+  assert.equal(h.view.path.split('/').slice(0, -1).join('/'), oldRoot, 'the folder is back');
+  const redone = h.view.history.redo(); await redone.redo();
+  assert.equal(h.view.map.title, 'Art book'); assert.equal(h.view.map.nodes.length, 1);
+  assert.equal(h.view.path.split('/').slice(0, -1).join('/'), newRoot);
+  assert.equal((await h.repo.readMap(h.view.path)).title, 'Art book'); assert.equal(h.contents.has(`${oldRoot}/Map.md`), false);
+});
+
+integrationTest('map chat: DX-fix2 - note-write, collapsed and living-commit entries inside a reply group undo and redo through the scope', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const path = h.view.map.nodes.find(n => n.id === h.ids.a).path, history = h.view.history;
+  const read = () => h.repo.readNote(path), raw = () => h.app.vault.read(h.app.vault.getAbstractFileByPath(path));
+  const write = async (field, value, label) => { const before = await read(); await h.repo.updateNote(path, { [field]: value }); h.view.recordNoteWrite(path, before, await read(), [field], label); };
+  const first = await read();
+  await write('summary', 'Scoped summary', 'note write');
+  const noteEntry = history.undo();
+  const mark = history.mark();
+  await write('detail', 'Detail one', 'part A'); await write('detail', 'Detail two', 'part B');
+  history.collapseSince(mark, 'composite');
+  const composite = history.undo();
+  assert.equal(composite.label, 'composite');
+  const other = h.view.map.nodes.find(n => n.id === h.ids.b).path, otherFile = () => h.app.vault.getAbstractFileByPath(other);
+  const rawBefore = await h.app.vault.read(otherFile()); await h.app.vault.process(otherFile(), c => c.replace(/\n*$/, '\n\nLiving line.\n'));
+  h.view.recordLivingCommit(other, rawBefore, await h.app.vault.read(otherFile()));
+  const living = history.undo();
+  assert.match(await h.app.vault.read(otherFile()), /Living line/);
+  // inside a reply group these entries run with History.owning > 0 and are undone by the group's step, which passes the scope
+  const step = await h.view.pushChatReplyEntry([noteEntry, composite, living], MAP, new Set([h.ids.a, h.ids.b]), new Set());
+  assert.ok(step, 'the group step exists');
+  await history.undo().undo();
+  assert.doesNotMatch(await h.app.vault.read(otherFile()), /Living line/, 'the living-commit entry went back through the scope');
+  assert.equal((await read()).summary, first.summary); assert.equal((await read()).detail, first.detail);
+  await history.redo().redo();
+  const again = await read();
+  assert.equal(again.summary, 'Scoped summary'); assert.equal(again.detail, 'Detail two'); assert.match(await h.app.vault.read(otherFile()), /Living line/);
+});
+
 // ---- bug 2: the files this conversation made come back to it (ownFiles) ----
 const ownTurn = async (h, text = 'go') => { saySomething(h); h.type(text); await h.view.sendMapChat(); await recordIdle(h); return contextOf(h.control.requests.at(-1)); };
 const ownRoot = 'Agent Workspace/Topics/map-a';

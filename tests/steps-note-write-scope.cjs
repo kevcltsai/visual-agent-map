@@ -128,6 +128,8 @@ test('W6: fail closed: a callback writing a tracked note through the original re
   assert.ok(isTransactionError(error, 'guard'), `refused with guard, got ${error?.message}`);
   assert.ok(h.app.vault.getAbstractFileByPath(h.a), 'the parked note went back');
   assert.equal(h.contents.get(MAP), mapBefore);
+  // Refused, not rolled back: the rollback restores only the items the transaction changed (map-transaction.ts), so the bypassing write stays.
+  assert.match(h.contents.get(h.parent), /Scoped summary/, 'the write that bypassed the scope is left in place');
 });
 
 test('W7: two interleaved transactions track only their own notes', async () => {

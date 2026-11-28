@@ -1,4 +1,5 @@
 import type { AiResult } from "./ai/types";
+import type { Repository } from "./repository";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
 import {
@@ -699,7 +700,13 @@ export interface HistoryMark {
   dropped: number;
   length: number;
 }
-export class History<T extends { undo: () => Promise<void>; redo: () => Promise<void>; label?: string }> {
+export class History<
+  T extends {
+    undo: (scope?: Repository) => Promise<void>;
+    redo: (scope?: Repository) => Promise<void>;
+    label?: string;
+  }
+> {
   private past: T[] = [];
   private future: T[] = [];
   /** Bumped by clear(), so a mark taken before it can tell the entries it covered are gone. */
@@ -840,17 +847,17 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     }
     // Solo steps keep their place below the folded one, so folding never takes a step that is not the caller's.
     this.past.push(...all.filter(entry => this.solo.has(entry)));
-    const run = async (list: T[], redo: boolean): Promise<void> => {
+    const run = async (list: T[], redo: boolean, scope?: Repository): Promise<void> => {
       const done: T[] = [];
       try {
         for (const entry of list) {
-          await (redo ? entry.redo() : entry.undo());
+          await (redo ? entry.redo(scope) : entry.undo(scope));
           done.push(entry);
         }
       } catch (error) {
         // Put back what already ran so the map is not left half-way; the original error is what the caller sees.
         try {
-          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+          for (const entry of done.reverse()) await (redo ? entry.undo(scope) : entry.redo(scope));
         } catch {
           // best effort
         }
@@ -858,8 +865,8 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
       }
     };
     const combined = {
-      undo: () => run([...entries].reverse(), false),
-      redo: () => run(entries, true),
+      undo: scope => run([...entries].reverse(), false, scope),
+      redo: scope => run(entries, true, scope),
       ...(label ? { label } : {})
     } as T;
     this.past.push(combined);

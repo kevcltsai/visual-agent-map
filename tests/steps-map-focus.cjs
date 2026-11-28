@@ -390,7 +390,7 @@ test('#11 real order for other menus: every menu goes through newMenu', () => {
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
-  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (the header title ▾ menu added for switching and managing maps; the card toolbar More button menu; ticket 07 removed the new-map menu with AIM; anchor right-click menu added; v3.3 P1.10b removed the relevance tag menu)');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (the knowledge reference card right-click menu; the header title ▾ menu added for switching and managing maps; the card toolbar More button menu; ticket 07 removed the new-map menu with AIM; anchor right-click menu added; v3.3 P1.10b removed the relevance tag menu; V3.3 B11 removed the card settings type menu)');
   const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
   assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
 });
@@ -456,7 +456,6 @@ test('08d: the Organizer, Unassigned and Archive windows (openMapModal) hand foc
 
 // Every menu opener, driven for real: the menu hides before the same Escape reaches the map, the selection stays, and a later Escape clears it.
 const MENU_OPENERS = {
-  openKindMenu: h => h.view.openKindMenu({}, () => {}),
   openUnlinkMenu: h => {
     h.view.map.canvasItems = [{ id: 't1', kind: 'text', text: 'Hi', x: 0, y: 0, links: [h.ids.leaf] }];
     h.view.openUnlinkMenu('t1', h.card('leaf'));

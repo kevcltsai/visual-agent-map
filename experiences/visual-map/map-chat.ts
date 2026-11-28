@@ -27,6 +27,7 @@ import {
   type ChatLineCounts
 } from "../../core/map-chat-layout";
 import { MapChatPaintScope } from "./map-chat-paint-scope";
+import type { ResumeItem, ResumeSummary } from "../../core/map-chat-resume";
 
 /**
  * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
@@ -498,6 +499,10 @@ export interface MapChatHost {
   recordsEnabled?(): boolean;
   /** The panel was cleared by "New conversation": the next turn goes into a new record file. */
   newConversation?(): void;
+  /** "Resume summary": built from this map's saved records, locally and read only (no AI, no write). Absent: no button. */
+  resumeSummary?(): Promise<ResumeSummary>;
+  /** "Locate" on a summary item: centres the card on the canvas without writing anything; false when the card is no longer on the map. */
+  locateTopic?(id: string): boolean;
 }
 
 const LABEL_LIMIT = 40;
@@ -667,6 +672,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private stopResizing: (() => void) | null = null;
   private chipsEl!: HTMLElement;
   private statusEl!: HTMLElement;
+  private resumeOpenEl: HTMLButtonElement | null = null;
+  private resumeEl: HTMLElement | null = null;
+  /** The summary shown now (rebuilt in place after a language change); null while it is closed. */
+  private resumeSummaryShown: ResumeSummary | null = null;
+  /** Counts the presses and resets, so an answer that comes late is not shown after the panel moved on. */
+  private resumeSummarySeq = 0;
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
@@ -1816,6 +1827,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
+    this.closeResume();
     this.paintScope.reset();
     this.rows = new WeakMap();
     this.messages = [];
@@ -2003,6 +2015,99 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.host.stateChanged?.();
   }
   /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
+  // ---- resume summary (P4.8): local, read only; never a message, never recorded -----------------------------------------------
+
+  private renderResumeButton(): void {
+    if (!this.resumeOpenEl) return;
+    this.resumeOpenEl.empty();
+    setIcon(this.resumeOpenEl.createSpan("vam-map-chat-resume-icon"), "history");
+    this.resumeOpenEl.createSpan({ text: t("ui.map_chat_resume_open") });
+  }
+  private async openResume(): Promise<void> {
+    if (!this.host.resumeSummary) return;
+    const seq = ++this.resumeSummarySeq;
+    let summary: ResumeSummary;
+    try {
+      summary = await this.host.resumeSummary();
+    } catch {
+      summary = { state: "empty", items: [] };
+    }
+    if (seq !== this.resumeSummarySeq || !this.built) return;
+    this.resumeSummaryShown = summary;
+    this.renderResume();
+  }
+  private closeResume(): void {
+    this.resumeSummarySeq++;
+    this.resumeSummaryShown = null;
+    if (this.resumeEl) {
+      this.resumeEl.empty();
+      this.resumeEl.hidden = true;
+    }
+  }
+  private resumeLabel(item: ResumeItem): string {
+    const title = item.subject;
+    switch (item.kind) {
+      case "research":
+        return item.total && item.total > 0
+          ? t("ui.map_chat_resume_research_batch_0_1_2", title, String(item.done ?? 0), String(item.total))
+          : t("ui.map_chat_resume_research_0", title);
+      case "unfinished":
+        return t("ui.map_chat_resume_unfinished_0", title);
+      case "remaining":
+        return t("ui.map_chat_resume_remaining_0", title);
+      case "stopped":
+        return t("ui.map_chat_resume_stopped_0", title);
+      default:
+        return t("ui.map_chat_resume_recent_0", title);
+    }
+  }
+  private renderResume(): void {
+    const box = this.resumeEl;
+    const summary = this.resumeSummaryShown;
+    if (!box || !summary) return;
+    box.empty();
+    box.hidden = false;
+    box.setAttr("aria-label", t("ui.map_chat_resume_title"));
+    const head = box.createDiv("vam-map-chat-resume-head");
+    head.createSpan({ cls: "vam-map-chat-resume-title", text: t("ui.map_chat_resume_title") });
+    const close = head.createEl("button", {
+      cls: "vam-map-chat-resume-close clickable-icon",
+      attr: { type: "button", "aria-label": t("ui.map_chat_resume_close") }
+    });
+    setIcon(close, "x");
+    close.addEventListener("click", () => this.closeResume());
+    if (summary.state === "empty" || !summary.items.length) {
+      box.createDiv({ cls: "vam-map-chat-resume-empty", text: t("ui.map_chat_resume_empty") });
+      return;
+    }
+    box.createDiv({ cls: "vam-map-chat-resume-note", text: t("ui.map_chat_resume_note") });
+    const list = box.createEl("ul", { cls: "vam-map-chat-resume-list" });
+    for (const item of summary.items) {
+      const row = list.createEl("li", { cls: `vam-map-chat-resume-item is-${item.kind}` });
+      row.createSpan({ cls: "vam-map-chat-resume-text", text: this.resumeLabel(item) });
+      const detail = row.createDiv({
+        cls: "vam-map-chat-resume-record",
+        text: t("ui.map_chat_resume_record_0_1_2", item.recordId, String(item.turn), item.at)
+      });
+      detail.hidden = true;
+      if (item.nodeId && this.host.topicTitle(item.nodeId) === null) {
+        // The card was deleted: nothing to focus, and the item says so instead of pointing at nothing.
+        row.createSpan({ cls: "vam-map-chat-resume-gone", text: t("ui.map_chat_resume_unlocatable") });
+        continue;
+      }
+      const locate = row.createEl("button", {
+        cls: "vam-map-chat-resume-locate",
+        text: t("ui.map_chat_resume_locate"),
+        attr: { type: "button" }
+      });
+      locate.addEventListener("click", () => {
+        // A card: centre it. No card in the item: the record it came from is shown under it.
+        if (item.nodeId && this.host.locateTopic?.(item.nodeId) !== false) return;
+        detail.hidden = !detail.hidden;
+      });
+    }
+  }
+
   private startNewConversation(): void {
     if (this.working) return;
     this.reset();
@@ -2155,6 +2260,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
+    if (this.host.resumeSummary) {
+      this.resumeEl = form.createDiv({ cls: "vam-map-chat-resume", attr: { role: "region" } });
+      this.resumeEl.hidden = true;
+      this.resumeOpenEl = form.createEl("button", { cls: "vam-map-chat-resume-open", attr: { type: "button" } });
+      this.resumeOpenEl.addEventListener("click", () => void this.openResume());
+      this.renderResumeButton();
+    }
     // The send / stop key sits inside the message box, bottom right: one box, one key at a time (↵ when idle, ■ while working).
     const box = form.createDiv("vam-map-chat-composer");
     this.inputEl = box.createEl("textarea", {
@@ -2309,6 +2421,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.renderSuggestions();
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
+    this.renderResumeButton();
+    this.renderResume();
     this.renderPlaceholder();
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));

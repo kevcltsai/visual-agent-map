@@ -1917,11 +1917,14 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-settings-list dt { color: var(--text-muted); }
 .vam-book-settings-list dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .vam-book-settings-list dd.is-empty { color: var(--text-faint); font-style: italic; }
-.vam-book-start-split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: stretch; margin-top: 6px; }
-@media (max-width: 640px) { .vam-book-start-split { grid-template-columns: 1fr; } }
-.vam-book-start-chat { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
-.vam-book-start-chat label { margin-top: 0; font-weight: 600; }
-.vam-book-start-fields { min-width: 0; }
+.vam-book-start-ask { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
+.vam-book-start-ask label { font-weight: 600; }
+.vam-book-start-ask .vam-book-chat-input { min-height: 2.6em; }
+.vam-book-start-advanced { margin-top: 4px; }
+.vam-book-start-advanced > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-book-start-advanced > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-book-start-advanced[open] > summary { margin-bottom: 8px; }
+.vam-book-chat-kept { margin: 4px 0 0; color: var(--text-muted); }
 .vam-book-chat-log { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 260px; overflow-y: auto; }
 .vam-book-chat-log:empty { display: none; }
 .vam-book-chat-me, .vam-book-chat-ed, .vam-book-chat-failed { max-width: 92%; padding: 6px 10px; border-radius: var(--radius-m); font-size: var(--font-ui-small); overflow-wrap: anywhere; }

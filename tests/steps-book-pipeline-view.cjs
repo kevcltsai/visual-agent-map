@@ -2248,16 +2248,18 @@ test('chat: a failed call (rejected) leaves every field as it was and adds one f
   modal.close();
 });
 
-test('chat: a card without editSettings has no chat column (and the fields are not wrapped)', async () => {
+test('chat: a card without editSettings has no request box (and the fields are not folded)', async () => {
   const h = await harness({ book: false });
   h.ctl.impl = async () => SUGGEST;
   const modal = new bundleStart.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, modelChoice: { options: () => ['a'], label: x => x, onChange() {} }, settings: {}, onStart() {} });
   modal.open();
   assert.equal(chatInput(modal), undefined);
-  assert.equal(byCls(modal, 'vam-book-start-split').length, 0);
+  assert.equal(byCls(modal, 'vam-book-start-ask').length, 0);
+  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined);
   modal.close();
-  assert.match(css, /\.vam-book-start-split \{[^}]*grid-template-columns/);
-  assert.match(css, /@media \(max-width: 640px\) \{ \.vam-book-start-split \{ grid-template-columns: 1fr; \} \}/);
+  // V3.3 P5.1a: the side-by-side chat column is gone; the request box is one column at every width.
+  assert.match(css, /\.vam-book-start-ask \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /\.vam-book-start-split/);
 });
 
 test('chat: the plugin calls the step on the plan model the card passes, with the owner\'s text only', () => {

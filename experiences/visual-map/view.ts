@@ -5321,7 +5321,27 @@ export class VisualAgentMapView extends ItemView {
   private tidyBarEl: HTMLElement | null = null;
   private tidyKeys: ((event: KeyboardEvent) => void) | null = null;
   /** Where focus was when the preview opened; given back when it closes. */
-  private tidyReturnFocus: HTMLElement | null = null;
+  private tidyReturnFocus: { el: HTMLElement; key: string | null } | null = null;
+  /** A repaint replaces the elements, so the focus is remembered by a selector that finds the new one. */
+  private tidyFocusKey(el: HTMLElement): string | null {
+    const card = el.closest?.<HTMLElement>("[data-node-id]");
+    const id = card?.dataset.nodeId;
+    if (el.matches?.(".vam-map-actions-button")) return ".vam-map-actions-button";
+    if (id && el.matches?.(".vam-card-tool-more")) return `[data-node-id="${CSS.escape(id)}"] .vam-card-tool-more`;
+    if (id && card === el) return `[data-node-id="${CSS.escape(id)}"]`;
+    return null;
+  }
+  /** After the last repaint: the same element (or its replacement), else the selected card, else the viewport (which cannot take focus; it stays out of the Tab order). */
+  private restoreTidyFocus(back: { el: HTMLElement; key: string | null } | null): void {
+    if (this.closed) return;
+    const found = back?.key ? this.contentEl.querySelector<HTMLElement>(back.key) : null;
+    const selected = this.selection.state.selected;
+    const card = selected
+      ? this.contentEl.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(selected)}"]`)
+      : null;
+    const target = found ?? (back?.el.isConnected ? back.el : null) ?? card ?? this.viewportEl;
+    target?.focus?.({ preventScroll: true });
+  }
   private tidyArrange(map: MapDocument, branchId?: string): void {
     if (branchId) this.arrangeBranch(map, branchId, descendants(map.nodes, branchId));
     else this.arrangeAll(map);
@@ -5332,7 +5352,9 @@ export class VisualAgentMapView extends ItemView {
     // A view built without a document (tests) has nothing to give back.
     const active = typeof activeDocument === "undefined" ? null : (activeDocument.activeElement as HTMLElement | null);
     this.tidyReturnFocus =
-      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active) ? active : null;
+      active && typeof this.contentEl.contains === "function" && this.contentEl.contains(active)
+        ? { el: active, key: this.tidyFocusKey(active) }
+        : null;
     const result = computeTidy(this.map, copy => this.tidyArrange(copy, branchId));
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
@@ -5354,7 +5376,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
   }
   /** Drops the preview (and its key handler); `repaint` false when a repaint follows anyway. */
-  private clearTidy(repaint = true): void {
+  private clearTidy(repaint = true, restoreFocus = true): void {
     if (this.tidyKeys) this.contentEl.removeEventListener("keydown", this.tidyKeys, true);
     this.tidyKeys = null;
     this.tidyBarEl?.remove();
@@ -5364,16 +5386,21 @@ export class VisualAgentMapView extends ItemView {
     if (had && repaint && !this.closed) this.render();
     const back = this.tidyReturnFocus;
     this.tidyReturnFocus = null;
-    if (had && !this.closed) (back?.isConnected ? back : this.viewportEl)?.focus?.({ preventScroll: true });
+    if (had && restoreFocus) this.restoreTidyFocus(back);
   }
   /** One undo step. A map that changed since the preview is previewed again instead of written. */
   private applyTidy(): void {
     const tidy = this.tidy;
     if (!tidy || !this.map) return;
     const stale = tidy.mapId !== this.map.id || tidy.signature !== mapSignature(this.map);
-    this.clearTidy(false);
+    const back = this.tidyReturnFocus;
+    this.clearTidy(false, false);
     if (stale) return this.openTidyPreview(tidy.branchId);
-    this.enqueue(() => this.mapChange(map => this.tidyArrange(map, tidy.branchId), false));
+    // The write repaints asynchronously; focus goes back after that last repaint.
+    this.enqueue(async () => {
+      await this.mapChange(map => this.tidyArrange(map, tidy.branchId), false);
+      this.restoreTidyFocus(back);
+    });
   }
   /** Any change of the map, another file, or another layout clears the preview. */
   private dropStaleTidy(): void {

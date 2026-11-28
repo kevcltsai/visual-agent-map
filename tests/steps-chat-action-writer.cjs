@@ -1,8 +1,8 @@
 // ChatActionWriter (experiences/visual-map/chat-action-writer.ts) on its own: fake ports and a fake map, no view, no real waiting.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load, obsidian } = require('./support.cjs');
-const { ChatActionWriter } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
+const { load, obsidian, i18nSource } = require('./support.cjs');
+const { ChatActionWriter, chatFailureReason } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
 const { t } = load('i18n.ts');
 const { contentHash } = load('core/map-chat-context.ts');
 
@@ -804,4 +804,21 @@ test('book plan chat, AI lock: a locked card is left as it is and named locked; 
   root.cards.get('r.md').aiLocked = true;
   assert.deepEqual(plain(await applyBookThreadEdit(root.deps, threadAction('x'), { bookPlan: root.baselineOf([]) })), skippedOutcome('ui.ai_locked_notice'));
   assert.deepEqual(root.writes, []);
+});
+
+// The result line of a failed chat action must not show an internal code (e.g. "changed-target"); the code stays in the exchange log only.
+test('a failed chat action line shows plain words, never an internal code, in all three languages', () => {
+  const codes = ['changed-target', 'changed-target-identity', 'changed-configuration', 'changed-source-identity', 'changed-source-resolution',
+    'missing-target', 'stale-base', 'base-mismatch', 'stale-or-cancelled-write', 'stale-generation', 'locked-target', 'missing-or-locked-target',
+    'unauthorized-source', 'missing-source', 'invalid-source', 'ambiguous-source', 'empty-prompt', 'self-reference', 'living-node-cycle',
+    'living-node-busy', 'map-file-source', 'target-unavailable', 'some-future-code'];
+  for (const code of codes) {
+    const reason = chatFailureReason(new Error(code));
+    assert.ok(reason && !reason.includes(code) && !/\b[a-z0-9]+(-[a-z0-9]+)+\b/.test(reason), `${code} -> ${reason}`);
+  }
+  assert.equal(chatFailureReason(new Error('The disk is full')), 'The disk is full'); // a real sentence is kept
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const source = i18nSource(language);
+    for (const key of ['ui.map_chat_fail_changed', 'ui.map_chat_fail_unknown']) assert.match(source, new RegExp(`"${key}": "[^"]+"`), `${language} ${key}`);
+  }
 });

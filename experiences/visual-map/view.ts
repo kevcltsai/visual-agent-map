@@ -130,7 +130,8 @@ import {
   type ChatOutcome,
   type ChatWriteAction,
   type ChatWriteBaseline,
-  type ChatRun
+  type ChatRun,
+  chatFailureReason
 } from "./chat-action-writer";
 import { TopicSelection, type SelectionChange, type SelectionSnapshot } from "./topic-selection";
 import {
@@ -25221,7 +25222,7 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         // All or nothing: the cards of the batch were not written, so their lines say so and the run forgets them.
         for (const item of staged) {
-          lines[item.index] = this.chatLine(item.label, { status: "failed", reason: errorMessage(error) });
+          lines[item.index] = this.chatLine(item.label, { status: "failed", reason: chatFailureReason(error) });
           for (const id of item.ids) {
             const at = run.created.indexOf(id);
             if (at >= 0) run.created.splice(at, 1);
@@ -25337,7 +25338,7 @@ export class VisualAgentMapView extends ItemView {
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
             });
         } catch (error) {
-          box.outcome = { status: "failed", reason: errorMessage(error) };
+          box.outcome = { status: "failed", reason: chatFailureReason(error) };
         } finally {
           if (stage) stage.on = false;
         }
@@ -25625,7 +25626,7 @@ export class VisualAgentMapView extends ItemView {
             }
           }
         } catch (error) {
-          outcome = { status: "failed", reason: errorMessage(error) };
+          outcome = { status: "failed", reason: chatFailureReason(error) };
         }
       }
       lines[index] = this.chatTargetLine(this.chatLine(label, outcome), action, run, run.created.length);
@@ -25760,7 +25761,7 @@ export class VisualAgentMapView extends ItemView {
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage(error), created: made.created };
+      return { status: "failed", reason: chatFailureReason(error), created: made.created };
     }
     if (opened) return { status: "done" };
     // A map that was made but is not open is not "the map was changed": say what happened.
@@ -25792,7 +25793,7 @@ export class VisualAgentMapView extends ItemView {
         anchor.path = this.path;
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage(error) };
+      return { status: "failed", reason: chatFailureReason(error) };
     }
     return outcome;
   }
@@ -26566,7 +26567,7 @@ export class VisualAgentMapView extends ItemView {
               },
               error => {
                 errorNotice(error);
-                resolve({ status: "failed", reason: errorMessage(error) });
+                resolve({ status: "failed", reason: chatFailureReason(error) });
               }
             );
           }).then(outcome => {

@@ -159,7 +159,7 @@ export interface CardActionRunOptions {
 export interface CardAction {
   id: CardActionId;
   titleKey: TranslationKey;
-  /** The entries that name the action their own way today (the palette's command names among them). */
+  /** The entries that name the action their own way today (the toolbar's short names). */
   titles?: Partial<Record<CardSurface, TranslationKey>>;
   /** An aria-label that says more than the visible name (the edge entry's). */
   ariaLabelKey?: TranslationKey;
@@ -295,7 +295,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "research",
     titleKey: "ui.ai_explore",
-    titles: { toolbar: "ui.card_tool_research", command: "ui.command_map_ai_explore" },
+    titles: { toolbar: "ui.card_tool_research" },
     icon: "sparkles",
     scope: ["card", "ai-card"],
     surfaces: ["toolbar", "context", "command"],
@@ -311,7 +311,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "open-note",
     titleKey: "ui.card_menu_open_note",
-    titles: { toolbar: "ui.card_tool_note", command: "ui.command_map_open_details" },
+    titles: { toolbar: "ui.card_tool_note" },
     icon: "file-text",
     scope: ["card", "ai-card"],
     surfaces: ["toolbar", "context", "command"],
@@ -327,7 +327,6 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "rename",
     titleKey: "ui.shortcut_rename",
-    titles: { command: "ui.command_map_rename" },
     icon: "pencil",
     shortcut: "ui.shortcut_rename",
     scope: ["card", "ai-card"],
@@ -458,7 +457,7 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "add-child",
     titleKey: "ui.card_menu_add_child",
-    titles: { toolbar: "ui.card_tool_add", command: "ui.command_map_add_subtopic" },
+    titles: { toolbar: "ui.card_tool_add" },
     icon: "plus",
     shortcut: "ui.shortcut_add_subtopic",
     scope: ["card", "ai-card"],
@@ -471,7 +470,6 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "add-sibling",
     titleKey: "ui.card_menu_add_sibling",
-    titles: { command: "ui.command_map_add_sibling" },
     icon: "list-plus",
     shortcut: "ui.shortcut_add_sibling",
     scope: ["card", "ai-card"],
@@ -497,7 +495,6 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   {
     id: "toggle-collapse",
     titleKey: "ui.card_menu_collapse",
-    titles: { command: "ui.command_map_toggle_collapse" },
     titleFor: ctx => (ctx.node?.collapsed ? "ui.card_menu_expand" : "ui.card_menu_collapse"),
     icon: "chevrons-down-up",
     iconFor: ctx => (ctx.node?.collapsed ? "chevrons-up-down" : "chevrons-down-up"),
@@ -805,10 +802,9 @@ export function titleKeyFor(action: CardAction, surface: CardSurface, ctx: CardA
   return action.titles?.[surface] ?? action.titleFor?.({ ...ctx, surface }) ?? action.titleKey;
 }
 
-/** The palette name of an action (main.ts names the CARD_COMMANDS by it). */
+/** The palette name of an action (main.ts names the CARD_COMMANDS by it): the action list's name, as the card ⋯ and right-click show it. */
 export function commandTitleKey(id: CardActionId): TranslationKey {
-  const action = CARD_ACTIONS.find(item => item.id === id)!;
-  return action.titles?.command ?? action.titleKey;
+  return CARD_ACTIONS.find(item => item.id === id)!.titleKey;
 }
 
 /** The action's keys, from the same rows the Keyboard shortcuts dialog lists. */

@@ -255,16 +255,17 @@ test('card actions: order, groups and the toolbar sets reproduce the entries of 
   assert.ok(ruleMoreSet('ai-card').includes('run-card') && !ruleMoreSet('card').includes('run-card'));
 });
 
-test('card actions: the eleven palette commands map to actions that keep their names', () => {
-  // The ids, names and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids).
+test('card actions: the eleven palette commands keep their ids and take the card action list names', () => {
+  // The ids and mapCommand actions main.ts registered before B05 (a user's hotkeys are bound to the ids); each name is the
+  // list's name, the one the card ⋯ and right-click show (ticket 05).
   const commands = [
     ['map-add-topic', 'ui.command_map_add_topic', 'add-topic'],
-    ['map-add-subtopic', 'ui.command_map_add_subtopic', 'add-subtopic'],
-    ['map-add-sibling', 'ui.command_map_add_sibling', 'add-sibling'],
-    ['map-ai-explore-selected', 'ui.command_map_ai_explore', 'ai-explore'],
-    ['map-rename-selected', 'ui.command_map_rename', 'rename'],
-    ['map-open-selected-details', 'ui.command_map_open_details', 'open-details'],
-    ['map-toggle-collapse-selected', 'ui.command_map_toggle_collapse', 'toggle-collapse'],
+    ['map-add-subtopic', 'ui.card_menu_add_child', 'add-subtopic'],
+    ['map-add-sibling', 'ui.card_menu_add_sibling', 'add-sibling'],
+    ['map-ai-explore-selected', 'ui.ai_explore', 'ai-explore'],
+    ['map-rename-selected', 'ui.shortcut_rename', 'rename'],
+    ['map-open-selected-details', 'ui.card_menu_open_note', 'open-details'],
+    ['map-toggle-collapse-selected', 'ui.card_menu_collapse', 'toggle-collapse'],
     ['map-zoom-to-fit', 'ui.command_map_zoom_fit', 'zoom-fit'],
     ['map-zoom-reset', 'ui.command_map_zoom_reset', 'zoom-reset'],
     ['map-search', 'ui.command_map_search', 'search'],
@@ -277,8 +278,9 @@ test('card actions: the eleven palette commands map to actions that keep their n
     assert.equal(entry.mapAction, mapAction, id);
     const target = action(entry.action);
     assert.ok(target.surfaces.includes('command'), id);
-    assert.equal(titleKeyFor(target, 'command', ctxFor('a', 'normal')), key, id);
     assert.equal(commandTitleKey(entry.action), key, id);
+    assert.equal(commandTitleKey(entry.action), target.titleKey, `${id}: the list's name`);
+    if (target.surfaces.includes('more')) assert.equal(commandTitleKey(entry.action), titleKeyFor(target, 'more', ctxFor('a', 'normal')), `${id}: the ⋯ name`);
   }
   // main.ts registers exactly these, named by commandTitleKey, each checking through mapCommand.
   const source = read('main.ts');

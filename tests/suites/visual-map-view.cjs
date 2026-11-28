@@ -4506,7 +4506,21 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   // main.ts registers the card action list's palette commands (B05): [id, name key, mapCommand action].
   const { CARD_COMMANDS, commandTitleKey } = load('experiences/visual-map/card-actions.ts', { obsidian });
   const tuples = CARD_COMMANDS.map(entry => [entry.commandId, commandTitleKey(entry.action), entry.mapAction]);
-  assert.ok(tuples.every(([id, key]) => /^map-[a-z-]+$/.test(id) && /^ui\.command_map_[a-z_]+$/.test(key)), 'ids and names as before');
+  assert.ok(tuples.every(([id]) => /^map-[a-z-]+$/.test(id)), 'ids as before');
+  // The names are the card action list's (ticket 05): the same as the card ⋯ and right-click.
+  assert.deepEqual(JSON.parse(JSON.stringify(tuples.map(([id, key]) => [id, key]))), [
+    ['map-add-topic', 'ui.command_map_add_topic'],
+    ['map-add-subtopic', 'ui.card_menu_add_child'],
+    ['map-add-sibling', 'ui.card_menu_add_sibling'],
+    ['map-ai-explore-selected', 'ui.ai_explore'],
+    ['map-rename-selected', 'ui.shortcut_rename'],
+    ['map-open-selected-details', 'ui.card_menu_open_note'],
+    ['map-toggle-collapse-selected', 'ui.card_menu_collapse'],
+    ['map-zoom-to-fit', 'ui.command_map_zoom_fit'],
+    ['map-zoom-reset', 'ui.command_map_zoom_reset'],
+    ['map-search', 'ui.command_map_search'],
+    ['map-keyboard-shortcuts', 'ui.command_map_shortcuts']
+  ]);
   assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
   assert.match(source, /for \(const \{ commandId, mapAction, action \} of CARD_COMMANDS\)/, 'main.ts registers the list');
   assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(mapAction, checking\) \?\? false/, 'no map view: the command does not apply');

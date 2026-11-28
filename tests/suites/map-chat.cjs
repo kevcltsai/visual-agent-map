@@ -959,6 +959,18 @@ integrationTest('map chat: a plan card applied after the user picked other cards
   assert.equal(started.length, 1); eq(started[0].selected.sort(), [a, b].sort(), 'the selection fixed at send, not the card picked while the plan waited');
 });
 
+integrationTest('map chat: P2.2d: with one card selected, a research action that names no card researches that card (the send-time selection)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  h.view.selection.setSelected(h.ids.b);
+  assert.equal(h.view.selection.state.multiSelectMode, false);
+  eq(h.view.chatSelectionIds(), [h.ids.b]);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
+  eq(lines.map(l => l.status), ['done']); await tick();
+  assert.equal(started.length, 1); eq(started[0].selected, [h.ids.b], 'only the one selected card is researched');
+});
+
 integrationTest('map chat: with no selection snapshot an action that names no card does not fall back to the live selection', async () => {
   const h = await harness(); await h.view.hydrate();
   const started = [];

@@ -837,6 +837,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-map-chat-plan-buttons { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .vam-map-chat-plan-summary { font-size: var(--font-ui-small); overflow-wrap: anywhere; }
 .vam-map-chat-plan-summary-part.is-danger { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
+.vam-map-chat-plan-not-requested { font-size: var(--font-ui-smaller); color: var(--text-muted); overflow-wrap: anywhere; }
 .vam-map-chat-plan-detail { display: flex; flex-direction: column; gap: 6px; }
 .vam-map-chat-plan-warning { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); font-size: var(--font-ui-smaller); }
 .vam-map-chat-plan-group.is-danger .vam-map-chat-plan-group-title { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }

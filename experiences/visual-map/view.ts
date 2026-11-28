@@ -2564,6 +2564,13 @@ export class VisualAgentMapView extends ItemView {
       event.stopPropagation();
       return;
     }
+    // A branch an outline reveal opened for the view (no search box) folds back first; with a search box Esc is the box's.
+    if (event.key === "Escape" && !this.mapSearch && this.searchOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeMapSearch(false);
+      return;
+    }
     if (event.key === "Escape" && this.branchFocus) {
       event.preventDefault();
       event.stopPropagation();
@@ -15690,6 +15697,22 @@ export class VisualAgentMapView extends ItemView {
     this.focusNode(node, false);
     return true;
   }
+  /** An outline reveal's temporary opening (no search box) folds back when a card off the opened path is clicked. */
+  private foldRevealUnless(node: MapNode): void {
+    const open = this.searchOpen;
+    if (this.mapSearch || !open || !this.map) return;
+    const byId = new Map(this.map.nodes.map(item => [item.id, item] as const));
+    const seen = new Set<string>();
+    for (
+      let at: MapNode | undefined = node;
+      at && !seen.has(at.id);
+      at = at.parentId ? byId.get(at.parentId) : undefined
+    ) {
+      if (open.expanded.has(at.id)) return;
+      seen.add(at.id);
+    }
+    this.closeMapSearch(false);
+  }
   private selectMapNode(node: MapNode): void {
     // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
     if (this.hintEl) this.markCanvasHintSeen();
@@ -16186,6 +16209,7 @@ export class VisualAgentMapView extends ItemView {
     if ((event.target as Element).closest("button")) return;
     // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
     if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+    this.foldRevealUnless(node);
     if (this.selection.state.multiSelectMode) {
       this.applySelectionChange(this.selection.toggleByClick(node.id));
       return;

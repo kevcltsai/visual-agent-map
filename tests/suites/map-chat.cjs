@@ -2827,14 +2827,19 @@ integrationTest('chat 04: delete with branch:true is applied at once (no plan): 
   const back = await h.saved(); assert.equal(back.some(n => n.id === h.ids.a) && back.some(n => n.id === h.ids.c), true, 'undo brings the branch back');
   for (const n of back) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`);
 });
-integrationTest('B1 plan: a plan that waited while the card changed skips that action as stale, like any other', async () => {
+integrationTest('B1 plan (E3-y): a plan that waited while a target card changed is not applied at all: Apply is greyed with the reason and nothing is written', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.b, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
   h.type('go'); await h.view.sendMapChat();
+  const nodes = JSON.stringify(await h.saved());
   await h.view.noteChange(h.node('a'), { title: 'Edited by the user meanwhile' });
-  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.transcript().at(-1).lines.length > 0);
+  planButton(h, 'apply').click(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(h.view.chatApplying, false);
   assert.equal((await h.note('a')).title, 'Edited by the user meanwhile', 'the user\'s edit stays');
-  assert.ok(chat.transcript().at(-1).lines.some(l => l.status === 'skipped' && /changed after you sent/.test(l.text)), JSON.stringify(chat.transcript().at(-1).lines));
+  assert.equal(JSON.stringify(await h.saved()), nodes, 'nothing was written');
+  assert.notEqual(chat.pendingPlan(), null, 'the plan stays unapplied');
+  assert.equal(planButton(h, 'apply').disabled, true, 'Apply is greyed');
+  assert.match(visibleText(planCard(h)[0]), /changed after this proposal/);
 });
 
 integrationTest('B1 map: create_map waits for Apply, then opens the new map, builds the tree in it, and the conversation goes along', async () => {
@@ -10739,8 +10744,11 @@ integrationTest('book plan chat: a Prompt changed after the proposal is not over
   h.type('change a'); await h.view.sendMapChat(); assert.ok(chat.pendingPlan());
   const own = planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: 'covers a', points: ['p'], entry: 'the author typed this', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'c1' }] }, 'en');
   await h.repo.updateNote(h.node('a').path, { prompt: own }); await h.view.hydrate();
-  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  planButton(h, 'apply').click(); await new Promise(r => setTimeout(r, 30));
+  assert.equal(h.view.chatApplying, false);
   assert.equal(await promptOf(h, 'a'), own, 'the author\'s own text stays');
+  assert.notEqual(chat.pendingPlan(), null, 'E3-y: the target changed after the proposal, so the plan is not applied');
+  assert.equal(planButton(h, 'apply').disabled, true, 'Apply is greyed');
 });
 
 integrationTest('book plan chat: a reply with two edit_book_plan actions shows both before and after on the plan card', async () => {

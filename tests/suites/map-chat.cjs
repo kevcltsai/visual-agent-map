@@ -399,7 +399,12 @@ async function harness({ aim = false, document = false, empty = false, realRende
       control.mutates++; if (control.depth > 0) control.nested++;
       const result = queue.then(async () => {
         control.depth++;
-        try { await work(); const view = ctx.view; if (view) await (viaSync ? view.synchronize() : view.hydrate()); } finally { control.depth--; }
+        try {
+          await work(); const view = ctx.view;
+          // The real readBackViews -> view.synchronize() reads nothing while a chat batch holds the view (syncHold > 0): it only notes a read is owed (syncPending), and releaseChatBatch queues one empty write for it. A staged card has no note file until the batch flush, so reading every note here would fail on it.
+          if (view && view.syncHold > 0) view.syncPending = true;
+          else if (view) await (viaSync ? view.synchronize() : view.hydrate());
+        } finally { control.depth--; }
       });
       queue = result.catch(() => {});
       return result;
@@ -4124,12 +4129,14 @@ integrationTest('B2-0 F4: 100 add_child into a 150-card map rebuild the derived 
   assert.equal(h.view.map.nodes.length, 250);
   assert.equal(counts.rebuild, 1, `rebuildDerivedData ${counts.rebuild}`); assert.ok(counts.scanMaps <= 1, `scanMaps ${counts.scanMaps}`);
 });
-integrationTest('B2-0 F4: a card that fails to be added still has the derived data rebuilt (once), and the other cards are made', async () => {
+integrationTest('B2-0 F4: a card that fails to be added fails the whole batch (E2-tx: all or nothing, no card or note left) and the derived data is still rebuilt (once)', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); const counts = countCalls(h);
   const createNote = h.repo.createNote.bind(h.repo); h.repo.createNote = async (title, ...rest) => { const made = await createNote(title, ...rest); if (title === 'Boom') throw new Error('disk full'); return made; };
   const actions = [addRoot('r', 'Root'), addRoot('a', 'A', 'new:r'), addRoot('b', 'Boom', 'new:r'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))];
   const lines = await apply(h, actions);
-  eq(lines.filter(l => l.status === 'failed').length, 1); assert.ok(lines.filter(l => l.status === 'done').length >= 6);
+  // The cards are staged and written in one transaction; the one that throws takes the others back with it.
+  eq(lines.filter(l => l.status === 'failed').length, 7, JSON.stringify(lines)); eq(lines.filter(l => l.status === 'done').length, 0);
+  assert.equal((await h.saved()).length, 0, 'no card is kept');
   assert.equal(counts.rebuild, 1, `rebuilt once: ${counts.rebuild}`);
 });
 integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops half way still rebuilds once for what it made', async () => {
@@ -4140,8 +4147,9 @@ integrationTest('B2-0 F4: nothing added, nothing rebuilt; a reply that stops hal
 });
 integrationTest('B2-0 F4: an outside change to Map.md in the middle of a batch is kept (no conflict window: the staged cards are put on it) and the batch goes on', async () => {
   const h = await harness({ empty: true, realRender: true, viaSync: true }); await h.view.hydrate(); let created = 0;
-  const createNote = h.repo.createNote.bind(h.repo);
-  h.repo.createNote = async (...args) => { const made = await createNote(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
+  // The outside write lands while the 4th card is only staged (its note is not a file yet), before the batch's one transaction.
+  const noteFromContent = h.repo.noteFromContent.bind(h.repo);
+  h.repo.noteFromContent = async (...args) => { const made = await noteFromContent(...args); if (++created === 4) await h.repo.saveMap(MAP, { ...(await h.repo.readMap(MAP)), title: 'Edited outside' }); return made; };
   const lines = await apply(h, [addRoot('r', 'Root'), ...Array.from({ length: 7 }, (_, i) => addRoot(`c${i}`, `C${i}`, 'new:r'))]);
   assert.equal((h.control.modals ?? []).length, 0, 'no conflict window: the staged cards are put on their version'); assert.ok(lines.filter(l => l.status === 'done').length >= 8);
   assert.equal((await h.repo.readMap(MAP)).title, 'Edited outside', 'their change is kept'); assert.equal((await h.repo.readMap(MAP)).nodes.length, 8);

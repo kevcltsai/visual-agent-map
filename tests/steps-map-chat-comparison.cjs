@@ -76,7 +76,7 @@ const build = comparison => plain(buildComparisonTable(comparison, { titleOf: id
 
 test('F08a builder: null becomes the unknown word; one unit stays one column', () => {
   const t = build({ attributes: [{ name: 'Fee' }, { name: 'Discount' }], rows: [row('a', { value: '290', unit: 'NT$' }, '15%'), row('b', { value: '350', unit: 'NT$' }, null)] });
-  assert.deepEqual(t.columns, [{ attribute: 0, name: 'Fee', unit: 'NT$', split: false }, { attribute: 1, name: 'Discount', unit: null, split: false }]);
+  assert.deepEqual(t.columns, [{ attribute: 0, name: 'Fee', unit: 'NT$', split: false }, { attribute: 1, name: 'Discount', unit: '%', split: false }]);
   assert.deepEqual(t.rows, [{ nodeId: 'a', title: 'A Co', cells: ['290', '15%'] }, { nodeId: 'b', title: 'B Co', cells: ['350', 'unknown'] }]);
 });
 
@@ -98,6 +98,35 @@ test('F08a builder: an attribute with only unknown values keeps one column; a go
   assert.deepEqual(t.rows, [{ nodeId: 'zzz', title: null, cells: ['unknown'] }]);
   const u = build({ attributes: [{ name: 'Fee', unit: 'NT$' }], rows: [row('a', '290'), row('b', '350')] });
   assert.deepEqual(u.columns, [{ attribute: 0, name: 'Fee', unit: 'NT$', split: false }]);
+});
+
+test('F08a builder (live payload): currencies written inside values with no unit split the column by currency', () => {
+  const t = build({ attributes: [{ name: '月費' }], rows: [row('a', 'NT$290'), row('b', 'NT$350'), row('c', 'US$12')] });
+  assert.deepEqual(t.columns, [{ attribute: 0, name: '月費', unit: 'NT$', split: true }, { attribute: 0, name: '月費', unit: 'US$', split: true }]);
+  assert.deepEqual(t.rows.map(r => r.cells), [['NT$290', 'unknown'], ['NT$350', 'unknown'], ['unknown', 'US$12']], 'the value text is kept exactly as given, in its own column only');
+});
+
+test('F08a builder: a unit written as a suffix inside the value: same unit stays one column, different units split', () => {
+  const same = build({ attributes: [{ name: 'Rate' }], rows: [row('a', '15%'), row('b', '20%')] });
+  assert.deepEqual(same.columns, [{ attribute: 0, name: 'Rate', unit: '%', split: false }]);
+  assert.deepEqual(same.rows.map(r => r.cells), [['15%'], ['20%']]);
+  const mixed = build({ attributes: [{ name: 'Weight' }], rows: [row('a', '12 kg'), row('b', '300 g')] });
+  assert.deepEqual(mixed.columns.map(c => c.unit), ['kg', 'g']);
+  assert.deepEqual(mixed.rows.map(r => r.cells), [['12 kg', 'unknown'], ['unknown', '300 g']]);
+});
+
+test('F08a builder: values that are not a single number with a recognizable prefix or suffix stay unitless', () => {
+  const t = build({ attributes: [{ name: 'Fee' }], rows: [row('a', '約 300'), row('b', '100-200'), row('c', '免費')] });
+  assert.deepEqual(t.columns, [{ attribute: 0, name: 'Fee', unit: null, split: false }]);
+  assert.deepEqual(t.rows.map(r => r.cells), [['約 300'], ['100-200'], ['免費']]);
+  const odd = build({ attributes: [{ name: 'Fee' }], rows: [row('a', 'NT$290 起'), row('b', 'NT$100~200'), row('c', '290')] });
+  assert.deepEqual(odd.columns.map(c => c.unit), [null]);
+});
+
+test('F08a builder: an explicit unit from the model wins over one found inside the value', () => {
+  const t = build({ attributes: [{ name: 'Fee' }], rows: [row('a', { value: 'NT$290', unit: 'TWD' }), row('b', { value: 'US$12', unit: 'TWD' })] });
+  assert.deepEqual(t.columns, [{ attribute: 0, name: 'Fee', unit: 'TWD', split: false }]);
+  assert.deepEqual(t.rows.map(r => r.cells), [['NT$290'], ['US$12']]);
 });
 
 test('F08a prompt: values must come from the cards content, null when unsupported, never invented', () => {

@@ -10839,7 +10839,7 @@ test('F08a comparison: a table under the reply with the card titles, the unknown
   const f = panelFixture(); cmpOf(f); f.panel.attachComparison(cmpData());
   const block = cmpBlock(f); assert.ok(block, 'the block exists');
   const headers = cmpHeads(block);
-  eq(headers, ['', 'Fee (NT$)', 'Fee (US$)', 'Discount']);
+  eq(headers, ['', 'Fee (NT$)', 'Fee (US$)', 'Discount (%)']);
   const rows = findAll(block, i => i.tag === 'tr').slice(1).map(tr => findAll(tr, i => i.tag === 'td' || i.tag === 'th').map(c => c.text));
   eq(rows, [['Topic A', '290', 'Unknown', '15%'], ['Topic B', 'Unknown', '12', 'Unknown'], ['(card no longer on the map)', '5', 'Unknown', '1%']]);
   assert.equal(findAll(block, i => i.tag === 'button' || i.tag === 'input').length, 0, 'read only: no button, no field (the save button is F08b)');
@@ -10856,7 +10856,7 @@ test('F08a comparison: it is not a plan or a write, follows the interface langua
   const f = panelFixture(); cmpOf(f); f.panel.attachComparison(cmpData());
   assert.equal(find(f.panel.el, i => hasClass(i, 'vam-map-chat-plan')), undefined, 'no plan card');
   f.setLanguage('zh-TW'); f.panel.relabel();
-  eq(cmpHeads(cmpBlock(f)), ['', 'Fee（NT$）', 'Fee（US$）', 'Discount']);
+  eq(cmpHeads(cmpBlock(f)), ['', 'Fee（NT$）', 'Fee（US$）', 'Discount（%）']);
   assert.match(visibleText(cmpBlock(f)), /未知/); f.setLanguage('en');
   f.panel.reset(); assert.equal(cmpBlock(f), undefined);
 });

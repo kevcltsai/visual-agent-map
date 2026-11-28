@@ -70,3 +70,11 @@ test('G06a plan: a reply without move_anchor is judged as before', () => {
   assert.deepEqual(plain(planFor([add], planContext, { imageMode: 'preview', imageAttached: true }).reasons), ['image_preview']);
 });
 test('G06a group: move_anchor is a change', () => assert.equal(chatPlanGroupOf('move_anchor'), 'change'));
+test('G06a parse: the picture file path comes from the selected picture, a reply-supplied imageRef is ignored', () => {
+  const withPath = ctx(annotated({ path: 'attachments/a.png' }));
+  assert.equal(parse([move()], withPath).actions[0].imageRef, 'attachments/a.png');
+  assert.equal(parse([move({ imageRef: 'attachments/evil.png' })], withPath).actions[0].imageRef, 'attachments/a.png');
+  assert.equal('imageRef' in parse([move({ imageRef: 'attachments/evil.png' })]).actions[0], false, 'no selected path: nothing is taken from the reply');
+  assert.equal(JSON.stringify(withPath.json).includes('attachments/a.png'), false, 'the path is never sent to the model');
+  assert.equal(MAP_CHAT_SCHEMA.properties.actions.items.properties.imageRef, undefined);
+});

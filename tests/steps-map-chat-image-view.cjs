@@ -1154,3 +1154,24 @@ test('G06a (counter-example): an anchor deleted, an image deleted or an image tu
     assert.deepEqual(statuses(h.chat.lines.at(-1).filter(l => /^(Skipped|Done)/.test(l.text))), ['skipped'], name);
   }
 });
+
+test('G06a (counter-example): the picture replaced by another file under the same id while the plan waits is stale: Apply writes nothing', async () => {
+  const h = await harness(); h.select('img1');
+  h.control.reply = async () => ({ reply: 'r', actions: [{ ...moveAnchor('old1', 0.6, 0.7), imageRef: 'attachments/a.png' }], rejected: [] });
+  await h.send('x');
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, path: 'attachments/b.png' } : i));
+  const fileBefore = h.contents.get(MAP);
+  h.chat.plans[0].apply(); await settled(h);
+  assert.equal(h.contents.get(MAP), fileBefore, 'Map.md is not written');
+  assert.equal(h.view.history.undoEntry, undefined, 'no undo step');
+  assert.deepEqual(await posOf(h), { kind: 'image-2d', x: 0.1, y: 0.1 });
+  assert.deepEqual(statuses(h.chat.lines.at(-1).filter(l => /^(Skipped|Done)/.test(l.text))), ['skipped']);
+});
+
+test('G06a (counter-example): an anchor that has no 2D position is skipped, never "done" without moving', async () => {
+  const items = [ANNOTATED({ anchors: [{ id: 'old1', at: { kind: 'image-3d', x: 1, y: 2, z: 3 }, note: 'Chuck' }] }), PLAIN()];
+  const h = await harness({ items });
+  const lines = await h.apply([{ kind: 'move_anchor', imageId: 'img1', anchorId: 'old1', x: 0.6, y: 0.7 }]);
+  assert.deepEqual(statuses(lines), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.view.history.undoEntry, undefined);
+});

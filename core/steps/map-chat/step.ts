@@ -255,7 +255,15 @@ export type MapChatAction =
    * Suggests moving one existing anchor (`anchorId`) of the selected annotated image to the relative position `x`, `y` (0-1, never
    * clamped: a value outside 0-1 is refused). Always a plan: it is written only after the user confirms.
    */
-  | { kind: "move_anchor"; imageId: string; anchorId: string; x: number; y: number };
+  | {
+      kind: "move_anchor";
+      imageId: string;
+      anchorId: string;
+      x: number;
+      y: number;
+      /** Set by the parser from the selected picture's file path, never from the reply: a picture replaced before Apply is stale. */
+      imageRef?: string;
+    };
 
 export type MapChatRejectCode =
   | "bad_item"
@@ -1081,7 +1089,14 @@ export function parseMapChat(
               throw new Dropped("bad_value");
             return field;
           });
-          actions.push({ kind: "move_anchor", imageId, anchorId, x, y });
+          actions.push({
+            kind: "move_anchor",
+            imageId,
+            anchorId,
+            x,
+            y,
+            ...(shown.path ? { imageRef: shown.path } : {})
+          });
           break;
         }
         case "remove_relation": {

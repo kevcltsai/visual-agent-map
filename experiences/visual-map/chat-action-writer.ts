@@ -4,8 +4,10 @@ import {
   anchorRelationAllowed,
   ANCHOR_LIMIT,
   findAnnotatedImage,
+  isImage2dAnchor,
   updateAnchor,
-  type AnchorRelation
+  type AnchorRelation,
+  type AnnotatedImageItem
 } from "./canvas-items";
 import type { Transaction, TransactionEntry } from "./map-transaction";
 import { randomUUID } from "node:crypto";
@@ -908,14 +910,21 @@ export class ChatActionWriter {
           ? "ui.map_chat_skip_image_plain"
           : "ui.map_chat_skip_image_gone"
       );
-    if (!image.anchors.some(anchor => anchor.id === action.anchorId)) return skipped("ui.map_chat_skip_anchor_gone");
+    /** Why this write is stale or cannot move the anchor now; null = it can. */
+    const refusal = (current: AnnotatedImageItem): TranslationKey | null => {
+      // The picture file was replaced since the suggestion: the position was meant for another picture.
+      if (action.imageRef !== undefined && current.path !== action.imageRef) return "ui.map_chat_skip_image_gone";
+      const anchor = current.anchors.find(entry => entry.id === action.anchorId);
+      // Only a 2D position can be moved; never answer "done" without moving.
+      return anchor && isImage2dAnchor(anchor) ? null : "ui.map_chat_skip_anchor_gone";
+    };
+    const early = refusal(image);
+    if (early) return skipped(early);
     const box: { refused: TranslationKey | null } = { refused: null };
     await this.ports.mapChange(map => {
       const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
-      if (!current) box.refused = "ui.map_chat_skip_image_gone";
-      else if (!current.anchors.some(anchor => anchor.id === action.anchorId))
-        box.refused = "ui.map_chat_skip_anchor_gone";
-      else
+      box.refused = current ? refusal(current) : "ui.map_chat_skip_image_gone";
+      if (!box.refused)
         map.canvasItems = updateAnchor(map.canvasItems ?? [], action.imageId, action.anchorId, {
           at: { x: action.x, y: action.y }
         });

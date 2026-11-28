@@ -23040,7 +23040,8 @@ export class VisualAgentMapView extends ItemView {
           to: link.to,
           ...(link.description ? { description: link.description } : {})
         })),
-        imageAttached: false
+        imageAttached: false,
+        path: image.path
       },
       path: image.path
     };

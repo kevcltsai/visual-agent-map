@@ -128,6 +128,14 @@ test('A10 review: Esc inside an input is not intercepted; Esc elsewhere cancels 
   assert.equal(view.tidy, null);
 });
 
+test('A10 batch UI: Esc on the focused Apply button cancels the preview (a button is not a text field)', () => {
+  const { view, listeners } = tidyView(true);
+  const onButton = key('Escape', inInput('button'));
+  listeners[0](onButton);
+  assert.equal(onButton.stopped, true);
+  assert.equal(view.tidy, null);
+});
+
 test('A10 review: Enter with an empty preview does not apply', () => {
   const { view, listeners } = tidyView(false);
   assert.equal(view.tidy.positions.size, 0);

@@ -1172,6 +1172,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_reason_failed": "上次執行沒有完成，原因請看紀錄",
   "ui.living_node_reason_dependency": "它依賴的卡片沒有完成",
   "ui.living_node_reason_missing_source": "來源筆記不見了或不允許使用",
+  "ui.living_node_reason_map_file": "心智圖檔（Map.md）是 VAM 的內部資料，不能當作來源；請從來源移除",
   "ui.living_node_reason_cycle": "卡片互相參照，形成迴圈",
   "ui.living_node_reason_range_too_large": "選取的段落或筆記太大，無法送出",
   "ui.living_node_reason_markers_damaged": "Living Node 標記已損壞，請手動修復",

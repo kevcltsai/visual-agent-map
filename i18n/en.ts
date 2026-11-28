@@ -1239,6 +1239,8 @@ export const en = {
   "ui.living_node_reason_failed": "The last run did not finish. See the log for the reason.",
   "ui.living_node_reason_dependency": "A card it depends on did not finish",
   "ui.living_node_reason_missing_source": "A source note is missing or not allowed",
+  "ui.living_node_reason_map_file":
+    "A map file (Map.md) is VAM's own data and cannot be a source; remove it from the sources",
   "ui.living_node_reason_cycle": "Cards refer to each other in a loop",
   "ui.living_node_reason_range_too_large": "The chosen sections or notes are too large to send",
   "ui.living_node_reason_markers_damaged": "The Living Node markers are damaged; fix them by hand",

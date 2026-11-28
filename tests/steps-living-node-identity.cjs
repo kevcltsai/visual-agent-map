@@ -131,7 +131,7 @@ test('runtime adapter: a rename of a referenced note keeps the evidence identity
   const store = make();
   const mk = (path, ctime, size) => { const f = new TFile(path); f.stat = { ctime, mtime: 1, size }; return f; };
   const files = new Map([['a.md', mk('a.md', 10, 5)]]);
-  const app = { vault: { configDir: '.obsidian', getAbstractFileByPath: p => files.get(p) ?? null }, metadataCache: {} };
+  const app = { vault: { configDir: '.obsidian', getAbstractFileByPath: p => files.get(p) ?? null }, metadataCache: { getFileCache: () => null } };
   setLivingIdentityStore(app, store);
   const r = sourceResolver(app);
   const first = r.resolveAuthorized('a.md', 'root.md', 'explicit', true);

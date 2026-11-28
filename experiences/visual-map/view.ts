@@ -228,6 +228,7 @@ import {
   saveLivingConfig,
   validateLivingStructure,
   livingRemovalConsumers,
+  livingNoteCandidates,
   livingReplacedSources,
   livingCrossCut,
   type LivingConfigSave
@@ -5306,8 +5307,10 @@ export class VisualAgentMapView extends ItemView {
     this.tidy = { ...result, branchId, mapId: this.map.id, signature: mapSignature(this.map) };
     this.tidyKeys = event => {
       const target = event.target as HTMLElement | null;
-      const inField = !!target?.closest?.("button, input, textarea, [contenteditable]");
-      if (event.key === "Escape" && !event.isComposing && !inField) {
+      // Esc is left to text fields only; the focused Apply button still cancels. Enter on a button presses that button.
+      const inText = !!target?.closest?.("input, textarea, [contenteditable]");
+      const inField = inText || !!target?.closest?.("button");
+      if (event.key === "Escape" && !event.isComposing && !inText) {
         event.preventDefault();
         event.stopPropagation();
         this.clearTidy();
@@ -15907,7 +15910,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
-    const files = this.app.vault.getMarkdownFiles();
+    const files = livingNoteCandidates(this.app, this.app.vault.getMarkdownFiles());
     const modal = new AiCardNotePicker(
       this.app,
       files,

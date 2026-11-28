@@ -149,7 +149,7 @@ async function measureInput(cdp, start, end, act) {
   return cdp.evaluate("__vamPerf.result()");
 }
 
-async function measureMap(cdp, samples) {
+async function measureMap(cdp, samples, ai) {
   const out = { pan: [], zoom: [], select: [], drag: [], expand: [], summary: [], search: [] };
   // Pan: one background drag per 10 samples, alternating direction.
   for (let done = 0, dir = 1; done < samples; dir = -dir) {
@@ -211,8 +211,9 @@ async function measureMap(cdp, samples) {
     }
     if (!flipped) throw new Error("Space on the branch card did not fold or unfold it.");
   }
-  // Summary: update_summary through the map-chat apply path with a fixture action (no provider).
-  for (let i = 0; i < samples; i++) {
+  // Summary: update_summary through the map-chat apply path with a fixture action (no provider). Not with --ai: an AI card's
+  // summary is written only by running the card, so the apply path skips it.
+  for (let i = 0; i < (ai ? 0 : samples); i++) {
     const id = `perf-b${i % 5}-l${(i >> 1) % 6}`;
     const r = await cdp.evaluate(`(async()=>{const v=${view};const now=await v.chatWriter.chatTopicNow(${JSON.stringify(id)});
 return __vamPerf.call(()=>v.applyMapChatActions({actions:[{kind:"update_summary",nodeId:${JSON.stringify(id)},summary:"Perf summary ${i}"}],rejected:[]},{mdHashes:{},topicHashes:{[${JSON.stringify(id)}]:{title:now.title,parentId:now.parentId}},mapSourcePaths:[]}))})()`);
@@ -258,7 +259,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
     await cdp.evaluate(probe);
     const heapBefore = await cdp.evaluate("performance.memory.usedJSHeapSize");
     const longBefore = await cdp.evaluate("__vamPerf.longTasks.length");
-    const interactions = await measureMap(cdp, samples);
+    const interactions = await measureMap(cdp, samples, ai);
     const batch = [];
     for (const mapPath of batchMaps) batch.push(await measureBatch(cdp, mapPath, cardCount));
     const heapAfter = await cdp.evaluate("performance.memory.usedJSHeapSize");
@@ -270,7 +271,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
       candidate: { head: git("rev-parse", "HEAD"), dirty: git("status", "--short") !== "", installedMainJsSha256: existsSync(installed) ? createHash("sha256").update(readFileSync(installed)).digest("hex") : null },
       host: { os: `${type()} ${release()} ${arch()}`, cpu: cpus()[0]?.model, cores: cpus().length, memGB: Math.round(totalmem() / 2 ** 30), ...env },
       fixture: { cards, batchMaps: batches, samples },
-      results: { ...Object.fromEntries(Object.entries(interactions).map(([k, v]) => [k, summarize(v)])), batch: summarize(batch), batchFirstMs: round(batch[0] ?? null) }, // the first batch of a session is the cold one
+      results: { ...Object.fromEntries(Object.entries(interactions).filter(([, v]) => v.length).map(([k, v]) => [k, summarize(v)])), batch: summarize(batch), batchFirstMs: round(batch[0] ?? null) }, // the first batch of a session is the cold one
       heap: { beforeMB: Math.round(heapBefore / 2 ** 20 * 10) / 10, afterMB: Math.round(heapAfter / 2 ** 20 * 10) / 10 },
       longTasks: { count: longTasks.length, totalMs: round(longTasks.reduce((a, b) => a + b, 0)) },
       uncaughtErrors: errors,

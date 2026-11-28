@@ -164,3 +164,53 @@ test('latest snapshot writer: a failing in-flight write and diagnostic cannot st
   await writer.flush();
   assert.deepEqual(writes, [0, 1]);
 });
+
+test('crash after remove and before rename: reload returns and promotes the temp snapshot', async () => {
+  const f = fixture();
+  f.faults.rename = true; // the process dies between remove(path) and rename(temp, path)
+  await assert.rejects(writeStoreAtomically(f.adapter, path, second), /rename failed/);
+  assert.equal(f.files.has(path), false);
+  f.faults.rename = false;
+  assert.equal(await readStoreText(f.adapter, path), second);
+  assert.equal(f.files.get(path), second);
+  assert.equal(f.files.has(temporary), false);
+});
+
+test('only a complete temp present: load returns the data and promotes it', async () => {
+  const f = fixture();
+  f.files.delete(path);
+  f.files.set(temporary, second);
+  assert.deepEqual(await readStoreValue(f.adapter, path, JSON.parse), { revision: 2 });
+  assert.equal(f.files.get(path), second);
+  assert.equal(f.files.has(temporary), false);
+});
+
+// A faithful desktop adapter: replace overwrites atomically, so the primary exists at every await boundary.
+function replaceFixture(failReplace = false) {
+  const f = fixture();
+  const seen = [];
+  const watch = fn => async (...args) => { seen.push(f.files.has(path)); return fn(...args); };
+  for (const key of ['exists', 'write', 'rename', 'remove']) f.adapter[key] = watch(f.adapter[key]);
+  f.adapter.replace = async (from, to) => {
+    if (failReplace) throw new Error('EBUSY');
+    f.files.set(to, f.files.get(from));
+    f.files.delete(from);
+    seen.push(f.files.has(path));
+  };
+  return { ...f, seen };
+}
+
+test('replace available: the primary never disappears during a write', async () => {
+  const f = replaceFixture();
+  await writeStoreAtomically(f.adapter, path, second);
+  assert.ok(f.seen.length > 0 && f.seen.every(Boolean), 'primary missing at some step');
+  assert.equal(f.files.get(path), second);
+  assert.equal(f.files.has(temporary), false);
+});
+
+test('replace failing falls back to remove+rename and still publishes', async () => {
+  const f = replaceFixture(true);
+  await writeStoreAtomically(f.adapter, path, second);
+  assert.equal(f.files.get(path), second);
+  assert.equal(f.files.has(temporary), false);
+});

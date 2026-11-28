@@ -152,6 +152,7 @@ import { AiExchangeLog } from "./ai-exchange-log";
 import { AiUsageStore } from "./core/ai-usage-store";
 import { VaultWriteRecovery } from "./core/vault-write-recovery";
 import { PendingSuggestions } from "./pending-suggestions";
+import { withAtomicReplace } from "./store-fs-adapter";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { chooseAndImportExchange } from "./experiences/visual-map/outline-exchange-io";
 import { ShareModal } from "./experiences/sharing/share-modal";
@@ -1379,7 +1380,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
-      const adapter = this.app.vault.adapter;
+      const adapter = withAtomicReplace(this.app.vault.adapter);
       this.exchanges = new AiExchangeLog(adapter, normalizePath(`${this.manifest.dir}/ai-exchanges.json`), error =>
         this.logs.appendLog(
           "error",

@@ -2128,6 +2128,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "note.no_conclusion_yet": "尚未形成結論",
   "note.untitled_topic": "未命名主題",
   "note.source_unconfirmed_0": "來源待確認：{0}",
+  "note.source_unverified": "（來源未驗證）",
   "note.external_source_0": "外部來源：{0}",
   "note.earlier_research_sources": "先前研究的來源",
   "note.no_new_information": "本次無新增內容。",

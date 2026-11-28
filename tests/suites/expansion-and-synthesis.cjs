@@ -2924,6 +2924,42 @@ integrationTest('AI mode: a note with research-depth deep keeps that line after 
   assert.match(await text(), /research-mode: local/, 'a Quick run writes the mode it used');
   assert.equal(h.contexts.at(-1).researchDepth, 'normal', 'the depth no longer comes from the note');
 });
+// §8b layer 2 (V3.3 #06): the real service, run and Repository write the marker the program owns; scan every written note.
+integrationTest('web sources: a Standard research marks the URL it never opened in the note language and keeps exactly one research-retrieved-at; Quick writes none', async () => {
+  const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const { translateNote } = load('i18n.ts');
+  const opened = 'https://opened.example/page', fake = 'https://fake.example/made-up';
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const runtime = { runTask: async (_p, _m, _e, _s, controls) => {
+      if (controls.webSearch) controls.onWebSearchEvent?.({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage', url: opened } } } });
+      return JSON.stringify({ summary: 'S', detail: `[o](${opened}) [f](${fake})`, suggestions: [], visualReferences: [] });
+    } };
+    const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => language, defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, codexRuntime: () => runtime, claudeRuntime: () => runtime });
+    const h = await templateHarness({ language, reply: context => service.askModel(context, 'gpt-6-luna', 'low') });
+    assert.doesNotMatch(h.contents.get(h.topic.path), /research-retrieved-at/);
+    assert.equal((await h.repo.readNote(h.topic.path)).status, 'idea', 'an old note without the key reads as before');
+    const marker = translateNote(language, 'note.source_unverified');
+    const standard = async () => { await (await h.view.runAgent(h.topic, undefined, undefined, { ...aiModeOptions('standard', 'research'), referenceGroups: [], rules: '' })).finished; await until(() => !h.plugin.running.size); };
+    await standard();
+    let text = h.contents.get(h.topic.path);
+    assert.ok(text.includes(`[f](${fake}) ${marker}`), `${language}: ${text}`);
+    assert.ok(!text.includes(`[o](${opened}) ${marker}`), `${language}: the opened URL is plain`);
+    assert.equal(text.match(/^research-retrieved-at: /gm)?.length, 1, language);
+    const first = text.match(/^research-retrieved-at: (.*)$/m)[1];
+    await new Promise(resolve => setTimeout(resolve, 5));
+    await standard();
+    text = h.contents.get(h.topic.path);
+    assert.equal(text.match(/^research-retrieved-at: /gm)?.length, 1, `${language}: a re-run replaces the key`);
+    assert.notEqual(text.match(/^research-retrieved-at: (.*)$/m)[1], first);
+    assert.equal(text.split(marker).length - 1, 1, `${language}: the marker is not doubled by the re-run`);
+    const quick = await templateHarness({ language, reply: context => service.askModel(context, 'gpt-6-luna', 'low') });
+    await quick.run();
+    const quickText = quick.contents.get(quick.topic.path);
+    assert.doesNotMatch(quickText, /research-retrieved-at/, `${language}: Quick retrieved nothing`);
+    assert.ok(quickText.includes(`[o](${opened}) ${marker}`) && quickText.includes(`[f](${fake}) ${marker}`), `${language}: Quick marks every URL`);
+  }
+});
 integrationTest('Re-run with Standard: one usage confirmation, Standard options, the plain research task without sources or extra requirements, and the Quick result is restored by one undo', async () => {
   const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Standard summary', detail: 'Standard detail with sources', visualReferences: [], suggestions: [] }) });
   await h.repo.updateNote(h.topic.path, { researchMode: 'local', summary: 'Quick summary', detail: GAP_DETAIL, status: 'completed', prompt: 'A stored custom prompt' });

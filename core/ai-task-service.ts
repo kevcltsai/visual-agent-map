@@ -15,7 +15,7 @@ import { checkCounts, countIssueText } from "../ai/detail-templates";
 import { decidedTemplateFromDetail, demoteUnknownHeadings } from "../ai/detail-sections";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
-import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
+import { noteLanguageOf, translate, translateNote, t, type ContentLanguage, type UiLanguage } from "../i18n";
 import { claudeModelChoice } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
@@ -31,6 +31,7 @@ import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondense
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
+import { markedUrlsIn, markUnverifiedUrls, webUrlKey, webUrlsIn } from "./web-sources";
 import { attachFullText, fetchFullTexts, splitFullText, wantsFullText, type FetchFile } from "./full-text";
 import {
   dropUnplayableVideos,
@@ -487,6 +488,30 @@ export class AiTaskService {
           }
         }
         result.formatIssues = issues;
+      }
+      // After the count repair (whose reply could drop a marker) and before the program's full-text blocks: a web URL this reply
+      // adds that the run never opened and no input held is marked unverified (a Quick run opens none). A top reply is only the new part.
+      if (readerFacingDetail(input) && !input.countRepair && role === undefined) {
+        const inputs = [
+          input.task,
+          input.userTexts,
+          input.detail,
+          input.sourceContext,
+          ...(input.referenceGroups ?? []).flatMap(group => group.documents.map(document => document.content))
+        ];
+        const markers = (["zh-TW", "en"] as const).map(language => translateNote(language, "note.source_unverified"));
+        // A URL the previous Detail still marks was never vouched for: dropping the marker in a rewrite does not make it known.
+        const unvouched = new Set(markedUrlsIn(input.detail ?? "", markers).map(webUrlKey));
+        const known = [
+          ...openedUrls,
+          ...webUrlsIn(inputs.filter(Boolean).join("\n")).filter(url => !unvouched.has(webUrlKey(url)))
+        ];
+        result.detail = markUnverifiedUrls(
+          result.detail,
+          known,
+          translateNote(outputLanguage, "note.source_unverified"),
+          markers
+        );
       }
       // After the count repair, so the repair never sees (or rewrites) the fetched text.
       // Every reader-facing reply passes here: a block the model wrote under the VAM label is never kept as the program's.

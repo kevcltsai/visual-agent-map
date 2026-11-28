@@ -1597,6 +1597,8 @@ export class TopicRuns {
             status: "completed",
             // The topic remembers the mode of its latest research (Quick is stored as local).
             ...(context.researchMode ? { researchMode: context.researchMode } : {}),
+            // A Standard research that retrieved from the web records when (only that key; the URLs are not stored).
+            ...(result.retrievals ? { researchRetrievedAt: new Date().toISOString() } : {}),
             ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
           };
           const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };

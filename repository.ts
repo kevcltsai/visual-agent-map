@@ -1056,6 +1056,7 @@ export class Repository {
     if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
     if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
     if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
+    if (patch.researchRetrievedAt !== undefined) fm["research-retrieved-at"] = patch.researchRetrievedAt;
     if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
     if (patch.detailTemplateId !== undefined)
       patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];

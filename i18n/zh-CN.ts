@@ -2128,6 +2128,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "note.no_conclusion_yet": "尚未形成结论",
   "note.untitled_topic": "未命名主题",
   "note.source_unconfirmed_0": "来源待确认：{0}",
+  "note.source_unverified": "（来源未验证）",
   "note.external_source_0": "外部来源：{0}",
   "note.earlier_research_sources": "先前研究的来源",
   "note.no_new_information": "本次无添加内容。",

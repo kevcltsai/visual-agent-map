@@ -1,6 +1,7 @@
 // P1.12 performance baseline: measures interaction latency of the mind-map view in a harness-launched test Obsidian over CDP.
 //   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]
-//   --ai marks every fixture card an AI card (ai-card: true), so selection exercises the dependency highlight.
+//   --ai marks every fixture card but perf-b1 an AI card (ai-card: true), so selection exercises the dependency highlight;
+//   perf-b1 stays ordinary because the expand measurement folds it with Space, which does not fold an AI card.
 // The vault must be harness-owned (made by `node scripts/test-harness.mjs --session=<name>`, already running and trusted).
 // For numbers to compare (P1.12 stage B against the stage A baseline), use a fresh session vault per run: fixture maps from
 // earlier runs stay in the vault and raise heap and batch times.
@@ -59,7 +60,7 @@ export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count
   const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
   const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai && card.id !== "perf-b1" ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
   }));
   return { mapPath: `${folder}/Map.md`, files: [{ path: `${folder}/Map.md`, text: map }, ...notes] };
 }

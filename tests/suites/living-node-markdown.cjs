@@ -658,7 +658,7 @@ S.integrationTest('D1-x11b: adopt leaves a native editor the user opened untouch
   const ai = new S.TFile('ai.md');
   aiCards.add('ai.md');
   await sidebar.openDetails(ai, 'editor');
-  await leaf.openFile(ai); // the 「在編輯器開啟」 button
+  await sidebar.openInEditor(leaf, ai); // the reader's 「在編輯器開啟」 button, through the pane
   const editor = leaf.view;
   const before = calls.length;
   await sidebar.restoreLivingOfficial(ai, 'editor');
@@ -672,7 +672,7 @@ S.integrationTest('D1-x11b: re-selecting the same AI card keeps its open native 
   const ai = new S.TFile('ai.md'), other = new S.TFile('other.md'), plain = new S.TFile('plain.md');
   aiCards.add('ai.md'); aiCards.add('other.md');
   await sidebar.openDetails(ai);
-  await leaf.openFile(ai);
+  await sidebar.openInEditor(leaf, ai);
   const editor = leaf.view;
   const before = calls.length;
   await sidebar.openDetails(ai);
@@ -680,11 +680,11 @@ S.integrationTest('D1-x11b: re-selecting the same AI card keeps its open native 
   assert.equal(calls.length, before);
   await sidebar.openDetails(other);
   assert.ok(leaf.view instanceof Reader, 'a different AI card reads in the reader');
-  await leaf.openFile(ai);
+  await sidebar.openInEditor(leaf, ai);
   await sidebar.openDetails(plain);
   assert.ok(leaf.view instanceof MarkdownView);
   assert.equal(leaf.view.file.path, 'plain.md', 'an ordinary card opens natively');
-  await leaf.openFile(ai);
+  await sidebar.openInEditor(leaf, ai);
   leaf.view = new MarkdownView(null); // the editor shows no file / was closed
   await sidebar.openDetails(ai);
   assert.ok(leaf.view instanceof Reader, 'once the editor is gone the next selection reads again');

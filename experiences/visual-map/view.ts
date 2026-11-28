@@ -268,7 +268,7 @@ import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
-import { EditorRoom, type SideDock } from "./living-editor-room";
+import { SidePanelRoom, type SideDock } from "./living-editor-room";
 import { livingSaveReason, livingTrialReason } from "./living-node-trial-reason";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
@@ -928,6 +928,8 @@ const CHAT_BATCH_WRITE_TIMEOUT_MS = 60000;
 const CHAT_BATCH_TAIL_TIMEOUT_MS = 10000;
 /** How many found items the failed merge's Notice and chat line list (View draft lists them all). */
 const MERGE_FINDINGS_NOTICE_LIMIT = 5;
+/** How long a new AI editor waits for the previous one to give the pane and side panels back before it takes them anyway. */
+const AI_CARD_CLOSE_TIMEOUT_MS = 3000;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1807,11 +1809,12 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController;
     viewSession: string;
     adoption?: LivingAdoptionCheck;
-    /** The room this editor makes among the side panels, given back when it closes. */
-    room: EditorRoom;
-    /** Ends the subscription to the reader's reveals. */
-    stopReveal?: () => void;
+    /** The room this editor makes among the side panels, given back when it closes (null until the previous editor's close finished). */
+    room: SidePanelRoom | null;
   } | null = null;
+  /** The closing editor's pane and side panels, still being given back: the next editor starts on the state after it. */
+  private aiCardClosing: Promise<void> | null = null;
+  private aiCardCloseTimeoutMs = AI_CARD_CLOSE_TIMEOUT_MS;
   private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   private backgroundEpoch = 0;
@@ -13584,9 +13587,10 @@ export class VisualAgentMapView extends ItemView {
     this.history.push({ label, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
     this.updateHistoryButtons();
   }
-  private openDetails(node: MapNode): void {
+  /** Shows the card in the right pane: the user's request, or (`follow`) a selection the pane follows when it is shown. */
+  private openDetails(node: MapNode, intent: "user" | "follow" = "user"): void {
     void this.plugin
-      .openDetails(this.plugin.repo.file(node.path))
+      .openDetails(this.plugin.repo.file(node.path), undefined, intent, this.notes.get(node.id)?.aiCard)
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Set by resolveMapConflict when a held view took the stored map and dropped its history (not an outside edit). */
@@ -17065,7 +17069,7 @@ export class VisualAgentMapView extends ItemView {
     // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
     const wasSelected = this.selection.state.selected === node.id;
     this.selectMapNode(node);
-    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
+    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node, "follow");
     // A click that moved the open topic chat to this card is done; the card text editor would take the input focus from it.
     if (!this.switchTopicChat(node, event.target)) this.openCardTextEditor(event, card, node, wasSelected);
   }
@@ -17383,34 +17387,37 @@ export class VisualAgentMapView extends ItemView {
       trial,
       controller,
       viewSession,
-      room: new EditorRoom(this.sideDocks())
+      room: null
     };
-    // The reader revealing its leaf can unfold the right panel: that is VAM's doing, not the user's, and it takes width.
-    const room = this.aiCardOpen.room;
-    this.aiCardOpen.stopReveal = this.plugin.onDetailsReveal?.(() => {
-      if (this.aiCardOpen?.room !== room) return;
-      room.accept(this.sideDock("right"));
-      this.makeRoomForAiCard();
-    });
+    const open = this.aiCardOpen;
     win.mount(overlay);
-    this.makeRoomForAiCard();
+    // The room and the pane start from the side panels and pane as the previous editor left them, once it gave them back.
+    const start = (): void => {
+      if (this.aiCardOpen !== open || !current()) return;
+      open.room = new SidePanelRoom(this.sideDocks());
+      // While the editor is open its room is the only part of VAM that folds or unfolds a side panel (the trial preview too).
+      this.plugin.useSidePanelRoom?.(open.room);
+      this.makeRoomForAiCard();
+      if (node) {
+        void this.plugin
+          .openDetails(this.plugin.repo.file(node.path), viewSession, "editor", note?.aiCard)
+          .then(() => {
+            // The reader took width in the right panel: the room is measured again.
+            if (current() && this.aiCardOpen) this.makeRoomForAiCard();
+          })
+          .catch(error => {
+            if (current()) new Notice(error instanceof Error ? error.message : String(error));
+          });
+      }
+    };
+    if (this.aiCardClosing) void this.aiCardClosing.then(start);
+    else start();
     if (node)
       void livingReplacedSources(this.app, this.plugin.repo, this.map, node.id)
         .then(names => {
           if (current() && names.length) win.markReplaced(names);
         })
         .catch(() => undefined);
-    if (node) {
-      void this.plugin
-        .openDetails(this.plugin.repo.file(node.path), viewSession)
-        .then(() => {
-          // The reader took width in the right panel: the room is measured again.
-          if (current() && this.aiCardOpen) this.makeRoomForAiCard();
-        })
-        .catch(error => {
-          if (current()) new Notice(error instanceof Error ? error.message : String(error));
-        });
-    }
   }
   private closeAiCardPopover(): void {
     const open = this.aiCardOpen;
@@ -17419,17 +17426,53 @@ export class VisualAgentMapView extends ItemView {
     open.controller.abort();
     open.trial.close();
     open.win.destroy();
-    open.stopReveal?.();
-    open.room.restore();
     if (!this.closed) this.restoreMapFocusSoon(open.nodeId ?? undefined);
     const node = open.nodeId ? this.mapNodeById(open.nodeId) : undefined;
     const target =
       node && !this.closed && !this.plugin.repo.isDisposed()
         ? this.app.vault.getAbstractFileByPath(node.path)
         : undefined;
-    void this.plugin
-      .restoreLivingOfficial(target instanceof TFile ? target : undefined, open.viewSession, true)
-      .catch(() => {});
+    const aiCard = node ? this.notes.get(node.id)?.aiCard : undefined;
+    // The pane is given back first (it never unfolds a side panel), then the side panels.
+    const released = (async () =>
+      this.plugin.restoreLivingOfficial(
+        target instanceof TFile ? target : undefined,
+        open.viewSession,
+        true,
+        aiCard
+      ))().then(
+      () => true,
+      () => false
+    );
+    // Not the raw error: what the user can do. The 「筆記」 entry reopens the pane; the side panels unfold by hand.
+    const failed = (): void => void new Notice(t("ui.living_node_close_restore_failed"));
+    const room = open.room;
+    // Closed before its room started: the previous editor's close, still running, gives the side panels back.
+    if (!room) {
+      void released.then(ok => ok || failed());
+      return;
+    }
+    // Given back once: when the pane is released, or when that takes too long (the next editor must not wait on it).
+    const closing = new Promise<void>(resolve => {
+      let done = false;
+      const giveBack = (ok: boolean): void => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        try {
+          room.restore();
+        } catch {
+          ok = false;
+        }
+        this.plugin.useSidePanelRoom?.(null, room);
+        if (this.aiCardClosing === closing) this.aiCardClosing = null;
+        if (!ok) failed();
+        resolve();
+      };
+      const timer = window.setTimeout(() => giveBack(false), this.aiCardCloseTimeoutMs);
+      void released.then(giveBack);
+    });
+    this.aiCardClosing = closing;
   }
   /** The note picker of the setup window: Markdown notes only; hands back the link name that resolves from the card. */
   private pickAiCardNote(fromPath: string, done: (name: string) => void, closed: () => void): void {
@@ -17569,9 +17612,7 @@ export class VisualAgentMapView extends ItemView {
     const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
     if (!overlay) return;
     const width = overlay.clientWidth ?? 0;
-    // A resize while the reader is revealing its leaf comes from VAM unfolding the right panel, not from the user.
-    if (this.plugin.detailsRevealing?.()) this.aiCardOpen.room.accept(this.sideDock("right"));
-    this.aiCardOpen.room.fit(width);
+    this.aiCardOpen.room?.fit(width);
   }
   private sideDock(side: "left" | "right"): SideDock | undefined {
     const workspace = this.app.workspace as { leftSplit?: SideDock; rightSplit?: SideDock } | undefined;
@@ -19309,11 +19350,6 @@ export class VisualAgentMapView extends ItemView {
     return (
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
-  }
-  /** The resolved title of one of this map's knowledge references; undefined when it is not one or not resolved (V3.3 P4.4). */
-  private knowledgeRefTitle(id: string): string | undefined {
-    const found = this.refResolved.get(id);
-    return found?.ok ? found.title : undefined;
   }
   /** The notes of these cards read again from disk (a missing card or note is left out). */
   private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
@@ -25338,7 +25374,7 @@ export class VisualAgentMapView extends ItemView {
       refTitles?.get(id) ??
       this.notes.get(id)?.title ??
       nodes.find(node => node.id === id)?.path ??
-      this.knowledgeRefTitle(id) ??
+      this.knowledgeRefLabel(id) ??
       id;
     const targets = (ids: string[]): number => (ids.length ? ids.length : selection.length);
     switch (action.kind) {
@@ -28525,7 +28561,7 @@ export class VisualAgentMapView extends ItemView {
         } else {
           this.applySelectionChange(this.selection.click(node.id));
           if (this.notesLoading()) return;
-          if (this.plugin.detailsShown()) this.openDetails(node);
+          if (this.plugin.detailsShown()) this.openDetails(node, "follow");
           // A press that never moved is a click: on the title or summary text it opens that text for typing.
           onPlainClick?.(e, wasSelected);
         }
@@ -29337,7 +29373,7 @@ export class VisualAgentMapView extends ItemView {
           ? anchored.anchorNote
             ? t("ui.anchor_relation_end_0", anchored.anchorNote)
             : t("ui.anchor_relation_end_empty")
-          : (this.notes.get(id)?.title ?? id),
+          : (this.notes.get(id)?.title ?? this.knowledgeRefLabel(id) ?? id),
       at = this.relationLabelAt.get(key),
       head = createSvg("tspan");
     head.textContent = t(

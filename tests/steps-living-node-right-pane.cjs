@@ -42,8 +42,9 @@ const bundle = load('tests/support-right-pane-entry.ts',
 const { default: Plugin, VisualAgentMapView, LivingReaderView, LIVING_READER_VIEW } = bundle;
 
 /** The workspace the pane lives in: one right dock (a tab group), leaves that really leave it on detach. */
-function workspaceOf(app) {
-  const types = { markdown: leaf => new MarkdownView(leaf), [LIVING_READER_VIEW]: leaf => new LivingReaderView(leaf), empty: leaf => new EmptyView(leaf) };
+function workspaceOf(app, host) {
+  // The reader as the plugin registers it (main.ts registerView: through its pane's createReader).
+  const types = { markdown: leaf => new MarkdownView(leaf), [LIVING_READER_VIEW]: leaf => host.nodeDetailsSidebar.createReader(leaf), empty: leaf => new EmptyView(leaf) };
   const rightSplit = { collapsed: false, children: [], active: null, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } };
   class Leaf {
     constructor() { this.app = app; this.parent = rightSplit; this.view = new EmptyView(this); }
@@ -107,13 +108,13 @@ async function world(vault) {
     vault = { repo, app, contents, settings, ids };
   }
   const { repo, app, settings, ids } = vault;
-  app.workspace = workspaceOf(app);
   const host = new Plugin(); host.app = app; host.repo = repo; host.settings = settings;
+  app.workspace = workspaceOf(app, host);
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {},
     recordFailure: (_l, e) => String(e?.message ?? e),
     // The plugin shell's own pane entries, unchanged: they forward to its NodeDetailsSidebar.
-    detailsShown: () => host.detailsShown(), openDetails: (file, owner) => host.openDetails(file, owner),
+    detailsShown: () => host.detailsShown(), openDetails: (...args) => host.openDetails(...args), useSidePanelRoom: (...args) => host.useSidePanelRoom(...args),
     showLivingTrial: (...args) => host.showLivingTrial(...args), invalidateLivingTrial: owner => host.invalidateLivingTrial(owner),
     restoreLivingOfficial: (...args) => host.restoreLivingOfficial(...args), closeStaleDetails: () => host.closeStaleDetails(),
     mutate: async work => { await work(); }
@@ -222,12 +223,13 @@ test('D1-x11c: every pane state × event lands on the reader for an AI card (sta
       if (after.empty) failures.push(`${label}: ${after.empty} empty reader leaf left in the dock`);
       if (after.leaves > 1) failures.push(`${label}: ${after.leaves} pane leaves`);
       // Recovery: from wherever the pane landed, the next selections read normally again. A pane the user closed stays
-      // closed (D1-x11d), unless the AI editor was still open: closing it returns to its card's reader.
+      // closed (D1-x11d), also when the AI editor was still open: closing it does not bring the pane back (D1 §23 I2).
       const aiEditorOpen = !!w.popover();
       await closeAiEditor(w);
       const userClosed = state === 'blank' || event === 'Cmd+W' || event === 'leaf.detach()';
-      const followsSelection = !userClosed || aiEditorOpen;
+      const followsSelection = !userClosed;
       if (pane(w).shown === 'closed' && followsSelection) failures.push(`${label} → close AI editor: closed, expected the reader`);
+      if (pane(w).shown !== 'closed' && userClosed && aiEditorOpen) failures.push(`${label} → close AI editor: ${pane(w).shown}, expected the closed pane to stay closed`);
       if (followsSelection) {
         await w.click('B');
         if (pane(w).shown !== 'reader:B') failures.push(`${label} → select other AI card: ${pane(w).shown}, expected reader:B`);

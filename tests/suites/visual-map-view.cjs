@@ -1474,7 +1474,8 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   view.autoLayout(); view.applyTidy(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*(?:map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\)|this\.arrangeAll\(map\));/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
+  // A9：P1.4 局部推開取代整圖重排（決策 A9-UI）。舊：收合鈕在同一次變更 arrangeAll；新：局部 layout 下收合不動卡、展開只推開被覆蓋者，只有整圖 layout（radial／timeline／fishbone／argument）才 arrangeAll。
+  assert.match(source, /n\.collapsed = !n\.collapsed;(?:\s*\/\/[^\n]*)*\s*if \(!this\.placesLocally\(map\)\) this\.arrangeAll\(map\);/, 'the card collapse button re-arranges whole only where the layout is whole-map; otherwise it places locally');
 });
 integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the eight arrangements, a separator, the three spacings and Auto layout', () => {
   const menus = [];

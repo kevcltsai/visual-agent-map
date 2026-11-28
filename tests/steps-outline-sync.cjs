@@ -10,7 +10,10 @@ const loadOutline = () => load('ui/outline-view.ts', { obsidian: { ...obsidian, 
 function outline() {
   const OutlineView = loadOutline();
   const view = new OutlineView({ app: {} }, async () => {});
-  const doc = { activeElement: null };
+  // As in a real document: an element taken out of the tree no longer has the focus (activeElement falls back to null/body).
+  let focused = null;
+  const attached = el => { if (!el.parent) return true; for (let at = el; at; at = at.parent) { if (at === view.contentEl) return true; if (!at.parent?.children.includes(at)) return false; } return false; };
+  const doc = { get activeElement() { return focused && attached(focused) ? focused : null; }, set activeElement(el) { focused = el; } };
   view.contentEl.root = doc; view.contentEl.ownerDocument = doc;
   view.collapsed = new Set(['root', 'child']);
   view.setMap({ title: 'M', nodes: [
@@ -63,6 +66,20 @@ test('B15 batch UI: a map repaint that hands the outline the same content keeps 
   const [map, titles] = content(); titles.set('other', 'Renamed');
   view.setMap(map, titles);
   assert.notEqual(rows()[rows().length - 1], before[before.length - 1], 'changed title: redrawn');
+});
+test('B18 batch UI: a row that has the keyboard focus keeps it through two outline rebuilds in a row', () => {
+  const { view, doc } = outline();
+  const note = path => dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note') && i.attrs['data-path'] === path)[0];
+  note('other.md').focus();
+  assert.equal(doc.activeElement, note('other.md'));
+  const nodes = () => [
+    { id: 'root', parentId: null, path: 'root.md' }, { id: 'child', parentId: 'root', path: 'child.md' },
+    { id: 'leaf', parentId: 'child', path: 'leaf.md' }, { id: 'other', parentId: null, path: 'other.md' }
+  ];
+  view.setMap({ title: 'M', nodes: nodes() }, new Map([['root', 'Root 2'], ['child', 'Child'], ['leaf', 'Leaf'], ['other', 'Other']]));
+  view.setMap({ title: 'M', nodes: nodes() }, new Map([['root', 'Root 3'], ['child', 'Child'], ['leaf', 'Leaf'], ['other', 'Other']]));
+  assert.equal(doc.activeElement?.attrs?.['data-path'], 'other.md', 'focus is on the same row after both rebuilds');
+  assert.equal(doc.activeElement, note('other.md'), 'and it is the row now in the tree');
 });
 test('B15: syncing the active row keeps the outline rows and the search box as the same objects', () => {
   const { view, rows } = outline();

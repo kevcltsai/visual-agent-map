@@ -25,6 +25,7 @@ import {
   type SceneEdge,
   type SceneImage
 } from "./map-export";
+import type { ReferenceOutline } from "./knowledge-refs";
 import type { BracketResult } from "./summary-bracket-geometry";
 import type { CoverFrame } from "./card-cover";
 import type { MapDocument, MapNode } from "../../map-model";
@@ -56,6 +57,8 @@ export interface MapExportPorts extends ExportSceneSource {
   fence(): () => boolean;
   outlineNodes(map: MapDocument): MapNode[];
   outlineSummary(id: string): string;
+  /** Reference lines to add to a Markdown outline; absent or empty when the map holds no usable reference to show. */
+  referenceOutline?(map: MapDocument): Promise<ReferenceOutline>;
   png(svg: string, width: number, height: number, scale: number): Promise<Blob>;
   host(): HTMLElement;
   attachmentPath(name: string, mapPath: string): Promise<string>;
@@ -407,10 +410,13 @@ export async function exportMap(
   try {
     let blob: Blob;
     if (format === "md") {
+      const refs = (await source.referenceOutline?.(map)) ?? { nodes: [], titles: new Map<string, string>() };
+      if (!isCurrent()) return;
+      if (refs.nodes.length) source.notice(t("ui.knowledge_ref_export_notice"));
       const outline = mapOutline(
-        source.outlineNodes(map),
-        id => source.noteTitle(id) ?? "",
-        id => source.outlineSummary(id),
+        [...source.outlineNodes(map), ...refs.nodes],
+        id => refs.titles.get(id) ?? source.noteTitle(id) ?? "",
+        id => (refs.titles.has(id) ? "" : source.outlineSummary(id)),
         map.title
       );
       blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });

@@ -1054,3 +1054,50 @@ test('card tool rows: a full repaint keeps the several-selected class on the new
   const next = src.slice(made, src.indexOf('const overlay = canvas.createDiv', made));
   assert.match(next, /this\.syncToolsVisibility\(\);/, 'the new viewport gets is-multi-selected before cards show');
 });
+
+// V3.3 B28 fix: the selected card's tool row must never sit over its own edge entries ("+ Topic card", "✦ AI card"). Both are
+// counter-scaled below 100% (styles.css), so on screen the pills keep their 22px height, 4px off the card edge, and the
+// column (right/left: two pills, 8px gap) or row (up/down: 74px + 8px + 70px) is centred on the card's side.
+function edgePillRect(card, side, zoom) {
+  const k = zoom * Math.max(1, 1 / zoom), off = 4 * k, cx = (card.left + card.right) / 2, cy = (card.top + card.bottom) / 2;
+  const colH = (22 * 2 + 8) * k, colW = 74 * k, rowW = (74 + 8 + 70) * k, rowH = 22 * k;
+  if (side === 'right') return { left: card.right + off, right: card.right + off + colW, top: cy - colH / 2, bottom: cy + colH / 2 };
+  if (side === 'left') return { left: card.left - off - colW, right: card.left - off, top: cy - colH / 2, bottom: cy + colH / 2 };
+  if (side === 'down') return { left: cx - rowW / 2, right: cx + rowW / 2, top: card.bottom + off, bottom: card.bottom + off + rowH };
+  return { left: cx - rowW / 2, right: cx + rowW / 2, top: card.top - off - rowH, bottom: card.top - off };
+}
+test('B28 fix: at 30%, 41% and 100% the tool row never covers the edge entries in any direction (they are a rect it avoids)', () => {
+  const visible = { left: 0, right: 2000, top: 0, bottom: 1400 }, size = { width: 173, height: 32 };
+  for (const zoom of [0.3, 0.41, 1]) {
+    const w = 280 * zoom, h = 180 * zoom, card = { left: 900, top: 600, right: 900 + w, bottom: 600 + h };
+    const above = { left: card.left, right: card.right, top: card.top - h, bottom: card.top };
+    const below = { left: card.left, right: card.right, top: card.bottom, bottom: card.bottom + h };
+    const beside = { left: card.right + 40 * zoom, right: card.right + 40 * zoom + w, top: card.top, bottom: card.bottom };
+    // Neighbours that push the row onto the entries' side when the entries are not avoided.
+    const crowd = { right: [above, below], left: [above, below, beside], down: [above], up: [] };
+    for (const side of ['right', 'left', 'down', 'up']) {
+      const pill = edgePillRect(card, side, zoom);
+      const row = { left: card.right - 10 * zoom - size.width, right: card.right - 10 * zoom };
+      const spot = inset.chooseCardToolsSpot({ card, row, size, others: crowd[side], controls: [], visible, rightGap: inset.cardToolsSideGap('right', zoom) * zoom, avoid: [pill] });
+      assert.equal(inset.rectsIntersect(spot.rect, pill), false, `${Math.round(zoom * 100)}% ${side}: row ${spot.side} ${JSON.stringify(spot.rect)} covers the entries ${JSON.stringify(pill)}`);
+    }
+  }
+});
+test('B28 fix: the view hands the selected card\'s own edge entries to the tool-row placement (41%, right-growing map)', () => {
+  const { view } = makeView();
+  const canvas = { left: 0, top: 0, right: 1400, bottom: 900 }, zoom = 0.41;
+  const nodes = [{ id: 'c1', x: 0, y: 0 }, { id: 'c2', x: 0, y: 180 }, { id: 'c3', x: 0, y: 360 }, { id: 'c0', x: -360, y: 180 }]
+    .map(n => ({ ...n, path: n.id + '.md', parentId: null }));
+  view.map = { nodes, viewport: { x: 500, y: 300, zoom } };
+  view.viewportEl = { toggleClass() {}, clientWidth: 1400, clientHeight: 900, getBoundingClientRect: () => canvas };
+  view.contentEl = { querySelector: () => null };
+  view.canvasInsets = () => ({ top: 0, right: 0, bottom: 0, left: 0 });
+  const rectOf = node => { const v = view.map.viewport; const left = canvas.left + node.x * v.zoom + v.x, top = canvas.top + node.y * v.zoom + v.y; return { left, top, right: left + 280 * v.zoom, bottom: top + 180 * v.zoom, width: 280 * v.zoom, height: 180 * v.zoom }; };
+  const classes = new Set();
+  const tools = { style: { removeProperty() {}, setProperty() {} }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)), getBoundingClientRect: () => ({ width: 173, height: 32 }) };
+  const c2 = nodes[1];
+  const edge = { getBoundingClientRect: () => edgePillRect(rectOf(c2), 'right', view.map.viewport.zoom) };
+  for (const node of nodes) view.cardEls.set(node.id, { isConnected: true, getBoundingClientRect: () => rectOf(node), querySelector: selector => (selector === ':scope > .vam-node-tools' ? tools : node === c2 && selector === ':scope > .vam-card-edge' ? edge : null) });
+  view.alignCardTools(view.cardEls.get('c2'));
+  assert.equal(classes.has('is-side-right'), false, 'the row is not put beside the card over the "+ Topic card" entries');
+});

@@ -269,6 +269,8 @@ export function chooseCardToolsSpot(input: {
   maxInset?: number;
   /** Screen pixels between the card's right edge and a row placed beside it on the right (default 4). */
   rightGap?: number;
+  /** Rects the row must not cover while another spot is left (the card's own edge entries, V3.3 B28). */
+  avoid?: ScreenRect[];
 }): CardToolsSpot {
   const { card, row, size, others, controls, visible } = input;
   const edge = input.edge ?? 6,
@@ -327,7 +329,10 @@ export function chooseCardToolsSpot(input: {
       candidate.side === "right" ||
       Math.min(candidate.rect.right, card.right) - Math.max(candidate.rect.left, card.left) >= touch
   );
-  const scored = attached.map(candidate => ({
+  // The card's own edge entries stay clickable: a spot over them is taken only when every spot is over them.
+  const avoid = input.avoid ?? [];
+  const clear = attached.filter(candidate => !avoid.some(rect => rectsIntersect(candidate.rect, rect)));
+  const scored = (clear.length ? clear : attached).map(candidate => ({
     ...candidate,
     overlap: others.reduce((total, other) => total + overlapArea(candidate.rect, other), 0),
     blocked:

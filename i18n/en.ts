@@ -1619,6 +1619,14 @@ export const en = {
   "ui.map_chat_do_auto_layout": "Arrange the whole map",
   "ui.map_chat_do_focus_0": "Move the view to “{0}”",
   "ui.map_chat_auto_layout_added": "Arranged the map automatically after adding many topics",
+  "ui.map_chat_added_cards": "Added {0} cards",
+  "ui.map_chat_locate": "Locate ›",
+  "ui.map_chat_scope_all": "This turn may change: every card on this map.",
+  "ui.map_chat_scope_selected_one":
+    "This turn may change: every card on this map; an action that names no card uses the selected card (fixed at send).",
+  "ui.map_chat_scope_selected_0":
+    "This turn may change: every card on this map; an action that names no card uses the {0} selected cards (fixed at send).",
+  "ui.topic_chat_writable": "This turn may change: this card and the cards under it.",
   "ui.map_chat_skip_parent_missing": "the parent topic was not created",
   "ui.map_chat_skip_no_children": "the topic has no subtopics",
   "ui.map_chat_skip_research_running": "research is already running on this map",

@@ -225,7 +225,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import { sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
+import { documentsSnapshot, sourceNodeId, sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -1464,7 +1464,12 @@ export class VisualAgentMapView extends ItemView {
         }
       ),
     noteChange: (node, patch) =>
-      this.noteChange(node, patch, undefined, patch.summary !== undefined || patch.detail !== undefined),
+      this.noteChange(
+        node,
+        patch,
+        undefined,
+        patch.summary !== undefined || patch.detail !== undefined ? true : "lock"
+      ),
     moveTopic: (node, parent) => this.moveTopic(node, parent),
     removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
     chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
@@ -3470,6 +3475,8 @@ export class VisualAgentMapView extends ItemView {
     this.selection.restore(this.branchFocus.selection, branch);
     this.render();
     this.fitCards(branch);
+    // From the command palette the keyboard is left on the page body, where the map's Esc is not heard: give it to the map.
+    this.restoreMapFocusSoon(id);
     return true;
   }
   exitBranchFocus(): boolean {
@@ -7355,8 +7362,8 @@ export class VisualAgentMapView extends ItemView {
     const group = await this.topicReferenceGroup(sources, "strong", { origin: false });
     const mapGroups = await this.readMapSourceGroups(signal);
     const content = mapGroups.length
-      ? `${JSON.stringify(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
-      : JSON.stringify(group.documents);
+      ? `${documentsSnapshot(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
+      : documentsSnapshot(group.documents);
     return { group, mapGroups, content };
   }
   /** Compares the merged summary and Detail with what the sources hold (numbers, links, embeds; no invented numbers). */
@@ -12935,8 +12942,8 @@ export class VisualAgentMapView extends ItemView {
     patch: NotePatch,
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry),
-    /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
-    rejectAiCard = false
+    /** Chat writes: the AI-card refusal (true, content) or only the AI lock ("lock", a rename) is checked on the bytes at the write, not on this view's cached note. */
+    rejectAiCard: boolean | "lock" = false
   ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
@@ -12953,7 +12960,13 @@ export class VisualAgentMapView extends ItemView {
     }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
     // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
-    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+    if (
+      (await this.plugin.repo.updateNoteGuarded(
+        node.path,
+        patch,
+        rejectAiCard === "lock" ? { rejectAiLock: true } : { rejectAiCard }
+      )) === "discarded"
+    )
       return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
@@ -16703,17 +16716,23 @@ export class VisualAgentMapView extends ItemView {
                 );
                 let ready = false;
                 let started = false;
-                await this.plugin.confirmAiUsage(prepared.model, async () => {
-                  if (!currentTrial()) return;
-                  started = true;
-                  ready = await trial.run(prepared.request);
-                });
+                win.setTrialWaiting(true);
+                try {
+                  await this.plugin.confirmAiUsage(prepared.model, async () => {
+                    win.setTrialWaiting(false);
+                    if (!currentTrial()) return;
+                    started = true;
+                    ready = await trial.run(prepared.request);
+                  });
+                } finally {
+                  win.setTrialWaiting(false);
+                }
                 if (!currentTrial() || !ready || !trial.result || this.aiCardOpen?.trial !== trial) {
                   // A try that never started (the user declined the usage question) or was stopped is a cancel, not a failure.
                   if (currentTrial() && started) {
                     invalidateTrial();
                     new Notice(t("ui.living_node_trial_invalid"));
-                    const failed = livingTrialReason(trial.failureCode ?? "");
+                    const failed = livingTrialReason(trial.failure ?? trial.failureCode ?? "");
                     win.showTrialFailure(failed.key, failed.code);
                   }
                   return false;
@@ -21348,7 +21367,7 @@ export class VisualAgentMapView extends ItemView {
           options?.signal
         );
         childSources = await readSources();
-        const sourceSnapshot = JSON.stringify(childSources.documents);
+        const sourceSnapshot = documentsSnapshot(childSources.documents);
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
         const language = this.plugin.settings.language;
@@ -21371,7 +21390,7 @@ export class VisualAgentMapView extends ItemView {
             this.path !== mapPath ||
             this.map?.id !== mapId ||
             childIds() !== startIds,
-          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+          sourcesChanged: async () => documentsSnapshot((await readSources()).documents) !== sourceSnapshot
         };
       },
       onStarted: async () => {
@@ -21976,7 +21995,8 @@ export class VisualAgentMapView extends ItemView {
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
       // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
-      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      // dialog names exactly the ones the run sends (an unnamed one is not sent). An original with an empty title is still
+      // listed, by its note name, so the set sent matches what the save check reads again.
       const refs = this.recombinedRefs(nodes);
       const found = refs.length
         ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
@@ -21986,8 +22006,8 @@ export class VisualAgentMapView extends ItemView {
       const listed = new Map<string, RefResolution>();
       const refNames = refs.flatMap(ref => {
         const resolution = found.get(ref.id);
-        const title = referenceTitle(resolution);
-        if (!title || !resolution) return [];
+        if (!resolution?.ok) return [];
+        const title = referenceTitle(resolution) ?? resolution.notePath.split("/").at(-1)?.replace(/\.md$/, "");
         listed.set(ref.id, resolution);
         return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
       });
@@ -22254,6 +22274,13 @@ export class VisualAgentMapView extends ItemView {
     const notes = await Promise.all(
       sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
     );
+    // The file as the other source paths read it, so a citation of this topic carries its node id and file revision, not those of the text below.
+    const files = await Promise.all(
+      sources.map(async source => {
+        const file = this.app.vault.getAbstractFileByPath(source.path);
+        return file instanceof TFile ? livingNoteForModel(await this.app.vault.read(file)) : undefined;
+      })
+    );
     const documents = sources.map((source, index) => {
       const note = notes[index];
       const finding = note.newFindings.trim();
@@ -22269,7 +22296,10 @@ export class VisualAgentMapView extends ItemView {
       ]
         .filter(Boolean)
         .join("\n\n");
-      return { path: source.path, content };
+      const file = files[index];
+      return file === undefined
+        ? { path: source.path, content }
+        : { path: source.path, content, nodeId: sourceNodeId(file), rev: sourceRevision(file) };
     });
     return {
       id: `mind-map:${this.map?.id ?? "selected"}`,
@@ -22347,7 +22377,7 @@ export class VisualAgentMapView extends ItemView {
       task.options.outputLanguage
     );
     if (
-      JSON.stringify(latest.documents) !== task.sourceContent ||
+      documentsSnapshot(latest.documents) !== task.sourceContent ||
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
@@ -23933,6 +23963,7 @@ export class VisualAgentMapView extends ItemView {
       },
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
+      mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).

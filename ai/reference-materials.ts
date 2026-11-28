@@ -14,6 +14,15 @@ export interface ReferenceDocument {
   /** {@link sourceRevision} of the content; computed when not given. */
   rev?: string;
 }
+/** The key that tells whether the documents a task was given changed: what the model sees, without the citation identity (`nodeId`, `rev`). */
+export function documentsSnapshot(documents: ReferenceDocument[]): string {
+  return JSON.stringify(
+    documents.map(document => {
+      const { nodeId, rev, ...rest } = document;
+      return rest;
+    })
+  );
+}
 export interface ReferenceGroup {
   id: string;
   name: string;
@@ -316,6 +325,8 @@ export function resolveDetailReferences(
   const dropped = new Set<string>();
   lines.forEach((line, index) => {
     if (!code[index]) {
+      // The reply's own definition line for a marker (`[S1]: [[note]] …`, also in a list item or quote): VAM writes that definition, so the line is dropped.
+      if (/^[ \t]*(?:>[ \t]*)*(?:[-*+][ \t]+)?\[S\d+\]:[ \t]*\[\[[^\]]+\]\]/.test(line)) return;
       const definition = sourceFootnoteDefinition(line);
       if (definition) {
         defined.set(definition.label, definition.target);

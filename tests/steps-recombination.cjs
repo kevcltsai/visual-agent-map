@@ -190,6 +190,33 @@ test('P4.6 every reference sent to the AI is named in the synthesis dialog', asy
   }
 });
 
+test('P4.6 a reference whose original has an empty title is listed, sent and the synthesis saves a new card', async () => {
+  const h = await harness();
+  const io = h.repo.knowledgeRefIO.bind(h.repo);
+  h.repo.knowledgeRefIO = () => {
+    const base = io();
+    return { ...base, readNote: async path => { const note = await base.readNote(path); return note && path === h.original.path ? { ...note, title: '' } : note; } };
+  };
+  let dialog = null;
+  h.view.openMapModal = modal => { dialog = modal; return modal; };
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  h.view.openSelectionSynthesis(null);
+  await until(() => dialog);
+  const names = dialog.selectionFlow.names;
+  const failures = [];
+  await dialog.synthesize({ ...options }, 'Combine across domains', message => failures.push(message), () => {});
+  assert.deepEqual(failures, []);
+  assert.equal(h.asks.length, 1);
+  const sent = h.asks[0].referenceGroups.flatMap(group => group.documents).filter(doc => !h.nodes.some(n => n.path === doc.path));
+  assert.equal(sent.map(doc => doc.path).join('\n'), h.original.path, 'the empty-titled original is sent');
+  assert.equal(names.length - h.nodes.length, sent.length, `listed references equal sent ones: ${JSON.stringify(names)}`);
+  for (const doc of sent) {
+    const title = doc.path.split('/').pop().replace(/\.md$/, '');
+    assert.ok(names.some(name => name.includes(title)), `${doc.path} is sent but the dialog lists only ${JSON.stringify(names)}`);
+  }
+  await until(() => h.view.map.nodes.length === 3);
+});
+
 test('P4.6 (F06-x) two recombinations in a row: the new cards never overlap any card, and an untouched card keeps its x and y', async () => {
   const h = await harness();
   const far = await h.repo.createNote('Far', 'gpt-6-luna', h.view.map, HOST, 'workspace');

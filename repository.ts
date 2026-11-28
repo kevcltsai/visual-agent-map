@@ -947,18 +947,22 @@ export class Repository {
       expectedContent?: string;
       /** Unintegrated AI writer: refuse even a flag-only card, using the actual bytes at commit. */
       rejectAiCard?: boolean;
+      /** AI writer whose write is exempt from the Living Node refusal (a chat rename): refuse only a note locked at commit. */
+      rejectAiLock?: boolean;
       /** Gets the file text the callback was given (so a check can look at the text as it is now, not as the caller last read it). */
       authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize, finalize, rejectAiCard, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, rejectAiCard, rejectAiLock, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if (
         rejectAiCard
           ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize(content))
-          : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))
+          : rejectAiLock
+            ? this.aiWriteBlocked(content, expectedContent, () => !authorize || authorize(content))
+            : (expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))
       ) {
         outcome = "discarded";
         return content;

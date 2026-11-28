@@ -1380,7 +1380,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
-      const adapter = withAtomicReplace(this.app.vault.adapter);
+      const adapter = withAtomicReplace(this.app.vault.adapter, (path, error) =>
+        this.logs.appendLog(
+          "warn",
+          `${path}: atomic replace failed, used remove and rename: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
       this.exchanges = new AiExchangeLog(adapter, normalizePath(`${this.manifest.dir}/ai-exchanges.json`), error =>
         this.logs.appendLog(
           "error",

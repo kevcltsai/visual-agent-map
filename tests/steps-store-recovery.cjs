@@ -214,3 +214,34 @@ test('replace failing falls back to remove+rename and still publishes', async ()
   assert.equal(f.files.get(path), second);
   assert.equal(f.files.has(temporary), false);
 });
+
+// DX-atomic: the desktop replace really renames on disk (argument order, full paths) and reports a failed replace once per path.
+test('withAtomicReplace: renames the temp over the existing primary on a real file system; a failure is reported once', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const { join } = require('node:path');
+  const { withAtomicReplace } = load('store-fs-adapter.ts');
+  const base = fs.mkdtempSync(join(os.tmpdir(), 'vam-store-'));
+  try {
+    const full = p => join(base, p);
+    const fallbacks = [];
+    const adapter = withAtomicReplace({
+      exists: async p => fs.existsSync(full(p)),
+      read: async p => fs.readFileSync(full(p), 'utf8'),
+      write: async (p, d) => fs.writeFileSync(full(p), d),
+      rename: async (a, b) => fs.renameSync(full(a), full(b)),
+      remove: async p => fs.rmSync(full(p)),
+      getFullPath: full
+    }, (path, error) => fallbacks.push([path, error.code]));
+    fs.writeFileSync(full('s.json'), '{"v":1}');
+    await writeStoreAtomically(adapter, 's.json', '{"v":2}');
+    assert.equal(fs.readFileSync(full('s.json'), 'utf8'), '{"v":2}');
+    assert.equal(fs.existsSync(full('s.json.tmp')), false);
+    await assert.rejects(adapter.replace('missing.tmp', 's.json'));
+    await assert.rejects(adapter.replace('missing.tmp', 's.json'));
+    assert.deepEqual(fallbacks, [['s.json', 'ENOENT']], 'one report per path');
+    assert.equal(fs.readFileSync(full('s.json'), 'utf8'), '{"v":2}', 'a failed replace leaves the primary as it was');
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});

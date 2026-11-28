@@ -287,3 +287,20 @@ test('tx.createNote: a failed step takes back the note it made', async () => {
   assert.deepEqual(before, h.notesIn('Notes').filter(p => !h.trashed.includes(p)));
   assert.equal((await h.repo.readMap(MAP)).nodes.some(n => n.id === 'made-1'), false);
 });
+
+test('tx.createNote: a rollback that fails to rebuild the derived data throws rollback-failed and keeps every created note', async () => {
+  const h = await harness();
+  const plugin = h.view.plugin;
+  const rebuild = plugin.rebuildDerivedData;
+  const spy = plugin.repo;
+  const save = spy.saveMap;
+  let calls = 0;
+  spy.saveMap = async (...args) => { calls += 1; const out = await save.apply(spy, args); if (calls === 1) throw new Error('injected saveMap 1'); return out; };
+  plugin.rebuildDerivedData = async () => { throw new Error('injected rebuild'); };
+  const error = await h.rejected(h.view.beginMapTransaction().createNote('k', newCard(h)).editMap(MAP, listMade(h)).commit());
+  plugin.rebuildDerivedData = rebuild;
+  spy.saveMap = save;
+  assert.equal(error.kind, 'rollback-failed');
+  assert.equal(h.notesIn('Notes').filter(p => /Made/.test(p)).length, 1, 'the created note file stays for the retry');
+  assert.equal(h.trashed.length, 0, 'nothing was trashed');
+});

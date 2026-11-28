@@ -916,7 +916,7 @@ test('popover prefill: a card with only a Prompt (no `ai-card`) opens with its q
 });
 
 test('popover room (D1-x10): a pane squeezed under 320px by Obsidian side panels folds them, left first, until the editor fits; a wide pane folds nothing', async () => {
-  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; } });
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
   const narrow = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
   const left = dock(), right = dock();
   narrow.view.app.workspace = { ...narrow.view.app.workspace, leftSplit: left, rightSplit: right };
@@ -931,6 +931,35 @@ test('popover room (D1-x10): a pane squeezed under 320px by Obsidian side panels
   wide.overlay.clientWidth = 504;
   wide.view.openAiCardPopover(wide.node('A'));
   assert.deepEqual([l2.collapsed, r2.collapsed], [false, false], 'a pane with room keeps both panels');
+});
+
+test('popover room (D1-x10b): a panel the user opens again while the editor is open is never folded again', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 42;
+  h.view.openAiCardPopover(h.node('A'));
+  h.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'both panels folded once to make room');
+  left.expand();
+  right.expand();
+  h.view.makeRoomForAiCard();
+  h.view.makeRoomForAiCard();
+  assert.deepEqual([left.collapsed, right.collapsed], [false, false], 'the user reopened both: the next resizes leave them open');
+});
+
+test('popover room (D1-x10b): closing the editor reopens only the panel it folded, not one the user folded', async () => {
+  const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(true), right = dock(false);
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 42;
+  h.view.openAiCardPopover(h.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'the user had folded the left; the editor folds the right');
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'closing reopens the right only; the user\'s left fold stays');
 });
 
 test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {

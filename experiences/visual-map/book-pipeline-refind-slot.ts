@@ -104,6 +104,7 @@ export class BookRefindSlot {
 
   private done(result: RefindResult): void {
     if (result.kind === "none") return this.ports.notice(t("ui.book_refind_none"));
+    if (result.kind === "failed") return this.ports.notice(t("ui.book_refind_service_down"));
     this.lastUndo = result;
     this.undoNotice?.hide();
     this.undoNotice = this.ports.noticeAction(

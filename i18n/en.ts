@@ -3190,6 +3190,7 @@ export const en = {
   "ui.book_refind_started": "Looking for another picture. Choose the menu item again to stop.",
   "ui.book_refind_done": "The picture was replaced",
   "ui.book_refind_none": "No other fitting picture was found. The chapter was not changed.",
+  "ui.book_refind_service_down": "The picture service did not answer. Try again later. The chapter was not changed.",
   "ui.book_refind_timeout": "The search took too long. The chapter was not changed.",
   "ui.book_refind_cancelled": "Stopped. The chapter was not changed.",
   "ui.book_refind_failed_0": "The picture search failed ({0}). The chapter was not changed.",

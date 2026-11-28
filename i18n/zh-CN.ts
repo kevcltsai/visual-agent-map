@@ -2995,6 +2995,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_refind_started": "正在找另一张图。再选一次菜单项可停止。",
   "ui.book_refind_done": "已换成另一张图",
   "ui.book_refind_none": "没有找到其他合适的图，章节没有改动。",
+  "ui.book_refind_service_down": "找图服务没有回应，请稍后再试。章节没有改动。",
   "ui.book_refind_timeout": "找图用时太久，章节没有改动。",
   "ui.book_refind_cancelled": "已停止，章节没有改动。",
   "ui.book_refind_failed_0": "找图失败（{0}），章节没有改动。",

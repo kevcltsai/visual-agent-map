@@ -428,6 +428,12 @@ interface PictureSearch {
   drawnDiagrams: Map<number, SlotDiagram>;
   commonsCut: Set<number>;
   commonsAsked: number;
+  /**
+   * Search calls asked (the finder's and Commons' requests) and how many of them answered: none of several answered is a provider that
+   * failed (sign-in, connection), not a search that found nothing. Only the refind reads it; the fill keeps its own handling.
+   */
+  searchesAsked: number;
+  searchesAnswered: number;
   commonsLimited: boolean;
   commonsNoHint: number;
   commonsRejected: Partial<Record<CommonsRejection, number>>;
@@ -1275,9 +1281,13 @@ export interface NotesApplyResult {
   refused?: { id: string; reason: string }[];
 }
 
-/** What one refind job did: nothing found (nothing written), or the swap it wrote with the chapter's text before and after (the undo's input). */
+/**
+ * What one refind job did: nothing found, every search call failed (the picture service did not answer; not the same as "none"), both
+ * writing nothing, or the swap it wrote with the chapter's text before and after (the undo's input).
+ */
 export type RefindResult =
   | { kind: "none" }
+  | { kind: "failed"; reason: "search_failed" }
   | { kind: "replaced"; path: string; before: string; after: string; swap: FigureSwap; language: string };
 
 export class BookPipelineRuns {
@@ -2675,7 +2685,7 @@ export class BookPipelineRuns {
       );
     try {
       const result = await this.runRefind(mapPath, nodeId, url, job, runId);
-      line(result.kind === "replaced" ? "ok" : "none");
+      line(result.kind === "replaced" ? "ok" : result.kind === "failed" ? result.reason : "none");
       return result;
     } catch (error) {
       line(error instanceof BookPipelineRunError ? error.code : internalCode(error));
@@ -2801,7 +2811,10 @@ export class BookPipelineRuns {
     refuseIfGone();
     const outcome = choosePictures([slot], found.perSlot, taken, language).get(slot.index);
     const figure = outcome && "figure" in outcome ? outcome.figure : undefined;
-    if (!figure) return { kind: "none" };
+    if (!figure)
+      return found.searchesAsked > 0 && found.searchesAnswered === 0
+        ? { kind: "failed", reason: "search_failed" }
+        : { kind: "none" };
     const to = figureLines(figure, block.lines[0].endsWith("\r"));
     // The exit check: the new lines may show this one picture and nothing else.
     if (this.exitCheck(to.join("\n"), new Set([figure.href]))) throw new Error("slots_unsafe");
@@ -5741,8 +5754,9 @@ export class BookPipelineRuns {
       avoid: readonly string[]
     ): Promise<FoundImages | undefined> => {
       if (!list.length || !this.ports.findImages) return undefined;
+      searchesAsked++;
       try {
-        return await untilAborted(
+        const answer = await untilAborted(
           signal,
           this.ports.findImages(
             {
@@ -5755,6 +5769,8 @@ export class BookPipelineRuns {
             { signal, admission: drive.admission }
           )
         );
+        if (answer) searchesAnswered++;
+        return answer;
       } catch (error) {
         if (isBudgetExhausted(error)) throw error;
         if (signal.aborted) throw error;
@@ -5808,6 +5824,8 @@ export class BookPipelineRuns {
       for (const [index, hint] of from?.hints ?? []) hints.set(index, { ...hints.get(index), ...hint });
     };
     let commonsAsked = 0;
+    let searchesAsked = 0;
+    let searchesAnswered = 0;
     let commonsLimited = false;
     const commonsCut = new Set<number>();
     let commonsNoHint = 0;
@@ -6035,6 +6053,8 @@ export class BookPipelineRuns {
           }
         );
         commonsAsked = commons.requests;
+        searchesAsked += commons.requests;
+        searchesAnswered += commons.answered;
         commonsLimited = commons.limited;
         commonsRejected = commons.rejected;
         for (const index of commons.cut) commonsCut.add(index);
@@ -6155,6 +6175,8 @@ export class BookPipelineRuns {
       drawnDiagrams,
       commonsCut,
       commonsAsked,
+      searchesAsked,
+      searchesAnswered,
       commonsLimited,
       commonsNoHint,
       commonsRejected,

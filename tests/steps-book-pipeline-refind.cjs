@@ -144,11 +144,25 @@ test('refind: swaps only the picture block, its Sources entry, its slot record i
   assert.ok(!/wikimedia|SecretRootTitle/.test(r.stat.logs.filter(l => l.includes('refind_slot')).join('\n')));
 });
 
-test('refind: nothing found, a failed search, a failed backup or a cancel write nothing', async () => {
+test('refind: nothing found, a failed search (failed, not none: behaviour fix of the G03 review), a failed backup or a cancel write nothing', async () => {
+  const plain = async p => JSON.parse(JSON.stringify(await p));
   const cases = [
-    ['none', { again: () => found({}) }, async r => assert.deepEqual(JSON.parse(JSON.stringify(await r.refind())), { kind: 'none' })],
-    // The fill's own search takes a provider failure as "found nothing" (existing behaviour), so a failed search is a none, not a throw.
-    ['fail', { again: () => { throw new Error('provider down'); } }, async r => assert.deepEqual(JSON.parse(JSON.stringify(await r.refind())), { kind: 'none' })],
+    ['none', { again: () => found({}) }, async r => assert.deepEqual(await plain(r.refind()), { kind: 'none' })],
+    // Every search call failed (sign-in, connection): the picture service did not answer, which is not "no other picture" (G03 review M1).
+    ['fail', { again: () => { throw new Error('provider down'); } }, async r => {
+      assert.deepEqual(await plain(r.refind()), { kind: 'failed', reason: 'search_failed' });
+      assert.match(r.stat.logs.join('\n'), /refind_slot .*result=search_failed/);
+    }],
+    ['fail, Commons fails too', { again: () => { throw new Error('provider down'); } }, async r => {
+      let asked = 0;
+      r.ports.fetchCommons = async () => { asked++; throw new Error('offline'); };
+      assert.deepEqual(await plain(r.refind()), { kind: 'failed', reason: 'search_failed' });
+      assert.ok(asked > 0, 'Commons was asked');
+    }],
+    ['fail, Commons answers with nothing', { again: () => { throw new Error('provider down'); } }, async r => {
+      r.ports.fetchCommons = async () => ({ status: 200, text: '{}' });
+      assert.deepEqual(await plain(r.refind()), { kind: 'none' }, 'one search answered: nothing found, not a failure');
+    }],
     ['backup', { backup: () => ({ ok: false }) }, async r => assert.rejects(r.refind(), refusal('backup_failed'))],
     ['cancel during the search', { again: (req, run) => new Promise((_, reject) => run.signal.addEventListener('abort', () => reject(new Error('aborted')))) }, async r => {
       const ac = new AbortController();
@@ -191,6 +205,52 @@ test('refind: a chapter changed during the search (the picture lines edited) is 
   const r = await rig({ again: async () => { await r.repo.updateNoteRawGuarded(r.path, text => text.replace('Caption 1', 'My own caption'), { authorize: () => true }); return found({ 1: [cand(3)] }); } });
   await assert.rejects(r.refind(), refusal('stale'));
   assert.ok(r.raw().includes('My own caption') && r.raw().includes(`![Work 1](${URL1})`) && !r.raw().includes(URL3));
+});
+
+test('refind: what changed while the search ran is re-checked after it, and each refusal writes nothing (G03 review M2)', async () => {
+  const swapAt = async (r, change) => { await change(r); return found({ 1: [cand(3)] }); };
+  const cases = [
+    ['the run was replaced (other runId)', 'stale', r => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.runId = 'run-other'; })],
+    ['the card left the order', 'stale', r => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.removed = [...(d.bookPipeline.removed ?? []), r.nodes[0].id]; })],
+    ['the card points at another path', 'stale', r => r.repo.updateMap(r.mapPath, d => { d.nodes.find(n => n.id === r.nodes[0].id).path = 'Elsewhere/moved.md'; })],
+    ['the chapter got ai-locked during the search', 'ai_locked', r => { r.locked = () => true; }]
+  ];
+  for (const [name, code, change] of cases) {
+    let r;
+    r = await rig({ again: () => swapAt(r, change) });
+    const before = r.raw();
+    r.writes = 0;
+    await assert.rejects(r.refind(), refusal(code), name);
+    assert.equal(r.stat.searches.length, 1, `${name}: the search did run`);
+    assert.equal(r.raw(), before, `${name}: the chapter is byte for byte as it was`);
+    assert.equal(r.writes, 0, `${name}: no write`);
+    assert.equal(r.runs.isApplyingNotes(r.mapPath), false, `${name}: the slot is free again`);
+  }
+  // A cancel that comes while the writer waits: the transform's own gate leaves the text as it is (the writer writes nothing).
+  const w = await rig();
+  const before = w.raw();
+  const ac = new AbortController();
+  const write = w.ports.notes.write;
+  const answers = [];
+  w.ports.notes.write = async (p, tr) => { ac.abort(); const out = await write(p, tr); answers.push(out); return out; };
+  await assert.rejects(w.refind(URL1, { signal: ac.signal }), refusal('cancelled'));
+  assert.deepEqual(answers, ['unchanged'], 'the writer was reached and changed nothing');
+  assert.equal(w.raw(), before);
+});
+
+test('refind: refused at once while a drive runs on the map (drive_running): no backup, no search, no write', async () => {
+  const r = await rig();
+  const before = r.raw();
+  const backups = r.stat.backups.length;
+  r.writes = 0;
+  // A drive of the map holds it (registered at once by start; held at its first map read, so it writes nothing itself): refused first.
+  r.ports.readMap = () => new Promise(() => {});
+  void r.runs.start(r.mapPath).catch(() => undefined);
+  assert.equal(r.runs.isRunning(r.mapPath), true, 'a drive is running');
+  await assert.rejects(r.refind(), refusal('drive_running'));
+  assert.ok(!r.stat.logs.some(l => l.includes('refind_slot')), 'refused before the job starts');
+  assert.equal(r.stat.searches.length, 0); assert.equal(r.stat.backups.length, backups); assert.equal(r.writes, 0);
+  assert.equal(r.raw(), before);
 });
 
 test('refind: a picture the reader put in (or one not in the record) is refused as not_slot, before any call or backup', async () => {
@@ -386,6 +446,11 @@ test('controller: press runs, a second press cancels (no write), the 3-minute li
   const s = ctlRig(async () => { throw Object.assign(new Error('x'), { code: 'not_slot' }); });
   s.ctl.press('p', URL1); await settle();
   assert.equal(s.notices.at(-1), 'refused:not_slot');
+  const down = ctlRig(async () => ({ kind: 'failed', reason: 'search_failed' }));
+  down.ctl.press('p', URL1); await settle();
+  assert.equal(down.notices.at(-1), t('ui.book_refind_service_down'));
+  assert.notEqual(t('ui.book_refind_service_down'), t('ui.book_refind_none'));
+  assert.equal(down.actions.length, 0); assert.equal(down.ctl.canUndo(), false);
   const n = ctlRig(async () => ({ kind: 'none' }));
   n.ctl.press('p', URL1); await settle();
   assert.equal(n.notices.at(-1), t('ui.book_refind_none'));

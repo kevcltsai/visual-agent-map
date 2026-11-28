@@ -11027,8 +11027,15 @@ export class VisualAgentMapView extends ItemView {
     // several topics are picked or the notes load. Without edit rights only the image's own menu answers; the rest stays shut.
     // Safe only while openImageMenu greys its writing rows in every state where canEditCanvasItems() is false: a new
     // condition there must also set the image menu's `off` reason.
+    // V3.3 G04-z: a card answers too while the notes load (its ⋯ list opens then, writing rows greyed); in topic selection
+    // the card has no ⋯, so it gets no menu either.
     viewport.addEventListener("contextmenu", event => {
-      if (this.canEditCanvasItems() || (event.target as Element | null)?.closest?.(".vam-canvas-image"))
+      const target = event.target as Element | null;
+      if (
+        this.canEditCanvasItems() ||
+        target?.closest?.(".vam-canvas-image") ||
+        (this.cardMenuWhileLoading() && target?.closest?.(".vam-node"))
+      )
         this.onCanvasContextMenu(event);
     });
     if (!this.canEditCanvasItems()) return;
@@ -11744,6 +11751,10 @@ export class VisualAgentMapView extends ItemView {
     const node = id ? this.map?.nodes.find(item => item.id === id) : undefined;
     if (node) this.cardKeyAction("toggle-collapse", node)?.();
   }
+  /** True while the notes load on a map shown for editing: a card's list still opens, its writing rows greyed (the toolbar draws no ⋯ in topic selection, so no menu there). */
+  private cardMenuWhileLoading(): boolean {
+    return !!this.map && !this.presentation && this.notesLoading() && !this.selection.state.multiSelectMode;
+  }
   private onCanvasContextMenu(event: MouseEvent): void {
     const hit = event.target as Element | null;
     const refEl = hit?.closest?.<HTMLElement>(".vam-knowledge-ref");
@@ -11774,8 +11785,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const card = hit?.closest?.<HTMLElement>(".vam-node");
     // While the notes load one card's list still opens, its rows that write greyed with the reason (decision #35, P1.1).
-    const loadingCard =
-      !!this.map && !this.presentation && this.notesLoading() && !this.selection.state.multiSelectMode;
+    const loadingCard = this.cardMenuWhileLoading();
     if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && (this.canEditSummary() || loadingCard)) {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
       if (cardId) {

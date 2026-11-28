@@ -745,6 +745,9 @@ export const en = {
   "ui.annotated_image_label_preview_0_1": "{0}. {1} anchor(s) in the plan preview.",
   "ui.annotated_image_preview_note":
     "Dashed dots are where the plan would put anchors. They are only placed when you press Apply.",
+  "ui.annotated_image_label_move_0_1": "{0}. Plan preview: {1} anchor(s) would move.",
+  "ui.annotated_image_move_note":
+    "The dashed dot is where the plan would move the anchor; the line starts at where it is now. It only moves when you press Apply.",
   "ui.annotated_image_convert": "Convert to annotated image…",
   "ui.annotated_image_open_original": "Open original file",
   "ui.annotated_image_delete_plain": "Delete image",

@@ -1336,6 +1336,7 @@ export class VisualAgentMapView extends ItemView {
     anchors: { imageId: string; x: number; y: number; note: string }[];
     cards?: PlanGhostSpec[];
     relations?: PlanGhostRelation[];
+    moves?: { imageId: string; anchorId: string; x: number; y: number }[];
   } | null = null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
@@ -8272,10 +8273,27 @@ export class VisualAgentMapView extends ItemView {
     if (!preview || preview.token !== this.chatPlanToken) return [];
     return preview.anchors.filter(a => a.imageId === imageId && Number.isFinite(a.x) && Number.isFinite(a.y));
   }
+  /**
+   * The anchors the pending plan would move on this image: only those still on the picture with a 2D position (an anchor deleted
+   * since is not drawn), each with where it is now.
+   */
+  private previewMovesOf(image: AnnotatedImageItem): { x: number; y: number; from: { x: number; y: number } }[] {
+    const preview = this.chatPreview;
+    if (!preview?.moves || preview.token !== this.chatPlanToken) return [];
+    return preview.moves.flatMap(move => {
+      if (move.imageId !== image.id || !Number.isFinite(move.x) || !Number.isFinite(move.y)) return [];
+      const anchor = image.anchors.find(entry => entry.id === move.anchorId);
+      return anchor && isImage2dAnchor(anchor)
+        ? [{ x: move.x, y: move.y, from: { x: anchor.at.x, y: anchor.at.y } }]
+        : [];
+    });
+  }
   private annotatedLabel(image: AnnotatedImageItem, name: string): string {
     const previewed = this.previewAnchorsOf(image.id).length;
-    const base = t("ui.annotated_image_label", image.note || name);
-    return previewed ? t("ui.annotated_image_label_preview_0_1", base, previewed) : base;
+    const moved = this.previewMovesOf(image).length;
+    let label = t("ui.annotated_image_label", image.note || name);
+    if (previewed) label = t("ui.annotated_image_label_preview_0_1", label, previewed);
+    return moved ? t("ui.annotated_image_label_move_0_1", label, moved) : label;
   }
   private annotatedCountText(image: AnnotatedImageItem): string {
     const previewed = this.previewAnchorsOf(image.id).length;
@@ -8290,19 +8308,49 @@ export class VisualAgentMapView extends ItemView {
   private paintAnchorPreview(el: HTMLElement, image: AnnotatedImageItem, name: string): void {
     for (const old of Array.from(el.querySelectorAll(".is-preview"))) old.remove();
     for (const old of Array.from(el.querySelectorAll(".vam-anchor-preview-note"))) old.remove();
+    for (const old of Array.from(el.querySelectorAll(".vam-anchor-move-link"))) old.remove();
     const preview = this.previewAnchorsOf(image.id);
+    const moves = this.previewMovesOf(image);
     el.querySelector(".vam-annotated-count")?.setText(this.annotatedCountText(image));
     el.setAttr("aria-label", this.annotatedLabel(image, name));
-    if (!preview.length) return;
+    if (!preview.length && !moves.length) return;
+    // Numbers only, clamped to the picture.
+    const pct = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 1e6) / 1e4;
     for (const point of preview) {
       const dot = el.createSpan("vam-anchor is-preview");
       dot.setAttr("aria-hidden", "true");
-      dot.style.left = `${Math.round(Math.min(1, Math.max(0, point.x)) * 1e6) / 1e4}%`;
-      dot.style.top = `${Math.round(Math.min(1, Math.max(0, point.y)) * 1e6) / 1e4}%`;
+      dot.style.left = `${pct(point.x)}%`;
+      dot.style.top = `${pct(point.y)}%`;
+    }
+    for (const move of moves) {
+      // A light line from where the anchor is (it stays there) to the dashed dot; the picture's own box is its 0-100 space.
+      const link = el.createSpan("vam-anchor-move-link");
+      link.setAttr("aria-hidden", "true");
+      const svg = createSvg("svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      const line = createSvg("line");
+      line.setAttribute("x1", String(pct(move.from.x)));
+      line.setAttribute("y1", String(pct(move.from.y)));
+      line.setAttribute("x2", String(pct(move.x)));
+      line.setAttribute("y2", String(pct(move.y)));
+      svg.appendChild(line);
+      link.appendChild(svg);
+      const dot = el.createSpan("vam-anchor is-preview is-move-target");
+      dot.setAttr("aria-hidden", "true");
+      dot.style.left = `${pct(move.x)}%`;
+      dot.style.top = `${pct(move.y)}%`;
     }
     const note = el.createDiv("vam-anchor-preview-note");
     note.setAttr("aria-hidden", "true");
-    note.setText(t("ui.annotated_image_preview_note"));
+    note.setText(
+      [
+        preview.length ? t("ui.annotated_image_preview_note") : "",
+        moves.length ? t("ui.annotated_image_move_note") : ""
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
   }
   /** Brings the dashed dots on the canvas in line with the pending plan, without a full render (so the focus stays put). */
   private syncAnchorPreview(): void {
@@ -23349,10 +23397,16 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       chain: () => this.chatChainRunner,
       plans: () => this.chatRecordSession.plans,
-      showPreview: (token, anchors, cards, relations = []) => {
+      showPreview: (token, anchors, cards, relations = [], moves = []) => {
         this.chatPreview =
-          anchors.length || cards.length || relations.length
-            ? { token, anchors, ...(cards.length ? { cards } : {}), ...(relations.length ? { relations } : {}) }
+          anchors.length || cards.length || relations.length || moves.length
+            ? {
+                token,
+                anchors,
+                ...(cards.length ? { cards } : {}),
+                ...(relations.length ? { relations } : {}),
+                ...(moves.length ? { moves } : {})
+              }
             : null;
         this.syncAnchorPreview();
         this.paintPlanGhosts();

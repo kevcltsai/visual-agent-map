@@ -701,6 +701,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.annotated_image_anchor_count_preview_0_1": "{0} 個錨點・預覽 {1} 個",
   "ui.annotated_image_label_preview_0_1": "{0}。計畫預覽中有 {1} 個錨點。",
   "ui.annotated_image_preview_note": "虛線點 = 計畫裡的錨點位置，按「套用」後才會真的放上去",
+  "ui.annotated_image_label_move_0_1": "{0}。計畫預覽中有 {1} 個錨點會移動。",
+  "ui.annotated_image_move_note": "虛線點 = 計畫要把錨點移到的位置，連線起點是它現在的位置，按「套用」後才會真的移動",
   "ui.annotated_image_convert": "轉成標註圖…",
   "ui.annotated_image_open_original": "開啟原始檔",
   "ui.annotated_image_delete_plain": "刪除圖片",

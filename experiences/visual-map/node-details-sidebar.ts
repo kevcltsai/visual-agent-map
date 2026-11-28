@@ -1,5 +1,6 @@
 import { MarkdownView, View, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { t } from "../../i18n";
+import type { LivingChangeSummary } from "./living-node-changes";
 import { LIVING_READER_VIEW, LivingReaderView } from "./living-node-reader";
 
 /** Owns the right-hand topic details pane. The plugin shell only forwards requests to this controller. */
@@ -89,7 +90,8 @@ export class NodeDetailsSidebar {
     markdown: string,
     owner: string,
     isCurrent: () => boolean,
-    warnings: readonly string[] = []
+    warnings: readonly string[] = [],
+    changes?: LivingChangeSummary
   ): Promise<boolean> {
     const revision = this.revision;
     const current = (): boolean => revision === this.revision && this.trialOwner === owner && isCurrent();
@@ -109,7 +111,7 @@ export class NodeDetailsSidebar {
         return false;
       }
       if (!(leaf.view instanceof LivingReaderView)) throw new Error(t("ui.unable_to_open_the_right_details_sidebar"));
-      await leaf.view.show(file, markdown, owner, warnings);
+      await leaf.view.show(file, markdown, owner, warnings, false, changes);
       if (!current()) return false;
       await this.app().workspace.revealLeaf(leaf);
       return current();

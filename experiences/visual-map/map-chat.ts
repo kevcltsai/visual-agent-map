@@ -3154,8 +3154,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
           clip(picture.kind === "annotated" ? name : picture.name)
         )
       });
-      // Only an annotated picture goes along; an ordinary one is never sent.
-      if (picture.kind === "annotated")
+      // Only an annotated picture goes along; an ordinary one is never sent, nor one the model cannot read (the notice says so).
+      if (picture.kind === "annotated" && !this.imageNotice())
         chip.createSpan({ cls: "vam-map-chat-chip-sent", text: t("ui.map_chat_image_sent") });
     }
     const unreadable = this.imageNotice();

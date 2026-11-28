@@ -6639,6 +6639,16 @@ test('G05 no image input: the explanation shows under the chip at once, Send is 
   f.parts.send().click(); assert.equal(f.calls.send, 1);
 });
 
+test('G05-x no image input: the chip does not say the picture goes to the AI while the model cannot read it; it says so again once it can', () => {
+  const state = { notice: 'This model cannot read pictures. Pick another model or select no picture. Nothing was sent.' };
+  const f = imageHostFixture(undefined, { imageNotice: () => state.notice });
+  const sent = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-sent')).map(i => i.text);
+  f.panel.refreshSelection();
+  assert.deepEqual(sent(), [], 'no "goes to the AI" next to "cannot read pictures"');
+  state.notice = null; f.panel.refreshSelection();
+  assert.deepEqual(sent(), ['This image goes to the AI']);
+});
+
 test('P4a switch: a named group of two aria-pressed buttons, only while a picture is chosen; clicking switches, remembers through the host, and a second click on the same button changes nothing', () => {
   const f = imageHostFixture(null);
   assert.equal(f.modeEl().hidden, true, 'no picture: no switch');

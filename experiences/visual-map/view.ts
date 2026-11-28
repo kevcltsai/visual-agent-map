@@ -23336,6 +23336,7 @@ export class VisualAgentMapView extends ItemView {
       },
       clearPreview: () => this.clearChatPreview(),
       applyBlock: anchor => this.chatPlanBlock(anchor),
+      mergeBlock: ids => (ids.some(id => this.isMerging(id)) ? t("ui.merge_locked") : null),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).

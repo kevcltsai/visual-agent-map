@@ -6529,6 +6529,33 @@ test('E3 gate: a plan whose map is read-only shows Apply greyed with the reason;
   assert.equal(applied, 1, 'applied once');
 });
 
+// ---- V3.3 F07a: suggested relations on the plan card, each with its own Adopt ----------------------------------------------------
+test('F07a card: the heading, one row per suggestion with "Reason: … Source: …" and Adopt; a blocked row is greyed with why; Adopt once; untrusted text stays text', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  let adopted = 0; let block = null;
+  const evil = '<img src=x onerror=alert(1)>';
+  const rows = [
+    { text: 'Link “A” to “B” (Prerequisite)', reason: 'B builds on A.', source: '[S1]', state: 'pending', blocked: () => block, adopt() { adopted++; rows[0].state = 'adopted'; } },
+    { text: 'Link “A” to “C” (Related)', reason: evil, source: evil, state: 'pending', blocked: () => null, adopt() {} }
+  ];
+  f.panel.showPlan({ reasons: [], items: [], estimate: 'e', state: 'pending', noApply: true, suggestions: rows, apply() { throw new Error('no apply'); }, cancel() {} });
+  const texts = () => findAll(f.panel.logEl, i => i.hasClass?.('vam-map-chat-suggestions')).flatMap(box => findAll(box, i => typeof i.text === 'string' && i.text).map(i => i.text));
+  assert.ok(texts().includes('Suggested relations (at most 5)'), 'the heading');
+  assert.ok(texts().includes('Reason: B builds on A. Source: [S1]'));
+  assert.equal(f.panel.logEl.querySelector('.vam-map-chat-plan-apply'), null, 'no Apply');
+  assert.equal(findAll(f.panel.logEl, i => i.tag === 'img' || i.tag === 'script').length, 0, 'text, never an element');
+  const buttons = () => findAll(f.panel.logEl, i => i.hasClass?.('vam-map-chat-suggestion-adopt'));
+  assert.deepEqual(buttons().map(b => b.text), ['Adopt', 'Adopt']);
+  block = 'Apply is off: the map is read-only while it is presented.'; f.panel.refreshPlan();
+  assert.equal(buttons()[0].disabled, true, 'greyed'); assert.ok(texts().includes(block), 'with the reason');
+  block = null; f.panel.refreshPlan();
+  const first = buttons()[0]; first.click(); first.click();
+  assert.equal(adopted, 1, 'adopted once');
+  f.panel.refreshPlan();
+  assert.ok(texts().includes('Adopted')); assert.equal(buttons().length, 1, 'the adopted row has no button');
+});
+
 // ---- persona G12: a move_topic without beforeId leaves no hole in the old branch (real Lane L coordinates: parent above, old parent below) ----
 integrationTest('persona G12: moving a card with its own branch up under another parent pulls the old parent\'s other children up to it, no big hole', async () => {
   const h = await harness(); await h.view.hydrate();
@@ -6900,7 +6927,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 33 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 34 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');

@@ -10,6 +10,7 @@ import {
 import type { MapChatContext } from "../../core/map-chat-context";
 import { CHAT_PLAN_GROUP_ORDER, chatPlanGroupOf } from "../../core/map-chat-layout";
 import {
+  estimateChatCalls,
   planFor,
   researchTargetsOf,
   keepPastedVideoUrls,
@@ -29,6 +30,7 @@ import type {
   MapChatPanel,
   MapChatPlanCard,
   MapChatSteer,
+  MapChatSuggestionRow,
   MapChatTurnHandle
 } from "./map-chat";
 import { newChatWork, type ChatChainRun, type ChatRoundWork, type MapChatChainRunner } from "./map-chat-chain-run";
@@ -120,6 +122,8 @@ export interface MapChatConversationPorts {
   clearPreview(): void;
   /** Why the plan made for `anchor` cannot be applied now (its map is not the open one, or the map is read-only here); null = it can. */
   applyBlock(anchor: { path: string; id: string | undefined }): string | null;
+  /** Why a change to these cards cannot be made now (one of them is merging); null = it can. */
+  mergeBlock(ids: readonly string[]): string | null;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
   /** `selection`: the cards selected when the message was sent (what an action that names no card works on). */
   actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>, selection?: readonly string[]): string;
@@ -263,8 +267,21 @@ export class MapChatConversation {
       action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
     );
     // The cards and relations the plan would make are drawn as a dashed preview (V3.3 E3); the text list below stays the full account.
+    // A suggested relation is a dashed line too, until it is adopted.
     const ghosts = planGhostSpecs(result.actions);
-    this.ports.showPreview(token, anchorsToPlace, ghosts, planGhostRelations(result.actions));
+    const suggested = (result.suggestions ?? []).map((suggestion): MapChatAction => ({
+      kind: "add_relation",
+      fromId: suggestion.fromId,
+      toId: suggestion.toId,
+      relationKind: suggestion.relationKind
+    }));
+    const rows: MapChatSuggestionRow[] = [];
+    const drawPreview = (): void =>
+      this.ports.showPreview(token, anchorsToPlace, ghosts, [
+        ...planGhostRelations(result.actions),
+        ...planGhostRelations(suggested.filter((_, at) => rows[at]?.state !== "adopted"))
+      ]);
+    drawPreview();
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
@@ -315,8 +332,24 @@ export class MapChatConversation {
       !bookDiffs.length &&
       !threadCard.length &&
       structureCards.every(card => card.note === undefined);
+    rows.push(
+      ...(result.suggestions ?? []).map((suggestion, at): MapChatSuggestionRow => {
+        const row: MapChatSuggestionRow = {
+          text: this.ports.actionLabel(suggested[at]),
+          reason: suggestion.reason,
+          source: suggestion.source,
+          state: "pending",
+          blocked: () => this.ports.applyBlock(anchor) ?? this.ports.mergeBlock([suggestion.fromId, suggestion.toId]),
+          adopt: () =>
+            void this.adoptSuggestion(card, row, token, suggested[at], baseline, anchor, message, drawPreview)
+        };
+        return row;
+      })
+    );
     const card: MapChatPlanCard = {
-      ...(noApply ? { noApply: true } : {}),
+      ...(noApply || !result.actions.length ? { noApply: true } : {}),
+      ...(rows.length ? { suggestions: rows } : {}),
+      ...(rows.length && !result.actions.length ? { summary: t("ui.map_chat_relation_suggest_summary") } : {}),
       ...(diff ? { diff, applyLabel: t("ui.map_chat_book_apply"), cancelLabel: t("ui.map_chat_book_cancel") } : {}),
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
       ...(plan.reasons.some(
@@ -349,6 +382,50 @@ export class MapChatConversation {
     };
     if (record) this.ports.plans().set(card, record);
     chat.showPlan(card);
+  }
+  /**
+   * Adopts one suggested relation (P4.4): the same add_relation write as any reply, alone, so it is one undo step. Only while its
+   * card waits and is the current plan; the map is checked first (not the open one, read-only here, a merging card): nothing is
+   * written then and the card is drawn again with the reason.
+   */
+  private async adoptSuggestion(
+    card: MapChatPlanCard,
+    row: MapChatSuggestionRow,
+    token: number,
+    action: MapChatAction,
+    baseline: PlanBaseline,
+    anchor: { path: string; id: string | undefined },
+    message: string,
+    redraw: () => void
+  ): Promise<void> {
+    const chat = this.ports.panel();
+    if (row.state !== "pending" || card.state !== "pending" || token !== this.planToken) return;
+    if (!chat || this.ports.closed() || chat.isBusy || this.applying) return;
+    if (row.blocked() !== null) {
+      chat.refreshPlan();
+      return;
+    }
+    this.applying = true;
+    row.state = "adopting";
+    let lines: MapChatLine[];
+    try {
+      lines = await this.ports.applyActions(
+        { reply: "", actions: [action], rejected: [], remaining: "", message },
+        baseline,
+        () => token === this.planToken,
+        { path: anchor.path, id: anchor.id },
+        { context: baseline, work: newChatWork(), continuation: false, chain: null }
+      );
+    } catch (error) {
+      lines = [{ status: "failed", text: errorMessage(error) }];
+    } finally {
+      this.applying = false;
+    }
+    row.state = lines.length && lines.every(line => line.status === "done") ? "adopted" : "failed";
+    if (row.state === "failed") row.note = lines.find(line => line.status !== "done")?.text;
+    if (this.ports.closed()) return;
+    if (token === this.planToken) redraw();
+    chat.refreshPlan();
   }
   async applyChatPlan(
     card: MapChatPlanCard,
@@ -682,9 +759,14 @@ export class MapChatConversation {
             run.replyRemaining = result.remaining;
             // The switch of the moment decides this round's plan (and the limits of the chain from here on).
             run.state = syncAutoApply(run.state, this.ports.autoApply());
-            const plan = result.actions.length
-              ? planFor(result.actions, request.context, this.ports.planOptions(run, request))
-              : null;
+            // Suggested relations (P4.4) always wait on a card: nothing is written until the user adopts one of them (the reply's
+            // other actions then wait for Apply with them).
+            const planOptions = this.ports.planOptions(run, request);
+            const plan =
+              (result.actions.length ? planFor(result.actions, request.context, planOptions) : null) ??
+              (result.suggestions?.length
+                ? { reasons: [], estimatedCalls: estimateChatCalls(result.actions, request.context, planOptions) }
+                : null);
             if (plan) {
               // Nothing is touched until the user applies the plan.
               if (chat.isBusy) {

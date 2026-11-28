@@ -580,6 +580,7 @@ function livingReaderFixture() {
     constructor() { this.containerEl = { isShown: () => true }; }
     owns(owner) { return this.owner === owner; }
     async show(file, preview, owner) { this.file = file; this.preview = preview; this.owner = owner; }
+    async showOfficial(file, owner) { this.file = file; this.owner = owner; this.official = true; }
     markInvalid(owner) { if (this.owns(owner)) this.invalid = true; }
   }
   const { NodeDetailsSidebar } = S.load('experiences/visual-map/node-details-sidebar.ts',
@@ -597,8 +598,9 @@ function livingReaderFixture() {
     rightSplit: split, getLeavesOfType: () => leaf.view instanceof MarkdownView ? [leaf] : [],
     getRightLeaf: () => leaf, async revealLeaf() {}, trigger() {}, getActiveViewOfType: () => null
   };
-  const app = { workspace, metadataCache: { getFileCache: () => ({ frontmatter: { 'agent-map-node': true } }) } };
-  return { sidebar: new NodeDetailsSidebar(() => app, () => {}), leaf, calls, Reader, MarkdownView };
+  const aiCards = new Set();
+  const app = { workspace, metadataCache: { getFileCache: file => ({ frontmatter: { 'agent-map-node': true, ...(aiCards.has(file?.path) ? { 'ai-card': true } : {}) } }) } };
+  return { aiCards, sidebar: new NodeDetailsSidebar(() => app, () => {}), leaf, calls, Reader, MarkdownView };
 }
 
 S.integrationTest('Living Node reader: a late preview and close from an older editor cannot replace a newer selection', async () => {
@@ -618,6 +620,21 @@ S.integrationTest('Living Node reader: a late preview and close from an older ed
   await sidebar.restoreLivingOfficial(a, 'editor-a', true);
   sidebar.invalidateLivingTrial('editor-a');
   assert.equal(leaf.view.file.path, 'b.md');
+});
+
+S.integrationTest('D1-x11: the right pane shows an AI card through the reader (official tab), a plain card natively', async () => {
+  const { sidebar, leaf, aiCards, Reader, MarkdownView } = livingReaderFixture();
+  const ai = new S.TFile('ai.md'), plain = new S.TFile('plain.md');
+  aiCards.add('ai.md');
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader);
+  assert.equal(leaf.view.official, true);
+  assert.equal(leaf.view.file.path, 'ai.md');
+  await sidebar.openDetails(plain);
+  assert.ok(leaf.view instanceof MarkdownView);
+  assert.equal(leaf.view.file.path, 'plain.md');
+  await sidebar.openDetails(ai);
+  assert.ok(leaf.view instanceof Reader);
 });
 
 S.integrationTest('Living Node reader: stopping during reader creation restores official content and does not poison another trial', async () => {

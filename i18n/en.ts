@@ -1290,6 +1290,8 @@ export const en = {
   "ui.living_node_trial_failed_title": "Trial did not finish",
   "ui.living_node_trial_failed_note": "The preview shown is not the result of this run.",
   "ui.living_node_trial_reason_provider": "The AI provider failed or did not answer.",
+  "ui.living_node_trial_reason_network": "The network connection failed. Check the network and try again.",
+  "ui.living_node_open_in_editor": "Open in editor",
   "ui.living_node_trial_reason_timeout": "The AI took too long and timed out.",
   "ui.living_node_trial_reason_web": "This card needs a web search, but no search result was used.",
   "ui.living_node_trial_reason_replaced": "A source note was replaced or changed during the trial.",

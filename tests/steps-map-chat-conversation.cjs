@@ -215,6 +215,25 @@ test('apply: panel order, applyActions arguments, run.work, merged lines to reco
   assert.deepEqual(r.log[6], ['flush', true]);
 });
 
+test('apply: the selection snapshot in the baseline reaches applyActions unchanged', async () => {
+  const r = rig();
+  const { card, token, result } = offer(r, [act.child]);
+  const baseline = { selectedCount: 2, selectedIds: ['a', 'b'] };
+  await r.conv.applyChatPlan(card, token, result, baseline, { ...ANCHOR }, null);
+  assert.equal(r.applyCalls.length, 1);
+  strict.equal(r.applyCalls[0][1], baseline);
+  assert.deepEqual(r.applyCalls[0][1].selectedIds, ['a', 'b']);
+});
+
+test('a plan that partly failed is not written again by a second Apply with the same card and token', async () => {
+  const r = rig();
+  const { card, token, result } = offer(r, [act.child, act.child]);
+  r.state.apply = () => Promise.resolve([{ status: 'done', text: 'one' }, { status: 'failed', text: 'two' }]);
+  await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, null);
+  await r.conv.applyChatPlan(card, token, result, { selectedCount: 0 }, { ...ANCHOR }, null);
+  assert.equal(r.applyCalls.length, 1, 'the done card is never applied a second time');
+});
+
 test('apply: round 1 is not a continuation; run null touches no chain port and no run.work', async () => {
   const r = rig();
   const { card, token, result } = offer(r, [act.child]);

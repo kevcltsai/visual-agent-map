@@ -110,7 +110,8 @@ export interface MapChatConversationPorts {
   showPreview(token: number, anchors: ChatPreviewAnchor[]): void;
   clearPreview(): void;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
-  actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>): string;
+  /** `selection`: the cards selected when the message was sent (what an action that names no card works on). */
+  actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>, selection?: readonly string[]): string;
   applyActions(
     result: MapChatResult & { message?: string },
     baseline: PlanBaseline,
@@ -145,7 +146,15 @@ export interface MapChatConversationPorts {
 }
 type PlanBaseline = Pick<
   MapChatContext,
-  "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths" | "bookPlan"
+  | "mdHashes"
+  | "topicHashes"
+  | "selectedCount"
+  | "selectedIds"
+  | "basis"
+  | "parents"
+  | "research"
+  | "mapSourcePaths"
+  | "bookPlan"
 >;
 
 /** The map chat's turn and plan flow: sending a message, its answer, the plan card under it, what Apply, Cancel and Stop do, and the state they share. */
@@ -246,7 +255,9 @@ export class MapChatConversation {
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
-    const items = shown.map(index => this.ports.actionLabel(result.actions[index], refTitles));
+    const items = shown.map(index =>
+      this.ports.actionLabel(result.actions[index], refTitles, baseline.selectedIds ?? [])
+    );
     // A change to the book plan shows each card as before and after, with its own two buttons.
     const bookDiffs = result.actions.flatMap(action =>
       action.kind === "edit_book_plan" ? (bookPlanDiff(action, baseline) ?? []) : []
@@ -332,6 +343,8 @@ export class MapChatConversation {
     anchor: { path: string; id: string | undefined },
     run: ChatChainRun | null = null
   ): Promise<void> {
+    // A card already applied or cancelled is never applied again, also with its own token (a retry after a partial failure).
+    if (card.state !== "pending") return;
     const chat = this.ports.panel();
     if (!chat || this.ports.closed() || token !== this.planToken || chat.isBusy || this.applying) return;
     // The map the plan was made for is not the one open any more: nothing is written.

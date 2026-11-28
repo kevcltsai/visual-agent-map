@@ -1277,7 +1277,8 @@ export interface NotesApplyResult {
 
 /** What one refind job did: nothing found (nothing written), or the swap it wrote with the chapter's text before and after (the undo's input). */
 export type RefindResult =
-  { kind: "none" } | { kind: "replaced"; path: string; before: string; after: string; swap: FigureSwap };
+  | { kind: "none" }
+  | { kind: "replaced"; path: string; before: string; after: string; swap: FigureSwap; language: string };
 
 export class BookPipelineRuns {
   private readonly drives = new Map<string, Drive>();
@@ -2838,7 +2839,7 @@ export class BookPipelineRuns {
       throw new BookPipelineRunError("stale");
     }
     const { before, after } = done;
-    return { kind: "replaced", path, before, after, swap };
+    return { kind: "replaced", path, before, after, swap, language };
   }
 
   /** The body changed: both neighbours' joins are worth a look, as after a rerun. */

@@ -6,7 +6,7 @@
  */
 
 import { translateNote, type ContentLanguage } from "../../i18n";
-import { programStampRaw } from "./body-integrity";
+import { isKeptRaw, keepRaw, programStampRaw } from "./body-integrity";
 import { protectedLines, type SlotFigure, type SlotsRecord } from "./image-slots";
 import { addPictureSources, detailBlockOf, fencedLines } from "./note-sections";
 
@@ -182,9 +182,13 @@ export function swapFigure(raw: string, swap: FigureSwap, language: string): str
 
 /**
  * The swap as the program's write of the chapter: the fingerprint follows when the chapter was as the program left it (a hand-edited
- * chapter stays hand-edited). Undefined: the swap does not fit the text (see {@link swapFigure}).
+ * chapter stays hand-edited). The reader's answer "keep my version" (or "accept as it is") for the text before the swap holds for the
+ * text after it: the reader asked for this one picture, so the keep is not voided and the review box is not asked again. A keep already
+ * voided by an edit stays voided. Undefined: the swap does not fit the text (see {@link swapFigure}).
  */
 export function swapFigureStamped(raw: string, swap: FigureSwap, language: string): string | undefined {
   const next = swapFigure(raw, swap, language);
-  return next === undefined ? undefined : programStampRaw(raw, next);
+  if (next === undefined) return undefined;
+  const stamped = programStampRaw(raw, next);
+  return isKeptRaw(raw) ? keepRaw(stamped) : stamped;
 }

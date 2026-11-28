@@ -3184,6 +3184,18 @@ export const en = {
   "ui.book_refused_unsafe": "This undo would make a card disappear, so nothing was undone.",
   "ui.book_refused_not_slot":
     "This picture was not placed by the picture-book run (or it was changed by hand), so it is not searched for again.",
+  "ui.book_refind_menu": "Find another picture",
+  "ui.book_refind_cancel": "Stop finding another picture",
+  "ui.command_book_refind_image": "Picture book: find another picture for this one",
+  "ui.book_refind_started": "Looking for another picture. Choose the menu item again to stop.",
+  "ui.book_refind_done": "The picture was replaced",
+  "ui.book_refind_none": "No other fitting picture was found. The chapter was not changed.",
+  "ui.book_refind_timeout": "The search took too long. The chapter was not changed.",
+  "ui.book_refind_cancelled": "Stopped. The chapter was not changed.",
+  "ui.book_refind_failed_0": "The picture search failed ({0}). The chapter was not changed.",
+  "ui.book_refind_undo_done": "The earlier picture is back.",
+  "ui.book_refind_undo_refused":
+    "The undo did not go through (the picture was changed since), so the chapter was not changed.",
   "ui.book_abandon": "Give up this book",
   "ui.book_remove": "Back to plain mind map",
   "ui.book_abandon_title": "Give up this picture book?",

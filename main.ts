@@ -25,7 +25,8 @@ import {
   type BookPipelineProgress,
   type PipelineCard,
   type BookRerunResult,
-  type NotesApplyResult
+  type NotesApplyResult,
+  type RefindResult
 } from "./experiences/visual-map/book-pipeline-run";
 import type { StructureNode, StructureOp } from "./core/book-pipeline/structure-edit";
 import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
@@ -47,6 +48,8 @@ import {
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
 import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
+import { BookRefindSlot } from "./experiences/visual-map/book-pipeline-refind-slot";
+import { figureUrlAt } from "./core/book-pipeline/refind-slot";
 import { locateAppliedShown } from "./core/book-pipeline/notes-apply";
 import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 import {
@@ -482,6 +485,37 @@ export default class VisualAgentMapPlugin extends Plugin {
     setTick: (run, ms) => window.setInterval(run, ms),
     clearTick: handle => window.clearInterval(handle as number)
   });
+  /** "Find another picture" for one picture of a chapter (V3.3 P5.1b): the job, cancel, messages and the undo of the last swap. */
+  private readonly bookRefindSlot = new BookRefindSlot({
+    run: (path, url, signal) => this.runBookRefind(path, url, signal),
+    cancel: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (map) this.bookPipelineRuns.cancelNotes(map);
+    },
+    mapBusy: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (!map) return null;
+      if (this.bookPipelineRuns.isRunning(map)) return "drive";
+      return this.bookPipelineRuns.isApplyingNotes(map) ? "notes" : null;
+    },
+    codeOf: error => (error instanceof BookPipelineRunError ? error.code : undefined),
+    refusalText: error => bookRefusalText(error),
+    reasonText: error => bookErrorReason(error),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
+    notice: message => void new Notice(message),
+    noticeAction: (message, label, onClick, ms) =>
+      showAppliedNotice(
+        document.body,
+        { set: (run, delay) => window.setTimeout(run, delay), clear: handle => window.clearTimeout(handle as number) },
+        message,
+        label,
+        onClick,
+        ms
+      ),
+    changed: () => this.bookNotes.paint(),
+    setTimer: (run, ms) => window.setTimeout(run, ms),
+    clearTimer: handle => window.clearTimeout(handle as number)
+  });
   /** The light-green mark on the paragraphs just rewritten, in every open editor of the note (10 s). */
   private readonly bookHighlights = new AppliedHighlights({
     targets: () => this.bookHighlightTargets(),
@@ -555,6 +589,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       const read = readBookPipeline(map);
       if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
         return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
+    }
+    throw new BookPipelineRunError("missing");
+  }
+  /** Finds the chapter's map and card, then runs the runner's picture job (a refusal or failure is thrown to the controller). */
+  private async runBookRefind(path: string, url: string, signal: AbortSignal): Promise<RefindResult> {
+    for (const { file, map } of await this.repo.readableMaps()) {
+      const node = map.nodes.find(item => item.path === path);
+      const read = readBookPipeline(map);
+      if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
+        return await this.bookPipelineRuns.refindSlot(file.path, node.id, url, { signal });
     }
     throw new BookPipelineRunError("missing");
   }
@@ -651,6 +695,42 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     };
   }
+  /** The picture at the cursor of a chapter in an editor (the image line, its caption or its source line); undefined elsewhere. */
+  private bookFigureAt(editor: Editor, path: string | undefined): { path: string; url: string } | undefined {
+    if (!path || !this.bookNotes.isChapter(path)) return undefined;
+    const url = figureUrlAt(editor.getValue(), editor.getCursor().line);
+    return url ? { path, url } : undefined;
+  }
+  /** The editor menu item and the command of "find another picture" (no public API for a picture's menu in reading mode). */
+  private registerBookRefind(): void {
+    const refind = this.bookRefindSlot;
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, view) => {
+        const at = this.bookFigureAt(editor, view.file?.path);
+        if (!at) return;
+        const running = refind.isRunning(at.path);
+        menu.addItem(item =>
+          item
+            .setTitle(t(running ? "ui.book_refind_cancel" : "ui.book_refind_menu"))
+            .setIcon("image")
+            .onClick(() => refind.press(at.path, at.url))
+        );
+      })
+    );
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-refind-image",
+        name: t("ui.command_book_refind_image"),
+        editorCheckCallback: (checking, editor, ctx) => {
+          const at = this.bookFigureAt(editor, ctx.file?.path);
+          if (!at) return false;
+          if (!checking) refind.press(at.path, at.url);
+          return true;
+        }
+      }),
+      key: "ui.command_book_refind_image"
+    });
+  }
   private registerBookNotes(): void {
     const notes = this.bookNotes;
     this.registerEvent(
@@ -713,6 +793,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.command_book_note_undo"
     });
+    this.registerBookRefind();
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
@@ -2322,6 +2403,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (this.bookPaintTimer !== null) window.clearTimeout(this.bookPaintTimer);
     this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
+    this.bookRefindSlot.dispose();
     this.bookHighlights.dispose();
     this.readingHighlight.release();
     this.bookNotes.dispose();

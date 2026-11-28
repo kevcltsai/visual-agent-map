@@ -469,7 +469,12 @@ async function readInputs(
     return picked.length ? picked.join("\n\n") : undefined;
   };
   // Own user material participates in the input revision independently from AI-generated records.
-  add("self:" + id, snapshot.note.title, ownKnowledge(snapshot.note));
+  // The latest summary a commit wrote from this card's own output (D1-x9) is not new user material: it must not make the card stale again.
+  const own =
+    base.output.text.trim() && snapshot.note.summary?.trim() === base.output.text.trim()
+      ? { ...snapshot.note, summary: "" }
+      : snapshot.note;
+  add("self:" + id, snapshot.note.title, ownKnowledge(own));
   for (const source of resolved.sources) {
     if (port.signal.aborted || !port.current()) throw new Error("cancelled");
     if (!allowedLivingNotePath(port.app, source.path)) throw new Error("unauthorized-source");

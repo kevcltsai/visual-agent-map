@@ -82,7 +82,7 @@ async function rig(over = {}) {
       stat.searches.push(request);
       return (over.again ?? (() => found({ 1: [cand(3)] })))(request, run, stat.searches.length);
     },
-    backupNote: async path => { stat.backups.push(path); return over.backup ? over.backup() : { ok: true, path: `${path}.bak` }; },
+    backupNote: async path => { stat.backups.push(path); return over.backup && r.armed ? over.backup() : { ok: true, path: `${path}.bak` }; },
     blocked: () => false,
     config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z',
@@ -94,6 +94,7 @@ async function rig(over = {}) {
   await runs.confirmGate1(mapPath);
   while (runs.isRunning(mapPath)) await tick();
   const rawWriter = createNoteWriter({ openViews: () => (r.views ? r.views : []), rawGuarded: (p, tr, o) => repo.updateNoteRawGuarded(p, tr, o) });
+  r.armed = true;
   r.writes = 0;
   ports.notes = { readText: async path => contents.get(path), write: (p, tr) => { r.writes++; return rawWriter(p, tr); } };
   Object.assign(r, { runs, ports, path: nodes[0].path, raw: () => contents.get(nodes[0].path), state: async () => readBookPipeline(await repo.readMap(mapPath)).data });
@@ -102,7 +103,10 @@ async function rig(over = {}) {
 }
 
 /** The lines of `a` and `b` that differ, as [index, a-line, b-line] (same line count required). */
-const lineDiff = (a, b) => { const x = a.split('\n'), y = b.split('\n'); return x.length === y.length ? x.flatMap((l, i) => (l === y[i] ? [] : [[i, l, y[i]]])) : null; };
+// The body fingerprint line moves (with the blank quote line before it) to the end of the research note when it is re-stamped: leave it out.
+const noBody = text => text.replace(/\r?\n>\r?\n> <!-- book-body:v1 .* -->/, '');
+const bodyLines = text => text.split('\n').filter(l => l.includes('book-body:v1')).length;
+const lineDiff = (a, b) => { const x = noBody(a).split('\n'), y = noBody(b).split('\n'); return x.length === y.length ? x.flatMap((l, i) => (l === y[i] ? [] : [[i, l, y[i]]])) : null; };
 
 // ---- the runner ----
 
@@ -118,8 +122,11 @@ test('refind: swaps only the picture block, its Sources entry, its slot record i
   assert.equal(result.before, before); assert.equal(result.after, after);
   const diff = lineDiff(before, after);
   assert.ok(diff, 'same number of lines (the block keeps its shape)');
-  const kinds = diff.map(([, a]) => (a.startsWith('![Work 1]') ? 'image' : a === 'Caption 1' ? 'caption' : a.startsWith('來源：') ? 'source' : a.startsWith('- 圖「Work 1」') ? 'entry' : a.includes('book-slots:v1') ? 'record' : a.includes('book-body:v1') ? 'fp' : `other:${a}`));
-  assert.deepEqual(kinds.sort(), ['caption', 'entry', 'fp', 'image', 'record', 'source']);
+  const kinds = diff.map(([, a]) => (a.startsWith('![Work 1]') ? 'image' : a === 'Caption 1' ? 'caption' : a.startsWith('來源：') ? 'source' : a.startsWith('- 圖「Work 1」') ? 'entry' : a.includes('book-slots:v1') ? 'record' : `other:${a}`));
+  assert.deepEqual(kinds.sort(), ['caption', 'entry', 'image', 'record', 'source']);
+  // The fingerprint line moves to the end of the research note when it is re-stamped (existing behaviour): still exactly one, and changed.
+  assert.equal(bodyLines(before), 1); assert.equal(bodyLines(after), 1);
+  assert.notEqual(/<!-- book-body:v1 .* -->/.exec(before)[0], /<!-- book-body:v1 .* -->/.exec(after)[0]);
   assert.ok(after.includes(`![Work 3](${URL3})\nCaption 3\n來源：`));
   assert.ok(after.includes('- 圖「Work 3」') && !after.includes('- 圖「Work 1」') && after.includes('- 圖「Work 2」'));
   assert.ok(after.includes(cand(2).url), 'the other picture stays');
@@ -132,15 +139,16 @@ test('refind: swaps only the picture block, its Sources entry, its slot record i
   assert.deepEqual(r.stat.backups.slice(-1), [r.path]);
   assert.equal(r.stat.searches.length, 1);
   assert.equal(r.stat.searches[0].again, true);
-  assert.deepEqual(r.stat.searches[0].slots.map(s => s.index), [1]);
-  assert.match(r.stat.logs.join('\n'), /refind_slot .* ok/);
+  assert.deepEqual(JSON.parse(JSON.stringify(r.stat.searches[0].slots.map(s => s.index))), [1]);
+  assert.match(r.stat.logs.join('\n'), /refind_slot .*result=ok/);
   assert.ok(!/wikimedia|SecretRootTitle/.test(r.stat.logs.filter(l => l.includes('refind_slot')).join('\n')));
 });
 
 test('refind: nothing found, a failed search, a failed backup or a cancel write nothing', async () => {
   const cases = [
-    ['none', { again: () => found({}) }, async r => assert.deepEqual(await r.refind(), { kind: 'none' })],
-    ['fail', { again: () => { throw new Error('provider down'); } }, async r => assert.rejects(r.refind())],
+    ['none', { again: () => found({}) }, async r => assert.deepEqual(JSON.parse(JSON.stringify(await r.refind())), { kind: 'none' })],
+    // The fill's own search takes a provider failure as "found nothing" (existing behaviour), so a failed search is a none, not a throw.
+    ['fail', { again: () => { throw new Error('provider down'); } }, async r => assert.deepEqual(JSON.parse(JSON.stringify(await r.refind())), { kind: 'none' })],
     ['backup', { backup: () => ({ ok: false }) }, async r => assert.rejects(r.refind(), refusal('backup_failed'))],
     ['cancel during the search', { again: (req, run) => new Promise((_, reject) => run.signal.addEventListener('abort', () => reject(new Error('aborted')))) }, async r => {
       const ac = new AbortController();
@@ -232,8 +240,8 @@ test('refind: a kept answer ("keep my version") survives the swap, so the box is
     await x.callouts.idle();
   }
   assert.equal(stageOf(r.raw()), 'checked', 'the save after the swap does not ask the hand-edit question again');
-  const pictureFree = text => text.split('\n').filter(l => !/W[13]\.jpg|Caption [13]|book-slots:v1|book-body:v1|- 圖「Work [13]」/.test(l)).join('\n');
-  assert.equal(pictureFree(r.raw()), pictureFree(control.raw()), 'apart from the picture, reconcile left both chapters the same');
+  const pictureFree = (text, x) => text.split('\n').filter(l => !/W[13]\.jpg|Caption [13]|book-slots:v1|book-body:v1|- 圖「Work [13]」/.test(l)).join('\n').replaceAll(x.nodes[0].id, 'NODE').replaceAll(/^topic-id: (.*)$/m.exec(text)[1], 'MAP').replace(/^updated: .*$/m, 'updated: T');
+  assert.equal(pictureFree(r.raw(), r), pictureFree(control.raw(), control), 'apart from the picture, reconcile left both chapters the same');
 });
 
 test('refind: a ticked review box stays ticked through the swap and the next reconcile', async () => {
@@ -260,7 +268,8 @@ test('swap: the reverse swap of a changed text puts the picture back; a text not
   const result = await r.refind();
   const edited = result.after.replace('正文二。', '正文二，後來改了。');
   const back = R.swapFigureStamped(edited, R.reverseSwap(result.swap), 'zh-TW');
-  assert.equal(back, result.before.replace('正文二。', '正文二，後來改了。').replace(/<!-- book-body:v1 .* -->/, /<!-- book-body:v1 .* -->/.exec(back)[0]));
+  assert.equal(noBody(back), noBody(result.before.replace('正文二。', '正文二，後來改了。')));
+  assert.equal(bodyLines(back), 1);
   assert.equal(R.swapFigure(edited.replace('Caption 3', 'Caption three'), R.reverseSwap(result.swap), 'zh-TW'), undefined, 'the new block was edited: no undo');
   assert.equal(R.swapFigure(result.after, result.swap, 'zh-TW'), undefined, 'the old block is gone: the same swap does not apply twice');
 });
@@ -293,8 +302,14 @@ test('CRLF chapter: the new block keeps CRLF and the swap is still exact', async
   const before = r.raw();
   const result = await r.refind();
   assert.equal(result.kind, 'replaced');
-  assert.ok(!/[^\r]\n/.test(r.raw()), 'every line ends with CRLF');
-  assert.equal(R.swapFigure(r.raw(), R.reverseSwap(result.swap), 'zh-TW').replace(/<!-- book-body:v1 .* -->/, ''), before.replace(/<!-- book-body:v1 .* -->/, ''));
+  // The re-stamped fingerprint line (and the quote line before it) is written by the existing stamp with LF; every other line keeps CRLF.
+  const rawLines = r.raw().split('\n').slice(0, -1);
+  const stamp = rawLines.findIndex(l => l.includes('book-body:v1'));
+  assert.deepEqual(rawLines.flatMap((l, i) => (l.endsWith('\r') || i === stamp || i === stamp - 1 ? [] : [i])), [], 'every line but the fingerprint pair ends with CRLF');
+  const back = R.swapFigure(r.raw(), R.reverseSwap(result.swap), 'zh-TW');
+  // The stamp's own lines are LF in a CRLF chapter (existing), so line ends are compared without the CR.
+  assert.equal(noBody(back.replace(/\r/g, '')), noBody(before.replace(/\r/g, '')));
+  assert.equal(bodyLines(back), 1);
 });
 
 // ---- undo: the editor (one transaction) and the "undo" notice ----

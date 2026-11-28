@@ -54,6 +54,8 @@ export interface FigureBlock {
   lines: string[];
   /** The entry text after `- `, as the fill built it from the source line (absent: the picture has no source line, or no such entry). */
   entry?: string;
+  /** The address in the source line's link (what the Sources entry is added back by); absent when the line has none. */
+  href?: string;
 }
 
 /**
@@ -80,7 +82,8 @@ export function readFigure(raw: string, url: string, language: string): FigureBl
   if (block.length < 3) return { lines: block };
   const detail = bare(block[2]).replace(SOURCE_LINE, "");
   const entry = translateNote(language as ContentLanguage, "note.image_source_entry_0_1", alt, detail);
-  return { lines: block, ...(entryLines(lines, entry).length === 1 ? { entry } : {}) };
+  const href = /\]\((https?:\/\/[^)\s]+)\)/.exec(bare(block[2]))?.[1];
+  return { lines: block, ...(entryLines(lines, entry).length === 1 ? { entry, ...(href ? { href } : {}) } : {}) };
 }
 
 /** Where `- entry` stands as a whole line outside code (line ends ignored). */
@@ -136,14 +139,20 @@ export function retagRecordLine(line: string, index: number, hash: string, off: 
 /** One picture swap: the block, the Sources entry (absent on a side: none there) and the record line, each as exact text. */
 export interface FigureSwap {
   block: { from: string[]; to: string[] };
-  entry: { from?: string; to?: string; href?: string };
+  /** `href` is the address of the `to` entry, `fromHref` of the `from` entry (what adds the entry back when its place is gone). */
+  entry: { from?: string; to?: string; href?: string; fromHref?: string };
   record: { from: string; to: string };
 }
 
 /** The same swap the other way (the undo). */
 export const reverseSwap = (swap: FigureSwap): FigureSwap => ({
   block: { from: swap.block.to, to: swap.block.from },
-  entry: { from: swap.entry.to, to: swap.entry.from, href: swap.entry.href },
+  entry: {
+    ...(swap.entry.to !== undefined ? { from: swap.entry.to } : {}),
+    ...(swap.entry.from !== undefined ? { to: swap.entry.from } : {}),
+    ...(swap.entry.fromHref ? { href: swap.entry.fromHref } : {}),
+    ...(swap.entry.href ? { fromHref: swap.entry.href } : {})
+  },
   record: { from: swap.record.to, to: swap.record.from }
 });
 

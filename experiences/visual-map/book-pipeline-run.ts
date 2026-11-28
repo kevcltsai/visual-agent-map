@@ -2810,7 +2810,7 @@ export class BookPipelineRuns {
     const swap: FigureSwap = {
       block: { from: block.lines, to },
       entry: {
-        ...(block.entry !== undefined ? { from: block.entry } : {}),
+        ...(block.entry !== undefined ? { from: block.entry, ...(block.href ? { fromHref: block.href } : {}) } : {}),
         ...(figure.source ? { to: figure.source.entry, href: figure.source.href } : {})
       },
       record: { from: recordLine, to: retagged }

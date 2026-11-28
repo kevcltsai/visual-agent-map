@@ -18476,7 +18476,14 @@ export class VisualAgentMapView extends ItemView {
    */
   private async changeTopicColor(node: MapNode, color: TopicColor | null, branch = false): Promise<void> {
     if (!this.map || !this.markersEditable(node)) return;
-    const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
+    await this.recolorTopics(branch ? branchNoteIds(this.map.nodes, node.id) : [node.id], color);
+  }
+  /**
+   * The one colour write of changeTopicColor and changeSelectionColor (their callers check the gates): only the notes whose
+   * colour really changes get topic-color, in one undoable map transaction; Map.md changes only its viewport.
+   */
+  private async recolorTopics(ids: readonly string[], color: TopicColor | null): Promise<void> {
+    if (!this.map) return;
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
       .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
@@ -20605,22 +20612,7 @@ export class VisualAgentMapView extends ItemView {
       if (availability) new Notice(t(availability.reasonKey, ...(availability.reasonArgs ?? [])));
       return;
     }
-    const targets = ids
-      .map(id => this.map!.nodes.find(item => item.id === id))
-      .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
-      .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
-    if (!targets.length) return;
-    const viewport = clone(this.map.viewport);
-    let transaction = this.beginMapTransaction();
-    for (const target of targets)
-      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeTopicColor(path, color));
-    const entry = await transaction
-      .editMap(this.path, map => {
-        map.viewport = clone(viewport);
-      })
-      .commit({ deferRebuild: true, label: t("ui.topic_color") });
-    this.history.push(entry);
-    await this.refreshAfterSavedChange();
+    await this.recolorTopics(ids, color);
   }
   /**
    * The narrow bar along the canvas bottom: nothing until a card is picked, then "N selected", the toolbar actions of the card

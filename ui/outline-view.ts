@@ -282,6 +282,9 @@ export class OutlineView extends ItemView {
     row.addClass(`is-drop-${place}`);
   }
   private renderTree(): void {
+    // A rebuild replaces every row: the row that had the keyboard focus gets it back (a move can rebuild twice in a row).
+    const focused = (this.contentEl.ownerDocument as Document | undefined)?.activeElement;
+    const focusedPath = [...this.noteEls].find(([, el]) => el === focused)?.[0];
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
     this.toggleEls.clear();
     this.branches.clear();
@@ -402,7 +405,7 @@ export class OutlineView extends ItemView {
       const path = this.map.nodes.find(node => node.id === this.refocusId)?.path;
       this.refocusId = null;
       if (path) this.noteEls.get(path)?.focus();
-    }
+    } else if (focusedPath) this.noteEls.get(focusedPath)?.focus();
     if (!tree.childElementCount) {
       tree.createDiv({ cls: "vam-outline-empty", text: t(query ? "ui.no_matching_topics" : "ui.empty_outline_hint") });
       if (query)

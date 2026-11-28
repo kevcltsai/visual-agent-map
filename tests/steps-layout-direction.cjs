@@ -636,7 +636,8 @@ test('E2-y: the parent card of the batch is deleted by another write during it: 
   assert.equal(saved.nodes.length, tree4.length - 1, 'only their change is on disk: no card of the batch');
   assert.equal(saved.nodes.some(n => n.parentId === parent), false);
   assert.equal(lines.filter(line => line.status === 'failed').length, 6, 'every card of the batch says it was not written');
-  assert.ok(lines.every(line => !line.text || line.status !== 'failed' || /changed-target/.test(line.text)), 'with the reason');
+  // E2-y: the reason is in plain words (ui.map_chat_fail_changed), never the internal code.
+  assert.ok(lines.every(line => !line.text || line.status !== 'failed' || (/the card was changed after you sent the message/.test(line.text) && !/changed-target/.test(line.text))), 'with the reason in plain words');
 });
 
 test('E2-y: another write changes a card field the batch also changes: theirs is not overwritten, the batch is not written', async () => {

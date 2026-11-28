@@ -17,6 +17,8 @@ import { addedMermaidBlocks } from "../../ai/mermaid-safety";
 import { frontmatter } from "../../core/repository-frontmatter";
 import { saveLivingConfig, type LivingConfigSave } from "./living-node-runtime";
 import { promptSourceLinks } from "./prompt-run";
+import { livingSaveReason } from "./living-node-trial-reason";
+import { errorMessage } from "../../core/error-message";
 import {
   canParent,
   clone,
@@ -100,6 +102,32 @@ export const chatAppearanceChange = (
   addStyles: action.formats ?? [],
   removeStyles: action.removeFormats ?? []
 });
+/** Codes thrown when the target moved on after the message was sent; the chat line says so in words. */
+const CHANGED_CODES = new Set([
+  "changed-target",
+  "changed-target-identity",
+  "changed-configuration",
+  "changed-source-identity",
+  "changed-source-resolution",
+  "missing-target",
+  "missing-or-locked-target",
+  "target-unavailable",
+  "stale-base",
+  "base-mismatch",
+  "stale-or-cancelled-write",
+  "stale-generation"
+]);
+/**
+ * The reason line of a chat action that threw: plain words for an internal code (the code itself stays in the log), the
+ * message as it is for a real sentence.
+ */
+export function chatFailureReason(error: unknown): string {
+  const message = errorMessage(error);
+  if (!/^[a-z0-9]+(-[a-z0-9]+)+$/.test(message)) return message;
+  if (CHANGED_CODES.has(message)) return t("ui.map_chat_fail_changed");
+  const key = livingSaveReason(error);
+  return key ? t(key) : t("ui.map_chat_fail_unknown");
+}
 export const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
 const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   outside_vault: "ui.map_chat_guard_outside_vault",

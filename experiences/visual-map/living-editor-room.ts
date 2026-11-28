@@ -19,7 +19,8 @@ export interface SideDock {
 export class EditorRoom {
   private readonly before = new Map<SideDock, boolean>();
   private readonly expected = new Map<SideDock, boolean>();
-  private readonly byUser = new Set<SideDock>();
+  /** Panels the user opened or folded while the editor was open, with the user's last choice (true: folded). */
+  private readonly byUser = new Map<SideDock, boolean>();
   private readonly folded = new Set<SideDock>();
 
   constructor(private readonly docks: readonly SideDock[]) {
@@ -55,8 +56,8 @@ export class EditorRoom {
   restore(): void {
     this.notice();
     for (const dock of this.docks) {
-      if (this.byUser.has(dock)) continue;
-      const was = this.before.get(dock);
+      // VAM may have changed a panel the user set (the reader revealing the right one on close): the user's choice wins.
+      const was = this.byUser.has(dock) ? this.byUser.get(dock) : this.before.get(dock);
       if (was === undefined || dock.collapsed === was) continue;
       if (was) dock.collapse();
       else dock.expand();
@@ -67,7 +68,7 @@ export class EditorRoom {
   private notice(): void {
     for (const dock of this.docks)
       if (this.expected.get(dock) !== dock.collapsed) {
-        this.byUser.add(dock);
+        this.byUser.set(dock, dock.collapsed);
         this.expected.set(dock, dock.collapsed);
       }
   }

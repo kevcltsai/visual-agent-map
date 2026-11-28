@@ -234,6 +234,61 @@ test('book lock: a structure lock adds no text block from any entry (the panel a
   assert.notEqual(await h.view.app.vault.read(file), before, 'once the book is done a text block is added');
 });
 
+// V3.3 G04-z: the right-click goes through the real viewport binding (setupCanvasImageInput), which used to be bound only while the
+// canvas was editable, so a card never got its menu while the notes loaded although its ⋯ did.
+const cardMenus = h => {
+  const opened = [];
+  const chain = it => ({ setTitle(x) { it.title = x; return this; }, setIcon() { return this; }, setDisabled(d) { it.disabled = d; return this; }, setChecked() { return this; }, setWarning() { return this; }, setSubmenu() { return { addItem() { return this; }, addSeparator() { return this; } }; }, onClick(fn) { it.fn = fn; return this; }, dom: { addClass(c) { it.cls = c; }, createSpan(o) { it.hints.push(o.text); } } });
+  h.view.newMenu = () => { const items = []; opened.push(items); return { setUseNativeMenu() {}, addItem(build) { const it = { hints: [] }; build(chain(it)); items.push(it); return this; }, addSeparator() { return this; }, showAtPosition() {}, showAtMouseEvent() {} }; };
+  return opened;
+};
+const boundCardRightClick = (h, target) => {
+  h.view.viewportEl = dom.element('div');
+  h.view.setupCanvasImageInput();
+  h.view.viewportEl.fire('contextmenu', { target: { closest: sel => (sel === '.vam-node' ? target : null) }, clientX: 5, clientY: 5 });
+};
+test('G04-z: while the notes load the real contextmenu binding opens the card list, rows greyed with the reason, same as ⋯; selection mode, presentation and other targets open nothing', async () => {
+  const h = await harness({ book: false });
+  h.plugin.mutate = async () => { throw new Error('nothing may be written'); };
+  h.view.noteLoad = { framed: false };
+  h.paint();
+  // Re-render while loading, then right-click through the binding.
+  const stage = h.paint();
+  h.view.contentEl = stage;
+  const card = h.view.cardEls.get(h.ids.a);
+  const more = byCls(card, 'vam-card-tool-more')[0];
+  more.getBoundingClientRect = () => ({ left: 0, bottom: 0 });
+  const opened = cardMenus(h);
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 1, 'the right-click opens while the notes load');
+  more.fire('click', { metaKey: false, ctrlKey: false });
+  assert.equal(opened.length, 2, '⋯ opens too');
+  const [context, moreRows] = [opened[0], opened[1]];
+  for (const row of context) {
+    assert.equal(row.disabled, true, `${row.title} greyed`);
+    assert.deepEqual(row.hints, [tr('ui.card_action_off_notes_loading')], `${row.title} gives the reason`);
+    assert.equal(row.fn, undefined, `${row.title} has no click`);
+  }
+  // ⋯ is the right-click list minus the toolbar's own actions (one registry, addCardActions): same state, same reason.
+  assert.ok(context.length >= moreRows.length, 'the right-click list has every ⋯ row');
+  for (const row of moreRows) {
+    assert.equal(row.disabled, true, `⋯ ${row.title} greyed`);
+    assert.deepEqual(row.hints, [tr('ui.card_action_off_notes_loading')], `⋯ ${row.title}: same reason as the right-click`);
+  }
+  // Another target while loading (the empty canvas) still opens nothing.
+  h.view.viewportEl.fire('contextmenu', { target: { closest: () => null }, clientX: 5, clientY: 5 });
+  assert.equal(opened.length, 2, 'the empty canvas stays shut');
+  // Topic selection: ⋯ is not drawn, so no menu.
+  h.view.selection.toggleMultiSelect();
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 2, 'no card menu in topic selection');
+  h.view.selection.toggleMultiSelect();
+  // Presenting opens none.
+  h.view.presentation = {};
+  boundCardRightClick(h, card);
+  assert.equal(opened.length, 2, 'no card menu while presenting');
+});
+
 test('notes loading (decision #35, P1.1): the card ⋯ and right-click open, every row greyed with "notes loading" and no click; nothing is written', async () => {
   const h = await harness({ book: false });
   let pending = Promise.resolve(), mutations = 0;

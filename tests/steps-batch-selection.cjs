@@ -446,3 +446,73 @@ test('B19c structure lock: Tidy this branch moves cards only: parents, paths and
   assert.deepEqual(strip(after), strip(nodes), 'only x and y may change');
   assert.deepEqual(notesOf(h.files()), notesOf(before), 'notes are not written');
 });
+
+// B19c-x: a resize that makes a card taller and so covers the card below pushes it apart in the same Map.md write and the
+// same undo step (before: the repaint's height settling wrote a second step, and Undo took two presses).
+const layoutApi = support.load('map-layout.ts');
+/** Cards drawn as tall as their style height, else as their natural height; the repaint runs the height settling as render does. */
+function drawnCards(h, natural = {}) {
+  const view = h.view;
+  const cardOf = id => {
+    const style = { width: '', height: '', padding: '', removeProperty(name) { this[name] = ''; } };
+    const node = view.map.nodes.find(n => n.id === id);
+    if (node.width) style.width = `${node.width}px`;
+    if (node.height) style.height = `${node.height}px`;
+    return { style, dataset: { nodeId: id }, get offsetHeight() { return parseFloat(style.height) || natural[id] || 80; }, get offsetWidth() { return parseFloat(style.width) || 280; } };
+  };
+  view.render = () => { view.cardEls = new Map(view.map.nodes.map(n => [n.id, cardOf(n.id)])); view.settleCardHeights(); };
+  view.cardHeightOf = id => view.cardEls.get(id)?.offsetHeight || 80;
+  view.render();
+  const writes = { n: 0 };
+  const begin = view.beginMapTransaction.bind(view);
+  view.beginMapTransaction = (...args) => { const tx = begin(...args); const commit = tx.commit.bind(tx); tx.commit = (...c) => { writes.n++; return commit(...c); }; return tx; };
+  return writes;
+}
+const places = async h => Object.fromEntries((await h.repo.readMap(MAP)).nodes.map(n => [h.view.notes.get(n.id)?.title, [n.x, n.y, n.width, n.height]]));
+const quiet = async h => { for (let i = 0; i < 6; i++) { await h.settled(); await new Promise(r => setTimeout(r, 0)); } };
+const overlapFree = h => assert.equal(layoutApi.cardsOverlapAny(h.view.map.nodes, new Set(h.view.map.nodes.map(n => n.id)), h.view.cardHeightOf), false, 'no two cards overlap');
+async function tallerCovers(h, resize) {
+  const writes = drawnCards(h);
+  const before = h.files(), placed = await places(h), steps = h.view.history.past.length;
+  await resize();
+  await quiet(h);
+  const after = await places(h);
+  assert.equal(after.A[3], 400, 'A is 400 high');
+  assert.ok(after.B[1] >= 400, `B is pushed below A (y ${after.B[1]})`);
+  for (const title of ['Root', 'A', 'A1']) assert.deepEqual(after[title].slice(0, 2), placed[title].slice(0, 2), `${title} keeps its x and y`);
+  overlapFree(h);
+  assert.equal(writes.n, 1, 'one Map.md write');
+  assert.equal(h.view.history.past.length, steps + 1, 'one undo step');
+  await h.view.history.undo().undo(); await quiet(h);
+  assert.deepEqual(h.files(), before, 'one undo restores the size and every pushed card');
+}
+test('B19c-x: Size with a height that makes a card cover the one below: one Map.md write, one undo step restores size and places', async () => {
+  const h = await harness(SPEC);
+  h.select(['A']);
+  await tallerCovers(h, async () => {
+    const { pop } = openSize(h);
+    type(inputs(pop)[1], '400');
+    popButton(pop, 'Apply to 1 card')[0].fire('click');
+  });
+});
+test('B19c-x: resizeCard to a height that covers the card below: one Map.md write, one undo step restores size and places', async () => {
+  const h = await harness(SPEC);
+  await tallerCovers(h, () => h.view.resizeCard(h.named('A').id, { height: 400 }));
+});
+test('B19c-x: a card that grows by itself (a longer summary) and covers another is still pushed apart as its own undo step', async () => {
+  const h = await harness(SPEC);
+  const natural = {};
+  const writes = drawnCards(h, natural);
+  const steps = h.view.history.past.length, placed = await places(h);
+  natural[h.named('A').id] = 400;
+  h.view.render(); await quiet(h);
+  const after = await places(h);
+  assert.ok(after.B[1] >= 400, `B is pushed below A (y ${after.B[1]})`);
+  for (const title of ['Root', 'A', 'A1']) assert.deepEqual(after[title].slice(0, 2), placed[title].slice(0, 2), `${title} keeps its x and y`);
+  overlapFree(h);
+  assert.equal(writes.n, 1); assert.equal(h.view.history.past.length, steps + 1);
+});
+test('B19c-x: a height handle drag (the card is drawn at its new height before the write) is one Map.md write and one undo step too', async () => {
+  const h = await harness(SPEC);
+  await tallerCovers(h, () => { h.view.cardEls.get(h.named('A').id).style.height = '400px'; return h.view.resizeCard(h.named('A').id, { height: 400 }); });
+});

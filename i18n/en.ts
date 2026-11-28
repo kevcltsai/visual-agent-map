@@ -1057,6 +1057,8 @@ export const en = {
   "ui.card_action_off_presentation": "Not available during a presentation",
   "ui.card_action_off_multi_select": "Not available while selecting several topics",
   "ui.card_action_off_no_lockable": "None of the selected cards can be locked",
+  "ui.selection_locked_0_1":
+    "△ {0} of them are locked or being merged ({1}), so this group cannot change color, size, position or merge. Take them out of the selection, or unlock them first.",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "Workspace default",
@@ -1237,6 +1239,15 @@ export const en = {
   "ui.living_node_ai_latest_deleted":
     "You deleted the AI latest result, so an identical result is not written back. A different result will appear.",
   "ui.living_node_trial_unsaved": "Trial · not saved",
+  "ui.living_node_changes_title": "This run's changes",
+  "ui.living_node_changes_first_run": "First run: there is no baseline to compare against.",
+  "ui.living_node_changes_none": "No changes this time.",
+  "ui.living_node_changes_added_0": "Added: {0}",
+  "ui.living_node_changes_supplemented_0": "Supplemented with new evidence: {0}",
+  "ui.living_node_changes_corrected_0": "Corrected: {0}",
+  "ui.living_node_changes_disputed_0": "Marked disputed: {0}",
+  "ui.living_node_changes_invalidated_0": "Invalidated: {0}",
+  "ui.living_node_changes_output_updated": "The current result was updated.",
   "ui.living_node_removed_source_0":
     "Removed a source referenced by these AI cards: {0}. Their saved references need repair or Undo.",
   "ui.living_node_omitted_edits_skipped":
@@ -1639,6 +1650,13 @@ export const en = {
   "ui.map_chat_skip_map_not_opened": "the new map was created but could not be opened here",
   "ui.map_chat_plan_title": "Plan to review",
   "ui.map_chat_plan_intro": "Nothing changes until you choose Apply.",
+  "ui.map_chat_plan_preview_note":
+    "The dashed cards on the canvas are the new cards. The map is checked again just before Apply.",
+  "ui.map_chat_plan_blocked_stale": "Apply is off: this plan was made for a map that is no longer open.",
+  "ui.map_chat_plan_blocked_presenting": "Apply is off: the map is read-only while it is presented.",
+  "ui.map_chat_plan_blocked_loading": "Apply is off: the map is read-only until its notes finish loading.",
+  "ui.map_chat_ghost_label": "Preview",
+  "ui.map_chat_ghost_more_0": "… {0} more",
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",
   "ui.map_chat_plan_reason_many_research_0": "Starts research on {0} topics",
   "ui.map_chat_plan_reason_new_map": "Creates a new map and opens it",

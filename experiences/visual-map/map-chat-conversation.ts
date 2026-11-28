@@ -33,6 +33,7 @@ import type {
 } from "./map-chat";
 import { newChatWork, type ChatChainRun, type ChatRoundWork, type MapChatChainRunner } from "./map-chat-chain-run";
 import { bookPlanDiff, bookStructureCard, bookThreadDiff } from "./book-plan-diff";
+import { planGhostRelations, planGhostSpecs, type PlanGhostRelation, type PlanGhostSpec } from "./chat-plan-preview";
 import type { TransactionEntry } from "./map-transaction";
 import type { MapChatTurnRecord, TurnEndFields } from "./map-chat-turn-record";
 import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
@@ -40,7 +41,7 @@ import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
 /** The part of the chat window the plan flow uses. */
 export type ChatPlanPanel = Pick<
   MapChatPanel,
-  "isBusy" | "pendingPlan" | "settlePlan" | "showPlan" | "setApplying" | "hasQueuedSteers"
+  "isBusy" | "pendingPlan" | "settlePlan" | "showPlan" | "setApplying" | "hasQueuedSteers" | "refreshPlan"
 >;
 /** The part of the chat window the turn driver uses (the plan flow's part included). */
 export type ChatTurnPanel = ChatPlanPanel &
@@ -106,9 +107,19 @@ export interface MapChatConversationPorts {
     | "advanceChain"
   >;
   plans(): WeakMap<MapChatPlanCard, MapChatTurnRecord>;
-  /** Draws the plan's anchors as dashed dots (an empty list clears them), only while `token` is the plan's current one. */
-  showPreview(token: number, anchors: ChatPreviewAnchor[]): void;
+  /**
+   * Draws the plan's anchors as dashed dots, the cards it would make as dashed cards and the relations it would add as dashed lines
+   * (empty lists clear them), only while `token` is the plan's current one. Drawn only: never a node or a relation of the map.
+   */
+  showPreview(
+    token: number,
+    anchors: ChatPreviewAnchor[],
+    cards: PlanGhostSpec[],
+    relations: PlanGhostRelation[]
+  ): void;
   clearPreview(): void;
+  /** Why the plan made for `anchor` cannot be applied now (its map is not the open one, or the map is read-only here); null = it can. */
+  applyBlock(anchor: { path: string; id: string | undefined }): string | null;
   refTitles(actions: readonly MapChatAction[]): Map<string, string>;
   /** `selection`: the cards selected when the message was sent (what an action that names no card works on). */
   actionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>, selection?: readonly string[]): string;
@@ -251,7 +262,9 @@ export class MapChatConversation {
     const anchorsToPlace = result.actions.flatMap(action =>
       action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
     );
-    this.ports.showPreview(token, anchorsToPlace);
+    // The cards and relations the plan would make are drawn as a dashed preview (V3.3 E3); the text list below stays the full account.
+    const ghosts = planGhostSpecs(result.actions);
+    this.ports.showPreview(token, anchorsToPlace, ghosts, planGhostRelations(result.actions));
     const refTitles = this.ports.refTitles(result.actions);
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
@@ -322,6 +335,8 @@ export class MapChatConversation {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
+      ...(ghosts.length ? { previewNote: t("ui.map_chat_plan_preview_note") } : {}),
+      blocked: () => this.ports.applyBlock(anchor),
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         if (token !== this.planToken) return;
@@ -356,6 +371,12 @@ export class MapChatConversation {
       const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       this.ports.plans().get(card)?.plan("cancelled", skip);
+      return;
+    }
+    // The map is checked again just before the write: read-only here now (a presentation, notes still loading) writes nothing and
+    // the card keeps waiting and is drawn again, with the reason under its greyed Apply.
+    if (this.ports.applyBlock(anchor) !== null) {
+      chat.refreshPlan();
       return;
     }
     this.applying = true;

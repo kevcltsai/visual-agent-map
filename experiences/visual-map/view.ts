@@ -613,6 +613,7 @@ import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } f
 import { sessionFor, type ClipRecord } from "./clipboard-session";
 import { cutSourceProblem, ledgerFor, sameApartFromStamps } from "./cross-map-history";
 import { computeTidy, mapSignature, overlayPositions, type TidyPreview } from "./layout-preview";
+import { planGhostLayout, type PlanGhostEdge, type PlanGhostRelation, type PlanGhostSpec } from "./chat-plan-preview";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -1326,9 +1327,16 @@ export class VisualAgentMapView extends ItemView {
   private set chatPlanToken(value: number) {
     this.mapChatConversation.planToken = value;
   }
-  /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
-  private chatPreview: { token: number; anchors: { imageId: string; x: number; y: number; note: string }[] } | null =
-    null;
+  /**
+   * The anchors the pending plan would place, drawn as dashed dots, and (`cards`, absent = none) the cards it would make, drawn as
+   * dashed cards; it only counts while its token is the plan's current one. Drawn only: never in map.nodes, the file or the history.
+   */
+  private chatPreview: {
+    token: number;
+    anchors: { imageId: string; x: number; y: number; note: string }[];
+    cards?: PlanGhostSpec[];
+    relations?: PlanGhostRelation[];
+  } | null = null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
    * the empty canvas, Esc, deleting the image and opening another map. Only the id is kept; the picture is read when a message is sent.
@@ -2219,6 +2227,8 @@ export class VisualAgentMapView extends ItemView {
     if (current.raf !== null) window.cancelAnimationFrame(current.raf);
     this.noteLoad = null;
     this.removeLoadStatus();
+    // A plan waiting for Apply was greyed "notes still loading": redraw it now that they are loaded.
+    this.chat?.refreshPlan();
   }
   private scheduleLoadBatch(load: NoteLoadState): void {
     if (load.raf !== null) return;
@@ -2990,6 +3000,8 @@ export class VisualAgentMapView extends ItemView {
       returnEl: card ? null : active
     };
     this.applyPresentationMarks(true);
+    // A waiting plan cannot be applied while the map is presented: its Apply greys and says why.
+    this.chat?.refreshPlan();
   }
   /** One key of a presentation. Everything it does is in memory: the camera follows, nothing is saved. */
   private stepPresentation(action: PresentationAction): void {
@@ -3117,6 +3129,7 @@ export class VisualAgentMapView extends ItemView {
     this.presentationBarEl?.remove();
     this.presentationBarEl = null;
     for (const card of this.cardEls.values()) card.toggleClass("is-presenting", false);
+    this.chat?.refreshPlan();
     if (!restore || this.closed || !this.map) return;
     const ids = new Set(this.map.nodes.map(node => node.id));
     const previous = this.selection.state.selected,
@@ -8331,11 +8344,73 @@ export class VisualAgentMapView extends ItemView {
       if (image) this.paintAnchorPreview(el, image, image.path.split("/").pop() ?? image.path);
     }
   }
-  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots off the canvas. */
+  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots and dashed cards off the canvas. */
   private clearChatPreview(): void {
     if (!this.chatPreview) return;
     this.chatPreview = null;
     this.syncAnchorPreview();
+    this.paintPlanGhosts();
+  }
+  /**
+   * Draws the cards the pending plan would make as dashed cards in their own layer of the stage (V3.3 E3), replacing what was drawn
+   * before. The layer is not a card, an edge or a canvas item: the export, the search, the drag and the keyboard never see it, and it
+   * takes no pointer. Titles are untrusted and go in as text.
+   */
+  private paintPlanGhosts(): void {
+    const stage = this.stageEl;
+    if (!stage) return;
+    for (const old of Array.from(stage.querySelectorAll(".vam-plan-ghosts"))) old.remove();
+    const preview = this.chatPreview;
+    if ((!preview?.cards?.length && !preview?.relations?.length) || preview.token !== this.chatPlanToken || !this.map)
+      return;
+    const shown = this.canvasNodes();
+    const boxes = new Map(
+      shown.map(node => {
+        const el = this.cardEls.get(node.id);
+        return [
+          node.id,
+          {
+            x: node.x,
+            y: node.y,
+            width: el?.offsetWidth || node.width || CARD_WIDTH,
+            height: el?.offsetHeight || node.height || CARD_HEIGHT_MIN
+          }
+        ] as const;
+      })
+    );
+    const layout = planGhostLayout(
+      preview.cards ?? [],
+      boxes,
+      parentId => shown.flatMap(node => (node.parentId === parentId ? [boxes.get(node.id)!] : [])),
+      preview.relations ?? []
+    );
+    if (!layout.cards.length && !layout.relations.length) return;
+    const layer = stage.createDiv("vam-plan-ghosts");
+    layer.setAttr("aria-hidden", "true");
+    // Each line is a dashed rule turned from one end to the other (plain boxes: nothing the edge layer reads).
+    const rule = (edge: PlanGhostEdge, cls: string): void => {
+      const dx = edge.to.x - edge.from.x,
+        dy = edge.to.y - edge.from.y;
+      const line = layer.createDiv(cls);
+      line.style.left = `${edge.from.x}px`;
+      line.style.top = `${edge.from.y}px`;
+      line.style.width = `${Math.round(Math.hypot(dx, dy))}px`;
+      line.style.transform = `rotate(${Math.round((Math.atan2(dy, dx) * 180 * 100) / Math.PI) / 100}deg)`;
+    };
+    for (const edge of layout.edges) rule(edge, "vam-plan-ghost-edge");
+    for (const edge of layout.relations) rule(edge, "vam-plan-ghost-edge is-relation");
+    for (const card of layout.cards) {
+      const el = layer.createDiv(card.more ? "vam-plan-ghost is-more" : "vam-plan-ghost");
+      el.style.left = `${card.x}px`;
+      el.style.top = `${card.y}px`;
+      el.style.width = `${card.width}px`;
+      el.style.minHeight = `${card.height}px`;
+      el.createEl("small", { cls: "vam-plan-ghost-label", text: t("ui.map_chat_ghost_label") });
+      el.createDiv({
+        cls: "vam-plan-ghost-title",
+        text: card.more ? t("ui.map_chat_ghost_more_0", card.more) : card.title
+      });
+    }
   }
   /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
   private async deleteAnchor(imageId: string, anchorId: string): Promise<void> {
@@ -13070,6 +13145,7 @@ export class VisualAgentMapView extends ItemView {
       },
       note: id => this.notes.get(id),
       isMerging: id => this.isMerging(id),
+      titles: ids => ids.map(id => this.notes.get(id)?.title ?? id).join(t("ui.list_separator")),
       isArgumentCard: id => this.isArgumentCard(id),
       stylesEditable: !!node && this.markersEditable(node),
       aiRunning: id => this.aiStatusOf(id) === "running",
@@ -13711,6 +13787,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderCanvasItems();
     this.renderTidyPreview(canvas);
     this.paintKnowledgeRefs();
+    this.paintPlanGhosts();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -16340,7 +16417,8 @@ export class VisualAgentMapView extends ItemView {
                   renderLivingPreview(trial.result),
                   viewSession,
                   currentTrial,
-                  warnings
+                  warnings,
+                  trial.changes
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 if (shown && currentTrial()) watchTrial(prepared);
@@ -20617,7 +20695,7 @@ export class VisualAgentMapView extends ItemView {
     for (const { action, availability } of entries) {
       if (action.id === "finish-selection") addMore();
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
-      const reasonText = availability.ok ? "" : t(availability.reasonKey);
+      const reasonText = availability.ok ? "" : t(availability.reasonKey, ...(availability.reasonArgs ?? []));
       const button = this.button(selection, t(titleKeyFor(action, "toolbar", context)), () => {
         if (reasonText) new Notice(reasonText);
         else action.run(context, {});
@@ -23283,11 +23361,16 @@ export class VisualAgentMapView extends ItemView {
       map: () => this.map,
       chain: () => this.chatChainRunner,
       plans: () => this.chatRecordSession.plans,
-      showPreview: (token, anchors) => {
-        this.chatPreview = anchors.length ? { token, anchors } : null;
+      showPreview: (token, anchors, cards, relations = []) => {
+        this.chatPreview =
+          anchors.length || cards.length || relations.length
+            ? { token, anchors, ...(cards.length ? { cards } : {}), ...(relations.length ? { relations } : {}) }
+            : null;
         this.syncAnchorPreview();
+        this.paintPlanGhosts();
       },
       clearPreview: () => this.clearChatPreview(),
+      applyBlock: anchor => this.chatPlanBlock(anchor),
       refTitles: actions => this.chatRefTitles(actions),
       actionLabel: (action, refTitles, selection) => this.chatActionLabel(action, refTitles, selection),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
@@ -23646,6 +23729,17 @@ export class VisualAgentMapView extends ItemView {
   }
   private releaseChatTask(): void {
     this.mapChatConversation.releaseChatTask();
+  }
+  /**
+   * The one gate of a plan's Apply (V3.3 E3): the reason it cannot be applied now, or null. Its map is not the open one (stale), or
+   * the map is read-only here: presented, or its notes still loading. Read when the card is drawn and again just before the write.
+   */
+  private chatPlanBlock(anchor: { path: string; id: string | undefined }): string | null {
+    if (this.closed || !this.map || this.path !== anchor.path || this.map.id !== anchor.id)
+      return t("ui.map_chat_plan_blocked_stale");
+    if (this.presentation) return t("ui.map_chat_plan_blocked_presenting");
+    if (this.notesLoading()) return t("ui.map_chat_plan_blocked_loading");
+    return null;
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {

@@ -316,9 +316,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const note = await this.repo.readNote(path);
       return { title: note.title, summary: note.summary };
     },
-    updateNote: async (path, patch) => {
-      await this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true });
-    },
+    updateNote: (path, patch) => this.repo.updateNoteGuarded(path, patch, { rejectAiCard: true }),
     askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
     runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
     // requestUrl has no abort: verifySource races its own 15 s timeout and the runner's fence drops a late result.
@@ -2207,7 +2205,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     // A picture-book card (it has a book role) reads as a book page; see `.vam-book-page` in styles.css.
     const bookRole: unknown =
       leaf.view.file && this.app.metadataCache.getFileCache(leaf.view.file)?.frontmatter?.["book-role"];
-    leaf.view.containerEl.toggleClass("vam-book-page", typeof bookRole === "string" && bookRole !== "");
+    const isBook = typeof bookRole === "string" && bookRole !== "";
+    leaf.view.containerEl.toggleClass("vam-book-page", isBook);
+    // vam-tokens: the reader sits outside the map view, so it carries the VAM token root itself (V3.3 G01).
+    leaf.view.containerEl.toggleClass("vam-tokens", isBook);
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
   startBookPipeline(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {

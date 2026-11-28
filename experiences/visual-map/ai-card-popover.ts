@@ -227,6 +227,13 @@ export class AiCardPopover {
     this.failureEl.querySelector<HTMLButtonElement>("button")?.focus();
   }
 
+  /** The preview no longer matches its sources: it stays readable, but cannot be adopted. */
+  trialInvalidated(): void {
+    if (this.destroyed) return;
+    this.preview = false;
+    this.refresh();
+  }
+
   /** Sources whose note was replaced: each offers an explicit confirm. */
   markReplaced(names: readonly string[]): void {
     if (this.destroyed) return;

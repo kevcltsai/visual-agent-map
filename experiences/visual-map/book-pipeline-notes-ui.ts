@@ -216,6 +216,7 @@ export class BookNoteModal extends Modal {
     super(app);
   }
   onOpen(): void {
+    this.contentEl.addClass("vam-tokens");
     this.titleEl.setText(t("ui.book_note_title"));
     this.contentEl.createEl("p", { text: this.selected, cls: "vam-book-note-selected" });
     // Mockup ⑦-4: a visible "what to change" label names the input (its accessible name is the same words).

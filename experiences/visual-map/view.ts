@@ -15950,6 +15950,8 @@ export class VisualAgentMapView extends ItemView {
       const ref: EventRef = this.app.vault.on("modify", file => {
         if (paths.has(file.path)) void check();
       });
+      // Also released with the view, should the plugin unload without closing it.
+      this.registerEvent(ref);
       let watching: EventRef | undefined = ref;
       unwatch = () => {
         if (!watching) return;
@@ -15957,18 +15959,24 @@ export class VisualAgentMapView extends ItemView {
         watching = undefined;
       };
       const check = async (): Promise<void> => {
-        await saving.catch(() => undefined);
-        if (watching !== ref || trial.state !== "ready") return;
-        let still = false;
-        try {
-          const content = await prepared.adoption.readSavedContent?.();
-          still = content !== undefined && trial.matchesTarget(content) && (await prepared.inputsCurrent());
-        } catch {
-          still = false;
+        for (;;) {
+          const pending = saving;
+          await pending.catch(() => undefined);
+          if (watching !== ref || trial.state !== "ready") return;
+          let still = false;
+          try {
+            const content = await prepared.adoption.readSavedContent?.();
+            still = content !== undefined && trial.matchesTarget(content) && (await prepared.inputsCurrent());
+          } catch {
+            still = false;
+          }
+          // A save started during the reads: judge the preview by that save's outcome, not by its half-done bytes.
+          if (saving !== pending) continue;
+          if (still || watching !== ref || trial.state !== "ready") return;
+          invalidateTrial();
+          win.trialInvalidated();
+          return;
         }
-        if (still || watching !== ref || trial.state !== "ready") return;
-        invalidateTrial();
-        win.trialInvalidated();
       };
       // A change between the last input check and this listener is not missed.
       void check();

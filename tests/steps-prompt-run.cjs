@@ -1437,7 +1437,8 @@ const trialHarness = async () => {
     for (const ref of [...listeners]) if (ref.name === 'modify') ref.fn(file);
     return result;
   };
-  const reader = [];
+  const reader = [], registered = [];
+  h.view.registerEvent = ref => { registered.push(ref); };
   h.host.showLivingTrial = async (file, _markdown, owner, isCurrent) => { reader.push(['trial', file?.path, owner]); return isCurrent(); };
   h.host.invalidateLivingTrial = owner => { reader.push(['invalid', owner]); };
   h.host.restoreLivingOfficial = async (file, owner, release) => { reader.push(['official', file?.path, owner, !!release]); };
@@ -1451,7 +1452,7 @@ const trialHarness = async () => {
     await dom.tick(); await dom.tick();
     assert.equal(button('Adopt trial').disabled, false, 'the preview is ready to adopt');
   };
-  return { ...h, listeners, reader, button, bytes, ready };
+  return { ...h, listeners, registered, reader, button, bytes, ready };
 };
 
 for (const [name, leave] of [
@@ -1545,10 +1546,43 @@ test('P3.4 the target card changed elsewhere turns the preview invalid; saving t
   assert.equal(h.button('Adopt trial').disabled, true);
 });
 
+test('P3.4 an identical save pressed while a source check is reading does not invalidate the preview', async () => {
+  const h = await trialHarness();
+  await h.ready();
+  const { trial } = h.view.aiCardOpen;
+  const target = h.node('A').path;
+  // The next read of the card waits; the card is written while it waits, and the save then pauses before it returns.
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let gated = false;
+  const read = h.repo.readNoteSnapshot.bind(h.repo);
+  h.repo.readNoteSnapshot = async (path, ...rest) => {
+    if (path === target && !gated) { gated = true; await gate; }
+    return read(path, ...rest);
+  };
+  const process = h.app.vault.process;
+  h.app.vault.process = async (file, change) => {
+    const result = await process(file, change);
+    if (file.path === target) { release(); for (let i = 0; i < 40; i++) await dom.tick(); }
+    return result;
+  };
+  // A modify of the source starts a check, which stops on the card read.
+  for (const ref of [...h.listeners]) ref.fn(h.app.vault.getAbstractFileByPath(h.node('N').path));
+  await until(() => gated);
+  h.saveButton().click();
+  await until(() => h.view.history.past.length > 0);
+  for (let i = 0; i < 40; i++) await dom.tick();
+  assert.equal(trial.state, 'ready', 'the save is checked by its result, not mid-way');
+  assert.equal(h.button('Adopt trial').disabled, false);
+  h.button('Adopt trial').click();
+  await until(() => /Result: A/.test(h.raw('A')));
+});
+
 test('P3.4 the source listener ends with the editor: a later change does nothing, and reopening keeps one listener', async () => {
   const h = await trialHarness();
   await h.ready();
   assert.equal(h.listeners.size, 1, 'one listener while a preview is ready');
+  assert.ok(h.registered.includes([...h.listeners][0]), 'registered with the view, so unloading the plugin removes it too');
   h.view.closeAiCardPopover();
   assert.equal(h.listeners.size, 0, 'closing removes it');
   const seen = h.reader.length;

@@ -29127,7 +29127,7 @@ export class VisualAgentMapView extends ItemView {
           ? anchored.anchorNote
             ? t("ui.anchor_relation_end_0", anchored.anchorNote)
             : t("ui.anchor_relation_end_empty")
-          : (this.notes.get(id)?.title ?? id),
+          : (this.notes.get(id)?.title ?? this.knowledgeRefLabel(id) ?? id),
       at = this.relationLabelAt.get(key),
       head = createSvg("tspan");
     head.textContent = t(

@@ -320,3 +320,25 @@ test('F01-x a reference whose parent card is gone draws no connector; an unavail
   h.view.drawEdges();
   assert.equal(connectors().length, 1);
 });
+
+test('F07b-z. a relation line ending at a knowledge reference names the card and its source map (or the unavailable text), never the ref id', async () => {
+  const h = await harness();
+  const key = 'k';
+  for (const ok of [true, false]) {
+    for (const kind of ['supports', 'related']) {
+      for (const end of ['to', 'from']) {
+        h.view.refResolved = new Map([['ref-a', ok ? { ok: true, mapPath: OTHER, mapTitle: 'Other map', notePath: 'x.md', title: 'Ref card' } : { ok: false, reason: 'missing' }]]);
+        const relation = end === 'to' ? { kind, from: h.ids.root, to: 'ref-a' } : { kind, from: 'ref-a', to: h.ids.root };
+        const label = dom.createSvg('text');
+        h.view.relationLabelEls = new Map([[key, label]]);
+        h.view.relationData = new Map([[key, relation]]);
+        h.view.relationLabelAt = new Map([[key, { x: 0, y: 0 }]]);
+        h.view.anchorLinks = new Map();
+        h.view.paintRelationLabel(key, true);
+        const text = label.children.map(c => c.text ?? c.textContent).join('\n');
+        assert.ok(!text.includes('ref-'), `${ok} ${kind} ${end}: ${text}`);
+        assert.ok(ok ? text.includes('Ref card') && text.includes('Reference from “Other map”') : text.includes('unavailable'), text);
+      }
+    }
+  }
+});

@@ -1683,6 +1683,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_plan_blocked_stale": "現在不能套用：這個計畫是為一張已經不在畫面上的心智圖做的。",
   "ui.map_chat_plan_blocked_presenting": "現在不能套用：簡報中的心智圖是唯讀的。",
   "ui.map_chat_plan_blocked_loading": "現在不能套用：議題內容讀取完之前，心智圖是唯讀的。",
+  "ui.map_chat_plan_blocked_changed": "現在不能套用：目標卡在提案之後被改過。請重新送出訊息，取得新的提案。",
   "ui.map_chat_ghost_label": "預覽",
   "ui.map_chat_ghost_more_0": "…再 {0} 張",
   "ui.map_chat_plan_reason_many_actions_0": "共 {0} 個動作",

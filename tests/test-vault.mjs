@@ -978,4 +978,7 @@ test('test Obsidian runs from a background-only copy with a mock keychain', { sk
   // Electron's log goes into this test profile only, after --args so it never reaches `open` itself.
   assert.ok(args.indexOf('--enable-logging=file') > args.indexOf('--args'));
   assert.ok(args.includes('--log-file=/private/tmp/vam-e2e-x/.vam-app/electron.log'));
+  // stderr (V8 "AndDie" fatals) goes to the test profile; it is an `open` option, so it comes before --args.
+  assert.equal(args[args.indexOf('--stderr') + 1], '/private/tmp/vam-e2e-x/.vam-app/stderr.log');
+  assert.ok(args.indexOf('--stderr') < args.indexOf('--args'));
 });

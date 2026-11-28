@@ -218,6 +218,7 @@ const reasonModule = require('./support-replay.cjs').loadSource(`
 export { livingTrialReason } from "./experiences/visual-map/living-node-trial-reason";
 export { LivingTrial } from "./experiences/visual-map/living-node-trial";
 export { setUiLanguage } from "./i18n";
+export { searchNotPerformedError } from "./ai/search-not-performed";
 `, { obsidian: S.obsidian });
 
 test('trial failure: a provider error and a validation error each give a short reason, with the raw code only as a detail', () => {
@@ -229,6 +230,10 @@ test('trial failure: a provider error and a validation error each give a short r
   const web = reasonModule.livingTrialReason(new Error('required-web-unavailable'));
   assert.match(web.reason, /web search/);
   assert.equal(web.code, 'required-web-unavailable');
+  // D1-x5: a runtime's "the search did not happen" error is a web reason, not a provider failure; its sentence is not a code.
+  const notSearched = reasonModule.livingTrialReason(reasonModule.searchNotPerformedError());
+  assert.equal(notSearched.key, 'ui.living_node_trial_reason_web');
+  assert.equal(notSearched.code, '');
   assert.match(reasonModule.livingTrialReason(new Error('living-node-context-too-large')).reason, /too large/);
   assert.match(reasonModule.livingTrialReason(new Error('stale-base')).reason, /replaced or changed/);
   assert.match(reasonModule.livingTrialReason(new Error('ambiguous-living-node-region')).reason, /markers are damaged/);

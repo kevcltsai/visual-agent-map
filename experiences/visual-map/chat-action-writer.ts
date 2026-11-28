@@ -173,7 +173,8 @@ export interface ChatWriterPorts {
     current: () => boolean,
     allowSource: (path: string) => boolean
   ): Promise<MapNode | undefined>;
-  noteChange(node: MapNode, patch: NotePatch): Promise<void>;
+  /** "discarded": the guarded commit refused the write (the note changed or got locked after the gate); nothing was written. */
+  noteChange(node: MapNode, patch: NotePatch): Promise<"written" | "discarded">;
   moveTopic(node: MapNode, parent: MapNode): Promise<void>;
   removeToUnassignedEntry(node: MapNode, branch: boolean, adopterId?: string): Promise<TransactionEntry | undefined>;
   chatMoveBefore(node: MapNode, parent: MapNode, before: MapNode): Promise<boolean>;
@@ -327,7 +328,8 @@ export class ChatActionWriter {
         run.created.push(created.id);
         run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
-        if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
+        if (action.summary && (await this.ports.noteChange(created, { summary: action.summary })) === "discarded")
+          return skipped("ui.map_chat_skip_stale");
         return done;
       }
       case "configure_ai_card": {
@@ -475,7 +477,7 @@ export class ChatActionWriter {
         if (blocked.includes("ai_locked")) return skipped("ui.ai_locked_notice");
         if (blocked.includes("read_only")) return skipped("ui.living_node_use_run_card");
         run.notes?.add(node.id);
-        await this.ports.noteChange(
+        const written = await this.ports.noteChange(
           node,
           action.kind === "rename_topic"
             ? { title: action.title }
@@ -483,6 +485,7 @@ export class ChatActionWriter {
               ? { summary: action.summary }
               : { detail }
         );
+        if (written === "discarded") return skipped("ui.map_chat_skip_stale");
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }

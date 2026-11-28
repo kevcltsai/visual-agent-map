@@ -1,5 +1,11 @@
 import type { LivingCoordinator, LivingLease } from "./living-node-coordinator";
-import { applyLivingChanges, type LivingChangeContext, type LivingKnowledge } from "./living-node-changes";
+import {
+  applyLivingChanges,
+  summarizeLivingChanges,
+  type LivingChangeContext,
+  type LivingChangeSummary,
+  type LivingKnowledge
+} from "./living-node-changes";
 import {
   commitLivingMarkdown,
   livingGeneration,
@@ -41,6 +47,7 @@ export interface LivingAdoptionCheck {
 export class LivingTrial {
   private status: LivingPreviewStatus = "none";
   private preview?: LivingKnowledge;
+  private summary?: LivingChangeSummary;
   private candidate?: { snapshot: TrialSnapshot; proposal: unknown; savedContent?: string };
   private lease?: LivingLease;
   private generation = 0;
@@ -60,6 +67,11 @@ export class LivingTrial {
     return this.preview ? clone(this.preview) : undefined;
   }
 
+  /** What this preview would change against the formal knowledge it was run on. */
+  get changes(): LivingChangeSummary | undefined {
+    return this.summary ? clone(this.summary) : undefined;
+  }
+
   invalidate(): void {
     this.generation++;
     this.candidate = undefined;
@@ -72,6 +84,7 @@ export class LivingTrial {
     this.closed = true;
     this.invalidate();
     this.preview = undefined;
+    this.summary = undefined;
     this.status = "none";
   }
 
@@ -121,6 +134,7 @@ export class LivingTrial {
         output: next.output,
         ...(next.aiLatest ? { aiLatest: next.aiLatest } : {})
       };
+      this.summary = summarizeLivingChanges(base, next);
       this.candidate = { snapshot, proposal, savedContent };
       this.status = "ready";
       return true;

@@ -222,7 +222,7 @@ import {
   requestUrl,
   setIcon
 } from "obsidian";
-import type { ReferenceGroup } from "../../ai/reference-materials";
+import { sourceRevision, type ReferenceGroup } from "../../ai/reference-materials";
 import {
   inspectLivingValidity,
   livingCoordinator,
@@ -236,6 +236,7 @@ import {
   livingCrossCut,
   type LivingConfigSave
 } from "./living-node-runtime";
+import { livingHighlight, type LivingDependencyGraph } from "./living-node-map";
 import { LivingTrial, type LivingAdoptionCheck } from "./living-node-trial";
 import {
   livingNoteForModel,
@@ -243,7 +244,8 @@ import {
   livingWithoutFence,
   renderLivingPreview
 } from "./living-node-markdown";
-import { livingReasonKey } from "./living-node-state";
+import { livingCardState, livingReasonKey, livingRoundStats } from "./living-node-state";
+import type { LivingSettlement } from "./living-node-execution";
 import { resolveMapSources, type MapSource } from "./map-sources";
 import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
 import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
@@ -373,7 +375,8 @@ import {
   type NotePatch,
   type TopicInfo,
   isPlaceholder,
-  type TopicAppearanceChange
+  type TopicAppearanceChange,
+  AiWriterRefusal
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
@@ -635,6 +638,7 @@ import {
   type AiCardStatus,
   type PromptBatchState,
   type PromptNoteRef,
+  type PromptOutcome,
   type PromptRunEntry
 } from "./prompt-run";
 import {
@@ -768,6 +772,23 @@ const INTERACTIVE_SELECTOR = [
   '[contenteditable="true"]',
   '[role="button"]'
 ].join(",");
+/** The last count of a Run All / Run Card round: only the classes that happened; "done" is changed + no-change only. */
+function livingRunSummary(outcome: PromptOutcome): string {
+  const parts = [
+    outcome.done &&
+      (outcome.noChange
+        ? t("ui.ai_run_summary_done_0_1", outcome.done, outcome.noChange)
+        : t("ui.ai_run_summary_done_0", outcome.done)),
+    outcome.failed && t("ui.ai_run_summary_failed_0", outcome.failed),
+    outcome.blocked && t("ui.ai_run_summary_blocked_0", outcome.blocked),
+    outcome.cancelled && t("ui.ai_run_summary_cancelled_0", outcome.cancelled),
+    outcome.skipped && t("ui.ai_run_summary_skipped_0", outcome.skipped),
+    outcome.reused && t("ui.ai_run_summary_reused_0", outcome.reused)
+  ].filter((part): part is string => !!part);
+  if (!parts.length) return "";
+  const list = parts.join(t("ui.ai_run_summary_separator"));
+  return t(outcome.stopped ? "ui.ai_run_summary_stopped_0" : "ui.ai_run_summary_finished_0", list);
+}
 /** True when a key event came from a text control, where the field owns the key (undo, Backspace, typing). */
 function isEditableTarget(target: unknown): boolean {
   return !!(target as Element | null)?.closest?.(EDITABLE_SELECTOR);
@@ -3387,7 +3408,10 @@ export class VisualAgentMapView extends ItemView {
       }
       const name = (value ?? "").trim();
       if (!name || name === note.title) this.render();
-      else this.enqueue(() => this.noteChange(node, { title: name }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { title: name });
+        });
     });
     this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
     return input;
@@ -3472,7 +3496,10 @@ export class VisualAgentMapView extends ItemView {
         this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
       }
       if (!save || value === state.original.trim()) this.render();
-      else this.enqueue(() => this.noteChange(node, { summary: value }));
+      else
+        this.enqueue(async () => {
+          await this.noteChange(node, { summary: value });
+        });
     };
     area.addEventListener("input", () => {
       state.draft = area.value;
@@ -3953,8 +3980,10 @@ export class VisualAgentMapView extends ItemView {
     this.notes = loaded;
     this.mapSourcesControl?.loadForMap(sources);
     this.livingValidity.clear();
+    this.livingGraph = undefined;
     if (map && path && [...loaded.values()].some(isAiCard) && !this.promptRunning()) {
       try {
+        let graph: LivingDependencyGraph | undefined;
         const validity = await inspectLivingValidity({
           app: this.app,
           repo: this.plugin.repo,
@@ -3965,9 +3994,13 @@ export class VisualAgentMapView extends ItemView {
           current: alive,
           noteReads: ctx,
           language: (live, note) => cardOutputLanguage(live, this.plugin.settings.language, note.title),
-          mapSources: signal => this.readLivingMapSourceReport(signal)
+          mapSources: signal => this.readLivingMapSourceReport(signal),
+          onDependencies: dependencies => (graph = dependencies)
         });
-        if (alive()) this.livingValidity = validity;
+        if (alive()) {
+          this.livingValidity = validity;
+          this.livingGraph = graph;
+        }
       } catch {
         // Unknown validity never pretends to be a fresh result.
       }
@@ -6536,6 +6569,7 @@ export class VisualAgentMapView extends ItemView {
     const button = parent.createEl("button", { cls: "vam-run-all", attr: { type: "button" } });
     if (state) {
       const done = Math.min(state.finished + 1, state.total);
+      const known = !!state.planned && state.total > 0;
       const ring = createSvg("svg");
       ring.setAttribute("viewBox", "0 0 20 20");
       ring.addClass("vam-run-all-ring");
@@ -6549,12 +6583,13 @@ export class VisualAgentMapView extends ItemView {
       arc.setAttribute("cy", "10");
       arc.setAttribute("r", "8");
       arc.setAttribute("pathLength", "100");
-      arc.setAttribute("stroke-dasharray", `${Math.round((state.finished / Math.max(1, state.total)) * 100)} 100`);
+      arc.setAttribute("stroke-dasharray", `${known ? Math.round((state.finished / state.total) * 100) : 0} 100`);
       arc.addClass("vam-run-all-arc");
       ring.appendChild(track);
       ring.appendChild(arc);
       button.appendChild(ring);
-      button.createSpan({ cls: "vam-run-all-count", text: `${done} / ${state.total}` });
+      // "n / N" only once the round is planned and has cards to process.
+      if (known) button.createSpan({ cls: "vam-run-all-count", text: `${done} / ${state.total}` });
       button.addClass("is-running");
       button.setAttr("aria-label", t("ui.ai_run_all_stop"));
       button.setAttr("title", t("ui.ai_run_all_stop"));
@@ -6654,6 +6689,11 @@ export class VisualAgentMapView extends ItemView {
     // The change is saved and in history; a failing rebuild is reported but leaves it there (Undo stays available).
     const ownership = (map: MapDocument): string =>
       JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+    // The dependency graph comes from the cards, paths and parents (not their order or place); after a change to those it is
+    // stale and highlights nothing until the next hydrate brings it back.
+    const planned = (map: MapDocument): string =>
+      JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]).sort());
+    if (planned(before) !== planned(after)) this.livingGraph = undefined;
     try {
       if (rebuildDerivedData && (ownership(before) !== ownership(after) || created.length > 0))
         await this.plugin.rebuildDerivedData();
@@ -7935,15 +7975,48 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t(probe?.reason === "ambiguous" ? "ui.knowledge_ref_ambiguous" : "ui.knowledge_ref_unusable"));
       return;
     }
-    const parent = this.canvasNodes().find(node => node.id === parentId);
+    const shown = this.canvasNodes();
+    const parent = shown.find(node => node.id === parentId);
     const siblings = visibleKnowledgeRefs(map).filter(ref => ref.parentId === parentId).length;
+    // Right of the parent card; when it already has child cards, in their column just below the lowest one.
+    const kids = parent ? shown.filter(node => node.parentId === parentId) : [];
+    const below = kids.length
+      ? {
+          x: Math.min(...kids.map(kid => kid.x)) - parent!.x,
+          y: Math.max(...kids.map(kid => kid.y + (this.cardHeightOf(kid.id) ?? DEFAULT_CARD_HEIGHT))) - parent!.y + 24
+        }
+      : null;
+    const at = { x: below?.x ?? (parent?.width ?? CARD_WIDTH) + 40, y: (below?.y ?? 0) + siblings * 90 };
+    if (parent) {
+      // Then down, past whatever card or reference it would cover (a reference counts as 260×60, its widest).
+      const byId = new Map(shown.map(node => [node.id, node]));
+      const boxes = [
+        ...shown.map(node => ({
+          x: node.x,
+          y: node.y,
+          w: node.width ?? CARD_WIDTH,
+          h: this.cardHeightOf(node.id) ?? DEFAULT_CARD_HEIGHT
+        })),
+        ...visibleKnowledgeRefs(map).flatMap(item => {
+          const owner = byId.get(item.parentId);
+          return owner ? [{ x: owner.x + item.x, y: owner.y + item.y, w: 260, h: 60 }] : [];
+        })
+      ];
+      for (let step = 0; step <= boxes.length; step++) {
+        const x = parent.x + at.x,
+          y = parent.y + at.y;
+        const hit = boxes.find(box => x < box.x + box.w && box.x < x + 260 && y < box.y + box.h && box.y < y + 60);
+        if (!hit) break;
+        at.y = hit.y + hit.h + 24 - parent.y;
+      }
+    }
     const ref: KnowledgeRef = {
       id: `ref-${crypto.randomUUID()}`,
       mapId: target.mapId,
       nodeId: target.nodeId,
       parentId,
-      x: (parent?.width ?? CARD_WIDTH) + 40,
-      y: siblings * 90,
+      x: at.x,
+      y: at.y,
       pathHint: probe.mapPath
     };
     const paths = this.knownRefPaths();
@@ -10428,6 +10501,7 @@ export class VisualAgentMapView extends ItemView {
         el.style.width = `${from.w}px`;
         el.style.height = `${from.h}px`;
         ring?.update(0, 0);
+        if (ring) this.syncDependencyHighlight();
       };
       const up = (): void => {
         if (done) return;
@@ -11608,7 +11682,26 @@ export class VisualAgentMapView extends ItemView {
       if (target) {
         map.nodes.find(node => node.id === target.id)!.collapsed = false;
         // One layout for the moved branches under the target, in the same history entry as the move.
-        this.arrangeBranch(map, target.id, moved, undefined);
+        if (roots.length > 1 && !before && this.placesLocally(map)) {
+          // A batch move keeps the branches' distances to each other: the top branch is laid out, the rest shift by the same offset, then only overlaps are pushed apart.
+          const lead = roots
+            .map(root => map.nodes.find(item => item.id === root.id)!)
+            .reduce((a, b) => (b.y < a.y ? b : a));
+          const start = new Map(
+            map.nodes.filter(node => moved.has(node.id)).map(node => [node.id, { x: node.x, y: node.y }])
+          );
+          const first = start.get(lead.id)!;
+          this.arrangeBranch(map, target.id, branchOf.get(lead.id)!, undefined);
+          const placed = map.nodes.find(node => node.id === lead.id)!;
+          const dx = placed.x - first.x,
+            dy = placed.y - first.y;
+          const rest = new Set([...moved].filter(id => !branchOf.get(lead.id)!.has(id)));
+          for (const node of map.nodes) {
+            const was = rest.has(node.id) ? start.get(node.id) : undefined;
+            if (was) Object.assign(node, { x: was.x + dx, y: was.y + dy });
+          }
+          this.pushFrom(map, rest);
+        } else this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }
@@ -12608,7 +12701,7 @@ export class VisualAgentMapView extends ItemView {
     sink: (entry: Action) => void = entry => this.history.push(entry),
     /** Chat content writes: the AI-card refusal is checked on the bytes at the write, not on this view's cached note. */
     rejectAiCard = false
-  ): Promise<void> {
+  ): Promise<"written" | "discarded"> {
     this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
@@ -12622,8 +12715,10 @@ export class VisualAgentMapView extends ItemView {
       before.previewInitialized = current.previewInitialized;
       before.previewAutoHash = current.previewAutoHash;
     }
-    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
-    await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard });
+    if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return "written";
+    // A write the guarded commit discarded changed nothing: no undo step, no task stop, no cache update.
+    if ((await this.plugin.repo.updateNoteGuarded(node.path, patch, { rejectAiCard })) === "discarded")
+      return "discarded";
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
       this.plugin.topicRuns.dropPending(node.path);
@@ -12664,6 +12759,7 @@ export class VisualAgentMapView extends ItemView {
     });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
     this.render();
+    return "written";
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
   private chartSnapshot(note: Note): string {
@@ -14992,6 +15088,7 @@ export class VisualAgentMapView extends ItemView {
     this.syncToolsVisibility();
     this.chat?.refreshSelection();
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
   }
   /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
   private syncToolsVisibility(): void {
@@ -16384,7 +16481,8 @@ export class VisualAgentMapView extends ItemView {
                   renderLivingPreview(trial.result),
                   viewSession,
                   currentTrial,
-                  warnings
+                  warnings,
+                  trial.changes
                 );
                 if (!shown && currentTrial()) invalidateTrial();
                 if (shown && currentTrial()) watchTrial(prepared);
@@ -21075,10 +21173,16 @@ export class VisualAgentMapView extends ItemView {
     }
     void this.runLivingBatch(requested);
   }
-  private setPromptStatus(mapPath: string, id: string, status: PromptRunEntry["status"], reason?: string): void {
+  private setPromptStatus(
+    mapPath: string,
+    id: string,
+    status: PromptRunEntry["status"],
+    reason?: string,
+    settled?: Pick<PromptRunEntry, "settlement" | "aborted">
+  ): void {
     let entries = this.promptRuns.get(mapPath);
     if (!entries) this.promptRuns.set(mapPath, (entries = new Map<string, PromptRunEntry>()));
-    entries.set(id, reason === undefined ? { status } : { status, reason });
+    entries.set(id, { status, ...(reason === undefined ? {} : { reason }), ...settled });
     // A batch resets every queued topic in one synchronous loop; paint once for all of them.
     if (this.promptRenderQueued) return;
     this.promptRenderQueued = true;
@@ -21116,7 +21220,14 @@ export class VisualAgentMapView extends ItemView {
     this.promptBatch = state;
     const failureReasons = new Map<string, string>();
     const trialSkipped = new Set<string>();
-    const tally = { done: 0, failed: 0, blocked: 0 };
+    // Every card's result this round, for the last count; `excluded` settle at once and are not progress.
+    const results = new Map<string, LivingSettlement>();
+    let excluded = new Set<string>();
+    const outcomeOf = (stopped: boolean): PromptOutcome => {
+      // Whether a not-run card counts as cancelled was decided when it settled (same as its face), not by the round's end.
+      const { success, ...rest } = livingRoundStats(results.values());
+      return { done: success, ...rest, stopped };
+    };
     let warnedOptionalSources = false;
     const viewCurrent = (): boolean => session() && !this.plugin.repo.isDisposed();
     const current = (): boolean => viewCurrent() && !run.signal.aborted;
@@ -21126,7 +21237,11 @@ export class VisualAgentMapView extends ItemView {
       switch (event.kind) {
         case "start":
           state.total = event.total;
+          state.planned = true;
+          excluded = new Set(event.excluded);
           this.promptRuns.delete(mapPath);
+          // A card of this round not reached yet waits, whatever an earlier round left on it.
+          for (const id of event.queued) this.setPromptStatus(mapPath, id, "waiting");
           for (const id of trialSkipped) this.setPromptStatus(mapPath, id, "idle", failureReasons.get(id));
           if (current()) this.render();
           break;
@@ -21147,30 +21262,29 @@ export class VisualAgentMapView extends ItemView {
           if (event.skipped.length && viewCurrent()) new Notice(t("ui.living_node_trial_boundary"));
           break;
         case "settled": {
-          const result = event.result;
-          state.finished = Math.min(state.total, state.finished + 1);
+          const result = event.result as LivingSettlement;
+          results.set(event.id, result === "not-run" && run.signal.aborted ? "cancelled" : result);
+          if (!excluded.has(event.id)) state.finished = Math.min(state.total, state.finished + 1);
           const usable = result === "changed" || result === "no-change" || result === "reused";
-          if (usable) tally.done++;
-          else if (result === "failed") tally.failed++;
-          else if (result === "blocked") tally.blocked++;
           this.setPromptStatus(
             mapPath,
             event.id,
             usable ? "done" : result === "failed" || result === "blocked" ? "blocked" : "idle",
-            failureReasons.get(event.id)
+            failureReasons.get(event.id),
+            { settlement: result, aborted: run.signal.aborted }
           );
           break;
         }
         case "done":
           // The skip line belongs to the batch only; the trial card is not stamped, so nothing else clears it.
           for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
-          state.outcome = { ...tally, stopped: run.signal.aborted || event.error === true };
+          state.outcome = outcomeOf(run.signal.aborted || event.error === true);
           if (session()) {
-            if (state.outcome.stopped) new Notice(t("ui.ai_run_stopped_0_1", state.outcome.done, state.total));
-            else if (state.outcome.failed || state.outcome.blocked)
-              new Notice(
-                t("ui.ai_run_finished_0_1_2", state.outcome.done, state.outcome.failed, state.outcome.blocked)
-              );
+            // Stopped before any card ran (while planning or confirming): still say the run stopped.
+            const summary =
+              livingRunSummary(state.outcome) ||
+              (run.signal.aborted ? t("ui.ai_run_summary_stopped_0", t("ui.ai_run_summary_none")) : "");
+            if (summary) new Notice(summary);
           }
           finish(state.outcome);
           break;
@@ -21180,7 +21294,7 @@ export class VisualAgentMapView extends ItemView {
     state.leave = () => {
       unsubscribe();
       for (const id of trialSkipped) this.promptRuns.get(mapPath)?.delete(id);
-      state.outcome ??= { ...tally, stopped: true };
+      state.outcome ??= outcomeOf(true);
       finish(state.outcome);
     };
     if (existing) {
@@ -21231,7 +21345,7 @@ export class VisualAgentMapView extends ItemView {
                 );
             },
             confirm: (model, work) => this.plugin.confirmAiUsage(model, work),
-            onStart: total => run.emit({ kind: "start", total }),
+            onStart: (total, excluded, queued) => run.emit({ kind: "start", total, excluded, queued }),
             onTrialBoundary: boundary => run.emit({ kind: "trial", ...boundary }),
             onRunning: id => run.emit({ kind: "running", id }),
             onSettled: (id, result) => run.emit({ kind: "settled", id, result }),
@@ -21302,6 +21416,11 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private livingValidity = new Map<string, "none" | "valid" | "stale">();
+  /** What each runnable AI card depends on, from the same validity pass; absent while unknown. */
+  private livingGraph: LivingDependencyGraph | undefined;
+  /** The tree lines this view marked and the overlay lines it added for the selected card's dependencies. */
+  private depMarks: SVGPathElement[] = [];
+  private depOverlays: SVGPathElement[] = [];
 
   /** Latest outcome and validity are independent. Old knowledge stays readable after a failure. */
   private aiStatusOf(id: string): AiCardStatus | undefined {
@@ -21310,16 +21429,23 @@ export class VisualAgentMapView extends ItemView {
     if (!node || !note || !isAiCard(note)) return undefined;
     const known = this.aiStatusMemo.get(id);
     if (known) return known;
-    const entry = this.promptRunning() ? this.promptEntryOf(id) : undefined;
-    let status: AiCardStatus;
-    if (this.aiWorkingOn(node)) status = "running";
-    else if (entry?.status === "blocked") status = "failed";
-    else if (entry?.status === "done") status = "done";
-    else if (note.livingNode?.outcome === "failed" || note.livingNode?.outcome === "blocked") status = "failed";
-    else {
-      const validity = this.livingValidity.get(id);
-      status = validity === "valid" ? "done" : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
-    }
+    const running = this.promptRunning();
+    const entry = this.promptEntryOf(id);
+    // After the round only a stop is taken from it: a cancelled attempt is not stamped on the card, the rest is.
+    const settled =
+      running || entry?.settlement === "cancelled" || (entry?.settlement === "not-run" && entry.aborted)
+        ? entry
+        : undefined;
+    const validity = this.livingValidity.get(id) ?? "none";
+    const state = livingCardState({
+      runtime: this.aiWorkingOn(node) ? "running" : running && entry?.status === "waiting" ? "waiting" : "idle",
+      settlement: settled?.settlement,
+      aborted: settled?.aborted,
+      latestOutcome: note.livingNode?.outcome ?? "never",
+      validity
+    });
+    const status: AiCardStatus =
+      state !== "suggested" ? state : validity === "stale" || note.livingNode?.damaged ? "stale" : "pending";
     this.aiStatusMemo.set(id, status);
     return status;
   }
@@ -21333,7 +21459,8 @@ export class VisualAgentMapView extends ItemView {
     if (note.livingNode?.lastSuccessfulCheck)
       lines.push(t("ui.living_node_last_success") + ": " + note.livingNode.lastSuccessfulCheck);
     if (note.livingNode?.lastAttempt) lines.push(t("ui.living_node_last_attempt") + ": " + note.livingNode.lastAttempt);
-    if (status === "failed" && this.promptEntryOf(node.id)?.reason) lines.push(this.promptEntryOf(node.id)!.reason!);
+    if ((status === "failed" || status === "blocked") && this.promptEntryOf(node.id)?.reason)
+      lines.push(this.promptEntryOf(node.id)!.reason!);
     return lines.join("\n");
   }
   /**
@@ -21355,7 +21482,14 @@ export class VisualAgentMapView extends ItemView {
     const title = card.querySelector<HTMLElement>(".vam-card-title");
     const parts: HTMLElement[] = [];
     const status = this.aiStatusOf(node.id) ?? "pending";
-    const names: string[] = [t("ui.ai_card"), t(`ui.ai_card_status_${status}`)];
+    // Failed, blocked or stopped knowledge may also be out of date: both are said.
+    const shown: AiCardStatus[] = [status];
+    if (
+      (status === "failed" || status === "blocked" || status === "stopped") &&
+      (this.livingValidity.get(node.id) === "stale" || note.livingNode?.damaged)
+    )
+      shown.push("stale");
+    const names: string[] = [t("ui.ai_card"), ...shown.map(each => t(`ui.ai_card_status_${each}`))];
     if (title) {
       const star = createSpan({ cls: "vam-ai-star", attr: { role: "img", "aria-label": t("ui.ai_card") } });
       setIcon(star, "sparkles");
@@ -21402,14 +21536,18 @@ export class VisualAgentMapView extends ItemView {
         parts.push(line);
       }
     }
-    // Running, stale and failed say so in the header with a mark and words, never by colour alone (the lock label takes the place when locked).
-    if ((status === "running" || status === "stale" || status === "failed") && note.aiLocked !== true) {
-      const chip = createSpan({ cls: `vam-status vam-status-${status}`, text: t(`ui.ai_card_status_${status}`) });
-      chip.setAttr("title", this.aiStatusTip(node, note, status));
-      const check = header.querySelector<HTMLElement>(":scope > input");
-      if (check) check.after(chip);
-      else header.prepend(chip);
-      parts.push(chip);
+    // Progress and trouble say so in the header with a mark and words, never by colour alone; done and suggested say nothing
+    // here (the lock label takes the place when locked).
+    if (status !== "done" && status !== "pending" && note.aiLocked !== true) {
+      let anchor = header.querySelector<HTMLElement>(":scope > input");
+      for (const each of shown) {
+        const chip = createSpan({ cls: `vam-status vam-status-${each}`, text: t(`ui.ai_card_status_${each}`) });
+        chip.setAttr("title", this.aiStatusTip(node, note, each));
+        if (anchor) anchor.after(chip);
+        else header.prepend(chip);
+        anchor = chip;
+        parts.push(chip);
+      }
     }
     // The toolbar's first button follows the state (B08): Run, or Stop while the AI works on the card (the header keeps its
     // own Stop, decision #39).
@@ -21497,22 +21635,39 @@ export class VisualAgentMapView extends ItemView {
       [...this.selection.state.multiSelected]
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
-    const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
+    const cardNames = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
     const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
+      // The read-only references hanging on the selected cards are synthesized too (P4.6). They are read once here: the
+      // dialog names exactly the ones the run sends (an unnamed one is not sent).
+      const refs = this.recombinedRefs(nodes);
+      const found = refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO()).catch(
+            () => new Map<string, RefResolution>()
+          )
+        : new Map<string, RefResolution>();
+      const listed = new Map<string, RefResolution>();
+      const refNames = refs.flatMap(ref => {
+        const resolution = found.get(ref.id);
+        const title = referenceTitle(resolution);
+        if (!title || !resolution) return [];
+        listed.set(ref.id, resolution);
+        return [`${t("ui.knowledge_ref_export_prefix")} ${title}`];
+      });
+      const names = [...cardNames, ...refNames];
       const dialog = new NextStepModal(
         this.app,
         this.plugin,
         (options, direction, failed, accepted, observer) =>
-          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
+          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer, undefined, listed),
         {
           names,
           initialTitle:
             pending?.title ??
-            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
+            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), cardNames),
           defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
           background: this.backgroundHooks(this.selectionTaskKey()),
           fields: {
@@ -21585,7 +21740,9 @@ export class VisualAgentMapView extends ItemView {
     failed: (message: string) => void,
     accepted: () => void,
     observer?: SynthesisObserver,
-    errorSink?: (error: unknown) => void
+    errorSink?: (error: unknown) => void,
+    /** The references the dialog named, as it read them; only these are sent. Without it they are read at run time. */
+    listedRefs?: ReadonlyMap<string, RefResolution>
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
@@ -21596,6 +21753,17 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.ai_locked_notice"));
       return;
     }
+    // The result is written as a new card, so a read-only map or a source an AI merge holds refuses it before any AI call.
+    // Read-only is what the card actions call it: a presentation, or notes still loading.
+    if (this.presentation || this.notesLoading()) {
+      failed(t("ui.synthesis_readonly"));
+      return;
+    }
+    if (sources.some(node => this.isMerging(node.id))) {
+      failed(t("ui.merge_locked"));
+      return;
+    }
+    const refs = this.recombinedRefs(sources);
     const mapId = this.map.id;
     let draftContext: TaskContext | undefined;
     await this.plugin.topicRuns.startSelectionSynthesis(this, {
@@ -21610,7 +21778,7 @@ export class VisualAgentMapView extends ItemView {
       mapId,
       changed: () => this.render(),
       model: () => this.selectionModel(sources),
-      readSources: (mode, language) => this.topicReferenceGroup(sources, mode, { language }),
+      readSources: (mode, language) => this.recombinationGroup(sources, refs, mode, language, listedRefs),
       startProgress: model => {
         return this.startTaskProgress(this.taskProgressKey("integration"), model);
       },
@@ -21776,6 +21944,46 @@ export class VisualAgentMapView extends ItemView {
       documents
     };
   }
+  /** The visible read-only references hanging on the given cards (P4.6: they are synthesized with them). */
+  private recombinedRefs(sources: readonly Pick<MapNode, "id">[]): KnowledgeRef[] {
+    if (!this.map) return [];
+    const ids = new Set(sources.map(node => node.id));
+    return visibleKnowledgeRefs(this.map).filter(ref => ids.has(ref.parentId));
+  }
+  /**
+   * What a selection synthesis reads (P4.6): the selected cards, then the originals of their references, read from the vault
+   * now (an original that cannot be used is left out). Each document carries its card id and its note's revision, so the new
+   * card cites every original by id, path and revision. Reads only.
+   */
+  private async recombinationGroup(
+    sources: MapNode[],
+    refs: readonly KnowledgeRef[],
+    mode: "strong" | "summary",
+    language?: ContentLanguage,
+    resolved?: ReadonlyMap<string, RefResolution>
+  ): Promise<ReferenceGroup> {
+    const found =
+      resolved ??
+      (refs.length
+        ? await resolveKnowledgeRefs(refs, this.plugin.repo.knowledgeRefIO())
+        : new Map<string, RefResolution>());
+    const cited: { id: string; path: string }[] = sources.map(node => ({ id: node.id, path: node.path }));
+    for (const ref of refs) {
+      const resolved = found.get(ref.id);
+      if (resolved?.ok && !cited.some(item => item.path === resolved.notePath))
+        cited.push({ id: ref.nodeId, path: resolved.notePath });
+    }
+    const group = await this.topicReferenceGroup(cited, mode, { language });
+    const vault = this.app.vault;
+    const documents = await Promise.all(
+      group.documents.map(async (document, index) => {
+        const file = vault.getAbstractFileByPath(document.path);
+        if (!(file instanceof TFile)) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        return { ...document, nodeId: cited[index].id, rev: sourceRevision(await vault.read(file)) };
+      })
+    );
+    return { ...group, documents };
+  }
   private async saveIntegratedNode(
     title: string,
     sources: MapNode[],
@@ -21797,10 +22005,12 @@ export class VisualAgentMapView extends ItemView {
       task.state !== "applying"
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    const latest = await this.topicReferenceGroup(
+    // The references are taken again: one added or removed since the run started changes the sources, so nothing is saved.
+    const latest = await this.recombinationGroup(
       sources,
+      this.recombinedRefs(sources),
       task.options.synthesisContent === "summary" ? "summary" : "strong",
-      { language: task.options.outputLanguage }
+      task.options.outputLanguage
     );
     if (
       JSON.stringify(latest.documents) !== task.sourceContent ||
@@ -21828,7 +22038,8 @@ export class VisualAgentMapView extends ItemView {
           ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
-          sourcePaths: sources.map(source => source.path),
+          // Every note it was read from, the references' originals included.
+          sourcePaths: latest.documents.map(document => document.path),
           status: "completed",
           ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
         },
@@ -22318,6 +22529,7 @@ export class VisualAgentMapView extends ItemView {
         target.closest(".vam-boundary-label") ||
         target.closest(".vam-summary") ||
         target.closest(".vam-summary-text") ||
+        target.closest(".vam-knowledge-ref") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
       )
@@ -24792,6 +25004,8 @@ export class VisualAgentMapView extends ItemView {
       return await this.chatWriter.write(action, baseline, same, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      // The guarded commit refused the bytes (a Living Node or damaged markers appeared after the gate): skipped, nothing written.
+      if (error instanceof AiWriterRefusal) return { status: "skipped", reason: error.message };
       throw error;
     } finally {
       this.chatReadOnlyPaths = previous;
@@ -25272,12 +25486,10 @@ export class VisualAgentMapView extends ItemView {
           work?.controller.signal
         );
         if (!outcome || outcome.stopped) return skipped("ui.map_chat_skip_stopped");
-        if (outcome.failed || outcome.blocked)
-          return {
-            status: "failed",
-            reason: t("ui.ai_run_finished_0_1_2", outcome.done, outcome.failed, outcome.blocked)
-          };
-        return outcome.done ? { status: "done" } : skipped("ui.prompt_run_nothing");
+        if (outcome.failed || outcome.blocked) return { status: "failed", reason: livingRunSummary(outcome) };
+        if (outcome.done) return { status: "done" };
+        // Every card was already current: nothing ran, so it is not "done".
+        return skipped(outcome.reused ? "ui.map_chat_skip_living_current" : "ui.prompt_run_nothing");
       }
       case "research_standard": {
         const researchTargets = targets.length ? targets : this.chatTargetIds(selection.ids);
@@ -26683,6 +26895,7 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          this.syncDependencyHighlight();
         }
       };
       const settle = (): void => {
@@ -26713,6 +26926,8 @@ export class VisualAgentMapView extends ItemView {
             this.renderAfterDrag = false;
             if (!this.closed) this.render();
           }
+          // A drop that puts the card back redraws no edges: the overlays come back here.
+          this.syncDependencyHighlight();
         }
       };
       const drop = (e: PointerEvent, landed: { node: MapNode; invalid: boolean } | null): void => {
@@ -26898,6 +27113,8 @@ export class VisualAgentMapView extends ItemView {
     });
     return {
       update: (dx, dy) => {
+        // Dependency overlays do not follow a drag; the next highlight pass draws them again.
+        this.clearDependencyOverlays();
         for (const { id, boxes } of spines) {
           const move = (item: string, box: CardBox): CardBox =>
             group.has(item) ? (shifted(item, dx, dy) ?? box) : box;
@@ -27022,6 +27239,7 @@ export class VisualAgentMapView extends ItemView {
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
+        this.clearDependencyOverlays();
         if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
@@ -27252,6 +27470,50 @@ export class VisualAgentMapView extends ItemView {
     for (const line of lines) this.edgesEl.appendChild(line);
     this.drawRelations(boxFor);
     this.syncRelationClasses();
+    this.syncDependencyHighlight();
+  }
+  /**
+   * The selected AI card's dependencies, as the planner resolves them: an AI dependency gets the run style, an ordinary
+   * card it reads the read style, on the tree line between them. A pair with no tree line drawn (an explicit reference,
+   * or a tree line left out for a relation) gets an overlay line while selected. Semantic lines are never marked.
+   * Only the previous marks are undone, so a selection change costs the size of the highlight, not the map.
+   */
+  private syncDependencyHighlight(): void {
+    for (const path of this.depMarks) path.removeClass("is-dep-run", "is-dep-read");
+    this.depMarks = [];
+    this.clearDependencyOverlays();
+    const selected = this.selection.state.selected;
+    if (!this.edgesEl || !this.map || this.map.aim || !this.livingGraph || !selected) return;
+    if (this.selection.state.multiSelected.size > 1) return;
+    const { run, read } = livingHighlight(this.livingGraph, selected);
+    const mark = (pairs: [string, string][], cls: string): void => {
+      for (const [consumer, dep] of pairs) {
+        const key = `${consumer}\u0000${dep}`;
+        // A child that reads its parent shares the parent's tree line (keyed parent first).
+        const path = this.edgeEls.get(key) ?? this.edgeEls.get(`${dep}\u0000${consumer}`);
+        if (path) {
+          path.addClass(cls);
+          this.depMarks.push(path);
+          continue;
+        }
+        // Collapsed away: with one end hidden there is nothing to join.
+        const from = this.cardEls.get(consumer);
+        const to = this.cardEls.get(dep);
+        if (!from || !to) continue;
+        const overlay = createSvg("path");
+        overlay.setAttribute("d", relationPathData(boxOf(from), boxOf(to)));
+        overlay.setAttribute("data-dep", key);
+        overlay.addClass("vam-edge-dep-overlay", cls);
+        this.edgesEl?.appendChild(overlay);
+        this.depOverlays.push(overlay);
+      }
+    };
+    mark(run, "is-dep-run");
+    mark(read, "is-dep-read");
+  }
+  private clearDependencyOverlays(): void {
+    for (const overlay of this.depOverlays) overlay.remove();
+    this.depOverlays = [];
   }
   /**
    * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving

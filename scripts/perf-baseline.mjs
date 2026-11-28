@@ -1,5 +1,6 @@
 // P1.12 performance baseline: measures interaction latency of the mind-map view in a harness-launched test Obsidian over CDP.
-//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]
+//   node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]
+//   --ai marks every fixture card an AI card (ai-card: true), so selection exercises the dependency highlight.
 // The vault must be harness-owned (made by `node scripts/test-harness.mjs --session=<name>`, already running and trusted).
 // For numbers to compare (P1.12 stage B against the stage A baseline), use a fresh session vault per run: fixture maps from
 // earlier runs stay in the vault and raise heap and batch times.
@@ -47,7 +48,7 @@ export function perfFixtureCards(count = PERF_CARD_COUNT) {
   return cards;
 }
 
-export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count = PERF_CARD_COUNT) {
+export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count = PERF_CARD_COUNT, { ai = false } = {}) {
   const topicId = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const folder = `${workspaceRoot}/Topics/${topic}`;
   const cards = perfFixtureCards(count);
@@ -58,13 +59,13 @@ export function perfFixtureFiles(topic, workspaceRoot = "Agent Workspace", count
   const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
   const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${topicId}\ntopic-state: active\nagent-map-id: ${topicId}\nstatus: completed\nsource-notes: []\n${ai ? "ai-card: true\n" : ""}---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: synthetic perf fixture line.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nSynthetic card ${card.id}.${filler}\n`
   }));
   return { mapPath: `${folder}/Map.md`, files: [{ path: `${folder}/Map.md`, text: map }, ...notes] };
 }
 
-function seed(vault, topic, count) {
-  const { mapPath, files } = perfFixtureFiles(topic, "Agent Workspace", count);
+function seed(vault, topic, count, ai) {
+  const { mapPath, files } = perfFixtureFiles(topic, "Agent Workspace", count, { ai });
   if (files.some(file => existsSync(join(vault, file.path)))) throw new Error(`${topic} already exists in ${vault}; not overwriting.`);
   for (const file of files) { mkdirSync(join(vault, file.path, ".."), { recursive: true }); writeFileSync(join(vault, file.path), file.text); }
   return mapPath;
@@ -148,7 +149,7 @@ async function measureInput(cdp, start, end, act) {
   return cdp.evaluate("__vamPerf.result()");
 }
 
-async function measureMap(cdp, samples) {
+async function measureMap(cdp, samples, ai) {
   const out = { pan: [], zoom: [], select: [], drag: [], expand: [], summary: [], search: [] };
   // Pan: one background drag per 10 samples, alternating direction.
   for (let done = 0, dir = 1; done < samples; dir = -dir) {
@@ -195,16 +196,24 @@ async function measureMap(cdp, samples) {
   if (!branch) throw new Error("Branch card perf-b1 is not on screen.");
   await mouse(cdp, "mousePressed", branch.x, branch.y, 1);
   await mouse(cdp, "mouseReleased", branch.x, branch.y);
-  if (!(await cdp.evaluate(`document.activeElement?.closest?.('.vam-node')?.dataset.nodeId==="perf-b1"`)))
-    await cdp.evaluate(`${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')?.focus()`);
+  // Space folds only when the card itself has focus (not a button inside it).
+  const branchCard = `${view}.containerEl.querySelector('.vam-node[data-node-id="perf-b1"]')`;
+  if (!(await cdp.evaluate(`document.activeElement===${branchCard}`))) await cdp.evaluate(`${branchCard}?.focus()`);
   const folded = `${view}.map.nodes.find(n=>n.id==="perf-b1").collapsed===true`;
   for (let i = 0; i < samples; i++) {
     const before = await cdp.evaluate(folded);
     out.expand.push(await measureInput(cdp, "keydown", "keyup", () => cdp.press("Space")));
-    if ((await cdp.evaluate(folded)) === before) throw new Error("Space on the branch card did not fold or unfold it.");
+    // The fold is queued and may land after the measured frames on a busy machine: poll for it (20 ms, up to about 2 s).
+    let flipped = false;
+    for (let wait = 0; wait < 100 && !flipped; wait++) {
+      flipped = (await cdp.evaluate(folded)) !== before;
+      if (!flipped) await delay(20);
+    }
+    if (!flipped) throw new Error("Space on the branch card did not fold or unfold it.");
   }
-  // Summary: update_summary through the map-chat apply path with a fixture action (no provider).
-  for (let i = 0; i < samples; i++) {
+  // Summary: update_summary through the map-chat apply path with a fixture action (no provider). Not with --ai: an AI card's
+  // summary is written only by running the card, so the apply path skips it.
+  for (let i = 0; i < (ai ? 0 : samples); i++) {
     const id = `perf-b${i % 5}-l${(i >> 1) % 6}`;
     const r = await cdp.evaluate(`(async()=>{const v=${view};const now=await v.chatWriter.chatTopicNow(${JSON.stringify(id)});
 return __vamPerf.call(()=>v.applyMapChatActions({actions:[{kind:"update_summary",nodeId:${JSON.stringify(id)},summary:"Perf summary ${i}"}],rejected:[]},{mdHashes:{},topicHashes:{[${JSON.stringify(id)}]:{title:now.title,parentId:now.parentId}},mapSourcePaths:[]}))})()`);
@@ -235,12 +244,12 @@ async function measureBatch(cdp, mapPath, cards) {
 
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
-export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards: cardCount = PERF_CARD_COUNT }) {
+export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards: cardCount = PERF_CARD_COUNT, ai = false }) {
   if (resolve(vault) === resolve(canonicalVault)) throw new Error(`Refusing ${vault}: it is the owner's testing vault.`);
   if (!existsSync(join(vault, marker))) throw new Error(`${vault} is not a harness-owned test vault (no ${marker}).`);
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "");
-  const main = seed(vault, `Perf Fixture ${stamp}`, cardCount);
-  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`, cardCount));
+  const main = seed(vault, `Perf Fixture ${stamp}`, cardCount, ai);
+  const batchMaps = Array.from({ length: batches }, (_, i) => seed(vault, `Perf Fixture ${stamp} B${i}`, cardCount, ai));
   const cdp = await connectCdp(vault);
   try {
     await cdp.evaluate(`app.vault.adapter.list("Agent Workspace/Topics")`); // let the vault index the new files
@@ -250,7 +259,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
     await cdp.evaluate(probe);
     const heapBefore = await cdp.evaluate("performance.memory.usedJSHeapSize");
     const longBefore = await cdp.evaluate("__vamPerf.longTasks.length");
-    const interactions = await measureMap(cdp, samples);
+    const interactions = await measureMap(cdp, samples, ai);
     const batch = [];
     for (const mapPath of batchMaps) batch.push(await measureBatch(cdp, mapPath, cardCount));
     const heapAfter = await cdp.evaluate("performance.memory.usedJSHeapSize");
@@ -262,7 +271,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
       candidate: { head: git("rev-parse", "HEAD"), dirty: git("status", "--short") !== "", installedMainJsSha256: existsSync(installed) ? createHash("sha256").update(readFileSync(installed)).digest("hex") : null },
       host: { os: `${type()} ${release()} ${arch()}`, cpu: cpus()[0]?.model, cores: cpus().length, memGB: Math.round(totalmem() / 2 ** 30), ...env },
       fixture: { cards, batchMaps: batches, samples },
-      results: { ...Object.fromEntries(Object.entries(interactions).map(([k, v]) => [k, summarize(v)])), batch: summarize(batch), batchFirstMs: round(batch[0] ?? null) }, // the first batch of a session is the cold one
+      results: { ...Object.fromEntries(Object.entries(interactions).filter(([, v]) => v.length).map(([k, v]) => [k, summarize(v)])), batch: summarize(batch), batchFirstMs: round(batch[0] ?? null) }, // the first batch of a session is the cold one
       heap: { beforeMB: Math.round(heapBefore / 2 ** 20 * 10) / 10, afterMB: Math.round(heapAfter / 2 ** 20 * 10) / 10 },
       longTasks: { count: longTasks.length, totalMs: round(longTasks.reduce((a, b) => a + b, 0)) },
       uncaughtErrors: errors,
@@ -271,7 +280,7 @@ export async function runPerfBaseline({ vault, samples = 30, batches = 10, cards
   } finally { cdp.close(); }
 }
 
-export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--out=<file.json>]";
+export const usage = "Usage: node scripts/perf-baseline.mjs --session=<name> | --vault=<path>  [--samples=30] [--batches=10] [--cards=40] [--ai] [--out=<file.json>]";
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
@@ -280,7 +289,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!vault || args.includes("--help")) { process.stdout.write(`${usage}\n`); process.exitCode = vault ? 0 : 2; }
   else {
     try {
-      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10), cards: Number(option("cards") ?? PERF_CARD_COUNT) });
+      const report = await runPerfBaseline({ vault, samples: Number(option("samples") ?? 30), batches: Number(option("batches") ?? 10), cards: Number(option("cards") ?? PERF_CARD_COUNT), ai: args.includes("--ai") });
       const out = resolve(option("out") ?? join(tmpdir(), `vam-perf-${Date.now()}.json`));
       writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
       const { raw, ...short } = report;

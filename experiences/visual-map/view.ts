@@ -2227,6 +2227,8 @@ export class VisualAgentMapView extends ItemView {
     if (current.raf !== null) window.cancelAnimationFrame(current.raf);
     this.noteLoad = null;
     this.removeLoadStatus();
+    // A plan waiting for Apply was greyed "notes still loading": redraw it now that they are loaded.
+    this.chat?.refreshPlan();
   }
   private scheduleLoadBatch(load: NoteLoadState): void {
     if (load.raf !== null) return;

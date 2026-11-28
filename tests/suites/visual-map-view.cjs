@@ -885,9 +885,9 @@ integrationTest('select mode: the narrow bar names Merge / Research by count, ke
   };
   assert.deepEqual(labels([]), [], 'no card picked: the bar is empty');
   // B09, B19b: Color, Move to…, Merge, Research, ⋯, Done selecting (the "?" is the last row of ⋯).
-  assert.deepEqual(labels(['a']).slice(0, 4), [['Color ▾', false, undefined], ['Move to…', false, undefined], ['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
-  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 4), [['Color ▾', false, undefined], ['Move to…', false, undefined], ['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
-  assert.deepEqual(labels(['a', 'b', 'c']).map(([text]) => text), ['Color ▾', 'Move to…', 'Merge', 'Research', '⋯', 'Done selecting']);
+  assert.deepEqual(labels(['a']).slice(0, 5), [['Color ▾', false, undefined], ['Size ▾', false, undefined], ['Move to…', false, undefined], ['Merge', false, undefined], ['Research', false, 'Research 1 topic']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).slice(0, 5), [['Color ▾', false, undefined], ['Size ▾', false, undefined], ['Move to…', false, undefined], ['Merge', false, 'Merge 3 topics'], ['Research', false, 'Research 3 topics']]);
+  assert.deepEqual(labels(['a', 'b', 'c']).map(([text]) => text), ['Color ▾', 'Size ▾', 'Move to…', 'Merge', 'Research', '⋯', 'Done selecting']);
   const countBar = view.renderSelectionBar(selectionDom()('div'));
   assert.equal(countBar.children[0].text, '3 selected'); assert.match(countBar.children[0].attrs['aria-label'], /^Selected 3: /, 'the names moved to the aria-label');
   const { translate } = load('i18n.ts');

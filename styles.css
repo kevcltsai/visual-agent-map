@@ -337,6 +337,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-style-popover-branch { gap: var(--vam-space-1); font-size: var(--vam-card-summary-size); cursor: pointer; }
 .vam-batch-popover { bottom: 100%; margin-bottom: var(--vam-space-1); }
 .vam-batch-popover-mixed { color: var(--vam-muted); font-size: var(--vam-card-summary-size); }
+.vam-batch-size-input { width: 6em; }
 .menu-item .vam-menu-hint { margin-left: auto; padding-left: 12px; color: var(--text-faint); font-size: var(--font-ui-smaller); }
 /* A greyed card action says why on the line under its name (V3.3 P1.8), lined up with the title past the icon. */
 .menu-item.vam-menu-has-reason { flex-wrap: wrap; }

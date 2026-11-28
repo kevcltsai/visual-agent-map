@@ -347,6 +347,19 @@ integrationTest('external rename reconciliation only follows a unique matching n
   assert.equal(await second.repo.reconcileMissingNodePaths(), 0);
   assert.equal((await second.repo.readMap(otherMap)).nodes[0].path, other.path);
 });
+integrationTest('a crash between a new card note and its Map.md write leaves no orphan after the next load recovery (DX-crash)', async () => {
+  const { repo, contents } = fixture();
+  const mapPath = await repo.createMap('Crash window'), doc = await repo.readMap(mapPath);
+  // The note is written first (createNote); the process dies before Map.md lists it, so saveMap never runs.
+  const orphan = await repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
+  assert.equal((await repo.readMap(mapPath)).nodes.length, 0);
+  // Next load: every recovery the plugin has (missing-path repair, then the derived-data rebuild).
+  await repo.reconcileMissingNodePaths();
+  await repo.rebuildDerivedData();
+  const map = await repo.readMap(mapPath);
+  assert.ok(contents.has(orphan.path), 'the user note is never deleted');
+  assert.ok(map.nodes.some(item => item.id === orphan.id), 'the orphan note is listed in Map.md again');
+});
 integrationTest('missing path reconciliation keeps an external map edit during citation updates', async () => {
   const { repo, app } = fixture();
   const mapPath = await repo.createMap('Recovery race'), doc = await repo.readMap(mapPath);

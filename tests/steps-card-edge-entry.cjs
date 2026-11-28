@@ -59,6 +59,7 @@ async function harness({ language = 'en' } = {}) {
   }
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    recordFailure: (_l, e) => String(e?.message ?? e), invalidateLivingTrial() {}, restoreLivingOfficial: async () => {}, showLivingTrial: async () => {},
     mutate: async work => { await work(); await view.hydrate(); }
   });
   const view = new VisualAgentMapView({ app }, plugin);
@@ -175,4 +176,113 @@ test('the edge container sits on the side the children grow toward (layout direc
   }
   h.view.directionOf = () => 'balanced'; h.build();
   assert.ok(edgeOf(h, 'leaf').classes.has('is-edge-right'), 'non-axis layouts fall back to right');
+});
+
+// ---- V3.3 A7: the edge "✦ AI card" and the empty canvas "✦ AI root" open the existing AI card setup (the card is made only on save) ----
+const aiBtn = (h, key) => findAll(h.card(key), i => i.tag === 'button' && i.classes.has('vam-card-edge-ai'))[0];
+const withPopover = h => {
+  const overlay = element('div', { cls: 'vam-canvas-overlay' });
+  overlay.ownerDocument = element('div');
+  h.view.contentEl.appendChild(overlay);
+  const pop = () => h.view.aiCardOpen?.win.el;
+  const question = () => findAllDom(pop(), i => i.tag === 'textarea')[0];
+  const saveButton = () => findAllDom(pop(), i => i.tag === 'button' && i.cls?.includes('mod-cta'))[0];
+  return { pop, question, saveButton };
+};
+const findAllDom = (root, predicate) => [...(predicate(root) ? [root] : []), ...(root.children ?? []).flatMap(c => findAllDom(c, predicate))];
+// Everything that could change on disk or in history when nothing should be written.
+const snapshot = h => ({ map: h.contents.get(MAP), notes: notesCount(h), files: [...h.contents.keys()].sort().join('|'), past: h.view.history.past.length, nodes: h.view.map.nodes.length });
+
+test('A7: the AI card entry sits beside "+ Topic card" in the same container, with translated labels', async () => {
+  for (const [language, label] of [['en', '✦ AI card'], ['zh-TW', '✦ AI 卡片'], ['zh-CN', '✦ AI 卡片']]) {
+    const h = await harness({ language });
+    const btn = aiBtn(h, 'leaf');
+    assert.ok(btn, language); assert.equal(btn.text, label);
+    assert.ok(btn.attrs['aria-label'] && btn.attrs['aria-label'] !== 'ui.card_edge_ai_label', 'aria-label is translated');
+    assert.deepEqual(edgeOf(h, 'leaf').children.map(c => [...c.classes].find(x => /^vam-card-edge-(add|ai)$/.test(x))), ['vam-card-edge-add', 'vam-card-edge-ai']);
+  }
+});
+
+test('A7: the AI card entry is hidden in multi-select, presentation, bookLock.ai, bookLock.structure and while notes load', async () => {
+  let h = await harness(); setSelection(h.view, true, [h.ids.leaf]); h.build();
+  assert.equal(aiBtn(h, 'leaf'), undefined, 'multi-select');
+  h = await harness(); h.view.selection.setSelected(h.ids.root); h.view.startPresentation(); h.build();
+  assert.equal(aiBtn(h, 'root'), undefined, 'presentation');
+  h = await harness(); h.view.bookLock = () => ({ ai: true, structure: false }); h.build();
+  assert.equal(aiBtn(h, 'leaf'), undefined, 'bookLock.ai'); assert.ok(addBtn(h, 'leaf'), 'bookLock.ai keeps "+ Topic card"');
+  h = await harness(); h.view.bookLock = () => ({ ai: false, structure: true }); h.build();
+  assert.equal(aiBtn(h, 'leaf'), undefined, 'bookLock.structure');
+  h = await harness(); h.view.noteLoad = {}; h.build();
+  assert.equal(aiBtn(h, 'leaf'), undefined, 'notes loading');
+});
+
+test('A7: clicking the AI card entry opens the setup popover for a new card under that card; cancel writes nothing at all', async () => {
+  const h = await harness(); const p = withPopover(h);
+  const before = snapshot(h);
+  const opened = []; const real = h.view.openAiCardPopover.bind(h.view);
+  h.view.openAiCardPopover = (...a) => { opened.push(a); return real(...a); };
+  click(aiBtn(h, 'branch'));
+  assert.equal(opened.length, 1); assert.equal(opened[0][0], null, 'no existing card'); assert.equal(opened[0][1].id, h.ids.branch, 'parent is the clicked card');
+  assert.ok(p.pop(), 'popover is open');
+  assert.equal(snapshot(h).notes, before.notes, 'opening makes no note');
+  p.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null, 'closed');
+  await tick(); await tick();
+  assert.deepEqual(snapshot(h), before, 'Map.md, notes, files, history and node count are unchanged');
+  assert.equal(h.view.history.canRedo, false);
+});
+
+test('A7: an empty question cannot be saved (button disabled, nothing written); a filled one saves once and one undo removes card and note', async () => {
+  const h = await harness(); const p = withPopover(h);
+  const before = snapshot(h);
+  click(aiBtn(h, 'leaf'));
+  assert.equal(p.saveButton().disabled, true, 'save disabled while empty');
+  assert.equal(await h.view.saveAiCard(null, h.view.map.nodes.find(n => n.id === h.ids.leaf), undefined, { title: '', question: '   ', sources: [], keepOld: true }, undefined, undefined, () => true), undefined, 'saveAiCard refuses a blank question');
+  await tick();
+  assert.deepEqual(snapshot(h), before, 'blank question wrote nothing');
+  p.question().value = 'What is next?'; p.question().input();
+  assert.equal(p.saveButton().disabled, false);
+  p.pop().keydown({ key: 'Enter', ctrlKey: true });
+  await until(() => h.view.map.nodes.length === before.nodes + 1); await until(() => h.view.history.past.length > before.past);
+  assert.equal(h.view.history.past.length, before.past + 1, 'exactly one history step');
+  const made = h.view.map.nodes.find(n => n.parentId === h.ids.leaf);
+  assert.ok(made, 'child under the clicked card');
+  assert.match(h.contents.get(made.path), /^ai-card: true$/m); assert.match(h.contents.get(made.path), /What is next\?/);
+  assert.equal(notesCount(h), before.notes + 1);
+  await h.view.history.undo().undo();
+  await h.view.hydrate();
+  assert.equal(h.contents.has(made.path), false, 'note file removed by one undo');
+  assert.equal(h.contents.get(MAP), before.map, 'Map.md is back to its content');
+  assert.equal(notesCount(h), before.notes);
+});
+
+test('A7: the empty canvas shows "+ Add first topic" and "✦ AI root" side by side; AI root opens the popover with no parent and cancel writes nothing', async () => {
+  const h = await harness(); const p = withPopover(h);
+  const before = snapshot(h);
+  const nodes = h.view.map.nodes; h.view.map.nodes = [];
+  const box = make('div'); h.view.fillEmptyMap(box);
+  h.view.map.nodes = nodes;
+  const btn = c => findAll(box, i => i.tag === 'button' && i.classes.has(c))[0];
+  const add = btn('vam-empty-add'), root = btn('vam-empty-add-ai');
+  assert.ok(add && root, 'both buttons'); assert.equal(root.text, '✦ AI root'); assert.ok(root.attrs['aria-label']);
+  assert.ok(box.children.indexOf(add) < box.children.indexOf(root) && box.children.indexOf(root) < box.children.findIndex(c => c.tag === 'div'), 'order: add, AI root, hint');
+  const opened = []; const real = h.view.openAiCardPopover.bind(h.view);
+  h.view.openAiCardPopover = (...a) => { opened.push(a); return real(...a); };
+  root.handlers.get('click')({ stopPropagation() {} });
+  assert.deepEqual(opened, [[null, null]]); assert.ok(p.pop());
+  p.pop().keydown({ key: 'Escape' }); await tick(); await tick();
+  assert.equal(h.view.aiCardOpen, null);
+  assert.deepEqual(snapshot(h), before, 'cancel wrote nothing');
+  const zh = await harness({ language: 'zh-TW' }); zh.view.map.nodes = [];
+  const zbox = make('div'); zh.view.fillEmptyMap(zbox);
+  assert.equal(findAll(zbox, i => i.classes.has('vam-empty-add-ai'))[0].text, '✦ AI 根');
+});
+
+test('A7: the empty canvas hides "✦ AI root" in presentation and under bookLock.ai, but keeps the first-topic button', async () => {
+  for (const setup of [h => { h.view.bookLock = () => ({ ai: true, structure: false }); }, h => { h.view.presentation = {}; }]) {
+    const h = await harness(); setup(h); h.view.map.nodes = [];
+    const box = make('div'); h.view.fillEmptyMap(box);
+    assert.equal(findAll(box, i => i.classes.has('vam-empty-add-ai')).length, 0);
+    assert.equal(findAll(box, i => i.classes.has('vam-empty-add')).length, 1);
+  }
 });

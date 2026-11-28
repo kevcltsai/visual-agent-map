@@ -7,7 +7,7 @@ import type { TopicRelation } from "../map-model";
  * entry asks it before calling the AI and again inside the write (the late-result fence). User edits and the program's
  * own maintenance never ask it.
  *
- * - `write`: change the target topic's note (title, summary, detail, preview, tier, images, charts).
+ * - `write`: change the target topic's note (title, summary, detail, preview, images, charts).
  * - `addChild`: add a child under the target.
  * - `remove`: take the target off the map (delete it, or merge it away). Its subtree goes with it, its parent loses a
  *   direct child, and a topic with a semantic relation to a locked topic may not be removed.

@@ -1,5 +1,4 @@
 import type { MapDocument } from "../../map-model";
-import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, readTopicStyle, type TopicColor, type TopicStyle } from "../../topic-colors";
 import { CARD_WIDTH, clampCardHeight, clampCardWidth } from "../../map-graph";
@@ -120,9 +119,6 @@ export interface ShareNodePayload {
   status: "idea" | "completed";
   title: string;
   summary: string;
-  tier?: RelevanceTier;
-  reason?: string;
-  manual?: true;
   /** Optional (ticket 33): whitelisted topic marker ids in fixed order. Absent means none; `version` stays 1. */
   markers?: TopicMarker[];
   /** Optional (ticket 37): a whitelisted topic colour id. Absent means none; `version` stays 1. */
@@ -269,9 +265,6 @@ export interface ShareNoteInput {
   title: string;
   summary: string;
   status: string;
-  relevance?: { tier: RelevanceTier; manual?: true };
-  /** Legacy `relevance-reason`, still shown when an older note has one. */
-  reason?: string;
   /** Topic type from the note; anything not on the whitelist is dropped when the payload is built. */
   kind?: unknown;
   /** The card's shape (computed by the exporter, argument-map cards are rect); anything not on the whitelist is dropped when the payload is built. */
@@ -593,12 +586,6 @@ export function buildSharePayload(
     const ringHeight = options.ringHeights?.[node.id];
     if (typeof ringHeight === "number" && Number.isFinite(ringHeight) && ringHeight >= 1 && ringHeight <= 20000)
       out.ringHeight = Math.round(ringHeight);
-    if (note?.relevance) {
-      out.tier = note.relevance.tier;
-      if (note.relevance.manual) out.manual = true;
-      const reason = optionalText(note.reason);
-      if (reason) out.reason = reason;
-    }
     if (isOneOf(SHARE_NODE_KINDS, note?.kind)) out.kind = note.kind;
     if (isOneOf(SHARE_NODE_SHAPES, note?.shape)) out.shape = note.shape;
     const markers = readTopicMarkers({ "topic-markers": note?.markers });

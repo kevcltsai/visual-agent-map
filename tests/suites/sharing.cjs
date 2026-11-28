@@ -36,7 +36,8 @@ const cleanedNotes = (includeDetail = true) => {
   const cleaned = {};
   for (const [id, { fm, detail }] of Object.entries(rawByNode)) {
     const result = clean.cleanShareMarkdown(detail, ctx);
-    notesById[id] = { title: fm.title, summary: fm.summary, status: fm.status, relevance: fm['relevance-tier'] ? { tier: fm['relevance-tier'], ...(fm['relevance-manual'] ? { manual: true } : {}) } : undefined, detailHtml: `<p>${fm.title} html</p>` };
+    // The fixture notes still carry relevance-tier/-manual (an older version wrote them); since P1.10b nothing reads them.
+    notesById[id] = { title: fm.title, summary: fm.summary, status: fm.status, detailHtml: `<p>${fm.title} html</p>` };
     cleaned[id] = result.markdown;
   }
   return { notesById, cleaned, assets, models };
@@ -51,9 +52,7 @@ test('sharing: payload has only the Spec fields and the 7 content kinds survive 
   assert.deepEqual(plain(Object.keys(payload).sort()), ['assets', 'exportedAt', 'format', 'language', 'nodes', 'source', 'title', 'version', 'viewport']);
   assert.deepEqual(plain(payload.source), { vamVersion: '0.25.0', mapId: 'share-fixture' });
   const rich = payload.nodes.find(n => n.id === 'rich');
-  assert.deepEqual(plain(Object.keys(rich).sort()), ['collapsed', 'detailHtml', 'id', 'manual', 'parentId', 'status', 'summary', 'tier', 'title', 'x', 'y']);
-  assert.equal(rich.tier, 'support');
-  assert.equal(rich.manual, true);
+  assert.deepEqual(plain(Object.keys(rich).sort()), ['collapsed', 'detailHtml', 'id', 'parentId', 'status', 'summary', 'title', 'x', 'y'], 'P1.10b: no tier or manual');
   const cleanedRich = cleanedNotes().cleaned.rich;
   assert.match(cleanedRich, /```mermaid/);
   assert.match(cleanedRich, /\| a \| b \|/);
@@ -392,19 +391,20 @@ test('sharing: leak categories have localized labels in every language', () => {
 // Ticket 33 P4: topic markers in the share payload. Optional field, same version, whitelist only.
 test('sharing markers: the payload carries only whitelisted marker ids in fixed order, and no key when there are none', () => {
   const { notesById } = cleanedNotes();
-  const hostile = ['star', 'done', 'done', 'Done', '<img src=x onerror=alert(1)>', 3, null, { id: 'done' }, 'priority-3', 'future-x'];
+  const hostile = ['star', 'done', 'done', 'Done', '<img src=x onerror=alert(1)>', 3, null, { id: 'done' }, 'priority-3', 'future-x', 'warning'];
   const withMarkers = { ...notesById, rich: { ...notesById.rich, markers: hostile }, [Object.keys(notesById)[0]]: { ...notesById[Object.keys(notesById)[0]], markers: [] } };
   const payload = format.buildSharePayload(fixtureMap(), withMarkers, options());
   assert.equal(payload.version, 1, 'no version bump');
-  const added = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, markers: ['question', 'flag-red', 'progress-50', 'priority-5', '<img src=x onerror=alert(1)>', 'flag-purple'] } }, options());
-  assert.deepEqual(plain(added.nodes.find(n => n.id === 'rich').markers), ['priority-5', 'progress-50', 'flag-red', 'question']);
+  // P1.10b: the removed priority, progress, flag and face ids are unknown values and never reach the file.
+  const removed = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, markers: ['question', 'flag-red', 'progress-50', 'priority-5', '<img src=x onerror=alert(1)>', 'flag-purple'] } }, options());
+  assert.equal('markers' in removed.nodes.find(n => n.id === 'rich'), false);
   const rich = payload.nodes.find(n => n.id === 'rich');
-  assert.deepEqual(plain(rich.markers), ['done', 'star', 'priority-3']);
+  assert.deepEqual(plain(rich.markers), ['done', 'warning', 'star']);
   assert.ok(!JSON.stringify(payload).includes('onerror'), 'unknown values never reach the file');
   for (const node of payload.nodes.filter(n => n.id !== 'rich')) assert.equal('markers' in node, false, `${node.id} has no markers key`);
   const notList = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, markers: 'done' } }, options());
   assert.equal('markers' in notList.nodes.find(n => n.id === 'rich'), false, 'a non-list value reads as nothing');
-  assert.ok(format.serializeShareJson(payload).includes('"markers":["done","star","priority-3"]'));
+  assert.ok(format.serializeShareJson(payload).includes('"markers":["done","warning","star"]'));
 });
 
 // topic-links P3: topic links in the share payload. Optional field, same version, valid http(s) only.

@@ -239,3 +239,45 @@ test('P4.6 (F06-x) two recombinations in a row: the new cards never overlap any 
   const farNow = nodes.find(n => n.id === far.id);
   assert.deepEqual([farNow.x, farNow.y], [3000, 3000], 'an unaffected card does not move');
 });
+
+// F06-y: a Living Node note read as a source is cited by the revision of its model view (livingNoteForModel), the same way
+// topicReferenceGroup reads it, so compareCitation over that view says "same" until the note's own content changes.
+const living = S.load('experiences/visual-map/living-node-markdown.ts', { obsidian });
+async function makeLiving(h, node, text) {
+  if (!/^ai-card: true$/m.test(h.contents.get(node.path))) await h.app.vault.process(h.app.vault.getAbstractFileByPath(node.path), c => c.replace(/\n---\n/, '\nai-card: true\n---\n'));
+  const before = h.contents.get(node.path);
+  const base = living.readLivingMarkdown(before);
+  const candidate = { executionId: 'x' + text, cardId: node.id, mapId: h.view.map.id, baseRevision: living.livingSnapshotRevision(before), inputRevision: 'i', viewSession: 'v' };
+  const result = await living.commitLivingMarkdown(h.repo, { path: node.path, expectedContent: before, candidate, base, baseGeneration: living.livingGeneration(before),
+    proposal: { baseRevision: base.revision, operations: [{ kind: 'output', text, evidence: ['e1'] }] },
+    context: { at: '2026-11-27T04:00:00+08:00', evidence: [{ id: 'e1', source: 'https://example.com', retrievedAt: 't1' }] },
+    signal: new AbortController().signal, isCurrent: () => true,
+    inspect: async () => ({ ...candidate, locked: false, aborted: false, dependenciesReady: true, alreadyCommitted: false }) });
+  assert.equal(result, 'written');
+}
+
+for (const kind of ['plain', 'living']) {
+  test(`F06-y recombination citation of a ${kind} source: same while unchanged, changed after an edit`, async () => {
+    const h = await harness();
+    const [first] = h.nodes;
+    if (kind === 'living') {
+      await makeLiving(h, first, 'LIVING-OUTPUT');
+      assert.notEqual(living.livingNoteForModel(h.contents.get(first.path)), h.contents.get(first.path), 'the source is a Living Node note');
+    }
+    await h.repo.rebuildDerivedData();
+    const read = () => living.livingNoteForModel(h.contents.get(first.path));
+    const beforeRun = read();
+    await run(h);
+    await until(() => h.view.map.nodes.length === 3);
+    const created = h.view.map.nodes.find(n => !h.nodes.some(item => item.id === n.id));
+    const detail = (await h.repo.readNote(created.path, h.view.map)).detail;
+    const target = new RegExp(`\\[\\[${first.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\|[^\\]]*\\]\\]%%vam-src:[A-Za-z0-9_-]+:[0-9a-f]{8}%%`).exec(detail)?.[0];
+    assert.ok(target, `cites the source: ${detail}`);
+    // The run itself adds derived Reference Links to a source, so "unchanged" is the note as it stood when it was read.
+    assert.equal(refs.compareCitation(target, [{ path: first.path, content: beforeRun }]).status, 'same', 'unchanged source is not stale');
+    const asModelSees = () => [{ path: first.path, content: read() }];
+    if (kind === 'living') await makeLiving(h, first, 'LIVING-OUTPUT-2');
+    else await h.repo.updateNote(first.path, { detail: 'EDITED DETAIL' });
+    assert.equal(refs.compareCitation(target, asModelSees()).status, 'changed', 'edited source is stale');
+  });
+}

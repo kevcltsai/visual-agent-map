@@ -87,6 +87,17 @@ test('B18: one drop is one map change; the real moveBranches puts the topic befo
   assert.equal(ids(f.doc), 'root< a<root b<a c<a d<a');
 });
 
+test('B18 batch UI: Alt+Arrow from the outline does not hand the focus to the canvas card (the outline keeps it)', async () => {
+  const f = mapView();
+  f.view.onScreenSiblingOrder = doc => doc.nodes;
+  f.view.mergeUnlocked = () => true;
+  let focusDuringWrite = 'unset';
+  f.view.mapChange = async change => { focusDuringWrite = f.view.focusNodeId; change(f.view.map); };
+  assert.equal(await f.view.outlineMove('d', { shift: -1 }), null);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(focusDuringWrite, null, 'no canvas card is asked to take the focus');
+});
+
 // ---- the outline itself ----
 const loadOutline = () => load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } }).OutlineView;
 function outline({ aim } = {}) {

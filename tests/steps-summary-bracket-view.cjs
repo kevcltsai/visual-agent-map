@@ -363,7 +363,7 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
   h.view.openCardMoreMenu({ getBoundingClientRect: () => ({ left: 10, bottom: 20 }) }, h.view.map.nodes.find(n => n.id === h.ids.b));
   const entryTitles = h.menus.at(-1).items.map(i => i.title);
-  assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 2), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
+  assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 3), ['Add summary bracket', 'Tidy this branch', 'Note style…'], 'A10: the ⋯ menu adds "Tidy this branch" after the bracket; T6 P3 added the topic note style entry after the bracket (D4)');
   assert.deepEqual(plain(h.menus.at(-1).at), { x: 10, y: 20 }, 'the More list opens under its button');
   h.menus.at(-1).items.find(i => i.title === 'Add summary bracket').click();
   assert.ok(h.area(), 'one card is enough; the editor opens');

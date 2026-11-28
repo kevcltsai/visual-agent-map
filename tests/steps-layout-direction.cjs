@@ -396,14 +396,15 @@ test('V4d: in a down map moved and copied topics go below their parent, not to i
 });
 
 test('V5: an AIM map offers no direction in the Layout menu', async () => {
-  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
+  // A10: P1.4 "Tidy map" replaces the "Auto layout" menu item (same action), so the last title changed.
+  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Tidy map'];
   const h = await harness(tree4);
   h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   h.view.openLayoutMenu({});
   assert.deepEqual(h.menuTitles(), original);
   h.view.map.aim = undefined;
   h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Tidy map']);
 });
 
 // ---- P3: the map chat's new cards follow the map's direction. ----

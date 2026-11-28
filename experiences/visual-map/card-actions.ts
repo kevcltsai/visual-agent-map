@@ -663,9 +663,8 @@ export const CARD_ACTIONS: readonly CardAction[] = [
     surfaces: ["more"],
     order: 370,
     group: 1,
-    // Today a selection with no lockable topic shows this row disabled, with no reason text.
-    applies: ctx => lockState(ctx).nodes.length > 0,
-    available: () => OK,
+    // A selection with no lockable topic shows this row disabled, with the reason (B09).
+    available: ctx => (lockState(ctx).nodes.length ? OK : off("ui.card_action_off_no_lockable")),
     run: ctx => {
       const { nodes, all } = lockState(ctx);
       ctx.host.setAiLock(nodes, !all);
@@ -695,10 +694,10 @@ export const CARD_ACTIONS: readonly CardAction[] = [
   },
   {
     id: "selection-help",
-    titleKey: "ui.selection_help",
+    titleKey: "ui.selection_help_item",
     icon: "help-circle",
     scope: ["multi"],
-    surfaces: ["toolbar"],
+    surfaces: ["more"],
     order: 400,
     group: 2,
     available: () => OK,
@@ -725,7 +724,7 @@ const CARD_TOOLBAR_SET: readonly CardActionId[] = ["research", "add-child", "ope
 export const CARD_TOOLBAR: Readonly<Record<"card" | "ai-card" | "multi", readonly CardActionId[]>> = {
   card: CARD_TOOLBAR_SET,
   "ai-card": ["stop-run-all", ...CARD_TOOLBAR_SET],
-  multi: ["merge", "multi-research", "move-to", "selection-help", "finish-selection"]
+  multi: ["move-to", "merge", "multi-research", "finish-selection"]
 };
 
 /** The palette commands (main.ts registers them by these ids) and the mapCommand action each one runs today. */

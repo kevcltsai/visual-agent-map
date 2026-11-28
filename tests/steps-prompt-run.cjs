@@ -962,6 +962,32 @@ test('popover room (D1-x10b): closing the editor reopens only the panel it folde
   assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'closing reopens the right only; the user\'s left fold stays');
 });
 
+test('popover room (D1-x10c): a pane squeezed to 0px by both side panels still folds one', async () => {
+  const dock = () => ({ collapsed: false, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(), right = dock();
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 0;
+  h.view.openAiCardPopover(h.node('A'));
+  assert.deepEqual([left.collapsed, right.collapsed], [true, false], 'a 0px pane is squeezed, not unmeasured');
+});
+
+test('popover room (D1-x10c): a right panel the user had folded, unfolded by the reader, is folded back on close and the room is measured again', async () => {
+  const dock = collapsed => ({ collapsed, collapse() { this.collapsed = true; }, expand() { this.collapsed = false; } });
+  const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
+  const left = dock(true), right = dock(true);
+  h.view.app.workspace = { ...h.view.app.workspace, leftSplit: left, rightSplit: right };
+  h.overlay.clientWidth = 600;
+  h.view.plugin.openDetails = async () => { right.expand(); h.overlay.clientWidth = 40; };
+  h.view.openAiCardPopover(h.node('A'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(right.collapsed, true, 'the reader squeezed the pane: measured again after it opened, the right panel folds');
+  right.expand();
+  h.pop().keydown({ key: 'Escape' });
+  assert.equal(h.view.aiCardOpen, null);
+  assert.deepEqual([left.collapsed, right.collapsed], [true, true], 'closing leaves the panels folded as the user had them');
+});
+
 test('popover close: Esc, Close or discard returns focus to the card it was opened from (A34)', async () => {
   const h = await popoverHarness([['A', null, { prompt: 'Why?' }]]);
   const restored = [];

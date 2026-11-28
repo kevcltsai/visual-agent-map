@@ -1,9 +1,10 @@
 import { t } from "../../i18n";
 import { livingRestoreSnapshot, livingWithoutFence } from "./living-node-markdown";
-import { clone, type MapDocument } from "../../map-model";
+import { clone, type MapDocument, type MapNode } from "../../map-model";
 import { pruneAfterText } from "./canvas-items";
 import { sameApartFromStamps } from "./cross-map-history";
-import type { NoteWriteGuard, Repository, TopicState } from "../../repository";
+import type { NewNoteInitial, NoteWriteGuard, Repository, TopicState } from "../../repository";
+import type { ModelSource } from "../../core/repository-note-types";
 import type { TFile } from "obsidian";
 import { findWikilinks, linkPathOf } from "../../core/link-rewrite";
 import {
@@ -30,6 +31,7 @@ export interface Lifecycle {
 export interface TransactionDeps {
   repo: Pick<
     Repository,
+    | "createNote"
     | "readNote"
     | "readMap"
     | "saveMap"
@@ -85,6 +87,20 @@ export interface CommitOptions {
 }
 /** The vault path commit chose for the attachment registered under `key`; throws for an unknown key. */
 export type AttachmentPath = (key: string) => string;
+/** The card (its id, and the path commit gave its note) that `createNote` made under `key`; throws for an unknown key. */
+export type MadeCard = (key: string) => MapNode;
+/** A new card's note: the arguments of `Repository.createNote`, plus where Undo parks the note. */
+export interface NewCard {
+  title: string;
+  model: string;
+  /** Only its id is used (the note's map id). */
+  map: Pick<MapDocument, "id">;
+  mapPath: string;
+  modelSource: ModelSource;
+  /** Give `nodeId` to keep the id of a card already shown before its note exists. */
+  initial: NewNoteInitial;
+  parkFolder: string;
+}
 export interface AttachmentSource {
   /** File name handed to Obsidian (which dedupes it), e.g. `image.png`. */
   name: string;
@@ -112,10 +128,22 @@ export interface Transaction {
   rename(path: string, title: string): Transaction;
   unpark(path: string, folder: string, topicId: string, mapId: string): Transaction;
   transfer(path: string, topic: { id: string; root: string }, mode: "unassigned" | "add"): Transaction;
+  /**
+   * Makes the note of a new card inside this step (commit writes it once, with its final content) and registers it like
+   * `create`: undo parks it in `card.parkFolder`, redo puts it back. The path is chosen at commit; `editMap` gets the card
+   * through `made(key)`. A failed commit trashes only a note this step made that is unchanged, listed in none of the maps it
+   * edits and linked from no note; a note that was edited, listed or linked stays.
+   */
+  createNote(key: string, card: NewCard): Transaction;
   /** `resolve(originalPath)` gives the path a moved note will have; moves run before map edits. */
   editMap(
     mapPath: string,
-    edit: (map: MapDocument, resolve: (originalPath: string) => string, attachment: AttachmentPath) => void
+    edit: (
+      map: MapDocument,
+      resolve: (originalPath: string) => string,
+      attachment: AttachmentPath,
+      made: MadeCard
+    ) => void
   ): Transaction;
   /**
    * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
@@ -176,6 +204,10 @@ interface Journal {
   notes: NoteWriteJournal;
   /** Files this step stored (created or reused); the created ones are trashed last when the step fails. */
   attachments?: AttachmentRecord[];
+  /** Card notes this step made (`createNote`), with the text they were made with; trashed last when the step fails. */
+  cards?: Array<{ path: string; file: TFile; text: string }>;
+  /** The maps this step edits: a made note one of them lists stays. */
+  mapPaths?: string[];
 }
 /** Where an attachment of this step is; `created`: this step wrote the file (a reused one is never trashed). */
 interface AttachmentRecord {
@@ -456,9 +488,16 @@ export function begin(deps: TransactionDeps): Transaction {
   }> = [];
   const edits: Array<{
     mapPath: string;
-    edit: (map: MapDocument, resolve: (originalPath: string) => string, attachment: AttachmentPath) => void;
+    edit: (
+      map: MapDocument,
+      resolve: (originalPath: string) => string,
+      attachment: AttachmentPath,
+      made: MadeCard
+    ) => void;
   }> = [];
   const noteOps: NoteOp[] = [];
+  const cards: Array<{ key: string } & NewCard> = [];
+  const madeCards: Array<{ key: string; node: MapNode }> = [];
   const sources: Array<{ key: string } & AttachmentSource> = [];
   const placed: AttachmentRecord[] = [];
   const attachment: AttachmentPath = key => {
@@ -525,6 +564,20 @@ export function begin(deps: TransactionDeps): Transaction {
     });
   }
 
+  /** A note this step made is its own to take back only while nothing else has come to use it. */
+  async function trashable(item: { path: string; file: TFile; text: string }, mapPaths: string[]): Promise<boolean> {
+    if (repo.app.vault.getAbstractFileByPath(item.path) !== item.file) return false;
+    if ((await repo.app.vault.read(item.file)) !== item.text || isLinked(repo.app, item.path)) return false;
+    for (const mapPath of mapPaths) {
+      try {
+        if ((await repo.readMap(mapPath)).nodes.some(node => node.path === item.path)) return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** The full rebuild when the step needs one, else a refresh of just the notes whose relation lines changed. */
   async function derive(rebuild: boolean, refresh: string[]): Promise<void> {
     if (rebuild) await deps.rebuildDerivedData();
@@ -584,6 +637,14 @@ export function begin(deps: TransactionDeps): Transaction {
     // Last, once nothing of this step links to them: a file changed since it was written or linked from any note stays.
     // Any earlier rollback problem means a note or Map.md may still link to them, so every file is kept for the retry.
     const trashed = new Set<string>();
+    for (const item of [...(journal.cards ?? [])].reverse()) {
+      if (problems.length > 0) break;
+      try {
+        if (await trashable(item, journal.mapPaths ?? [])) await repo.app.fileManager.trashFile(item.file);
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
     for (const item of [...(journal.attachments ?? [])].reverse()) {
       if (problems.length > 0) break;
       if (!item.created || trashed.has(item.path)) continue;
@@ -806,6 +867,11 @@ export function begin(deps: TransactionDeps): Transaction {
       noteOps.push({ path, write, ...(settle ? { settle } : {}) });
       return transaction;
     },
+    createNote(key, card) {
+      if (cards.some(item => item.key === key)) throw new Error(`Card key used twice: ${key}`);
+      cards.push({ key, ...card });
+      return transaction;
+    },
     createAttachment(key, source) {
       if (sources.some(item => item.key === key)) throw new Error(`Attachment key used twice: ${key}`);
       sources.push({ key, ...source });
@@ -855,9 +921,11 @@ export function begin(deps: TransactionDeps): Transaction {
           repo,
           noteRecords.map(note => ({ path: note.path, restore: note.beforeText }))
         ),
-        attachments: placed
+        attachments: placed,
+        cards: [],
+        mapPaths
       };
-      let rebuildNeeded = ops.length > 0;
+      let rebuildNeeded = ops.length > 0 || cards.length > 0;
       const records: MapRecord[] = [];
       // Ends of relations this step changed; refreshed even when the caller defers the full rebuild.
       const refresh: string[] = [];
@@ -871,6 +939,31 @@ export function begin(deps: TransactionDeps): Transaction {
             authorize();
           }
           await place(owner);
+          // A made note joins `ops` as a create (undo parks it, redo puts it back) and the journal as soon as it exists.
+          for (const item of cards) {
+            const node = await repo.createNote(
+              item.title,
+              item.model,
+              item.map as MapDocument,
+              item.mapPath,
+              item.modelSource,
+              item.initial
+            );
+            const file = repo.file(node.path);
+            journal.cards!.push({ path: node.path, file, text: await repo.app.vault.read(file) });
+            madeCards.push({ key: item.key, node });
+            const note = await repo.readNote(node.path);
+            const op: FileOp = {
+              kind: "create",
+              original: node.path,
+              folder: item.parkFolder,
+              lifecycle: { topicId: item.map.id, mapId: "", state: "unassigned" },
+              previous: { topicId: note.topicId, mapId: note.mapId, state: note.topicState },
+              target: ""
+            };
+            ops.push(op);
+            started.set(node.path, op);
+          }
           for (const note of noteRecords) await note.write(note.path, attachment);
           for (const op of ops) {
             if (op.kind !== "move") continue;
@@ -929,7 +1022,12 @@ export function begin(deps: TransactionDeps): Transaction {
           for (const mapPath of mapPaths) {
             const before = befores.get(mapPath)!;
             const after = clone(before);
-            for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
+            const made: MadeCard = key => {
+              const found = madeCards.find(card => card.key === key);
+              if (!found) throw new Error(`Not a card of this step: ${key}`);
+              return found.node;
+            };
+            for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment, made);
             // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
             pruneAfterText(after);
             await deps.validateStructure?.(before, after);

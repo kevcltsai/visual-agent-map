@@ -970,7 +970,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 /* The cap is 22 body ems; inside the smaller caption paragraph that is 22 / 0.85. */
 .markdown-preview-view.visual-agent-map-node p.vam-picture-paragraph > img { max-height: 25.88em; margin-bottom: 0.5em; }
 /* Picture-book page (a card with a book role, marked on the leaf by styleNodeLeaf): set like a printed page. A serif face (Latin first, then Chinese), a narrower page, paragraphs told apart by a first-line indent instead of a gap, a paper-toned ground. Reading view only. */
-.vam-book-page .markdown-preview-view.visual-agent-map-node { --font-text: "Iowan Old Style", "Palatino Linotype", Georgia, "Songti TC", "Noto Serif TC", "PMingLiU", serif; --file-line-width: 33em; --line-height-normal: 1.9; --h3-size: 1.35em; background-color: color-mix(in srgb, var(--background-primary) 93%, var(--color-yellow)); }
+.vam-book-page .markdown-preview-view.visual-agent-map-node { --font-text: "Iowan Old Style", "Palatino Linotype", Georgia, "Songti TC", "Noto Serif TC", "PMingLiU", serif; --file-line-width: 33em; --line-height-normal: 1.9; --h3-size: 1.35em; background-color: color-mix(in srgb, var(--vam-surface, var(--background-primary)) 93%, var(--color-yellow)); }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h1 { margin-block: 1.2em 1.6em; letter-spacing: 0.12em; text-align: center; }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h2 { margin-block: 2.4em 1em; border-bottom: 0; letter-spacing: 0.3em; text-align: center; }
 .vam-book-page .markdown-preview-view.visual-agent-map-node h3 { margin-block: 2.2em 0.9em; }
@@ -1907,134 +1907,134 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-argument-badge.is-core { border: 1px solid var(--interactive-accent); color: var(--text-accent); }
 /* Picture-book pipeline (03b): toolbar button, top progress bar, card labels. Theme variables only; every state also has a word. */
 .vam-toolbar-actions .vam-book-button { margin-right: 6px; white-space: nowrap; }
-.vam-book-button:focus-visible, .vam-book-bar button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vam-book-bar { flex: 1 1 100%; order: 99; display: grid; gap: 6px; min-width: 0; padding: 8px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
-.vam-book-bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; font-size: var(--font-ui-small); }
+.vam-book-button:focus-visible, .vam-book-bar button:focus-visible { outline: 2px solid var(--vam-accent, var(--interactive-accent)); outline-offset: 2px; }
+.vam-book-bar { flex: 1 1 100%; order: 99; display: grid; gap: 6px; min-width: 0; padding: var(--vam-space-2, 8px) var(--vam-space-3, 12px); border: 1px solid var(--vam-border, var(--background-modifier-border)); border-radius: var(--radius-m); background: var(--background-secondary); }
+.vam-book-bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--vam-space-3, 12px); min-width: 0; font-size: var(--font-ui-small); }
 .vam-book-bar-title { font-weight: 650; }
-.vam-book-bar-counts { flex: 1 1 160px; min-width: 0; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.vam-book-bar-counts { flex: 1 1 160px; min-width: 0; color: var(--vam-muted, var(--text-muted)); font-variant-numeric: tabular-nums; }
 .vam-book-bar-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-.vam-book-bar[data-mode="budget"] .vam-book-bar-counts { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); font-weight: 600; }
-.vam-book-track { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--background-modifier-border); }
+.vam-book-bar[data-mode="budget"] .vam-book-bar-counts { color: color-mix(in srgb, var(--vam-warning, var(--color-orange)) 75%, var(--vam-text, var(--text-normal))); font-weight: 600; }
+.vam-book-track { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--vam-border, var(--background-modifier-border)); }
 .vam-book-seg { display: block; height: 100%; }
 .vam-book-seg.is-checked, .vam-book-legend-item.is-checked::before { background: var(--color-green); }
 .vam-book-seg.is-written, .vam-book-legend-item.is-written::before { background: var(--color-cyan); }
 .vam-book-seg.is-planned, .vam-book-legend-item.is-planned::before { background: var(--color-blue); }
-.vam-book-seg.is-needs-review, .vam-book-legend-item.is-needs-review::before { background: var(--color-orange); }
-.vam-book-seg.is-checked { background: var(--interactive-accent); }
+.vam-book-seg.is-needs-review, .vam-book-legend-item.is-needs-review::before { background: var(--vam-warning, var(--color-orange)); }
+.vam-book-seg.is-checked { background: var(--vam-accent, var(--interactive-accent)); }
 .vam-book-bar[data-mode="stopped"] .vam-book-seg, .vam-book-bar[data-mode="budget"] .vam-book-seg { background: var(--text-faint); }
-.vam-book-now-at { color: var(--text-muted); }
-.vam-book-bar button.vam-book-stop { border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; color: var(--text-muted); }
-.vam-book-bar button.vam-book-stop:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
-.vam-book-bar button.vam-book-settings-view { border: 1px solid var(--background-modifier-border); background: transparent; box-shadow: none; color: var(--text-muted); }
-.vam-book-bar button.vam-book-settings-view:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
-.vam-book-settings-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; margin: 0 0 8px; }
-.vam-book-settings-list dt { color: var(--text-muted); }
+.vam-book-now-at { color: var(--vam-muted, var(--text-muted)); }
+.vam-book-bar button.vam-book-stop { border: 1px solid var(--vam-border, var(--background-modifier-border)); background: transparent; box-shadow: none; color: var(--vam-muted, var(--text-muted)); }
+.vam-book-bar button.vam-book-stop:hover { color: var(--vam-text, var(--text-normal)); background: var(--background-modifier-hover); }
+.vam-book-bar button.vam-book-settings-view { border: 1px solid var(--vam-border, var(--background-modifier-border)); background: transparent; box-shadow: none; color: var(--vam-muted, var(--text-muted)); }
+.vam-book-bar button.vam-book-settings-view:hover { color: var(--vam-text, var(--text-normal)); background: var(--background-modifier-hover); }
+.vam-book-settings-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--vam-space-3, 12px); margin: 0 0 var(--vam-space-2, 8px); }
+.vam-book-settings-list dt { color: var(--vam-muted, var(--text-muted)); }
 .vam-book-settings-list dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .vam-book-settings-list dd.is-empty { color: var(--text-faint); font-style: italic; }
-.vam-book-start-ask { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
+.vam-book-start-ask { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--vam-space-2, 8px); min-width: 0; padding: 10px; border: 1px solid var(--vam-accent, var(--interactive-accent)); border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
 .vam-book-start-ask label { font-weight: 600; }
 .vam-book-start-ask .vam-book-chat-input { min-height: 2.6em; }
-.vam-book-start-advanced { margin-top: 4px; }
-.vam-book-start-advanced > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-small); }
-.vam-book-start-advanced > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vam-book-start-advanced[open] > summary { margin-bottom: 8px; }
-.vam-book-chat-kept { margin: 4px 0 0; color: var(--text-muted); }
+.vam-book-start-advanced { margin-top: var(--vam-space-1, 4px); }
+.vam-book-start-advanced > summary { cursor: pointer; color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-small); }
+.vam-book-start-advanced > summary:focus-visible { outline: 2px solid var(--vam-focus, var(--interactive-accent)); outline-offset: 2px; }
+.vam-book-start-advanced[open] > summary { margin-bottom: var(--vam-space-2, 8px); }
+.vam-book-chat-kept { margin: var(--vam-space-1, 4px) 0 0; color: var(--vam-muted, var(--text-muted)); }
 .vam-book-chat-log { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 260px; overflow-y: auto; }
 .vam-book-chat-log:empty { display: none; }
 .vam-book-chat-me, .vam-book-chat-ed, .vam-book-chat-failed { max-width: 92%; padding: 6px 10px; border-radius: var(--radius-m); font-size: var(--font-ui-small); overflow-wrap: anywhere; }
-.vam-book-chat-me { justify-self: end; background: var(--interactive-accent); color: var(--text-on-accent); }
-.vam-book-chat-ed { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }
+.vam-book-chat-me { justify-self: end; background: var(--vam-accent, var(--interactive-accent)); color: var(--text-on-accent); }
+.vam-book-chat-ed { border: 1px solid var(--vam-border, var(--background-modifier-border)); background: var(--vam-surface, var(--background-primary)); }
 .vam-book-chat-ed b { margin-right: 6px; }
-.vam-book-chat-failed { border: 1px solid var(--background-modifier-border); color: var(--text-warning, var(--text-muted)); }
-.vam-book-chat-undo { margin-left: 6px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--interactive-accent); text-decoration: underline; cursor: pointer; }
-.vam-book-chat-busy { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); }
+.vam-book-chat-failed { border: 1px solid var(--vam-border, var(--background-modifier-border)); color: var(--text-warning, var(--vam-muted, var(--text-muted))); }
+.vam-book-chat-undo { margin-left: 6px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--vam-accent, var(--interactive-accent)); text-decoration: underline; cursor: pointer; }
+.vam-book-chat-busy { margin: 0; font-size: var(--font-ui-small); color: var(--vam-muted, var(--text-muted)); }
 .vam-book-chat-busy.is-empty { display: none; }
 .vam-book-chat-row { align-self: end; display: flex; gap: 6px; align-items: stretch; }
 .vam-book-chat-input { flex: 1 1 0; width: 0; min-width: 0; resize: vertical; }
 .vam-book-chat-send { flex: none; white-space: nowrap; }
-.vam-book-start-edited { margin-left: 6px; font-size: var(--font-ui-smaller); font-weight: 600; color: var(--interactive-accent); }
-.vam-book-plan-hint { padding: 6px 10px; border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); background: color-mix(in srgb, var(--interactive-accent) 14%, transparent); color: var(--text-accent); font-size: var(--font-ui-small); }
-.vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-book-start-edited { margin-left: 6px; font-size: var(--font-ui-smaller); font-weight: 600; color: var(--vam-accent, var(--interactive-accent)); }
+.vam-book-plan-hint { padding: 6px 10px; border-left: 3px solid var(--vam-accent, var(--interactive-accent)); border-radius: var(--radius-s); background: color-mix(in srgb, var(--vam-accent, var(--interactive-accent)) 14%, transparent); color: var(--text-accent); font-size: var(--font-ui-small); }
+.vam-book-legend { display: flex; flex-wrap: wrap; gap: var(--vam-space-1, 4px) var(--vam-space-3, 12px); font-size: var(--font-ui-smaller); color: var(--vam-muted, var(--text-muted)); }
 .vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
-.vam-book-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: var(--font-ui-small); min-width: 0; overflow-wrap: anywhere; }
-.vam-book-start-estimate { margin-block: 8px 10px; color: var(--text-muted); }
-.vam-book-start-settings textarea:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vam-book-start-model-choice { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 12px; margin-bottom: 10px; }
-.vam-book-start-settings label { display: block; margin-top: 8px; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-book-start-model-choice label { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-book-start-model-label { display: flex; align-items: center; gap: 4px; }
-.vam-book-start-info { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 10px; line-height: 1; cursor: help; flex: none; }
-.vam-book-start-info:hover { color: var(--text-normal); border-color: var(--text-normal); }
-.vam-book-start-info:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vam-book-start-model-warning { grid-column: 2; margin-top: -4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-book-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--vam-space-1, 4px) var(--vam-space-3, 12px); font-size: var(--font-ui-small); min-width: 0; overflow-wrap: anywhere; }
+.vam-book-start-estimate { margin-block: var(--vam-space-2, 8px) 10px; color: var(--vam-muted, var(--text-muted)); }
+.vam-book-start-settings textarea:focus-visible { outline: 2px solid var(--vam-accent, var(--interactive-accent)); outline-offset: 2px; }
+.vam-book-start-model-choice { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px var(--vam-space-3, 12px); margin-bottom: 10px; }
+.vam-book-start-settings label { display: block; margin-top: var(--vam-space-2, 8px); font-size: var(--font-ui-small); color: var(--vam-muted, var(--text-muted)); }
+.vam-book-start-model-choice label { margin: 0; font-size: var(--font-ui-small); color: var(--vam-muted, var(--text-muted)); }
+.vam-book-start-model-label { display: flex; align-items: center; gap: var(--vam-space-1, 4px); }
+.vam-book-start-info { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--vam-muted, var(--text-muted)); color: var(--vam-muted, var(--text-muted)); font-size: 10px; line-height: 1; cursor: help; flex: none; }
+.vam-book-start-info:hover { color: var(--vam-text, var(--text-normal)); border-color: var(--vam-text, var(--text-normal)); }
+.vam-book-start-info:focus-visible { outline: 2px solid var(--vam-accent, var(--interactive-accent)); outline-offset: 2px; }
+.vam-book-start-model-warning { grid-column: 2; margin-top: -4px; font-size: var(--font-ui-smaller); color: var(--vam-muted, var(--text-muted)); }
 .vam-book-start-model-warning:empty { display: none; }
-.vam-book-start-suggesting { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-book-start-spinner { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid var(--background-modifier-border); border-top-color: var(--interactive-accent); animation: vam-book-start-spin 0.9s linear infinite; }
+.vam-book-start-suggesting { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--vam-muted, var(--text-muted)); }
+.vam-book-start-spinner { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid var(--vam-border, var(--background-modifier-border)); border-top-color: var(--vam-accent, var(--interactive-accent)); animation: vam-book-start-spin 0.9s linear infinite; }
 .vam-book-start-field-wrap { position: relative; }
 .vam-book-start-shimmer { display: none; }
 .vam-book-start-settings.is-loading .vam-book-start-field:placeholder-shown::placeholder { color: transparent; }
-.vam-book-start-settings.is-loading .vam-book-start-field:placeholder-shown + .vam-book-start-shimmer { display: block; position: absolute; left: 10px; top: 50%; width: 55%; height: 10px; margin-top: -5px; border-radius: 4px; pointer-events: none; background: linear-gradient(90deg, var(--background-modifier-border) 0%, var(--interactive-normal) 50%, var(--background-modifier-border) 100%); background-size: 200% 100%; animation: vam-book-start-shimmer 1.4s ease-in-out infinite; }
+.vam-book-start-settings.is-loading .vam-book-start-field:placeholder-shown + .vam-book-start-shimmer { display: block; position: absolute; left: 10px; top: 50%; width: 55%; height: 10px; margin-top: -5px; border-radius: 4px; pointer-events: none; background: linear-gradient(90deg, var(--vam-border, var(--background-modifier-border)) 0%, var(--interactive-normal) 50%, var(--vam-border, var(--background-modifier-border)) 100%); background-size: 200% 100%; animation: vam-book-start-shimmer 1.4s ease-in-out infinite; }
 @keyframes vam-book-start-spin { to { transform: rotate(360deg); } }
 @keyframes vam-book-start-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .vam-book-start-spinner, .vam-book-start-settings.is-loading .vam-book-start-shimmer { animation: none; } }
-.vam-book-start-hint { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-warning, var(--text-muted)); white-space: pre-line; }
+.vam-book-start-hint { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-warning, var(--vam-muted, var(--text-muted))); white-space: pre-line; }
 .vam-book-start-hint.is-empty { display: none; }
-.vam-book-start-field.vam-book-start-suggested::placeholder { font-style: italic; color: var(--text-muted); opacity: 0.85; }
+.vam-book-start-field.vam-book-start-suggested::placeholder { font-style: italic; color: var(--vam-muted, var(--text-muted)); opacity: 0.85; }
 .vam-book-start-field { width: 100%; resize: vertical; }
-.vam-book-state.is-planned { color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
+.vam-book-state.is-planned { color: color-mix(in srgb, var(--color-blue) 70%, var(--vam-text, var(--text-normal))); }
 .vam-book-state.is-planned::before { background: var(--color-blue); }
-.vam-book-state.is-written { color: color-mix(in srgb, var(--color-cyan) 70%, var(--text-normal)); }
+.vam-book-state.is-written { color: color-mix(in srgb, var(--color-cyan) 70%, var(--vam-text, var(--text-normal))); }
 .vam-book-state.is-written::before { background: var(--color-cyan); }
-.vam-book-state.is-checked { color: color-mix(in srgb, var(--color-green) 70%, var(--text-normal)); }
+.vam-book-state.is-checked { color: color-mix(in srgb, var(--color-green) 70%, var(--vam-text, var(--text-normal))); }
 .vam-book-state.is-checked::before { background: var(--color-green); }
-.vam-book-state.is-needs-review { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
-.vam-book-state.is-needs-review::before { background: var(--color-orange); }
-.vam-book-state.is-pending::before { border: 1.5px solid var(--text-muted); background: transparent; }
-.vam-book-elapsed { margin-left: 4px; font-variant-numeric: tabular-nums; }
-.vam-book-role { display: inline-block; padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
+.vam-book-state.is-needs-review { font-weight: 600; color: color-mix(in srgb, var(--vam-warning, var(--color-orange)) 75%, var(--vam-text, var(--text-normal))); }
+.vam-book-state.is-needs-review::before { background: var(--vam-warning, var(--color-orange)); }
+.vam-book-state.is-pending::before { border: 1.5px solid var(--vam-muted, var(--text-muted)); background: transparent; }
+.vam-book-elapsed { margin-left: var(--vam-space-1, 4px); font-variant-numeric: tabular-nums; }
+.vam-book-role { display: inline-block; padding: 0 6px; border: 1px solid var(--vam-border, var(--background-modifier-border)); border-radius: 4px; font-size: var(--font-ui-smaller); color: var(--vam-muted, var(--text-muted)); white-space: nowrap; }
 .vam-book-summary-prefix { color: var(--text-faint); margin-right: 2px; }
 .vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
-.vam-book-bar button.vam-book-link { padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: var(--text-accent); text-decoration: underline; cursor: pointer; }
+.vam-book-bar button.vam-book-link { padding: 0 var(--vam-space-1, 4px); border: 0; background: transparent; box-shadow: none; color: var(--text-accent); text-decoration: underline; cursor: pointer; }
 .vam-book-bar button.vam-book-link:hover { color: var(--text-accent-hover); }
-.vam-book-structure { display: grid; gap: 6px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
+.vam-book-structure { display: grid; gap: 6px; min-width: 0; padding-top: var(--vam-space-2, 8px); border-top: 1px solid var(--vam-border, var(--background-modifier-border)); font-size: var(--font-ui-small); }
 .vam-book-structure-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.vam-book-structure-sum { color: var(--text-muted); }
+.vam-book-structure-sum { color: var(--vam-muted, var(--text-muted)); }
 .vam-book-structure-list { display: grid; gap: 6px; min-width: 0; }
 .vam-book-structure-accept { margin-left: auto; }
-.vam-book-structure-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); }
-.vam-book-structure-row.is-undone { border-style: dashed; color: var(--text-muted); }
-.vam-book-structure-kind { padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--font-ui-smaller); font-weight: 600; white-space: nowrap; color: var(--text-muted); }
+.vam-book-structure-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--vam-space-1, 4px) 10px; align-items: start; padding: 6px var(--vam-space-2, 8px); border: 1px solid var(--vam-border, var(--background-modifier-border)); border-radius: var(--radius-s); background: var(--vam-surface, var(--background-primary)); }
+.vam-book-structure-row.is-undone { border-style: dashed; color: var(--vam-muted, var(--text-muted)); }
+.vam-book-structure-kind { padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--font-ui-smaller); font-weight: 600; white-space: nowrap; color: var(--vam-muted, var(--text-muted)); }
 .vam-book-structure-kind.is-add { color: var(--color-green); }
 .vam-book-structure-kind.is-move { color: var(--color-blue); }
-.vam-book-structure-kind.is-merge, .vam-book-structure-kind.is-remove { color: var(--color-orange); }
+.vam-book-structure-kind.is-merge, .vam-book-structure-kind.is-remove { color: var(--vam-warning, var(--color-orange)); }
 .vam-book-structure-what { min-width: 0; overflow-wrap: anywhere; }
-.vam-book-structure-why, .vam-book-structure-dep, .vam-book-structure-skipped, .vam-book-structure-foot { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-book-structure-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.vam-book-structure-why, .vam-book-structure-dep, .vam-book-structure-skipped, .vam-book-structure-foot { color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-smaller); }
+.vam-book-structure-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--vam-space-3, 12px); }
 .vam-book-structure-foot button { margin-left: auto; }
-.vam-book-structure-status.is-failed { color: var(--text-error); }
+.vam-book-structure-status.is-failed { color: var(--vam-error, var(--text-error)); }
 .vam-book-structure button[disabled] { opacity: 0.5; cursor: not-allowed; }
-.vam-book-bar-eta { color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
-.vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
-.vam-book-state.is-seam::before { background: var(--color-orange); }
-.vam-book-abandon-card { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
-.vam-book-abandon-card p { margin: 4px 0 8px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-book-bar-eta { color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--vam-warning, var(--color-orange)) 75%, var(--vam-text, var(--text-normal))); }
+.vam-book-state.is-seam::before { background: var(--vam-warning, var(--color-orange)); }
+.vam-book-abandon-card { margin-top: var(--vam-space-2, 8px); padding: 10px var(--vam-space-3, 12px); border: 1px solid var(--vam-border, var(--background-modifier-border)); border-radius: var(--radius-m); background: var(--vam-surface, var(--background-primary)); }
+.vam-book-abandon-card p { margin: var(--vam-space-1, 4px) 0 var(--vam-space-2, 8px); color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-small); }
 .vam-book-abandon-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Zoomed out, the label is dropped and the button sits in the card's bottom-right corner (not on the header row, so it never covers a status label), counter-scaled to a readable icon that stays inside the card. */
 .vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { position: absolute; right: 4px; bottom: 4px; font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.6 / var(--vam-zoom, 1))); transform-origin: right bottom; z-index: 2; }
-.vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
+.vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--vam-text, var(--text-normal))); }
 .vam-book-state.is-rerun::before { background: var(--color-blue); }
-.vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
+.vam-book-menu-note { color: var(--vam-muted, var(--text-muted)); font-size: var(--font-ui-smaller); pointer-events: none; }
 /* The picture-book pipeline's work records (Prompt, proofread result, research notes) are written as [!vam-book] callouts: hidden in reading and live preview, still there in source mode. */
 .callout[data-callout="vam-book"] { display: none; }
 /* ...except the plan blocks the owner reads and edits (the root's book plan, a card's plan): marked by the plan view (book-plan-view.ts). */
 .callout[data-callout="vam-book"].vam-book-plan { display: block; }
 .vam-book-plan .vam-book-plan-hidden { display: none; }
-.vam-book-plan-fold { margin-block: 4px; }
-.vam-book-plan-fold > summary { cursor: pointer; color: var(--text-muted); font-weight: var(--font-semibold); }
-.vam-book-plan-fold > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-book-plan-fold { margin-block: var(--vam-space-1, 4px); }
+.vam-book-plan-fold > summary { cursor: pointer; color: var(--vam-muted, var(--text-muted)); font-weight: var(--font-semibold); }
+.vam-book-plan-fold > summary:focus-visible { outline: 2px solid var(--vam-accent, var(--interactive-accent)); outline-offset: 2px; }
 /* The program's hint in a picture-book chapter is the AI proofread box (below). The old trial note keeps its info look in case a note still carries one. */
 .callout[data-callout="vam-trial"] { --callout-color: var(--color-blue-rgb); --callout-icon: lucide-info; }
 /* The AI proofread box of a chapter (the program's own [!vam-review] kind): purple, set apart from the orange warnings. */
@@ -2043,18 +2043,18 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* The box's hidden %%marker%% lines leave empty paragraphs in reading view: they must not stretch the box into a blank block under its title. */
 .callout[data-callout="vam-review"] .callout-content > p:empty { display: none; }
 .callout[data-callout="vam-review"] .callout-content.vam-review-content-empty { display: none; }
-.view-action.vam-book-apply-notes { width: auto; gap: 4px; padding-inline: 6px; }
+.view-action.vam-book-apply-notes { width: auto; gap: var(--vam-space-1, 4px); padding-inline: 6px; }
 .vam-book-apply-label { font-size: var(--font-ui-smaller); }
-.vam-book-note-selected { margin-block: 0 8px; padding: 4px 8px; border-left: 3px solid var(--interactive-accent); color: var(--text-muted); }
+.vam-book-note-selected { margin-block: 0 var(--vam-space-2, 8px); padding: var(--vam-space-1, 4px) var(--vam-space-2, 8px); border-left: 3px solid var(--vam-accent, var(--interactive-accent)); color: var(--vam-muted, var(--text-muted)); }
 .vam-book-note-problem:empty { display: none; }
-.vam-book-note-problem { color: var(--text-error); margin-block: 4px 0; }
+.vam-book-note-problem { color: var(--vam-error, var(--text-error)); margin-block: var(--vam-space-1, 4px) 0; }
 
 .vam-book-applied { background-color: color-mix(in srgb, var(--color-green) 28%, transparent); border-radius: 2px; }
-.vam-book-state.is-edited { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
-.vam-book-state.is-edited::before { background: var(--color-orange); }
+.vam-book-state.is-edited { font-weight: 600; color: color-mix(in srgb, var(--vam-warning, var(--color-orange)) 75%, var(--vam-text, var(--text-normal))); }
+.vam-book-state.is-edited::before { background: var(--vam-warning, var(--color-orange)); }
 .view-action.vam-book-apply-notes.is-disabled { opacity: 0.5; }
 
-.vam-book-applied-notice { position: fixed; right: 16px; bottom: 16px; z-index: var(--layer-notice); max-width: 360px; padding: 8px 12px; border-radius: var(--radius-m); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); color: var(--text-normal); font-size: var(--font-ui-small); }
+.vam-book-applied-notice { position: fixed; right: 16px; bottom: 16px; z-index: var(--layer-notice); max-width: 360px; padding: var(--vam-space-2, 8px) var(--vam-space-3, 12px); border-radius: var(--radius-m); background: var(--background-secondary); border: 1px solid var(--vam-border, var(--background-modifier-border)); box-shadow: var(--shadow-s); color: var(--vam-text, var(--text-normal)); font-size: var(--font-ui-small); }
 .vam-map-chat-diff-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 
 /* Book figures (```vam-figure): drawn by the plugin from structured data; colours come only from Obsidian's variables. */

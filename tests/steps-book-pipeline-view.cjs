@@ -699,7 +699,7 @@ test('suggestions: one call on the picture model\'s entry with only the root tit
   }
   assert.ok(!texts(modal.modalEl).includes('AI 正在依主題想建議，好了會自動填進下面的框'), 'the waiting line is gone');
   // The grey italic look is real CSS on the placeholder (computed look: checked live).
-  assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--text-muted\)/);
+  assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--vam-muted, var\(--text-muted\)\)/);
   modal.close();
 });
 
@@ -846,7 +846,7 @@ test('start card (2026-11-23 mockup 10, 11): an ⓘ beside each model label expl
   assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-spinner')), undefined);
   assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader);
   // Motion is CSS, with Obsidian variables, and stops for reduced motion.
-  assert.match(css, /\.vam-book-start-spinner \{[^}]*border-top-color: var\(--interactive-accent\)[^}]*animation: vam-book-start-spin/);
+  assert.match(css, /\.vam-book-start-spinner \{[^}]*border-top-color: var\(--vam-accent, var\(--interactive-accent\)\)[^}]*animation: vam-book-start-spin/);
   assert.match(css, /\.is-loading \.vam-book-start-field:placeholder-shown \+ \.vam-book-start-shimmer \{[^}]*animation: vam-book-start-shimmer/);
   const wraps = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-field-wrap'));
   assert.ok(wraps.length > 0, 'the fields have wrappers');

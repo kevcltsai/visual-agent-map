@@ -130,13 +130,14 @@ test('P3.9 load: a vault with a stale Living card makes no AI call and writes no
   assert.deepEqual(writes, [], 'unload writes nothing');
 });
 
-test('DX-orphan startup: adoption waits for the layout (the vault folder scan), adopts a crash-orphaned note once before ready, and a note staged afterwards is not adopted by vault events or a mutate', async () => {
+/** A plugin over a fixture vault holding one crash orphan; the layout callbacks are held until the test fires them. */
+async function bootWithOrphan(migrated, { hideUntilScanned }) {
   const f = S.fixture('en');
   const mapPath = await f.repo.createMap('Crashed batch'), doc = await f.repo.readMap(mapPath);
   const orphan = await f.repo.createNote('Night market', 'a', doc, mapPath, 'workspace');
   const handlers = [], adoptCalls = [], layoutCallbacks = [];
   // Cold start: Obsidian is still scanning the vault folder, so the note added while VAM was closed is not listed yet.
-  let scanned = false;
+  const state = { scanned: !hideUntilScanned };
   const bare = new lifecycle.default();
   // The repository is built inside onload: wrap adoption the moment it is assigned, so the startup call is seen too.
   let repo;
@@ -150,36 +151,49 @@ test('DX-orphan startup: adoption waits for the layout (the vault folder scan), 
   const on = (name, handler) => { handlers.push([name, handler]); return {}; };
   plugin.app = { ...f.app, fileManager: f.app.fileManager,
     metadataCache: { ...f.app.metadataCache, on: () => ({}) },
-    vault: { ...f.app.vault, on, getMarkdownFiles: () => f.app.vault.getMarkdownFiles().filter(file => scanned || file.path !== orphan.path) },
+    vault: { ...f.app.vault, on, getMarkdownFiles: () => f.app.vault.getMarkdownFiles().filter(file => state.scanned || file.path !== orphan.path) },
     workspace: { onLayoutReady: callback => layoutCallbacks.push(callback), on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: false }, loadLocalStorage: () => null, saveLocalStorage() {} };
-  // Not yet migrated: the startup rebuild runs too, and must find the orphan already listed.
-  plugin.loadData = async () => ({ migrated: false, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
+  plugin.loadData = async () => ({ migrated, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
   plugin.saveData = async () => {};
   plugin.addCommand = command => command;
   const logs = [];
   plugin.logs = { appendLog: (level, line) => logs.push([level, line]), dispose() {} };
   await plugin.onload();
-  await delay(20);
-  assert.equal(adoptCalls.length, 0, 'nothing is adopted while the layout is not ready');
-  scanned = true;
-  for (const callback of layoutCallbacks) callback();
-  await plugin.ready;
-  assert.equal(adoptCalls.length, 1, 'adoption ran exactly once, after the layout was ready');
-  const map = await f.repo.readMap(mapPath);
-  assert.ok(map.nodes.some(node => node.id === orphan.id), 'the orphan is listed in Map.md once ready resolves');
-  assert.match(f.contents.get(orphan.path), /agent-map-id: /, 'its map id survived the startup rebuild');
-  assert.ok(logs.some(([, line]) => /Recovered 1 card note/.test(line)), 'the adoption is logged');
+  return { f, mapPath, orphan, plugin, bare, handlers, adoptCalls, layoutCallbacks, state, logs, fireLayout: () => { for (const callback of layoutCallbacks) callback(); } };
+}
+const resolvedNow = async promise => { let done = false; promise.then(() => { done = true; }); await delay(20); return done; };
+
+test('DX-orphan startup (migrated vault): ready does not wait for the layout; adoption runs after it, once, and a note staged later is not adopted by vault events or a mutate', async () => {
+  const t = await bootWithOrphan(true, { hideUntilScanned: true });
+  assert.equal(await resolvedNow(t.plugin.ready), true, 'ready resolves while the layout is not ready (a view tab awaits it in onOpen)');
+  assert.equal(t.adoptCalls.length, 0, 'nothing is adopted before the layout is ready');
+  assert.equal(await resolvedNow(t.plugin.orphansAdopted), false, 'orphansAdopted is still pending');
+  t.state.scanned = true;
+  t.fireLayout();
+  await t.plugin.orphansAdopted;
+  assert.equal(t.adoptCalls.length, 1, 'adoption ran exactly once, after the layout was ready');
+  assert.ok((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === t.orphan.id), 'the orphan is listed in Map.md');
+  assert.ok(t.logs.some(([, line]) => /Recovered 1 card note/.test(line)), 'the adoption is logged');
   // A chat batch is now staging: the note is written, Map.md does not list it yet.
-  const staged = await f.repo.createNote('Staged card', 'a', await f.repo.readMap(mapPath), mapPath, 'workspace');
-  const mapBefore = f.contents.get(mapPath);
-  const file = f.app.vault.getAbstractFileByPath(staged.path);
-  assert.ok(handlers.length > 0, 'the plugin registered vault handlers');
-  for (const [name, handler] of handlers) if (name === 'create' || name === 'modify') { try { await handler(file); } catch { /* a handler needing a view is irrelevant here */ } }
-  await plugin.mutate(async () => {});
-  assert.equal(adoptCalls.length, 1, 'no vault event or mutate ran adoption again');
-  assert.equal(f.contents.get(mapPath), mapBefore, 'Map.md is unchanged while the batch is staging');
-  assert.equal((await f.repo.readMap(mapPath)).nodes.some(node => node.id === staged.id), false);
-  bare.onunload();
+  const staged = await t.f.repo.createNote('Staged card', 'a', await t.f.repo.readMap(t.mapPath), t.mapPath, 'workspace');
+  const mapBefore = t.f.contents.get(t.mapPath);
+  const file = t.f.app.vault.getAbstractFileByPath(staged.path);
+  assert.ok(t.handlers.length > 0, 'the plugin registered vault handlers');
+  for (const [name, handler] of t.handlers) if (name === 'create' || name === 'modify') { try { await handler(file); } catch { /* a handler needing a view is irrelevant here */ } }
+  await t.plugin.mutate(async () => {});
+  assert.equal(t.adoptCalls.length, 1, 'no vault event or mutate ran adoption again');
+  assert.equal(t.f.contents.get(t.mapPath), mapBefore, 'Map.md is unchanged while the batch is staging');
+  assert.equal((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === staged.id), false);
+  t.bare.onunload();
+});
+
+test('DX-orphan startup (unmigrated vault): adoption runs inside ready, before the migrate rebuild strips the orphan\'s map id, without waiting for the layout', async () => {
+  const t = await bootWithOrphan(false, { hideUntilScanned: false });
+  await t.plugin.ready;
+  assert.equal(t.layoutCallbacks.length > 0 && t.adoptCalls.length, 1, 'adopted once, with the layout callbacks still held');
+  assert.ok((await t.f.repo.readMap(t.mapPath)).nodes.some(node => node.id === t.orphan.id), 'the orphan is listed');
+  assert.match(t.f.contents.get(t.orphan.path), /agent-map-id: /, 'its map id survived the startup rebuild');
+  t.bare.onunload();
 });
 
 test('P3.9 unload: a Living result that arrives after unload, and unload itself, make no vault create, modify or delete', async () => {

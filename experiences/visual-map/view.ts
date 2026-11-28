@@ -25389,6 +25389,8 @@ export class VisualAgentMapView extends ItemView {
     // The copy belongs to the same round: its chip paths are the request's, not the latest message's.
     const chips = this.chatChipPaths.get(baseline);
     if (chips) this.chatChipPaths.set(own, chips);
+    // Cards are staged only after startup adoption has settled, or it could list a staged note whose Map.md write is pending.
+    await this.plugin.orphansAdopted;
     // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;

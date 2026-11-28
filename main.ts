@@ -255,6 +255,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     save: () => this.saveSettings()
   });
   ready: Promise<void> = Promise.resolve();
+  /** Settles once startup adoption of crash-orphaned card notes is done; a chat batch waits for it before staging cards. */
+  orphansAdopted: Promise<void> = Promise.resolve();
   /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
@@ -1418,27 +1420,28 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     this.repo = new Repository(this.app, this.settings, recovery);
     this.repo.onUnreadableMaps = failures => this.reportUnreadableMaps(failures);
-    // First, before any rebuildDerivedData (it strips the map id from notes no map lists) and before a chat batch can
-    // start: takes back card notes whose Map.md write a crash cut off. It waits for the layout: until then Obsidian is
-    // still scanning the vault folder, so a note added while VAM was closed is not in the file list yet. Views that
-    // opened meanwhile re-read the map through mutate. A failure is logged by mutate, not fatal.
-    const layoutReady = new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve));
-    const adoptOrphans = layoutReady
-      .then(() =>
-        this.mutate(async () => {
-          const adopted = await this.repo.adoptOrphanNodeNotes({
-            skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
-            failed: (mapPath, error) =>
-              this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
-          });
-          if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
-        })
-      )
-      .catch(() => undefined);
+    // Takes back card notes whose Map.md write a crash cut off, before any rebuildDerivedData strips their map id and
+    // before a chat batch stages cards (the view awaits `orphansAdopted` first). `ready` does not wait for the layout:
+    // Obsidian sets layoutReady only after every visible VAM tab opened, and a tab's onOpen awaits `ready`. So a vault
+    // already migrated adopts on layout ready, when Obsidian has finished scanning the vault folder (a note added while VAM
+    // was closed is not in the file list before that). An unmigrated vault adopts at once, ahead of its migrate and rebuild,
+    // inside `ready`. A failure is logged by mutate, not fatal; views open meanwhile re-read the map through mutate.
+    const adopt = (): Promise<void> =>
+      this.mutate(async () => {
+        const adopted = await this.repo.adoptOrphanNodeNotes({
+          skipped: path => this.logs.appendLog("warn", t("log.orphan_note_skipped_duplicate_id_0", path)),
+          failed: (mapPath, error) =>
+            this.logs.appendLog("warn", `${mapPath}: ${error instanceof Error ? error.message : String(error)}`)
+        });
+        if (adopted) this.logs.appendLog("warn", t("log.adopted_orphan_notes_0", String(adopted)));
+      }).catch(() => undefined);
+    this.orphansAdopted = this.settings.migrated
+      ? new Promise<void>(resolve => this.app.workspace.onLayoutReady(resolve)).then(adopt)
+      : adopt();
     const initialize = (
       this.settings.migrated
-        ? adoptOrphans
-        : adoptOrphans
+        ? Promise.resolve()
+        : this.orphansAdopted
             .then(() => this.repo.migrate())
             .then(async () => {
               await this.repo.rebuildDerivedData();

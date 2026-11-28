@@ -1989,8 +1989,8 @@ export class Repository {
       if (!mapId || text(fm["topic-state"], "active") !== "active") continue;
       candidates.push({ path: file.path, id: text(fm["node-id"]), mapId });
     }
-    // The original wins an id collision: a "name (1)" or conflict copy sorts after the file it copies.
-    const copyLike = (path: string): boolean => /(?: \(\d+\)\.md|conflict[^/]*\.md)$/i.test(path);
+    // The original wins an id collision: a "name (1)", iCloud "name 2" or conflict copy sorts after the file it copies.
+    const copyLike = (path: string): boolean => /(?: \(\d+\)| \d+)\.md$|conflict[^/]*\.md$/i.test(path);
     candidates.sort((a, b) => Number(copyLike(a.path)) - Number(copyLike(b.path)) || a.path.localeCompare(b.path));
     let adopted = 0;
     for (const { file, map } of maps) {

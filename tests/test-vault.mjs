@@ -6,14 +6,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, ensureSessionProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, assertContainsOriginMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, ensureSessionProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, runHarnessCli, greenInstallRun, prepareSessionCandidate, assertSessionOwner, withSessionLock, sessionDisableExpression, reloadSessionVault, reloadPluginExpression, reloadRunningPlugin, ensureTestApp, testAppBundleId, launchArgs } from '../scripts/test-harness.mjs';
 import { fetchDepsTable, refreshDepsTable } from '../scripts/test-affected.mjs';
 import { typecheckArgs } from '../scripts/build-product.mjs';
 import { viewerCacheEnabled, viewerInputs, viewerCacheKey, viewerCacheHit, readViewerCache, saveViewerCache } from '../scripts/viewer-cache.mjs';
 import { generatedConflictPlan } from '../scripts/resolve-generated-conflicts.mjs';
 import { matchingEvidence, recordDevEvent } from '../scripts/dev-metrics.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
-import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
+import { policyAction, applyPolicy, policyExpression, parseFrontApp } from '../scripts/keep-background.mjs';
 
 function environment(t) {
   const folder = mkdtempSync(join(tmpdir(), 'vam-harness-test-'));
@@ -946,4 +946,33 @@ test('session reload CDP guard really executes: only an idle correct instance is
     assert.notEqual((await execute(state)).status, 'disabled');
     assert.deepEqual(state.calls, []);
   }
+});
+
+test('front app is read from both lsappinfo formats', () => {
+  assert.deepEqual(parseFrontApp('"pid"=828\n"LSBundlePath"="/Applications/LINE.app"\n'), { pid: 828, path: '/Applications/LINE.app' });
+  const macos27 = '[ NULL ]  ASN:0x0-0x15015: (in front) \n    bundleID=[ NULL ] \n    bundle path="/Applications/LINE.app"\n    executable path=[ NULL ] \n    pid = 828 !cgsConnection !signalled type=[ NULL ]\n';
+  assert.deepEqual(parseFrontApp(macos27), { pid: 828, path: '/Applications/LINE.app' });
+  assert.ok(Number.isNaN(parseFrontApp('').pid));
+});
+
+test('test Obsidian runs from a background-only copy with a mock keychain', { skip: process.platform !== 'darwin' && 'macOS bundle tools' }, t => {
+  const folder = mkdtempSync(join(tmpdir(), 'vam-test-app-'));
+  t.after(() => rmSync(folder, { recursive: true, force: true }));
+  const source = join(folder, 'Obsidian.app');
+  mkdirSync(join(source, 'Contents', 'MacOS'), { recursive: true });
+  copyFileSync('/usr/bin/true', join(source, 'Contents', 'MacOS', 'Obsidian'));
+  writeFileSync(join(source, 'Contents', 'Info.plist'), '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>md.obsidian</string><key>CFBundleExecutable</key><string>Obsidian</string><key>CFBundleVersion</key><string>1.2.3</string></dict></plist>');
+  const copies = join(folder, 'copies');
+  const app = ensureTestApp(source, copies);
+  assert.equal(app, join(copies, 'Obsidian-1.2.3.app'));
+  const read = key => execFileSync('plutil', ['-extract', key, 'raw', join(app, 'Contents', 'Info.plist')], { encoding: 'utf8' }).trim();
+  assert.equal(read('CFBundleIdentifier'), testAppBundleId);
+  assert.equal(read('LSBackgroundOnly'), 'true');
+  assert.match(readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8'), /<string>md\.obsidian<\/string>/, 'the installed Obsidian is never changed');
+  execFileSync('codesign', ['-v', app]);
+  assert.equal(ensureTestApp(source, copies), app, 'an existing copy for the same build is reused');
+  assert.deepEqual(readdirSync(copies), ['Obsidian-1.2.3.app'], 'no staging folder is left behind');
+  const args = launchArgs(app, '/private/tmp/vam-e2e-x/.vam-app');
+  assert.equal(args[args.indexOf('-a') + 1], app);
+  assert.ok(args.includes('--use-mock-keychain') && args.includes('--password-store=basic'));
 });

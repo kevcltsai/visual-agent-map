@@ -195,6 +195,11 @@ export class LivingReaderView extends ItemView {
         void this.paint();
       });
     }
+    if (!this.draft) {
+      // Hand edits happen in the native editor; this is the visible, keyboard-reachable way there.
+      const edit = host.createEl("button", { text: t("ui.living_node_open_in_editor"), attr: { type: "button" } });
+      edit.addEventListener("click", () => void this.leaf.openFile(file));
+    }
     if (this.tab === "trial") {
       host.createDiv({
         cls: "vam-living-reader-banner",

@@ -1,5 +1,6 @@
 import { isSearchNotPerformed } from "../../ai/search-not-performed";
 import { t, type TranslationKey } from "../../i18n";
+import { isNetworkFailure } from "./living-node-state";
 
 /** A bare error code such as "required-web-unavailable"; anything longer or free-form may carry private text. */
 const CODE = /^[a-z][a-z0-9-]{1,63}$/;
@@ -24,6 +25,7 @@ export function livingTrialReason(error: unknown): { key: TranslationKey; reason
     if (/^(unauthorized-source|missing-source|invalid-source)$/.test(code))
       return "ui.living_node_reason_missing_source";
     if (code) return "ui.living_node_trial_reason_validation";
+    if (isNetworkFailure(error)) return "ui.living_node_trial_reason_network";
     if (/time.?out|timed out/i.test(message)) return "ui.living_node_trial_reason_timeout";
     return "ui.living_node_trial_reason_provider";
   })();

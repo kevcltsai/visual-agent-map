@@ -217,7 +217,7 @@ test('setup window: a relabel puts the focus back on the equivalent rebuilt cont
 const reasonModule = require('./support-replay.cjs').loadSource(`
 export { livingTrialReason } from "./experiences/visual-map/living-node-trial-reason";
 export { LivingTrial } from "./experiences/visual-map/living-node-trial";
-export { setUiLanguage } from "./i18n";
+export { setUiLanguage, t } from "./i18n";
 export { searchNotPerformedError } from "./ai/search-not-performed";
 export { livingSnapshotRevision } from "./experiences/visual-map/living-node-markdown";
 `, { obsidian: S.obsidian });
@@ -280,9 +280,23 @@ test('trial failure (D1-x5b): a real trial whose runtime did not search ends wit
   const web = await run(reasonModule.searchNotPerformedError());
   assert.equal(web.key, 'ui.living_node_trial_reason_web');
   assert.equal(web.code, '', 'the sentence is never shown as a code');
-  const provider = await run(new Error('connect ECONNRESET /Users/me/secret'));
+  const provider = await run(new Error('connect EPROTO /Users/me/secret'));
   assert.equal(provider.key, 'ui.living_node_trial_reason_provider');
   assert.equal(provider.code, '');
+  // D1-x11: a network failure is its own class, for the trial; no path or raw text reaches the reason or the code.
+  const networkErrors = [new Error('connect ECONNRESET /Users/me/secret'), Object.assign(new Error('fetch failed'), { cause: new Error('getaddrinfo ENOTFOUND /Users/me/secret') }), new Error('connect ETIMEDOUT /Users/me/secret')];
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    reasonModule.setUiLanguage(language);
+    for (const error of networkErrors) {
+      const network = await run(error);
+      assert.equal(network.key, 'ui.living_node_trial_reason_network', language + ' ' + error.message);
+      assert.equal(network.code, '');
+      assert.doesNotMatch(network.reason + network.code, /secret|\/Users|ECONN|ENOTFOUND|ETIMEDOUT|fetch failed/);
+      assert.notEqual(network.reason, reasonModule.t('ui.living_node_trial_reason_provider'));
+    }
+  }
+  reasonModule.setUiLanguage('en');
+  assert.match((await run(networkErrors[0])).reason, /network/i);
 });
 
 test('setup window: an open failure follows a language change (zh-TW, en, zh-CN)', () => {
@@ -392,4 +406,30 @@ test('D1-x11: the official tab shows the frontmatter summary when the note has n
   assert.equal(withSection.includes('STUB FIXED lighthouse built 1887, 31 m.\n\n## '), false);
   const plainNote = await officialMarkdown('---\ntitle: x\nsummary: "ignored"\n---\n# x\n');
   assert.equal(plainNote.includes('ignored'), false, 'a note that is not a Living card is left alone');
+});
+
+test('D1-x11: the reader has a keyboard-operable "Open in editor" entry that opens the note natively; none for an unsaved draft', async () => {
+  const view = require('./support-replay.cjs').loadSource(`
+export { LivingReaderView } from "./experiences/visual-map/living-node-reader";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian, Component: class { load() {} unload() {} }, ItemView: class { constructor() { this.contentEl = element('div'); this.app = { vault: { read: async () => '' } }; } }, MarkdownRenderer: { render: async () => {} } } });
+  const opened = [];
+  const entry = reader => findAll(reader.contentEl, i => i.tag === 'button' && i.attrs?.role !== 'tab');
+  for (const [language, label] of [['en', 'Open in editor'], ['zh-TW', '在編輯器開啟'], ['zh-CN', '在编辑器打开']]) {
+    view.setUiLanguage(language);
+    try {
+      const reader = new view.LivingReaderView({});
+      reader.leaf = { async openFile(file) { opened.push(file.path); } };
+      await reader.showOfficial({ path: 'a.md' });
+      const buttons = entry(reader).filter(b => b.text === label);
+      assert.equal(buttons.length, 1, language);
+      assert.equal(buttons[0].attrs.type, 'button', 'a real button: reachable and operable by keyboard');
+      buttons[0].click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const draft = new view.LivingReaderView({});
+      await draft.show({ path: 'd.md' }, 'preview', 'owner', [], false, undefined, true);
+      assert.equal(entry(draft).filter(b => b.text === label).length, 0, 'an unsaved draft has no note to open');
+    } finally { view.setUiLanguage('en'); }
+  }
+  assert.deepEqual(opened, ['a.md', 'a.md', 'a.md']);
 });

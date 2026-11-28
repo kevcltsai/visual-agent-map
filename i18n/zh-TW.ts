@@ -1196,6 +1196,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.living_node_trial_failed_title": "試跑沒有完成",
   "ui.living_node_trial_failed_note": "目前顯示的預覽不是這次試跑的結果。",
   "ui.living_node_trial_reason_provider": "AI 服務失敗或沒有回應。",
+  "ui.living_node_trial_reason_network": "網路連線失敗，請檢查網路後重試。",
+  "ui.living_node_open_in_editor": "在編輯器開啟",
   "ui.living_node_trial_reason_timeout": "AI 回應太久，已逾時。",
   "ui.living_node_trial_reason_web": "這張卡需要網路搜尋，但沒有使用到搜尋結果。",
   "ui.living_node_trial_reason_replaced": "試跑期間來源筆記被替換或改動。",
